@@ -116,8 +116,10 @@ func (uaq *unlockedActiveQueue) has(pInfo *framework.QueuedPodInfo) bool {
 type backoffQPopper interface {
 	// popBackoff pops the pInfo from the podBackoffQ.
 	popBackoff() (*framework.QueuedPodInfo, error)
+	unlockedPopBackoff() (*framework.QueuedPodInfo, error)
 	// len returns length of the podBackoffQ queue.
 	lenBackoff() int
+	unlockedLenBackoff() int
 }
 
 // activeQueue implements activeQueuer. All of the fields have to be protected using the lock.
@@ -128,7 +130,7 @@ type activeQueue struct {
 	// You should always take "SchedulingQueue.lock" first, otherwise the queue could end up in deadlock.
 	// "lock" should not be taken after taking "backoffQueue.lock" or "nominator.nLock".
 	// Correct locking order is: SchedulingQueue.lock > lock > backoffQueue.lock > nominator.nLock.
-	lock sync.RWMutex
+	lock *sync.RWMutex
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
@@ -186,8 +188,9 @@ type activeQueue struct {
 	backoffQPopper backoffQPopper
 }
 
-func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
+func newActiveQueue(lock *sync.RWMutex, queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
 	aq := &activeQueue{
+		lock:                         lock,
 		queue:                        queue,
 		inFlightPods:                 make(map[types.UID]*list.Element),
 		inFlightEvents:               list.New(),
@@ -196,7 +199,7 @@ func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueu
 		unlockedQueue:                newUnlockedActiveQueue(queue),
 		backoffQPopper:               backoffQPopper,
 	}
-	aq.cond.L = &aq.lock
+	aq.cond.L = aq.lock
 
 	return aq
 }
@@ -256,7 +259,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 	for aq.queue.Len() == 0 {
 		// backoffQPopper is non-nil only if SchedulerPopFromBackoffQ feature is enabled.
 		// In case of non-empty backoffQ, try popping from there.
-		if aq.backoffQPopper != nil && aq.backoffQPopper.lenBackoff() != 0 {
+		if aq.backoffQPopper != nil && aq.backoffQPopper.unlockedLenBackoff() != 0 {
 			break
 		}
 		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
@@ -274,7 +277,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 			return nil, err
 		}
 		// Try to pop from backoffQ when activeQ is empty.
-		pInfo, err = aq.backoffQPopper.popBackoff()
+		pInfo, err = aq.backoffQPopper.unlockedPopBackoff()
 		if err != nil {
 			return nil, err
 		}

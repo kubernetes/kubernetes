@@ -65,10 +65,12 @@ type backoffQueuer interface {
 	// delete deletes the pInfo from backoffQueue.
 	// It returns true if the pod was deleted.
 	delete(pInfo *framework.QueuedPodInfo) bool
+	unlockedDelete(pInfo *framework.QueuedPodInfo) bool
 	// get returns the pInfo matching given pInfoLookup, if exists.
 	get(pInfoLookup *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
 	// has inform if pInfo exists in the queue.
 	has(pInfo *framework.QueuedPodInfo) bool
+	unlockedHas(pInfo *framework.QueuedPodInfo) bool
 	// list returns all pods that are in the queue.
 	list() []*v1.Pod
 	// len returns length of the queue.
@@ -84,7 +86,7 @@ type backoffQueue struct {
 	// You should always take "SchedulingQueue.lock" and "activeQueue.lock" first, otherwise the queue could end up in deadlock.
 	// "lock" should not be taken after taking "nominator.nLock".
 	// Correct locking order is: SchedulingQueue.lock > activeQueue.lock > lock > nominator.nLock.
-	lock sync.RWMutex
+	lock *sync.RWMutex
 
 	clock clock.WithTicker
 
@@ -105,8 +107,9 @@ type backoffQueue struct {
 	isPopFromBackoffQEnabled bool
 }
 
-func newBackoffQueue(clock clock.WithTicker, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration, activeQLessFn framework.LessFunc, popFromBackoffQEnabled bool) *backoffQueue {
+func newBackoffQueue(lock *sync.RWMutex, clock clock.WithTicker, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration, activeQLessFn framework.LessFunc, popFromBackoffQEnabled bool) *backoffQueue {
 	bq := &backoffQueue{
+		lock:                     lock,
 		clock:                    clock,
 		podInitialBackoff:        podInitialBackoffDuration,
 		podMaxBackoff:            podMaxBackoffDuration,
@@ -344,6 +347,10 @@ func (bq *backoffQueue) delete(pInfo *framework.QueuedPodInfo) bool {
 	bq.lock.Lock()
 	defer bq.lock.Unlock()
 
+	return bq.unlockedDelete(pInfo)
+}
+
+func (bq *backoffQueue) unlockedDelete(pInfo *framework.QueuedPodInfo) bool {
 	if bq.podBackoffQ.Delete(pInfo) == nil {
 		return true
 	}
@@ -357,6 +364,10 @@ func (bq *backoffQueue) popBackoff() (*framework.QueuedPodInfo, error) {
 	bq.lock.Lock()
 	defer bq.lock.Unlock()
 
+	return bq.unlockedPopBackoff()
+}
+
+func (bq *backoffQueue) unlockedPopBackoff() (*framework.QueuedPodInfo, error) {
 	return bq.podBackoffQ.Pop()
 }
 
@@ -377,6 +388,11 @@ func (bq *backoffQueue) has(pInfo *framework.QueuedPodInfo) bool {
 	bq.lock.RLock()
 	defer bq.lock.RUnlock()
 
+	return bq.podBackoffQ.Has(pInfo) || bq.podErrorBackoffQ.Has(pInfo)
+}
+
+// has inform if pInfo exists in the queue.
+func (bq *backoffQueue) unlockedHas(pInfo *framework.QueuedPodInfo) bool {
 	return bq.podBackoffQ.Has(pInfo) || bq.podErrorBackoffQ.Has(pInfo)
 }
 
@@ -408,5 +424,10 @@ func (bq *backoffQueue) lenBackoff() int {
 	bq.lock.RLock()
 	defer bq.lock.RUnlock()
 
+	return bq.unlockedLenBackoff()
+}
+
+// lenBackoff returns length of the podBackoffQ.
+func (bq *backoffQueue) unlockedLenBackoff() int {
 	return bq.podBackoffQ.Len()
 }
