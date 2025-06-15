@@ -64,7 +64,7 @@ func Example() {
 		// everything that comes in.
 		Process: func(obj interface{}, isInInitialList bool) error {
 			// Obj is from the Pop method of the Queue we make above.
-			newest := obj.(Deltas).Newest()
+			newest := obj.([]Deltas)[0].Newest()
 
 			if newest.Type != Deleted {
 				// Update our downstream store.
