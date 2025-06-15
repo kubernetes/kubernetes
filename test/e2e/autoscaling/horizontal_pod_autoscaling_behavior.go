@@ -545,6 +545,72 @@ var _ = SIGDescribe(feature.HPAConfigurableTolerance, framework.WithFeatureGate(
 				gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
 			})
 		})
+
+		ginkgo.Describe("with large scale-up, small scale-down tolerances", func() {
+			ginkgo.It("should not scale", func(ctx context.Context) {
+				ginkgo.By("setting up resource consumer and HPA")
+				initPods := 1
+				initCPUUsageTotal := usageForReplicas(initPods)
+
+				rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
+					hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+					initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
+					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+				)
+				ginkgo.DeferCleanup(rc.CleanUp)
+
+				scaleUpRule := e2eautoscaling.HPAScalingRuleWithToleranceMilli(300)  // 30%
+				scaleDownRule := e2eautoscaling.HPAScalingRuleWithToleranceMilli(20) // 2%
+				hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
+					rc, int32(targetCPUUtilizationPercent), 1, 10,
+					e2eautoscaling.HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule),
+				)
+				ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
+
+				ginkgo.By("trying to trigger scale up to 12 replicas")
+				rc.ConsumeCPU(usageForReplicas(12))
+				waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
+
+				ginkgo.By("waiting for replicas to scale up")
+				waitStart := time.Now()
+				rc.WaitForReplicas(ctx, 12, waitDeadline)
+				timeWaited := time.Now().Sub(waitStart)
+				framework.Logf("time waited for scale up: %s", timeWaited)
+				gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
+
+				// Increase resource usage so match 14 replicas. Should not scale up
+				// as this in scale-up tolerance.
+
+				ginkgo.By("trying to trigger scale up to 14 replicas")
+				rc.ConsumeCPU(usageForReplicas(14))
+				waitStart = time.Now()
+
+				rc.EnsureDesiredReplicasInRange(ctx, 12, 12, waitDeadline, hpa.Name)
+				timeWaited = time.Now().Sub(waitStart)
+
+				ginkgo.By("verifying time waited for a scale up to 14 replicas")
+				framework.Logf("time waited for scale up: %s", timeWaited)
+				gomega.Expect(timeWaited).To(gomega.BeNumerically(">", waitDeadline), "waited %s, wanted to wait more than %s", timeWaited, waitDeadline)
+
+				ginkgo.By("verifying number of replicas is still 12")
+				replicas, err := rc.GetReplicas(ctx)
+				framework.ExpectNoError(err)
+				gomega.Expect(replicas).To(gomega.BeNumerically("==", 12), "had %s replicas, still have %s replicas after time deadline", 12, replicas)
+
+				// Decrease resource usage so match 11 replicas. Should scale down despite this
+				// being a 9% change only, as scale-down tolerance has been set to 2%.
+
+				ginkgo.By("triggering scale down by lowering consumption")
+				rc.ConsumeCPU(usageForReplicas(11))
+
+				ginkgo.By("waiting for replicas to scale downd")
+				waitStart = time.Now()
+				rc.WaitForReplicas(ctx, 11, waitDeadline)
+				timeWaited = time.Now().Sub(waitStart)
+				framework.Logf("time waited for scale down: %s", timeWaited)
+				gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
+			})
+		})
 	})
 
 // usageForReplicas returns usage for (n - 0.5) replicas as if they would consume all CPU
