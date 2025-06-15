@@ -107,8 +107,8 @@ func (e *Error) ErrorBody() string {
 			s = fmt.Sprintf("%s: %s", e.Type, valstr)
 		}
 	default:
-		// NOTE: This panics if we find a code that truly is not supported.
-		s = e.Type.String()
+		internal := InternalError(nil, fmt.Errorf("unhandled error code: %s: please report this", e.Type))
+		s = internal.ErrorBody()
 	}
 	if len(e.Detail) != 0 {
 		s += fmt.Sprintf(": %s", e.Detail)
@@ -195,7 +195,7 @@ func (t ErrorType) String() string {
 	case ErrorTypeTypeInvalid:
 		return "Invalid value"
 	default:
-		panic(fmt.Sprintf("unrecognized validation error: %q", string(t)))
+		return fmt.Sprintf("<unknown error %q>", string(t))
 	}
 }
 

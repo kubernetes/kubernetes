@@ -630,6 +630,17 @@ func TestErrorFormatting(t *testing.T) {
 			CoveredByDeclarative: true,
 		},
 		expect: `path.to.field: Invalid value: field.SelfMarshalerNonStringer{S:"visible"}: the details`,
+	}, {
+		name: "unknown error type",
+		input: &Error{
+			Type:                 "not real",
+			Field:                "path.to.field",
+			BadValue:             SelfMarshalerNonStringer{"visible"},
+			Detail:               "the details",
+			Origin:               "theOrigin",
+			CoveredByDeclarative: true,
+		},
+		expect: `path.to.field: Internal error: unhandled error code: <unknown error "not real">: please report this: the details`,
 	}}
 
 	for _, tc := range cases {
