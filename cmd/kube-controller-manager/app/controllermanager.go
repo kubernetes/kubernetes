@@ -239,7 +239,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 	saTokenControllerDescriptor := newServiceAccountTokenControllerDescriptor(rootClientBuilder)
 
-	run := func(ctx context.Context, controllerDescriptors map[string]*ControllerDescriptor) {
+	run := func(ctx context.Context, controllerDescriptors map[string]*ControllerDescriptor, healthzHandler *controllerhealthz.MutableHealthzHandler) {
 		controllerContext, err := CreateControllerContext(ctx, c, rootClientBuilder, clientBuilder)
 		if err != nil {
 			logger.Error(err, "Error building controller context")
@@ -262,7 +262,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		controllerDescriptors := NewControllerDescriptors()
 		controllerDescriptors[names.ServiceAccountTokenController] = saTokenControllerDescriptor
-		run(ctx, controllerDescriptors)
+		run(ctx, controllerDescriptors, healthzHandler)
 		return nil
 	}
 
@@ -323,27 +323,30 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		go leaseCandidate.Run(ctx)
 	}
 
-	// Start the main lock
-	go leaderElectAndRun(ctx, c, id, electionChecker,
-		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		c.ComponentConfig.Generic.LeaderElection.ResourceName,
-		leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(ctx context.Context) {
-				controllerDescriptors := NewControllerDescriptors()
-				if leaderMigrator != nil {
-					// If leader migration is enabled, we should start only non-migrated controllers
-					//  for the main lock.
-					controllerDescriptors = filteredControllerDescriptors(controllerDescriptors, leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
-					logger.Info("leader migration: starting main controllers.")
-				}
-				controllerDescriptors[names.ServiceAccountTokenController] = saTokenControllerDescriptor
-				run(ctx, controllerDescriptors)
-			},
-			OnStoppedLeading: func() {
-				logger.Error(nil, "leaderelection lost")
-				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-			},
-		})
+	wait.Until(func() {
+		// Start the main lock
+		leaderElectAndRun(ctx, c, id, electionChecker,
+			c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+			c.ComponentConfig.Generic.LeaderElection.ResourceName,
+			leaderelection.LeaderCallbacks{
+				OnStartedLeading: func(ctx context.Context) {
+					controllerDescriptors := NewControllerDescriptors()
+					if leaderMigrator != nil {
+						// If leader migration is enabled, we should start only non-migrated controllers
+						//  for the main lock.
+						controllerDescriptors = filteredControllerDescriptors(controllerDescriptors, leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
+						logger.Info("leader migration: starting main controllers.")
+					}
+					controllerDescriptors[names.ServiceAccountTokenController] = saTokenControllerDescriptor
+					run(ctx, controllerDescriptors, healthzHandler)
+				},
+				OnStoppedLeading: func() {
+					logger.Error(nil, "leaderelection lost")
+					healthzHandler.Reset()
+				},
+			})
+
+	}, 5*time.Second, stopCh)
 
 	// If Leader Migration is enabled, proceed to attempt the migration lock.
 	if leaderMigrator != nil {
@@ -364,7 +367,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 					controllerDescriptors = filteredControllerDescriptors(controllerDescriptors, leaderMigrator.FilterFunc, leadermigration.ControllerMigrated)
 					// DO NOT start saTokenController under migration lock
 					delete(controllerDescriptors, names.ServiceAccountTokenController)
-					run(ctx, controllerDescriptors)
+					run(ctx, controllerDescriptors, healthzHandler)
 				},
 				OnStoppedLeading: func() {
 					logger.Error(nil, "migration leaderelection lost")
@@ -715,7 +718,7 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, cont
 		}
 	}
 
-	healthzHandler.AddHealthChecker(controllerChecks...)
+	healthzHandler.AddResettableHealthChecker(controllerChecks...)
 
 	return nil
 }
@@ -763,7 +766,8 @@ func StartController(ctx context.Context, controllerCtx ControllerContext, contr
 	if ctrl != nil {
 		// check if the controller supports and requests a debugHandler
 		// and it needs the unsecuredMux to mount the handler onto.
-		if debuggable, ok := ctrl.(controller.Debuggable); ok && unsecuredMux != nil {
+		if debuggable, ok := ctrl.(controller.Debuggable); ok && unsecuredMux != nil && false {
+			// Temporarily disable debugging handler for POC
 			if debugHandler := debuggable.DebuggingHandler(); debugHandler != nil {
 				basePath := "/debug/controllers/" + controllerName
 				unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
@@ -899,7 +903,7 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 		Coordinated:   utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection),
 	})
 
-	panic("unreachable")
+	// panic("unreachable")
 }
 
 // filteredControllerDescriptors returns all controllerDescriptors after filtering through filterFunc.
