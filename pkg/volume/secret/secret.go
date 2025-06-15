@@ -100,7 +100,7 @@ func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.M
 			spec.Name(),
 			pod.UID,
 			plugin,
-			plugin.host.GetMounter(plugin.GetPluginName()),
+			plugin.host.GetMounter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source:    *spec.Volume.Secret,
@@ -115,7 +115,7 @@ func (plugin *secretPlugin) NewUnmounter(volName string, podUID types.UID) (volu
 			volName,
 			podUID,
 			plugin,
-			plugin.host.GetMounter(plugin.GetPluginName()),
+			plugin.host.GetMounter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil

@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
+	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/keymutex"
 
 	v1 "k8s.io/api/core/v1"
@@ -60,7 +61,7 @@ func (plugin *iscsiPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 }
 
 func (plugin *iscsiPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter(iscsiPluginName)
+	mounter := plugin.host.GetMounter()
 	return mounter.GetMountRefs(deviceMountPath)
 }
 
@@ -101,7 +102,7 @@ func (attacher *iscsiAttacher) GetDeviceMountPath(
 }
 
 func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
-	mounter := attacher.host.GetMounter(iscsiPluginName)
+	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -126,7 +127,7 @@ func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string,
 		options = volumeutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
 	}
 	if notMnt {
-		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(iscsiPluginName)}
+		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: utilexec.New()}
 		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, fsType, mountOptions)
 		if err != nil {
@@ -151,7 +152,7 @@ var _ volume.DeviceUnmounter = &iscsiDetacher{}
 func (plugin *iscsiPlugin) NewDetacher() (volume.Detacher, error) {
 	return &iscsiDetacher{
 		host:    plugin.host,
-		mounter: plugin.host.GetMounter(iscsiPluginName),
+		mounter: plugin.host.GetMounter(),
 		manager: &ISCSIUtil{},
 		plugin:  plugin,
 	}, nil
@@ -211,7 +212,7 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks 
 	if err != nil {
 		return nil, err
 	}
-	exec := host.GetExec(iscsiPluginName)
+	exec := utilexec.New()
 
 	volumeMode, err := volumeutil.GetVolumeMode(spec)
 	if err != nil {
@@ -224,20 +225,19 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks 
 		fsType:     fsType,
 		volumeMode: volumeMode,
 		readOnly:   readOnly,
-		mounter:    &mount.SafeFormatAndMount{Interface: host.GetMounter(iscsiPluginName), Exec: exec},
+		mounter:    &mount.SafeFormatAndMount{Interface: host.GetMounter(), Exec: exec},
 		exec:       exec,
 		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 	}, nil
 }
 
 func volumeSpecToUnmounter(mounter mount.Interface, host volume.VolumeHost, plugin *iscsiPlugin) *iscsiDiskUnmounter {
-	exec := host.GetExec(iscsiPluginName)
 	return &iscsiDiskUnmounter{
 		iscsiDisk: &iscsiDisk{
 			plugin: plugin,
 		},
 		mounter:    mounter,
-		exec:       exec,
+		exec:       utilexec.New(),
 		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 	}
 }
