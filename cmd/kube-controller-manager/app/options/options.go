@@ -482,6 +482,7 @@ func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers
 	kubeconfig.ContentConfig.ContentType = s.Generic.ClientConnection.ContentType
 	kubeconfig.QPS = s.Generic.ClientConnection.QPS
 	kubeconfig.Burst = int(s.Generic.ClientConnection.Burst)
+	kubeconfig.VersionInfo = s.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent)
 
 	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, KubeControllerManagerUserAgent))
 	if err != nil {
