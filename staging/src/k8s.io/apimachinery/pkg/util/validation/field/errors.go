@@ -17,8 +17,8 @@ limitations under the License.
 package field
 
 import (
+	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -72,45 +72,42 @@ var omitValue = OmitValueType{}
 // for building nice-looking higher-level error reporting.
 func (e *Error) ErrorBody() string {
 	var s string
-	switch {
-	case e.Type == ErrorTypeRequired:
+	switch e.Type {
+	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeTooMany, ErrorTypeInternal:
 		s = e.Type.String()
-	case e.Type == ErrorTypeForbidden:
-		s = e.Type.String()
-	case e.Type == ErrorTypeTooLong:
-		s = e.Type.String()
-	case e.Type == ErrorTypeInternal:
-		s = e.Type.String()
-	case e.BadValue == omitValue:
-		s = e.Type.String()
-	default:
-		value := e.BadValue
-		valueType := reflect.TypeOf(value)
-		if value == nil || valueType == nil {
-			value = "null"
-		} else if valueType.Kind() == reflect.Pointer {
-			if reflectValue := reflect.ValueOf(value); reflectValue.IsNil() {
-				value = "null"
-			} else {
-				value = reflectValue.Elem().Interface()
-			}
+	case ErrorTypeInvalid, ErrorTypeTypeInvalid, ErrorTypeNotSupported, ErrorTypeNotFound, ErrorTypeDuplicate:
+		if e.BadValue == omitValue {
+			s = e.Type.String()
+			break
 		}
-		switch t := value.(type) {
+		switch t := e.BadValue.(type) {
 		case int64, int32, float64, float32, bool:
 			// use simple printer for simple types
-			s = fmt.Sprintf("%s: %v", e.Type, value)
+			s = fmt.Sprintf("%s: %v", e.Type, t)
 		case string:
 			s = fmt.Sprintf("%s: %q", e.Type, t)
-		case fmt.Stringer:
-			// anything that defines String() is better than raw struct
-			s = fmt.Sprintf("%s: %s", e.Type, t.String())
 		default:
-			// fallback to raw struct
-			// TODO: internal types have panic guards against json.Marshalling to prevent
-			// accidental use of internal types in external serialized form.  For now, use
-			// %#v, although it would be better to show a more expressive output in the future
-			s = fmt.Sprintf("%s: %#v", e.Type, value)
+			// use more complex techniques to render more complex types
+			valstr := ""
+			jb, err := json.Marshal(e.BadValue)
+			if err == nil {
+				// best case
+				valstr = string(jb)
+			} else if stringer, ok := e.BadValue.(fmt.Stringer); ok {
+				// anything that defines String() is better than raw struct
+				valstr = stringer.String()
+			} else {
+				// worst case - fallback to raw struct
+				// TODO: internal types have panic guards against json.Marshalling to prevent
+				// accidental use of internal types in external serialized form.  For now, use
+				// %#v, although it would be better to show a more expressive output in the future
+				valstr = fmt.Sprintf("%#v", e.BadValue)
+			}
+			s = fmt.Sprintf("%s: %s", e.Type, valstr)
 		}
+	default:
+		internal := InternalError(nil, fmt.Errorf("unhandled error code: %s: please report this", e.Type))
+		s = internal.ErrorBody()
 	}
 	if len(e.Detail) != 0 {
 		s += fmt.Sprintf(": %s", e.Detail)
@@ -197,7 +194,7 @@ func (t ErrorType) String() string {
 	case ErrorTypeTypeInvalid:
 		return "Invalid value"
 	default:
-		panic(fmt.Sprintf("unrecognized validation error: %q", string(t)))
+		return fmt.Sprintf("<unknown error %q>", string(t))
 	}
 }
 
