@@ -48,9 +48,10 @@ func TestStatefulSetStrategy(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
