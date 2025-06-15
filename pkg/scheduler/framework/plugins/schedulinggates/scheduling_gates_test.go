@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -67,32 +68,32 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"backoff-wrong-old-object": {
 			pod:          &v1.Pod{},
 			oldObj:       "not-a-pod",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"backoff-wrong-new-object": {
 			pod:          &v1.Pod{},
 			newObj:       "not-a-pod",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"skip-queue-on-other-pod-updated": {
 			pod:          st.MakePod().Name("p").SchedulingGates([]string{"foo", "bar"}).UID("uid0").Obj(),
 			oldObj:       st.MakePod().Name("p1").SchedulingGates([]string{"foo", "bar"}).UID("uid1").Obj(),
 			newObj:       st.MakePod().Name("p1").SchedulingGates([]string{"foo"}).UID("uid1").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"queue-on-the-unsched-pod-updated": {
 			pod:          st.MakePod().Name("p").SchedulingGates([]string{"foo"}).Obj(),
 			oldObj:       st.MakePod().Name("p").SchedulingGates([]string{"foo"}).Obj(),
 			newObj:       st.MakePod().Name("p").SchedulingGates([]string{}).Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 	}
 
