@@ -75,7 +75,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	defer tCtx.Cancel("test has completed")
 
 	informers.Start(tCtx.Done())
-	go rm.Run(tCtx)
+	go rm.Run(tCtx, 5, 5)
 
 	var gracePeriodSeconds int64 = 30
 	deleteOption := metav1.DeleteOptions{
@@ -188,7 +188,7 @@ func TestTerminalPodEviction(t *testing.T) {
 	defer tCtx.Cancel("test has completed")
 
 	informers.Start(tCtx.Done())
-	go rm.Run(tCtx)
+	go rm.Run(tCtx, 5, 5)
 
 	var gracePeriodSeconds int64 = 30
 	deleteOption := metav1.DeleteOptions{
@@ -259,7 +259,7 @@ func TestEvictionVersions(t *testing.T) {
 	defer tCtx.Cancel("test has completed")
 
 	informers.Start(tCtx.Done())
-	go rm.Run(tCtx)
+	go rm.Run(tCtx, 5, 5)
 
 	ns := "default"
 	subresource := "eviction"
@@ -372,7 +372,7 @@ func TestEvictionWithFinalizers(t *testing.T) {
 			defer tCtx.Cancel("test has completed")
 
 			informers.Start(tCtx.Done())
-			go rm.Run(tCtx)
+			go rm.Run(tCtx, 5, 5)
 
 			pod := newPod("pod")
 			pod.ObjectMeta.Finalizers = []string{"test.k8s.io/finalizer"}
@@ -447,7 +447,7 @@ func TestEvictionWithUnhealthyPodEvictionPolicy(t *testing.T) {
 			defer tCtx.Cancel("test has completed")
 
 			informers.Start(tCtx.Done())
-			go rm.Run(tCtx)
+			go rm.Run(tCtx, 5, 5)
 
 			pod := newPod("pod")
 			if _, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
@@ -540,7 +540,7 @@ func TestEvictionWithPrecondition(t *testing.T) {
 
 			defer tCtx.Cancel("test has completed")
 			informers.Start(tCtx.Done())
-			go rm.Run(tCtx)
+			go rm.Run(tCtx, 5, 5)
 
 			pod := newPod("pod")
 			pod, err := clientSet.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
