@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -158,7 +157,7 @@ func TestValidateAPIApproval(t *testing.T) {
 					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "v1", Storage: true, Served: true}},
 					Names:    apiextensions.CustomResourceDefinitionNames{Plural: "foos", Singular: "foo", Kind: "Foo", ListKind: "FooList"},
 					Validation: &apiextensions.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object", XPreserveUnknownFields: pointer.BoolPtr(true)},
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object", XPreserveUnknownFields: ptr.To(true)},
 					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
@@ -176,7 +175,7 @@ func TestValidateAPIApproval(t *testing.T) {
 						Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "v1", Storage: true, Served: true}},
 						Names:    apiextensions.CustomResourceDefinitionNames{Plural: "foos", Singular: "foo", Kind: "Foo", ListKind: "FooList"},
 						Validation: &apiextensions.CustomResourceValidation{
-							OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object", XPreserveUnknownFields: pointer.BoolPtr(true)},
+							OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object", XPreserveUnknownFields: ptr.To(true)},
 						},
 					},
 					Status: apiextensions.CustomResourceDefinitionStatus{
