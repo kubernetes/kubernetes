@@ -1407,6 +1407,70 @@ func TestCreateMirrorPod(t *testing.T) {
 	}
 }
 
+func TestPodStartDurationCountMetric(t *testing.T) {
+	metrics.Register()
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	// Pod with a pending status.
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:         "uid",
+			Name:        "name",
+			Namespace:   "namespace",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			NodeName: "machine",
+			Containers: []v1.Container{
+				{Name: "containerA"},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPending,
+		},
+	}
+
+	// Set the first seen time of the pod.
+	pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey] = kubetypes.NewTimestamp().GetString()
+
+	// In the first sync process, the pod's status should be pending.
+	_, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:  "containerA",
+				State: kubecontainer.ContainerStateCreated,
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("Unexpected err: %v", err)
+	}
+
+	// Now, the pod's status should be running.
+	_, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:  "containerA",
+				State: kubecontainer.ContainerStateRunning,
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("Unexpected err: %v", err)
+	}
+
+	// The metric should not count the startup twice.
+	testutil.AssertHistogramTotalCount(t, "kubelet_pod_start_duration_seconds", map[string]string{}, 1)
+}
+
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
