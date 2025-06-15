@@ -228,6 +228,16 @@ func getPodResourcesValues(ctx context.Context, cli kubeletpodresourcesv1.PodRes
 	return convertToMap(resp.GetPodResources()), nil
 }
 
+func getPodResourcesValuesWithOptions(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient, includeInitContainers bool) (podResMap, error) {
+	resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{
+		IncludeInitContainers: includeInitContainers,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return convertToMap(resp.GetPodResources()), nil
+}
+
 type testPodData struct {
 	PodMap map[string]*v1.Pod
 }
@@ -272,7 +282,7 @@ func findContainerDeviceByName(devs []*kubeletpodresourcesv1.ContainerDevices, r
 	return nil
 }
 
-func matchPodDescWithResources(expected []podDesc, found podResMap) error {
+func matchPodDescWithResources(expected []podDesc, found podResMap, includeInitContainers bool) error {
 	for _, podReq := range expected {
 		framework.Logf("matching: %#v", podReq)
 
@@ -323,7 +333,7 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 
 		// check init containers
 		for _, initCntDesc := range podReq.initContainers {
-			if initCntDesc.restartPolicy == nil || *initCntDesc.restartPolicy != v1.ContainerRestartPolicyAlways {
+			if !includeInitContainers && (initCntDesc.restartPolicy == nil || *initCntDesc.restartPolicy != v1.ContainerRestartPolicyAlways) {
 				// If the init container is not restartable, we don't expect it
 				// to be reported.
 				_, ok := podInfo[initCntDesc.cntName]
@@ -383,7 +393,17 @@ func expectPodResources(ctx context.Context, offset int, cli kubeletpodresources
 		if err != nil {
 			return err
 		}
-		return matchPodDescWithResources(expected, found)
+		return matchPodDescWithResources(expected, found, false)
+	}, time.Minute, 10*time.Second).Should(gomega.Succeed())
+}
+
+func expectPodResourcesWithOptions(ctx context.Context, offset int, cli kubeletpodresourcesv1.PodResourcesListerClient, expected []podDesc, includeInitContainers bool) {
+	gomega.EventuallyWithOffset(1+offset, ctx, func(ctx context.Context) error {
+		found, err := getPodResourcesValuesWithOptions(ctx, cli, includeInitContainers)
+		if err != nil {
+			return err
+		}
+		return matchPodDescWithResources(expected, found, includeInitContainers)
 	}, time.Minute, 10*time.Second).Should(gomega.Succeed())
 }
 
@@ -715,6 +735,44 @@ func podresourcesListTests(ctx context.Context, f *framework.Framework, cli kube
 		expectPodResources(ctx, 1, cli, expected)
 		tpd.deletePodsForTest(ctx, f)
 	}
+
+	tpd = newTestPodData()
+	ginkgo.By("checking the output when pods have init containers and requesting with includeInitContainers")
+	if sd != nil {
+		expected = []podDesc{
+			{
+				podName:    "pod-00",
+				cntName:    "regular-00",
+				cpuRequest: 1000,
+				initContainers: []initContainerDesc{
+					{
+						cntName:        "init-00",
+						resourceName:   sd.resourceName,
+						resourceAmount: 1,
+						cpuRequest:     1000,
+					},
+				},
+			},
+		}
+	} else {
+		expected = []podDesc{
+			{
+				podName:    "pod-00",
+				cntName:    "regular-00",
+				cpuRequest: 1000,
+				initContainers: []initContainerDesc{
+					{
+						cntName:    "init-00",
+						cpuRequest: 1000,
+					},
+				},
+			},
+		}
+	}
+
+	tpd.createPodsForTest(ctx, f, expected)
+	expectPodResourcesWithOptions(ctx, 1, cli, expected, true)
+	tpd.deletePodsForTest(ctx, f)
 }
 
 func podresourcesGetAllocatableResourcesTests(ctx context.Context, cli kubeletpodresourcesv1.PodResourcesListerClient, sd *sriovData, onlineCPUs, reservedSystemCPUs cpuset.CPUSet) {
@@ -770,7 +828,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 	podResourceList := []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
 	gomega.Expect(err).To(gomega.HaveOccurred(), "pod not found")
 	res := convertToMap(podResourceList)
-	err = matchPodDescWithResources(expected, res)
+	err = matchPodDescWithResources(expected, res, false)
 	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
 
 	tpd := newTestPodData()
@@ -786,7 +844,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 	framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-00")
 	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
 	res = convertToMap(podResourceList)
-	err = matchPodDescWithResources(expected, res)
+	err = matchPodDescWithResources(expected, res, false)
 	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
 	tpd.deletePodsForTest(ctx, f)
 
@@ -804,7 +862,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 	framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
 	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
 	res = convertToMap(podResourceList)
-	err = matchPodDescWithResources(expected, res)
+	err = matchPodDescWithResources(expected, res, false)
 	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
 	tpd.deletePodsForTest(ctx, f)
 
@@ -836,10 +894,39 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 		framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
 		podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
 		res = convertToMap(podResourceList)
-		err = matchPodDescWithResources(expected, res)
+		err = matchPodDescWithResources(expected, res, false)
 		framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
 		tpd.deletePodsForTest(ctx, f)
 	}
+
+	tpd = newTestPodData()
+	ginkgo.By("checking the output when only pod with init containers require CPU")
+	expected = []podDesc{
+		{
+			podName:    "pod-01",
+			cntName:    "cnt-00",
+			cpuRequest: 1000,
+			initContainers: []initContainerDesc{
+				{
+					cntName:    "init-00",
+					cpuRequest: 1000,
+				},
+				{
+					cntName:       "restartable-init-01",
+					cpuRequest:    1000,
+					restartPolicy: &containerRestartPolicyAlways,
+				},
+			},
+		},
+	}
+	tpd.createPodsForTest(ctx, f, expected)
+	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
+	framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
+	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
+	res = convertToMap(podResourceList)
+	err = matchPodDescWithResources(expected, res, false)
+	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
+	tpd.deletePodsForTest(ctx, f)
 }
 
 // Serial because the test updates kubelet configuration.
@@ -1196,7 +1283,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 			framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
 			podResourceList := []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
 			res := convertToMap(podResourceList)
-			err = matchPodDescWithResources(expected, res)
+			err = matchPodDescWithResources(expected, res, false)
 			framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
 			tpd.deletePodsForTest(ctx, f)
 		})
