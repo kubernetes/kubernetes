@@ -36,7 +36,7 @@ kube::util::ensure-temp-dir
 WORKTREE="${KUBE_TEMP}/worktree"
 
 # Create a copy of the repo with $BRANCH checked out
-git worktree add -f "${WORKTREE}" "${BRANCH}"
+git worktree add -f --quiet "${WORKTREE}" "${BRANCH}"
 # Clean up the copy on exit
 kube::util::trap_add "git worktree remove -f ${WORKTREE}" EXIT
 
