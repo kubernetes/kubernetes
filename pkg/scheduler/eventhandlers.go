@@ -154,7 +154,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", newPod.Namespace, newPod.Name, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "failed to check whether pod is assumed", "pod", klog.KObj(newPod))
 	}
 	if isAssumed {
 		return
