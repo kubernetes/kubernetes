@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	lifecyclecontroller "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/podgc"
+	podipmirroringcontroller "k8s.io/kubernetes/pkg/controller/podipmirroring"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
@@ -964,5 +965,22 @@ func startSELinuxWarningController(ctx context.Context, controllerContext Contro
 		return nil, true, fmt.Errorf("failed to start SELinux warning controller: %w", err)
 	}
 	go seLinuxController.Run(ctx, 1)
+	return nil, true, nil
+}
+
+func newPodIPMirroringControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.PodIPMirroringController,
+		initFunc: startPodIPMirroringController,
+	}
+}
+
+func startPodIPMirroringController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	go podipmirroringcontroller.NewPodIPMirroringController(
+		ctx,
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Networking().V1().IPAddresses(),
+		controllerContext.ClientBuilder.ClientOrDie("podip-mirroring-controller"),
+	).Run(ctx)
 	return nil, true, nil
 }
