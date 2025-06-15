@@ -315,7 +315,7 @@ func GetIndexOfContainerStatus(statuses []v1.ContainerStatus, name string) (int,
 // Precondition for an available pod is that it must be ready. On top
 // of that, there are two cases when a pod can be considered available:
 // 1. minReadySeconds == 0, or
-// 2. LastTransitionTime (is set) + minReadySeconds < current time
+// 2. LastTransitionTime (is set) + minReadySeconds <= current time
 func IsPodAvailable(pod *v1.Pod, minReadySeconds int32, now metav1.Time) bool {
 	if !IsPodReady(pod) {
 		return false
@@ -323,7 +323,7 @@ func IsPodAvailable(pod *v1.Pod, minReadySeconds int32, now metav1.Time) bool {
 
 	c := GetPodReadyCondition(pod.Status)
 	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
-	if minReadySeconds == 0 || (!c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now.Time)) {
+	if minReadySeconds == 0 || (!c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Compare(now.Time) <= 0) {
 		return true
 	}
 	return false
