@@ -18,12 +18,33 @@ package cache
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiltrace "k8s.io/utils/trace"
-	"sync"
-	"time"
 )
+
+// RealFIFOOptions is the configuration parameters for RealFIFO. All are
+// optional.
+type RealFIFOOptions struct {
+	// KeyFunction is used to figure out what key an object should have. (It's
+	// exposed in the returned RealFIFO's keyOf() method, with additional
+	// handling around deleted objects and queue state).
+	// Optional, the default is MetaNamespaceKeyFunc.
+	KeyFunction KeyFunc
+
+	// KnownObjects is expected to return a list of keys that the consumer of
+	// this queue "knows about". It is used to decide which items are missing
+	// when Replace() is called; 'Deleted' deltas are produced for the missing items.
+	// KnownObjects may be nil if you can tolerate missing deletions on Replace().
+	KnownObjects KeyListerGetter
+
+	// If set, will be called for objects before enqueueing them. Please
+	// see the comment on TransformFunc for details.
+	Transformer TransformFunc
+}
 
 // RealFIFO is a Queue in which every notification from the Reflector is passed
 // in order to the Queue via Pop.
@@ -402,6 +423,28 @@ func NewRealFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter, transformer Tran
 		knownObjects: knownObjects,
 		transformer:  transformer,
 	}
+	f.cond.L = &f.lock
+	return f
+}
+
+// NewRealFIFOWithOptions returns a Queue which can be used to process changes to
+// items. See also the comment on RealFIFO.
+func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
+	if opts.KeyFunction == nil {
+		opts.KeyFunction = MetaNamespaceKeyFunc
+	}
+
+	if opts.KnownObjects == nil {
+		panic("coding error: knownObjects must be provided")
+	}
+
+	f := &RealFIFO{
+		items:        make([]Delta, 0, 10),
+		keyFunc:      opts.KeyFunction,
+		knownObjects: opts.KnownObjects,
+		transformer:  opts.Transformer,
+	}
+
 	f.cond.L = &f.lock
 	return f
 }
