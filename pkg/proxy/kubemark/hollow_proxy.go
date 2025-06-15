@@ -29,18 +29,17 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/utils/ptr"
 )
 
 type HollowProxy struct {
+	NodeName    string
 	ProxyServer *proxyapp.ProxyServer
 }
 
-type FakeProxier struct {
-	proxyconfig.NoopNodeHandler
-}
+type FakeProxier struct{}
 
 func (*FakeProxier) Sync() {}
 func (*FakeProxier) SyncLoop() {
@@ -55,6 +54,7 @@ func (*FakeProxier) OnEndpointSliceUpdate(oldSlice, slice *discoveryv1.EndpointS
 func (*FakeProxier) OnEndpointSliceDelete(slice *discoveryv1.EndpointSlice)           {}
 func (*FakeProxier) OnEndpointSlicesSynced()                                          {}
 func (*FakeProxier) OnServiceCIDRsChanged(_ []string)                                 {}
+func (*FakeProxier) OnTopologyChange(_ map[string]string)                             {}
 
 func NewHollowProxy(
 	nodeName string,
@@ -62,8 +62,13 @@ func NewHollowProxy(
 	eventClient v1core.EventsGetter,
 	broadcaster events.EventBroadcaster,
 	recorder events.EventRecorder,
-) *HollowProxy {
+) (*HollowProxy, error) {
+	nodeManager, err := proxy.NewNodeManager(context.TODO(), client, 30*time.Second, nodeName, false)
+	if err != nil {
+		return nil, err
+	}
 	return &HollowProxy{
+		NodeName: nodeName,
 		ProxyServer: &proxyapp.ProxyServer{
 			Config: &proxyconfigapi.KubeProxyConfiguration{
 				Mode:             proxyconfigapi.ProxyMode("fake"),
@@ -83,12 +88,12 @@ func NewHollowProxy(
 				UID:       types.UID(nodeName),
 				Namespace: "",
 			},
+			NodeManager: nodeManager,
 		},
-	}
+	}, nil
 }
 
 func (hp *HollowProxy) Run() error {
-
 	if err := hp.ProxyServer.Run(context.TODO()); err != nil {
 		return fmt.Errorf("Error while running proxy: %w", err)
 	}
