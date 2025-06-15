@@ -927,7 +927,7 @@ func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DeviceMaxIDLength))
 	}
 	for _, msg := range validation.IsCIdentifier(id) {
-		allErrs = append(allErrs, field.TypeInvalid(fldPath, id, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, id, msg))
 	}
 	return allErrs
 }
