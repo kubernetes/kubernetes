@@ -21,7 +21,9 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -51,6 +53,16 @@ var _ = Describe("nodes", func() {
 		nodes, err := f.ClientSet.CoreV1().Nodes().
 			List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "error reading nodes")
+
+		// check nodes' kubelet version, if it is greater than 1.34.0, then we need to check if the nodeLocalCRISocket is enabled
+		// otherwise, we can skip the test
+		for _, node := range nodes.Items {
+			minVer := version.MustParseSemantic("v1.34.0-alpha.0")
+			kubeletVersion := version.MustParseSemantic(node.Status.NodeInfo.KubeletVersion)
+			if kubeletVersion.LessThan(minVer) {
+				e2eskipper.Skipf("Skipping because version %s is older than the minimum version %s", kubeletVersion, minVer)
+			}
+		}
 
 		nodeLocalCRISocketEnabled := true
 		cc := getClusterConfiguration(f.ClientSet)
