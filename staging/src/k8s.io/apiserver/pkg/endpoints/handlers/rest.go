@@ -174,7 +174,7 @@ func (r *RequestScope) GetEquivalentResourceMapper() runtime.EquivalentResourceM
 }
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
-func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
+func ConnectResource(connecter rest.Connecter, getter rest.Getter, scope *RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		if isDryRun(req.URL) {
 			scope.err(errors.NewBadRequest("dryRun is not supported"), w, req)
@@ -196,24 +196,60 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 			scope.err(err, w, req)
 			return
 		}
+
+		var obj runtime.Object // This will hold our fetched Pod object.
+
+		// 1. Check if we're dealing with a pod subresource.
+		if scope.Resource.Group == "" && scope.Resource.Resource == "pods" && scope.Subresource != "" {
+			// 2. Fetch the Pod object.
+			if getter == nil {
+				// Should not happen if wired correctly, but a good guardrail.
+				scope.err(errors.NewInternalError(fmt.Errorf("no getter provided to ConnectResource")), w, req)
+				return
+			}
+			var err error
+			obj, err = getter.Get(ctx, name, &metav1.GetOptions{})
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
+		}
+
 		if admit != nil && admit.Handles(admission.Connect) {
 			userInfo, _ := request.UserFrom(ctx)
+
+			// 3. CRITICAL: Use the 'obj' you just fetched in NewAttributesRecord.
+			attributes := admission.NewAttributesRecord(
+				obj, // Pass the fetched pod object here.
+				nil,
+				scope.Kind,
+				namespace,
+				name,
+				scope.Resource,
+				scope.Subresource,
+				admission.Connect,
+				nil,   /* options */
+				false, /* dryRun */
+				userInfo,
+			)
+
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(ctx, admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
+				err = mutatingAdmission.Admit(ctx, attributes, scope) // Pass the modified attributes
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(ctx, admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
+				err = validatingAdmission.Validate(ctx, attributes, scope) // Pass the modified attributes
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 		}
+
 		requestInfo, _ := request.RequestInfoFrom(ctx)
 		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
 			handler, err := connecter.Connect(ctx, name, opts, &responder{scope: scope, req: req, w: w})

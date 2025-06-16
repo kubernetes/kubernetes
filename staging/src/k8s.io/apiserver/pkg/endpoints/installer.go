@@ -1055,7 +1055,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				if isSubresource {
 					doc = "connect " + method + " requests to " + subresource + " of " + kind
 				}
-				handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
+				// Get the getter from the storage
+				getter, _ := storage.(rest.Getter)
+				handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulConnectResource(connecter, getter, reqScope, admit, path, isSubresource))
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
 				route := ws.Method(method).Path(action.Path).
 					To(handler).
@@ -1343,8 +1345,8 @@ func restfulGetResourceWithOptions(r rest.GetterWithOptions, scope handlers.Requ
 	}
 }
 
-func restfulConnectResource(connecter rest.Connecter, scope handlers.RequestScope, admit admission.Interface, restPath string, isSubresource bool) restful.RouteFunction {
+func restfulConnectResource(connecter rest.Connecter, getter rest.Getter, scope handlers.RequestScope, admit admission.Interface, restPath string, isSubresource bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.ConnectResource(connecter, &scope, admit, restPath, isSubresource)(res.ResponseWriter, req.Request)
+		handlers.ConnectResource(connecter, getter, &scope, admit, restPath, isSubresource)(res.ResponseWriter, req.Request)
 	}
 }
