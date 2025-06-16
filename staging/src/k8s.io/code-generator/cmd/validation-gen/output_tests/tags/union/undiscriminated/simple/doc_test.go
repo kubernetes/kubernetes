@@ -35,4 +35,8 @@ func Test(t *testing.T) {
 	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).ExpectInvalid(
 		field.Invalid(nil, "{m1, m2}", "must specify exactly one of: `m1`, `m2`"),
 	)
+
+	// Test validation ratcheting
+	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).OldValue(&Struct{M1: &M1{}, M2: &M2{}}).ExpectValid()
+	st.Value(&Struct{}).OldValue(&Struct{}).ExpectValid()
 }
