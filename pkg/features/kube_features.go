@@ -1725,6 +1725,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	genericfeatures.APIServerTracing: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
 	},
 
 	genericfeatures.APIServingWithRoutine: {
