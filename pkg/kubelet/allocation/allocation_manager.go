@@ -21,11 +21,14 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"sort"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -275,11 +278,159 @@ func (m *manager) PushPendingResize(uid types.UID) {
 		}
 	}
 
-	// Add the pod to the pending resizes list
+	// Add the pod to the pending resizes list and sort by priority.
 	m.podsWithPendingResizes = append(m.podsWithPendingResizes, uid)
+	m.sortPendingPodsByPriority()
+}
 
-	// TODO (natasha41575): Sort the pending resizes list by priority.
-	// See https://github.com/kubernetes/enhancements/pull/5266.
+// sortPendingPodsByPriority sorts the list of pending resizes:
+// - First, prioritizing resizes that do not increase requests.
+// - Second, based on the pod's PriorityClass.
+// - Third, based on the pod's QoS class.
+// - Last, prioritizing resizes that have been in the deferred state the longest.
+func (m *manager) sortPendingPodsByPriority() {
+	sort.Slice(m.podsWithPendingResizes, func(i, j int) bool {
+		firstPod, found := m.getPodByUID(m.podsWithPendingResizes[i])
+		if !found {
+			return false
+		}
+		secondPod, found := m.getPodByUID(m.podsWithPendingResizes[j])
+		if !found {
+			return false
+		}
+
+		// First, resizes that don't increase requests will be prioritized.
+		// These resizes are expected to always succeed.
+		firstPodIncreasing := m.isResizeIncreasingAnyRequests(firstPod)
+		secondPodIncreasing := m.isResizeIncreasingAnyRequests(secondPod)
+		if !firstPodIncreasing && secondPodIncreasing {
+			return true
+		}
+		if !secondPodIncreasing && firstPodIncreasing {
+			return false
+		}
+
+		// Second, pods with a higher PriorityClass will be prioritized.
+		firstPodPriority := int32(0)
+		if firstPod.Spec.Priority != nil {
+			firstPodPriority = *firstPod.Spec.Priority
+		}
+		secondPodPriority := int32(0)
+		if secondPod.Spec.Priority != nil {
+			secondPodPriority = *secondPod.Spec.Priority
+		}
+		if firstPodPriority > secondPodPriority {
+			return true
+		}
+		if secondPodPriority > firstPodPriority {
+			return false
+		}
+
+		// Third, pods with a higher QoS class will be prioritized, where guaranteed > burstable.
+		// Best effort pods don't have resource requests or limits, so we don't need to consider them here.
+		firstPodQOS := v1qos.GetPodQOS(firstPod)
+		secondPodQOS := v1qos.GetPodQOS(secondPod)
+		if firstPodQOS == v1.PodQOSGuaranteed && secondPodQOS != v1.PodQOSGuaranteed {
+			return true
+		}
+		if secondPodQOS == v1.PodQOSGuaranteed && firstPodQOS != v1.PodQOSGuaranteed {
+			return false
+		}
+
+		// If all else is the same, resize requests that have been pending longer will be
+		// evaluated first.
+		var firstPodLastTransitionTime *metav1.Time
+		firstPodResizeConditions := m.statusManager.GetPodResizeConditions(firstPod.UID)
+		for _, c := range firstPodResizeConditions {
+			if c.Type == v1.PodResizePending {
+				firstPodLastTransitionTime = &c.LastTransitionTime
+			}
+		}
+		var secondPodLastTransitionTime *metav1.Time
+		secondPodResizeConditions := m.statusManager.GetPodResizeConditions(secondPod.UID)
+		for _, c := range secondPodResizeConditions {
+			if c.Type == v1.PodResizePending {
+				secondPodLastTransitionTime = &c.LastTransitionTime
+			}
+		}
+		if firstPodLastTransitionTime == nil {
+			return false
+		}
+		if secondPodLastTransitionTime == nil {
+			return true
+		}
+		return firstPodLastTransitionTime.Before(secondPodLastTransitionTime)
+	})
+}
+
+// isResizeIncreasingAnyRequests returns true if any of the resource requests are increasing.
+func (m *manager) isResizeIncreasingAnyRequests(pod *v1.Pod) bool {
+	allocatedPod, updated := m.UpdatePodFromAllocation(pod)
+	if !updated {
+		return false
+	}
+
+	if isResizeIncreasingAnyRequestsForContainer(allocatedPod.Spec.Resources, pod.Spec.Resources) {
+		return true
+	}
+
+	for i, c := range pod.Spec.Containers {
+		if isResizeIncreasingAnyRequestsForContainer(&allocatedPod.Spec.Containers[i].Resources, &c.Resources) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isResizeNonIncreasingForContainer returns true only if none of the resources requests are increasing.
+// Resource limits are not considered for pod admission, so they are left out of the check here.
+func isResizeIncreasingAnyRequestsForContainer(old *v1.ResourceRequirements, new *v1.ResourceRequirements) bool {
+	if old == nil && new == nil {
+		return false
+	}
+
+	var oldCPURequests, newCPURequests, oldMemRequests, newMemRequests *apiresource.Quantity
+
+	if old != nil && old.Requests != nil {
+		oldCPURequests = old.Requests.Cpu()
+		oldMemRequests = old.Requests.Memory()
+	}
+	if new != nil && new.Requests != nil {
+		newCPURequests = new.Requests.Cpu()
+		newMemRequests = new.Requests.Memory()
+	}
+
+	oldCPURequestsEmpty := oldCPURequests == nil || oldCPURequests.IsZero()
+	newCPURequestsEmpty := newCPURequests == nil || newCPURequests.IsZero()
+	oldMemRequestsEmpty := oldMemRequests == nil || oldMemRequests.IsZero()
+	newMemRequestsEmpty := newMemRequests == nil || newMemRequests.IsZero()
+
+	if oldCPURequestsEmpty && !newCPURequestsEmpty {
+		// CPU Requests have been added, which is considered a resource increase.
+		return true
+	}
+
+	if oldMemRequestsEmpty && !newMemRequestsEmpty {
+		// Memory Requests have been added, which is considered a resource increase.
+		return true
+	}
+
+	if !oldCPURequestsEmpty && !newCPURequestsEmpty {
+		if newCPURequests.Cmp(*oldCPURequests) > 0 {
+			// CPU Requests are being increased.
+			return true
+		}
+	}
+
+	if !oldMemRequestsEmpty && !newMemRequestsEmpty {
+		if newMemRequests.Cmp(*oldMemRequests) > 0 {
+			// Memory Requests are being increased.
+			return true
+		}
+	}
+
+	return false
 }
 
 // GetContainerResourceAllocation returns the last checkpointed AllocatedResources values

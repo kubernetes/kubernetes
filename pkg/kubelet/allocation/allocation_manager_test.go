@@ -20,6 +20,7 @@ import (
 	"fmt"
 	goruntime "runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1017,6 +1018,208 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 			assert.Equal(t, "true", newPod.Annotations["pod-sync-triggered"], "pod sync annotation should be set")
 		})
 	}
+}
+
+func TestIsResizeIncreasingAnyRequests(t *testing.T) {
+	cpu500m := resource.MustParse("500m")
+	cpu1000m := resource.MustParse("1")
+	cpu1500m := resource.MustParse("1500m")
+	mem500M := resource.MustParse("500Mi")
+	mem1000M := resource.MustParse("1Gi")
+	mem1500M := resource.MustParse("1500Mi")
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "1111",
+			Name:      "pod1",
+			Namespace: "ns1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				},
+				{
+					Name:  "c2",
+					Image: "i2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				},
+				{
+					Name:  "c3",
+					Image: "i3",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{},
+					},
+				},
+				{
+					Name:  "c4",
+					Image: "i4",
+					Resources: v1.ResourceRequirements{
+						Requests: nil,
+					},
+				},
+			},
+		},
+	}
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{testPod})
+	require.NoError(t, allocationManager.SetAllocatedResources(testPod))
+
+	tests := []struct {
+		name        string
+		newRequests map[int]v1.ResourceList
+		expected    bool
+	}{
+		{
+			name:        "increase requests, one container",
+			newRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M}},
+			expected:    true,
+		},
+		{
+			name:        "decrease requests, one container",
+			newRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}},
+			expected:    false,
+		},
+		{
+			name:        "increase cpu, decrease memory, one container",
+			newRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M}},
+			expected:    true,
+		},
+		{
+			name:        "increase memory, decrease cpu, one container",
+			newRequests: map[int]v1.ResourceList{0: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M}},
+			expected:    true,
+		},
+		{
+			name: "increase one container, decrease another container",
+			newRequests: map[int]v1.ResourceList{
+				0: {v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
+				1: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			},
+			expected: true,
+		},
+		{
+			name: "decrease requests, two containers",
+			newRequests: map[int]v1.ResourceList{
+				0: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+				1: {v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			},
+			expected: false,
+		},
+		{
+			name:        "remove requests, set as empty struct",
+			newRequests: map[int]v1.ResourceList{0: {}},
+			expected:    false,
+		},
+		{
+			name:        "remove requests, set as nil",
+			newRequests: map[int]v1.ResourceList{0: nil},
+			expected:    false,
+		},
+		{
+			name:        "add requests, set as empty struct",
+			newRequests: map[int]v1.ResourceList{2: {v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}},
+			expected:    true,
+		},
+		{
+			name:        "add requests, set as nil",
+			newRequests: map[int]v1.ResourceList{3: {v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}},
+			expected:    true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.newRequests {
+				testPod.Spec.Containers[k].Resources.Requests = v
+			}
+			require.Equal(t, tc.expected, allocationManager.(*manager).isResizeIncreasingAnyRequests(testPod))
+		})
+	}
+}
+
+func TestSortPendingPodsByPriority(t *testing.T) {
+	cpu500m := resource.MustParse("500m")
+	cpu1000m := resource.MustParse("1")
+	cpu1500m := resource.MustParse("1500m")
+	mem500M := resource.MustParse("500Mi")
+	mem1000M := resource.MustParse("1Gi")
+	mem1500M := resource.MustParse("1500Mi")
+
+	createTestPod := func(podNumber int) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       types.UID(fmt.Sprintf("%d", podNumber)),
+				Name:      fmt.Sprintf("pod%d", podNumber),
+				Namespace: fmt.Sprintf("ns%d", podNumber),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  fmt.Sprintf("c%d", podNumber),
+					Image: fmt.Sprintf("i%d", podNumber),
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				}},
+			},
+		}
+	}
+
+	testPods := []*v1.Pod{createTestPod(0), createTestPod(1), createTestPod(2), createTestPod(3), createTestPod(4), createTestPod(5)}
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, testPods)
+	for _, testPod := range testPods {
+		require.NoError(t, allocationManager.SetAllocatedResources(testPod))
+	}
+
+	// testPods[0] has the highest priority, as it doesn't increase resource requests.
+	// testPods[1] has the highest PriorityClass.
+	// testPods[2] is the only pod with QoS class "guaranteed" (all others are burstable).
+	// testPods[3] has been in a "deferred" state for longer than testPods[4].
+	// testPods[5] has no resize conditions yet, indicating it is a newer request than the other deferred resizes.
+
+	testPods[0].Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}
+	for i := 1; i < len(testPods); i++ {
+		testPods[i].Spec.Containers[0].Resources.Requests = v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M}
+	}
+
+	testPods[1].Spec.Priority = ptr.To(int32(100))
+	testPods[2].Status.QOSClass = v1.PodQOSGuaranteed
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[3].UID, v1.PodReasonDeferred, "some-message")
+	time.Sleep(5 * time.Millisecond)
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[4].UID, v1.PodReasonDeferred, "some-message")
+
+	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+		pods := map[types.UID]*v1.Pod{
+			testPods[0].UID: testPods[0],
+			testPods[1].UID: testPods[1],
+			testPods[2].UID: testPods[2],
+			testPods[3].UID: testPods[3],
+			testPods[4].UID: testPods[4],
+			testPods[5].UID: testPods[5],
+		}
+		pod, found := pods[uid]
+		return pod, found
+	}
+
+	expected := []types.UID{testPods[0].UID, testPods[1].UID, testPods[2].UID, testPods[3].UID, testPods[4].UID, testPods[5].UID}
+
+	// Push all the pods to the queue.
+	for i := range testPods {
+		allocationManager.PushPendingResize(testPods[i].UID)
+	}
+	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingResizes)
+
+	// Clear the queue and push the pods in reverse order to spice things up.
+	allocationManager.(*manager).podsWithPendingResizes = nil
+	for i := 5; i >= 0; i-- {
+		allocationManager.PushPendingResize(testPods[i].UID)
+	}
+	require.Equal(t, expected, allocationManager.(*manager).podsWithPendingResizes)
 }
 
 func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, allocatedPods []*v1.Pod) Manager {
