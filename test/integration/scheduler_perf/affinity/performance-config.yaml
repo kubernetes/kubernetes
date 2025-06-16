@@ -211,7 +211,7 @@
       measurePods: 5000
 
 - name: SchedulingPreferredPodAntiAffinity
-  defaultPodTemplatePath: ../templates/pod-with-preferred-pod-affinity.yaml
+  defaultPodTemplatePath: ../templates/pod-with-preferred-pod-anti-affinity.yaml
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
