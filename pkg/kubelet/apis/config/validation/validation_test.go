@@ -569,15 +569,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: taint.TimeAdded is not nil",
 		}, {
-			name: "specify tracing with KubeletTracing disabled",
-			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				samplingRate := int32(99999)
-				conf.FeatureGates = map[string]bool{"KubeletTracing": false}
-				conf.Tracing = &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
-				return conf
-			},
-			errMsg: "invalid configuration: tracing should not be configured if KubeletTracing feature flag is disabled.",
-		}, {
 			name: "specify tracing invalid sampling rate",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				samplingRate := int32(-1)
