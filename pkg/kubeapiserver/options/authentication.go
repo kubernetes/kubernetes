@@ -491,7 +491,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 	if len(o.AuthenticationConfigFile) > 0 {
 		var err error
 		if ret.AuthenticationConfig, ret.AuthenticationConfigData, err = loadAuthenticationConfig(o.AuthenticationConfigFile); err != nil {
-			return kubeauthenticator.Config{}, err
+			return kubeauthenticator.Config{}, fmt.Errorf("failed to load authentication configuration from file %q: %w", o.AuthenticationConfigFile, err)
 		}
 	} else {
 		ret.AuthenticationConfig = &apiserver.AuthenticationConfiguration{}
@@ -577,7 +577,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 	}
 
 	if err := apiservervalidation.ValidateAuthenticationConfiguration(authenticationcel.NewDefaultCompiler(), ret.AuthenticationConfig, ret.ServiceAccountIssuers).ToAggregate(); err != nil {
-		return kubeauthenticator.Config{}, err
+		return kubeauthenticator.Config{}, fmt.Errorf("invalid authentication configuration: %w", err)
 	}
 
 	if o.RequestHeader != nil {

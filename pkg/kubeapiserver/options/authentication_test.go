@@ -799,6 +799,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 		name         string
 		args         []string
 		expectConfig kubeauthenticator.Config
+		expectErr    string
 	}{
 		{
 			name: "username prefix is '-'",
@@ -1038,6 +1039,29 @@ jwt:
 				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
 		},
+		{
+			name: "authentication config file not found",
+			args: []string{
+				"--authentication-config=nonexistent-file",
+			},
+			expectErr:    `failed to load authentication configuration from file "nonexistent-file": open nonexistent-file: no such file or directory`,
+			expectConfig: kubeauthenticator.Config{},
+		},
+		{
+			name: "authentication config validation error",
+			args: []string{
+				"--authentication-config=" + writeTempFile(t, `
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+    audiences: [ "🐼" ]
+`),
+			},
+			expectErr:    "invalid authentication configuration: jwt[0].claimMappings.username: Required value: claim or expression is required",
+			expectConfig: kubeauthenticator.Config{},
+		},
 	}
 
 	for _, testcase := range testCases {
@@ -1051,9 +1075,13 @@ jwt:
 			}
 
 			resultConfig, err := opts.ToAuthenticationConfig()
-			if err != nil {
-				t.Fatal(err)
+			if (err != nil) != (testcase.expectErr != "") {
+				t.Fatalf("Got err: %v; Want err: %v", err, testcase.expectErr)
 			}
+			if len(testcase.expectErr) > 0 && !strings.Contains(err.Error(), testcase.expectErr) {
+				t.Fatalf("Got err: %v; Want err: %v", err, testcase.expectErr)
+			}
+
 			if !reflect.DeepEqual(resultConfig, testcase.expectConfig) {
 				t.Error(cmp.Diff(resultConfig, testcase.expectConfig))
 			}
