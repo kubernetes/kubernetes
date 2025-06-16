@@ -254,6 +254,9 @@ type Subject struct {
 	// `serviceAccount` matches ServiceAccounts.
 	// +optional
 	ServiceAccount *ServiceAccountSubject `json:"serviceAccount,omitempty" protobuf:"bytes,4,opt,name=serviceAccount"`
+	// `userAgent` matches based on user-agent.
+	// +optional
+	UserAgent *UserAgentSubject `json:"userAgent,omitempty" protobuf:"bytes,50,opt,name=userAgent"`
 }
 
 // SubjectKind is the kind of subject.
@@ -264,6 +267,7 @@ const (
 	SubjectKindUser           SubjectKind = "User"
 	SubjectKindGroup          SubjectKind = "Group"
 	SubjectKindServiceAccount SubjectKind = "ServiceAccount"
+	SubjectUserAgent          SubjectKind = "UserAgent"
 )
 
 // UserSubject holds detailed information for user-kind subject.
@@ -290,6 +294,13 @@ type ServiceAccountSubject struct {
 	// `name` is the name of matching ServiceAccount objects, or "*" to match regardless of name.
 	// Required.
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
+}
+
+// UserAgentSubject holds detailed information for user-agent-kind subject.
+type UserAgentSubject struct {
+	// `nameRegexp` is the agent name regular expression that matches.
+	// Required.
+	NameRegexp string `json:"nameRegexp" protobuf:"bytes,1,opt,name=nameRegexp"`
 }
 
 // ResourcePolicyRule is a predicate that matches some resource
