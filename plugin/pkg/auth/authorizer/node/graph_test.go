@@ -23,8 +23,9 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-
+	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -461,10 +462,8 @@ func TestIndex2(t *testing.T) {
 			sort.Strings(sortedTo)
 			actual[toString(g, node.ID())] = sortedTo
 		}
-		if !reflect.DeepEqual(expect, actual) {
-			e, _ := json.MarshalIndent(expect, "", "  ")
-			a, _ := json.MarshalIndent(actual, "", "  ")
-			t.Errorf("expected graph:\n%s\ngot:\n%s", string(e), string(a))
+		if diff := cmp.Diff(actual, expect); diff != "" {
+			t.Errorf("Bad graph; diff (-got +want):\n%s", diff)
 		}
 	}
 	expectIndex := func(t *testing.T, g *Graph, expect map[string][]string) {
@@ -478,10 +477,8 @@ func TestIndex2(t *testing.T) {
 			sort.Strings(sortedValues)
 			actual[toString(g, from)] = sortedValues
 		}
-		if !reflect.DeepEqual(expect, actual) {
-			e, _ := json.MarshalIndent(expect, "", "  ")
-			a, _ := json.MarshalIndent(actual, "", "  ")
-			t.Errorf("expected index:\n%s\ngot:\n%s", string(e), string(a))
+		if diff := cmp.Diff(actual, expect); diff != "" {
+			t.Errorf("Bad index; diff (-got +want):\n%s", diff)
 		}
 	}
 
@@ -889,6 +886,63 @@ func TestIndex2(t *testing.T) {
 			},
 			expectedIndex: map[string][]string{},
 		},
+		{
+			desc:          "podcertificaterequest adding",
+			startingGraph: NewTestGraph(),
+			graphTransformer: func(g *Graph) {
+				g.AddPodCertificateRequest(pcr("foo", "pcr1", "pod1", "sa1", "node1"))
+				g.AddPodCertificateRequest(pcr("foo", "pcr2", "pod1", "sa1", "node1"))
+				g.AddPodCertificateRequest(pcr("foo", "pcr3", "pod2", "sa2", "node1"))
+				g.AddPodCertificateRequest(pcr("foo", "pcr4", "pod4", "sa4", "node2"))
+			},
+			expectedGraph: map[string][]string{
+				"node:node1":                     {},
+				"node:node2":                     {},
+				"podcertificaterequest:foo/pcr1": {"node:node1"},
+				"podcertificaterequest:foo/pcr2": {"node:node1"},
+				"podcertificaterequest:foo/pcr3": {"node:node1"},
+				"podcertificaterequest:foo/pcr4": {"node:node2"},
+			},
+			expectedIndex: map[string][]string{},
+		},
+		{
+			desc: "podcertificaterequest deleting",
+			startingGraph: func() *Graph {
+				g := NewTestGraph()
+				g.AddPodCertificateRequest(pcr("foo", "pcr1", "pod1", "sa1", "node1"))
+				g.AddPodCertificateRequest(pcr("foo", "pcr2", "pod1", "sa1", "node1"))
+				g.AddPodCertificateRequest(pcr("foo", "pcr3", "pod2", "sa2", "node1"))
+				g.AddPodCertificateRequest(pcr("foo", "pcr4", "pod4", "sa4", "node2"))
+				return g
+			}(),
+			graphTransformer: func(g *Graph) {
+				g.DeletePodCertificateRequest(pcr("foo", "pcr3", "", "", ""))
+				g.DeletePodCertificateRequest(pcr("foo", "pcr4", "", "", ""))
+			},
+			expectedGraph: map[string][]string{
+				"node:node1":                     {},
+				"podcertificaterequest:foo/pcr1": {"node:node1"},
+				"podcertificaterequest:foo/pcr2": {"node:node1"},
+			},
+			expectedIndex: map[string][]string{},
+		},
+		{
+			desc: "podcertificaterequest deleting (check namespace/name ordering)",
+			startingGraph: func() *Graph {
+				g := NewTestGraph()
+				g.AddPodCertificateRequest(pcr("foo", "bar", "pod1", "sa1", "node1"))
+				g.AddPodCertificateRequest(pcr("bar", "foo", "pod2", "sa2", "node2"))
+				return g
+			}(),
+			graphTransformer: func(g *Graph) {
+				g.DeletePodCertificateRequest(pcr("foo", "bar", "", "", ""))
+			},
+			expectedGraph: map[string][]string{
+				"node:node2":                    {},
+				"podcertificaterequest:bar/foo": {"node:node2"},
+			},
+			expectedIndex: map[string][]string{},
+		},
 	}
 
 	for _, tc := range cases {
@@ -898,4 +952,20 @@ func TestIndex2(t *testing.T) {
 			expectIndex(t, tc.startingGraph, tc.expectedIndex)
 		})
 	}
+}
+
+func pcr(namespace, name, podName, saName, nodeName string) *certsv1alpha1.PodCertificateRequest {
+	pcr := &certsv1alpha1.PodCertificateRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+			UID:       types.UID(fmt.Sprintf("pcr%suid", name)),
+		},
+		Spec: certsv1alpha1.PodCertificateRequestSpec{
+			PodName:            podName,
+			ServiceAccountName: saName,
+			NodeName:           types.NodeName(nodeName),
+		},
+	}
+	return pcr
 }
