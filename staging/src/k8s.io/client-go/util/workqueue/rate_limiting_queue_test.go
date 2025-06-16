@@ -73,3 +73,15 @@ func TestRateLimitingQueue(t *testing.T) {
 	}
 
 }
+
+func TestNewNamedRateLimitingWithCustomQueue(t *testing.T) {
+	priorityQueue := NewNamedRateLimitingWithCustomQueue(DefaultControllerRateLimiter(), NewPriority(), "cluster")
+	key := "one"
+	priority := 6
+	priorityQueue.AddRateLimited(&Item{Value: key, Priority: priority})
+	it, shutdown := priorityQueue.Get()
+	item := it.(*Item)
+	if !shutdown && item.Value != key {
+		t.Errorf("expected %v, got %v", key, item)
+	}
+}
