@@ -19,16 +19,18 @@ package filters
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"testing"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"net/http"
-	"net/http/httptest"
-	"reflect"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	batch "k8s.io/api/batch/v1"
@@ -248,6 +250,7 @@ func TestAuditAnnotation(t *testing.T) {
 		authorizer         fakeAuthorizer
 		decisionAnnotation string
 		reasonAnnotation   string
+		statusCode         int
 	}{
 		"decision allow": {
 			fakeAuthorizer{
@@ -257,6 +260,7 @@ func TestAuditAnnotation(t *testing.T) {
 			},
 			"allow",
 			"RBAC: allowed to patch pod",
+			http.StatusOK,
 		},
 		"decision forbid": {
 			fakeAuthorizer{
@@ -266,6 +270,7 @@ func TestAuditAnnotation(t *testing.T) {
 			},
 			"forbid",
 			"RBAC: not allowed to patch pod",
+			http.StatusForbidden,
 		},
 		"error": {
 			fakeAuthorizer{
@@ -275,6 +280,17 @@ func TestAuditAnnotation(t *testing.T) {
 			},
 			"",
 			reasonError,
+			http.StatusInternalServerError,
+		},
+		"unauthorized": {
+			fakeAuthorizer{
+				authorizer.DecisionNoOpinion,
+				"",
+				apierrors.NewUnauthorized("must be logged in"),
+			},
+			"", // decision
+			"", // error
+			http.StatusUnauthorized,
 		},
 	}
 
@@ -288,9 +304,10 @@ func TestAuditAnnotation(t *testing.T) {
 		req = withTestContext(req, nil, &auditinternal.Event{Level: auditinternal.LevelMetadata})
 		ae := audit.AuditEventFrom(req.Context())
 		req.RemoteAddr = "127.0.0.1"
-		handler.ServeHTTP(httptest.NewRecorder(), req)
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
 		assert.Equal(t, tc.decisionAnnotation, ae.Annotations[decisionAnnotationKey], k+": unexpected decision annotation")
 		assert.Equal(t, tc.reasonAnnotation, ae.Annotations[reasonAnnotationKey], k+": unexpected reason annotation")
+		assert.Equal(t, tc.statusCode, recorder.Code, k+": unexpected response status")
 	}
-
 }
