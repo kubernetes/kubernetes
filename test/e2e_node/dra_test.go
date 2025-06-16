@@ -683,7 +683,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			time.Sleep(5 * time.Second)
 
 			ginkgo.By("restarting plugin")
-			kubeletPlugin = newDRAService(ctx, f.ClientSet, nodeName, driverName)
+			newDRAService(ctx, f.ClientSet, nodeName, driverName)
 
 			ginkgo.By("ensuring unchanged ResourceSlices")
 			gomega.Consistently(ctx, listResources(f.ClientSet)).WithTimeout(time.Minute).Should(gomega.Equal(slices), "ResourceSlices")
@@ -881,8 +881,7 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
-	switch podName {
-	case "drasleeppod":
+	if podName == "drasleeppod" {
 		// As above, plus infinite sleep.
 		pod.Spec.Containers[0].Command[2] += "&& sleep 100000"
 	}
