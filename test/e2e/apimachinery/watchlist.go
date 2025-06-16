@@ -198,14 +198,15 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 	ginkgo.It("falls backs to supported content type when when receiving resources as Tables was requested", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 
-		modifiedClientConfig := f.ClientConfig()
+		modifiedClientConfig := dynamic.ConfigFor(f.ClientConfig())
 		modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
 			fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
 			"application/json",
 		}, ",")
 		modifiedClientConfig.GroupVersion = &v1.SchemeGroupVersion
-		dynamicClient, err := dynamic.NewForConfig(modifiedClientConfig)
+		restClient, err := rest.RESTClientFor(modifiedClientConfig)
 		framework.ExpectNoError(err)
+		dynamicClient := dynamic.New(restClient)
 
 		stopCh := make(chan struct{})
 		defer close(stopCh)
