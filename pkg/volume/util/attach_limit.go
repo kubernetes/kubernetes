@@ -25,28 +25,6 @@ import (
 // shared between volume package and scheduler
 
 const (
-	// EBSVolumeLimitKey resource name that will store volume limits for EBS
-	EBSVolumeLimitKey = "attachable-volumes-aws-ebs"
-	// EBSNitroLimitRegex finds nitro instance types with different limit than EBS defaults
-	EBSNitroLimitRegex = "^[cmr]5.*|t3|z1d"
-	// DefaultMaxEBSVolumes is the limit for volumes attached to an instance.
-	// Amazon recommends no more than 40; the system root volume uses at least one.
-	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
-	DefaultMaxEBSVolumes = 39
-	// DefaultMaxEBSNitroVolumeLimit is default EBS volume limit on m5 and c5 instances
-	DefaultMaxEBSNitroVolumeLimit = 25
-	// AzureVolumeLimitKey stores resource name that will store volume limits for Azure
-	AzureVolumeLimitKey = "attachable-volumes-azure-disk"
-	// GCEVolumeLimitKey stores resource name that will store volume limits for GCE node
-	GCEVolumeLimitKey = "attachable-volumes-gce-pd"
-
-	// CinderVolumeLimitKey contains Volume limit key for Cinder
-	CinderVolumeLimitKey = "attachable-volumes-cinder"
-	// DefaultMaxCinderVolumes defines the maximum number of PD Volumes for Cinder
-	// For Openstack we are keeping this to a high enough value so as depending on backend
-	// cluster admins can configure it.
-	DefaultMaxCinderVolumes = 256
-
 	// CSIAttachLimitPrefix defines prefix used for CSI volumes
 	CSIAttachLimitPrefix = "attachable-volumes-csi-"
 
