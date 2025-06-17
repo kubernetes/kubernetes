@@ -509,13 +509,6 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 
 func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo, reason string) error {
 	isRuntimeClassInImageCriAPIEnabled := utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI)
-	// Remove image. Continue despite errors.
-	var err error
-	klog.InfoS("Removing image to free bytes", "imageID", image.id, "size", image.size, "runtimeHandler", image.runtimeHandlerUsedToPullImage)
-	err = im.runtime.RemoveImage(ctx, container.ImageSpec{Image: image.id, RuntimeHandler: image.runtimeHandlerUsedToPullImage})
-	if err != nil {
-		return err
-	}
 
 	imageKey := image.id
 	if isRuntimeClassInImageCriAPIEnabled {
@@ -523,11 +516,51 @@ func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo,
 	}
 
 	im.imageRecordsLock.Lock()
-	delete(im.imageRecords, imageKey)
+	record, exists := im.imageRecords[imageKey]
 	im.imageRecordsLock.Unlock()
 
-	metrics.ImageGarbageCollectedTotal.WithLabelValues(reason).Inc()
-	return err
+	if !exists {
+		klog.V(4).InfoS("Image record not found, skipping removal", "imageID", image.id)
+		return nil
+	}
+
+	klog.InfoS("Removing image to free bytes", "imageID", image.id, "size", image.size, "runtimeHandler", image.runtimeHandlerUsedToPullImage)
+
+	err := im.runtime.RemoveImage(ctx, container.ImageSpec{
+		Image:          image.id,
+		RuntimeHandler: image.runtimeHandlerUsedToPullImage,
+	})
+
+	if err != nil {
+		klog.ErrorS(err, "Failed to remove image", "imageID", image.id)
+
+		// Update lastUsed to prevent immediate retry.
+		im.imageRecordsLock.Lock()
+		if currentRecord, exists := im.imageRecords[imageKey]; exists {
+			// Prevent immediate re-attempt by making it appear recently used.
+			currentRecord.lastUsed = time.Now()
+		}
+		im.imageRecordsLock.Unlock()
+
+		return err
+	}
+
+	im.imageRecordsLock.Lock()
+	defer im.imageRecordsLock.Unlock()
+
+	if currentRecord, exists := im.imageRecords[imageKey]; exists {
+		// Verify we're removing the same instance we operated on.
+		if currentRecord == record {
+			delete(im.imageRecords, imageKey)
+			metrics.ImageGarbageCollectedTotal.WithLabelValues(reason).Inc()
+		} else {
+			klog.V(4).InfoS("Image record changed during removal, skipping deletion", "imageID", image.id)
+		}
+	} else {
+		klog.V(4).InfoS("Image record removed by concurrent operation", "imageID", image.id)
+	}
+
+	return nil
 }
 
 // Queries all of the image records and arranges them in a slice of evictionInfo, sorted based on last time used, ignoring images pinned by the runtime.
