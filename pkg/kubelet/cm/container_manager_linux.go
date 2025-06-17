@@ -1048,10 +1048,41 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 	// For now we only support Device Plugin
 	cm.deviceManager.UpdateAllocatedResourcesStatus(pod, status)
 
-	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources which is planned for the next iteration of a KEP.
+	// Update DRA resources if the feature is enabled and the manager exists
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+		cm.draManager.UpdateAllocatedResourcesStatus(pod, status)
+	}
 }
 
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
-	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources, for now only use device plugin updates. DRA support is planned for the next iteration of a KEP.
-	return cm.deviceManager.Updates()
+
+	out := make(chan resourceupdates.Update)
+	var wg sync.WaitGroup
+
+	sources := []<-chan resourceupdates.Update{}
+	if cm.deviceManager != nil {
+		sources = append(sources, cm.deviceManager.Updates())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+		sources = append(sources, cm.draManager.Updates())
+	}
+
+	for _, ch := range sources {
+		wg.Add(1)
+		go func(c <-chan resourceupdates.Update) {
+			defer wg.Done()
+			for v := range c {
+				klog.Infof("[KEP-4680 DEBUG] 2. Container Manager: Forwarding update for pods: %v", v.PodUIDs)
+
+				out <- v
+			}
+		}(ch)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+
+	return out
 }

@@ -18,25 +18,28 @@ package plugin
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"path"
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"k8s.io/klog/v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type fakeGRPCServer struct {
+	drapbv1beta1.UnimplementedDRAPluginServer
+	drahealthv1alpha1.UnimplementedNodeHealthServer
 }
-
-var _ drapbv1beta1.DRAPluginServer = &fakeGRPCServer{}
 
 func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1beta1.NodePrepareResourcesRequest) (*drapbv1beta1.NodePrepareResourcesResponse, error) {
 	return &drapbv1beta1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1beta1.NodePrepareResourceResponse{"claim-uid": {
@@ -71,16 +74,13 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 
 	s := grpc.NewServer()
 	fakeGRPCServer := &fakeGRPCServer{}
-	switch service {
-	case drapbv1beta1.DRAPluginService:
-		drapbv1beta1.RegisterDRAPluginServer(s, fakeGRPCServer)
-	default:
-		return nil, fmt.Errorf("unsupported gRPC service: %s", service)
-	}
+
+	drapbv1beta1.RegisterDRAPluginServer(s, fakeGRPCServer)
+	drahealthv1alpha1.RegisterNodeHealthServer(s, fakeGRPCServer)
 
 	go func() {
 		go func() {
-			if err := s.Serve(listener); err != nil {
+			if err := s.Serve(listener); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 				panic(err)
 			}
 		}()
@@ -96,9 +96,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	service := drapbv1beta1.DRAPluginService
 	addr := path.Join(t.TempDir(), "dra.sock")
 	teardown, err := setupFakeGRPCServer(service, addr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer teardown()
 
 	reusedConns := make(map[*grpc.ClientConn]int)
@@ -108,7 +106,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	driverName := "dummy-driver"
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
 	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get plugin")
@@ -148,12 +146,8 @@ func TestGRPCConnIsReused(t *testing.T) {
 
 	wg.Wait()
 	// We should have only one entry otherwise it means another gRPC connection has been created
-	if len(reusedConns) != 1 {
-		t.Errorf("expected length to be 1 but got %d", len(reusedConns))
-	}
-	if counter, ok := reusedConns[conn]; ok && counter != 2 {
-		t.Errorf("expected counter to be 2 but got %d", counter)
-	}
+	require.Len(t, reusedConns, 1, "expected length to be 1 but got %d", len(reusedConns))
+	require.Equal(t, 2, reusedConns[conn], "expected counter to be 2 but got %d", reusedConns[conn])
 }
 
 func TestGetDRAPlugin(t *testing.T) {
@@ -182,7 +176,7 @@ func TestGetDRAPlugin(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
 			if test.setup != nil {
 				require.NoError(t, test.setup(draPlugins), "setup plugin")
 			}
@@ -228,8 +222,9 @@ func TestGRPCMethods(t *testing.T) {
 			defer teardown()
 
 			driverName := "dummy-driver"
-			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
 			tCtx.ExpectNoError(draPlugins.add(driverName, addr, test.chosenService, defaultClientCallTimeout))
+
 			plugin, err := draPlugins.GetPlugin(driverName)
 			if err != nil {
 				t.Fatal(err)
@@ -254,4 +249,33 @@ func assertError(t *testing.T, expectError string, err error) {
 	case err != nil && !strings.Contains(err.Error(), expectError):
 		t.Errorf("Expected error %q, got: %v", expectError, err)
 	}
+}
+
+func TestPlugin_WatchResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx := klog.NewContext(tCtx, klog.NewKlogr())
+	driverName := "test-driver"
+	addr := path.Join(t.TempDir(), "dra.sock")
+
+	teardown, err := setupFakeGRPCServer(drapbv1beta1.DRAPluginService, addr)
+	require.NoError(t, err)
+	defer teardown()
+
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
+	err = draPlugins.add(driverName, addr, drapbv1beta1.DRAPluginService, 5*time.Second)
+	require.NoError(t, err)
+	defer draPlugins.remove(driverName, addr)
+
+	p, err := draPlugins.GetPlugin(driverName)
+	require.NoError(t, err)
+
+	stream, err := p.WatchResources(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, stream)
+
+	resp, err := stream.Recv()
+	assert.NoError(t, err)
+	assert.Len(t, resp.Devices, 1)
+	assert.Equal(t, "pool1", resp.Devices[0].PoolName)
+	assert.Equal(t, "Healthy", resp.Devices[0].Health)
 }
