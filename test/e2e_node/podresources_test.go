@@ -947,7 +947,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResources, func() {
+var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodResourcesAPI, func() {
 	f := framework.NewDefaultFramework("podresources-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
