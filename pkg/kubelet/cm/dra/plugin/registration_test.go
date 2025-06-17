@@ -151,7 +151,7 @@ func TestRegistrationHandler(t *testing.T) {
 			description:       "two-services",
 			driverName:        pluginB,
 			socketFile:        socketFileB,
-			supportedServices: []string{drapb.DRAPluginService /* TODO: add v1 here once we have it */},
+			supportedServices: []string{drapb.DRAPluginService, "v1alpha1.NodeHealth" /* TODO: add v1 here once we have it */},
 			chosenService:     drapb.DRAPluginService,
 		},
 		// TODO: use v1beta1 here once we have v1
@@ -221,7 +221,7 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// The DRAPluginManager wipes all slices at startup.
-			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, time.Second /* very short wiping delay for testing */)
+			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, time.Second /* very short wiping delay for testing */)
 			tCtx.Cleanup(draPlugins.Stop)
 			if test.withClient {
 				requireNoSlices(tCtx)
@@ -309,7 +309,7 @@ func TestConnectionHandling(t *testing.T) {
 			tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
 
 			// The handler wipes all slices at startup.
-			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, test.delay)
+			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, test.delay)
 			tCtx.Cleanup(draPlugins.Stop)
 			requireNoSlices(tCtx)
 

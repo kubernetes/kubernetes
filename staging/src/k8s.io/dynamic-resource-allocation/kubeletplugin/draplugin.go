@@ -37,6 +37,7 @@ import (
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
@@ -487,6 +488,7 @@ type options struct {
 	nodeV1                     bool
 	registrationService        bool
 	draService                 bool
+	healthService              *bool
 }
 
 // Helper combines the kubelet registration service and the DRA node plugin
@@ -618,6 +620,12 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	if o.nodeV1beta1 {
 		supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
 	}
+	// Check if the plugin implements the DRAResourceHealth service.
+	if _, ok := plugin.(drahealthv1alpha1.DRAResourceHealthServer); ok {
+		// If it does, add it to the list of services this plugin supports.
+		logger.V(5).Info("detected v1alpha1.DRAResourceHealth gRPC service")
+		supportedServices = append(supportedServices, drahealthv1alpha1.DRAResourceHealth_ServiceDesc.ServiceName)
+	}
 	if len(supportedServices) == 0 {
 		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
 	}
@@ -635,7 +643,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 			o.unaryInterceptors,
 			o.streamInterceptors,
 			draEndpoint,
-			func(ctx context.Context, err error) {
+			func(ctx context.Context, err error) { // This error handler is REQUIRED
 				plugin.HandleError(ctx, err, "DRA gRPC server failed")
 			},
 			func(grpcServer *grpc.Server) {
@@ -643,9 +651,17 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 					logger.V(5).Info("registering v1.DRAPlugin gRPC service")
 					drapbv1.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
 				}
+
 				if o.nodeV1beta1 {
 					logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
 					drapbv1beta1.RegisterDRAPluginServer(grpcServer, drapbv1beta1.V1ServerWrapper{DRAPluginServer: &nodePluginImplementation{Helper: d}})
+				}
+
+				if heatlhServer, ok := d.plugin.(drahealthv1alpha1.DRAResourceHealthServer); ok {
+					if o.healthService == nil || *o.healthService {
+						logger.V(5).Info("registering v1alpha1.DRAResourceHealth gRPC service")
+						drahealthv1alpha1.RegisterDRAResourceHealthServer(grpcServer, heatlhServer)
+					}
 				}
 			},
 		)

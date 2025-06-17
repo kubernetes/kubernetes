@@ -2522,7 +2522,6 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		}
 
 		kl.sourcesReady.AddSource(u.Source)
-
 	case e := <-plegCh:
 		if isSyncPodWorthy(e) {
 			// PLEG event for a pod; sync it.
@@ -2586,7 +2585,6 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			// We do not apply the optimization by updating the status directly, but can do it later
 			handler.HandlePodSyncs(pods)
 		}
-
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready or volume manager has not yet synced the states,
