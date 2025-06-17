@@ -33,7 +33,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2/types"
 
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
+	yaml "go.yaml.in/yaml/v2"
 )
 
 // ConformanceData describes the structure of the conformance.yaml file

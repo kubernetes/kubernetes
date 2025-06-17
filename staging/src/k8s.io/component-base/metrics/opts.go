@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	promext "k8s.io/component-base/metrics/prometheusextension"
 	"k8s.io/klog/v2"
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
+	yaml "go.yaml.in/yaml/v2"
 )
 
 var (
