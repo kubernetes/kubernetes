@@ -19,8 +19,10 @@ package consistencydetector
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -30,6 +32,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
+
+var dataConsistencyDetectionForWatchListEnabled = false
+
+func init() {
+	dataConsistencyDetectionForWatchListEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_WATCHLIST_INCONSISTENCY_DETECTOR"))
+}
+
+// IsDataConsistencyDetectionForWatchListEnabled returns true when
+// the KUBE_WATCHLIST_INCONSISTENCY_DETECTOR environment variable was set during a binary startup.
+func IsDataConsistencyDetectionForWatchListEnabled() bool {
+	return dataConsistencyDetectionForWatchListEnabled
+}
 
 type RetrieveItemsFunc[U any] func() []U
 
