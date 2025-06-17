@@ -44,8 +44,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
-	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -335,13 +333,11 @@ func TestManager(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
 
-			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
 			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil)
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 			manager := NewManager(&Config{
 				Logger:                          logger,
-				ProbeManager:                    proberManager,
 				VolumeManager:                   fakeVolumeManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
@@ -441,14 +437,12 @@ func TestFeatureEnabled(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)
 
-			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
 			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil)
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			manager := NewManager(&Config{
 				Logger:                          logger,
-				ProbeManager:                    proberManager,
 				VolumeManager:                   fakeVolumeManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
@@ -500,13 +494,11 @@ func TestRestart(t *testing.T) {
 		return dbus, nil
 	}
 
-	proberManager := probetest.FakeManager{}
 	fakeRecorder := &record.FakeRecorder{}
 	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil)
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager := NewManager(&Config{
 		Logger:                          logger,
-		ProbeManager:                    proberManager,
 		VolumeManager:                   fakeVolumeManager,
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,
@@ -540,7 +532,6 @@ func TestRestart(t *testing.T) {
 
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	var (
-		probeManager      = probetest.FakeManager{}
 		fakeRecorder      = &record.FakeRecorder{}
 		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil)
 		syncNodeStatus    = func() {}
@@ -551,7 +542,6 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	type fields struct {
 		recorder                         record.EventRecorder
 		nodeRef                          *v1.ObjectReference
-		probeManager                     prober.Manager
 		volumeManager                    volumemanager.VolumeManager
 		shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 		getPods                          eviction.ActivePodsFunc
@@ -573,7 +563,6 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 			fields: fields{
 				recorder:      fakeRecorder,
 				nodeRef:       nodeRef,
-				probeManager:  probeManager,
 				volumeManager: fakeVolumeManager,
 				shutdownGracePeriodByPodPriority: []kubeletconfig.ShutdownGracePeriodByPodPriority{
 					{
@@ -615,7 +604,6 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 				logger:                logger,
 				recorder:              tt.fields.recorder,
 				nodeRef:               tt.fields.nodeRef,
-				probeManager:          tt.fields.probeManager,
 				getPods:               tt.fields.getPods,
 				syncNodeStatus:        tt.fields.syncNodeStatus,
 				dbusCon:               tt.fields.dbusCon,
@@ -651,7 +639,6 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 
 func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	var (
-		probeManager               = probetest.FakeManager{}
 		fakeRecorder               = &record.FakeRecorder{}
 		syncNodeStatus             = func() {}
 		nodeRef                    = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
@@ -667,10 +654,9 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	)
 	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
 	m := &managerImpl{
-		logger:       logger,
-		recorder:     fakeRecorder,
-		nodeRef:      nodeRef,
-		probeManager: probeManager,
+		logger:   logger,
+		recorder: fakeRecorder,
+		nodeRef:  nodeRef,
 		getPods: func() []*v1.Pod {
 			return []*v1.Pod{
 				makePod("test-pod", 1, nil),
