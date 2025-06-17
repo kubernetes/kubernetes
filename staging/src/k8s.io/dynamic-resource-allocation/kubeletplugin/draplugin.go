@@ -37,6 +37,7 @@ import (
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
@@ -578,6 +579,12 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
 		supportedServices = append(supportedServices, drapb.DRAPluginService)
 	}
+	// Check if the plugin implements the NodeHealth service.
+	if _, ok := plugin.(drahealthv1alpha1.NodeHealthServer); ok {
+		// If it does, add it to the list of services this plugin supports.
+		logger.V(5).Info("detected v1alpha1.NodeHealth gRPC service")
+		supportedServices = append(supportedServices, drahealthv1alpha1.NodeHealth_ServiceDesc.ServiceName)
+	}
 	if len(supportedServices) == 0 {
 		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
 	}
@@ -593,6 +600,10 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 			if o.nodeV1beta1 {
 				logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
 				drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
+			}
+			if heatlhServer, ok := d.plugin.(drahealthv1alpha1.NodeHealthServer); ok {
+				logger.V(5).Info("registering v1alpha1.NodeHealth gRPC service")
+				drahealthv1alpha1.RegisterNodeHealthServer(grpcServer, heatlhServer)
 			}
 		})
 		if err != nil {
