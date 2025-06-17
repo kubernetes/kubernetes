@@ -28,78 +28,83 @@ import (
 	resourceapi "k8s.io/dynamic-resource-allocation/api"
 )
 
-func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
+func TestStandardPCIDeviceAttributes(t *testing.T) {
 	pciBusID := "0000:01:02.3"
+	pciIntermediateBusID := "0000:00:13.1"
 	pcieRoot := "pci0000:01"
-	expectedAttribute := &resourceapi.DeviceAttribute{
-		StringValue: ptr.To(pcieRoot),
-	}
-
 	tests := map[string]struct {
-		smockSysfsSetup   func(t *testing.T, mockSysfs sysfsPath)
-		address           string
-		expectedAttribute *resourceapi.DeviceAttribute
-		expectsError      bool
-		expectedErrMsg    string
+		smockSysfsSetup func(t *testing.T, mockSysfs sysfs)
+		opts            []StandardPCIDeviceAttributesOption
+		expected        map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+		expectsError    bool
+		expectedErrMsg  string
 	}{
 		"valid": {
-			smockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
-				devicePath := mockSysfs.Devices(filepath.Join(pcieRoot, "0000:00:13.1", pciBusID))
+			smockSysfsSetup: func(t *testing.T, mockSysfs sysfs) {
+				devicePath := mockSysfs.Devices(filepath.Join(pcieRoot, pciIntermediateBusID, pciBusID))
 				TouchFile(t, devicePath)
 				busPath := mockSysfs.Bus(filepath.Join("pci", "devices", pciBusID))
 				CreateSymlink(t, devicePath, busPath)
 			},
-			address:           pciBusID,
-			expectedAttribute: expectedAttribute,
-			expectsError:      false,
+			opts: []StandardPCIDeviceAttributesOption{
+				WithPCIDeviceAddress(pciBusID),
+			},
+			expected: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				qualifiedNamePCIeRoot: {
+					StringValue: ptr.To(pcieRoot),
+				},
+			},
 		},
 		"invalid empty PCI Bus ID": {
-			address:           "",
-			expectedAttribute: nil,
-			expectsError:      true,
-			expectedErrMsg:    "PCI Bus ID cannot be empty",
+			opts: []StandardPCIDeviceAttributesOption{
+				WithPCIDeviceAddress(""),
+			},
+			expected:       nil,
+			expectsError:   true,
+			expectedErrMsg: "PCI Bus ID cannot be empty",
 		},
 		"invalid PCI Bus ID format": {
-			address:           "invalid-pci-id",
-			expectedAttribute: nil,
-			expectsError:      true,
-			expectedErrMsg:    "invalid PCI Bus ID format: invalid-pci-id",
+			opts: []StandardPCIDeviceAttributesOption{
+				WithPCIDeviceAddress("invalid-pci-id"),
+			},
+			expected:       nil,
+			expectsError:   true,
+			expectedErrMsg: "invalid PCI Bus ID format: invalid-pci-id",
 		},
 		"invalid no exist PCI Bus ID": {
-			address:           pciBusID,
-			expectedAttribute: nil,
-			expectsError:      true,
-			expectedErrMsg:    "no such file or directory",
+			opts: []StandardPCIDeviceAttributesOption{
+				WithPCIDeviceAddress(pciBusID),
+			},
+			expected:       nil,
+			expectsError:   true,
+			expectedErrMsg: "no such file or directory",
 		},
 		"invalid symlink": {
-			smockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
+			smockSysfsSetup: func(t *testing.T, mockSysfs sysfs) {
 				devicePath := mockSysfs.Devices(filepath.Join("invalid-pci-root", "0000:00:13.1", pciBusID))
 				TouchFile(t, devicePath)
 				busPath := mockSysfs.Bus(filepath.Join("pci", "devices", pciBusID))
 				CreateSymlink(t, devicePath, busPath)
 			},
-			address:           pciBusID,
-			expectedAttribute: nil,
-			expectsError:      true,
-			expectedErrMsg:    "invalid symlink target for PCI Bus ID",
+			opts: []StandardPCIDeviceAttributesOption{
+				WithPCIDeviceAddress(pciBusID),
+			},
+			expected:       nil,
+			expectsError:   true,
+			expectedErrMsg: "invalid symlink target for PCI Bus ID",
 		},
 	}
+
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			mockSysfsPath := t.TempDir()
-			mockSysfs := sysfsPath(mockSysfsPath)
+
+			mockSysfs := sysfs(mockSysfsPath)
 			if test.smockSysfsSetup != nil {
 				test.smockSysfsSetup(t, mockSysfs)
 			}
-			sysfs = mockSysfs
-			t.Cleanup(func() {
-				sysfs = sysfsPath(sysfsRoot)
-				if err := os.RemoveAll(mockSysfsPath); err != nil {
-					t.Errorf("Failed to clean up mock sysfs path %s: %v", mockSysfsPath, err)
-				}
-			})
 
-			got, err := GetPCIeRootAttributeByPCIBusID(test.address)
+			got, err := StandardPCIDeviceAttributes(append(test.opts, withSysfs(mockSysfs))...)
 			if test.expectsError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -114,8 +119,8 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if !reflect.DeepEqual(got, *test.expectedAttribute) {
-				t.Errorf("Expected attribute %v, got %v", test.expectedAttribute, got)
+			if !reflect.DeepEqual(got, test.expected) {
+				t.Errorf("Expected attributes %v, got %v", test.expected, got)
 			}
 		})
 	}
