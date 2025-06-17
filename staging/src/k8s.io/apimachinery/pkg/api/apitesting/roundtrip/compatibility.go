@@ -29,7 +29,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
+	"github.com/google/go-cmp/cmp"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"

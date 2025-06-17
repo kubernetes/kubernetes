@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/v3"
-	"github.com/google/go-cmp/cmp" //nolint:depguard
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -91,7 +91,7 @@ func (f *fakeResourceManager) Validate() error {
 	defer f.expect.lock.RUnlock()
 
 	if !reflect.DeepEqual(f.expect.Actions, f.Actions) {
-		return errors.New(cmp.Diff(f.expect.Actions, f.Actions))
+		return errors.New(diff.Diff(f.expect.Actions, f.Actions))
 	}
 	return nil
 }
