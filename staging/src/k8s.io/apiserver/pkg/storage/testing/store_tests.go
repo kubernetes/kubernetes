@@ -32,6 +32,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/etcd/client/v3/kubernetes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -39,8 +40,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -624,7 +627,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, ignoreWatchCacheTests bool) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, watchCacheEnabled bool, recorder *KubernetesRecorder) {
 	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -670,6 +673,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		expectRVTooLarge           bool
 		expectRV                   string
 		expectRVFunc               func(string) error
+		expectEtcdRequest          func() []RecordedList
 	}{
 		{
 			name:        "rejects invalid resource version",
@@ -813,6 +817,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(currentRV))),
 			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectEtcdRequest: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/second/",
+						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 1},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit at current resource version",
@@ -1574,7 +1589,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			// doesn't automatically preclude some scenarios from happening.
 			t.Parallel()
 
-			if ignoreWatchCacheTests && tt.ignoreForWatchCache {
+			if watchCacheEnabled && tt.ignoreForWatchCache {
 				t.Skip()
 			}
 
@@ -1589,7 +1604,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Predicate:            tt.pred,
 				Recursive:            true,
 			}
-			err := store.GetList(ctx, tt.prefix, storageOpts, out)
+			recorderKey := t.Name()
+			listCtx := context.WithValue(ctx, recorderContextKey, recorderKey)
+			err := store.GetList(listCtx, tt.prefix, storageOpts, out)
 			if tt.expectRVTooLarge {
 				// TODO: Clasify etcd future revision error as TooLargeResourceVersion
 				if err == nil || !(storage.IsTooLargeResourceVersion(err) || strings.Contains(err.Error(), "etcdserver: mvcc: required revision is a future revision")) {
@@ -1635,6 +1652,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			}
 			if !cmp.Equal(tt.expectedRemainingItemCount, out.RemainingItemCount) {
 				t.Fatalf("unexpected remainingItemCount, diff: %s", cmp.Diff(tt.expectedRemainingItemCount, out.RemainingItemCount))
+			}
+			if watchCacheEnabled && tt.expectEtcdRequest != nil {
+				expectEtcdLists := tt.expectEtcdRequest()
+				etcdLists := recorder.ListRequestForKey(recorderKey)
+				if !cmp.Equal(expectEtcdLists, etcdLists) {
+					t.Fatalf("unexpected etcd requests, diff: %s", cmp.Diff(expectEtcdLists, etcdLists))
+				}
 			}
 		})
 	}
