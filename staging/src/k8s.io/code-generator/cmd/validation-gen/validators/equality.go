@@ -65,13 +65,13 @@ func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Vali
 	var disallowedValue any
 	var err error
 
-	switch t {
-	case types.String:
+	switch {
+	case t == types.String:
 		if tag.ValueType != codetags.ValueTypeString {
 			return Validations{}, fmt.Errorf("type mismatch: field is a string, but payload is of type %s", tag.ValueType)
 		}
 		disallowedValue = tag.Value
-	case types.Bool:
+	case t == types.Bool:
 		if tag.ValueType != codetags.ValueTypeBool {
 			return Validations{}, fmt.Errorf("type mismatch: field is a bool, but payload is of type %s", tag.ValueType)
 		}
@@ -79,18 +79,16 @@ func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Vali
 		if err != nil {
 			return Validations{}, fmt.Errorf("invalid bool value for payload: %w", err)
 		}
-	default:
-		if types.IsInteger(t) {
-			if tag.ValueType != codetags.ValueTypeInt {
-				return Validations{}, fmt.Errorf("type mismatch: field is an integer, but payload is of type %s", tag.ValueType)
-			}
-			disallowedValue, err = strconv.Atoi(tag.Value)
-			if err != nil {
-				return Validations{}, fmt.Errorf("invalid integer value for payload: %w", err)
-			}
-		} else {
-			return Validations{}, fmt.Errorf("unsupported type for 'neq' tag: %s", t.Name)
+	case types.IsInteger(t):
+		if tag.ValueType != codetags.ValueTypeInt {
+			return Validations{}, fmt.Errorf("type mismatch: field is an integer, but payload is of type %s", tag.ValueType)
 		}
+		disallowedValue, err = strconv.Atoi(tag.Value)
+		if err != nil {
+			return Validations{}, fmt.Errorf("invalid integer value for payload: %w", err)
+		}
+	default:
+		return Validations{}, fmt.Errorf("unsupported type for 'neq' tag: %s", t.Name)
 	}
 
 	fn := Function(v.TagName(), DefaultFlags, neqValidator, disallowedValue)
