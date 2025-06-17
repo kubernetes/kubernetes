@@ -223,7 +223,21 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 		}
 	}
 
+	if !apiequality.Semantic.DeepEqual(oldStatus.ContainerStatuses, status.ContainerStatuses) {
+		return false
+	}
+	if !apiequality.Semantic.DeepEqual(oldStatus.InitContainerStatuses, status.InitContainerStatuses) {
+		return false
+	}
+	if !apiequality.Semantic.DeepEqual(oldStatus.EphemeralContainerStatuses, status.EphemeralContainerStatuses) {
+		return false
+	}
+
 	oldCopy.Conditions = status.Conditions
+	oldCopy.ContainerStatuses = status.ContainerStatuses
+	oldCopy.InitContainerStatuses = status.InitContainerStatuses
+	oldCopy.EphemeralContainerStatuses = status.EphemeralContainerStatuses
+
 	return apiequality.Semantic.DeepEqual(oldCopy, status)
 }
 

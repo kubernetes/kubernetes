@@ -223,6 +223,7 @@ func NewCommand() *cobra.Command {
 		}
 
 		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{DriverResources: &driverResources},
+			Options{EnableHealthService: true},
 			kubeletplugin.PluginDataDirectoryPath(datadir),
 			kubeletplugin.RegistrarDirectoryPath(*kubeletRegistryDir),
 		)
