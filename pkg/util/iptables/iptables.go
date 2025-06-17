@@ -177,9 +177,6 @@ var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
 // WaitMinVersion a minimum iptables versions supporting the -w and -w<seconds> flags
 var WaitMinVersion = utilversion.MustParseGeneric("1.4.20")
 
-// WaitIntervalMinVersion a minimum iptables versions supporting the wait interval useconds
-var WaitIntervalMinVersion = utilversion.MustParseGeneric("1.6.1")
-
 // WaitSecondsMinVersion a minimum iptables versions supporting the wait seconds
 var WaitSecondsMinVersion = utilversion.MustParseGeneric("1.4.22")
 
