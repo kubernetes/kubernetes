@@ -26,133 +26,117 @@ import (
 	"k8s.io/utils/ptr"
 
 	resourceapi "k8s.io/dynamic-resource-allocation/api"
-	dratesting "k8s.io/dynamic-resource-allocation/testing"
-	utils "k8s.io/dynamic-resource-allocation/utils"
 )
 
-func TestStandardPCIDeviceAttributes(t *testing.T) {
-	pcieRootAttrName := resourceapi.QualifiedName(resourceapi.StandardDeviceAttributePCIeRoot)
-
-	address := utils.MustNewPCIAddress(0x0, 0x1, 0x2, 0x3)
-	root := utils.MustNewPCIRoot(0x0, 0x1)
-	standardAttributes := map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-		pcieRootAttrName: {
-			StringValue: ptr.To("pci" + root.String()),
-		},
+func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
+	pciBusID := "0000:01:02.3"
+	pcieRoot := "pci0000:01"
+	expectedAttribute := &resourceapi.DeviceAttribute{
+		StringValue: ptr.To(pcieRoot),
 	}
 
 	tests := map[string]struct {
-		pciAddress         *utils.PCIAddress
-		sysfs              func(*testing.T, string) utils.Sysfs
-		expectedAttributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-		expectsErr         bool
-		expectedErrMsg     string
+		smockSysfsSetup   func(t *testing.T, mockSysfs sysfsPath)
+		address           string
+		expectedAttribute *resourceapi.DeviceAttribute
+		expectsError      bool
+		expectedErrMsg    string
 	}{
-		"nil address": {
-			pciAddress: nil,
-			sysfs: func(t *testing.T, testSysfsRoot string) utils.Sysfs {
-				return utils.NewSysfs()
+		"valid": {
+			smockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
+				devicePath := mockSysfs.Devices(filepath.Join(pcieRoot, "0000:00:13.1", pciBusID))
+				TouchFile(t, devicePath)
+				busPath := mockSysfs.Bus(filepath.Join("pci", "devices", pciBusID))
+				CreateSymlink(t, devicePath, busPath)
 			},
-			expectedAttributes: nil,
+			address:           pciBusID,
+			expectedAttribute: expectedAttribute,
+			expectsError:      false,
 		},
-		"valid address": {
-			pciAddress: address,
-			sysfs: func(t *testing.T, testSysfsRoot string) utils.Sysfs {
-				sysfs := utils.NewSysfsWithRoot(testSysfsRoot)
-				devicePath := sysfs.Devices(filepath.Join("pci"+root.String(), address.String()))
-				dratesting.TouchFile(t, devicePath)
-
-				busPath := sysfs.Bus(filepath.Join("pci", "devices", address.String()))
-				dratesting.CreateSymlink(t, devicePath, busPath)
-				return sysfs
-			},
-			expectedAttributes: standardAttributes,
+		"invalid empty PCI Bus ID": {
+			address:           "",
+			expectedAttribute: nil,
+			expectsError:      true,
+			expectedErrMsg:    "PCI Bus ID cannot be empty",
 		},
-		"non-existent address": {
-			pciAddress: address,
-			sysfs: func(t *testing.T, testSysfsRoot string) utils.Sysfs {
-				return utils.NewSysfsWithRoot(testSysfsRoot)
-			},
-			expectsErr:     true,
-			expectedErrMsg: "no such file or directory",
+		"invalid PCI Bus ID format": {
+			address:           "invalid-pci-id",
+			expectedAttribute: nil,
+			expectsError:      true,
+			expectedErrMsg:    "invalid PCI Bus ID format: invalid-pci-id",
 		},
-		"devices path not a symlink": {
-			pciAddress: address,
-			sysfs: func(t *testing.T, testSysfsRoot string) utils.Sysfs {
-				sysfs := utils.NewSysfsWithRoot(testSysfsRoot)
-				devicePath := sysfs.Devices(filepath.Join("pci"+root.String(), address.String()))
-				dratesting.TouchFile(t, devicePath)
-
-				// Create a file instead of a symlink
-				busPath := sysfs.Bus(filepath.Join("pci", "devices", address.String()))
-				dratesting.TouchFile(t, busPath)
-				return sysfs
-			},
-			expectsErr:     true,
-			expectedErrMsg: "invalid argument",
+		"invalid no exist PCI Bus ID": {
+			address:           pciBusID,
+			expectedAttribute: nil,
+			expectsError:      true,
+			expectedErrMsg:    "no such file or directory",
 		},
-		"invalid symlink target": {
-			pciAddress: address,
-			sysfs: func(t *testing.T, testSysfsRoot string) utils.Sysfs {
-				sysfs := utils.NewSysfsWithRoot(testSysfsRoot)
-				invalidDevicePath := sysfs.Devices(filepath.Join("invalid", "pci"+root.String(), address.String()))
-				dratesting.TouchFile(t, invalidDevicePath)
-
-				// Create a symlink that points to an invalid path
-				busPath := sysfs.Bus(filepath.Join("pci", "devices", address.String()))
-				dratesting.CreateSymlink(t, invalidDevicePath, busPath)
-				return sysfs
+		"invalid symlink": {
+			smockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
+				devicePath := mockSysfs.Devices(filepath.Join("invalid-pci-root", "0000:00:13.1", pciBusID))
+				TouchFile(t, devicePath)
+				busPath := mockSysfs.Bus(filepath.Join("pci", "devices", pciBusID))
+				CreateSymlink(t, devicePath, busPath)
 			},
-			expectsErr:     true,
-			expectedErrMsg: "invalid symlink target for PCI device",
-		},
-		"invalid root format": {
-			pciAddress: address,
-			sysfs: func(t *testing.T, testSysfsRoot string) utils.Sysfs {
-				sysfs := utils.NewSysfsWithRoot(testSysfsRoot)
-				devicePath := sysfs.Devices(filepath.Join("pci-invalid-root", address.String()))
-				dratesting.TouchFile(t, devicePath)
-
-				// Create a symlink with an invalid root format
-				busPath := sysfs.Bus(filepath.Join("pci", "devices", address.String()))
-				dratesting.CreateSymlink(t, devicePath, busPath)
-				return sysfs
-			},
-			expectsErr:     true,
-			expectedErrMsg: "invalid PCIRoot format",
+			address:           pciBusID,
+			expectedAttribute: nil,
+			expectsError:      true,
+			expectedErrMsg:    "invalid symlink target for PCI Bus ID",
 		},
 	}
-
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			testSysfsRoot, err := os.MkdirTemp("", "sysfs-test")
-			if err != nil {
-				t.Fatalf("Failed to create temp sysfs directory: %v", err)
+			mockSysfsPath := t.TempDir()
+			mockSysfs := sysfsPath(mockSysfsPath)
+			if test.smockSysfsSetup != nil {
+				test.smockSysfsSetup(t, mockSysfs)
 			}
+			sysfs = mockSysfs
 			t.Cleanup(func() {
-				if err := os.RemoveAll(testSysfsRoot); err != nil {
-					t.Errorf("Failed to remove temp sysfs directory: %v", err)
+				sysfs = sysfsPath(sysfsRoot)
+				if err := os.RemoveAll(mockSysfsPath); err != nil {
+					t.Errorf("Failed to clean up mock sysfs path %s: %v", mockSysfsPath, err)
 				}
 			})
-			result, err := StandardPCIDeviceAttributes(
-				WithPCIDeviceAddress(test.pciAddress),
-				withSysfs(test.sysfs(t, testSysfsRoot)),
-			)
-			if test.expectsErr {
+
+			got, err := GetPCIeRootAttributeByPCIBusID(test.address)
+			if test.expectsError {
 				if err == nil {
-					t.Fatalf("Expected error but got none")
+					t.Errorf("Expected error but got none")
+					return
 				}
 				if !strings.Contains(err.Error(), test.expectedErrMsg) {
-					t.Fatalf("Expected error message %q contains %q", err.Error(), test.expectedErrMsg)
+					t.Errorf("Expected error message to contain %q, got %q", test.expectedErrMsg, err.Error())
+					return
 				}
 				return
 			}
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if !reflect.DeepEqual(result, test.expectedAttributes) {
-				t.Fatalf("Expected attributes %v, got %v", test.expectedAttributes, result)
+			if !reflect.DeepEqual(got, *test.expectedAttribute) {
+				t.Errorf("Expected attribute %v, got %v", test.expectedAttribute, got)
 			}
 		})
+	}
+}
+
+func TouchFile(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("Failed to create directory %s: %v", filepath.Dir(path), err)
+	}
+	if _, err := os.Create(path); err != nil {
+		t.Fatalf("Failed to create file %s: %v", path, err)
+	}
+}
+
+func CreateSymlink(t *testing.T, target, link string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(link), 0755); err != nil {
+		t.Fatalf("Failed to create directory for symlink %s: %v", filepath.Dir(link), err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatalf("Failed to create symlink from %s to %s: %v", target, link, err)
 	}
 }
