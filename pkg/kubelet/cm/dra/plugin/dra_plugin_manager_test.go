@@ -40,7 +40,7 @@ func TestAddSameName(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
 	require.NoError(t, draPlugins.add(p))
 
 	assert.False(t, firstWasCancelled, "should not cancel context after the first call")
@@ -79,7 +79,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
 	draPlugins.add(p)
 
 	draPlugins.remove(p.driverName, "")

@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -42,9 +43,11 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 )
 
 type ExamplePlugin struct {
+	drahealthv1alpha1.UnimplementedNodeHealthServer
 	stopCh         <-chan struct{}
 	logger         klog.Logger
 	resourceClient cgoresource.ResourceV1beta2Interface
@@ -143,6 +146,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 			return nil
 		}
 	}
+
 	ex := &ExamplePlugin{
 		stopCh:         ctx.Done(),
 		logger:         logger,
@@ -536,4 +540,55 @@ func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resour
 // To restore normal GetInfo behavior, call SetGetInfoError(nil).
 func (ex *ExamplePlugin) SetGetInfoError(err error) {
 	ex.d.SetGetInfoError(err)
+}
+
+var _ drahealthv1alpha1.NodeHealthServer = &ExamplePlugin{}
+
+func (ex *ExamplePlugin) WatchResources(req *drahealthv1alpha1.WatchResourcesRequest, srv drahealthv1alpha1.NodeHealth_WatchResourcesServer) error {
+	logger := klog.FromContext(srv.Context())
+	logger.Info("Starting WatchResources stream")
+
+	// Mock device health data
+	mockDevices := []drahealthv1alpha1.DeviceHealth{
+		{
+			ResourceName: "test-driver/pool1/device1",
+			PoolName:     "pool1",
+			DeviceName:   "device1",
+			Health:       "Healthy",
+			LastUpdated:  time.Now().Unix(),
+		},
+	}
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-srv.Context().Done():
+			logger.Info("WatchResources stream canceled by kubelet")
+			return srv.Context().Err()
+		case <-ticker.C:
+			// Update timestamp and send health data
+			for i := range mockDevices {
+				mockDevices[i].LastUpdated = time.Now().Unix()
+			}
+
+			// Create a slice of pointers for the response
+			healthUpdates := make([]*drahealthv1alpha1.DeviceHealth, len(mockDevices))
+			for i := range mockDevices {
+				// Create a new variable for the address to avoid capturing loop variable
+				deviceCopy := mockDevices[i]
+				healthUpdates[i] = &deviceCopy
+			}
+			resp := &drahealthv1alpha1.WatchResourcesResponse{
+				Devices: healthUpdates,
+			}
+
+			if err := srv.Send(resp); err != nil {
+				logger.Error(err, "Failed to send health update")
+				return err
+			}
+			logger.V(4).Info("Sent health update", "devices", mockDevices)
+		}
+	}
 }

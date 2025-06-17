@@ -25,11 +25,16 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"k8s.io/klog/v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -137,7 +142,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
 	tCtx.ExpectNoError(draPlugins.add(p), "add plugin")
 
 	// we call `NodePrepareResource` 2 times and check whether a new connection is created or the same is reused
@@ -210,7 +215,7 @@ func TestGetDRAPlugin(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
 			if test.setup != nil {
 				require.NoError(t, test.setup(draPlugins), "setup plugin")
 			}
@@ -291,7 +296,7 @@ func TestGRPCMethods(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
 			draPlugins.add(p)
 			plugin, err := draPlugins.GetPlugin(driverName)
 			if err != nil {
@@ -318,3 +323,83 @@ func assertError(t *testing.T, expectError string, err error) {
 		t.Errorf("Expected error %q, got: %v", expectError, err)
 	}
 }
+
+func TestPlugin_WatchResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx := klog.NewContext(tCtx, klog.NewKlogr())
+
+	// Mock gRPC stream
+	mockStream := &mockWatchResourcesClient{
+		recvFunc: func() (*drahealthv1alpha1.WatchResourcesResponse, error) {
+			return &drahealthv1alpha1.WatchResourcesResponse{
+				Devices: []*drahealthv1alpha1.DeviceHealth{
+					{
+						PoolName:    "pool1",
+						DeviceName:  "device1",
+						Health:      "Healthy",
+						LastUpdated: time.Now().Unix(),
+					},
+				},
+			}, nil
+		},
+	}
+	mockClient := &mockNodeHealthClient{
+		watchFunc: func(ctx context.Context, in *drahealthv1alpha1.WatchResourcesRequest, opts ...grpc.CallOption) (drahealthv1alpha1.NodeHealth_WatchResourcesClient, error) {
+			return mockStream, nil
+		},
+	}
+
+	// Create Plugin instance
+	driverName := "test-driver"
+	p := &DRAPlugin{
+		driverName:        driverName,
+		backgroundCtx:     ctx,
+		endpoint:          "unix:///tmp/test.sock",
+		chosenService:     drapbv1beta1.DRAPluginService,
+		healthClient:      mockClient,
+		clientCallTimeout: 5 * time.Second,
+	}
+
+	// Register plugin using the new manager
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
+	draPlugins.add(p)
+	defer draPlugins.remove(p.driverName, p.endpoint)
+
+	// Test WatchResources
+	stream, err := p.WatchResources(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, stream)
+
+	resp, err := stream.Recv()
+	assert.NoError(t, err)
+	assert.Len(t, resp.Devices, 1)
+	assert.Equal(t, "pool1", resp.Devices[0].PoolName)
+	assert.Equal(t, "Healthy", resp.Devices[0].Health)
+}
+
+// Mock implementations for WatchResources
+type mockNodeHealthClient struct {
+	watchFunc func(ctx context.Context, in *drahealthv1alpha1.WatchResourcesRequest, opts ...grpc.CallOption) (drahealthv1alpha1.NodeHealth_WatchResourcesClient, error)
+}
+
+func (m *mockNodeHealthClient) WatchResources(ctx context.Context, in *drahealthv1alpha1.WatchResourcesRequest, opts ...grpc.CallOption) (drahealthv1alpha1.NodeHealth_WatchResourcesClient, error) {
+	return m.watchFunc(ctx, in, opts...)
+}
+
+type mockWatchResourcesClient struct {
+	grpc.ClientStream
+	recvFunc func() (*drahealthv1alpha1.WatchResourcesResponse, error)
+}
+
+func (m *mockWatchResourcesClient) Recv() (*drahealthv1alpha1.WatchResourcesResponse, error) {
+	return m.recvFunc()
+}
+
+// Implement the rest of the grpc.ClientStream interface if needed,
+// often just embedding is enough for the test to compile.
+func (m *mockWatchResourcesClient) Header() (metadata.MD, error) { return nil, nil }
+func (m *mockWatchResourcesClient) Trailer() metadata.MD         { return nil }
+func (m *mockWatchResourcesClient) CloseSend() error             { return nil }
+func (m *mockWatchResourcesClient) Context() context.Context     { return context.Background() }
+func (m *mockWatchResourcesClient) SendMsg(v interface{}) error  { return nil }
+func (m *mockWatchResourcesClient) RecvMsg(v interface{}) error  { return nil }
