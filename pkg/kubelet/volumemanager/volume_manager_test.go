@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -423,7 +422,6 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 		stateProvider,
 		kubeClient,
 		plugMgr,
-		&containertest.FakeRuntime{},
 		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		"",
