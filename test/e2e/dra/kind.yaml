@@ -18,6 +18,7 @@ nodes:
     controllerManager:
         extraArgs:
           v: "5"
+          vmodule: "controller=6" # resourceclaim/controller.go - should have renamed it when copying the controller it was based on!
     apiServer:
         extraArgs:
           runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true"
