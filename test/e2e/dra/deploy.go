@@ -779,13 +779,7 @@ func (d *Driver) TearDown(ctx context.Context) {
 // because of the delay in the kubelet. Only use this in slow
 // tests...
 func (d *Driver) IsGone(ctx context.Context) {
-	gomega.Eventually(ctx, func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
-		slices, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
-		if err != nil {
-			return nil, err
-		}
-		return slices.Items, err
-	}).WithTimeout(7 * time.Minute).Should(gomega.BeEmpty())
+	gomega.Eventually(ctx, d.NewGetSlices()).WithTimeout(7 * time.Minute).Should(gomega.HaveField("Item", gomega.BeEmpty()))
 }
 
 func (d *Driver) interceptor(nodename string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
