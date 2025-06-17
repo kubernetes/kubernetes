@@ -171,7 +171,7 @@ type ReservedMemoryVar struct {
 // Set sets the flag value
 func (v *ReservedMemoryVar) Set(s string) error {
 	if v.Value == nil {
-		return fmt.Errorf("no target (nil pointer to *[]MemoryReservation")
+		return fmt.Errorf("no target (nil pointer to *[]MemoryReservation)")
 	}
 
 	if s == "" {
@@ -200,7 +200,7 @@ func (v *ReservedMemoryVar) Set(s string) error {
 		}
 		numaNodeID, err := strconv.Atoi(numaNodeReservation[0])
 		if err != nil {
-			return fmt.Errorf("failed to convert the NUMA node ID, exptected integer, got %s", numaNodeReservation[0])
+			return fmt.Errorf("failed to convert the NUMA node ID, expected integer, got %s", numaNodeReservation[0])
 		}
 
 		memoryReservation := kubeletconfig.MemoryReservation{
@@ -211,7 +211,7 @@ func (v *ReservedMemoryVar) Set(s string) error {
 		for _, memoryTypeReservation := range memoryTypeReservations {
 			limit := strings.Split(memoryTypeReservation, "=")
 			if len(limit) != 2 {
-				return fmt.Errorf("the reserved limit has incorrect value, expected type=quantatity, got %s", memoryTypeReservation)
+				return fmt.Errorf("the reserved limit has incorrect value, expected type=quantity, got %s", memoryTypeReservation)
 			}
 
 			resourceName := v1.ResourceName(limit[0])
@@ -221,7 +221,7 @@ func (v *ReservedMemoryVar) Set(s string) error {
 
 			q, err := resource.ParseQuantity(limit[1])
 			if err != nil {
-				return fmt.Errorf("failed to parse the quantatity, expected quantatity, got %s", limit[1])
+				return fmt.Errorf("failed to parse the quantity: %s", limit[1])
 			}
 
 			memoryReservation.Limits[v1.ResourceName(limit[0])] = q
@@ -264,6 +264,10 @@ type RegisterWithTaintsVar struct {
 
 // Set sets the flag value
 func (t RegisterWithTaintsVar) Set(s string) error {
+	if t.Value == nil {
+		return fmt.Errorf("no target (nil pointer to []v1.Taint)")
+	}
+
 	if len(s) == 0 {
 		*t.Value = nil
 		return nil
@@ -283,7 +287,7 @@ func (t RegisterWithTaintsVar) Set(s string) error {
 
 // String returns the flag value
 func (t RegisterWithTaintsVar) String() string {
-	if len(*t.Value) == 0 {
+	if t.Value == nil || len(*t.Value) == 0 {
 		return ""
 	}
 	var taints []string
