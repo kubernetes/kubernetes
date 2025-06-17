@@ -150,6 +150,17 @@ EOF
   output_message=$(kubectl get pod/test-pod-2 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
   kube::test::if_has_string "${output_message}" "test-pod-2"
 
+  # verify getn alias is working or not, depending if KUBECTL_KUBERC is on or off
+  output_message=$(! KUBECTL_KUBERC=false kubectl getn 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
+  kube::test::if_has_string "${output_message}" "error: unknown command \"getn\" for \"kubectl\""
+  KUBECTL_KUBERC=true kubectl getn "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/kuberc_file
+
+  # verify KUBERC=off is working as expected
+  output_message=$(! KUBERC=off kubectl getn 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
+  kube::test::if_has_string "${output_message}" "KUBERC=off and passing kuberc flag are mutually exclusive"
+  output_message=$(! KUBERC=off kubectl getn 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" "error: unknown command \"getn\" for \"kubectl\""
+
   cat > "${TMPDIR:-/tmp}"/kuberc_file_multi << EOF
 ---
 apiVersion: kubectl.config.k8s.io/v1beta1
