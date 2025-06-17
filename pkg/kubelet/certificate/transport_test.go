@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var (
@@ -191,7 +192,8 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	}
 
 	// Check for a new cert every 10 milliseconds
-	if _, err := updateTransport(stop, 10*time.Millisecond, c, m, 0); err != nil {
+	tCtx := ktesting.Init(t)
+	if _, err := updateTransport(tCtx, 10*time.Millisecond, c, m, 0); err != nil {
 		t.Fatal(err)
 	}
 

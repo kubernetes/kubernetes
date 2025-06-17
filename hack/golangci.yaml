@@ -224,6 +224,7 @@ linters:
             # this restriction. Whether we then do a global search/replace remains
             # to be decided.
             with-helpers .*
+            contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
       kubeapilinter:
         path: _output/local/bin/kube-api-linter.so
         description: kube-api-linter and lints Kube like APIs based on API conventions and best practices.
