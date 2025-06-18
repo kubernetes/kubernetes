@@ -89,7 +89,7 @@ var _ = utils.SIGDescribe("MutableCSINodeAllocatableCount", framework.WithFeatur
 		driverName = cfg.GetUniqueDriverName()
 		nodeName = cfg.ClientNodeSelection.Name
 
-		enablePeriodicUpdates(ctx, clientSet, driverName, updatePeriodSeconds)
+		updateCSIDriverWithNodeAllocatableUpdatePeriodSeconds(ctx, clientSet, driverName, updatePeriodSeconds)
 
 		err := drivers.WaitForCSIDriverRegistrationOnNode(ctx, nodeName, driverName, clientSet)
 		framework.ExpectNoError(err)
@@ -97,12 +97,12 @@ var _ = utils.SIGDescribe("MutableCSINodeAllocatableCount", framework.WithFeatur
 
 	f.It("should observe dynamic changes in CSINode allocatable count", func(ctx context.Context) {
 		framework.Logf("Testing dynamic changes in CSINode allocatable count")
-		initVal, err := readLimit(ctx, clientSet, nodeName, driverName)
+		initVal, err := readCSINodeLimit(ctx, clientSet, nodeName, driverName)
 		framework.ExpectNoError(err)
 		framework.Logf("Initial MaxVolumesPerNode limit: %d", initVal)
 
 		err = wait.PollUntilContextTimeout(ctx, time.Duration(updatePeriodSeconds), timeout, true, func(ctx context.Context) (bool, error) {
-			cur, err := readLimit(ctx, clientSet, nodeName, driverName)
+			cur, err := readCSINodeLimit(ctx, clientSet, nodeName, driverName)
 			if err != nil {
 				return false, nil
 			}
@@ -114,7 +114,7 @@ var _ = utils.SIGDescribe("MutableCSINodeAllocatableCount", framework.WithFeatur
 	})
 })
 
-func enablePeriodicUpdates(ctx context.Context, cs clientset.Interface, driverName string, period int64) {
+func updateCSIDriverWithNodeAllocatableUpdatePeriodSeconds(ctx context.Context, cs clientset.Interface, driverName string, period int64) {
 	err := wait.PollUntilContextTimeout(ctx, 2*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		obj, err := cs.StorageV1().CSIDrivers().Get(ctx, driverName, metav1.GetOptions{})
 		if err != nil {
@@ -130,7 +130,7 @@ func enablePeriodicUpdates(ctx context.Context, cs clientset.Interface, driverNa
 	framework.ExpectNoError(err, "enabling periodic CSINode allocatable updates failed")
 }
 
-func readLimit(ctx context.Context, cs clientset.Interface, node, drv string) (int32, error) {
+func readCSINodeLimit(ctx context.Context, cs clientset.Interface, node, drv string) (int32, error) {
 	c, err := cs.StorageV1().CSINodes().Get(ctx, node, metav1.GetOptions{})
 	if err != nil {
 		return 0, err
