@@ -572,7 +572,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			name: "specify tracing invalid sampling rate",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				samplingRate := int32(-1)
-				conf.FeatureGates = map[string]bool{"KubeletTracing": true}
 				conf.Tracing = &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
 				return conf
 			},
@@ -581,7 +580,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			name: "specify tracing invalid endpoint",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				ep := "dn%2s://localhost:4317"
-				conf.FeatureGates = map[string]bool{"KubeletTracing": true}
 				conf.Tracing = &tracingapi.TracingConfiguration{Endpoint: &ep}
 				return conf
 			},
