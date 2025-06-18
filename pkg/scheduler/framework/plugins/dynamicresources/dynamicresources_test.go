@@ -310,6 +310,7 @@ type want struct {
 	prescore         result
 	reserve          result
 	unreserve        result
+	prebindPreFlight *framework.Status
 	prebind          result
 	postbind         result
 	postFilterResult *framework.PostFilterResult
@@ -367,9 +368,7 @@ func TestPlugin(t *testing.T) {
 				prefilter: result{
 					status: framework.NewStatus(framework.Skip),
 				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable),
-				},
+				prebindPreFlight: framework.NewStatus(framework.Skip),
 			},
 		},
 		"claim-reference": {
@@ -904,9 +903,7 @@ func TestPlugin(t *testing.T) {
 				prefilter: result{
 					status: framework.NewStatus(framework.Skip),
 				},
-				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `plugin disabled`),
-				},
+				prebindPreFlight: framework.NewStatus(framework.Skip),
 			},
 			disableDRA: true,
 		},
@@ -1007,7 +1004,7 @@ func TestPlugin(t *testing.T) {
 				assert.Equal(t, tc.want.preFilterResult, result)
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
 			})
-			unschedulable := status.Code() != framework.Success
+			unschedulable := status.IsRejected()
 
 			var potentialNodes []*framework.NodeInfo
 
@@ -1074,11 +1071,14 @@ func TestPlugin(t *testing.T) {
 
 					initialObjects = testCtx.listAll(t)
 					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.prebind)
-					status := testCtx.p.PreBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
-					t.Run("prebind", func(t *testing.T) {
-						testCtx.verify(t, tc.want.prebind, initialObjects, nil, status)
+					preBindPreFlightStatus := testCtx.p.PreBindPreFlight(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
+					t.Run("prebindPreFlight", func(t *testing.T) {
+						assert.Equal(t, tc.want.prebindPreFlight, preBindPreFlightStatus)
 					})
-
+					preBindStatus := testCtx.p.PreBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)
+					t.Run("prebind", func(t *testing.T) {
+						testCtx.verify(t, tc.want.prebind, initialObjects, nil, preBindStatus)
+					})
 					if tc.want.unreserveAfterBindFailure != nil {
 						initialObjects = testCtx.listAll(t)
 						testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Node().Name)

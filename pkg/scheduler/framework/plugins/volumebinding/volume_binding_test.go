@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -1125,6 +1126,64 @@ func TestVolumeBinding(t *testing.T) {
 				if score != item.wantScores[i] {
 					t.Errorf("Score expects score %d for node %q, got: %d", item.wantScores[i], nodeName, score)
 				}
+			}
+		})
+	}
+}
+
+func Test_PreBindPreFlight(t *testing.T) {
+	table := []struct {
+		name     string
+		nodeName string
+		state    *stateData
+		want     *framework.Status
+	}{
+		{
+			name:     "all bound",
+			nodeName: "node-a",
+			state: &stateData{
+				allBound: true,
+			},
+			want: framework.NewStatus(framework.Skip),
+		},
+		{
+			name:     "volume to be bound",
+			nodeName: "node-a",
+			state: &stateData{
+				podVolumesByNode: map[string]*PodVolumes{
+					"node-a": {},
+				},
+			},
+			want: framework.NewStatus(framework.Success),
+		},
+		{
+			name:     "error: state is nil",
+			nodeName: "node-a",
+			want:     framework.AsStatus(fwk.ErrNotFound),
+		},
+		{
+			name:     "error: node is not found in podVolumesByNode",
+			nodeName: "node-a",
+			state: &stateData{
+				podVolumesByNode: map[string]*PodVolumes{
+					"node-b": {},
+				},
+			},
+			want: framework.AsStatus(errNoPodVolumeForNode),
+		},
+	}
+
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			pl := &VolumeBinding{}
+			_, ctx := ktesting.NewTestContext(t)
+			state := framework.NewCycleState()
+			if item.state != nil {
+				state.Write(stateKey, item.state)
+			}
+			status := pl.PreBindPreFlight(ctx, state, &v1.Pod{}, item.nodeName)
+			if !status.Equal(item.want) {
+				t.Errorf("PreBindPreFlight failed - got: %v, want: %v", status, item.want)
 			}
 		})
 	}

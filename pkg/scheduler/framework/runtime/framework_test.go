@@ -235,6 +235,10 @@ func (pl *TestPlugin) Reserve(ctx context.Context, state fwk.CycleState, p *v1.P
 func (pl *TestPlugin) Unreserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
 }
 
+func (pl *TestPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+	return nil
+}
+
 func (pl *TestPlugin) PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *framework.Status {
 	return framework.NewStatus(framework.Code(pl.inj.PreBindStatus), injectReason)
 }
