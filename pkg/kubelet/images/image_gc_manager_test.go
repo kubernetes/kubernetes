@@ -678,7 +678,16 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		LowThresholdPercent:  80,
 	}
 	mockStatsProvider := statstest.NewMockProvider(t)
-	manager, fakeRuntime := newRealImageGCManager(policy, mockStatsProvider)
+	fakeRuntime := &containertest.FakeRuntime{}
+	recorder := record.NewFakeRecorder(1)
+	manager := &realImageGCManager{
+		runtime:       fakeRuntime,
+		policy:        policy,
+		imageRecords:  make(map[string]*imageRecord),
+		statsProvider: mockStatsProvider,
+		recorder:      recorder,
+		tracer:        noopoteltrace.NewTracerProvider().Tracer(""),
+	}
 
 	// Expect 95% usage and little of it gets freed.
 	imageFs := &statsapi.FsStats{
@@ -690,7 +699,17 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		makeImage(0, 50),
 	}
 
-	assert.Error(t, manager.GarbageCollect(ctx, time.Now()))
+	err := manager.GarbageCollect(ctx, time.Now())
+	assert.Error(t, err)
+
+	// Check that a warning event was sent
+	expectedEvent := "Warning FreeDiskSpaceFailed Failed to garbage collect required amount of images. Attempted to free 150 bytes, but only found 50 bytes eligible to free."
+	select {
+	case event := <-recorder.Events:
+		assert.Equal(t, expectedEvent, event)
+	default:
+		t.Errorf("expected a 'FreeDiskSpaceFailed' event")
+	}
 }
 
 func TestGarbageCollectImageNotOldEnough(t *testing.T) {
