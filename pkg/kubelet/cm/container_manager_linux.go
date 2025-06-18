@@ -1055,45 +1055,34 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 }
 
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
-	return cm.deviceManager.Updates()
 
 	out := make(chan resourceupdates.Update)
 	var wg sync.WaitGroup
-	// May need to be adjusted depending on if we want to expect both to be working immeditaley, maybe version guarded?
-	wg.Add(2)
 
-	proxy := func(c <-chan resourceupdates.Update) {
-		if c == nil {
-			wg.Done()
-			return
-		}
-		for v := range c {
-			out <- v
-		}
-		wg.Done()
-	}
-
-	// Handle channels incase managers are not ready
-	var dmUpdates <-chan resourceupdates.Update
+	sources := []<-chan resourceupdates.Update{}
 	if cm.deviceManager != nil {
-		dmUpdates = cm.deviceManager.Updates()
+		sources = append(sources, cm.deviceManager.Updates())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+		sources = append(sources, cm.draManager.Updates())
 	}
 
-	var draUpdates <-chan resourceupdates.Update
-	if cm.draManager != nil {
-		draUpdates = cm.draManager.Updates()
-	} else {
-		wg.Done()
-	}
+	for _, ch := range sources {
+		wg.Add(1)
+		go func(c <-chan resourceupdates.Update) {
+			defer wg.Done()
+			for v := range c {
+				klog.Infof("[KEP-4680 DEBUG] Container Manager Fan-in: Forwarding update for pods: %v", v.PodUIDs)
 
-	go proxy(dmUpdates)
-	if draUpdates != nil {
-		go proxy(draUpdates)
+				out <- v
+			}
+		}(ch)
 	}
 
 	go func() {
 		wg.Wait()
 		close(out)
 	}()
+
 	return out
 }
