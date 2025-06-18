@@ -541,6 +541,24 @@ func (pl *VolumeBinding) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1
 	return nil
 }
 
+var errNoPodVolumeForNode = fmt.Errorf("no pod volume found for node")
+
+func (pl *VolumeBinding) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+	s, err := getStateData(state)
+	if err != nil {
+		return framework.AsStatus(err)
+	}
+	if s.allBound {
+		// no need to bind volumes
+		return framework.NewStatus(framework.Skip)
+	}
+
+	if _, ok := s.podVolumesByNode[nodeName]; !ok {
+		return framework.AsStatus(fmt.Errorf("%w %q", errNoPodVolumeForNode, nodeName))
+	}
+	return nil
+}
+
 // PreBind will make the API update with the assumed bindings and wait until
 // the PV controller has completely finished the binding operation.
 //

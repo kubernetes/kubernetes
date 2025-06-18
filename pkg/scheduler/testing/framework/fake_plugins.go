@@ -208,6 +208,11 @@ func (pl *FakePreBindPlugin) Name() string {
 }
 
 // PreBind invoked at the PreBind extension point.
+func (pl *FakePreBindPlugin) PreBindPreFlight(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) *framework.Status {
+	return pl.Status
+}
+
+// PreBind invoked at the PreBind extension point.
 func (pl *FakePreBindPlugin) PreBind(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) *framework.Status {
 	return pl.Status
 }
