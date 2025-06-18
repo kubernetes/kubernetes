@@ -20,12 +20,15 @@ import (
 	"bufio"
 	"context"
 	_ "embed"
+	"flag"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -37,11 +40,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/utils/kindcluster"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -49,6 +51,27 @@ import (
 
 //go:embed kind.yaml
 var kindConfig string
+
+func init() {
+	// -v=5 may be useful to debug driver operations, but usually isn't needed.
+	ktesting.SetDefaultVerbosity(2)
+}
+
+var repoRoot = repoRootDefault()
+
+// repoRootDefault figures out whether an E2E suite is invoked in its directory (as in `go test ./test/e2e`),
+// directly in the root (as in `make test-e2e` or `ginkgo ./test/e2e`), or somewhere deep inside
+// the _output directory (`ginkgo _output/bin/e2e.test` where `_output/bin` is actually a symlink).
+func repoRootDefault() string {
+	for i := 0; i < 10; i++ {
+		path := "." + strings.Repeat("/..", i)
+		if _, err := os.Stat(path + "/test/e2e/framework"); err == nil {
+			return path
+		}
+	}
+	// Traditional default.
+	return "../../"
+}
 
 // Upgrade/downgrade tests are slow, partly because "make quick-release" below
 // and BuildImage in kindcluster.go are slow.
@@ -60,18 +83,34 @@ var kindConfig string
 // Beware that the apiserver not coming up again can be caused by not
 // having up-to-date release images, so run "make quick-release" manually.
 
-var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DynamicResourceAllocation) /* TODO: add framework.WithSlow() once we have pull-kubernetes-kind-dra-slow */ /* TODO: add feature.KindCommand once jobs are updated*/, func() {
+func TestUpgradeDowngrade(t *testing.T) {
+	if _, ok := os.LookupEnv("KIND_COMMAND"); !ok {
+		t.Skip("KIND_COMMAND must be set to test DRA upgrade/downgrade scenarios.")
+	}
+	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	ginkgo.RunSpecs(t, "DRA", suiteConfig, reporterConfig)
+}
 
-	ginkgo.It("upgrade/downgrade works", func(ctx context.Context) {
+var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
+	// Initialize the default values by registering flags. We don't actually expose those flags.
+	var fs flag.FlagSet
+	framework.RegisterCommonFlags(&fs)
+	framework.RegisterClusterFlags(&fs)
+
+	// Some other things normally done by test/e2e.
+	testfiles.AddFileSource(testfiles.RootFileSource{Root: repoRoot})
+	gomega.RegisterFailHandler(ginkgo.Fail)
+
+	ginkgo.It("works", func(ctx context.Context) {
 		// TODO: replace with helper code from https://github.com/kubernetes/kubernetes/pull/122481 should that get merged.
 		tCtx := ktesting.Init(GinkgoContextTB())
 		tCtx = ktesting.WithContext(tCtx, ctx)
 
 		tCtx = ktesting.Begin(tCtx, "get source code version")
-		gitVersion, dockerTag, err := sourceVersion(tCtx, framework.TestContext.RepoRoot)
-		tCtx.ExpectNoError(err, "determine source code version for repo root %q", framework.TestContext.RepoRoot)
+		gitVersion, dockerTag, err := sourceVersion(tCtx, repoRoot)
+		tCtx.ExpectNoError(err, "determine source code version for repo root %q", repoRoot)
 		version, err := version.ParseGeneric(gitVersion)
-		tCtx.ExpectNoError(err, "parse version %s of repo root %q", gitVersion, framework.TestContext.RepoRoot)
+		tCtx.ExpectNoError(err, "parse version %s of repo root %q", gitVersion, repoRoot)
 		major, previousMinor := version.Major(), version.Minor()-1
 		tCtx = ktesting.End(tCtx)
 
@@ -123,7 +162,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		tCtx = ktesting.End(tCtx)
 
 		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("update to %s", gitVersion))
-		repoRoot := framework.TestContext.RepoRoot
 		// We could split this up into first updating the apiserver, then control plane components, then restarting kubelet.
 		// For the purpose of this test here we we primarily care about full before/after comparisons, so not done yet.
 		releaseImagesDir, kubelet := buildReleaseImages(tCtx, repoRoot)

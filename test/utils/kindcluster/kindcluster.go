@@ -428,7 +428,11 @@ func ServerDownloadURL(tCtx ktesting.TContext, major, minor uint) string {
 
 func runKind(tCtx ktesting.TContext, args ...string) string {
 	tCtx.Helper()
-	return runAndLogCmd(tCtx, "kind", args...)
+	kindCmd, ok := os.LookupEnv("KIND_COMMAND")
+	if !ok {
+		kindCmd = "kind"
+	}
+	return runAndLogCmd(tCtx, kindCmd, args...)
 }
 
 func runAndLogCmd(tCtx ktesting.TContext, name string, args ...string) string {
