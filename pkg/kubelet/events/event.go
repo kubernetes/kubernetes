@@ -67,6 +67,7 @@ const (
 	WarnAlreadyMountedVolume             = "AlreadyMountedVolume"
 	SuccessfulAttachVolume               = "SuccessfulAttachVolume"
 	SuccessfulMountVolume                = "SuccessfulMountVolume"
+	SuccessfulMapVolume                  = "SuccessfulMapVolume"
 	NodeRebooted                         = "Rebooted"
 	NodeShutdown                         = "Shutdown"
 	ContainerGCFailed                    = "ContainerGCFailed"

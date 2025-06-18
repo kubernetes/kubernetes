@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -133,7 +133,7 @@ type MounterArgs struct {
 	FSGroupChangePolicy *v1.PodFSGroupChangePolicy
 	DesiredSize         *resource.Quantity
 	SELinuxLabel        string
-	Recorder            record.EventRecorder
+	Recorder            events.EventRecorder
 
 	// Optional interface that will be used to change the ownership of the volume, if specified.
 	// mainly used by unit tests
@@ -141,7 +141,7 @@ type MounterArgs struct {
 }
 
 type VolumeOwnershipChanger interface {
-	AddProgressNotifier(pod *v1.Pod, recorder record.EventRecorder) VolumeOwnershipChanger
+	AddProgressNotifier(pod *v1.Pod, recorder events.EventRecorder) VolumeOwnershipChanger
 	ChangePermissions() error
 }
 
@@ -155,7 +155,7 @@ type VolumeOwnership struct {
 	// for monitoring progress of permission change operation
 	pod         *v1.Pod
 	fileCounter atomic.Int64
-	recorder    record.EventRecorder
+	recorder    events.EventRecorder
 }
 
 // Mounter interface provides methods to set up/mount the volume.
