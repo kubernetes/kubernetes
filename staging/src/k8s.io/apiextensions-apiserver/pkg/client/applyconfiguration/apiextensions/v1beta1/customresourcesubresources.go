@@ -34,6 +34,7 @@ type CustomResourceSubresourcesApplyConfiguration struct {
 func CustomResourceSubresources() *CustomResourceSubresourcesApplyConfiguration {
 	return &CustomResourceSubresourcesApplyConfiguration{}
 }
+func (b CustomResourceSubresourcesApplyConfiguration) IsApplyConfiguration() {}
 
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

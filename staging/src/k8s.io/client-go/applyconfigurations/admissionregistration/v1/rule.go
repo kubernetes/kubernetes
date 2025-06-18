@@ -36,6 +36,7 @@ type RuleApplyConfiguration struct {
 func Rule() *RuleApplyConfiguration {
 	return &RuleApplyConfiguration{}
 }
+func (b RuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAPIGroups adds the given value to the APIGroups field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

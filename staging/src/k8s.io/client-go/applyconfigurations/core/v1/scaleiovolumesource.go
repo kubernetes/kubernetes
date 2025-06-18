@@ -38,6 +38,7 @@ type ScaleIOVolumeSourceApplyConfiguration struct {
 func ScaleIOVolumeSource() *ScaleIOVolumeSourceApplyConfiguration {
 	return &ScaleIOVolumeSourceApplyConfiguration{}
 }
+func (b ScaleIOVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithGateway sets the Gateway field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

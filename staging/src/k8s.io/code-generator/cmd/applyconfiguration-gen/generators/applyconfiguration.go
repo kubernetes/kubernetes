@@ -115,6 +115,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 			sw.Do(constructor, typeParams)
 		}
 	}
+	g.generateIsApplyConfiguration(typeParams.ApplyConfig.ApplyConfiguration, sw)
 	g.generateWithFuncs(t, typeParams, sw, nil, &[]string{})
 	g.generateGetters(t, typeParams, sw, nil)
 	return sw.Error()
@@ -145,7 +146,8 @@ func blocklisted(t *types.Type, member types.Member) bool {
 
 func needsGetter(t *types.Type, member types.Member) bool {
 	// Needed when applying an ApplyConfiguration
-	return objectMeta.Name == t.Name && member.Name == "Name"
+	return (objectMeta.Name == t.Name && (member.Name == "Name" || member.Name == "Namespace")) ||
+		(typeMeta.Name == t.Name && (member.Name == "Kind" || member.Name == "APIVersion"))
 }
 
 func (g *applyConfigurationGenerator) generateGetters(t *types.Type, typeParams TypeParams, sw *generator.SnippetWriter, embed *memberParams) {
@@ -268,6 +270,10 @@ func (g *applyConfigurationGenerator) generateStruct(sw *generator.SnippetWriter
 		}
 	}
 	sw.Do("}\n", typeParams)
+}
+
+func (g *applyConfigurationGenerator) generateIsApplyConfiguration(t *types.Type, sw *generator.SnippetWriter) {
+	sw.Do("func (b $.|public$) IsApplyConfiguration() {}\n", t)
 }
 
 func deref(t *types.Type) *types.Type {

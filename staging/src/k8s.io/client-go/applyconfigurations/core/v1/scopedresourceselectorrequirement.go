@@ -35,6 +35,7 @@ type ScopedResourceSelectorRequirementApplyConfiguration struct {
 func ScopedResourceSelectorRequirement() *ScopedResourceSelectorRequirementApplyConfiguration {
 	return &ScopedResourceSelectorRequirementApplyConfiguration{}
 }
+func (b ScopedResourceSelectorRequirementApplyConfiguration) IsApplyConfiguration() {}
 
 // WithScopeName sets the ScopeName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

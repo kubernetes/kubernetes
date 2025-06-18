@@ -30,6 +30,7 @@ type ExternalMetricSourceApplyConfiguration struct {
 func ExternalMetricSource() *ExternalMetricSourceApplyConfiguration {
 	return &ExternalMetricSourceApplyConfiguration{}
 }
+func (b ExternalMetricSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMetric sets the Metric field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

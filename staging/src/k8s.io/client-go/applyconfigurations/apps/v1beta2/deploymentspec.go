@@ -41,6 +41,7 @@ type DeploymentSpecApplyConfiguration struct {
 func DeploymentSpec() *DeploymentSpecApplyConfiguration {
 	return &DeploymentSpecApplyConfiguration{}
 }
+func (b DeploymentSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithReplicas sets the Replicas field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

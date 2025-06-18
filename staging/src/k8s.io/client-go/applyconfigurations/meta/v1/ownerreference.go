@@ -38,6 +38,7 @@ type OwnerReferenceApplyConfiguration struct {
 func OwnerReference() *OwnerReferenceApplyConfiguration {
 	return &OwnerReferenceApplyConfiguration{}
 }
+func (b OwnerReferenceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAPIVersion sets the APIVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

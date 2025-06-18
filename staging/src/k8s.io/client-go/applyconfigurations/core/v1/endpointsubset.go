@@ -31,6 +31,7 @@ type EndpointSubsetApplyConfiguration struct {
 func EndpointSubset() *EndpointSubsetApplyConfiguration {
 	return &EndpointSubsetApplyConfiguration{}
 }
+func (b EndpointSubsetApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAddresses adds the given value to the Addresses field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

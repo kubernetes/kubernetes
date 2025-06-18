@@ -33,6 +33,7 @@ type ContainerStateRunningApplyConfiguration struct {
 func ContainerStateRunning() *ContainerStateRunningApplyConfiguration {
 	return &ContainerStateRunningApplyConfiguration{}
 }
+func (b ContainerStateRunningApplyConfiguration) IsApplyConfiguration() {}
 
 // WithStartedAt sets the StartedAt field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

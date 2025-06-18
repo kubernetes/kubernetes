@@ -76,6 +76,7 @@ type JSONSchemaPropsApplyConfiguration struct {
 func JSONSchemaProps() *JSONSchemaPropsApplyConfiguration {
 	return &JSONSchemaPropsApplyConfiguration{}
 }
+func (b JSONSchemaPropsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithID sets the ID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

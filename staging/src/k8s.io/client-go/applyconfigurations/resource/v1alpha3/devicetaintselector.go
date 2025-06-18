@@ -33,6 +33,7 @@ type DeviceTaintSelectorApplyConfiguration struct {
 func DeviceTaintSelector() *DeviceTaintSelectorApplyConfiguration {
 	return &DeviceTaintSelectorApplyConfiguration{}
 }
+func (b DeviceTaintSelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDeviceClassName sets the DeviceClassName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

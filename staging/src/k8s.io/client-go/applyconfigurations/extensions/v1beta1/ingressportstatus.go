@@ -35,6 +35,7 @@ type IngressPortStatusApplyConfiguration struct {
 func IngressPortStatus() *IngressPortStatusApplyConfiguration {
 	return &IngressPortStatusApplyConfiguration{}
 }
+func (b IngressPortStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPort sets the Port field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

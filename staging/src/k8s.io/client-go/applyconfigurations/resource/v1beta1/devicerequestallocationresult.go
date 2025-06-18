@@ -34,6 +34,7 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 func DeviceRequestAllocationResult() *DeviceRequestAllocationResultApplyConfiguration {
 	return &DeviceRequestAllocationResultApplyConfiguration{}
 }
+func (b DeviceRequestAllocationResultApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRequest sets the Request field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

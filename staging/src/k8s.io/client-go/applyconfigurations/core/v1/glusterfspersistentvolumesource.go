@@ -32,6 +32,7 @@ type GlusterfsPersistentVolumeSourceApplyConfiguration struct {
 func GlusterfsPersistentVolumeSource() *GlusterfsPersistentVolumeSourceApplyConfiguration {
 	return &GlusterfsPersistentVolumeSourceApplyConfiguration{}
 }
+func (b GlusterfsPersistentVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithEndpointsName sets the EndpointsName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

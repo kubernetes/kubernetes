@@ -37,6 +37,7 @@ type PersistentVolumeStatusApplyConfiguration struct {
 func PersistentVolumeStatus() *PersistentVolumeStatusApplyConfiguration {
 	return &PersistentVolumeStatusApplyConfiguration{}
 }
+func (b PersistentVolumeStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPhase sets the Phase field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

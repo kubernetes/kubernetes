@@ -37,6 +37,7 @@ type MetricTargetApplyConfiguration struct {
 func MetricTarget() *MetricTargetApplyConfiguration {
 	return &MetricTargetApplyConfiguration{}
 }
+func (b MetricTargetApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

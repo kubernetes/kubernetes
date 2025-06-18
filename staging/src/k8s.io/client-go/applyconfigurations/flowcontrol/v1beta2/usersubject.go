@@ -29,6 +29,7 @@ type UserSubjectApplyConfiguration struct {
 func UserSubject() *UserSubjectApplyConfiguration {
 	return &UserSubjectApplyConfiguration{}
 }
+func (b UserSubjectApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
