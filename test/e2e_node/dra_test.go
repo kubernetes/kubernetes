@@ -381,13 +381,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 		ginkgo.It("must be functional when plugin starts to listen on a service socket after registration", func(ctx context.Context) {
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+			registrar := newRegistrar(ctx, f.ClientSet, getNodeName(ctx, f), driverName, "")
 
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
 			ginkgo.By("start DRA plugin service")
-			draService := newDRAService(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+			draService := newDRAService(ctx, f.ClientSet, getNodeName(ctx, f), driverName, "")
 
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
@@ -403,13 +403,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, "")
 
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
 			ginkgo.By("start DRA plugin service")
-			draService := newDRAService(ctx, f.ClientSet, nodeName, driverName)
+			draService := newDRAService(ctx, f.ClientSet, nodeName, driverName, "")
 
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drasleeppod" /* enables sleeping */, false /* pod is deleted below */, []string{driverName})
 
@@ -427,7 +427,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Eventually(ctx, listResources(f.ClientSet)).Should(gomega.BeEmpty(), "ResourceSlices without plugin")
 
 			ginkgo.By("restarting plugin")
-			draService = newDRAService(ctx, f.ClientSet, nodeName, driverName)
+			draService = newDRAService(ctx, f.ClientSet, nodeName, driverName, "")
 
 			ginkgo.By("stopping pod")
 			err = f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
@@ -617,13 +617,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, "")
 
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
 			ginkgo.By("start DRA plugin service")
-			kubeletPlugin := newDRAService(ctx, f.ClientSet, nodeName, driverName)
+			kubeletPlugin := newDRAService(ctx, f.ClientSet, nodeName, driverName, "")
 
 			ginkgo.By("wait for ResourceSlice to be created by plugin")
 			matchNode := gomega.ConsistOf(matchResourcesByNodeName(nodeName))
@@ -642,7 +642,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, "")
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
@@ -659,13 +659,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, "")
 
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
 			ginkgo.By("start DRA plugin service")
-			kubeletPlugin := newDRAService(ctx, f.ClientSet, nodeName, driverName)
+			kubeletPlugin := newDRAService(ctx, f.ClientSet, nodeName, driverName, "")
 
 			ginkgo.By("wait for ResourceSlice to be created by plugin")
 			matchNode := gomega.ConsistOf(matchResourcesByNodeName(nodeName))
@@ -683,7 +683,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			time.Sleep(5 * time.Second)
 
 			ginkgo.By("restarting plugin")
-			newDRAService(ctx, f.ClientSet, nodeName, driverName)
+			newDRAService(ctx, f.ClientSet, nodeName, driverName, "")
 
 			ginkgo.By("ensuring unchanged ResourceSlices")
 			gomega.Consistently(ctx, listResources(f.ClientSet)).WithTimeout(time.Minute).Should(gomega.Equal(slices), "ResourceSlices")
@@ -743,17 +743,33 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 }
 
 // newRegistrar starts a registrar for the specified DRA driver, without the DRA gRPC service.
-func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string) *testdriver.ExamplePlugin {
+func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, serviceSocketPath string) *testdriver.ExamplePlugin {
 	ginkgo.By("start only Kubelet plugin registrar")
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin registrar "+driverName))
 	ctx = klog.NewContext(ctx, logger)
-	registrar, err := testdriver.StartPlugin(ctx, cdiDir, driverName, clientSet, nodeName, testdriver.FileOperations{}, kubeletplugin.DRAService(false))
+	opts := []kubeletplugin.Option{
+		kubeletplugin.DRAService(false),
+	}
+	if serviceSocketPath != "" {
+		dir, file := path.Split(serviceSocketPath)
+		opts = append(opts, kubeletplugin.PluginDataDirectoryPath(dir))
+		opts = append(opts, kubeletplugin.PluginSocket(file))
+	}
+	registrar, err := testdriver.StartPlugin(
+		ctx,
+		cdiDir,
+		driverName,
+		clientSet,
+		nodeName,
+		testdriver.FileOperations{},
+		opts...,
+	)
 	framework.ExpectNoError(err, "start only Kubelet plugin registrar")
 	return registrar
 }
 
 // newDRAService starts the DRA gRPC service for the specified DRA driver, without the registrar.
-func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string) *testdriver.ExamplePlugin {
+func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, socketPath string) *testdriver.ExamplePlugin {
 	ginkgo.By("start only Kubelet plugin")
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin "+driverName), "node", nodeName)
 	ctx = klog.NewContext(ctx, logger)
@@ -763,7 +779,21 @@ func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName
 	// creating those directories.
 	err := os.MkdirAll(cdiDir, os.FileMode(0750))
 	framework.ExpectNoError(err, "create CDI directory")
-	datadir := path.Join(kubeletplugin.KubeletPluginsDir, driverName) // The default, not set below.
+	opts := []kubeletplugin.Option{
+		kubeletplugin.RegistrationService(false),
+	}
+	var datadir string
+	if socketPath == "" {
+		// The default, not set as option.
+		datadir = path.Join(kubeletplugin.KubeletPluginsDir, driverName)
+	} else {
+		dir, file := path.Split(socketPath)
+		opts = append(opts,
+			kubeletplugin.PluginDataDirectoryPath(dir),
+			kubeletplugin.PluginSocket(file),
+		)
+		datadir = dir
+	}
 	err = os.MkdirAll(datadir, 0750)
 	framework.ExpectNoError(err, "create DRA socket directory")
 
@@ -788,7 +818,7 @@ func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName
 				},
 			},
 		},
-		kubeletplugin.RegistrationService(false),
+		opts...,
 	)
 	framework.ExpectNoError(err)
 
