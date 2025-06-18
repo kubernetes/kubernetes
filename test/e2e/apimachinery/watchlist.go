@@ -85,7 +85,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		framework.ExpectNoError(err, "Failed waiting for the secret informer in %s namespace to be synced", f.Namespace.Namespace)
 
 		ginkgo.By("Verifying if the secret informer was properly synchronised")
-		verifyStore(ctx, expectedSecrets, secretInformer.GetStore())
+		verifyStoreFor(ctx, verifyStoreForMetaObject(expectedSecrets, secretInformer.GetStore()))
 
 		ginkgo.By("Modifying a secret and checking if the update was picked up by the secret informer")
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(ctx, "secret-1", metav1.GetOptions{})
@@ -95,7 +95,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		framework.ExpectNoError(err)
 
 		expectedSecrets[0] = secret
-		verifyStore(ctx, expectedSecrets, secretInformer.GetStore())
+		verifyStoreFor(ctx, verifyStoreForMetaObject(expectedSecrets, secretInformer.GetStore()))
 	})
 	ginkgo.It("should NOT be requested by client-go's List method when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
@@ -238,9 +238,8 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		framework.ExpectNoError(err, "Failed waiting for the secret informer in %s namespace to be synced", f.Namespace.Namespace)
 
 		ginkgo.By("Verifying if the secret informer was properly synchronised")
-		verifyStore[unstructured.Unstructured](ctx, expectedSecrets, secretInformer.GetStore())
+		verifyStoreFor(ctx, verifyStoreForMetaObject[unstructured.Unstructured](expectedSecrets, secretInformer.GetStore()))
 	})
-
 })
 
 type roundTripper struct {
@@ -271,10 +270,17 @@ func clientConfigWithRoundTripper(f *framework.Framework) (*roundTripper, *rest.
 	return rt, clientConfig
 }
 
-func verifyStore[T any](ctx context.Context, expectedSecrets []*T, store cache.Store) {
+func verifyStoreFor(ctx context.Context, verifier func() bool) {
 	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		ginkgo.By("Comparing secrets retrieved directly from the server with the ones that have been streamed to the secret informer")
 
+		return verifier(), nil
+	})
+	framework.ExpectNoError(err)
+}
+
+func verifyStoreForMetaObject[T any](expectedSecrets []*T, store cache.Store) func() bool {
+	return func() bool {
 		expectedSecretsAsMetaObject, err := toMetaObjectSlice(expectedSecrets)
 		framework.ExpectNoError(err)
 		actualSecretsAsMetaObject, err := toMetaObjectSlice(store.List())
@@ -283,9 +289,8 @@ func verifyStore[T any](ctx context.Context, expectedSecrets []*T, store cache.S
 		sort.Sort(byName(expectedSecretsAsMetaObject))
 		sort.Sort(byName(actualSecretsAsMetaObject))
 
-		return cmp.Equal(expectedSecretsAsMetaObject, actualSecretsAsMetaObject), nil
-	})
-	framework.ExpectNoError(err)
+		return cmp.Equal(expectedSecretsAsMetaObject, actualSecretsAsMetaObject)
+	}
 }
 
 var expectedListRequestMadeByClient = func() string {
