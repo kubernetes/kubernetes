@@ -334,12 +334,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
 
-	if localFeatureGate.Enabled(features.KubeletTracing) {
-		if errs := tracingapi.ValidateTracingConfiguration(kc.Tracing, localFeatureGate, field.NewPath("tracing")); len(errs) > 0 {
-			allErrors = append(allErrors, errs.ToAggregate().Errors()...)
-		}
-	} else if kc.Tracing != nil {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: tracing should not be configured if KubeletTracing feature flag is disabled."))
+	if errs := tracingapi.ValidateTracingConfiguration(kc.Tracing, localFeatureGate, field.NewPath("tracing")); len(errs) > 0 {
+		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
 
 	if localFeatureGate.Enabled(features.MemoryQoS) && kc.MemoryThrottlingFactor == nil {

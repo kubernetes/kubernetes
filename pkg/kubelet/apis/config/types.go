@@ -503,7 +503,6 @@ type KubeletConfiguration struct {
 
 	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
 	// See https://kep.k8s.io/2832 for more details.
-	// +featureGate=KubeletTracing
 	// +optional
 	Tracing *tracingapi.TracingConfiguration
 
