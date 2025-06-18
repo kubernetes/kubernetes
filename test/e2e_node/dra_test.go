@@ -642,7 +642,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, "")
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
@@ -743,17 +743,32 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 }
 
 // newRegistrar starts a registrar for the specified DRA driver, without the DRA gRPC service.
-func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string) *testdriver.ExamplePlugin {
+func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, serviceSocketPath string) *testdriver.ExamplePlugin {
 	ginkgo.By("start only Kubelet plugin registrar")
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin registrar "+driverName))
 	ctx = klog.NewContext(ctx, logger)
-	registrar, err := testdriver.StartPlugin(ctx, cdiDir, driverName, clientSet, nodeName, testdriver.FileOperations{}, kubeletplugin.DRAService(false))
+	opts := []kubeletplugin.Option{
+		kubeletplugin.DRAService(false),
+	}
+	if serviceSocketPath != "" {
+		opts = append(opts, kubeletplugin.PluginDataDirectoryPath(path.Dir(serviceSocketPath)))
+		opts = append(opts, kubeletplugin.PluginSocket(path.Base(serviceSocketPath)))
+	}
+	registrar, err := testdriver.StartPlugin(
+		ctx,
+		cdiDir,
+		driverName,
+		clientSet,
+		nodeName,
+		testdriver.FileOperations{},
+		opts...,
+	)
 	framework.ExpectNoError(err, "start only Kubelet plugin registrar")
 	return registrar
 }
 
 // newDRAService starts the DRA gRPC service for the specified DRA driver, without the registrar.
-func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string) *testdriver.ExamplePlugin {
+func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, socketPath string) *testdriver.ExamplePlugin {
 	ginkgo.By("start only Kubelet plugin")
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin "+driverName), "node", nodeName)
 	ctx = klog.NewContext(ctx, logger)
@@ -763,9 +778,22 @@ func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName
 	// creating those directories.
 	err := os.MkdirAll(cdiDir, os.FileMode(0750))
 	framework.ExpectNoError(err, "create CDI directory")
-	datadir := path.Join(kubeletplugin.KubeletPluginsDir, driverName) // The default, not set below.
+	var datadir string
+	if socketPath == "" {
+		datadir = path.Join(kubeletplugin.KubeletPluginsDir, driverName) // The default, not set below.
+	} else {
+		datadir = path.Dir(socketPath)
+	}
 	err = os.MkdirAll(datadir, 0750)
 	framework.ExpectNoError(err, "create DRA socket directory")
+
+	opts := []kubeletplugin.Option{
+		kubeletplugin.RegistrationService(false),
+		kubeletplugin.PluginDataDirectoryPath(datadir),
+	}
+	if socketPath != "" {
+		opts = append(opts, kubeletplugin.PluginSocket(path.Base(socketPath)))
+	}
 
 	plugin, err := testdriver.StartPlugin(
 		ctx,
@@ -788,7 +816,7 @@ func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName
 				},
 			},
 		},
-		kubeletplugin.RegistrationService(false),
+		opts...,
 	)
 	framework.ExpectNoError(err)
 
