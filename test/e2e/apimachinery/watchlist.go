@@ -112,7 +112,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 
 		ginkgo.By("Verifying retrieved secrets")
 		actualSecrets := secretList.Items
-		gomega.Expect(cmp.Equal(expectedSecrets, toSecretPointerSlice(actualSecrets))).To(gomega.BeTrueBecause("data received via list must match the added data"))
+		gomega.Expect(cmp.Equal(expectedSecrets, toPointerSlice(actualSecrets))).To(gomega.BeTrueBecause("data received via list must match the added data"))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
 		expectedRequestsMadeByKubeClient := []string{expectedListRequestMadeByClient}
@@ -134,7 +134,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 
 		ginkgo.By("verifying retrieved secrets")
 		actualSecrets := secretList.Items
-		gomega.Expect(cmp.Equal(expectedSecrets, toSecretPointerSlice(actualSecrets))).To(gomega.BeTrueBecause("data received via list must match the added data"))
+		gomega.Expect(cmp.Equal(expectedSecrets, toPointerSlice(actualSecrets))).To(gomega.BeTrueBecause("data received via list must match the added data"))
 		gomega.Expect(secretList.GetObjectKind().GroupVersionKind()).To(gomega.Equal(v1.SchemeGroupVersion.WithKind("SecretList")))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
@@ -240,6 +240,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		ginkgo.By("Verifying if the secret informer was properly synchronised")
 		verifyStore[unstructured.Unstructured](ctx, expectedSecrets, secretInformer.GetStore())
 	})
+
 })
 
 type roundTripper struct {
@@ -345,7 +346,7 @@ func toMetaObjectSlice[T any](s []T) ([]metav1.Object, error) {
 	return result, nil
 }
 
-func toSecretPointerSlice[T any](items []T) []*T {
+func toPointerSlice[T any](items []T) []*T {
 	result := make([]*T, 0, len(items))
 	for i := range items {
 		result = append(result, &items[i])
