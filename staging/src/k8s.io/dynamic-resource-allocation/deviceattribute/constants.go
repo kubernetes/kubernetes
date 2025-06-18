@@ -14,7 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package deviceattribute
+
+import (
+	resourceapi "k8s.io/dynamic-resource-allocation/api"
+)
 
 const (
 	// StandardDeviceAttributePrefix is the prefix used for standard device attributes.
@@ -25,5 +29,5 @@ const (
 	// The value is a string value in the format `pci<domain>:<bus>`,
 	// referring to a PCIe (Peripheral Component Interconnect Express) Root Complex.
 	// This attribute can be used to identify devices that share the same PCIe Root Complex.
-	StandardDeviceAttributePCIeRoot = StandardDeviceAttributePrefix + "pcieRoot"
+	StandardDeviceAttributePCIeRoot resourceapi.QualifiedName = StandardDeviceAttributePrefix + "pcieRoot"
 )
