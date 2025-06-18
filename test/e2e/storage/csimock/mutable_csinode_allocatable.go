@@ -53,7 +53,7 @@ var _ = utils.SIGDescribe("MutableCSINodeAllocatableCount", framework.WithFeatur
 	var (
 		driver     drivers.MockCSITestDriver
 		cfg        *storageframework.PerTestConfig
-		k8s        clientset.Interface
+		clientSet  clientset.Interface
 		nodeName   string
 		driverName string
 	)
@@ -85,51 +85,48 @@ var _ = utils.SIGDescribe("MutableCSINodeAllocatableCount", framework.WithFeatur
 		driver = drivers.InitMockCSIDriver(opts)
 		cfg = driver.PrepareTest(ctx, f)
 
-		k8s = f.ClientSet
+		clientSet = f.ClientSet
 		driverName = cfg.GetUniqueDriverName()
 		nodeName = cfg.ClientNodeSelection.Name
 
-		enablePeriodicUpdates(ctx, k8s, driverName, updatePeriodSeconds)
+		enablePeriodicUpdates(ctx, clientSet, driverName, updatePeriodSeconds)
 
-		err := drivers.WaitForCSIDriverRegistrationOnNode(ctx, nodeName, driverName, k8s)
+		err := drivers.WaitForCSIDriverRegistrationOnNode(ctx, nodeName, driverName, clientSet)
 		framework.ExpectNoError(err)
 	})
 
-	f.It("should observe dynamic changes in CSINode allocatable count",
-		func(ctx context.Context) {
-			framework.Logf("Testing dynamic changes in CSINode allocatable count")
-			initVal, err := readLimit(ctx, k8s, nodeName, driverName)
-			framework.ExpectNoError(err)
-			framework.Logf("Initial MaxVolumesPerNode limit: %d", initVal)
+	f.It("should observe dynamic changes in CSINode allocatable count", func(ctx context.Context) {
+		framework.Logf("Testing dynamic changes in CSINode allocatable count")
+		initVal, err := readLimit(ctx, clientSet, nodeName, driverName)
+		framework.ExpectNoError(err)
+		framework.Logf("Initial MaxVolumesPerNode limit: %d", initVal)
 
-			err = wait.PollUntilContextTimeout(ctx, time.Duration(updatePeriodSeconds), timeout, true,
-				func(ctx context.Context) (bool, error) {
-					cur, err := readLimit(ctx, k8s, nodeName, driverName)
-					if err != nil {
-						return false, nil
-					}
-					return int64(cur) == updatedMaxVolumesPerNode, nil
-				})
-
-			framework.ExpectNoError(err, "CSINode allocatable count was not updated to %d in time", updatedMaxVolumesPerNode)
-			framework.Logf("SUCCESS: MaxVolumesPerNode updated limit %d", updatedMaxVolumesPerNode)
-		})
-})
-
-func enablePeriodicUpdates(ctx context.Context, cs clientset.Interface, name string, period int64) {
-	err := wait.PollUntilContextTimeout(ctx, 2*time.Second, timeout, true,
-		func(ctx context.Context) (bool, error) {
-			obj, err := cs.StorageV1().CSIDrivers().Get(ctx, name, metav1.GetOptions{})
+		err = wait.PollUntilContextTimeout(ctx, time.Duration(updatePeriodSeconds), timeout, true, func(ctx context.Context) (bool, error) {
+			cur, err := readLimit(ctx, clientSet, nodeName, driverName)
 			if err != nil {
 				return false, nil
 			}
-			if obj.Spec.NodeAllocatableUpdatePeriodSeconds != nil && *obj.Spec.NodeAllocatableUpdatePeriodSeconds == period {
-				return true, nil
-			}
-			obj.Spec.NodeAllocatableUpdatePeriodSeconds = &period
-			_, err = cs.StorageV1().CSIDrivers().Update(ctx, obj, metav1.UpdateOptions{})
-			return err == nil, nil
+			return int64(cur) == updatedMaxVolumesPerNode, nil
 		})
+
+		framework.ExpectNoError(err, "CSINode allocatable count was not updated to %d in time", updatedMaxVolumesPerNode)
+		framework.Logf("SUCCESS: MaxVolumesPerNode updated limit %d", updatedMaxVolumesPerNode)
+	})
+})
+
+func enablePeriodicUpdates(ctx context.Context, cs clientset.Interface, driverName string, period int64) {
+	err := wait.PollUntilContextTimeout(ctx, 2*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+		obj, err := cs.StorageV1().CSIDrivers().Get(ctx, driverName, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		if obj.Spec.NodeAllocatableUpdatePeriodSeconds != nil && *obj.Spec.NodeAllocatableUpdatePeriodSeconds == period {
+			return true, nil
+		}
+		obj.Spec.NodeAllocatableUpdatePeriodSeconds = &period
+		_, err = cs.StorageV1().CSIDrivers().Update(ctx, obj, metav1.UpdateOptions{})
+		return err == nil, nil
+	})
 	framework.ExpectNoError(err, "enabling periodic CSINode allocatable updates failed")
 }
 
