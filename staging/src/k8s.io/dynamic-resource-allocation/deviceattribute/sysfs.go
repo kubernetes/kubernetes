@@ -19,41 +19,45 @@ package deviceattribute
 import "path/filepath"
 
 const (
-	defaultSysfsRoot = "/sys"
+	sysfsRoot = "/sys"
 )
 
-// sysfs provides methods to construct sysfs paths for various subsystems.
+var (
+	sysfs sysfsPath = sysfsPath(sysfsRoot)
+)
+
+// sysfsPath provides methods to construct sysfs paths for various subsystems.
 // It is used to abstract the sysfs path construction
 // and can be replaced with a mock in tests.
-type sysfs string
+type sysfsPath string
 
-func (s sysfs) Devices(path string) string {
+func (s sysfsPath) Devices(path string) string {
 	return filepath.Join(string(s), "devices", path)
 }
 
-func (s sysfs) Bus(path string) string {
+func (s sysfsPath) Bus(path string) string {
 	return filepath.Join(string(s), "bus", path)
 }
 
-func (s sysfs) Block(path string) string {
+func (s sysfsPath) Block(path string) string {
 	return filepath.Join(string(s), "block", path)
 }
 
-func (s sysfs) Class(path string) string {
+func (s sysfsPath) Class(path string) string {
 	return filepath.Join(string(s), "class", path)
 }
 
-func (s sysfs) Dev(path string) string {
+func (s sysfsPath) Dev(path string) string {
 	return filepath.Join(string(s), "dev", path)
 }
 
-func (s sysfs) Firmware(path string) string {
+func (s sysfsPath) Firmware(path string) string {
 	return filepath.Join(string(s), "firmware", path)
 }
-func (s sysfs) Kernel(path string) string {
+func (s sysfsPath) Kernel(path string) string {
 	return filepath.Join(string(s), "kernel", path)
 }
 
-func (s sysfs) Module(path string) string {
+func (s sysfsPath) Module(path string) string {
 	return filepath.Join(string(s), "module", path)
 }

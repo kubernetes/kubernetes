@@ -28,66 +28,16 @@ import (
 
 var (
 	bdfRegexp = regexp.MustCompile(`^([0-9a-f]{4}):([0-9a-f]{2}):([0-9a-f]{2})\.([0-9a-f]{1})$`)
-
-	qualifiedNamePCIeRoot = resourceapi.QualifiedName(resourceapi.StandardDeviceAttributePCIeRoot)
 )
 
-type StandardPCIDeviceAttributesOption func(args *StandardPCIDeviceAttributeArgs)
-
-// WithPCIDeviceAddress sets the PCI address for the PCI Bus ID
+// GetPCIeRootAttributeByPCIBusID retrieves the PCIe Root Complex for a given PCI Bus ID.
 // in BDF (Bus-Device-Function) format, e.g., "0123:45:1e.7".
 //
 // It returns a DeviceAttribute with the PCIe Root Complex information("pci<domain>:<bus>")
 // as a string value or an error if the PCI Bus ID is invalid or the root complex cannot be determined.
 //
 // ref: https://wiki.xenproject.org/wiki/Bus:Device.Function_(BDF)_Notation
-func WithPCIDeviceAddress(pciBusID string) StandardPCIDeviceAttributesOption {
-	return func(args *StandardPCIDeviceAttributeArgs) {
-		args.pciAddress = pciBusID
-	}
-}
-
-// StandardPCIDeviceAttributeArgs holds the arguments for generating standard PCI device attributes.
-type StandardPCIDeviceAttributeArgs struct {
-	pciAddress string
-	sysfs      sysfs
-}
-
-// StandardPCIDeviceAttributes returns standard device attributes for a PCI device.
-func StandardPCIDeviceAttributes(opts ...StandardPCIDeviceAttributesOption) (map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, error) {
-	args := &StandardPCIDeviceAttributeArgs{
-		sysfs: sysfs(defaultSysfsRoot),
-	}
-	for _, opt := range opts {
-		opt(args)
-	}
-
-	attrs := make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
-
-	pciRootAttribute, err := getPCIeRootAttributeByPCIBusID(args.pciAddress, args.sysfs)
-	if err != nil {
-		return nil, err
-	}
-	attrs[qualifiedNamePCIeRoot] = pciRootAttribute
-
-	return attrs, nil
-}
-
-// This is only for testing purposes.
-func withSysfs(sysfs sysfs) StandardPCIDeviceAttributesOption {
-	return func(args *StandardPCIDeviceAttributeArgs) {
-		args.sysfs = sysfs
-	}
-}
-
-// GetPCIeRootAttributeByPCI Bus ID retrieves the PCIe Root Complex for a given PCI Bus ID.
-// in BDF (Bus-Device-Function) format, e.g., "0123:45:1e.7".
-//
-// It returns a DeviceAttribute with the PCIe Root Complex information("pci<domain>:<bus>")
-// as a string value or an error if the PCI Bus ID is invalid or the root complex cannot be determined.
-//
-// ref: https://wiki.xenproject.org/wiki/Bus:Device.Function_(BDF)_Notation
-func getPCIeRootAttributeByPCIBusID(pciBusID string, sysfs sysfs) (resourceapi.DeviceAttribute, error) {
+func GetPCIeRootAttributeByPCIBusID(pciBusID string) (resourceapi.DeviceAttribute, error) {
 	if pciBusID == "" {
 		return resourceapi.DeviceAttribute{}, fmt.Errorf("PCI Bus ID cannot be empty")
 	}
@@ -97,7 +47,7 @@ func getPCIeRootAttributeByPCIBusID(pciBusID string, sysfs sysfs) (resourceapi.D
 	}
 
 	// e.g. /sys/devices/pci0000:01/...<intermediate PCI devices>.../0000:00:1f.0,
-	sysDevicesPath, err := resolveSysDevicesPath(pciBusID, sysfs)
+	sysDevicesPath, err := resolveSysDevicesPath(pciBusID)
 	if err != nil {
 		return resourceapi.DeviceAttribute{}, fmt.Errorf("failed to resolve sysfs path for PCI Bus ID %s: %w", pciBusID, err)
 	}
@@ -123,7 +73,7 @@ func getPCIeRootAttributeByPCIBusID(pciBusID string, sysfs sysfs) (resourceapi.D
 // For example, if the PCIAddress is "0000:00:1f.0",
 // /sys/bus/pci/devices/0000:00:1f.0 points to
 // /sys/devices/pci0000:01/...<intermediate PCI devices>.../0000:00:1f.0,
-func resolveSysDevicesPath(pciBusID string, sysfs sysfs) (string, error) {
+func resolveSysDevicesPath(pciBusID string) (string, error) {
 	// e.g. /sys/bus/pci/devices/0000:00:1f.0
 	sysBusPath := sysfs.Bus(filepath.Join("pci", "devices", pciBusID))
 
