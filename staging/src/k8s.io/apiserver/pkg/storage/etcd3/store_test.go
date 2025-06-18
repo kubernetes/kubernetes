@@ -600,6 +600,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		NewDefaultDecoder(setupOpts.codec, versioner),
 		versioner,
 	)
+	t.Cleanup(store.Close)
 	ctx := context.Background()
 	return ctx, store, client
 }

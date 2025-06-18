@@ -20,17 +20,31 @@ import (
 	"context"
 	"sync"
 
+	"sync/atomic"
+	"time"
+
 	"go.etcd.io/etcd/api/v3/mvccpb"
+
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/klog/v2"
 )
+
+const sizerRefreshInterval = time.Minute
 
 type keysFunc func(context.Context) ([]string, error)
 
 func newStatsCache(getKeys keysFunc) *statsCache {
 	sc := &statsCache{
 		getKeys: getKeys,
+		stop:    make(chan struct{}),
 		keys:    make(map[string]sizeRevision),
 	}
+	sc.wg.Add(1)
+	go func() {
+		defer sc.wg.Done()
+		sc.run()
+	}()
 	return sc
 }
 
@@ -44,7 +58,10 @@ func newStatsCache(getKeys keysFunc) *statsCache {
 // This approach may leak keys if delete events are not observed,
 // thus we run a background goroutine to periodically cleanup keys if needed.
 type statsCache struct {
-	getKeys keysFunc
+	getKeys        keysFunc
+	stop           chan struct{}
+	wg             sync.WaitGroup
+	lastKeyCleanup atomic.Pointer[time.Time]
 
 	lock sync.Mutex
 	keys map[string]sizeRevision
@@ -72,6 +89,36 @@ func (sc *statsCache) Stats(ctx context.Context) (storage.Stats, error) {
 	return stats, nil
 }
 
+func (sc *statsCache) Close() {
+	close(sc.stop)
+	sc.wg.Wait()
+}
+
+func (sc *statsCache) run() {
+	err := wait.PollUntilContextCancel(wait.ContextForChannel(sc.stop), sizerRefreshInterval, false, func(ctx context.Context) (done bool, err error) {
+		sc.cleanKeysIfNeeded(ctx)
+		return false, nil
+	})
+	if err != nil {
+		klog.InfoS("Sizer exiting")
+	}
+}
+
+func (sc *statsCache) cleanKeysIfNeeded(ctx context.Context) {
+	lastKeyCleanup := sc.lastKeyCleanup.Load()
+	if lastKeyCleanup != nil && time.Since(*lastKeyCleanup) < sizerRefreshInterval {
+		return
+	}
+	// Don't execute getKeys under lock.
+	keys, err := sc.getKeys(ctx)
+	if err != nil {
+		klog.InfoS("Error getting keys", "err", err)
+	}
+	sc.lock.Lock()
+	defer sc.lock.Unlock()
+	sc.cleanKeys(keys)
+}
+
 func (sc *statsCache) cleanKeys(keepKeys []string) {
 	newKeys := make(map[string]sizeRevision, len(keepKeys))
 	for _, key := range keepKeys {
@@ -82,6 +129,8 @@ func (sc *statsCache) cleanKeys(keepKeys []string) {
 		newKeys[key] = keySizeRevision
 	}
 	sc.keys = newKeys
+	now := time.Now()
+	sc.lastKeyCleanup.Store(&now)
 }
 
 func (sc *statsCache) keySizes() (totalSize int64) {
