@@ -109,6 +109,9 @@ type Controller struct {
 	// A store of pods, populated by the podController
 	podStore corelisters.PodLister
 
+	// podIndexer allows looking up pods by ControllerRef UID
+	podIndexer cache.Indexer
+
 	// Jobs that need to be updated
 	queue workqueue.TypedRateLimitingInterface[string]
 
@@ -222,6 +225,12 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 	}
 	jm.podStore = podInformer.Lister()
 	jm.podStoreSynced = podInformer.Informer().HasSynced
+
+	err := controller.AddPodControllerUIDIndexer(podInformer.Informer())
+	if err != nil {
+		return nil, fmt.Errorf("adding Pod controller UID indexer: %w", err)
+	}
+	jm.podIndexer = podInformer.Informer().GetIndexer()
 
 	jm.updateStatusHandler = jm.updateJobStatus
 	jm.patchJobHandler = jm.patchJob
@@ -758,9 +767,9 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Po
 	if err != nil {
 		return nil, fmt.Errorf("couldn't convert Job selector: %v", err)
 	}
-	// List all pods to include those that don't match the selector anymore
-	// but have a ControllerRef pointing to this controller.
-	pods, err := jm.podStore.Pods(j.Namespace).List(labels.Everything())
+
+	// list all pods managed by this Job using the pod indexer
+	pods, err := jm.getJobPodsByIndexer(j)
 	if err != nil {
 		return nil, err
 	}
@@ -797,6 +806,27 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Po
 		}
 	}
 	return pods, err
+}
+
+// getJobPodsByIndexer returns the set of pods that this Job should manage.
+func (jm *Controller) getJobPodsByIndexer(j *batch.Job) ([]*v1.Pod, error) {
+	podsForJob := []*v1.Pod{}
+	for _, key := range []string{string(j.UID), controller.OrphanPodIndexKey} {
+		pods, err := jm.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, obj := range pods {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+				continue
+			}
+			podsForJob = append(podsForJob, pod)
+		}
+	}
+	return podsForJob, nil
 }
 
 // syncJob will sync the job with the given key if it has had its expectations fulfilled, meaning
