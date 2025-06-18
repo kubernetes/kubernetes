@@ -52,7 +52,7 @@ shopt -s dotglob
 shopt -s extglob
 set -o pipefail
 
-[[ ${GIMME_DEBUG} ]] && set -x
+set -x
 
 readonly GIMME_VERSION="v1.5.4"
 readonly GIMME_COPYRIGHT="Copyright (c) 2015-2020 gimme contributors"

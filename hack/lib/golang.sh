@@ -519,6 +519,7 @@ kube::golang::set_platform_envs() {
 #   env-var GO_VERSION is the desired go version to use, downloading it if needed (defaults to content of .go-version)
 #   env-var FORCE_HOST_GO set to a non-empty value uses the go version in the $PATH and skips ensuring $GO_VERSION is used
 kube::golang::internal::verify_go_version() {
+  set -x
   # default GO_VERSION to content of .go-version
   GO_VERSION="${GO_VERSION:-"$(cat "${KUBE_ROOT}/.go-version")"}"
   if [ "${GOTOOLCHAIN:-auto}" != 'auto' ]; then
@@ -528,7 +529,11 @@ kube::golang::internal::verify_go_version() {
     # get the latest master version of Go, build and use that version
     export GOTOOLCHAIN='local'
     if [[ ! -f "${KUBE_ROOT}/.gimme/envs/gomaster.env" && ! -f "${HOME}/.gimme/envs/gomaster.env" ]]; then
-      GOROOT_BOOTSTRAP="${GOROOT_BOOTSTRAP:-/usr/local/go}" "${KUBE_ROOT}/third_party/gimme/gimme" "master" >/dev/null 2>&1
+      echo "Building latest Go master version..."
+      # shellcheck disable=SC2155
+      [ -w "${HOME:?Variable HOME is not set}" ] || export HOME="$(mktemp -d)"
+      GOROOT_BOOTSTRAP="${GOROOT_BOOTSTRAP:-/usr/local/go}" "${KUBE_ROOT}/third_party/gimme/gimme" "master"
+      echo "Done building latest Go master version..."
     fi
 
     if [[ -f "${KUBE_ROOT}/.gimme/envs/gomaster.env" ]]; then
