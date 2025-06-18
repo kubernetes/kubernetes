@@ -570,7 +570,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 					},
 				},
 			},
-			expectErr: "providers.defaultCacheDuration: Invalid value: -1m0s: defaultCacheDuration must be greater than or equal to 0",
+			expectErr: "providers.defaultCacheDuration: Invalid value: \"-1m0s\": defaultCacheDuration must be greater than or equal to 0",
 		},
 		{
 			name: "invalid match image",
@@ -754,7 +754,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 				},
 			},
 			saTokenForCredentialProviders: true,
-			expectErr:                     `providers.tokenAttributes: Invalid value: []string{"now-with-dashes/simple-2"}: annotation keys cannot be both required and optional`,
+			expectErr:                     `providers.tokenAttributes: Invalid value: ["now-with-dashes/simple-2"]: annotation keys cannot be both required and optional`,
 		},
 		{
 			name: "required annotation keys set when requireServiceAccount is false",

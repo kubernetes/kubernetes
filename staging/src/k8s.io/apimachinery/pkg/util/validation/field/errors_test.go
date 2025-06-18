@@ -318,7 +318,7 @@ func TestErrorFormatting(t *testing.T) {
 			Origin:               "theOrigin",
 			CoveredByDeclarative: true,
 		},
-		expect: `path.to.field: Too many: the details`,
+		expect: `path.to.field: Too many: "the value": the details`,
 	}, {
 		name:   "too many func(2, 1)",
 		input:  TooMany(NewPath("path.to.field"), 2, 1),
@@ -404,7 +404,7 @@ func TestErrorFormatting(t *testing.T) {
 			Origin:               "theOrigin",
 			CoveredByDeclarative: true,
 		},
-		expect: `path.to.field: Invalid value: {"StringField":"stringval","intField":9376,"boolField":true}: the details`,
+		expect: `path.to.field: Invalid value: {"stringField":"stringval","intField":9376,"boolField":true}: the details`,
 	}, {
 		name: "invalid list",
 		input: &Error{
@@ -525,7 +525,7 @@ func TestErrorFormatting(t *testing.T) {
 			Origin:               "theOrigin",
 			CoveredByDeclarative: true,
 		},
-		expect: `path.to.field: Invalid value: {"StringField":"stringval","intField":9376,"boolField":true}: the details`,
+		expect: `path.to.field: Invalid value: {"stringField":"stringval","intField":9376,"boolField":true}: the details`,
 	}, {
 		name: "invalid list ptr",
 		input: &Error{

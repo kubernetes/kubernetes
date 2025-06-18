@@ -10987,7 +10987,7 @@ func TestValidateCustomResourceDefinitionStoredVersions(t *testing.T) {
 			storageVersion: "v1",
 			storedVersions: []string{},
 			errors: []validationMatch{
-				invalid("status", "storedVersions").contains("Invalid value: []string{}: must have at least one stored version"),
+				invalid("status", "storedVersions").contains("Invalid value: []: must have at least one stored version"),
 			},
 		},
 		{
@@ -11011,7 +11011,7 @@ func TestValidateCustomResourceDefinitionStoredVersions(t *testing.T) {
 			storageVersion: "v1",
 			storedVersions: []string{"v1alpha", "v1beta1"},
 			errors: []validationMatch{
-				invalid("status", "storedVersions").contains("Invalid value: []string{\"v1alpha\", \"v1beta1\"}: must have the storage version v1"),
+				invalid("status", "storedVersions").contains("Invalid value: [\"v1alpha\",\"v1beta1\"]: must have the storage version v1"),
 			},
 		},
 	}

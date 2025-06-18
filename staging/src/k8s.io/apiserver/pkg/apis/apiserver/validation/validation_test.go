@@ -905,7 +905,7 @@ func TestValidateAudiences(t *testing.T) {
 			name:        "multiple audiences set when structured authn feature is disabled",
 			in:          []string{"audience1", "audience2"},
 			matchPolicy: "MatchAny",
-			want:        `issuer.audiences: Invalid value: []string{"audience1", "audience2"}: multiple audiences are not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
+			want:        `issuer.audiences: Invalid value: ["audience1","audience2"]: multiple audiences are not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
 		},
 	}
 

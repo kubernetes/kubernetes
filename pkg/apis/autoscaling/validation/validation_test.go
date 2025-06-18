@@ -927,7 +927,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				}},
 			},
 		},
-		msg: "Invalid value: InvalidResource: must be a standard resource type or fully qualified",
+		msg: "Invalid value: \"InvalidResource\": must be a standard resource type or fully qualified",
 	}, {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
@@ -1429,7 +1429,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %q", c.msg)
 		} else if !strings.Contains(errs[0].Error(), c.msg) {
-			t.Errorf("unexpected error: %q, expected: %q", errs[0], c.msg)
+			t.Errorf("unexpected error:\n  expected: %q\n       got: %q", c.msg, errs[0])
 		}
 	}
 

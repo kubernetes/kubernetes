@@ -125,7 +125,7 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 		}
 
 		if provider.DefaultCacheDuration != nil && provider.DefaultCacheDuration.Duration < 0 {
-			allErrs = append(allErrs, field.Invalid(fieldPath.Child("defaultCacheDuration"), provider.DefaultCacheDuration.Duration, "defaultCacheDuration must be greater than or equal to 0"))
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("defaultCacheDuration"), provider.DefaultCacheDuration, "defaultCacheDuration must be greater than or equal to 0"))
 		}
 
 		if provider.TokenAttributes != nil {
