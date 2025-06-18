@@ -202,6 +202,12 @@ func (s *store) Versioner() storage.Versioner {
 	return s.versioner
 }
 
+func (s *store) Close() {
+	if s.stats != nil {
+		s.stats.Close()
+	}
+}
+
 // Get implements storage.Interface.Get.
 func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, out runtime.Object) error {
 	preparedKey, err := s.prepareKey(key)

@@ -71,6 +71,7 @@ func newEtcdTestStorage(t testing.TB, prefix string) (*etcd3testing.EtcdTestServ
 		etcd3.NewDefaultLeaseManagerConfig(),
 		etcd3.NewDefaultDecoder(codec, versioner),
 		versioner)
+	t.Cleanup(storage.Close)
 	return server, storage
 }
 

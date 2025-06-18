@@ -28,6 +28,7 @@ import (
 func TestStatsCache(t *testing.T) {
 	ctx := t.Context()
 	store := newStatsCache(func(ctx context.Context) ([]string, error) { return []string{}, nil })
+	defer store.Close()
 
 	stats, err := store.Stats(ctx)
 	require.NoError(t, err)
