@@ -26,10 +26,6 @@ import (
 	resourceapi "k8s.io/dynamic-resource-allocation/api"
 )
 
-var (
-	bdfRegexp = regexp.MustCompile(`^([0-9a-f]{4}):([0-9a-f]{2}):([0-9a-f]{2})\.([0-9a-f]{1})$`)
-)
-
 // GetPCIeRootAttributeByPCIBusID retrieves the PCIe Root Complex for a given PCI Bus ID.
 // in BDF (Bus-Device-Function) format, e.g., "0123:45:1e.7".
 //
@@ -42,6 +38,7 @@ func GetPCIeRootAttributeByPCIBusID(pciBusID string) (DeviceAttribute, error) {
 		return DeviceAttribute{}, fmt.Errorf("PCI Bus ID cannot be empty")
 	}
 
+	bdfRegexp := regexp.MustCompile(`^([0-9a-f]{4}):([0-9a-f]{2}):([0-9a-f]{2})\.([0-9a-f]{1})$`)
 	if !bdfRegexp.MatchString(pciBusID) {
 		return DeviceAttribute{}, fmt.Errorf("invalid PCI Bus ID format: %s", pciBusID)
 	}
