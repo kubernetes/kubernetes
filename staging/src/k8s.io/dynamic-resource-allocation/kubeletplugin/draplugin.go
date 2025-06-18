@@ -261,6 +261,19 @@ func PluginDataDirectoryPath(path string) Option {
 	}
 }
 
+// PluginSocket sets the name of the socket inside the directory where
+// the DRA driver creates the socket for the DRA gRPC calls. This is used
+// by the kubelet to connect to the DRA plugin.
+//
+// This is meant for testing. Normal DRA drivers should not use this and
+// instead rely on the automatic handling of the name.
+func PluginSocket(name string) Option {
+	return func(o *options) error {
+		o.pluginSocket = name
+		return nil
+	}
+}
+
 // PluginListener configures how to create the registrar socket.
 // The default is to remove the file if it exists and to then
 // create a socket.
@@ -424,7 +437,8 @@ type options struct {
 	nodeName                   string
 	nodeUID                    types.UID
 	pluginRegistrationEndpoint endpoint
-	pluginDataDirectoryPath    string
+	pluginDataDirectoryPath    string // The directory where the plugin socket is created.
+	pluginSocket               string // The socket name for the DRA gRPC service.
 	rollingUpdateUID           types.UID
 	draEndpointListen          func(ctx context.Context, path string) (net.Listener, error)
 	unaryInterceptors          []grpc.UnaryServerInterceptor
@@ -513,6 +527,9 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	if o.pluginDataDirectoryPath == "" {
 		o.pluginDataDirectoryPath = path.Join(KubeletPluginsDir, o.driverName)
 	}
+	if o.pluginSocket == "" {
+		o.pluginSocket = "dra" + uidPart + ".sock" // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
+	}
 
 	d := &Helper{
 		driverName:     o.driverName,
@@ -565,7 +582,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	}
 	draEndpoint := endpoint{
 		dir:        o.pluginDataDirectoryPath,
-		file:       "dra" + uidPart + ".sock", // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
+		file:       o.pluginSocket,
 		listenFunc: o.draEndpointListen,
 	}
 
