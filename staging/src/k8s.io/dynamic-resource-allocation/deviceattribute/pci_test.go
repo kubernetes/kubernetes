@@ -31,14 +31,15 @@ import (
 func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 	pciBusID := "0000:01:02.3"
 	pcieRoot := "pci0000:01"
-	expectedAttribute := &resourceapi.DeviceAttribute{
-		StringValue: ptr.To(pcieRoot),
+	expectedAttribute := DeviceAttribute{
+		Name:  StandardDeviceAttributePCIeRoot,
+		Value: resourceapi.DeviceAttribute{StringValue: ptr.To(pcieRoot)},
 	}
 
 	tests := map[string]struct {
 		smockSysfsSetup   func(t *testing.T, mockSysfs sysfsPath)
 		address           string
-		expectedAttribute *resourceapi.DeviceAttribute
+		expectedAttribute *DeviceAttribute
 		expectsError      bool
 		expectedErrMsg    string
 	}{
@@ -50,7 +51,7 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 				CreateSymlink(t, devicePath, busPath)
 			},
 			address:           pciBusID,
-			expectedAttribute: expectedAttribute,
+			expectedAttribute: &expectedAttribute,
 			expectsError:      false,
 		},
 		"invalid empty PCI Bus ID": {

@@ -37,25 +37,26 @@ var (
 // as a string value or an error if the PCI Bus ID is invalid or the root complex cannot be determined.
 //
 // ref: https://wiki.xenproject.org/wiki/Bus:Device.Function_(BDF)_Notation
-func GetPCIeRootAttributeByPCIBusID(pciBusID string) (resourceapi.DeviceAttribute, error) {
+func GetPCIeRootAttributeByPCIBusID(pciBusID string) (DeviceAttribute, error) {
 	if pciBusID == "" {
-		return resourceapi.DeviceAttribute{}, fmt.Errorf("PCI Bus ID cannot be empty")
+		return DeviceAttribute{}, fmt.Errorf("PCI Bus ID cannot be empty")
 	}
 
 	if !bdfRegexp.MatchString(pciBusID) {
-		return resourceapi.DeviceAttribute{}, fmt.Errorf("invalid PCI Bus ID format: %s", pciBusID)
+		return DeviceAttribute{}, fmt.Errorf("invalid PCI Bus ID format: %s", pciBusID)
 	}
 
 	// e.g. /sys/devices/pci0000:01/...<intermediate PCI devices>.../0000:00:1f.0,
 	sysDevicesPath, err := resolveSysDevicesPath(pciBusID)
 	if err != nil {
-		return resourceapi.DeviceAttribute{}, fmt.Errorf("failed to resolve sysfs path for PCI Bus ID %s: %w", pciBusID, err)
+		return DeviceAttribute{}, fmt.Errorf("failed to resolve sysfs path for PCI Bus ID %s: %w", pciBusID, err)
 	}
 
 	pciRootPart := strings.Split(strings.TrimPrefix(sysDevicesPath, sysfs.Devices("")+"/"), "/")[0]
 
-	return resourceapi.DeviceAttribute{
-		StringValue: &pciRootPart,
+	return DeviceAttribute{
+		Name:  StandardDeviceAttributePCIeRoot,
+		Value: resourceapi.DeviceAttribute{StringValue: &pciRootPart},
 	}, nil
 }
 
