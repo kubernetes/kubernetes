@@ -34,7 +34,7 @@ LATEST_ETCD_VERSION?=3.6.1
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=0
+REVISION?=1
 
 # IMAGE_TAG Uniquely identifies registry.k8s.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -171,7 +171,7 @@ else
 			"git clone https://github.com/etcd-io/etcd $$etcd_build_dir \
 			&& cd $$etcd_build_dir \
 			&& git checkout v$${version} \
-			&& $(arch_prefix) GOARCH=$(ARCH) ./build.sh \
+			&& $(arch_prefix) GOARCH=$(ARCH) ./scripts/build.sh \
 			&& cp -f bin/$(ARCH)/etcd* bin/etcd* /etcdbin; echo 'done'"; \
 		$(BIN_INSTALL) $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
 		$(BIN_INSTALL) $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
