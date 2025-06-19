@@ -423,7 +423,6 @@ func newTestKubeletWithImageList(
 		kubelet.podWorkers,
 		fakeKubeClient,
 		kubelet.volumePluginMgr,
-		fakeRuntime,
 		kubelet.mounter,
 		kubelet.hostutil,
 		kubelet.getPodsDir(),
