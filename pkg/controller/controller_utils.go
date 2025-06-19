@@ -1083,6 +1083,11 @@ func AddPodNodeNameIndexer(podInformer cache.SharedIndexInformer) error {
 	})
 }
 
+// OrphanPodIndexKeyForNamespace returns the orphan pod index key for a specific namespace.
+func OrphanPodIndexKeyForNamespace(namespace string) string {
+	return OrphanPodIndexKey + "/" + namespace
+}
+
 // AddPodControllerUIDIndexer adds an indexer for Pod's controllerRef.UID to the given PodInformer.
 // This indexer is used to efficiently look up pods by their ControllerRef.UID
 func AddPodControllerUIDIndexer(podInformer cache.SharedIndexInformer) error {
@@ -1100,9 +1105,9 @@ func AddPodControllerUIDIndexer(podInformer cache.SharedIndexInformer) error {
 			if ref := metav1.GetControllerOf(pod); ref != nil {
 				return []string{string(ref.UID)}, nil
 			}
-			// If the Pod has no controller (i.e., it's orphaned), index it with the OrphanPodIndexKey
+			// If the Pod has no controller (i.e., it's orphaned), index it with the OrphanPodIndexKeyForNamespace
 			// This helps identify orphan pods for reconciliation and adoption by controllers
-			return []string{OrphanPodIndexKey}, nil
+			return []string{OrphanPodIndexKeyForNamespace(pod.Namespace)}, nil
 		},
 	})
 }
