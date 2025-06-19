@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"net/http/httptest"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -33,11 +34,13 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1121,6 +1124,219 @@ func TestRemoveTaintOffNode(t *testing.T) {
 	}
 }
 
+func TestGetPodsMatchingSelectorUsingPodNamespaceLabelIndex(t *testing.T) {
+	informer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return &v1.PodList{}, nil
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return watch.NewFake(), nil
+			},
+		},
+		&v1.Pod{},
+		0,
+		cache.Indexers{
+			cache.NamespaceIndex: cache.MetaNamespaceIndexFunc,
+		},
+	)
+
+	if err := AddPodNamespaceLabelIndexer(informer); err != nil {
+		t.Fatalf("failed to add indexer: %v", err)
+	}
+
+	// Add test pods
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "pod1",
+			UID:       "uid1",
+			Labels: map[string]string{
+				"app":         "foo",
+				"role":        "backend",
+				"environment": "prod",
+			},
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "pod2",
+			UID:       "uid2",
+			Labels: map[string]string{
+				"app":         "foo",
+				"role":        "frontend",
+				"environment": "prod",
+			},
+		},
+	}
+	pod3 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "kube-system",
+			Name:      "pod3",
+			UID:       "uid3",
+			Labels: map[string]string{
+				"app":         "foo",
+				"role":        "backend",
+				"environment": "dev",
+			},
+		},
+	}
+	pod4 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "pod4",
+			UID:       "uid4",
+			Labels: map[string]string{
+				"app":                 "foo",
+				"role":                "backend",
+				"very-long-label-key": strings.Repeat("a", 63),
+			},
+		},
+	}
+	pod5 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "pod5",
+			UID:       "uid5",
+			Labels: map[string]string{
+				// Test case sensitivity
+				"APP":  "FOO",
+				"role": "backend",
+			},
+		},
+	}
+
+	// Add pods to the store
+	_ = informer.GetStore().Add(pod1)
+	_ = informer.GetStore().Add(pod2)
+	_ = informer.GetStore().Add(pod3)
+	_ = informer.GetStore().Add(pod4)
+	_ = informer.GetStore().Add(pod5)
+
+	// Test cases
+	tests := []struct {
+		name          string
+		namespace     string
+		labelSelector map[string]string
+		expectedPods  []*v1.Pod
+	}{
+		{
+			name:      "match pods in default namespace with app=foo",
+			namespace: "default",
+			labelSelector: map[string]string{
+				"app": "foo",
+			},
+			expectedPods: []*v1.Pod{pod1, pod2, pod4},
+		},
+		{
+			name:      "match pods in kube-system namespace with app=foo",
+			namespace: "kube-system",
+			labelSelector: map[string]string{
+				"app": "foo",
+			},
+			expectedPods: []*v1.Pod{pod3},
+		},
+		{
+			name:      "match pods in default namespace with role=backend",
+			namespace: "default",
+			labelSelector: map[string]string{
+				"role": "backend",
+			},
+			expectedPods: []*v1.Pod{pod1, pod4, pod5},
+		},
+		{
+			name:      "no match pods with app=bar",
+			namespace: "default",
+			labelSelector: map[string]string{
+				"app": "bar",
+			},
+			expectedPods: []*v1.Pod{},
+		},
+		{
+			name:          "empty selector returns nil",
+			namespace:     "default",
+			labelSelector: map[string]string{},
+			expectedPods:  []*v1.Pod{pod1, pod2, pod4, pod5},
+		},
+		{
+			name:      "no match in wrong namespace",
+			namespace: "nonexistent",
+			labelSelector: map[string]string{
+				"app": "foo",
+			},
+			expectedPods: []*v1.Pod{},
+		},
+		{
+			name:      "selector matches no pod across labels",
+			namespace: "default",
+			labelSelector: map[string]string{
+				"app":  "foo",
+				"role": "nonexistent",
+			},
+			expectedPods: []*v1.Pod{},
+		},
+		{
+			name:      "match multiple labels (AND condition)",
+			namespace: "default",
+			labelSelector: map[string]string{
+				"app":         "foo",
+				"role":        "backend",
+				"environment": "prod",
+			},
+			expectedPods: []*v1.Pod{pod1},
+		},
+		{
+			name:      "case sensitive label values",
+			namespace: "default",
+			labelSelector: map[string]string{
+				"APP": "FOO",
+			},
+			expectedPods: []*v1.Pod{pod5},
+		},
+		{
+			name:      "very long label values",
+			namespace: "default",
+			labelSelector: map[string]string{
+				"very-long-label-key": strings.Repeat("a", 63),
+			},
+			expectedPods: []*v1.Pod{pod4},
+		},
+		{
+			name:          "nil selector returns nil",
+			namespace:     "default",
+			labelSelector: nil,
+			expectedPods:  []*v1.Pod{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pods, err := GetPodsMatchingSelectorUsingPodNamespaceLabelIndex(informer.GetIndexer(), test.namespace, test.labelSelector)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(pods) != len(test.expectedPods) {
+				t.Errorf("expected %d pods, got %d", len(test.expectedPods), len(pods))
+			}
+
+			// Sort pods by name for consistent comparison
+			sort.Slice(pods, func(i, j int) bool {
+				return pods[i].Name < pods[j].Name
+			})
+			sort.Slice(test.expectedPods, func(i, j int) bool {
+				return test.expectedPods[i].Name < test.expectedPods[j].Name
+			})
+
+			for i := range pods {
+				if pods[i].Name != test.expectedPods[i].Name {
+					t.Errorf("expected pod %s, got %s", test.expectedPods[i].Name, pods[i].Name)
+				}
+			}
+		})
+	}
+}
 func TestAddOrUpdateTaintOnNode(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -1358,4 +1574,159 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 			"%s: unexpected request count: expected %+v, got %+v",
 			test.name, test.requestCount, test.nodeHandler.RequestCount)
 	}
+}
+
+// BenchmarkPodNamespaceLabelIndexer tests the performance of single label lookup vs full list scan
+func BenchmarkPodNamespaceLabelIndexer(b *testing.B) {
+	const numPods = 150000
+
+	// Create a shared index informer
+	informer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return &v1.PodList{}, nil
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return watch.NewFake(), nil
+			},
+		},
+		&v1.Pod{},
+		0,
+		cache.Indexers{},
+	)
+
+	if err := AddPodNamespaceLabelIndexer(informer); err != nil {
+		b.Fatalf("failed to add indexer: %v", err)
+	}
+
+	labelValues := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+
+	type labelGenMode int
+	const (
+		uniformMode labelGenMode = iota
+		zipfMode
+	)
+
+	runBenchmark := func(mode labelGenMode) {
+		b.Helper()
+		informer = cache.NewSharedIndexInformer(
+			&cache.ListWatch{
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					return &v1.PodList{}, nil
+				},
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return watch.NewFake(), nil
+				},
+			},
+			&v1.Pod{},
+			0,
+			cache.Indexers{},
+		)
+		if err := AddPodNamespaceLabelIndexer(informer); err != nil {
+			b.Fatalf("failed to add indexer: %v", err)
+		}
+
+		// Setup Zipf generator
+		r := rand.New(rand.NewSource(42))
+		var zipf *rand.Zipf
+		if mode == zipfMode {
+			zipf = rand.NewZipf(r, 1.2, 1, uint64(len(labelValues)-1))
+		}
+		largeString := strings.Repeat("x", 10000)
+		// Create pods with a single label "app"
+		for i := 0; i < numPods; i++ {
+			var v string
+			if mode == zipfMode {
+				v = labelValues[zipf.Uint64()]
+			} else {
+				v = labelValues[r.Intn(len(labelValues))]
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   "default",
+					Name:        fmt.Sprintf("pod-%d", i),
+					UID:         types.UID(fmt.Sprintf("uid-%d", i)),
+					Labels:      map[string]string{"app": v},
+					Annotations: map[string]string{"bloat": largeString},
+				},
+			}
+			_ = informer.GetIndexer().Add(pod)
+		}
+
+		selector := map[string]string{
+			"app": "b",
+		}
+
+		modeName := "uniform"
+		if mode == zipfMode {
+			modeName = "zipf"
+		}
+
+		// verify both methods return the same results
+		indexedPods, err := GetPodsMatchingSelectorUsingPodNamespaceLabelIndex(informer.GetIndexer(), "default", selector)
+		if err != nil {
+			b.Fatalf("indexed query failed: %v", err)
+		}
+
+		sel := metav1.LabelSelector{MatchLabels: selector}
+		labelSelector, err := metav1.LabelSelectorAsSelector(&sel)
+		if err != nil {
+			b.Fatalf("failed to create selector: %v", err)
+		}
+
+		var naivePods []*v1.Pod
+		for _, obj := range informer.GetIndexer().List() {
+			pod := obj.(*v1.Pod)
+			if labelSelector.Matches(labels.Set(pod.Labels)) {
+				naivePods = append(naivePods, pod)
+			}
+		}
+
+		sort.Slice(indexedPods, func(i, j int) bool {
+			return indexedPods[i].Name < indexedPods[j].Name
+		})
+		sort.Slice(naivePods, func(i, j int) bool {
+			return naivePods[i].Name < naivePods[j].Name
+		})
+
+		if len(indexedPods) != len(naivePods) {
+			b.Fatalf("indexed query returned %d pods, naive query returned %d pods", len(indexedPods), len(naivePods))
+		}
+
+		for i := range indexedPods {
+			if indexedPods[i].Name != naivePods[i].Name {
+				b.Fatalf("pod mismatch at index %d: indexed=%s, naive=%s", i, indexedPods[i].Name, naivePods[i].Name)
+			}
+		}
+
+		b.Run(fmt.Sprintf("%s_LabelQueryWithIndex", modeName), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				pods, err := GetPodsMatchingSelectorUsingPodNamespaceLabelIndex(informer.GetIndexer(), "default", selector)
+				if err != nil {
+					b.Fatalf("query failed: %v", err)
+				}
+				if len(pods) == 0 {
+					b.Fatal("unexpected empty result")
+				}
+			}
+		})
+
+		b.Run(fmt.Sprintf("%s_LabelQueryFullScan", modeName), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				var matches []*v1.Pod
+				for _, obj := range informer.GetIndexer().List() {
+					pod := obj.(*v1.Pod)
+					if labelSelector.Matches(labels.Set(pod.Labels)) {
+						matches = append(matches, pod)
+					}
+				}
+				if len(matches) == 0 {
+					b.Fatal("unexpected empty result")
+				}
+			}
+		})
+	}
+
+	runBenchmark(uniformMode)
+	runBenchmark(zipfMode)
 }

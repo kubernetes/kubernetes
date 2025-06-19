@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -93,6 +94,10 @@ const (
 	// podControllerUIDIndex is the name for the Pod store's index function,
 	// which is to index by pods's controllerUID.
 	PodControllerUIDIndex = "podControllerUID"
+
+	// PodNamespaceLabelIndex is the name for the Pod store's index function,
+	// which is to index by pods's namespace and labels.
+	PodNamespaceLabelIndex = "podNamespaceLabel"
 )
 
 var UpdateTaintBackoff = wait.Backoff{
@@ -1105,6 +1110,97 @@ func AddPodControllerUIDIndexer(podInformer cache.SharedIndexInformer) error {
 			return []string{OrphanPodIndexKey}, nil
 		},
 	})
+}
+
+// AddPodNamespaceLabelIndexer adds an indexer for Pod's namespace and labels to the given PodInformer.
+// This indexer is used to efficiently look up pods by their namespace and labels.
+func AddPodNamespaceLabelIndexer(podInformer cache.SharedIndexInformer) error {
+	if _, exists := podInformer.GetIndexer().GetIndexers()[PodNamespaceLabelIndex]; exists {
+		// indexer already exists, do nothing
+		return nil
+	}
+	return podInformer.AddIndexers(cache.Indexers{
+		PodNamespaceLabelIndex: func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return nil, nil
+			}
+			// For each label in the pod, create an index key in the format of "ns:<namespace>/label:<key>=<value>"
+			indexKeys := make([]string, 0, len(pod.Labels))
+			for k, v := range pod.Labels {
+				indexKeys = append(indexKeys, fmt.Sprintf("ns:%s/label:%s=%s", pod.Namespace, k, v))
+			}
+			return indexKeys, nil
+		},
+	})
+}
+
+// GetPodsMatchingSelectorUsingPodNamespaceLabelIndex queries the index for each label selector and intersects the results efficiently.
+func GetPodsMatchingSelectorUsingPodNamespaceLabelIndex(
+	podIndexer cache.Indexer,
+	namespace string,
+	selector map[string]string,
+) ([]*v1.Pod, error) {
+	if selector == nil {
+		// Nil selector returns empty slice
+		// this should never happen other the unit test case
+		return []*v1.Pod{}, nil
+	}
+
+	if len(selector) == 0 {
+		// Empty selector matches all pods in the namespace (equivalent to labels.Everything())
+		objs, err := podIndexer.ByIndex(cache.NamespaceIndex, namespace)
+		if err != nil {
+			return nil, err
+		}
+		pods := make([]*v1.Pod, 0, len(objs))
+		for _, obj := range objs {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+				continue
+			}
+			pods = append(pods, pod)
+		}
+		return pods, nil
+	}
+
+	// Incremental intersection to find pods matching all labels
+	var intersection sets.Set[*v1.Pod]
+
+	for k, v := range selector {
+		indexKey := fmt.Sprintf("ns:%s/label:%s=%s", namespace, k, v)
+		objs, err := podIndexer.ByIndex(PodNamespaceLabelIndex, indexKey)
+		if err != nil {
+			return nil, err
+		}
+		if len(objs) == 0 {
+			// No pods for this label, so no need to check further
+			return nil, nil
+		}
+		// Create a set of pods for this label
+		currentSet := sets.New[*v1.Pod]()
+		for _, obj := range objs {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+				continue
+			}
+			currentSet.Insert(pod)
+		}
+
+		if intersection == nil {
+			intersection = currentSet
+		} else {
+			intersection = intersection.Intersection(currentSet)
+			// Exit early if intersection becomes empty
+			if intersection.Len() == 0 {
+				return nil, nil
+			}
+		}
+	}
+	// Convert intersection set to slice
+	return intersection.UnsortedList(), nil
 }
 
 // PodKey returns a key unique to the given pod within a cluster.

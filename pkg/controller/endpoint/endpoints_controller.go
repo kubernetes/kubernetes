@@ -109,6 +109,10 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 	e.podLister = podInformer.Lister()
 	e.podsSynced = podInformer.Informer().HasSynced
 
+	// Initialize the pod indexer
+	controller.AddPodNamespaceLabelIndexer(podInformer.Informer()) //nolint:errcheck
+	e.podIndexer = podInformer.Informer().GetIndexer()
+
 	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.onEndpointsDelete,
 	})
@@ -144,7 +148,8 @@ type Controller struct {
 	// podsSynced returns true if the pod shared informer has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podsSynced cache.InformerSynced
-
+	// podIndexer allows looking up pods by namespace and labels
+	podIndexer cache.Indexer
 	// endpointsLister is able to list/get endpoints and is populated by the shared informer passed to
 	// NewEndpointController.
 	endpointsLister corelisters.EndpointsLister
@@ -385,7 +390,11 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	}
 
 	logger.V(5).Info("About to update endpoints for service", "service", klog.KRef(namespace, name))
-	pods, err := e.podLister.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelectorPreValidated())
+	pods, err := controller.GetPodsMatchingSelectorUsingPodNamespaceLabelIndex(
+		e.podIndexer,
+		service.Namespace,
+		service.Spec.Selector,
+	)
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is
 		// basically impossible to get this error.
