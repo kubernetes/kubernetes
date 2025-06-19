@@ -164,17 +164,18 @@ else
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
 		etcd_build_dir="/go/src/github.com/coreos/etcd"; \
+		etcd_build_script="./build.sh"
 		if [ $$(echo $$version | cut -d. -f2) -gt 3 ]; then \
 			etcd_build_dir="/go/src/go.etcd.io/etcd"; \
 		fi; \
 		if [ $$(echo $$version | cut -d. -f2) -gt 5 ]; then \
-			etcd_build_dir="/go/src/go.etcd.io/etcd/scripts"; \
+			etcd_build_script="./scripts/build.sh"; \
 		fi; \
 		docker run --rm --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION)$(DOCKER_VOL_OPTS) /bin/bash -c \
 			"git clone https://github.com/etcd-io/etcd $$etcd_build_dir \
 			&& cd $$etcd_build_dir \
 			&& git checkout v$${version} \
-			&& $(arch_prefix) GOARCH=$(ARCH) ./build.sh \
+			&& $(arch_prefix) GOARCH=$(ARCH) $$etcd_build_script \
 			&& cp -f bin/$(ARCH)/etcd* bin/etcd* /etcdbin; echo 'done'"; \
 		$(BIN_INSTALL) $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
 		$(BIN_INSTALL) $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
