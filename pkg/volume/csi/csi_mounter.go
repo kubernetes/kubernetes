@@ -558,7 +558,7 @@ func containsVolumeMode(modes []storage.VolumeLifecycleMode, mode storage.Volume
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check
 func isDirMounted(plug *csiPlugin, dir string) (bool, error) {
-	mounter := plug.host.GetMounter(plug.GetPluginName())
+	mounter := plug.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
 		klog.Error(log("isDirMounted IsLikelyNotMountPoint test failed for dir [%v]", dir))

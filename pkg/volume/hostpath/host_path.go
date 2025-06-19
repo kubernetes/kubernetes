@@ -138,7 +138,7 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume
 	return &hostPathMounter{
 		hostPath:      &hostPath{path: path, pathType: pathType},
 		readOnly:      readOnly,
-		mounter:       plugin.host.GetMounter(plugin.GetPluginName()),
+		mounter:       plugin.host.GetMounter(),
 		hu:            kvh.GetHostUtil(),
 		noTypeChecker: plugin.noTypeChecker,
 	}, nil
