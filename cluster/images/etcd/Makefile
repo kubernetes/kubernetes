@@ -167,6 +167,9 @@ else
 		if [ $$(echo $$version | cut -d. -f2) -gt 3 ]; then \
 			etcd_build_dir="/go/src/go.etcd.io/etcd"; \
 		fi; \
+		if [ $$(echo $$version | cut -d. -f2) -gt 5 ]; then \
+			etcd_build_dir="/go/src/go.etcd.io/etcd/scripts"; \
+		fi; \
 		docker run --rm --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION)$(DOCKER_VOL_OPTS) /bin/bash -c \
 			"git clone https://github.com/etcd-io/etcd $$etcd_build_dir \
 			&& cd $$etcd_build_dir \
