@@ -1,10 +1,11 @@
 ---
 dir: .
-filename: "mock_{{.InterfaceName | snakecase}}_test.go"
-boilerplate-file: ../../../../../hack/boilerplate/boilerplate.generatego.txt
-outpkg: rest
-with-expecter: true
+pkgname: rest
+template: testify
+template-data:
+  boilerplate-file: ../../../../../hack/boilerplate/boilerplate.generatego.txt
+  unroll-variadic: true
 packages:
   k8s.io/client-go/rest:
     interfaces:
-      BackoffManager:
+      BackoffManager: {}
