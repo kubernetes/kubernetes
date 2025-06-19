@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -252,7 +252,7 @@ func TestReplicationControllerConversion(t *testing.T) {
 				Namespace: "namespace",
 			},
 			Spec: v1.ReplicationControllerSpec{
-				Replicas:        utilpointer.Int32(1),
+				Replicas:        ptr.To(int32(1)),
 				MinReadySeconds: 32,
 				Selector:        map[string]string{"foo": "bar", "bar": "foo"},
 				Template: &v1.PodTemplateSpec{
@@ -726,14 +726,14 @@ func TestConvert_v1_Pod_To_core_Pod(t *testing.T) {
 			args: args{
 				in: &v1.Pod{
 					Spec: v1.PodSpec{
-						TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+						TerminationGracePeriodSeconds: ptr.To(int64(-1)),
 					},
 				},
 				out: &core.Pod{},
 			},
 			wantOut: &core.Pod{
 				Spec: core.PodSpec{
-					TerminationGracePeriodSeconds: utilpointer.Int64(1),
+					TerminationGracePeriodSeconds: ptr.To(int64(1)),
 					SecurityContext:               &core.PodSecurityContext{},
 				},
 			},
@@ -766,14 +766,14 @@ func TestConvert_core_Pod_To_v1_Pod(t *testing.T) {
 			args: args{
 				in: &core.Pod{
 					Spec: core.PodSpec{
-						TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+						TerminationGracePeriodSeconds: ptr.To(int64(-1)),
 					},
 				},
 				out: &v1.Pod{},
 			},
 			wantOut: &v1.Pod{
 				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: utilpointer.Int64(1),
+					TerminationGracePeriodSeconds: ptr.To(int64(1)),
 				},
 			},
 		},

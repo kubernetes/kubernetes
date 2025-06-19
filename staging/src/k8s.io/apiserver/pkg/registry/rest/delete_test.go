@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -103,8 +102,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(-1),
 			},
 			// want 1
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(1),
-			wantGracePeriodSeconds:         utilpointer.Int64(1),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(1)),
+			wantGracePeriodSeconds:         ptr.To(int64(1)),
 			wantGraceful:                   false,
 			wantGracefulPending:            true,
 		},
@@ -115,8 +114,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(0),
 			},
 			// want 0
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(0),
-			wantGracePeriodSeconds:         utilpointer.Int64(0),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(0)),
+			wantGracePeriodSeconds:         ptr.To(int64(0)),
 			wantGraceful:                   true,
 			wantGracefulPending:            false,
 		},
@@ -127,8 +126,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(1),
 			},
 			// want 1
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(1),
-			wantGracePeriodSeconds:         utilpointer.Int64(1),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(1)),
+			wantGracePeriodSeconds:         ptr.To(int64(1)),
 			wantGraceful:                   false,
 			wantGracefulPending:            true,
 		},
@@ -139,8 +138,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(2),
 			},
 			// want 1
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(1),
-			wantGracePeriodSeconds:         utilpointer.Int64(2),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(1)),
+			wantGracePeriodSeconds:         ptr.To(int64(2)),
 			wantGraceful:                   false,
 			wantGracefulPending:            true,
 		},
@@ -152,8 +151,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(-1),
 			},
 			// want 0
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(0),
-			wantGracePeriodSeconds:         utilpointer.Int64(1),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(0)),
+			wantGracePeriodSeconds:         ptr.To(int64(1)),
 			wantGraceful:                   false,
 			wantGracefulPending:            false,
 		},
@@ -164,8 +163,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(0),
 			},
 			// want 0
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(0),
-			wantGracePeriodSeconds:         utilpointer.Int64(0),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(0)),
+			wantGracePeriodSeconds:         ptr.To(int64(0)),
 			wantGraceful:                   false,
 			wantGracefulPending:            false,
 		},
@@ -176,8 +175,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(1),
 			},
 			// want 0
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(0),
-			wantGracePeriodSeconds:         utilpointer.Int64(1),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(0)),
+			wantGracePeriodSeconds:         ptr.To(int64(1)),
 			wantGraceful:                   false,
 			wantGracefulPending:            false,
 		},
@@ -188,8 +187,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(2),
 			},
 			// want 0
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(0),
-			wantGracePeriodSeconds:         utilpointer.Int64(2),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(0)),
+			wantGracePeriodSeconds:         ptr.To(int64(2)),
 			wantGraceful:                   false,
 			wantGracefulPending:            false,
 		},
@@ -201,8 +200,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(-1),
 			},
 			// want 1
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(1),
-			wantGracePeriodSeconds:         utilpointer.Int64(1),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(1)),
+			wantGracePeriodSeconds:         ptr.To(int64(1)),
 			wantGraceful:                   false,
 			wantGracefulPending:            true,
 		},
@@ -213,8 +212,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(0),
 			},
 			// want 0
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(0),
-			wantGracePeriodSeconds:         utilpointer.Int64(0),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(0)),
+			wantGracePeriodSeconds:         ptr.To(int64(0)),
 			wantGraceful:                   true,
 			wantGracefulPending:            false,
 		},
@@ -225,8 +224,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(1),
 			},
 			// want 1
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(1),
-			wantGracePeriodSeconds:         utilpointer.Int64(1),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(1)),
+			wantGracePeriodSeconds:         ptr.To(int64(1)),
 			wantGraceful:                   false,
 			wantGracefulPending:            true,
 		},
@@ -237,8 +236,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(2),
 			},
 			// want 1
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(1),
-			wantGracePeriodSeconds:         utilpointer.Int64(2),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(1)),
+			wantGracePeriodSeconds:         ptr.To(int64(2)),
 			wantGraceful:                   false,
 			wantGracefulPending:            true,
 		},
@@ -250,8 +249,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(-1),
 			},
 			// want 1
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(1),
-			wantGracePeriodSeconds:         utilpointer.Int64(1),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(1)),
+			wantGracePeriodSeconds:         ptr.To(int64(1)),
 			wantGraceful:                   true,
 			wantGracefulPending:            false,
 		},
@@ -262,8 +261,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(0),
 			},
 			// want 0
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(0),
-			wantGracePeriodSeconds:         utilpointer.Int64(0),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(0)),
+			wantGracePeriodSeconds:         ptr.To(int64(0)),
 			wantGraceful:                   true,
 			wantGracefulPending:            false,
 		},
@@ -274,8 +273,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(1),
 			},
 			// want 1
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(1),
-			wantGracePeriodSeconds:         utilpointer.Int64(1),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(1)),
+			wantGracePeriodSeconds:         ptr.To(int64(1)),
 			wantGraceful:                   true,
 			wantGracefulPending:            false,
 		},
@@ -286,8 +285,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(2),
 			},
 			// want 2
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(2),
-			wantGracePeriodSeconds:         utilpointer.Int64(2),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(2)),
+			wantGracePeriodSeconds:         ptr.To(int64(2)),
 			wantGraceful:                   false,
 			wantGracefulPending:            true,
 		},
@@ -298,8 +297,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(50),
 			},
 			wantDeletionTimestamp:          &now,
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(1),
-			wantGracePeriodSeconds:         utilpointer.Int64(50),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(1)),
+			wantGracePeriodSeconds:         ptr.To(int64(50)),
 			wantGraceful:                   true,
 		},
 		{
@@ -309,8 +308,8 @@ func TestBeforeDelete(t *testing.T) {
 				options: makeOption(0),
 			},
 			wantDeletionTimestamp:          &now,
-			wantDeletionGracePeriodSeconds: utilpointer.Int64(0),
-			wantGracePeriodSeconds:         utilpointer.Int64(0),
+			wantDeletionGracePeriodSeconds: ptr.To(int64(0)),
+			wantGracePeriodSeconds:         ptr.To(int64(0)),
 			wantGraceful:                   true,
 		},
 	}
@@ -337,10 +336,10 @@ func TestBeforeDelete(t *testing.T) {
 			if gotGracefulPending != tt.wantGracefulPending {
 				t.Errorf("BeforeDelete() gotGracefulPending = %v, want %v", gotGracefulPending, tt.wantGracefulPending)
 			}
-			if !utilpointer.Int64Equal(tt.args.pod.DeletionGracePeriodSeconds, tt.wantDeletionGracePeriodSeconds) {
+			if !ptr.Equal(tt.args.pod.DeletionGracePeriodSeconds, tt.wantDeletionGracePeriodSeconds) {
 				t.Errorf("metadata.DeletionGracePeriodSeconds = %v, want %v", ptr.Deref(tt.args.pod.DeletionGracePeriodSeconds, 0), ptr.Deref(tt.wantDeletionGracePeriodSeconds, 0))
 			}
-			if !utilpointer.Int64Equal(tt.args.options.GracePeriodSeconds, tt.wantGracePeriodSeconds) {
+			if !ptr.Equal(tt.args.options.GracePeriodSeconds, tt.wantGracePeriodSeconds) {
 				t.Errorf("options.GracePeriodSeconds = %v, want %v", ptr.Deref(tt.args.options.GracePeriodSeconds, 0), ptr.Deref(tt.wantGracePeriodSeconds, 0))
 			}
 			if tt.wantDeletionTimestamp != nil {

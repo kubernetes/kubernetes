@@ -48,7 +48,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -370,7 +370,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 							},
 						},
 					},
-					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+					TerminationGracePeriodSeconds: ptr.To(int64(-1)),
 				},
 			}
 
@@ -394,7 +394,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "failed to query for pod")
 				ginkgo.By("updating the pod to have a negative TerminationGracePeriodSeconds")
-				pod.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(-1)
+				pod.Spec.TerminationGracePeriodSeconds = ptr.To(int64(-1))
 				_, err = podClient.PodInterface.Update(ctx, pod, metav1.UpdateOptions{})
 				return err
 			})
@@ -573,7 +573,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 			pod.ObjectMeta.Labels = map[string]string{
 				"time": value,
 			}
-			pod.Spec.ActiveDeadlineSeconds = utilpointer.Int64(5000)
+			pod.Spec.ActiveDeadlineSeconds = ptr.To(int64(5000))
 
 			ginkgo.By("submitting the pod to kubernetes")
 			pod = podClient.CreateSync(ctx, pod)

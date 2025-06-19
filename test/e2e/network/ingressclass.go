@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -178,11 +178,11 @@ var _ = common.SIGDescribe("IngressClass", feature.Ingress, func() {
 			Spec: networkingv1.IngressClassSpec{
 				Controller: "example.com/controller",
 				Parameters: &networkingv1.IngressClassParametersReference{
-					Scope:     utilpointer.String("Namespace"),
-					Namespace: utilpointer.String("foo-ns"),
+					Scope:     ptr.To("Namespace"),
+					Namespace: ptr.To("foo-ns"),
 					Kind:      "fookind",
 					Name:      "fooname",
-					APIGroup:  utilpointer.String("example.com"),
+					APIGroup:  ptr.To("example.com"),
 				},
 			},
 		}

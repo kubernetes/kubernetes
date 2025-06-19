@@ -45,7 +45,7 @@ import (
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutils "k8s.io/kubernetes/test/utils"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -949,7 +949,7 @@ func CreateCustomResourceDefinition(ctx context.Context, c crdclientset.Interfac
 					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
 						SpecReplicasPath:   ".spec.replicas",
 						StatusReplicasPath: ".status.replicas",
-						LabelSelectorPath:  utilpointer.String(".status.selector"),
+						LabelSelectorPath:  ptr.To(".status.selector"),
 					},
 				},
 			}},

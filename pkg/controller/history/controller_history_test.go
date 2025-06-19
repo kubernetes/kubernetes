@@ -41,7 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestRealHistory_ListControllerRevisions(t *testing.T) {
@@ -1650,7 +1650,7 @@ func newStatefulSet(replicas int, name string, uid types.UID, labels map[string]
 				MatchLabels:      nil,
 				MatchExpressions: testMatchExpressions,
 			},
-			Replicas: pointer.Int32(int32(replicas)),
+			Replicas: ptr.To(int32(replicas)),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,

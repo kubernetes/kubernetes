@@ -47,12 +47,12 @@ import (
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"k8s.io/utils/pointer"
 
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 func TestTypeResolver(t *testing.T) {
@@ -412,7 +412,7 @@ func sampleReplicatedDeployment() *appsv1.Deployment {
 			Name: "demo-deployment",
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32(2),
+			Replicas: ptr.To(int32(2)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "demo",
@@ -466,7 +466,7 @@ func installCRD(apiExtensionClient extclientset.Interface) (*apiextensionsv1.Cus
 					Storage: true,
 					Schema: &apiextensionsv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-							XPreserveUnknownFields: pointer.Bool(true),
+							XPreserveUnknownFields: ptr.To(true),
 							Type:                   "object",
 							Properties: map[string]apiextensionsv1.JSONSchemaProps{
 								"spec": {

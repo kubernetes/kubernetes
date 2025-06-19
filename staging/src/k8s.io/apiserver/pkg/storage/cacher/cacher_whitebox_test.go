@@ -60,7 +60,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func newTestCacherWithoutSyncing(s storage.Interface, c clock.WithTicker) (*Cacher, storage.Versioner, error) {
@@ -2412,7 +2412,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 					p.AllowWatchBookmarks = true
 					return p
 				}(),
-				SendInitialEvents: pointer.Bool(true),
+				SendInitialEvents: ptr.To(true),
 				ResourceVersion:   "105",
 			},
 			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
@@ -2428,7 +2428,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 					p.AllowWatchBookmarks = false
 					return p
 				}(),
-				SendInitialEvents: pointer.Bool(true),
+				SendInitialEvents: ptr.To(true),
 			},
 			backingStorage: func() *dummyStorage {
 				hasBeenPrimed := false
@@ -2472,7 +2472,7 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 					p.AllowWatchBookmarks = true
 					return p
 				}(),
-				SendInitialEvents: pointer.Bool(true),
+				SendInitialEvents: ptr.To(true),
 			},
 			backingStorage: func() *dummyStorage {
 				hasBeenPrimed := false
@@ -2698,7 +2698,7 @@ func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
 	pred.AllowWatchBookmarks = true
 	opts := storage.ListOptions{
 		Predicate:         pred,
-		SendInitialEvents: pointer.Bool(true),
+		SendInitialEvents: ptr.To(true),
 	}
 	w, err := cacher.Watch(context.Background(), "pods/ns", opts)
 	require.NoError(t, err, "failed to create watch: %v")
@@ -2815,12 +2815,12 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 		},
 		{
 			name:                         "RV=unset, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                         listOptions(true, pointer.Bool(true), ""),
+			opts:                         listOptions(true, ptr.To(true), ""),
 			expectedWatchResourceVersion: 100,
 		},
 		{
 			name:                         "RV=unset, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                         listOptions(true, pointer.Bool(false), ""),
+			opts:                         listOptions(true, ptr.To(false), ""),
 			expectedWatchResourceVersion: 100,
 		},
 		{
@@ -2832,12 +2832,12 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 		},
 		{
 			name:                         "RV=unset, allowWatchBookmarks=false, sendInitialEvents=true, legacy",
-			opts:                         listOptions(false, pointer.Bool(true), ""),
+			opts:                         listOptions(false, ptr.To(true), ""),
 			expectedWatchResourceVersion: 100,
 		},
 		{
 			name:                         "RV=unset, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                         listOptions(false, pointer.Bool(false), ""),
+			opts:                         listOptions(false, ptr.To(false), ""),
 			expectedWatchResourceVersion: 100,
 		},
 		// +-----------------+---------------------+-----------------------+
@@ -2852,12 +2852,12 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 		},
 		{
 			name:                         "RV=0, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                         listOptions(true, pointer.Bool(true), "0"),
+			opts:                         listOptions(true, ptr.To(true), "0"),
 			expectedWatchResourceVersion: 0,
 		},
 		{
 			name:                         "RV=0, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                         listOptions(true, pointer.Bool(false), "0"),
+			opts:                         listOptions(true, ptr.To(false), "0"),
 			expectedWatchResourceVersion: 0,
 		},
 		{
@@ -2867,12 +2867,12 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 		},
 		{
 			name:                         "RV=0, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                         listOptions(false, pointer.Bool(true), "0"),
+			opts:                         listOptions(false, ptr.To(true), "0"),
 			expectedWatchResourceVersion: 0,
 		},
 		{
 			name:                         "RV=0, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                         listOptions(false, pointer.Bool(false), "0"),
+			opts:                         listOptions(false, ptr.To(false), "0"),
 			expectedWatchResourceVersion: 0,
 		},
 		// +-----------------+---------------------+-----------------------+
@@ -2887,12 +2887,12 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 		},
 		{
 			name:                         "RV=95, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                         listOptions(true, pointer.Bool(true), "95"),
+			opts:                         listOptions(true, ptr.To(true), "95"),
 			expectedWatchResourceVersion: 95,
 		},
 		{
 			name:                         "RV=95, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                         listOptions(true, pointer.Bool(false), "95"),
+			opts:                         listOptions(true, ptr.To(false), "95"),
 			expectedWatchResourceVersion: 95,
 		},
 		{
@@ -2902,12 +2902,12 @@ func TestGetWatchCacheResourceVersion(t *testing.T) {
 		},
 		{
 			name:                         "RV=95, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                         listOptions(false, pointer.Bool(true), "95"),
+			opts:                         listOptions(false, ptr.To(true), "95"),
 			expectedWatchResourceVersion: 95,
 		},
 		{
 			name:                         "RV=95, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                         listOptions(false, pointer.Bool(false), "95"),
+			opts:                         listOptions(false, ptr.To(false), "95"),
 			expectedWatchResourceVersion: 95,
 		},
 	}
@@ -2978,14 +2978,14 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 		},
 		{
 			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                            listOptions(true, pointer.Bool(true), ""),
+			opts:                            listOptions(true, ptr.To(true), ""),
 			requiredResourceVersion:         100,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 100,
 		},
 		{
 			name:                            "RV=unset, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                            listOptions(true, pointer.Bool(false), ""),
+			opts:                            listOptions(true, ptr.To(false), ""),
 			requiredResourceVersion:         100,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 0,
@@ -2999,14 +2999,14 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 		},
 		{
 			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                            listOptions(false, pointer.Bool(true), ""),
+			opts:                            listOptions(false, ptr.To(true), ""),
 			requiredResourceVersion:         100,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 0,
 		},
 		{
 			name:                            "RV=unset, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                            listOptions(false, pointer.Bool(false), ""),
+			opts:                            listOptions(false, ptr.To(false), ""),
 			requiredResourceVersion:         100,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 0,
@@ -3025,14 +3025,14 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 		},
 		{
 			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                            listOptions(true, pointer.Bool(true), "0"),
+			opts:                            listOptions(true, ptr.To(true), "0"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 99,
 		},
 		{
 			name:                            "RV=0, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                            listOptions(true, pointer.Bool(false), "0"),
+			opts:                            listOptions(true, ptr.To(false), "0"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 0,
@@ -3046,14 +3046,14 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 		},
 		{
 			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                            listOptions(false, pointer.Bool(true), "0"),
+			opts:                            listOptions(false, ptr.To(true), "0"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 0,
 		},
 		{
 			name:                            "RV=0, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                            listOptions(false, pointer.Bool(false), "0"),
+			opts:                            listOptions(false, ptr.To(false), "0"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 0,
@@ -3072,14 +3072,14 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 		},
 		{
 			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=true",
-			opts:                            listOptions(true, pointer.Bool(true), "95"),
+			opts:                            listOptions(true, ptr.To(true), "95"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 95,
 		},
 		{
 			name:                            "RV=95, allowWatchBookmarks=true, sendInitialEvents=false",
-			opts:                            listOptions(true, pointer.Bool(false), "95"),
+			opts:                            listOptions(true, ptr.To(false), "95"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 0,
@@ -3093,14 +3093,14 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 		},
 		{
 			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=true",
-			opts:                            listOptions(false, pointer.Bool(true), "95"),
+			opts:                            listOptions(false, ptr.To(true), "95"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 0,
 		},
 		{
 			name:                            "RV=95, allowWatchBookmarks=false, sendInitialEvents=false",
-			opts:                            listOptions(false, pointer.Bool(false), "95"),
+			opts:                            listOptions(false, ptr.To(false), "95"),
 			requiredResourceVersion:         0,
 			watchCacheResourceVersion:       99,
 			expectedBookmarkResourceVersion: 0,

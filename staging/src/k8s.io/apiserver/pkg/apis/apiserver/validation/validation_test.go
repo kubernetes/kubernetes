@@ -36,7 +36,7 @@ import (
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidateAuthenticationConfiguration(t *testing.T) {
@@ -69,7 +69,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -87,7 +87,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -114,7 +114,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -133,7 +133,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -153,7 +153,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "claim",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -183,7 +183,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "claim",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -208,7 +208,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						},
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -234,7 +234,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 						UserValidationRules: []api.UserValidationRule{
@@ -264,7 +264,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -653,7 +653,7 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 						ClaimMappings: api.ClaimMappings{
 							Username: api.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String("prefix"),
+								Prefix: ptr.To("prefix"),
 							},
 						},
 					},
@@ -1137,7 +1137,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Expression: "claims.username",
-					Prefix:     pointer.String("prefix"),
+					Prefix:     ptr.To("prefix"),
 				},
 			},
 			structuredAuthnFeatureEnabled: true,
@@ -1170,7 +1170,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Groups: api.PrefixedClaimOrExpression{
 					Claim:      "claim",
@@ -1185,11 +1185,11 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Groups: api.PrefixedClaimOrExpression{
 					Expression: "claims.groups",
-					Prefix:     pointer.String("prefix"),
+					Prefix:     ptr.To("prefix"),
 				},
 			},
 			structuredAuthnFeatureEnabled: true,
@@ -1200,7 +1200,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Groups: api.PrefixedClaimOrExpression{
 					Claim: "claim",
@@ -1214,7 +1214,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Groups: api.PrefixedClaimOrExpression{
 					Expression: "foo.bar",
@@ -1230,7 +1230,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				UID: api.ClaimOrExpression{
 					Claim:      "claim",
@@ -1245,7 +1245,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				UID: api.ClaimOrExpression{
 					Expression: "foo.bar",
@@ -1261,7 +1261,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Extra: []api.ExtraMapping{
 					{Key: "", ValueExpression: "claims.extra"},
@@ -1275,7 +1275,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Extra: []api.ExtraMapping{
 					{Key: "example.org/foo", ValueExpression: ""},
@@ -1289,7 +1289,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Extra: []api.ExtraMapping{
 					{Key: "example.org/foo", ValueExpression: "foo.bar"},
@@ -1317,7 +1317,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Groups: api.PrefixedClaimOrExpression{
 					Expression: "foo.bar",
@@ -1333,7 +1333,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				UID: api.ClaimOrExpression{
 					Expression: "foo.bar",
@@ -1349,7 +1349,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				UID: api.ClaimOrExpression{
 					Claim: "claim",
@@ -1363,7 +1363,7 @@ func TestValidateClaimMappings(t *testing.T) {
 			in: api.ClaimMappings{
 				Username: api.PrefixedClaimOrExpression{
 					Claim:  "claim",
-					Prefix: pointer.String("prefix"),
+					Prefix: ptr.To("prefix"),
 				},
 				Extra: []api.ExtraMapping{
 					{Key: "example.org/foo", ValueExpression: "claims.extra"},

@@ -55,7 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.Pod) {
@@ -321,8 +321,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				Namespace: api.NamespaceNodeLease,
 			},
 			Spec: coordination.LeaseSpec{
-				HolderIdentity:       pointer.String("mynode"),
-				LeaseDurationSeconds: pointer.Int32(40),
+				HolderIdentity:       ptr.To("mynode"),
+				LeaseDurationSeconds: ptr.To(int32(40)),
 				RenewTime:            &metav1.MicroTime{Time: time.Now()},
 			},
 		}
@@ -332,8 +332,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				Namespace: "foo",
 			},
 			Spec: coordination.LeaseSpec{
-				HolderIdentity:       pointer.String("mynode"),
-				LeaseDurationSeconds: pointer.Int32(40),
+				HolderIdentity:       ptr.To("mynode"),
+				LeaseDurationSeconds: ptr.To(int32(40)),
 				RenewTime:            &metav1.MicroTime{Time: time.Now()},
 			},
 		}
@@ -343,8 +343,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				Namespace: api.NamespaceNodeLease,
 			},
 			Spec: coordination.LeaseSpec{
-				HolderIdentity:       pointer.String("mynode"),
-				LeaseDurationSeconds: pointer.Int32(40),
+				HolderIdentity:       ptr.To("mynode"),
+				LeaseDurationSeconds: ptr.To(int32(40)),
 				RenewTime:            &metav1.MicroTime{Time: time.Now()},
 			},
 		}
@@ -569,13 +569,13 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	configmappod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "foo"}}}}}
 
 	ctbpod, _ := makeTestPod("ns", "myctbpod", "mynode", true)
-	ctbpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{ClusterTrustBundle: &api.ClusterTrustBundleProjection{Name: pointer.String("foo")}}}}}}}
+	ctbpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{ClusterTrustBundle: &api.ClusterTrustBundleProjection{Name: ptr.To("foo")}}}}}}}
 
 	pvcpod, _ := makeTestPod("ns", "mypvcpod", "mynode", true)
 	pvcpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "foo"}}}}
 
 	claimpod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
-	claimpod.Spec.ResourceClaims = []api.PodResourceClaim{{Name: "myclaim", ResourceClaimName: pointer.String("myexternalclaim")}}
+	claimpod.Spec.ResourceClaims = []api.PodResourceClaim{{Name: "myclaim", ResourceClaimName: ptr.To("myexternalclaim")}}
 
 	tests := []admitTestCase{
 		// Mirror pods bound to us
@@ -1789,7 +1789,7 @@ func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
 		Kind:       "Node",
 		Name:       "mynode",
 		UID:        "mynode-uid",
-		Controller: pointer.BoolPtr(true),
+		Controller: ptr.To(true),
 	}
 	invalidName := validOwner
 	invalidName.Name = "other"
@@ -1800,9 +1800,9 @@ func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
 	invalidControllerNil := validOwner
 	invalidControllerNil.Controller = nil
 	invalidControllerFalse := validOwner
-	invalidControllerFalse.Controller = pointer.BoolPtr(false)
+	invalidControllerFalse.Controller = ptr.To(bool(false))
 	invalidBlockDeletion := validOwner
-	invalidBlockDeletion.BlockOwnerDeletion = pointer.BoolPtr(true)
+	invalidBlockDeletion.BlockOwnerDeletion = ptr.To(true)
 
 	tests := []struct {
 		name        string
@@ -2163,7 +2163,7 @@ func TestAdmitResourceSlice(t *testing.T) {
 			Name: "something",
 		},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: pointer.String(nodename),
+			NodeName: ptr.To(nodename),
 		},
 	}
 	sliceOtherNode := &resourceapi.ResourceSlice{
@@ -2171,7 +2171,7 @@ func TestAdmitResourceSlice(t *testing.T) {
 			Name: "something",
 		},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: pointer.String(nodename + "-other"),
+			NodeName: ptr.To(nodename + "-other"),
 		},
 	}
 	sliceNoNode := &resourceapi.ResourceSlice{

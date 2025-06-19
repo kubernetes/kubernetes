@@ -55,10 +55,10 @@ import (
 	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -1094,7 +1094,7 @@ var _ = SIGDescribe("Pods", func() {
 				Labels: label,
 			},
 			Spec: v1.PodSpec{
-				TerminationGracePeriodSeconds: pointer.Int64(1),
+				TerminationGracePeriodSeconds: ptr.To(int64(1)),
 				Containers: []v1.Container{
 					{
 						Name:  "agnhost",

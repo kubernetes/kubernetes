@@ -40,7 +40,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -210,8 +210,8 @@ func newTestLease(acquireTime time.Time, namespace string) *coordinationv1.Lease
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity:       pointer.String(testLeaseName),
-			LeaseDurationSeconds: pointer.Int32(3600),
+			HolderIdentity:       ptr.To(testLeaseName),
+			LeaseDurationSeconds: ptr.To(int32(3600)),
 			AcquireTime:          &metav1.MicroTime{Time: acquireTime},
 			RenewTime:            &metav1.MicroTime{Time: acquireTime},
 		},

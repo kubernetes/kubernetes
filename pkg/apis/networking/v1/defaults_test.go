@@ -28,7 +28,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
 	. "k8s.io/kubernetes/pkg/apis/networking/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSetDefaultNetworkPolicy(t *testing.T) {
@@ -258,7 +258,7 @@ func TestSetDefaultsForIngressClassParametersReference(t *testing.T) {
 					Parameters: &networkingv1.IngressClassParametersReference{
 						Kind:  "k",
 						Name:  "n",
-						Scope: utilpointer.String(networkingv1.IngressClassParametersReferenceScopeCluster),
+						Scope: ptr.To(networkingv1.IngressClassParametersReferenceScopeCluster),
 					},
 				},
 			},
@@ -269,10 +269,12 @@ func TestSetDefaultsForIngressClassParametersReference(t *testing.T) {
 				Spec: networkingv1.IngressClassSpec{
 					Controller: "controller",
 					Parameters: &networkingv1.IngressClassParametersReference{
-						Kind:      "k",
-						Name:      "n",
-						Scope:     utilpointer.String(networkingv1.IngressClassParametersReferenceScopeNamespace),
-						Namespace: utilpointer.String("foo-ns"),
+						Kind: "k",
+						Name: "n",
+						// Scope:     utilpointer.String(networkingv1.IngressClassParametersReferenceScopeNamespace),
+						// Namespace: utilpointer.String("foo-ns"),
+						Scope:     ptr.To(networkingv1.IngressClassParametersReferenceScopeNamespace),
+						Namespace: ptr.To("foo-ns"),
 					},
 				},
 			},
@@ -282,8 +284,8 @@ func TestSetDefaultsForIngressClassParametersReference(t *testing.T) {
 					Parameters: &networkingv1.IngressClassParametersReference{
 						Kind:      "k",
 						Name:      "n",
-						Scope:     utilpointer.String(networkingv1.IngressClassParametersReferenceScopeNamespace),
-						Namespace: utilpointer.String("foo-ns"),
+						Scope:     ptr.To(networkingv1.IngressClassParametersReferenceScopeNamespace),
+						Namespace: ptr.To("foo-ns"),
 					},
 				},
 			},

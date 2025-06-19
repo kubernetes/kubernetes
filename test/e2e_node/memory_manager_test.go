@@ -44,7 +44,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/cpuset"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -310,11 +310,11 @@ var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.With
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		if isMultiNUMASupported == nil {
-			isMultiNUMASupported = pointer.BoolPtr(isMultiNUMA())
+			isMultiNUMASupported = ptr.To(isMultiNUMA())
 		}
 
 		if is2MiHugepagesSupported == nil {
-			is2MiHugepagesSupported = pointer.BoolPtr(isHugePageAvailable(hugepagesSize2M))
+			is2MiHugepagesSupported = ptr.To(isHugePageAvailable(hugepagesSize2M))
 		}
 
 		if len(allNUMANodes) == 0 {
@@ -325,7 +325,7 @@ var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.With
 		if *is2MiHugepagesSupported {
 			ginkgo.By("Configuring hugepages")
 			gomega.Eventually(ctx, func() error {
-				return configureHugePages(hugepagesSize2M, hugepages2MiCount, pointer.IntPtr(0))
+				return configureHugePages(hugepagesSize2M, hugepages2MiCount, ptr.To(0))
 			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
 		}
 	})
@@ -358,7 +358,7 @@ var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.With
 			ginkgo.By("Releasing allocated hugepages")
 			gomega.Eventually(ctx, func() error {
 				// configure hugepages on the NUMA node 0 to avoid hugepages split across NUMA nodes
-				return configureHugePages(hugepagesSize2M, 0, pointer.IntPtr(0))
+				return configureHugePages(hugepagesSize2M, 0, ptr.To(0))
 			}, 90*time.Second, 15*time.Second).ShouldNot(gomega.HaveOccurred(), "failed to release hugepages")
 		}
 	})

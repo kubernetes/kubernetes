@@ -39,10 +39,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"k8s.io/utils/ptr"
 )
 
 var _ = common.SIGDescribe("EndpointSlice", func() {
@@ -602,8 +602,8 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("creating")
 		eps1 := epsTemplate.DeepCopy()
 		eps1.Ports = []discoveryv1.EndpointPort{{
-			Name:     pointer.String("port80"),
-			Port:     pointer.Int32(8090),
+			Name:     ptr.To("port80"),
+			Port:     ptr.To(int32(8090)),
 			Protocol: &tcpProtocol,
 		}}
 
@@ -611,8 +611,8 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err)
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Ports = []discoveryv1.EndpointPort{{
-			Name:     pointer.String("port81"),
-			Port:     pointer.Int32(9090),
+			Name:     ptr.To("port81"),
+			Port:     ptr.To(int32(9090)),
 			Protocol: &tcpProtocol,
 		}}
 
@@ -707,8 +707,8 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			},
 		}
 		eps1.Ports = []discoveryv1.EndpointPort{{
-			Name:     pointer.String("port80"),
-			Port:     pointer.Int32(8090),
+			Name:     ptr.To("port80"),
+			Port:     ptr.To(int32(8090)),
 			Protocol: &tcpProtocol,
 		}}
 
@@ -722,8 +722,8 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			},
 		}
 		eps2.Ports = []discoveryv1.EndpointPort{{
-			Name:     pointer.String("port81"),
-			Port:     pointer.Int32(8090),
+			Name:     ptr.To("port81"),
+			Port:     ptr.To(int32(8090)),
 			Protocol: &tcpProtocol,
 		}}
 		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps2, metav1.CreateOptions{})

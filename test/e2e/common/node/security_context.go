@@ -40,7 +40,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
@@ -460,7 +459,7 @@ var _ = SIGDescribe("Security Context", func() {
 							Name:    podName,
 							Command: []string{"id", "-u"}, // Print UID and exit
 							SecurityContext: &v1.SecurityContext{
-								RunAsNonRoot: pointer.BoolPtr(true),
+								RunAsNonRoot: ptr.To(true),
 								RunAsUser:    userid,
 							},
 						},
@@ -473,7 +472,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-nonroot-uid"
-			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(nonRootTestUserID))
+			pod := makeNonRootPod(name, rootImage, ptr.To(int64(nonRootTestUserID)))
 			podClient.Create(ctx, pod)
 
 			podClient.WaitForSuccess(ctx, name, framework.PodStartTimeout)
@@ -483,7 +482,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-root-uid"
-			pod := makeNonRootPod(name, nonRootImage, pointer.Int64Ptr(0))
+			pod := makeNonRootPod(name, nonRootImage, ptr.To(int64(0)))
 			pod = podClient.Create(ctx, pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
