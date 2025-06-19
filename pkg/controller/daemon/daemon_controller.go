@@ -696,7 +696,7 @@ func (dsc *DaemonSetsController) getDaemonPodsFromCache(ds *apps.DaemonSet) ([]*
 	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
 	//   but may be adopted later on if they have matching labels with the Daemonset.
 	podsForDS := []*v1.Pod{}
-	for _, key := range []string{string(ds.UID), controller.OrphanPodIndexKey} {
+	for _, key := range []string{string(ds.UID), controller.OrphanPodIndexKeyForNamespace(ds.Namespace)} {
 		podObjs, err := dsc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
 		if err != nil {
 			return nil, err
