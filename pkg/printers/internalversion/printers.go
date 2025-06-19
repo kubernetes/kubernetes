@@ -1963,6 +1963,10 @@ func printNode(obj *api.Node, options printers.GenerateOptions) ([]metav1.TableR
 		if crVersion == "" {
 			crVersion = "<unknown>"
 		}
+		// append arch to kernelVersion
+		if obj.Status.NodeInfo.Architecture != "" {
+			kernelVersion += " (" + obj.Status.NodeInfo.Architecture + ")"
+		}
 		row.Cells = append(row.Cells, getNodeInternalIP(obj), getNodeExternalIP(obj), osImage, kernelVersion, crVersion)
 	}
 
