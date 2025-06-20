@@ -169,17 +169,19 @@ func (v *TimingHistogramVec) WithLabelValuesChecked(lvs ...string) (GaugeMetric,
 		}
 		return noop, errNotRegistered
 	}
+
+	// Initialize label allow lists if not already initialized
+	v.initializeLabelAllowListsOnce.Do(func() {
+		allowListLock.RLock()
+		if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+			v.LabelValueAllowLists = allowList
+		}
+		allowListLock.RUnlock()
+	})
+
+	// Constrain label values to allowed values
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
-	} else {
-		v.initializeLabelAllowListsOnce.Do(func() {
-			allowListLock.RLock()
-			if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
-				v.LabelValueAllowLists = allowList
-				allowList.ConstrainToAllowedList(v.originalLabels, lvs)
-			}
-			allowListLock.RUnlock()
-		})
 	}
 	ops, err := v.TimingHistogramVec.GetMetricWithLabelValues(lvs...)
 	if err != nil {
@@ -217,19 +219,24 @@ func (v *TimingHistogramVec) WithChecked(labels map[string]string) (GaugeMetric,
 		}
 		return noop, errNotRegistered
 	}
+
+	// Initialize label allow lists if not already initialized
+	v.initializeLabelAllowListsOnce.Do(func() {
+		allowListLock.RLock()
+		if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+			v.LabelValueAllowLists = allowList
+		}
+		allowListLock.RUnlock()
+	})
+
+	// Constrain label map to allowed values
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainLabelMap(labels)
-	} else {
-		v.initializeLabelAllowListsOnce.Do(func() {
-			allowListLock.RLock()
-			if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
-				v.LabelValueAllowLists = allowList
-				allowList.ConstrainLabelMap(labels)
-			}
-			allowListLock.RUnlock()
-		})
 	}
 	ops, err := v.TimingHistogramVec.GetMetricWith(labels)
+	if err != nil {
+		return noop, err
+	}
 	return ops.(GaugeMetric), err
 }
 

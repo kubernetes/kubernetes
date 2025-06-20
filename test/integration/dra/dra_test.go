@@ -490,10 +490,10 @@ func testConvert(tCtx ktesting.TContext) {
 	claim.Namespace = namespace
 	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
 	tCtx.ExpectNoError(err, "create claim")
-	claimAlpha, err := tCtx.Client().ResourceV1alpha3().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
+	claimBeta2, err := tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get claim")
 	// We could check more fields, but there are unit tests which cover this better.
-	assert.Equal(tCtx, claim.Name, claimAlpha.Name, "claim name")
+	assert.Equal(tCtx, claim.Name, claimBeta2.Name, "claim name")
 }
 
 // testAdminAccess creates a claim with AdminAccess and then checks
@@ -510,14 +510,14 @@ func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
 	if adminAccessEnabled {
 		if err != nil {
 			// should result in validation error
-			assert.ErrorContains(tCtx, err, "admin access to devices requires the `resource.k8s.io/admin-access: true` label on the containing namespace", "the error message should have contained the expected error message")
+			assert.ErrorContains(tCtx, err, "admin access to devices requires the `resource.kubernetes.io/admin-access: true` label on the containing namespace", "the error message should have contained the expected error message")
 			return
 		} else {
 			tCtx.Fatal("expected validation error(s), got none")
 		}
 
 		// create claim with AdminAccess in admin namespace
-		adminNS := createTestNamespace(tCtx, map[string]string{"resource.k8s.io/admin-access": "true"})
+		adminNS := createTestNamespace(tCtx, map[string]string{"resource.kubernetes.io/admin-access": "true"})
 		claim2 := claim.DeepCopy()
 		claim2.Namespace = adminNS
 		claim2.Name = "claim2"

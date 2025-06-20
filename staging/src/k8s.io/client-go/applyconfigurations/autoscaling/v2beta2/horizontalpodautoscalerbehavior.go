@@ -30,6 +30,7 @@ type HorizontalPodAutoscalerBehaviorApplyConfiguration struct {
 func HorizontalPodAutoscalerBehavior() *HorizontalPodAutoscalerBehaviorApplyConfiguration {
 	return &HorizontalPodAutoscalerBehaviorApplyConfiguration{}
 }
+func (b HorizontalPodAutoscalerBehaviorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithScaleUp sets the ScaleUp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

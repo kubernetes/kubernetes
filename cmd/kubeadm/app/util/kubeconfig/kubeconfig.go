@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
-
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // CreateBasic creates a basic, general KubeConfig object that then can be extended

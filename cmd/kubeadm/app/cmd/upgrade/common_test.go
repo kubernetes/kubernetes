@@ -76,8 +76,8 @@ func TestEnforceRequirements(t *testing.T) {
 			flags: applyPlanFlags{
 				kubeConfigPath: fullPath,
 			},
-			expectedErr:        "ERROR CoreDNSUnsupportedPlugins",
-			expectedErrNonRoot: "user is not running as", // user is not running as (root || administrator)
+			expectedErr:        "preflight checks failed",
+			expectedErrNonRoot: "preflight checks failed",
 		},
 		{
 			name: "Bogus preflight check specify all with individual check",

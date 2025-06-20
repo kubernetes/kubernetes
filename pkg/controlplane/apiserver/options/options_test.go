@@ -47,7 +47,7 @@ import (
 	"k8s.io/component-base/metrics"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	v1alpha1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1alpha1"
+	v1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1"
 	netutils "k8s.io/utils/net"
 )
 
@@ -485,7 +485,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			if tc.externalSigner {
 				// create and start mock signer.
 				socketPath := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("mock-external-jwt-signer-%d.sock", time.Now().Nanosecond()))
-				mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
+				mockSigner := v1testing.NewMockSigner(t, socketPath)
 				defer mockSigner.CleanUp()
 
 				mockSigner.MaxTokenExpirationSeconds = tc.externalMaxExpirationSec

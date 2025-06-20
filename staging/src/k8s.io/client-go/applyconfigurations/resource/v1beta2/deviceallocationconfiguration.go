@@ -35,6 +35,7 @@ type DeviceAllocationConfigurationApplyConfiguration struct {
 func DeviceAllocationConfiguration() *DeviceAllocationConfigurationApplyConfiguration {
 	return &DeviceAllocationConfigurationApplyConfiguration{}
 }
+func (b DeviceAllocationConfigurationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSource sets the Source field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

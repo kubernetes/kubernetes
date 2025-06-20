@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/kubernetes/pkg/windows/service"
 
 	"golang.org/x/sys/windows/registry"
@@ -52,10 +51,9 @@ const (
 
 // managerImpl has functions that can be used to interact with the Node Shutdown Manager.
 type managerImpl struct {
-	logger       klog.Logger
-	recorder     record.EventRecorder
-	nodeRef      *v1.ObjectReference
-	probeManager prober.Manager
+	logger   klog.Logger
+	recorder record.EventRecorder
+	nodeRef  *v1.ObjectReference
 
 	getPods        eviction.ActivePodsFunc
 	syncNodeStatus func()
@@ -87,7 +85,6 @@ func NewManager(conf *Config) Manager {
 
 	manager := &managerImpl{
 		logger:         conf.Logger,
-		probeManager:   conf.ProbeManager,
 		recorder:       conf.Recorder,
 		nodeRef:        conf.NodeRef,
 		getPods:        conf.GetPodsFunc,

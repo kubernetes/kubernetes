@@ -36,6 +36,7 @@ type RBDPersistentVolumeSourceApplyConfiguration struct {
 func RBDPersistentVolumeSource() *RBDPersistentVolumeSourceApplyConfiguration {
 	return &RBDPersistentVolumeSourceApplyConfiguration{}
 }
+func (b RBDPersistentVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithCephMonitors adds the given value to the CephMonitors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

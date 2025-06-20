@@ -31,6 +31,7 @@ type ResourceClaimStatusApplyConfiguration struct {
 func ResourceClaimStatus() *ResourceClaimStatusApplyConfiguration {
 	return &ResourceClaimStatusApplyConfiguration{}
 }
+func (b ResourceClaimStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAllocation sets the Allocation field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

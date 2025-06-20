@@ -35,6 +35,7 @@ type PodFailurePolicyOnExitCodesRequirementApplyConfiguration struct {
 func PodFailurePolicyOnExitCodesRequirement() *PodFailurePolicyOnExitCodesRequirementApplyConfiguration {
 	return &PodFailurePolicyOnExitCodesRequirementApplyConfiguration{}
 }
+func (b PodFailurePolicyOnExitCodesRequirementApplyConfiguration) IsApplyConfiguration() {}
 
 // WithContainerName sets the ContainerName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

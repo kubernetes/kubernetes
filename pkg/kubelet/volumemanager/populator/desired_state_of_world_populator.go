@@ -40,7 +40,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -101,7 +100,6 @@ func NewDesiredStateOfWorldPopulator(
 	podStateProvider PodStateProvider,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
-	kubeContainerRuntime kubecontainer.Runtime,
 	csiMigratedPluginManager csimigration.PluginManager,
 	intreeToCSITranslator csimigration.InTreeToCSITranslator,
 	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
@@ -114,7 +112,6 @@ func NewDesiredStateOfWorldPopulator(
 		actualStateOfWorld:  actualStateOfWorld,
 		pods: processedPods{
 			processedPods: make(map[volumetypes.UniquePodName]bool)},
-		kubeContainerRuntime:     kubeContainerRuntime,
 		hasAddedPods:             false,
 		hasAddedPodsLock:         sync.RWMutex{},
 		csiMigratedPluginManager: csiMigratedPluginManager,
@@ -131,7 +128,6 @@ type desiredStateOfWorldPopulator struct {
 	desiredStateOfWorld      cache.DesiredStateOfWorld
 	actualStateOfWorld       cache.ActualStateOfWorld
 	pods                     processedPods
-	kubeContainerRuntime     kubecontainer.Runtime
 	hasAddedPods             bool
 	hasAddedPodsLock         sync.RWMutex
 	csiMigratedPluginManager csimigration.PluginManager

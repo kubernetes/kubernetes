@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/pflag"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -50,7 +51,6 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-
 	"k8s.io/utils/pointer"
 )
 
@@ -64,6 +64,7 @@ func TestAuthenticationValidate(t *testing.T) {
 		testAuthenticationConfigFile      string
 		expectErr                         string
 		enabledFeatures, disabledFeatures []featuregate.Feature
+		emulationVersion                  *version.Version
 	}{
 		{
 			name: "test when OIDC and ServiceAccounts are nil",
@@ -250,6 +251,9 @@ func TestAuthenticationValidate(t *testing.T) {
 				Allow:    true,
 				FlagsSet: true,
 			},
+			// This allows us to disable the AnonymousAuthConfigurableEndpoints
+			// feature-gate, otherwise this feature-gate cannot be disabled.
+			emulationVersion: version.MustParse("1.33"),
 		},
 	}
 
@@ -261,6 +265,12 @@ func TestAuthenticationValidate(t *testing.T) {
 			options.ServiceAccounts = testcase.testSA
 			options.WebHook = testcase.testWebHook
 			options.AuthenticationConfigFile = testcase.testAuthenticationConfigFile
+
+			// SetFeatureGateEmulationVersionDuringTest needs to be called
+			// before any calls to SetFeatureGateDuringTest to work reliably.
+			if testcase.emulationVersion != nil {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
 			for _, f := range testcase.enabledFeatures {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
 			}
@@ -507,7 +517,6 @@ func TestWithTokenGetterFunction(t *testing.T) {
 }
 
 func TestToAuthenticationConfig_Anonymous(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 	testCases := []struct {
 		name                     string
 		args                     []string
@@ -690,7 +699,7 @@ anonymous:
   enabled: true
 `),
 			},
-			expectErr: "--anonynous-auth flag cannot be set when anonymous field is configured in authentication configuration file",
+			expectErr: "--anonymous-auth flag cannot be set when anonymous field is configured in authentication configuration file",
 		},
 		{
 			name:                     "flag-anonymous-enabled-file-anonymous-notset-AnonymousAuthConfigurableEndpoints-enabled",
@@ -747,7 +756,11 @@ jwt:
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
+			if !testcase.enableAnonymousEndpoints {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnonymousAuthConfigurableEndpoints, testcase.enableAnonymousEndpoints)
+
 			opts := NewBuiltInAuthenticationOptions().WithAnonymous()
 			pf := pflag.NewFlagSet("test-builtin-authentication-opts", pflag.ContinueOnError)
 			opts.AddFlags(pf)
@@ -782,12 +795,11 @@ jwt:
 }
 
 func TestToAuthenticationConfig_OIDC(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-
 	testCases := []struct {
 		name         string
 		args         []string
 		expectConfig kubeauthenticator.Config
+		expectErr    string
 	}{
 		{
 			name: "username prefix is '-'",
@@ -1027,6 +1039,29 @@ jwt:
 				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
 		},
+		{
+			name: "authentication config file not found",
+			args: []string{
+				"--authentication-config=nonexistent-file",
+			},
+			expectErr:    `failed to load authentication configuration from file "nonexistent-file": open nonexistent-file: no such file or directory`,
+			expectConfig: kubeauthenticator.Config{},
+		},
+		{
+			name: "authentication config validation error",
+			args: []string{
+				"--authentication-config=" + writeTempFile(t, `
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+    audiences: [ "🐼" ]
+`),
+			},
+			expectErr:    "invalid authentication configuration: jwt[0].claimMappings.username: Required value: claim or expression is required",
+			expectConfig: kubeauthenticator.Config{},
+		},
 	}
 
 	for _, testcase := range testCases {
@@ -1040,9 +1075,13 @@ jwt:
 			}
 
 			resultConfig, err := opts.ToAuthenticationConfig()
-			if err != nil {
-				t.Fatal(err)
+			if (err != nil) != (testcase.expectErr != "") {
+				t.Fatalf("Got err: %v; Want err: %v", err, testcase.expectErr)
 			}
+			if len(testcase.expectErr) > 0 && !strings.Contains(err.Error(), testcase.expectErr) {
+				t.Fatalf("Got err: %v; Want err: %v", err, testcase.expectErr)
+			}
+
 			if !reflect.DeepEqual(resultConfig, testcase.expectConfig) {
 				t.Error(cmp.Diff(resultConfig, testcase.expectConfig))
 			}
@@ -1195,6 +1234,9 @@ func TestValidateOIDCOptions(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
+			if !tt.structuredAuthenticationConfigEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, tt.structuredAuthenticationConfigEnabled)
 
 			opts := NewBuiltInAuthenticationOptions().WithOIDC()

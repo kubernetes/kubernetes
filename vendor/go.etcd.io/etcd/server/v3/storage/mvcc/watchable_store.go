@@ -162,11 +162,11 @@ func (s *watchableStore) cancelWatcher(wa *watcher) {
 		} else if s.synced.delete(wa) {
 			watcherGauge.Dec()
 			break
-		} else if wa.compacted {
-			watcherGauge.Dec()
-			break
 		} else if wa.ch == nil {
 			// already canceled (e.g., cancel/close race)
+			break
+		} else if wa.compacted {
+			watcherGauge.Dec()
 			break
 		}
 

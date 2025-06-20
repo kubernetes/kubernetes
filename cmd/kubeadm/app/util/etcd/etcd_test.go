@@ -24,8 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
@@ -36,6 +34,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
 )
 

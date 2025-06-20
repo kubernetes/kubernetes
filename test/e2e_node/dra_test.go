@@ -572,9 +572,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 })
 
 // Run Kubelet plugin and wait until it's registered
-func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeName, pluginName string) *testdriver.ExamplePlugin {
+func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string) *testdriver.ExamplePlugin {
 	ginkgo.By("start Kubelet plugin")
-	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin "+pluginName), "node", nodeName)
+	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "DRA kubelet plugin "+driverName), "node", nodeName)
 	ctx = klog.NewContext(ctx, logger)
 
 	// Ensure that directories exist, creating them if necessary. We want
@@ -582,14 +582,14 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 	// creating those directories.
 	err := os.MkdirAll(cdiDir, os.FileMode(0750))
 	framework.ExpectNoError(err, "create CDI directory")
-	datadir := path.Join(kubeletplugin.KubeletPluginsDir, pluginName) // The default, not set below.
+	datadir := path.Join(kubeletplugin.KubeletPluginsDir, driverName) // The default, not set below.
 	err = os.MkdirAll(datadir, 0750)
 	framework.ExpectNoError(err, "create DRA socket directory")
 
 	plugin, err := testdriver.StartPlugin(
 		ctx,
 		cdiDir,
-		pluginName,
+		driverName,
 		clientSet,
 		nodeName,
 		testdriver.FileOperations{

@@ -35,6 +35,7 @@ type HPAScalingPolicyApplyConfiguration struct {
 func HPAScalingPolicy() *HPAScalingPolicyApplyConfiguration {
 	return &HPAScalingPolicyApplyConfiguration{}
 }
+func (b HPAScalingPolicyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

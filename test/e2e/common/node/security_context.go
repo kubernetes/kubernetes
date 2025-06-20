@@ -102,7 +102,7 @@ var _ = SIGDescribe("Security Context", func() {
 				podClient.DeleteSync(ctx, createdPod2.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			})
 			getLogs := func(pod *v1.Pod) (string, error) {
-				err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod1.Name, f.Namespace.Name, f.Timeouts.PodStart)
+				err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart)
 				if err != nil {
 					return "", err
 				}

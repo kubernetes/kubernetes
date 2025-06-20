@@ -16,10 +16,16 @@ limitations under the License.
 
 package safe
 
-// Field takes a pointer to any value (which may or may not be nil) and
-// a function that traverses to a target type R (a typical use case is to dereference a field),
-// and returns the result of the traversal, or the zero value of the target type.
-// This is roughly equivalent to "value != nil ? fn(value) : zero-value" in languages that support the ternary operator.
+// Field takes a pointer to any value (which may or may not be nil) and a
+// function that traverses to a target type R (a typical use case is to
+// dereference a field), and returns the result of the traversal, or the zero
+// value of the target type.
+//
+// This is roughly equivalent to:
+//
+//	value != nil ? fn(value) : zero-value
+//
+// ...in languages that support the ternary operator.
 func Field[V any, R any](value *V, fn func(*V) R) R {
 	if value == nil {
 		var zero R
@@ -34,4 +40,20 @@ func Field[V any, R any](value *V, fn func(*V) R) R {
 func Cast[T any](value any) T {
 	result, _ := value.(T)
 	return result
+}
+
+// Value takes a pointer to any value (which may or may not be nil) and a
+// function that returns a pointer to the same type.  If the value is not nil,
+// it is returned, otherwise the result of the function is returned.
+//
+// This is roughly equivalent to:
+//
+//	value != nil ? value : fn()
+//
+// ...in languages that support the ternary operator.
+func Value[T any](value *T, fn func() *T) *T {
+	if value != nil {
+		return value
+	}
+	return fn()
 }

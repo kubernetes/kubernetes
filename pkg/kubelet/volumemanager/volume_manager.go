@@ -185,7 +185,6 @@ func NewVolumeManager(
 	podStateProvider PodStateProvider,
 	kubeClient clientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
-	kubeContainerRuntime container.Runtime,
 	mounter mount.Interface,
 	hostutil hostutil.HostUtils,
 	kubeletPodsDir string,
@@ -217,7 +216,6 @@ func NewVolumeManager(
 		podStateProvider,
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
-		kubeContainerRuntime,
 		csiMigratedPluginManager,
 		intreeToCSITranslator,
 		volumePluginMgr)

@@ -1257,6 +1257,12 @@ func (cfg *Config) Validate() error {
 		return errors.New("both --discovery-token and --discovery-endpoints must be set")
 	}
 
+	for _, ep := range cfg.DiscoveryCfg.Endpoints {
+		if strings.TrimSpace(ep) == "" {
+			return errors.New("--discovery-endpoints must not contain empty endpoints")
+		}
+	}
+
 	if cfg.TickMs == 0 {
 		return fmt.Errorf("--heartbeat-interval must be >0 (set to %dms)", cfg.TickMs)
 	}

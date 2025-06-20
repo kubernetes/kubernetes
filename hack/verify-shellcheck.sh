@@ -114,7 +114,7 @@ if ${HAVE_SHELLCHECK}; then
 else
   echo "Using shellcheck ${SHELLCHECK_VERSION} docker image."
   "${DOCKER}" run \
-    --rm -v "${KUBE_ROOT}:${KUBE_ROOT}" -w "${KUBE_ROOT}" \
+    --rm -v "${KUBE_ROOT}:${KUBE_ROOT}" -w "${KUBE_ROOT}" --security-opt label=disable \
     "${SHELLCHECK_IMAGE}" \
     "${SHELLCHECK_OPTIONS[@]}" "${scripts_to_check[@]}" >&2 || res=$?
 fi

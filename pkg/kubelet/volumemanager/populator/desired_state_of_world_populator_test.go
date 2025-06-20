@@ -1608,7 +1608,6 @@ func createDswpWithVolumeWithCustomPluginMgr(pv *v1.PersistentVolume, pvc *v1.Pe
 		actualStateOfWorld:  fakeASW,
 		pods: processedPods{
 			processedPods: make(map[types.UniquePodName]bool)},
-		kubeContainerRuntime:     fakeRuntime,
 		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
 		intreeToCSITranslator:    csiTranslator,
 		volumePluginMgr:          fakeVolumePluginMgr,

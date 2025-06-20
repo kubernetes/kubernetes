@@ -39,10 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
@@ -378,8 +375,6 @@ func (c *claimsTest) run(t *testing.T) {
 }
 
 func TestToken(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-
 	synchronizeTokenIDVerifierForTest = true
 	tests := []claimsTest{
 		{
@@ -4081,6 +4076,43 @@ func TestToken(t *testing.T) {
 			want: &user.DefaultInfo{
 				Name: "jane",
 			},
+		},
+		{
+			name: "using credential id and user validation rule to simulate revocation",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							// While full token revocation is not supported, it is possible to approximate revocation by writing user info validation rules
+							// based on a unique identifier in the token, such as the jti claim (if present).
+							Expression: `!(user.extra[?'authentication.kubernetes.io/credential-id'][0].orValue('') in ["JTI=ea28ed49-2e11-4280-9ec5-bc3d1d84661a"])`,
+							Message:    "credential is revoked",
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d,
+				"jti": "ea28ed49-2e11-4280-9ec5-bc3d1d84661a"
+			}`, valid.Unix()),
+			wantErr: `oidc: error evaluating user info validation rule: validation expression '!(user.extra[?'authentication.kubernetes.io/credential-id'][0].orValue('') in ["JTI=ea28ed49-2e11-4280-9ec5-bc3d1d84661a"])' failed: credential is revoked`,
 		},
 	}
 

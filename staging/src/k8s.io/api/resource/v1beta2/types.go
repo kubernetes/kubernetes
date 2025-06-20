@@ -596,7 +596,7 @@ const (
 // of adminAccess: true in any namespaced resource.k8s.io API types. Currently,
 // this permission applies to ResourceClaim and ResourceClaimTemplate objects.
 const (
-	DRAAdminNamespaceLabelKey = "resource.k8s.io/admin-access"
+	DRAAdminNamespaceLabelKey = "resource.kubernetes.io/admin-access"
 )
 
 // DeviceRequest is a request for devices required for a claim.

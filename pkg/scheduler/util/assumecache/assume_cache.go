@@ -23,11 +23,11 @@ import (
 	"sync"
 
 	"k8s.io/klog/v2"
+	"k8s.io/utils/buffer"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/scheduler/util/queue"
 )
 
 // Informer is the subset of [cache.SharedInformer] that NewAssumeCache depends upon.
@@ -147,7 +147,7 @@ type AssumeCache struct {
 	// which tries to lock the rwMutex). Writing into such a channel
 	// while not holding the rwMutex doesn't work because in-order delivery
 	// of events would no longer be guaranteed.
-	eventQueue queue.FIFO[func()]
+	eventQueue buffer.Ring[func()]
 
 	// describes the object stored
 	description string
@@ -194,6 +194,7 @@ func NewAssumeCache(logger klog.Logger, informer Informer, description, indexNam
 		description: description,
 		indexFunc:   indexFunc,
 		indexName:   indexName,
+		eventQueue:  *buffer.NewRing[func()](buffer.RingOptions{InitialSize: 0, NormalSize: 4}),
 	}
 	indexers := cache.Indexers{}
 	if indexName != "" && indexFunc != nil {
@@ -308,15 +309,15 @@ func (c *AssumeCache) pushEvent(oldObj, newObj interface{}) {
 	for _, handler := range c.eventHandlers {
 		handler := handler
 		if oldObj == nil {
-			c.eventQueue.Push(func() {
+			c.eventQueue.WriteOne(func() {
 				handler.OnAdd(newObj, false)
 			})
 		} else if newObj == nil {
-			c.eventQueue.Push(func() {
+			c.eventQueue.WriteOne(func() {
 				handler.OnDelete(oldObj)
 			})
 		} else {
-			c.eventQueue.Push(func() {
+			c.eventQueue.WriteOne(func() {
 				handler.OnUpdate(oldObj, newObj)
 			})
 		}
@@ -493,7 +494,7 @@ func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) cache.
 	c.eventHandlers = append(c.eventHandlers, handler)
 	allObjs := c.listLocked(nil)
 	for _, obj := range allObjs {
-		c.eventQueue.Push(func() {
+		c.eventQueue.WriteOne(func() {
 			handler.OnAdd(obj, true)
 		})
 	}
@@ -511,7 +512,7 @@ func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) cache.
 func (c *AssumeCache) emitEvents() {
 	for {
 		c.rwMutex.Lock()
-		deliver, ok := c.eventQueue.Pop()
+		deliver, ok := c.eventQueue.ReadOne()
 		c.rwMutex.Unlock()
 
 		if !ok {

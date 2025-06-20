@@ -45,6 +45,7 @@ type StatefulSetSpecApplyConfiguration struct {
 func StatefulSetSpec() *StatefulSetSpecApplyConfiguration {
 	return &StatefulSetSpecApplyConfiguration{}
 }
+func (b StatefulSetSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithReplicas sets the Replicas field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

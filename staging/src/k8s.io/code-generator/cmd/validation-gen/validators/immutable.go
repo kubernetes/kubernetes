@@ -18,7 +18,10 @@ package validators
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
+
+	"k8s.io/code-generator/cmd/validation-gen/util"
 )
 
 const (
@@ -48,10 +51,10 @@ var (
 	immutableReflectValidator = types.Name{Package: libValidationPkg, Name: "ImmutableByReflect"}
 )
 
-func (immutableTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	var result Validations
 
-	if nonPointer(nativeType(context.Type)).Kind == types.Builtin {
+	if util.NonPointer(util.NativeType(context.Type)).Kind == types.Builtin {
 		// This is a minor optimization to just compare primitive values when
 		// possible. Slices and maps are not comparable, and structs might hold
 		// pointer fields, which are directly comparable but not what we need.

@@ -176,12 +176,16 @@ func rpad(s string, padding int) string {
 	return fmt.Sprintf(formattedString, s)
 }
 
-// tmpl executes the given template text on data, writing the result to w.
-func tmpl(w io.Writer, text string, data interface{}) error {
-	t := template.New("top")
-	t.Funcs(templateFuncs)
-	template.Must(t.Parse(text))
-	return t.Execute(w, data)
+func tmpl(text string) *tmplFunc {
+	return &tmplFunc{
+		tmpl: text,
+		fn: func(w io.Writer, data interface{}) error {
+			t := template.New("top")
+			t.Funcs(templateFuncs)
+			template.Must(t.Parse(text))
+			return t.Execute(w, data)
+		},
+	}
 }
 
 // ld compares two strings and returns the levenshtein distance between them.

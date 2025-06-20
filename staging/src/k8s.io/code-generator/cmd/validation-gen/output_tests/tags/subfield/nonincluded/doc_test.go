@@ -23,7 +23,7 @@ import (
 func TestSubfieldObjectMetaValidationWithValidateFalse(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
-	st.Value(&Struct{}).
-		// check for subfield +k8s:validateFalse validation on Struct.(other.StructType).StringField
-		ExpectValidateFalse("subfield Struct.(other.StructType).StringField")
+	st.Value(&Struct{}).ExpectValidateFalseByPath(map[string][]string{
+		"other.StructType.stringField": {"subfield Struct.(other.StructType).StringField"},
+	})
 }

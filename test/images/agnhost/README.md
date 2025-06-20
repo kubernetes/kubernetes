@@ -392,6 +392,7 @@ Starts a HTTP(S) server on given port with the following endpoints:
 
 - `/`: Returns the request's timestamp.
 - `/clientip`: Returns the request's IP address.
+- `/serverport`: Returns the server port.
 - `/dial`: Creates a given number of requests to the given host and port using the given protocol,
   and returns a JSON with the fields `responses` (successful request responses) and `errors` (
   failed request responses). Returns `200 OK` status code if the last request succeeded,
