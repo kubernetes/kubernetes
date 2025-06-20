@@ -458,7 +458,6 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, timeout time
 }
 
 func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, name string, opts *attach.AttachOptions) error {
-	// pod, err := waitForPod(podClient, ns, name, opts.GetPodTimeout, podRunningAndReady)
 	pod, err := waitForPod(podClient, ns, name, opts.GetPodTimeout, mainContainerRunning)
 	if err != nil && err != ErrPodCompleted {
 		return err
