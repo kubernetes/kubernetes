@@ -17,7 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,13 +33,15 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 const testPodLogsDirectory = "/var/log/pods"
 
 func TestGeneratePodSandboxConfig(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 	pod := newTestPod()
 
@@ -62,7 +63,7 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 		},
 	}
 
-	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 1)
+	podSandboxConfig, err := m.generatePodSandboxConfig(tCtx, pod, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedLabels, podSandboxConfig.Labels)
 	assert.Equal(t, expectedLogDirectory, podSandboxConfig.LogDirectory)
@@ -72,8 +73,8 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 
 // TestCreatePodSandbox tests creating sandbox and its corresponding pod log directory.
 func TestCreatePodSandbox(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 	pod := newTestPod()
 
@@ -84,10 +85,10 @@ func TestCreatePodSandbox(t *testing.T) {
 		assert.Equal(t, os.FileMode(0755), perm)
 		return nil
 	}
-	id, _, err := m.createPodSandbox(ctx, pod, 1)
+	id, _, err := m.createPodSandbox(tCtx, pod, 1)
 	assert.NoError(t, err)
 	assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
-	sandboxes, err := fakeRuntime.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{Id: id})
+	sandboxes, err := fakeRuntime.ListPodSandbox(tCtx, &runtimeapi.PodSandboxFilter{Id: id})
 	assert.NoError(t, err)
 	assert.Len(t, sandboxes, 1)
 	assert.Equal(t, sandboxes[0].Id, fmt.Sprintf("%s_%s_%s_1", pod.Name, pod.Namespace, pod.UID))
@@ -95,7 +96,8 @@ func TestCreatePodSandbox(t *testing.T) {
 }
 
 func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -139,11 +141,11 @@ func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
 
 // TestCreatePodSandbox_RuntimeClass tests creating sandbox with RuntimeClasses enabled.
 func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
-	ctx := context.Background()
+	tCtx := ktesting.Init(t)
 	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
 	defer rctest.StartManagerSync(rcm)()
 
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 	m.runtimeClassManager = rcm
 
@@ -162,7 +164,7 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 			pod := newTestPod()
 			pod.Spec.RuntimeClassName = test.rcn
 
-			id, _, err := m.createPodSandbox(ctx, pod, 1)
+			id, _, err := m.createPodSandbox(tCtx, pod, 1)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {
@@ -214,7 +216,8 @@ func newSeccompPod(podFieldProfile, containerFieldProfile *v1.SeccompProfile, po
 }
 
 func TestGeneratePodSandboxWindowsConfig_HostProcess(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	const containerName = "container"
