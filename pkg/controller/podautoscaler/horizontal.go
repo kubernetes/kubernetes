@@ -1431,12 +1431,15 @@ func (a *HorizontalController) setStatus(hpa *autoscalingv2.HorizontalPodAutosca
 	}
 
 	hpa.Status = autoscalingv2.HorizontalPodAutoscalerStatus{
-		CurrentReplicas:          currentReplicas,
-		DesiredReplicas:          desiredReplicas,
-		LastScaleTime:            hpa.Status.LastScaleTime,
-		CurrentMetrics:           metricStatuses,
-		Conditions:               hpa.Status.Conditions,
-		CurrentSelectionStrategy: strategy,
+		CurrentReplicas: currentReplicas,
+		DesiredReplicas: desiredReplicas,
+		LastScaleTime:   hpa.Status.LastScaleTime,
+		CurrentMetrics:  metricStatuses,
+		Conditions:      hpa.Status.Conditions,
+	}
+
+	if hpa.Spec.SelectionStrategy != nil {
+		hpa.Status.CurrentSelectionStrategy = strategy
 	}
 
 	if rescale {
