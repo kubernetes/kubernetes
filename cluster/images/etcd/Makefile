@@ -164,7 +164,7 @@ else
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
 		etcd_build_dir="/go/src/github.com/coreos/etcd"; \
-		etcd_build_script="./build.sh"
+		etcd_build_script="./build.sh"; \
 		if [ $$(echo $$version | cut -d. -f2) -gt 3 ]; then \
 			etcd_build_dir="/go/src/go.etcd.io/etcd"; \
 		fi; \
