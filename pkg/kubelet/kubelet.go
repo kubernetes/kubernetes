@@ -2048,7 +2048,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 					// TODO: We only need to make this call if any of the resources were decreased.
 					kl.allocationManager.RetryPendingResizes()
 				} else {
-					kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, false)
+					// If the condition already exists, the observedGeneration does not get updated.
+					kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, pod.Generation)
 				}
 			}
 		}
