@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
-	uexec "k8s.io/utils/exec"
 )
 
 var (
@@ -367,9 +366,9 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			// we need different exit condition depending on restart policy
 			// for Never it can either fail or succeed, for OnFailure only
 			// success matters
-			exitCondition := podCompleted
+			exitCondition := mainContainerTerminated
 			if restartPolicy == corev1.RestartPolicyOnFailure {
-				exitCondition = podSucceeded
+				exitCondition = mainContainerSucceeded
 			}
 			pod, err = waitForPod(clientset.CoreV1(), attachablePod.Namespace, attachablePod.Name, opts.GetPodTimeout, exitCondition)
 			if err != nil {
@@ -380,25 +379,16 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			return nil
 		}
 
-		switch pod.Status.Phase {
-		case corev1.PodSucceeded:
-			return nil
-		case corev1.PodFailed:
-			unknownRcErr := fmt.Errorf("pod %s/%s failed with unknown exit code", pod.Namespace, pod.Name)
-			if len(pod.Status.ContainerStatuses) == 0 || pod.Status.ContainerStatuses[0].State.Terminated == nil {
-				return unknownRcErr
+		for _, container := range pod.Status.ContainerStatuses {
+			if container.Name == pod.Name {
+				if container.State.Terminated != nil {
+					if container.State.Terminated.ExitCode == 0 {
+						return nil
+					} else {
+						return fmt.Errorf("pod %s/%s terminated (%s)\n%s", pod.Namespace, pod.Name, container.State.Terminated.Reason, container.State.Terminated.Message)
+					}
+				}
 			}
-			// assume here that we have at most one status because kubectl-run only creates one container per pod
-			rc := pod.Status.ContainerStatuses[0].State.Terminated.ExitCode
-			if rc == 0 {
-				return unknownRcErr
-			}
-			return uexec.CodeExitError{
-				Err:  fmt.Errorf("pod %s/%s terminated (%s)\n%s", pod.Namespace, pod.Name, pod.Status.ContainerStatuses[0].State.Terminated.Reason, pod.Status.ContainerStatuses[0].State.Terminated.Message),
-				Code: int(rc),
-			}
-		default:
-			return fmt.Errorf("pod %s/%s left in phase %s", pod.Namespace, pod.Name, pod.Status.Phase)
 		}
 
 	}
@@ -468,7 +458,7 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, timeout time
 }
 
 func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, name string, opts *attach.AttachOptions) error {
-	pod, err := waitForPod(podClient, ns, name, opts.GetPodTimeout, podRunningAndReady)
+	pod, err := waitForPod(podClient, ns, name, opts.GetPodTimeout, mainContainerRunning)
 	if err != nil && err != ErrPodCompleted {
 		return err
 	}
@@ -712,6 +702,63 @@ func podRunningAndReady(event watch.Event) (bool, error) {
 					conditions[i].Status == corev1.ConditionTrue {
 					return true, nil
 				}
+			}
+		}
+	}
+	return false, nil
+}
+
+// mainContainerRunning returns true if the main container is running
+func mainContainerRunning(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *corev1.Pod:
+		// in kubectl run, the container name is the same as the pod name
+		containerName := event.Object.(*corev1.Pod).Name
+		for _, container := range t.Status.ContainerStatuses {
+			if container.Name == containerName && container.State.Running != nil {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// mainContainerSucceeded returns true if the main container has run to completion and exited successfully
+func mainContainerSucceeded(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *corev1.Pod:
+		containerName := event.Object.(*corev1.Pod).Name
+		for _, container := range t.Status.ContainerStatuses {
+			if container.Name == containerName && container.State.Terminated != nil {
+				if container.State.Terminated.ExitCode == 0 {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
+}
+
+// mainContainerTerminated returns true if the main container has run to completion, no matter exited successfully or not
+func mainContainerTerminated(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(schema.GroupResource{Resource: "pods"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *corev1.Pod:
+		containerName := event.Object.(*corev1.Pod).Name
+		for _, container := range t.Status.ContainerStatuses {
+			if container.Name == containerName && container.State.Terminated != nil {
+				return true, nil
 			}
 		}
 	}
