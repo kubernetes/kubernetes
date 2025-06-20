@@ -5445,7 +5445,7 @@ func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
 		},
 	}
 
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
+	_, _, _, _, testScaleClient, _ := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
 	updateCallCount := 0
