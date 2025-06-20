@@ -24,13 +24,12 @@ import (
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // VerifyVersionedValidationEquivalence tests that all versions of an API return equivalent validation errors.
-func VerifyVersionedValidationEquivalence(t *testing.T, obj, old k8sruntime.Object) {
+func VerifyVersionedValidationEquivalence(t *testing.T, obj, old k8sruntime.Object, subresources ...string) {
 	t.Helper()
 
 	// Accumulate errors from all versioned validation, per version.
@@ -39,9 +38,9 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old k8sruntime.Obje
 		all[gv] = errs
 	}
 	if old == nil {
-		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, sets.Set[string]{}, obj, accumulate)
+		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, obj, accumulate, subresources...)
 	} else {
-		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, sets.Set[string]{}, obj, old, accumulate)
+		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, obj, old, accumulate, subresources...)
 	}
 
 	// Make a copy so we can modify it.

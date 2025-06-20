@@ -23,13 +23,12 @@ import (
 	"io"
 	"strings"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
-
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/diff"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
@@ -335,6 +334,10 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 		}
 	}
 
+	if len(pod.Spec.ResourceClaims) > 0 {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference resourceclaims", nodeName))
+	}
+
 	return nil
 }
 
@@ -472,7 +475,7 @@ func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 
 		// ensure no metadata changed. nodes should not be able to relabel, add finalizers/owners, etc
 		if !apiequality.Semantic.DeepEqual(oldPVC, newPVC) {
-			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update fields other than status.quantity and status.conditions: %v", nodeName, cmp.Diff(oldPVC, newPVC)))
+			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update fields other than status.quantity and status.conditions: %v", nodeName, diff.Diff(oldPVC, newPVC)))
 		}
 
 		return nil

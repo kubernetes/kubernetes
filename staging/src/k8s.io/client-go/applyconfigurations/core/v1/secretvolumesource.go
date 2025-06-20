@@ -32,6 +32,7 @@ type SecretVolumeSourceApplyConfiguration struct {
 func SecretVolumeSource() *SecretVolumeSourceApplyConfiguration {
 	return &SecretVolumeSourceApplyConfiguration{}
 }
+func (b SecretVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSecretName sets the SecretName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

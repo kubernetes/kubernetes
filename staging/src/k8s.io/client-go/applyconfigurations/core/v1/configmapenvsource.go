@@ -30,6 +30,7 @@ type ConfigMapEnvSourceApplyConfiguration struct {
 func ConfigMapEnvSource() *ConfigMapEnvSourceApplyConfiguration {
 	return &ConfigMapEnvSourceApplyConfiguration{}
 }
+func (b ConfigMapEnvSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

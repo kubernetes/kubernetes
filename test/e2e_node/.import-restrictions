@@ -4,6 +4,7 @@ rules:
     allowedPrefixes:
       - k8s.io/kubernetes/test/e2e/common
       - k8s.io/kubernetes/test/e2e/dra/test-driver/app
+      - k8s.io/kubernetes/test/e2e/dra/test-driver/gomega
       - k8s.io/kubernetes/test/e2e/feature
       - k8s.io/kubernetes/test/e2e/framework
       - k8s.io/kubernetes/test/e2e/storage/utils

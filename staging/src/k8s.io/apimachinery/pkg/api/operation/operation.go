@@ -16,7 +16,10 @@ limitations under the License.
 
 package operation
 
-import "k8s.io/apimachinery/pkg/util/sets"
+import (
+	"slices"
+	"strings"
+)
 
 // Operation provides contextual information about a validation request and the API
 // operation being validated.
@@ -41,10 +44,15 @@ type Operation struct {
 	// resource first began using the feature.
 	//
 	// Unset options are disabled/false.
-	Options sets.Set[string]
+	Options []string
 
 	// Request provides information about the request being validated.
 	Request Request
+}
+
+// HasOption returns true if the given string is in the Options slice.
+func (o Operation) HasOption(option string) bool {
+	return slices.Contains(o.Options, option)
 }
 
 // Request provides information about the request being validated.
@@ -71,6 +79,15 @@ type Request struct {
 	// Field wiping logic is expected to be handled in resource strategies by
 	// modifying the incoming object before it is validated.
 	Subresources []string
+}
+
+// SubresourcePath returns the path is a slash-separated list of subresource
+// names. For example, `/status`, `/resize`, or `/x/y/z`.
+func (r Request) SubresourcePath() string {
+	if len(r.Subresources) == 0 {
+		return "/"
+	}
+	return "/" + strings.Join(r.Subresources, "/")
 }
 
 // Code is the request operation to be validated.

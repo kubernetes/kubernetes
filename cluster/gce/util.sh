@@ -794,7 +794,6 @@ function construct-linux-kubelet-flags {
       #flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
       flags+=" --register-with-taints=node-role.kubernetes.io/control-plane=:NoSchedule"
       flags+=" --kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
-      flags+=" --register-schedulable=false"
     fi
     if [[ "${MASTER_OS_DISTRIBUTION}" == "ubuntu" ]]; then
       # Configure the file path for host dns configuration
@@ -1199,7 +1198,6 @@ ENABLE_APISERVER_DYNAMIC_AUDIT: $(yaml-quote "${ENABLE_APISERVER_DYNAMIC_AUDIT:-
 ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote "${ENABLE_CACHE_MUTATION_DETECTOR:-false}")
 ENABLE_KUBE_WATCHCACHE_CONSISTENCY_CHECKER: $(yaml-quote "${ENABLE_KUBE_WATCHCACHE_CONSISTENCY_CHECKER:-false}")
 ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR: $(yaml-quote "${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR:-false}")
-ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR: $(yaml-quote "${ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR:-false}")
 ENABLE_PATCH_CONVERSION_DETECTOR: $(yaml-quote "${ENABLE_PATCH_CONVERSION_DETECTOR:-false}")
 ADVANCED_AUDIT_POLICY: $(yaml-quote "${ADVANCED_AUDIT_POLICY:-}")
 ADVANCED_AUDIT_BACKEND: $(yaml-quote "${ADVANCED_AUDIT_BACKEND:-log}")

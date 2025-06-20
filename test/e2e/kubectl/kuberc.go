@@ -39,19 +39,19 @@ import (
 )
 
 var kuberc = `
-apiVersion: kubectl.config.k8s.io/v1alpha1
+apiVersion: kubectl.config.k8s.io/v1beta1
 kind: Preference
 aliases:
 - name: getn
   command: get
   prependArgs:
    - namespace
-  flags:
+  options:
    - name: output
      default: json
 - name: runx
   command: run
-  flags:
+  options:
   - name: image
     default: %s
   - name: labels
@@ -65,9 +65,9 @@ aliases:
   - --
   - custom-arg1
   - custom-arg2
-overrides:
+defaults:
 - command: apply
-  flags:
+  options:
   - name: server-side
     default: "true"
   - name: dry-run
@@ -75,11 +75,11 @@ overrides:
   - name: validate
     default: "strict"
 - command: delete
-  flags:
+  options:
   - name: interactive
     default: "true"
 - command: get
-  flags:
+  options:
   - name: namespace
     default: "%s"
   - name: output
@@ -106,7 +106,7 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 		ginkgo.It("should be applied", func(ctx context.Context) {
 			ginkgo.By("verifying that json formatter output of the alias is working")
 			args := []string{"getn", fmt.Sprintf("--kuberc=%s", kubercFile), ns}
-			output := e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_KUBERC=true"}).ExecOrDie(ns)
+			output := e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			var namespace v1.Namespace
 			err = json.Unmarshal([]byte(output), &namespace)
 			framework.ExpectNoError(err)
@@ -114,10 +114,10 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 
 			ginkgo.By("verifying that alias for run is working")
 			args = []string{"runx", fmt.Sprintf("--kuberc=%s", kubercFile)}
-			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_KUBERC=true"}).ExecOrDie(ns)
+			e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			ginkgo.By("verifying that overridden flags in get command is used")
 			args = []string{"get", "pod/test-pod-2", fmt.Sprintf("--kuberc=%s", kubercFile)}
-			podOutput := e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_KUBERC=true"}).ExecOrDie(ns)
+			podOutput := e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			var pod v1.Pod
 			err = json.Unmarshal([]byte(podOutput), &pod)
 			framework.ExpectNoError(err)
@@ -129,14 +129,14 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 
 			ginkgo.By("verifying that interactive flag that is enabled by default in kuberc is used")
 			args = []string{"delete", "pod/test-pod-2", "--kuberc", kubercFile}
-			output = e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_KUBERC=true"}).ExecOrDie(ns)
+			output = e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			gomega.Expect(output).To(gomega.ContainSubstring("You are about to delete the following 1 resource(s)"))
 		})
 
 		ginkgo.It("should be ignored when flags are explicitly passed", func(ctx context.Context) {
 			ginkgo.By("verifying that yaml formatter output surpasses the flag in kuberc alias")
 			args := []string{"getn", fmt.Sprintf("--kuberc=%s", kubercFile), ns, "-oyaml"}
-			output := e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_KUBERC=true"}).ExecOrDie(ns)
+			output := e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			var namespace v1.Namespace
 			err = yaml.Unmarshal([]byte(output), &namespace)
 			framework.ExpectNoError(err)
@@ -144,9 +144,9 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 
 			ginkgo.By("verifying that explicitly passed flag surpasses the flag in kuberc alias")
 			args = []string{"runx", fmt.Sprintf("--kuberc=%s", kubercFile), fmt.Sprintf("--image=%s", imageutils.GetE2EImage(imageutils.Nginx))}
-			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_KUBERC=true"}).ExecOrDie(ns)
+			e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			args = []string{"get", "pod/test-pod-2", fmt.Sprintf("--kuberc=%s", kubercFile), "-oyaml"}
-			podOutput := e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_KUBERC=true"}).ExecOrDie(ns)
+			podOutput := e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			var pod v1.Pod
 			err = yaml.Unmarshal([]byte(podOutput), &pod)
 			framework.ExpectNoError(err)
@@ -158,7 +158,7 @@ var _ = SIGDescribe("kubectl kuberc", func() {
 
 			ginkgo.By("verifying that interactive flag that is enabled by default in kuberc is surpassed by explicit")
 			args = []string{"delete", "pod/test-pod-2", "--interactive=false", "--kuberc", kubercFile}
-			output = e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_KUBERC=true"}).ExecOrDie(ns)
+			output = e2ekubectl.NewKubectlCommand(ns, args...).ExecOrDie(ns)
 			gomega.Expect(output).NotTo(gomega.ContainSubstring("You are about to delete the following 1 resource(s)"))
 		})
 	})

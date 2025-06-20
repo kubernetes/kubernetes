@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 )
 
 var _ volume.VolumeHost = &Controller{}
@@ -73,7 +72,7 @@ func (c *Controller) NewWrapperUnmounter(volName string, spec volume.Spec, podUI
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by SELinux controller VolumeHost implementation")
 }
 
-func (c *Controller) GetMounter(pluginName string) mount.Interface {
+func (c *Controller) GetMounter() mount.Interface {
 	return nil
 }
 
@@ -116,10 +115,6 @@ func (c *Controller) DeleteServiceAccountTokenFunc() func(types.UID) {
 		// nolint:logcheck
 		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in SELinux controller")
 	}
-}
-
-func (c *Controller) GetExec(pluginName string) utilexec.Interface {
-	return utilexec.New()
 }
 
 func (c *Controller) GetNodeLabels() (map[string]string, error) {

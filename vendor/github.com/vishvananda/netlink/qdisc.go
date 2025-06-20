@@ -374,10 +374,10 @@ func (qdisc *FqCodel) Type() string {
 type Sfq struct {
 	QdiscAttrs
 	// TODO: Only the simplified options for SFQ are handled here. Support for the extended one can be added later.
-	Quantum uint8
-	Perturb uint8
+	Quantum uint32
+	Perturb int32
 	Limit   uint32
-	Divisor uint8
+	Divisor uint32
 }
 
 func (sfq *Sfq) String() string {

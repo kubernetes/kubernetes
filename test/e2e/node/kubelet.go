@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -67,7 +68,7 @@ const (
 func getPodMatches(ctx context.Context, c clientset.Interface, nodeName string, podNamePrefix string, namespace string) sets.String {
 	matches := sets.NewString()
 	framework.Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
-	runningPods, err := e2ekubelet.GetKubeletPods(ctx, c, nodeName)
+	runningPods, err := e2ekubelet.GetKubeletRunningPods(ctx, c, nodeName)
 	if err != nil {
 		framework.Logf("Error checking running pods on %v: %v", nodeName, err)
 		return matches
@@ -642,7 +643,7 @@ var _ = SIGDescribe("kubelet", func() {
 	})
 })
 
-var _ = SIGDescribe("specific log stream", feature.PodLogsQuerySplitStreams, func() {
+var _ = SIGDescribe("specific log stream", feature.PodLogsQuerySplitStreams, framework.WithFeatureGate(features.PodLogsQuerySplitStreams), func() {
 	var (
 		c  clientset.Interface
 		ns string

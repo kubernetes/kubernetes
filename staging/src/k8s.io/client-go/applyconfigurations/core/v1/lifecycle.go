@@ -35,6 +35,7 @@ type LifecycleApplyConfiguration struct {
 func Lifecycle() *LifecycleApplyConfiguration {
 	return &LifecycleApplyConfiguration{}
 }
+func (b LifecycleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPostStart sets the PostStart field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

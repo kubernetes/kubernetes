@@ -102,7 +102,7 @@ var _ = SIGDescribe("Security Context", func() {
 				podClient.DeleteSync(ctx, createdPod2.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			})
 			getLogs := func(pod *v1.Pod) (string, error) {
-				err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod1.Name, f.Namespace.Name, f.Timeouts.PodStart)
+				err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart)
 				if err != nil {
 					return "", err
 				}
@@ -969,7 +969,7 @@ var _ = SIGDescribe("User Namespaces for Pod Security Standards [LinuxOnly]", fu
 	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 
 	ginkgo.Context("with UserNamespacesSupport and UserNamespacesPodSecurityStandards enabled", func() {
-		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, func(ctx context.Context) {
+		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, framework.WithFeatureGate(features.UserNamespacesSupport), framework.WithFeatureGate(features.UserNamespacesPodSecurityStandards), func(ctx context.Context) {
 			name := "pod-user-namespaces-pss-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: name},

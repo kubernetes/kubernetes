@@ -29,6 +29,7 @@ type SessionAffinityConfigApplyConfiguration struct {
 func SessionAffinityConfig() *SessionAffinityConfigApplyConfiguration {
 	return &SessionAffinityConfigApplyConfiguration{}
 }
+func (b SessionAffinityConfigApplyConfiguration) IsApplyConfiguration() {}
 
 // WithClientIP sets the ClientIP field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

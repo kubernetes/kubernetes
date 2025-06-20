@@ -34,6 +34,7 @@ type VolumeAttachmentSourceApplyConfiguration struct {
 func VolumeAttachmentSource() *VolumeAttachmentSourceApplyConfiguration {
 	return &VolumeAttachmentSourceApplyConfiguration{}
 }
+func (b VolumeAttachmentSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPersistentVolumeName sets the PersistentVolumeName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

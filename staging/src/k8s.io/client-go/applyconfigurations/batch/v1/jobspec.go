@@ -50,6 +50,7 @@ type JobSpecApplyConfiguration struct {
 func JobSpec() *JobSpecApplyConfiguration {
 	return &JobSpecApplyConfiguration{}
 }
+func (b JobSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithParallelism sets the Parallelism field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

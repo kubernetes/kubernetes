@@ -82,6 +82,7 @@ func extractHorizontalPodAutoscaler(horizontalPodAutoscaler *autoscalingv1.Horiz
 	b.WithAPIVersion("autoscaling/v1")
 	return b, nil
 }
+func (b HorizontalPodAutoscalerApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -257,8 +258,24 @@ func (b *HorizontalPodAutoscalerApplyConfiguration) WithStatus(value *Horizontal
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *HorizontalPodAutoscalerApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *HorizontalPodAutoscalerApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *HorizontalPodAutoscalerApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *HorizontalPodAutoscalerApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

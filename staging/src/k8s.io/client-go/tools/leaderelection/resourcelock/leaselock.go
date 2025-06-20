@@ -35,6 +35,7 @@ type LeaseLock struct {
 	Client     coordinationv1client.LeasesGetter
 	LockConfig ResourceLockConfig
 	lease      *coordinationv1.Lease
+	Labels     map[string]string
 }
 
 // Get returns the election record from a Lease spec
@@ -55,13 +56,16 @@ func (ll *LeaseLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, er
 // Create attempts to create a Lease
 func (ll *LeaseLock) Create(ctx context.Context, ler LeaderElectionRecord) error {
 	var err error
-	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Create(ctx, &coordinationv1.Lease{
+	lease := &coordinationv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ll.LeaseMeta.Name,
 			Namespace: ll.LeaseMeta.Namespace,
+			Labels:    ll.Labels,
 		},
 		Spec: LeaderElectionRecordToLeaseSpec(&ler),
-	}, metav1.CreateOptions{})
+	}
+
+	ll.lease, err = ll.Client.Leases(ll.LeaseMeta.Namespace).Create(ctx, lease, metav1.CreateOptions{})
 	return err
 }
 
@@ -71,6 +75,13 @@ func (ll *LeaseLock) Update(ctx context.Context, ler LeaderElectionRecord) error
 		return errors.New("lease not initialized, call get or create first")
 	}
 	ll.lease.Spec = LeaderElectionRecordToLeaseSpec(&ler)
+
+	if ll.Labels != nil {
+		// Only overwrite the labels that are specifically set
+		for k, v := range ll.Labels {
+			ll.lease.Labels[k] = v
+		}
+	}
 
 	lease, err := ll.Client.Leases(ll.LeaseMeta.Namespace).Update(ctx, ll.lease, metav1.UpdateOptions{})
 	if err != nil {

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
@@ -70,7 +70,7 @@ func TestValidateDeclaratively(t *testing.T) {
 		object      runtime.Object
 		oldObject   runtime.Object
 		subresource string
-		options     sets.Set[string]
+		options     []string
 		expected    field.ErrorList
 	}{
 		{
@@ -107,7 +107,7 @@ func TestValidateDeclaratively(t *testing.T) {
 		},
 		{
 			name:     "update with option",
-			options:  sets.New("option1"),
+			options:  []string{"option1"},
 			object:   valid,
 			expected: field.ErrorList{invalidIfOptionErr},
 		},
@@ -124,10 +124,10 @@ func TestValidateDeclaratively(t *testing.T) {
 
 	scheme.AddValidationFunc(&v1.Pod{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
 		results := field.ErrorList{}
-		if op.Options.Has("option1") {
+		if op.HasOption("option1") {
 			results = append(results, invalidIfOptionErr)
 		}
-		if len(op.Request.Subresources) == 1 && op.Request.Subresources[0] == "status" {
+		if slices.Equal(op.Request.Subresources, []string{"status"}) {
 			results = append(results, invalidStatusErr)
 		}
 		if op.Type == operation.Update && object.(*v1.Pod).Spec.RestartPolicy != oldObject.(*v1.Pod).Spec.RestartPolicy {
@@ -161,9 +161,9 @@ func TestValidateDeclaratively(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var results field.ErrorList
 			if tc.oldObject == nil {
-				results = ValidateDeclaratively(ctx, tc.options, scheme, tc.object)
+				results = ValidateDeclaratively(ctx, scheme, tc.object, WithOptions(tc.options))
 			} else {
-				results = ValidateUpdateDeclaratively(ctx, tc.options, scheme, tc.object, tc.oldObject)
+				results = ValidateUpdateDeclaratively(ctx, scheme, tc.object, tc.oldObject, WithOptions(tc.options))
 			}
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			matcher.Test(t, tc.expected, results)
@@ -445,19 +445,19 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 func TestWithRecover(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
-	options := sets.New[string]()
+	var options []string
 	obj := &runtime.Unknown{}
 
 	testCases := []struct {
 		name            string
-		validateFn      func(context.Context, sets.Set[string], *runtime.Scheme, runtime.Object) field.ErrorList
+		validateFn      func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList
 		takeoverEnabled bool
 		wantErrs        field.ErrorList
 		expectLogRegex  string
 	}{
 		{
 			name: "no panic",
-			validateFn: func(context.Context, sets.Set[string], *runtime.Scheme, runtime.Object) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
 				return field.ErrorList{
 					field.Invalid(field.NewPath("field"), "value", "reason"),
 				}
@@ -470,7 +470,7 @@ func TestWithRecover(t *testing.T) {
 		},
 		{
 			name: "panic with takeover disabled",
-			validateFn: func(context.Context, sets.Set[string], *runtime.Scheme, runtime.Object) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
 				panic("test panic")
 			},
 			takeoverEnabled: false,
@@ -480,7 +480,7 @@ func TestWithRecover(t *testing.T) {
 		},
 		{
 			name: "panic with takeover enabled",
-			validateFn: func(context.Context, sets.Set[string], *runtime.Scheme, runtime.Object) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
 				panic("test panic")
 			},
 			takeoverEnabled: true,
@@ -491,7 +491,7 @@ func TestWithRecover(t *testing.T) {
 		},
 		{
 			name: "nil return, no panic",
-			validateFn: func(context.Context, sets.Set[string], *runtime.Scheme, runtime.Object) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
 				return nil
 			},
 			takeoverEnabled: false,
@@ -509,7 +509,7 @@ func TestWithRecover(t *testing.T) {
 
 			// Pass the takeover flag to panicSafeValidateFunc instead of relying on the feature gate
 			wrapped := panicSafeValidateFunc(tc.validateFn, tc.takeoverEnabled)
-			gotErrs := wrapped(ctx, options, scheme, obj)
+			gotErrs := wrapped(ctx, scheme, obj, nil, &validationConfigOption{opType: operation.Create, options: options, takeover: tc.takeoverEnabled})
 
 			klog.Flush()
 			logOutput := buf.String()
@@ -538,20 +538,20 @@ func TestWithRecover(t *testing.T) {
 func TestWithRecoverUpdate(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
-	options := sets.New[string]()
+	var options []string
 	obj := &runtime.Unknown{}
 	oldObj := &runtime.Unknown{}
 
 	testCases := []struct {
 		name            string
-		validateFn      func(context.Context, sets.Set[string], *runtime.Scheme, runtime.Object, runtime.Object) field.ErrorList
+		validateFn      func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList
 		takeoverEnabled bool
 		wantErrs        field.ErrorList
 		expectLogRegex  string
 	}{
 		{
 			name: "no panic",
-			validateFn: func(context.Context, sets.Set[string], *runtime.Scheme, runtime.Object, runtime.Object) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
 				return field.ErrorList{
 					field.Invalid(field.NewPath("field"), "value", "reason"),
 				}
@@ -564,7 +564,7 @@ func TestWithRecoverUpdate(t *testing.T) {
 		},
 		{
 			name: "panic with takeover disabled",
-			validateFn: func(context.Context, sets.Set[string], *runtime.Scheme, runtime.Object, runtime.Object) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
 				panic("test update panic")
 			},
 			takeoverEnabled: false,
@@ -574,7 +574,7 @@ func TestWithRecoverUpdate(t *testing.T) {
 		},
 		{
 			name: "panic with takeover enabled",
-			validateFn: func(context.Context, sets.Set[string], *runtime.Scheme, runtime.Object, runtime.Object) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
 				panic("test update panic")
 			},
 			takeoverEnabled: true,
@@ -585,7 +585,7 @@ func TestWithRecoverUpdate(t *testing.T) {
 		},
 		{
 			name: "nil return, no panic",
-			validateFn: func(context.Context, sets.Set[string], *runtime.Scheme, runtime.Object, runtime.Object) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
 				return nil
 			},
 			takeoverEnabled: false,
@@ -602,8 +602,8 @@ func TestWithRecoverUpdate(t *testing.T) {
 			defer klog.LogToStderr(true)
 
 			// Pass the takeover flag to panicSafeValidateUpdateFunc instead of relying on the feature gate
-			wrapped := panicSafeValidateUpdateFunc(tc.validateFn, tc.takeoverEnabled)
-			gotErrs := wrapped(ctx, options, scheme, obj, oldObj)
+			wrapped := panicSafeValidateFunc(tc.validateFn, tc.takeoverEnabled)
+			gotErrs := wrapped(ctx, scheme, obj, oldObj, &validationConfigOption{opType: operation.Update, options: options, takeover: tc.takeoverEnabled})
 
 			klog.Flush()
 			logOutput := buf.String()
@@ -632,12 +632,12 @@ func TestWithRecoverUpdate(t *testing.T) {
 func TestValidateDeclarativelyWithRecovery(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
-	options := sets.New[string]()
+	var options []string
 	obj := &runtime.Unknown{}
 
 	// Simple test for the ValidateDeclarativelyWithRecovery function
 	t.Run("with takeover disabled", func(t *testing.T) {
-		errs := ValidateDeclarativelyWithRecovery(ctx, options, scheme, obj, false)
+		errs := ValidateDeclaratively(ctx, scheme, obj, WithOptions(options), WithTakeover(false))
 		if errs == nil {
 			// This is expected to error since the request info is missing
 			t.Errorf("Expected errors but got nil")
@@ -645,9 +645,9 @@ func TestValidateDeclarativelyWithRecovery(t *testing.T) {
 	})
 
 	t.Run("with takeover enabled", func(t *testing.T) {
-		errs := ValidateDeclarativelyWithRecovery(ctx, options, scheme, obj, true)
+		errs := ValidateDeclaratively(ctx, scheme, obj, WithOptions(options), WithTakeover(true))
 		if errs == nil {
-			// This is expected to error since the request info is missing
+			// This is expected to error since the request info is missioptionsng
 			t.Errorf("Expected errors but got nil")
 		}
 	})
@@ -656,13 +656,13 @@ func TestValidateDeclarativelyWithRecovery(t *testing.T) {
 func TestValidateUpdateDeclarativelyWithRecovery(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
-	options := sets.New[string]()
+	var options []string
 	obj := &runtime.Unknown{}
 	oldObj := &runtime.Unknown{}
 
 	// Simple test for the ValidateUpdateDeclarativelyWithRecovery function
 	t.Run("with takeover disabled", func(t *testing.T) {
-		errs := ValidateUpdateDeclarativelyWithRecovery(ctx, options, scheme, obj, oldObj, false)
+		errs := ValidateUpdateDeclaratively(ctx, scheme, obj, oldObj, WithOptions(options), WithTakeover(false))
 		if errs == nil {
 			// This is expected to error since the request info is missing
 			t.Errorf("Expected errors but got nil")
@@ -670,7 +670,7 @@ func TestValidateUpdateDeclarativelyWithRecovery(t *testing.T) {
 	})
 
 	t.Run("with takeover enabled", func(t *testing.T) {
-		errs := ValidateUpdateDeclarativelyWithRecovery(ctx, options, scheme, obj, oldObj, true)
+		errs := ValidateUpdateDeclaratively(ctx, scheme, obj, oldObj, WithOptions(options), WithTakeover(true))
 		if errs == nil {
 			// This is expected to error since the request info is missing
 			t.Errorf("Expected errors but got nil")

@@ -59,7 +59,7 @@ func (s *ClientStream) Read(n int) (mem.BufferSlice, error) {
 	return b, err
 }
 
-// Close closes the stream and popagates err to any readers.
+// Close closes the stream and propagates err to any readers.
 func (s *ClientStream) Close(err error) {
 	var (
 		rst     bool

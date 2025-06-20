@@ -77,7 +77,10 @@ func parseProtinfo(infos []syscall.NetlinkRouteAttr) (pi Protinfo) {
 			pi.Isolated = byteToBool(info.Value[0])
 		case nl.IFLA_BRPORT_NEIGH_SUPPRESS:
 			pi.NeighSuppress = byteToBool(info.Value[0])
+		case nl.IFLA_BRPORT_VLAN_TUNNEL:
+			pi.VlanTunnel = byteToBool(info.Value[0])
 		}
+
 	}
 	return
 }

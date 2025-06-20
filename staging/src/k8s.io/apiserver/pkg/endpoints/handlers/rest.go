@@ -388,11 +388,11 @@ func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 	return data, nil
 }
 
-func limitedReadBodyWithRecordMetric(ctx context.Context, req *http.Request, limit int64, resourceGroup string, verb requestmetrics.RequestBodyVerb) ([]byte, error) {
+func limitedReadBodyWithRecordMetric(ctx context.Context, req *http.Request, limit int64, groupResource schema.GroupResource, verb requestmetrics.RequestBodyVerb) ([]byte, error) {
 	readBody, err := limitedReadBody(req, limit)
 	if err == nil {
 		// only record if we've read successfully
-		requestmetrics.RecordRequestBodySize(ctx, resourceGroup, verb, len(readBody))
+		requestmetrics.RecordRequestBodySize(ctx, groupResource, verb, len(readBody))
 	}
 	return readBody, err
 }

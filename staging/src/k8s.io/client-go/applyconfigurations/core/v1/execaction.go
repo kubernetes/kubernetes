@@ -29,6 +29,7 @@ type ExecActionApplyConfiguration struct {
 func ExecAction() *ExecActionApplyConfiguration {
 	return &ExecActionApplyConfiguration{}
 }
+func (b ExecActionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithCommand adds the given value to the Command field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

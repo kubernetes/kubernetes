@@ -41,6 +41,7 @@ type CSIDriverSpecApplyConfiguration struct {
 func CSIDriverSpec() *CSIDriverSpecApplyConfiguration {
 	return &CSIDriverSpecApplyConfiguration{}
 }
+func (b CSIDriverSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAttachRequired sets the AttachRequired field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -36,7 +36,6 @@ import (
 	runtimetestingv1 "k8s.io/apimachinery/pkg/runtime/testing/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -1029,7 +1028,7 @@ func TestRegisterValidate(t *testing.T) {
 		object      runtime.Object
 		oldObject   runtime.Object
 		subresource []string
-		options     sets.Set[string]
+		options     []string
 		expected    field.ErrorList
 	}{
 		{
@@ -1051,7 +1050,7 @@ func TestRegisterValidate(t *testing.T) {
 		{
 			name:     "options error",
 			object:   &TestType1{},
-			options:  sets.New("option1"),
+			options:  []string{"option1"},
 			expected: field.ErrorList{invalidIfOptionErr},
 		},
 		{
@@ -1067,7 +1066,7 @@ func TestRegisterValidate(t *testing.T) {
 
 	// register multiple types for testing to ensure registration is working as expected
 	s.AddValidationFunc(&TestType1{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
-		if op.Options.Has("option1") {
+		if op.HasOption("option1") {
 			return field.ErrorList{invalidIfOptionErr}
 		}
 		if slices.Equal(op.Request.Subresources, []string{"status"}) {

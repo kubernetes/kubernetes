@@ -32,6 +32,7 @@ type EnvVarSourceApplyConfiguration struct {
 func EnvVarSource() *EnvVarSourceApplyConfiguration {
 	return &EnvVarSourceApplyConfiguration{}
 }
+func (b EnvVarSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithFieldRef sets the FieldRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

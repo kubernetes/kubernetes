@@ -57,7 +57,7 @@ const (
 	maxResourceConsumerDelay    = maxConsumeCPUDelay + waitForReplicasPollInterval
 )
 
-var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "Horizontal pod autoscaling (non-default behavior)", func() {
+var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavior)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -506,7 +506,7 @@ var _ = SIGDescribe(feature.HPA, framework.WithSerial(), framework.WithSlow(), "
 })
 
 var _ = SIGDescribe(feature.HPAConfigurableTolerance, framework.WithFeatureGate(features.HPAConfigurableTolerance),
-	framework.WithSerial(), framework.WithSlow(), "Horizontal pod autoscaling (configurable tolerance)", func() {
+	"Horizontal pod autoscaling (configurable tolerance)", func() {
 		f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

@@ -33,6 +33,7 @@ type OverheadApplyConfiguration struct {
 func Overhead() *OverheadApplyConfiguration {
 	return &OverheadApplyConfiguration{}
 }
+func (b OverheadApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPodFixed sets the PodFixed field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

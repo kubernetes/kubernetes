@@ -34,6 +34,7 @@ type ResourceQuotaStatusApplyConfiguration struct {
 func ResourceQuotaStatus() *ResourceQuotaStatusApplyConfiguration {
 	return &ResourceQuotaStatusApplyConfiguration{}
 }
+func (b ResourceQuotaStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithHard sets the Hard field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

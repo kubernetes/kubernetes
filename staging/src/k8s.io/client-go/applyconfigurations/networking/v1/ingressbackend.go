@@ -34,6 +34,7 @@ type IngressBackendApplyConfiguration struct {
 func IngressBackend() *IngressBackendApplyConfiguration {
 	return &IngressBackendApplyConfiguration{}
 }
+func (b IngressBackendApplyConfiguration) IsApplyConfiguration() {}
 
 // WithService sets the Service field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

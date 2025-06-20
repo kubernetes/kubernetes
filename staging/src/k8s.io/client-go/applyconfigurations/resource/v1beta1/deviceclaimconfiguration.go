@@ -30,6 +30,7 @@ type DeviceClaimConfigurationApplyConfiguration struct {
 func DeviceClaimConfiguration() *DeviceClaimConfigurationApplyConfiguration {
 	return &DeviceClaimConfigurationApplyConfiguration{}
 }
+func (b DeviceClaimConfigurationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRequests adds the given value to the Requests field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

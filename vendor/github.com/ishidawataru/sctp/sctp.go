@@ -83,7 +83,10 @@ const (
 	SCTP_EVENT_ALL = SCTP_EVENT_DATA_IO | SCTP_EVENT_ASSOCIATION | SCTP_EVENT_ADDRESS | SCTP_EVENT_SEND_FAILURE | SCTP_EVENT_PEER_ERROR | SCTP_EVENT_SHUTDOWN | SCTP_EVENT_PARTIAL_DELIVERY | SCTP_EVENT_ADAPTATION_LAYER | SCTP_EVENT_AUTHENTICATION | SCTP_EVENT_SENDER_DRY
 )
 
-type SCTPNotificationType int
+type (
+	SCTPNotificationType int
+	SCTPAssocID          int32
+)
 
 const (
 	SCTP_SN_TYPE_BASE = SCTPNotificationType(iota + (1 << 15))
@@ -138,6 +141,60 @@ type InitMsg struct {
 	MaxInstreams   uint16
 	MaxAttempts    uint16
 	MaxInitTimeout uint16
+}
+
+// SackTimer Parameters defined in RFC 6458 8.1.19 - SCTP_DELAYED_SACK Delayed Sack Timer sack_timeout
+type SackTimer struct {
+	AssocID       SCTPAssocID
+	SackDelay     uint32
+	SackFrequency uint32
+}
+
+type PeerState int32
+
+const (
+	SCTP_UNCONFIRMED PeerState = iota
+	SCTP_ACTIVE
+	SCTP_INACTIVE
+)
+
+// PeerAddrinfo Parameters defined in RFC 6458 8.2.2 - Peer Address Information (SCTP_GET_PEER_ADDR_INFO)
+type PeerAddrinfo struct {
+	AssocID SCTPAssocID
+	Address [128]byte // if needed from here, retrieve using resolveFromRawAddr(unsafe.Pointer(&PeerAddrinfo.Address), 1), or get it from *SCTPConn.SCTPGetPrimaryPeerAddr()
+	State   PeerState
+	CWND    uint32
+	SRTT    uint32
+	RTO     uint32
+	MTU     uint32
+}
+
+type StatusState int32
+
+const (
+	SCTP_CLOSED StatusState = iota
+	SCTP_BOUND
+	SCTP_LISTEN
+	SCTP_COOKIE_WAIT
+	SCTP_COOKIE_ECHOED
+	SCTP_ESTABLISHED
+	SCTP_SHUTDOWN_PENDING
+	SCTP_SHUTDOWN_SENT
+	SCTP_SHUTDOWN_RECEIVED
+	SCTP_SHUTDOWN_ACK_SENT
+)
+
+// Status Parameters defined in RFC 6458 8.2.1 - Association Status (SCTP_STATUS)
+type Status struct {
+	AssocID            SCTPAssocID
+	State              StatusState
+	RWND               uint32
+	Unackdata          uint16
+	Penddata           uint16
+	Instreams          uint16
+	Ostreams           uint16
+	FragmentationPoint uint32
+	PrimaryPeerAddr    PeerAddrinfo
 }
 
 type SndRcvInfo struct {
@@ -505,6 +562,36 @@ func (c *SCTPConn) GetDefaultSentParam() (*SndRcvInfo, error) {
 	return info, err
 }
 
+func (c *SCTPConn) SetSackTimer(timer *SackTimer) error { // SackTimer
+	optlen := unsafe.Sizeof(*timer)
+	_, _, err := setsockopt(c.fd(), SCTP_DELAYED_SACK, uintptr(unsafe.Pointer(timer)), optlen)
+	return err
+}
+
+func (c *SCTPConn) GetSackTimer() (*SackTimer, error) { // SackTimer
+	timer := &SackTimer{}
+	optlen := unsafe.Sizeof(*timer)
+	_, _, err := getsockopt(
+		c.fd(),
+		SCTP_DELAYED_SACK,
+		uintptr(unsafe.Pointer(timer)),
+		uintptr(unsafe.Pointer(&optlen)),
+	)
+	return timer, err
+}
+
+func (c *SCTPConn) GetStatus() (*Status, error) { // Status
+	sctpStatus := &Status{}
+	optlen := unsafe.Sizeof(*sctpStatus)
+	_, _, err := getsockopt(
+		c.fd(),
+		SCTP_STATUS,
+		uintptr(unsafe.Pointer(sctpStatus)),
+		uintptr(unsafe.Pointer(&optlen)),
+	)
+	return sctpStatus, err
+}
+
 func (c *SCTPConn) Getsockopt(optname, optval, optlen uintptr) (uintptr, uintptr, error) {
 	return getsockopt(c.fd(), optname, optval, optlen)
 }
@@ -636,8 +723,9 @@ func (c *SCTPConn) SetWriteDeadline(t time.Time) error {
 }
 
 type SCTPListener struct {
-	fd int
-	m  sync.Mutex
+	fd                  int
+	m                   sync.Mutex
+	notificationHandler NotificationHandler
 }
 
 func (ln *SCTPListener) Addr() net.Addr {
@@ -723,15 +811,16 @@ type SocketConfig struct {
 	// If Control is not nil it is called after the socket is created but before
 	// it is bound or connected.
 	Control func(network, address string, c syscall.RawConn) error
-
+	// NotificationHandler defines actions taken on received notifications when MSG_NOTIFICATION flag is set.
+	NotificationHandler NotificationHandler
 	// InitMsg is the options to send in the initial SCTP message
 	InitMsg InitMsg
 }
 
 func (cfg *SocketConfig) Listen(net string, laddr *SCTPAddr) (*SCTPListener, error) {
-	return listenSCTPExtConfig(net, laddr, cfg.InitMsg, cfg.Control)
+	return listenSCTPExtConfig(net, laddr, cfg.InitMsg, cfg.Control, cfg.NotificationHandler)
 }
 
 func (cfg *SocketConfig) Dial(net string, laddr, raddr *SCTPAddr) (*SCTPConn, error) {
-	return dialSCTPExtConfig(net, laddr, raddr, cfg.InitMsg, cfg.Control)
+	return dialSCTPExtConfig(net, laddr, raddr, cfg.InitMsg, cfg.Control, cfg.NotificationHandler)
 }

@@ -31,6 +31,7 @@ type ConfigMapKeySelectorApplyConfiguration struct {
 func ConfigMapKeySelector() *ConfigMapKeySelectorApplyConfiguration {
 	return &ConfigMapKeySelectorApplyConfiguration{}
 }
+func (b ConfigMapKeySelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

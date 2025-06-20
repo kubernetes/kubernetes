@@ -23,7 +23,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 
 	v1 "k8s.io/api/core/v1"
@@ -661,3 +663,80 @@ var configMapTypedSchema = typed.YAMLObject(`types:
       namedType: __untyped_deduced_
     elementRelationship: separable
 `)
+
+func TestManagedFieldsObjectTrackerReloadsScheme(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	// Create tracker without registered ConfigMap type
+	tracker := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-cm",
+		},
+		Data: map[string]string{"key": "value"},
+	}
+
+	// Register the type in scheme
+	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
+
+	err := tracker.Create(cmResource, cm, "default", metav1.CreateOptions{FieldManager: "test-manager"})
+	assert.NoError(t, err, "Create should succeed after registering type")
+}
+
+func TestManagedFielsdObjectTrackerWithUnstructured(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	cmGVK := schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypeWithName(cmGVK, &unstructured.Unstructured{})
+	codecs := serializer.NewCodecFactory(scheme)
+
+	tracker := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), managedfields.NewDeducedTypeConverter())
+
+	cm := &unstructured.Unstructured{}
+	cm.SetAPIVersion("v1")
+	cm.SetKind("ConfigMap")
+	cm.SetName("test-cm")
+	cm.SetNamespace("default")
+	require.NoError(t, unstructured.SetNestedMap(cm.Object,
+		map[string]any{
+			"key": "value",
+		},
+		"data"),
+	)
+
+	// Validate creating through apply works
+	cmOriginal := cm.DeepCopy()
+
+	require.NoError(t, tracker.Apply(cmResource, cm, "default", metav1.PatchOptions{FieldManager: "test-manager"}))
+	cmActualUntyped, err := tracker.Get(cmResource, "default", cm.GetName())
+	require.NoError(t, err)
+
+	cmActual, ok := cmActualUntyped.(*unstructured.Unstructured)
+	require.True(t, ok)
+
+	unstructured.RemoveNestedField(cmActual.Object, "metadata", "managedFields")
+	require.Empty(t, cmp.Diff(cmOriginal, cmActual))
+
+	// Validate updating through apply works
+	require.NoError(t, unstructured.SetNestedMap(cmActual.Object,
+		map[string]any{
+			"key":         "value",
+			"another-key": "another-value",
+		},
+		"data"),
+	)
+
+	cmOriginal = cmActual.DeepCopy()
+	require.NoError(t, tracker.Apply(cmResource, cmActual, "default", metav1.PatchOptions{FieldManager: "test-manager"}))
+	cmActualUntyped, err = tracker.Get(cmResource, "default", cm.GetName())
+	require.NoError(t, err)
+
+	cmActual, ok = cmActualUntyped.(*unstructured.Unstructured)
+	require.True(t, ok)
+
+	unstructured.RemoveNestedField(cmActual.Object, "metadata", "managedFields")
+	require.Empty(t, cmp.Diff(cmOriginal, cmActual))
+}

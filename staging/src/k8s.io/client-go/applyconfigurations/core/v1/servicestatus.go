@@ -34,6 +34,7 @@ type ServiceStatusApplyConfiguration struct {
 func ServiceStatus() *ServiceStatusApplyConfiguration {
 	return &ServiceStatusApplyConfiguration{}
 }
+func (b ServiceStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithLoadBalancer sets the LoadBalancer field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

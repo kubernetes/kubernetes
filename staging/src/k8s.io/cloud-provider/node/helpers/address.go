@@ -18,9 +18,8 @@ package helpers
 
 import (
 	"fmt"
-	"net"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	nodeutil "k8s.io/component-helpers/node/util"
 	netutils "k8s.io/utils/net"
 )
@@ -42,52 +41,6 @@ func AddToNodeAddresses(addresses *[]v1.NodeAddress, addAddresses ...v1.NodeAddr
 	}
 }
 
-// GetNodeAddressesFromNodeIPLegacy filters node addresses to prefer a specific node IP or
-// address family. This function is used only with legacy cloud providers.
-//
-// If nodeIP is either '0.0.0.0' or '::' it is taken to represent any address of
-// that address family: IPv4 or IPv6. i.e. if nodeIP is '0.0.0.0' we will return
-// node addresses sorted such that all IPv4 addresses are listed before IPv6
-// addresses.
-//
-// If nodeIP is a specific IP, either IPv4 or IPv6, we will return node
-// addresses filtered such that:
-//   - Any address matching nodeIP will be listed first.
-//   - If nodeIP matches an address of a particular type (internal or external),
-//     that will be the *only* address of that type returned.
-//   - All remaining addresses are listed after.
-func GetNodeAddressesFromNodeIPLegacy(nodeIP net.IP, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
-	// If nodeIP is unset, just use the addresses provided by the cloud provider as-is
-	if nodeIP == nil {
-		return cloudNodeAddresses, nil
-	}
-
-	// nodeIP is "0.0.0.0" or "::"; sort cloudNodeAddresses to
-	// prefer addresses of the matching family
-	if nodeIP.IsUnspecified() {
-		preferIPv4 := nodeIP.To4() != nil
-		isPreferredIPFamily := func(ip net.IP) bool { return (ip.To4() != nil) == preferIPv4 }
-
-		sortedAddresses := make([]v1.NodeAddress, 0, len(cloudNodeAddresses))
-		for _, nodeAddress := range cloudNodeAddresses {
-			ip := netutils.ParseIPSloppy(nodeAddress.Address)
-			if ip == nil || isPreferredIPFamily(ip) {
-				sortedAddresses = append(sortedAddresses, nodeAddress)
-			}
-		}
-		for _, nodeAddress := range cloudNodeAddresses {
-			ip := netutils.ParseIPSloppy(nodeAddress.Address)
-			if ip != nil && !isPreferredIPFamily(ip) {
-				sortedAddresses = append(sortedAddresses, nodeAddress)
-			}
-		}
-		return sortedAddresses, nil
-	}
-
-	// Otherwise the result is the same as for GetNodeAddressesFromNodeIP
-	return GetNodeAddressesFromNodeIP(nodeIP.String(), cloudNodeAddresses)
-}
-
 // GetNodeAddressesFromNodeIP filters the provided list of nodeAddresses to match the
 // providedNodeIP from the Node annotation (which is assumed to be non-empty). This is
 // used for external cloud providers.
@@ -97,11 +50,6 @@ func GetNodeAddressesFromNodeIPLegacy(nodeIP net.IP, cloudNodeAddresses []v1.Nod
 //   - If nodeIP matches an address of a particular type (internal or external),
 //     that will be the *only* address of that type returned.
 //   - All remaining addresses are listed after.
-//
-// (This does not have the same behavior with `0.0.0.0` and `::` as
-// GetNodeAddressesFromNodeIPLegacy, because that case never occurs for external cloud
-// providers, because kubelet does not set the `provided-node-ip` annotation in that
-// case.)
 func GetNodeAddressesFromNodeIP(providedNodeIP string, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
 	nodeIPs, err := nodeutil.ParseNodeIPAnnotation(providedNodeIP)
 	if err != nil {

@@ -39,6 +39,7 @@ type ISCSIPersistentVolumeSourceApplyConfiguration struct {
 func ISCSIPersistentVolumeSource() *ISCSIPersistentVolumeSourceApplyConfiguration {
 	return &ISCSIPersistentVolumeSourceApplyConfiguration{}
 }
+func (b ISCSIPersistentVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithTargetPortal sets the TargetPortal field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

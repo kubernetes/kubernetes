@@ -176,7 +176,7 @@ var (
 			Help:           "Number of events sent in watch clients",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"group", "version", "kind"},
+		[]string{"group", "version", "resource"},
 	)
 	WatchEventsSizes = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
@@ -186,7 +186,7 @@ var (
 			Buckets:        compbasemetrics.ExponentialBuckets(1024, 2.0, 8), // 1K, 2K, 4K, 8K, ..., 128K.
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"group", "version", "kind"},
+		[]string{"group", "version", "resource"},
 	)
 	// Because of volatility of the base metric this is pre-aggregated one. Instead of reporting current usage all the time
 	// it reports maximal usage during the last second.
@@ -226,7 +226,7 @@ var (
 			Help:           "Counter of apiserver self-requests broken out for each verb, API resource and subresource.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"verb", "resource", "subresource"},
+		[]string{"verb", "group", "resource", "subresource"},
 	)
 
 	requestFilterDuration = compbasemetrics.NewHistogramVec(
@@ -604,7 +604,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	// MonitorRequest happens after authentication, so we can trust the username given by the request
 	info, ok := request.UserFrom(req.Context())
 	if ok && info.GetName() == user.APIServerUser {
-		apiSelfRequestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, resource, subresource).Inc()
+		apiSelfRequestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, group, resource, subresource).Inc()
 	}
 	if deprecated {
 		deprecatedRequestGauge.WithContext(req.Context()).WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)

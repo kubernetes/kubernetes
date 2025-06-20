@@ -40,6 +40,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
@@ -47,9 +48,12 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/events"
+	testdriverapp "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
+	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -266,6 +270,87 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 			testContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, true, container0Env...)
 			testContainerEnv(ctx, f, pod, pod.Spec.Containers[1].Name, true, container1Env...)
+		})
+
+		// https://github.com/kubernetes/kubernetes/issues/131513 was fixed in master for 1.34 and not backported,
+		// so this test only passes for kubelet >= 1.34.
+		f.It("blocks new pod after force-delete", f.WithLabel("KubeletMinVersion:1.34"), func(ctx context.Context) {
+			// The problem with a force-deleted pod is that kubelet
+			// is not necessarily done yet with tearing down the
+			// pod at the time when the pod and its claim are
+			// already removed. The user can replace the claim and
+			// pod with new instances under the same name.  The
+			// kubelet then needs to detect that the new claim is
+			// not the same as the one that kubelet currently works
+			// on and that the new pod cannot start until the old
+			// one is torn down.
+			//
+			// This test delays termination of the first pod to ensure
+			// that the race goes bad (old pod pending shutdown when
+			// new one arrives) and always schedules to the same node.
+			claim := b.externalClaim()
+			pod := b.podExternal()
+			node := nodes.NodeNames[0]
+			pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": node}
+			oldClaim := b.create(ctx, claim, pod)[0].(*resourceapi.ResourceClaim)
+			b.testPod(ctx, f, pod)
+
+			ginkgo.By("Force-delete claim and pod")
+			forceDelete := metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}
+			framework.ExpectNoError(b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, forceDelete))
+
+			// Fail NodeUnprepareResources to simulate long grace period
+			unprepareResources := MethodInstance{node, NodeUnprepareResourcesMethod}
+			driver.Fail(unprepareResources, true)
+
+			// The pod should get deleted immediately.
+			_, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			if !apierrors.IsNotFound(err) {
+				framework.Failf("Expected 'not found' error, got: %v", err)
+			}
+
+			// The claim may take a bit longer because of the allocation and finalizer.
+			framework.ExpectNoError(b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, forceDelete))
+			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
+				claim, err := b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil, nil
+				}
+				return claim, err
+			}).Should(gomega.BeNil())
+			gomega.Expect(b.driver.Nodes[node].GetPreparedResources()).Should(gomega.Equal([]testdriverapp.ClaimID{{Name: oldClaim.Name, UID: oldClaim.UID}}), "Old claim should still be prepared.")
+
+			ginkgo.By("Re-creating the same claim and pod")
+			newClaim := b.create(ctx, claim, pod)[0].(*resourceapi.ResourceClaim)
+
+			// Keep blocking NodeUnprepareResources for the old pod
+			// until the new pod calls NodePrepareResources and fails.
+			// This ensures that the race is triggered.
+			expectedEvent := fields.Set{
+				"involvedObject.kind":      "Pod",
+				"involvedObject.name":      pod.Name,
+				"involvedObject.namespace": pod.Namespace,
+				"reason":                   events.FailedPrepareDynamicResources,
+			}.AsSelector().String()
+
+			// 10 min timeout (PodStartTimeout * 2) should be enough
+			// for Kubelet to emit multiple events, so the test should
+			// be able to catch at least one of them.
+			framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
+				ctx,
+				f.ClientSet,
+				pod.Namespace,
+				expectedEvent,
+				fmt.Sprintf("old ResourceClaim with same name %s and different UID %s still exists", oldClaim.Name, oldClaim.UID),
+				framework.PodStartTimeout*2))
+
+			driver.Fail(unprepareResources, false)
+
+			b.testPod(ctx, f, pod)
+
+			// The pod must not have started before NodeUnprepareResources was called for the old one,
+			// i.e. what is prepared now must be the new claim.
+			gomega.Expect(b.driver.Nodes[node].GetPreparedResources()).Should(gomega.Equal([]testdriverapp.ClaimID{{Name: newClaim.Name, UID: newClaim.UID}}), "Only new claim should be prepared now because new pod is running.")
 		})
 	})
 
@@ -1455,12 +1540,19 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			b.create(ctx, pod, template)
 			b.testPod(ctx, f, pod)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
-				// Unblock shutdown by removing the finalizer.
-				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err, "get pod")
-				pod.Finalizers = nil
-				_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(ctx, pod, metav1.UpdateOptions{})
-				framework.ExpectNoError(err, "remove finalizers from pod")
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					// Unblock shutdown by removing the finalizer.
+					pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+					if err != nil {
+						return fmt.Errorf("get pod: %w", err)
+					}
+					pod.Finalizers = nil
+					_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(ctx, pod, metav1.UpdateOptions{})
+					if err != nil {
+						return fmt.Errorf("remove finalizers from pod: %w", err)
+					}
+					return nil
+				}).WithTimeout(30*time.Second).WithPolling(1*time.Second).Should(gomega.Succeed(), "Failed to remove finalizers")
 			})
 
 			// Now evict it.
@@ -1562,7 +1654,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			listSlices := framework.ListObjects(f.ClientSet.ResourceV1beta2().ResourceSlices().List, metav1.ListOptions{
 				FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName,
 			})
-			gomega.Eventually(ctx, listSlices).WithTimeout(time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
+			gomega.Eventually(ctx, listSlices).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
 
 			// Verify state.
 			expectSlices, err := listSlices(ctx)
@@ -1602,7 +1694,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			claim.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 			_, claimTemplate := b.podInline()
 			claimTemplate.Spec.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
-			matchValidationError := gomega.MatchError(gomega.ContainSubstring("admin access to devices requires the `resource.k8s.io/admin-access: true` label on the containing namespace"))
+			matchValidationError := gomega.MatchError(gomega.ContainSubstring("admin access to devices requires the `resource.kubernetes.io/admin-access: true` label on the containing namespace"))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
 				if err := b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
@@ -1623,7 +1715,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 			// After labeling the namespace, creation must (eventually...) succeed.
 			_, err := b.f.ClientSet.CoreV1().Namespaces().Apply(ctx,
-				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.k8s.io/admin-access": "true"}),
+				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.kubernetes.io/admin-access": "true"}),
 				metav1.ApplyOptions{FieldManager: b.f.UniqueName})
 			framework.ExpectNoError(err)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -1703,7 +1795,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		f.It("DaemonSet with admin access", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
 			// Ensure namespace has the dra admin label.
 			_, err := b.f.ClientSet.CoreV1().Namespaces().Apply(ctx,
-				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.k8s.io/admin-access": "true"}),
+				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.kubernetes.io/admin-access": "true"}),
 				metav1.ApplyOptions{FieldManager: b.f.UniqueName})
 			framework.ExpectNoError(err)
 
@@ -2013,7 +2105,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 	})
 
-	ginkgo.It("rolling update", func(ctx context.Context) {
+	// Seamless upgrade support was added in Kubernetes 1.33.
+	f.It("rolling update", f.WithLabel("KubeletMinVersion:1.33"), func(ctx context.Context) {
 		nodes := NewNodesNow(ctx, f, 1, 1)
 
 		oldDriver := NewDriverInstance(f)
@@ -2055,7 +2148,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 	})
 
-	ginkgo.It("failed update", func(ctx context.Context) {
+	// Seamless upgrade support was added in Kubernetes 1.33.
+	f.It("failed update", f.WithLabel("KubeletMinVersion:1.33"), func(ctx context.Context) {
 		nodes := NewNodesNow(ctx, f, 1, 1)
 
 		oldDriver := NewDriverInstance(f)
@@ -2098,7 +2192,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 	})
 
-	f.It("sequential update with pods replacing each other", framework.WithSlow(), func(ctx context.Context) {
+	f.It("sequential update with pods replacing each other", f.WithLabel("KubeletMinVersion:1.33"), framework.WithSlow(), func(ctx context.Context) {
 		nodes := NewNodesNow(ctx, f, 1, 1)
 
 		// Same driver name, same socket path.

@@ -35,6 +35,7 @@ type MetricValueStatusApplyConfiguration struct {
 func MetricValueStatus() *MetricValueStatusApplyConfiguration {
 	return &MetricValueStatusApplyConfiguration{}
 }
+func (b MetricValueStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithValue sets the Value field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

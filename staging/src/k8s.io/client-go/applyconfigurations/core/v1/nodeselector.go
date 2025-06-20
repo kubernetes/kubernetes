@@ -29,6 +29,7 @@ type NodeSelectorApplyConfiguration struct {
 func NodeSelector() *NodeSelectorApplyConfiguration {
 	return &NodeSelectorApplyConfiguration{}
 }
+func (b NodeSelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithNodeSelectorTerms adds the given value to the NodeSelectorTerms field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

@@ -154,6 +154,10 @@ type WatchFuncWithContext func(ctx context.Context, options metav1.ListOptions) 
 // ListWithContextFunc and WatchFuncWithContext are preferred if
 // a context is available, otherwise ListFunc and WatchFunc.
 //
+// Beware of the inconsistent naming of the two WithContext methods.
+// This was unintentional, but fixing it now would force the ecosystem
+// to go through a breaking Go API change and was deemed not worth it.
+//
 // NewFilteredListWatchFromClient sets all of the functions to ensure that callers
 // which only know about ListFunc and WatchFunc continue to work.
 type ListWatch struct {

@@ -19,6 +19,8 @@ package plugin
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -29,24 +31,72 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
-// readCredentialProviderConfigFile receives a path to a config file and decodes it
-// into the internal CredentialProviderConfig type.
-func readCredentialProviderConfigFile(configPath string) (*kubeletconfig.CredentialProviderConfig, error) {
+// readCredentialProviderConfig receives a path to a config file or directory.
+// If the path is a directory, it reads all "*.json", "*.yaml" and "*.yml" files in lexicographic order,
+// decodes them, and merges their entries into a single CredentialProviderConfig object.
+// If the path is a file, it decodes the file into a CredentialProviderConfig object directly
+func readCredentialProviderConfig(configPath string) (*kubeletconfig.CredentialProviderConfig, error) {
 	if configPath == "" {
 		return nil, fmt.Errorf("credential provider config path is empty")
 	}
 
-	data, err := os.ReadFile(configPath)
+	fileInfo, err := os.Stat(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read external registry credential provider configuration from %q: %w", configPath, err)
+		return nil, fmt.Errorf("unable to access path %q: %w", configPath, err)
 	}
 
-	config, err := decode(data)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding config %s: %w", configPath, err)
+	var configs []*kubeletconfig.CredentialProviderConfig
+	var configFiles []string
+
+	if fileInfo.IsDir() {
+		entries, err := os.ReadDir(configPath)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read directory %q: %w", configPath, err)
+		}
+
+		// Filter and sort *.json/*.yaml/*.yml files in lexicographic order
+		for _, entry := range entries {
+			ext := filepath.Ext(entry.Name())
+			if !entry.IsDir() && (ext == ".json" || ext == ".yaml" || ext == ".yml") {
+				configFiles = append(configFiles, filepath.Join(configPath, entry.Name()))
+			}
+		}
+		sort.Strings(configFiles)
+
+		if len(configFiles) == 0 {
+			return nil, fmt.Errorf("no configuration files found in directory %q", configPath)
+		}
+	} else {
+		configFiles = append(configFiles, configPath)
 	}
 
-	return config, nil
+	for _, filePath := range configFiles {
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read file %q: %w", filePath, err)
+		}
+
+		config, err := decode(data)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding config %q: %w", filePath, err)
+		}
+		configs = append(configs, config)
+	}
+
+	// Merge all configs into a single CredentialProviderConfig
+	mergedConfig := &kubeletconfig.CredentialProviderConfig{}
+	providerNames := sets.NewString()
+	for _, config := range configs {
+		for _, provider := range config.Providers {
+			if providerNames.Has(provider.Name) {
+				return nil, fmt.Errorf("duplicate provider name %q found in configuration file(s)", provider.Name)
+			}
+			providerNames.Insert(provider.Name)
+			mergedConfig.Providers = append(mergedConfig.Providers, provider)
+		}
+	}
+
+	return mergedConfig, nil
 }
 
 // decode decodes data into the internal CredentialProviderConfig type.

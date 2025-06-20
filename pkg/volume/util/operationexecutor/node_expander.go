@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -96,12 +97,19 @@ func (ne *NodeExpander) runPreCheck() bool {
 		ne.markExpansionInfeasibleOnFailure = true
 	}
 
-	// PVC is already expanded but we are still trying to expand the volume because
-	// last recorded size in ASOW is older. This can happen for RWX volume types.
-	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 &&
-		ne.resizeStatus == "" &&
-		storage.ContainsAccessMode(ne.pvc.Spec.AccessModes, v1.ReadWriteMany) {
+	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 && ne.resizeStatus == "" {
 		ne.pvcAlreadyUpdated = true
+	}
+
+	// if the volume is already expanded, but volume is of type RWX and
+	// pvc doesn't have annotation indicating that node expansion is not required
+	// then we should allow node expansion to proceed, even if the volume is already expanded.
+	//
+	// This special cases is needed because, in case of RWX volumes, the volume expansion
+	// should be performed on all nodes, even if the volume is already expanded.
+	if ne.pvcAlreadyUpdated &&
+		storage.ContainsAccessMode(ne.pvc.Spec.AccessModes, v1.ReadWriteMany) &&
+		!metav1.HasAnnotation(ne.pvc.ObjectMeta, volumetypes.NodeExpansionNotRequired) {
 		return true
 	}
 
@@ -124,6 +132,14 @@ func (ne *NodeExpander) runPreCheck() bool {
 func (ne *NodeExpander) expandOnPlugin() (bool, resource.Quantity, error) {
 	allowExpansion := ne.runPreCheck()
 	if !allowExpansion {
+		if ne.pvcAlreadyUpdated {
+			// if pvc is already updated, then we could be here because size stored in ASOW is smaller and controller did full
+			// expansion and hence no node expansion is needed.
+			// This will stop reconciler from retrying expansion on the node.
+			ne.testStatus = testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: false}
+			return true, ne.pluginResizeOpts.NewSize, nil
+		}
+
 		klog.V(3).Infof("NodeExpandVolume is not allowed to proceed for volume %s with resizeStatus %s", ne.vmt.VolumeName, ne.resizeStatus)
 		ne.testStatus = testResponseData{false /* resizeCalledOnPlugin */, true /* assumeResizeFinished */}
 		return false, ne.pluginResizeOpts.OldSize, nil

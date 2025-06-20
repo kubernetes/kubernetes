@@ -34,6 +34,7 @@ type PreconditionsApplyConfiguration struct {
 func Preconditions() *PreconditionsApplyConfiguration {
 	return &PreconditionsApplyConfiguration{}
 }
+func (b PreconditionsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithUID sets the UID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

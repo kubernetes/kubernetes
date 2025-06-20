@@ -35,6 +35,7 @@ type NodeSelectorRequirementApplyConfiguration struct {
 func NodeSelectorRequirement() *NodeSelectorRequirementApplyConfiguration {
 	return &NodeSelectorRequirementApplyConfiguration{}
 }
+func (b NodeSelectorRequirementApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKey sets the Key field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

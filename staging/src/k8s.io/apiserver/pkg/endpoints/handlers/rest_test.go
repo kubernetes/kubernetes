@@ -136,40 +136,40 @@ func TestLimitedReadBody(t *testing.T) {
 			expectedMetrics: `
         # HELP apiserver_request_body_size_bytes [ALPHA] Apiserver request body size in bytes broken out by resource and verb.
         # TYPE apiserver_request_body_size_bytes histogram
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="50000"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="150000"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="250000"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="350000"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="450000"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="550000"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="650000"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="750000"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="850000"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="950000"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.05e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.15e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.25e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.35e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.45e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.55e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.65e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.75e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.85e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.95e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.05e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.15e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.25e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.35e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.45e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.55e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.65e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.75e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.85e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.95e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="3.05e+06"} 1
-        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="+Inf"} 1
-        apiserver_request_body_size_bytes_sum{resource="resource.group",verb="create"} 4
-        apiserver_request_body_size_bytes_count{resource="resource.group",verb="create"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="50000"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="150000"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="250000"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="350000"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="450000"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="550000"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="650000"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="750000"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="850000"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="950000"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="1.05e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="1.15e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="1.25e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="1.35e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="1.45e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="1.55e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="1.65e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="1.75e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="1.85e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="1.95e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="2.05e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="2.15e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="2.25e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="2.35e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="2.45e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="2.55e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="2.65e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="2.75e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="2.85e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="2.95e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="3.05e+06"} 1
+        apiserver_request_body_size_bytes_bucket{group="group",resource="resource",verb="create",le="+Inf"} 1
+        apiserver_request_body_size_bytes_sum{group="group",resource="resource",verb="create"} 4
+        apiserver_request_body_size_bytes_count{group="group",resource="resource",verb="create"} 1
 `,
 			expectedErr: false,
 		},
@@ -186,7 +186,7 @@ func TestLimitedReadBody(t *testing.T) {
 			if err != nil {
 				t.Errorf("err not expected: got %v", err)
 			}
-			_, err = limitedReadBodyWithRecordMetric(context.Background(), req, tc.limit, "resource.group", metrics.Create)
+			_, err = limitedReadBodyWithRecordMetric(context.Background(), req, tc.limit, schema.GroupResource{Group: "group", Resource: "resource"}, metrics.Create)
 			if tc.expectedErr {
 				if err == nil {
 					t.Errorf("err expected: got nil")

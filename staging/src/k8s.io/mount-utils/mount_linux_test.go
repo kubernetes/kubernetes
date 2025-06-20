@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/constraints"
 	"golang.org/x/sys/unix"
 	utilexec "k8s.io/utils/exec"
 	testexec "k8s.io/utils/exec/testing"
@@ -817,9 +816,23 @@ func TestFormatTimeout(t *testing.T) {
 	mu.Unlock()
 }
 
+// Replicate some types found in "golang.org/x/exp/constraints"
+// to avoid a dependency on that package.
+type Signed interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64
+}
+
+type Unsigned interface {
+	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
+}
+
+type Integer interface {
+	Signed | Unsigned
+}
+
 // Some platforms define unix.Statfs_t.Flags differently.  Our need here is
 // pretty constrained, so some aggressive type-conversion is OK.
-func mkStatfsFlags[T1 constraints.Integer, T2 constraints.Integer](orig T1, add T2) T1 {
+func mkStatfsFlags[T1 Integer, T2 Integer](orig T1, add T2) T1 {
 	return orig | T1(add)
 }
 

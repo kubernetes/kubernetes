@@ -46,7 +46,8 @@ type IPerfCSVResult struct {
 	server        string
 	servPort      int64
 	id            string
-	interval      string
+	intervalStart string
+	intervalEnd   string
 	transferBits  int64
 	bandwidthBits int64
 }
@@ -84,9 +85,9 @@ func NewIPerf(csvLine string) (*IPerfCSVResult, error) {
 	}
 	csvLine = strings.Trim(csvLine, "\n")
 	slice := StrSlice(strings.Split(csvLine, ","))
-	// iperf 2.19+ reports 15 fields, before it was just 9
-	if len(slice) != 15 {
-		return nil, fmt.Errorf("incorrect fields in the output: %v (%v out of 15)", slice, len(slice))
+	// iperf 2.2.0+ reports 17 fields, before it was just 15
+	if len(slice) != 17 {
+		return nil, fmt.Errorf("incorrect fields in the output: %v (%v out of 17)", slice, len(slice))
 	}
 	i := IPerfCSVResult{}
 	i.date = slice.get(0)
@@ -95,9 +96,10 @@ func NewIPerf(csvLine string) (*IPerfCSVResult, error) {
 	i.server = slice.get(3)
 	i.servPort = intOrFail("server port", slice.get(4))
 	i.id = slice.get(5)
-	i.interval = slice.get(6)
-	i.transferBits = intOrFail("transfer port", slice.get(7))
-	i.bandwidthBits = intOrFail("bandwidth port", slice.get(8))
+	i.intervalStart = slice.get(6)
+	i.intervalEnd = slice.get(7)
+	i.transferBits = intOrFail("transfer port", slice.get(8))
+	i.bandwidthBits = intOrFail("bandwidth port", slice.get(9))
 	return &i, nil
 }
 
@@ -128,22 +130,25 @@ type IPerf2EnhancedCSVResults struct {
 
 // ParseIPerf2EnhancedResultsFromCSV parses results from iperf2 when given the -e (--enhancedreports)
 // and `--reportstyle C` options.
-// Example output for version < 2.19 (agnhost < 2.53):
+// Example output for version < 2.1.9 (agnhost < 2.53):
 // 20201210141800.884,10.244.2.24,47880,10.96.114.79,6789,3,0.0-1.0,1677852672,13422821376
 // 20201210141801.881,10.244.2.24,47880,10.96.114.79,6789,3,1.0-2.0,1980760064,15846080512
 // 20201210141802.883,10.244.2.24,47880,10.96.114.79,6789,3,2.0-3.0,1886650368,15093202944
-// Example output with version >= 2.19 (agnhost >= 2.53)
+// Example output with version >= 2.1.9 (agnhost >= 2.53)
 // +0000:20240908113035.128,192.168.9.3,58256,192.168.9.4,5001,1,0.0-1.0,5220466748,41763733984,-1,-1,-1,-1,0,0
 // +0000:20240908113036.128,192.168.9.3,58256,192.168.9.4,5001,1,1.0-2.0,5127667712,41021341696,-1,-1,-1,-1,0,0
-// +0000:20240908113037.128,192.168.9.3,58256,192.168.9.4,5001,1,2.0-3.0,5127405568,41019244544,-1,-1,-1,-1,0,0
-// +0000:20240908113038.128,192.168.9.3,58256,192.168.9.4,5001,1,3.0-4.0,5173018624,41384148992,-1,-1,-1,-1,0,0
-// +0000:20240908113039.128,192.168.9.3,58256,192.168.9.4,5001,1,4.0-5.0,5245894656,41967157248,-1,-1,-1,-1,0,0
-// +0000:20240908113040.128,192.168.9.3,58256,192.168.9.4,5001,1,5.0-6.0,5213257728,41706061824,-1,-1,-1,-1,0,0
-// +0000:20240908113041.128,192.168.9.3,58256,192.168.9.4,5001,1,6.0-7.0,5113118720,40904949760,-1,-1,-1,-1,0,0
-// +0000:20240908113042.128,192.168.9.3,58256,192.168.9.4,5001,1,7.0-8.0,5242748928,41941991424,-1,-1,-1,-1,0,0
+// Example output with version >= 2.2.0 (agnhost >= 2.55)
+// time,srcaddress,srcport,dstaddr,dstport,transferid,istart,iend,bytes,speed,writecnt,writeerr,tcpretry,tcpcwnd,tcppcwnd,tcprtt,tcprttvar
+// +0000:20250605191028.955,10.244.2.64,43380,10.96.223.154,6789,1,0.0,1.0,7817396288,62539170304,-1,-1,4294967295,-1,4294967295,0,0
+// +0000:20250605191029.955,10.244.2.64,43380,10.96.223.154,6789,1,1.0,2.0,7550795776,60406366208,-1,-1,4294967295,-1,4294967295,0,0
+// +0000:20250605191030.955,10.244.2.64,43380,10.96.223.154,6789,1,2.0,3.0,8703574016,69628592128,-1,-1,4294967295,-1,4294967295,0,0
 func ParseIPerf2EnhancedResultsFromCSV(output string) (*IPerf2EnhancedCSVResults, error) {
 	var parsedResults []*IPerfCSVResult
-	for _, line := range strings.Split(output, "\n") {
+	for i, line := range strings.Split(output, "\n") {
+		if i == 0 {
+			// we skip the first line, iperf 2.2.0+ returns headers as first line in output
+			continue
+		}
 		parsed, err := NewIPerf(line)
 		if err != nil {
 			return nil, err

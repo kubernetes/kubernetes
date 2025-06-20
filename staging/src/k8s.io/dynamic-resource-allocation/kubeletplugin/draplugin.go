@@ -100,6 +100,12 @@ type DRAPlugin interface {
 	// It is the responsibility of the DRA driver to cache whatever additional
 	// information it might need about prepared resources.
 	//
+	// The DRA driver cannot assume that the matching PrepareResourceClaims
+	// call was handled by the same process:
+	// - The driver might have been restarted in the meantime.
+	// - [RollingUpdate], if enabled, can lead to PrepareResourceClaims being
+	//   called in one driver instance and UnprepareResourceClaims in another.
+	//
 	// This call must be idempotent because the kubelet might have to ask
 	// for un-preparation multiple times, for example if it gets restarted.
 	// Therefore it is not an error if this gets called for a ResourceClaim
@@ -626,11 +632,6 @@ func (d *Helper) PublishResources(_ context.Context, resources resourceslice.Dri
 		// our background context, not the one passed into this
 		// function, and thus is connected to the lifecycle of the
 		// plugin.
-		//
-		// TODO: don't delete ResourceSlices, not even on a clean shutdown.
-		// We either support rolling updates and want to hand over seamlessly
-		// or don't and then perhaps restart the pod quickly enough that
-		// the kubelet hasn't deleted ResourceSlices yet.
 		controllerCtx := d.backgroundCtx
 		controllerLogger := klog.FromContext(controllerCtx)
 		controllerLogger = klog.LoggerWithName(controllerLogger, "ResourceSlice controller")
@@ -661,6 +662,13 @@ func (d *Helper) RegistrationStatus() *registerapi.RegistrationStatus {
 	}
 	// TODO: protect against concurrency issues.
 	return d.registrar.status
+}
+
+// SetGetInfoError configures the registration server to make
+// GetInfo calls return the specified error.
+// To restore normal behavior, call SetGetInfoError(nil).
+func (d *Helper) SetGetInfoError(err error) {
+	d.registrar.setGetInfoError(err)
 }
 
 // serializeGRPCIfEnabled locks a mutex if serialization is enabled.

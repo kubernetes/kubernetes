@@ -42,7 +42,7 @@ func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
 
 	if scale.Spec.Replicas < 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "replicas"), scale.Spec.Replicas, "must be greater than or equal to 0"))
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(scale.Spec.Replicas), field.NewPath("spec", "replicas")).MarkCoveredByDeclarative()...)
 	}
 
 	return allErrs

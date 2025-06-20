@@ -1,0 +1,121 @@
+kind: ResourceSlice
+apiVersion: resource.k8s.io/v1beta2
+metadata:
+  name: resourceslice-{{.Index}}
+spec:
+  pool:
+    name: resourceslice-{{.Index}}
+    generation: 1
+    resourceSliceCount: 1
+  driver: test-driver.cdi.k8s.io
+  nodeSelector:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: node-with-dra
+        operator: In
+        values:
+        - "true"
+  sharedCounters:
+  - name: counter-set-for-cpu
+    counters:
+      cpu1:
+        value: "1"
+      cpu2:
+        value: "1"
+      cpu3:
+        value: "1"
+      cpu4:
+        value: "1"
+      cpu5:
+        value: "1"
+      cpu6:
+        value: "1"
+      cpu7:
+        value: "1"
+      cpu8:
+        value: "1"
+  - name: counter-set-for-mem
+    counters:
+      mem:
+        value: "70Gi"
+  devices:
+  - name: device-1
+    consumesCounters:
+    - counterSet: counter-set-for-cpu
+      counters:
+        cpu1:
+          value: "1"
+    - counterSet: counter-set-for-mem
+      counters:
+        mem:
+          value: "20Gi"
+  - name: device-2
+    consumesCounters:
+    - counterSet: counter-set-for-cpu
+      counters:
+        cpu2:
+          value: "1"
+    - counterSet: counter-set-for-mem
+      counters:
+        mem:
+          value: "10Gi"
+  - name: device-3
+    consumesCounters:
+    - counterSet: counter-set-for-cpu
+      counters:
+        cpu3:
+          value: "1"
+    - counterSet: counter-set-for-mem
+      counters:
+        mem:
+          value: "10Gi"
+  - name: device-4
+    consumesCounters:
+    - counterSet: counter-set-for-cpu
+      counters:
+        cpu4:
+          value: "1"
+    - counterSet: counter-set-for-mem
+      counters:
+        mem:
+          value: "10Gi"
+  - name: device-5
+    consumesCounters:
+    - counterSet: counter-set-for-cpu
+      counters:
+        cpu5:
+          value: "1"
+    - counterSet: counter-set-for-mem
+      counters:
+        mem:
+          value: "10Gi"
+  - name: device-6
+    consumesCounters:
+    - counterSet: counter-set-for-cpu
+      counters:
+        cpu6:
+          value: "1"
+    - counterSet: counter-set-for-mem
+      counters:
+        mem:
+          value: "10Gi"
+  - name: device-7
+    consumesCounters:
+    - counterSet: counter-set-for-cpu
+      counters:
+        cpu7:
+          value: "1"
+    - counterSet: counter-set-for-mem
+      counters:
+        mem:
+          value: "10Gi"
+  - name: device-8
+    consumesCounters:
+    - counterSet: counter-set-for-cpu
+      counters:
+        cpu8:
+          value: "1"
+    - counterSet: counter-set-for-mem
+      counters:
+        mem:
+          value: "10Gi"

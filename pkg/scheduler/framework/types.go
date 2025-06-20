@@ -82,16 +82,13 @@ const (
 	// Depends on the DynamicResourceAllocation feature gate.
 	UpdatePodGeneratedResourceClaim
 
-	// updatePodOther is a update for pod's other fields.
-	// It's used only for the internal event handling, and thus unexported.
-	updatePodOther
-
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim | updatePodOther
-	// none is a special ActionType that is only used internally.
-	none ActionType = 0
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+
+	// None is a special ActionType that is only used internally.
+	None ActionType = 0
 )
 
 var (
@@ -129,8 +126,6 @@ func (a ActionType) String() string {
 		return "UpdatePodSchedulingGatesEliminated"
 	case UpdatePodGeneratedResourceClaim:
 		return "UpdatePodGeneratedResourceClaim"
-	case updatePodOther:
-		return "Update"
 	case All:
 		return "All"
 	case Update:
@@ -321,14 +316,24 @@ func (ce ClusterEvent) IsWildCard() bool {
 }
 
 // Match returns true if ClusterEvent is matched with the coming event.
+// "match" means the coming event is the same or more specific than the ce.
+// i.e., when ce.ActionType is Update, it return true if a coming event is UpdateNodeLabel
+// because UpdateNodeLabel is more specific than Update.
+// On the other hand, when ce.ActionType is UpdateNodeLabel, it doesn't return true if a coming event is Update.
+// This is based on the fact that the scheduler interprets the coming cluster event as specific event if possible;
+// meaning, if a coming event is Node/Update, it means that Node's update is not something
+// that can be interpreted as any of Node's specific Update events.
+//
 // If the ce.Resource is "*", there's no requirement for the coming event' Resource.
 // Contrarily, if the coming event's Resource is "*", the ce.Resource should only be "*".
+// (which should never happen in the current implementation of the scheduling queue.)
 //
 // Note: we have a special case here when the coming event is a wildcard event,
 // it will force all Pods to move to activeQ/backoffQ,
 // but we take it as an unmatched event unless the ce is also a wildcard one.
 func (ce ClusterEvent) Match(incomingEvent ClusterEvent) bool {
-	return ce.IsWildCard() || ce.Resource.match(incomingEvent.Resource) && ce.ActionType&incomingEvent.ActionType != 0
+	return ce.IsWildCard() ||
+		ce.Resource.match(incomingEvent.Resource) && ce.ActionType&incomingEvent.ActionType != 0 && incomingEvent.ActionType <= ce.ActionType
 }
 
 // match returns true if the resource is matched with the coming resource.
@@ -373,14 +378,30 @@ type QueuedPodInfo struct {
 	*PodInfo
 	// The time pod added to the scheduling queue.
 	Timestamp time.Time
-	// Number of schedule attempts before successfully scheduled.
-	// It's used to record the # attempts metric and calculate the backoff time this Pod is obliged to get before retrying.
+	// Number of all schedule attempts before successfully scheduled.
+	// It's used to record the # attempts metric.
 	Attempts int
 	// BackoffExpiration is the time when the Pod will complete its backoff.
 	// If the SchedulerPopFromBackoffQ feature is enabled, the value is aligned to the backoff ordering window.
 	// Then, two Pods with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
 	// to make sure popping from the backoffQ considers priority of pods that are close to the expiration time.
 	BackoffExpiration time.Time
+	// The total number of the scheduling attempts that this Pod gets unschedulable.
+	// Basically it equals Attempts, but when the Pod fails with the Error status (e.g., the network error),
+	// this count won't be incremented.
+	// It's used to calculate the backoff time this Pod is obliged to get before retrying.
+	UnschedulableCount int
+	// The number of the error status that this Pod gets sequentially.
+	// This count is reset when the Pod gets another status than Error.
+	//
+	// If the error status is returned (e.g., kube-apiserver is unstable), we don't want to immediately retry the Pod and hence need a backoff retry mechanism
+	// because that might push more burden to the kube-apiserver.
+	// But, we don't want to calculate the backoff time in the same way as the normal unschedulable reason
+	// since the purpose is different; the backoff for a unschedulable status etc is for the punishment of wasting the scheduling cycles,
+	// whereas the backoff for the error status is for the protection of the kube-apiserver.
+	// That's why we need to distinguish ConsecutiveErrorsCount for the error status and UnschedulableCount for the unschedulable status.
+	// See https://github.com/kubernetes/kubernetes/issues/128744 for the discussion.
+	ConsecutiveErrorsCount int
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
@@ -413,12 +434,14 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		PodInfo:                 pqi.PodInfo.DeepCopy(),
 		Timestamp:               pqi.Timestamp,
 		Attempts:                pqi.Attempts,
+		UnschedulableCount:      pqi.UnschedulableCount,
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
 		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
 		BackoffExpiration:       pqi.BackoffExpiration,
 		GatingPlugin:            pqi.GatingPlugin,
 		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
 		PendingPlugins:          pqi.PendingPlugins.Clone(),
+		ConsecutiveErrorsCount:  pqi.ConsecutiveErrorsCount,
 	}
 }
 
@@ -1184,13 +1207,11 @@ func (pi *PodInfo) calculateResource() podResource {
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
 func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
-	for _, container := range pod.Spec.Containers {
-		for _, podPort := range container.Ports {
-			if add {
-				n.UsedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
-			} else {
-				n.UsedPorts.Remove(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
-			}
+	for _, port := range schedutil.GetHostPorts(pod) {
+		if add {
+			n.UsedPorts.Add(port.HostIP, string(port.Protocol), port.HostPort)
+		} else {
+			n.UsedPorts.Remove(port.HostIP, string(port.Protocol), port.HostPort)
 		}
 	}
 }

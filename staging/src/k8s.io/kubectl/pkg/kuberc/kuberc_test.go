@@ -20,14 +20,16 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/config"
 )
 
@@ -51,7 +53,7 @@ type testApplyOverride[T supportedTypes] struct {
 	nestedCmds         []fakeCmds[T]
 	args               []string
 	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
-	expectedFLags      []fakeFlag[T]
+	expectedFlags      []fakeFlag[T]
 	expectedErr        error
 }
 
@@ -60,7 +62,7 @@ type testApplyAlias[T supportedTypes] struct {
 	nestedCmds         []fakeCmds[T]
 	args               []string
 	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
-	expectedFLags      []fakeFlag[T]
+	expectedFlags      []fakeFlag[T]
 	expectedCmd        string
 	expectedArgs       []string
 	expectedErr        error
@@ -91,10 +93,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -104,7 +106,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed",
@@ -139,10 +141,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -152,7 +154,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed",
@@ -193,10 +195,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "first",
 									Default: "changed",
@@ -206,7 +208,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "first",
 					value: "changed",
@@ -251,10 +253,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -264,7 +266,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -304,10 +306,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -317,7 +319,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -357,10 +359,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -370,7 +372,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -410,10 +412,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "  command1   command2   ",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -423,7 +425,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -463,10 +465,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -476,7 +478,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -512,10 +514,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -525,7 +527,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -562,10 +564,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -575,7 +577,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -613,10 +615,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -626,7 +628,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -663,10 +665,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -676,7 +678,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -718,10 +720,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -731,7 +733,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -781,10 +783,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1 command2",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -794,7 +796,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -824,10 +826,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -843,7 +845,7 @@ func TestApplyOverride(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "test",
@@ -873,10 +875,10 @@ func TestApplyOverride(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "testalias",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -898,51 +900,49 @@ func TestApplyOverride(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]util.FeatureGate{util.KubeRC}, t, func(t *testing.T) {
-				rootCmd := &cobra.Command{
-					Use: "root",
+			rootCmd := &cobra.Command{
+				Use: "root",
+			}
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			addCommands(rootCmd, test.nestedCmds)
+			pref.getPreferencesFunc = test.getPreferencesFunc
+			errWriter := &bytes.Buffer{}
+			_, err := pref.Apply(rootCmd, test.args, errWriter)
+			if test.expectedErr == nil && err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+			if test.expectedErr != nil {
+				if test.expectedErr.Error() != err.Error() {
+					t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
 				}
-				prefHandler := NewPreferences()
-				prefHandler.AddFlags(rootCmd.PersistentFlags())
-				pref, ok := prefHandler.(*Preferences)
-				if !ok {
-					t.Fatal("unexpected type. Expected *Preferences")
-				}
-				addCommands(rootCmd, test.nestedCmds)
-				pref.getPreferencesFunc = test.getPreferencesFunc
-				errWriter := &bytes.Buffer{}
-				_, err := pref.Apply(rootCmd, test.args, errWriter)
-				if test.expectedErr == nil && err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
-				if test.expectedErr != nil {
-					if test.expectedErr.Error() != err.Error() {
-						t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
-					}
-					return
-				}
+				return
+			}
 
-				actualCmd, _, err := rootCmd.Find(test.args[1:])
-				if err != nil {
-					t.Fatalf("unable to find the command %v\n", err)
-				}
+			actualCmd, _, err := rootCmd.Find(test.args[1:])
+			if err != nil {
+				t.Fatalf("unable to find the command %v\n", err)
+			}
 
-				err = actualCmd.ParseFlags(test.args[1:])
-				if err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
+			err = actualCmd.ParseFlags(test.args[1:])
+			if err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
 
-				if errWriter.String() != "" {
-					t.Fatalf("unexpected error message %s\n", errWriter.String())
-				}
+			if errWriter.String() != "" {
+				t.Fatalf("unexpected error message %s\n", errWriter.String())
+			}
 
-				for _, expectedFlag := range test.expectedFLags {
-					actualFlag := actualCmd.Flag(expectedFlag.name)
-					if actualFlag.Value.String() != expectedFlag.value {
-						t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
-					}
+			for _, expectedFlag := range test.expectedFlags {
+				actualFlag := actualCmd.Flag(expectedFlag.name)
+				if actualFlag.Value.String() != expectedFlag.value {
+					t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
-			})
+			}
 		})
 	}
 }
@@ -972,10 +972,10 @@ func TestApplOverrideBool(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "false",
@@ -985,7 +985,7 @@ func TestApplOverrideBool(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[bool]{
+			expectedFlags: []fakeFlag[bool]{
 				{
 					name:  "firstflag",
 					value: false,
@@ -1016,10 +1016,10 @@ func TestApplOverrideBool(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "false",
@@ -1029,7 +1029,7 @@ func TestApplOverrideBool(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[bool]{
+			expectedFlags: []fakeFlag[bool]{
 				{
 					name:  "firstflag",
 					value: true,
@@ -1061,10 +1061,10 @@ func TestApplOverrideBool(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "false",
@@ -1074,7 +1074,7 @@ func TestApplOverrideBool(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[bool]{
+			expectedFlags: []fakeFlag[bool]{
 				{
 					name:  "firstflag",
 					value: true,
@@ -1116,10 +1116,10 @@ func TestApplOverrideBool(t *testing.T) {
 						Kind:       "Preference",
 						APIVersion: "kubectl.config.k8s.io/v1alpha1",
 					},
-					Overrides: []config.CommandOverride{
+					Defaults: []config.CommandDefaults{
 						{
 							Command: "command1",
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "false",
@@ -1129,7 +1129,7 @@ func TestApplOverrideBool(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[bool]{
+			expectedFlags: []fakeFlag[bool]{
 				{
 					name:  "firstflag",
 					value: true,
@@ -1140,48 +1140,46 @@ func TestApplOverrideBool(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]util.FeatureGate{util.KubeRC}, t, func(t *testing.T) {
-				rootCmd := &cobra.Command{
-					Use: "root",
-				}
-				prefHandler := NewPreferences()
-				prefHandler.AddFlags(rootCmd.PersistentFlags())
-				pref, ok := prefHandler.(*Preferences)
-				if !ok {
-					t.Fatal("unexpected type. Expected *Preferences")
-				}
-				addCommands(rootCmd, test.nestedCmds)
-				pref.getPreferencesFunc = test.getPreferencesFunc
-				errWriter := &bytes.Buffer{}
-				_, err := pref.Apply(rootCmd, test.args, errWriter)
+			rootCmd := &cobra.Command{
+				Use: "root",
+			}
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			addCommands(rootCmd, test.nestedCmds)
+			pref.getPreferencesFunc = test.getPreferencesFunc
+			errWriter := &bytes.Buffer{}
+			_, err := pref.Apply(rootCmd, test.args, errWriter)
+			if err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+			actualCmd, _, err := rootCmd.Find(test.args[1:])
+			if err != nil {
+				t.Fatalf("unable to find the command %v\n", err)
+			}
+
+			err = actualCmd.ParseFlags(test.args[1:])
+			if err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+
+			if errWriter.String() != "" {
+				t.Fatalf("unexpected error message %s\n", errWriter.String())
+			}
+
+			for _, expectedFlag := range test.expectedFlags {
+				actualFlag := actualCmd.Flag(expectedFlag.name)
+				actualValue, err := strconv.ParseBool(actualFlag.Value.String())
 				if err != nil {
 					t.Fatalf("unexpected error %v\n", err)
 				}
-				actualCmd, _, err := rootCmd.Find(test.args[1:])
-				if err != nil {
-					t.Fatalf("unable to find the command %v\n", err)
+				if actualValue != expectedFlag.value {
+					t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
-
-				err = actualCmd.ParseFlags(test.args[1:])
-				if err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
-
-				if errWriter.String() != "" {
-					t.Fatalf("unexpected error message %s\n", errWriter.String())
-				}
-
-				for _, expectedFlag := range test.expectedFLags {
-					actualFlag := actualCmd.Flag(expectedFlag.name)
-					actualValue, err := strconv.ParseBool(actualFlag.Value.String())
-					if err != nil {
-						t.Fatalf("unexpected error %v\n", err)
-					}
-					if actualValue != expectedFlag.value {
-						t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
-					}
-				}
-			})
+			}
 		})
 	}
 }
@@ -1219,7 +1217,7 @@ func TestApplyAliasBool(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "true",
@@ -1229,7 +1227,7 @@ func TestApplyAliasBool(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[bool]{
+			expectedFlags: []fakeFlag[bool]{
 				{
 					name:  "firstflag",
 					value: true,
@@ -1273,7 +1271,7 @@ func TestApplyAliasBool(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "false",
@@ -1283,7 +1281,7 @@ func TestApplyAliasBool(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[bool]{
+			expectedFlags: []fakeFlag[bool]{
 				{
 					name:  "firstflag",
 					value: true,
@@ -1328,7 +1326,7 @@ func TestApplyAliasBool(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "false",
@@ -1338,7 +1336,7 @@ func TestApplyAliasBool(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[bool]{
+			expectedFlags: []fakeFlag[bool]{
 				{
 					name:  "firstflag",
 					value: true,
@@ -1393,7 +1391,7 @@ func TestApplyAliasBool(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "false",
@@ -1403,7 +1401,7 @@ func TestApplyAliasBool(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[bool]{
+			expectedFlags: []fakeFlag[bool]{
 				{
 					name:  "firstflag",
 					value: true,
@@ -1427,72 +1425,70 @@ func TestApplyAliasBool(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]util.FeatureGate{util.KubeRC}, t, func(t *testing.T) {
-				rootCmd := &cobra.Command{
-					Use: "root",
+			rootCmd := &cobra.Command{
+				Use: "root",
+			}
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			addCommands(rootCmd, test.nestedCmds)
+			pref.getPreferencesFunc = test.getPreferencesFunc
+			errWriter := &bytes.Buffer{}
+			lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
+			if test.expectedErr == nil && err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+			if test.expectedErr != nil {
+				if test.expectedErr.Error() != err.Error() {
+					t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
 				}
-				prefHandler := NewPreferences()
-				prefHandler.AddFlags(rootCmd.PersistentFlags())
-				pref, ok := prefHandler.(*Preferences)
-				if !ok {
-					t.Fatal("unexpected type. Expected *Preferences")
-				}
-				addCommands(rootCmd, test.nestedCmds)
-				pref.getPreferencesFunc = test.getPreferencesFunc
-				errWriter := &bytes.Buffer{}
-				lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
-				if test.expectedErr == nil && err != nil {
+				return
+			}
+
+			actualCmd, _, err := rootCmd.Find(lastArgs[1:])
+			if err != nil {
+				t.Fatalf("unable to find the command %v\n", err)
+			}
+
+			err = actualCmd.ParseFlags(lastArgs)
+			if err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+
+			if errWriter.String() != "" {
+				t.Fatalf("unexpected error message %s\n", errWriter.String())
+			}
+
+			if test.expectedCmd != actualCmd.Name() {
+				t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
+			}
+
+			for _, expectedFlag := range test.expectedFlags {
+				actualFlag := actualCmd.Flag(expectedFlag.name)
+				actualValue, err := strconv.ParseBool(actualFlag.Value.String())
+				if err != nil {
 					t.Fatalf("unexpected error %v\n", err)
 				}
-				if test.expectedErr != nil {
-					if test.expectedErr.Error() != err.Error() {
-						t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
-					}
-					return
+				if actualValue != expectedFlag.value {
+					t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
+			}
 
-				actualCmd, _, err := rootCmd.Find(lastArgs[1:])
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				err = actualCmd.ParseFlags(lastArgs)
-				if err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
-
-				if errWriter.String() != "" {
-					t.Fatalf("unexpected error message %s\n", errWriter.String())
-				}
-
-				if test.expectedCmd != actualCmd.Name() {
-					t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
-				}
-
-				for _, expectedFlag := range test.expectedFLags {
-					actualFlag := actualCmd.Flag(expectedFlag.name)
-					actualValue, err := strconv.ParseBool(actualFlag.Value.String())
-					if err != nil {
-						t.Fatalf("unexpected error %v\n", err)
-					}
-					if actualValue != expectedFlag.value {
-						t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
+			for _, expectedArg := range test.expectedArgs {
+				found := false
+				for _, actualArg := range lastArgs {
+					if actualArg == expectedArg {
+						found = true
+						break
 					}
 				}
-
-				for _, expectedArg := range test.expectedArgs {
-					found := false
-					for _, actualArg := range lastArgs {
-						if actualArg == expectedArg {
-							found = true
-							break
-						}
-					}
-					if !found {
-						t.Fatalf("expected arg %s can not be found", expectedArg)
-					}
+				if !found {
+					t.Fatalf("expected arg %s can not be found", expectedArg)
 				}
-			})
+			}
 		})
 	}
 }
@@ -1530,7 +1526,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -1540,7 +1536,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed",
@@ -1583,7 +1579,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -1593,7 +1589,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed",
@@ -1637,7 +1633,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -1647,7 +1643,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed",
@@ -1695,7 +1691,7 @@ func TestApplyAlias(t *testing.T) {
 								"arg1",
 								"arg2",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -1705,7 +1701,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed",
@@ -1756,7 +1752,7 @@ func TestApplyAlias(t *testing.T) {
 								"arg3",
 								"arg4",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -1766,7 +1762,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed",
@@ -1821,7 +1817,7 @@ func TestApplyAlias(t *testing.T) {
 								"arg3",
 								"arg4",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -1831,7 +1827,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -1878,7 +1874,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -1892,7 +1888,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -1935,7 +1931,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "--firstflag",
 									Default: "changed",
@@ -1949,7 +1945,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -1992,7 +1988,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -2035,7 +2031,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -2079,7 +2075,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -2089,7 +2085,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -2134,7 +2130,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -2144,7 +2140,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -2190,7 +2186,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -2200,7 +2196,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -2249,7 +2245,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -2259,7 +2255,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "explicit",
@@ -2306,7 +2302,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -2316,7 +2312,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed",
@@ -2360,7 +2356,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -2370,7 +2366,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed",
@@ -2414,7 +2410,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed",
@@ -2424,7 +2420,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed",
@@ -2480,7 +2476,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed2",
@@ -2490,7 +2486,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed2",
@@ -2546,7 +2542,7 @@ func TestApplyAlias(t *testing.T) {
 								"resources",
 								"nodes",
 							},
-							Flags: []config.CommandOverrideFlag{
+							Options: []config.CommandOptionDefault{
 								{
 									Name:    "firstflag",
 									Default: "changed2",
@@ -2556,7 +2552,7 @@ func TestApplyAlias(t *testing.T) {
 					},
 				}, nil
 			},
-			expectedFLags: []fakeFlag[string]{
+			expectedFlags: []fakeFlag[string]{
 				{
 					name:  "firstflag",
 					value: "changed2",
@@ -2572,68 +2568,66 @@ func TestApplyAlias(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]util.FeatureGate{util.KubeRC}, t, func(t *testing.T) {
-				rootCmd := &cobra.Command{
-					Use: "root",
+			rootCmd := &cobra.Command{
+				Use: "root",
+			}
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			addCommands(rootCmd, test.nestedCmds)
+			pref.getPreferencesFunc = test.getPreferencesFunc
+			errWriter := &bytes.Buffer{}
+			lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
+			if test.expectedErr == nil && err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+			if test.expectedErr != nil {
+				if test.expectedErr.Error() != err.Error() {
+					t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
 				}
-				prefHandler := NewPreferences()
-				prefHandler.AddFlags(rootCmd.PersistentFlags())
-				pref, ok := prefHandler.(*Preferences)
-				if !ok {
-					t.Fatal("unexpected type. Expected *Preferences")
-				}
-				addCommands(rootCmd, test.nestedCmds)
-				pref.getPreferencesFunc = test.getPreferencesFunc
-				errWriter := &bytes.Buffer{}
-				lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
-				if test.expectedErr == nil && err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
-				if test.expectedErr != nil {
-					if test.expectedErr.Error() != err.Error() {
-						t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
-					}
-					return
-				}
+				return
+			}
 
-				actualCmd, _, err := rootCmd.Find(lastArgs[1:])
-				if err != nil {
-					t.Fatal(err)
-				}
+			actualCmd, _, err := rootCmd.Find(lastArgs[1:])
+			if err != nil {
+				t.Fatal(err)
+			}
 
-				err = actualCmd.ParseFlags(lastArgs)
-				if err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
+			err = actualCmd.ParseFlags(lastArgs)
+			if err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
 
-				if errWriter.String() != "" {
-					t.Fatalf("unexpected error message %s\n", errWriter.String())
-				}
+			if errWriter.String() != "" {
+				t.Fatalf("unexpected error message %s\n", errWriter.String())
+			}
 
-				if test.expectedCmd != actualCmd.Name() {
-					t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
-				}
+			if test.expectedCmd != actualCmd.Name() {
+				t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
+			}
 
-				for _, expectedFlag := range test.expectedFLags {
-					actualFlag := actualCmd.Flag(expectedFlag.name)
-					if actualFlag.Value.String() != expectedFlag.value {
-						t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
-					}
+			for _, expectedFlag := range test.expectedFlags {
+				actualFlag := actualCmd.Flag(expectedFlag.name)
+				if actualFlag.Value.String() != expectedFlag.value {
+					t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
+			}
 
-				for _, expectedArg := range test.expectedArgs {
-					found := false
-					for _, actualArg := range lastArgs {
-						if actualArg == expectedArg {
-							found = true
-							break
-						}
-					}
-					if !found {
-						t.Fatalf("expected arg %s can not be found", expectedArg)
+			for _, expectedArg := range test.expectedArgs {
+				found := false
+				for _, actualArg := range lastArgs {
+					if actualArg == expectedArg {
+						found = true
+						break
 					}
 				}
-			})
+				if !found {
+					t.Fatalf("expected arg %s can not be found", expectedArg)
+				}
+			}
 		})
 	}
 }
@@ -2720,4 +2714,179 @@ func addCommands[T supportedTypes](rootCmd *cobra.Command, commands []fakeCmds[T
 	rootCmd.AddCommand(subCmd)
 
 	addCommands[T](subCmd, commands[1:])
+}
+
+func TestDefaultGetPreferences(t *testing.T) {
+	tests := map[string]struct {
+		defaultKubercFile string
+
+		// kubercEnv and kubercEnvFile are mutually exclusive, the latter will
+		// overrite the former always
+		kubercEnv     string
+		kubercEnvFile string
+
+		// kubercFlag and kubercFlagFile are mutually exclusive, the latter will
+		// overrite the former always
+		kubercFlag     string
+		kubercFlagFile string
+
+		expectedWarning     string
+		expectedError       string
+		expectedPreferences *config.Preference
+	}{
+		// flag variants
+		"explicit flag with valid file returns preference": {
+			kubercFlagFile: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+defaults:
+  - command: delete
+    options:
+      - name: interactive
+        default: "true"`,
+			expectedPreferences: &config.Preference{
+				Defaults: []config.CommandDefaults{
+					{
+						Command: "delete",
+						Options: []config.CommandOptionDefault{
+							{Name: "interactive", Default: "true"},
+						},
+					},
+				},
+			},
+		},
+		"explicit flag with strict decoding error returns preference with warning": {
+			kubercFlagFile: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+unknownField: value`,
+			expectedWarning:     "strict decoding error: unknown field",
+			expectedPreferences: &config.Preference{},
+		},
+		"explicit flag with invalid file returns error": {
+			kubercFlagFile: `invalid: yaml: content: [unclosed bracket`,
+			expectedError:  "no valid preferences found",
+		},
+		"explicit flag with non-existent file returns error": {
+			kubercFlag:    "/non/existent/file",
+			expectedError: "no such file or directory",
+		},
+
+		// KUBERC env variants
+		"KUBERC=off with empty flag returns nil": {
+			kubercEnv: "off",
+		},
+		"KUBERC=off with flag set returns error": {
+			kubercFlag:    "/some/path",
+			kubercEnv:     "off",
+			expectedError: "KUBERC=off and passing kuberc flag",
+		},
+		"KUBERC env with valid file returns preference": {
+			kubercEnvFile: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+defaults:
+  - command: delete
+    options:
+      - name: interactive
+        default: "true"`,
+			expectedPreferences: &config.Preference{
+				Defaults: []config.CommandDefaults{
+					{
+						Command: "delete",
+						Options: []config.CommandOptionDefault{
+							{Name: "interactive", Default: "true"},
+						},
+					},
+				},
+			},
+		},
+		"KUBERC env with strict decoding error returns preference with warning": {
+			kubercEnvFile: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+unknownField: value`,
+			expectedWarning:     "strict decoding error: unknown field",
+			expectedPreferences: &config.Preference{},
+		},
+		"KUBERC env with invalid file returns error": {
+			kubercEnvFile: `invalid: yaml: content: [unclosed bracket`,
+			expectedError: "no valid preferences found",
+		},
+
+		// default kuberc variants
+		"no explicit kuberc, non-existent default file returns nil": {
+			defaultKubercFile: "",
+		},
+		"no explicit kuberc, valid default file returns preference": {
+			defaultKubercFile: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+defaults:
+  - command: delete
+    options:
+      - name: interactive
+        default: "true"`,
+			expectedPreferences: &config.Preference{
+				Defaults: []config.CommandDefaults{
+					{
+						Command: "delete",
+						Options: []config.CommandOptionDefault{
+							{Name: "interactive", Default: "true"},
+						},
+					},
+				},
+			},
+		},
+		"no explicit kuberc, invalid default file returns nil with warning": {
+			defaultKubercFile: `invalid: yaml: content: [unclosed bracket`,
+			expectedWarning:   "no valid preferences found",
+		},
+		"no explicit kuberc, strict decoding error returns preference with warning": {
+			defaultKubercFile: `apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+unknownField: value`,
+			expectedWarning:     "strict decoding error: unknown field",
+			expectedPreferences: &config.Preference{},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			defaultRecommendedKubeRCFile := RecommendedKubeRCFile
+			defer func() {
+				RecommendedKubeRCFile = defaultRecommendedKubeRCFile
+			}()
+			RecommendedKubeRCFile = ""
+			if len(tc.defaultKubercFile) != 0 {
+				RecommendedKubeRCFile = filepath.Join(t.TempDir(), "kuberc")
+				require.NoError(t, os.WriteFile(RecommendedKubeRCFile, []byte(tc.defaultKubercFile), 0644))
+			}
+
+			kubercFlag := tc.kubercFlag
+			if len(tc.kubercFlagFile) != 0 {
+				kubercFlag = filepath.Join(t.TempDir(), "kuberc")
+				require.NoError(t, os.WriteFile(kubercFlag, []byte(tc.kubercFlagFile), 0644))
+			}
+
+			kubercEnv := tc.kubercEnv
+			if len(tc.kubercEnvFile) != 0 {
+				kubercEnv = filepath.Join(t.TempDir(), "kuberc")
+				require.NoError(t, os.WriteFile(kubercEnv, []byte(tc.kubercEnvFile), 0644))
+			}
+			t.Setenv("KUBERC", kubercEnv)
+
+			var errOut bytes.Buffer
+			actual, err := DefaultGetPreferences(kubercFlag, &errOut)
+
+			if len(tc.expectedError) != 0 {
+				require.ErrorContains(t, err, tc.expectedError, "wrong expected error")
+				return
+			}
+			require.NoError(t, err, "unexpected error")
+			if len(tc.expectedWarning) != 0 {
+				require.Contains(t, errOut.String(), tc.expectedWarning, "wrong expected warning")
+			} else {
+				require.Empty(t, errOut.String(), "unexpected warnings")
+			}
+			if !apiequality.Semantic.DeepEqual(tc.expectedPreferences, actual) {
+				t.Errorf("expected prefs:\n%#v\ngot:\n%#v\n\n", tc.expectedPreferences, actual)
+			}
+		})
+	}
 }

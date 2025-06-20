@@ -190,7 +190,7 @@ func newWatchCache(
 	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 		wc.snapshots = newStoreSnapshotter()
 	}
-	metrics.WatchCacheCapacity.WithLabelValues(groupResource.String()).Set(float64(wc.capacity))
+	metrics.WatchCacheCapacity.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.indexValidator = wc.isIndexValidLocked
 
@@ -272,7 +272,7 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
-	metrics.EventsReceivedCounter.WithLabelValues(w.groupResource.String()).Inc()
+	metrics.EventsReceivedCounter.WithLabelValues(w.groupResource.Group, w.groupResource.Resource).Inc()
 
 	key, err := w.keyFunc(event.Object)
 	if err != nil {
@@ -343,7 +343,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if w.eventHandler != nil {
 		w.eventHandler(wcEvent)
 	}
-	metrics.RecordResourceVersion(w.groupResource.String(), resourceVersion)
+	metrics.RecordResourceVersion(w.groupResource, resourceVersion)
 	return nil
 }
 
@@ -397,7 +397,7 @@ func (w *watchCache) doCacheResizeLocked(capacity int) {
 		newCache[i%capacity] = w.cache[i%w.capacity]
 	}
 	w.cache = newCache
-	metrics.RecordsWatchCacheCapacityChange(w.groupResource.String(), w.capacity, capacity)
+	metrics.RecordsWatchCacheCapacityChange(w.groupResource, w.capacity, capacity)
 	w.capacity = capacity
 }
 
@@ -426,7 +426,7 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 		}
 		w.eventHandler(wcEvent)
 	}
-	metrics.RecordResourceVersion(w.groupResource.String(), rv)
+	metrics.RecordResourceVersion(w.groupResource, rv)
 }
 
 // List returns list of pointers to <storeElement> objects.
@@ -441,7 +441,7 @@ func (w *watchCache) waitUntilFreshAndBlock(ctx context.Context, resourceVersion
 	startTime := w.clock.Now()
 	defer func() {
 		if resourceVersion > 0 {
-			metrics.WatchCacheReadWait.WithContext(ctx).WithLabelValues(w.groupResource.String()).Observe(w.clock.Since(startTime).Seconds())
+			metrics.WatchCacheReadWait.WithContext(ctx).WithLabelValues(w.groupResource.Group, w.groupResource.Resource).Observe(w.clock.Since(startTime).Seconds())
 		}
 	}()
 
@@ -708,7 +708,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	}
 	w.cond.Broadcast()
 
-	metrics.RecordResourceVersion(w.groupResource.String(), version)
+	metrics.RecordResourceVersion(w.groupResource, version)
 	klog.V(3).Infof("Replaced watchCache (rev: %v) ", resourceVersion)
 	return nil
 }

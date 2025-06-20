@@ -39,6 +39,7 @@ type NodeSystemInfoApplyConfiguration struct {
 func NodeSystemInfo() *NodeSystemInfoApplyConfiguration {
 	return &NodeSystemInfoApplyConfiguration{}
 }
+func (b NodeSystemInfoApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMachineID sets the MachineID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -30,6 +30,7 @@ type SuccessPolicyRuleApplyConfiguration struct {
 func SuccessPolicyRule() *SuccessPolicyRuleApplyConfiguration {
 	return &SuccessPolicyRuleApplyConfiguration{}
 }
+func (b SuccessPolicyRuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSucceededIndexes sets the SucceededIndexes field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

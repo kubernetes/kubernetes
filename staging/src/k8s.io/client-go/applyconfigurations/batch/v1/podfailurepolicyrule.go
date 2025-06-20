@@ -35,6 +35,7 @@ type PodFailurePolicyRuleApplyConfiguration struct {
 func PodFailurePolicyRule() *PodFailurePolicyRuleApplyConfiguration {
 	return &PodFailurePolicyRuleApplyConfiguration{}
 }
+func (b PodFailurePolicyRuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAction sets the Action field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

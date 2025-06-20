@@ -63,6 +63,11 @@ func NewReplicationManager(ctx context.Context, podInformer coreinformers.PodInf
 				Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replication-controller"}),
 			}},
 			eventBroadcaster,
+			replicaset.ReplicaSetControllerFeatures{
+				// ReplicationController API does not support the .status.terminatingReplicas field. However,
+				// ReplicaSets do support this field, which is then propagated to Deployments for higher-level features.
+				EnableStatusTerminatingReplicas: false,
+			},
 		),
 	}
 }

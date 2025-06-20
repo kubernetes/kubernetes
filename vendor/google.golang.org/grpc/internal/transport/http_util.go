@@ -439,8 +439,8 @@ func getWriteBufferPool(size int) *sync.Pool {
 	return pool
 }
 
-// parseDialTarget returns the network and address to pass to dialer.
-func parseDialTarget(target string) (string, string) {
+// ParseDialTarget returns the network and address to pass to dialer.
+func ParseDialTarget(target string) (string, string) {
 	net := "tcp"
 	m1 := strings.Index(target, ":")
 	m2 := strings.Index(target, ":/")

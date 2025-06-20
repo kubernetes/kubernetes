@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	"k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -174,8 +173,6 @@ type VolumePlugin interface {
 	ConstructVolumeSpec(volumeName, volumePath string) (ReconstructedVolume, error)
 
 	// SupportsMountOption returns true if volume plugins supports Mount options
-	// Specifying mount options in a volume plugin that doesn't support
-	// user specified mount options will result in error creating persistent volumes
 	SupportsMountOption() bool
 
 	// SupportsSELinuxContextMount returns true if volume plugins supports
@@ -388,7 +385,7 @@ type VolumeHost interface {
 	NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error)
 
 	// Get mounter interface.
-	GetMounter(pluginName string) mount.Interface
+	GetMounter() mount.Interface
 
 	// Returns the hostname of the host kubelet is running on
 	GetHostName() string
@@ -408,9 +405,6 @@ type VolumeHost interface {
 	GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 
 	DeleteServiceAccountTokenFunc() func(podUID types.UID)
-
-	// Returns an interface that should be used to execute any utilities in volume plugins
-	GetExec(pluginName string) exec.Interface
 
 	// Returns the labels on the node
 	GetNodeLabels() (map[string]string, error)

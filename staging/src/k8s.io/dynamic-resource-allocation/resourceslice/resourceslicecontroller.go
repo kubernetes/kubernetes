@@ -26,8 +26,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
-
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -37,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -51,10 +50,6 @@ import (
 )
 
 const (
-	// resyncPeriod for informer
-	// TODO (https://github.com/kubernetes/kubernetes/issues/123688): disable?
-	resyncPeriod = time.Duration(10 * time.Minute)
-
 	// poolNameIndex is the name for the ResourceSlice store's index function,
 	// which is to index by ResourceSlice.Spec.Pool.Name
 	poolNameIndex = "poolName"
@@ -433,7 +428,11 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			},
 		},
 		&resourceapi.ResourceSlice{},
-		resyncPeriod,
+		// No resync because all it would do is periodically trigger syncing pools
+		// again by reporting all slices as updated with the object as old/new.
+		// Our sync method is deterministic (or should be!), so repeating it
+		// won't change the outcome.
+		0,
 		indexers,
 	)
 	c.sliceStore = cache.NewIntegerResourceVersionMutationCache(logger, informer.GetStore(), informer.GetIndexer(), c.mutationCacheTTL, true /* includeAdds */)
@@ -456,7 +455,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				return
 			}
 			if loggerV := logger.V(6); loggerV.Enabled() {
-				loggerV.Info("ResourceSlice update", "slice", klog.KObj(newSlice), "diff", cmp.Diff(oldSlice, newSlice))
+				loggerV.Info("ResourceSlice update", "slice", klog.KObj(newSlice), "diff", diff.Diff(oldSlice, newSlice))
 			} else {
 				logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
 			}

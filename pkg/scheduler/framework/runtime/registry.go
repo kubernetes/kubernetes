@@ -31,11 +31,11 @@ import (
 type PluginFactory = func(ctx context.Context, configuration runtime.Object, f framework.Handle) (framework.Plugin, error)
 
 // PluginFactoryWithFts is a function that builds a plugin with certain feature gates.
-type PluginFactoryWithFts func(context.Context, runtime.Object, framework.Handle, plfeature.Features) (framework.Plugin, error)
+type PluginFactoryWithFts[T framework.Plugin] func(context.Context, runtime.Object, framework.Handle, plfeature.Features) (T, error)
 
 // FactoryAdapter can be used to inject feature gates for a plugin that needs
 // them when the caller expects the older PluginFactory method.
-func FactoryAdapter(fts plfeature.Features, withFts PluginFactoryWithFts) PluginFactory {
+func FactoryAdapter[T framework.Plugin](fts plfeature.Features, withFts PluginFactoryWithFts[T]) PluginFactory {
 	return func(ctx context.Context, plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 		return withFts(ctx, plArgs, fh, fts)
 	}

@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 )
@@ -34,7 +35,6 @@ func TestCalculateDigest(t *testing.T) {
 		cacherReady     bool
 		cacherItems     []example.Pod
 		etcdItems       []example.Pod
-		resourcePrefix  string
 
 		expectListKey string
 		expectDigest  storageDigest
@@ -178,7 +178,7 @@ func TestCalculateDigest(t *testing.T) {
 					},
 				},
 			}
-			checker := newConsistencyChecker(tc.resourcePrefix, newListFunc, cacher, etcd)
+			checker := newConsistencyChecker("", schema.GroupResource{}, newListFunc, cacher, etcd)
 			digest, err := checker.calculateDigests(context.Background())
 			if (err != nil) != tc.expectErr {
 				t.Fatalf("Expect error: %v, got: %v", tc.expectErr, err)

@@ -50,6 +50,7 @@ type PersistentVolumeSourceApplyConfiguration struct {
 func PersistentVolumeSource() *PersistentVolumeSourceApplyConfiguration {
 	return &PersistentVolumeSourceApplyConfiguration{}
 }
+func (b PersistentVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithGCEPersistentDisk sets the GCEPersistentDisk field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

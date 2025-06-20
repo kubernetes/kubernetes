@@ -24,16 +24,13 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/kubectl/pkg/config"
-	kuberc "k8s.io/kubectl/pkg/config/install"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/kubectl/pkg/config"
 )
 
 const RecommendedKubeRCFileName = "kuberc"
@@ -44,15 +41,7 @@ var (
 
 	aliasNameRegex = regexp.MustCompile("^[a-zA-Z]+$")
 	shortHandRegex = regexp.MustCompile("^-[a-zA-Z]+$")
-
-	scheme        = runtime.NewScheme()
-	strictCodecs  = serializer.NewCodecFactory(scheme, serializer.EnableStrict)
-	lenientCodecs = serializer.NewCodecFactory(scheme, serializer.DisableStrict)
 )
-
-func init() {
-	kuberc.Install(scheme)
-}
 
 // PreferencesHandler is responsible for setting default flags
 // arguments based on user's kuberc configuration.
@@ -80,13 +69,13 @@ func NewPreferences() PreferencesHandler {
 type aliasing struct {
 	appendArgs  []string
 	prependArgs []string
-	flags       []config.CommandOverrideFlag
+	flags       []config.CommandOptionDefault
 	command     *cobra.Command
 }
 
 // AddFlags adds kuberc related flags into the command.
 func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
-	flags.String("kuberc", "", "Path to the kuberc file to use for preferences. This can be disabled by exporting KUBECTL_KUBERC=false.")
+	flags.String("kuberc", "", "Path to the kuberc file to use for preferences. This can be disabled by exporting KUBECTL_KUBERC=false feature gate or turning off the feature KUBERC=off.")
 }
 
 // Apply firstly applies the aliases in the preferences file and secondly overrides
@@ -133,7 +122,7 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 		return nil
 	}
 
-	for _, c := range kuberc.Overrides {
+	for _, c := range kuberc.Defaults {
 		parsedCmds := strings.Fields(c.Command)
 		overrideCmd, _, err := rootCmd.Find(parsedCmds)
 		if err != nil {
@@ -158,7 +147,7 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 			}
 		})
 
-		for _, fl := range c.Flags {
+		for _, fl := range c.Options {
 			existingFlag := cmd.Flag(fl.Name)
 			if existingFlag == nil {
 				return fmt.Errorf("invalid flag %s for command %s", fl.Name, c.Command)
@@ -227,7 +216,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		aliasArgs = &aliasing{
 			prependArgs: alias.PrependArgs,
 			appendArgs:  alias.AppendArgs,
-			flags:       alias.Flags,
+			flags:       alias.Options,
 			command:     aliasCmd,
 		}
 		break
@@ -318,9 +307,9 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 
 	preference, err := decodePreference(kubeRCFile)
 	switch {
-	case explicitly && preference != nil && runtime.IsStrictDecodingError(err):
-		// if explicitly requested, just warn about strict decoding errors if we got a usable Preference object back
-		fmt.Fprintf(errOut, "kuberc: ignoring strict decoding error in %s: %v", kubeRCFile, err)
+	case preference != nil && runtime.IsStrictDecodingError(err):
+		// just warn about strict decoding errors if we got a usable Preference object back
+		fmt.Fprintf(errOut, "kuberc: ignoring strict decoding error in %s: %v", kubeRCFile, err) //nolint:errcheck
 		return preference, nil
 
 	case explicitly && err != nil:
@@ -333,7 +322,7 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 
 	case !explicitly && err != nil:
 		// if not explicitly requested, only warn on any other error
-		fmt.Fprintf(errOut, "kuberc: no preferences loaded from %s: %v", kubeRCFile, err)
+		fmt.Fprintf(errOut, "kuberc: no preferences loaded from %s: %v", kubeRCFile, err) //nolint:errcheck
 		return nil, nil
 
 	default:
@@ -424,7 +413,7 @@ func searchInArgs(flagName string, shorthand string, allShorthands map[string]st
 }
 
 func validate(plugin *config.Preference) error {
-	validateFlag := func(flags []config.CommandOverrideFlag) error {
+	validateFlag := func(flags []config.CommandOptionDefault) error {
 		for _, flag := range flags {
 			if strings.HasPrefix(flag.Name, "-") {
 				return fmt.Errorf("flag name %s should be in long form without dashes", flag.Name)
@@ -438,7 +427,7 @@ func validate(plugin *config.Preference) error {
 			return fmt.Errorf("invalid alias name, can only include alphabetical characters")
 		}
 
-		if err := validateFlag(alias.Flags); err != nil {
+		if err := validateFlag(alias.Options); err != nil {
 			return err
 		}
 
@@ -448,8 +437,8 @@ func validate(plugin *config.Preference) error {
 		aliases[alias.Name] = struct{}{}
 	}
 
-	for _, override := range plugin.Overrides {
-		if err := validateFlag(override.Flags); err != nil {
+	for _, override := range plugin.Defaults {
+		if err := validateFlag(override.Options); err != nil {
 			return err
 		}
 	}

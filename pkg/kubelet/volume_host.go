@@ -215,7 +215,7 @@ func (kvh *kubeletVolumeHost) NewWrapperUnmounter(volName string, spec volume.Sp
 	return plugin.NewUnmounter(spec.Name(), podUID)
 }
 
-func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
+func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
 	return kvh.kubelet.mounter
 }
 
@@ -301,8 +301,4 @@ func (kvh *kubeletVolumeHost) GetNodeName() types.NodeName {
 
 func (kvh *kubeletVolumeHost) GetEventRecorder() record.EventRecorder {
 	return kvh.kubelet.recorder
-}
-
-func (kvh *kubeletVolumeHost) GetExec(pluginName string) utilexec.Interface {
-	return kvh.exec
 }

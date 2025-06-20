@@ -2726,3 +2726,214 @@ func TestNodeResourcesFilter(t *testing.T) {
 		})
 	}
 }
+
+func TestNodeAffinityFilter(t *testing.T) {
+	pause := imageutils.GetPauseImageName()
+	tests := []struct {
+		name         string
+		nodes        []*v1.Node
+		incomingPod  *v1.Pod
+		expectedNode string
+	}{
+		{
+			name: "Pod fits when node matches label using In operator",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-ssd").Label("disktype", "ssd").Obj(),
+				st.MakeNode().Name("node-hdd").Label("disktype", "hdd").Obj(),
+			},
+			incomingPod: st.MakePod().Name("affinity-fitting-pod").
+				NodeAffinity(&v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "disktype",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"ssd"},
+									},
+								},
+							},
+						},
+					},
+				}).Container(pause).
+				Obj(),
+			expectedNode: "node-ssd",
+		},
+		{
+			name: "Pod not fit when node not match label using In operator",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-ssd").Label("disktype", "ssd").Obj(),
+			},
+			incomingPod: st.MakePod().Name("affinity-non-fitting-pod").
+				NodeAffinity(&v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "disktype",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"hdd"},
+									},
+								},
+							},
+						},
+					},
+				}).
+				Container(pause).
+				Obj(),
+			expectedNode: "",
+		},
+		{
+			name: "Pod not fit when node matches label using NotIn operator",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-hdd-1").Label("disktype", "hdd").Obj(),
+				st.MakeNode().Name("node-hdd-2").Label("disktype", "hdd").Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-avoid-hdd").
+				NodeAffinity(&v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "disktype",
+										Operator: v1.NodeSelectorOpNotIn,
+										Values:   []string{"hdd"},
+									},
+								},
+							},
+						},
+					},
+				}).Container(pause).
+				Obj(),
+			expectedNode: "",
+		},
+		{
+			name: "Pod fits when node matches label using Exists operator",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-with-disktype").Label("disktype", "ssd").Obj(),
+				st.MakeNode().Name("node-without-disktype").Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-requires-any-disktype").
+				NodeAffinity(&v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "disktype",
+										Operator: v1.NodeSelectorOpExists,
+									},
+								},
+							},
+						},
+					},
+				}).Container(pause).
+				Obj(),
+			expectedNode: "node-with-disktype",
+		},
+		{
+			name: "Pod not fit when node matches label using DoesNotExist operator",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-with-disktype-1").Label("disktype", "ssd").Obj(),
+				st.MakeNode().Name("node-with-disktype-2").Label("disktype", "ssd").Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-avoids-disktype").
+				NodeAffinity(&v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "disktype",
+										Operator: v1.NodeSelectorOpDoesNotExist,
+									},
+								},
+							},
+						},
+					},
+				}).Container(pause).
+				Obj(),
+			expectedNode: "",
+		},
+		{
+			name: "Pod fits both label and metadata.name using MatchExpressions and MatchFields",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("affinity-matching-node-1").Label("disktype", "ssd").Obj(),
+				st.MakeNode().Name("affinity-matching-node-2").Obj(),
+			},
+			incomingPod: st.MakePod().Name("affinity-fitting-pod").
+				NodeAffinity(&v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchExpressions: []v1.NodeSelectorRequirement{
+									{
+										Key:      "disktype",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"ssd"},
+									},
+								},
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      "metadata.name",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"affinity-matching-node-1"},
+									},
+								},
+							},
+						},
+					},
+				}).Container(pause).
+				Obj(),
+			expectedNode: "affinity-matching-node-1",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := initTest(t, "nodeaffinity-filter")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			// Create node.
+			for _, node := range tt.nodes {
+				if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create node: %v", err)
+				}
+			}
+
+			// Set namespace for pods and create them.
+			tt.incomingPod.SetNamespace(ns)
+			defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{tt.incomingPod})
+
+			// Attempt to schedule the incoming pod.
+			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(testCtx.Ctx, tt.incomingPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create pod during test: %v", err)
+			}
+
+			if tt.expectedNode != "" {
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podScheduled(cs, testPod.Namespace, testPod.Name))
+				if err != nil {
+					t.Errorf("Test Failed: Expected pod %s/%s to be scheduled but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+				pod, err := cs.CoreV1().Pods(testPod.Namespace).Get(testCtx.Ctx, testPod.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("Failed to get pod after scheduling: %v", err)
+				}
+				if pod.Spec.NodeName != tt.expectedNode {
+					t.Errorf("Expected pod to be scheduled to %q, but was scheduled to %q", tt.expectedNode, pod.Spec.NodeName)
+				}
+			} else {
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				if err != nil {
+					t.Errorf("Test Failed: Expected pod %s/%s to be unschedulable but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+			}
+		})
+	}
+}

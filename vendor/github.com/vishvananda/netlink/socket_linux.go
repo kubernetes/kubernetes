@@ -500,7 +500,7 @@ func (h *Handle) UnixSocketDiagInfo() ([]*UnixDiagInfoResp, error) {
 
 		var attrs []syscall.NetlinkRouteAttr
 		var err error
-		if attrs, err = nl.ParseRouteAttr(msg[sizeofSocket:]); err != nil {
+		if attrs, err = nl.ParseRouteAttr(msg[sizeofUnixSocket:]); err != nil {
 			return false
 		}
 

@@ -61,6 +61,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
+	testdrivergomega "k8s.io/kubernetes/test/e2e/dra/test-driver/gomega"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
@@ -431,6 +432,21 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 				klog.Background().Info("deleting CDI file", "node", nodename, "filename", name)
 				return d.removeFile(&pod, name)
 			},
+			ErrorHandler: func(ctx context.Context, err error, msg string) {
+				// Record a failure, but don't kill the background goroutine.
+				defer ginkgo.GinkgoRecover()
+				// During tests when canceling the context it is possible to get all kinds of
+				// follow-up errors for that, like:
+				//   processing ResourceSlice objects: retrieve node "127.0.0.1": client rate limiter Wait returned an error: context canceled
+				//
+				// The "context canceled" error was not wrapped, so `errors.Is` doesn't work.
+				// Instead of trying to detect errors which can be ignored, let's only
+				// treat errors as failures which definitely shouldn't occur:
+				var droppedFields *resourceslice.DroppedFieldsError
+				if errors.As(err, &droppedFields) {
+					framework.Failf("driver %s: %v", d.Name, err)
+				}
+			},
 		}
 
 		if dr, ok := driverResources[nodename]; ok {
@@ -491,7 +507,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 		notRegistered := make(map[string][]app.GRPCCall)
 		for nodename, plugin := range d.Nodes {
 			calls := plugin.GetGRPCCalls()
-			if contains, err := app.BeRegistered.Match(calls); err != nil || !contains {
+			if contains, err := testdrivergomega.BeRegistered.Match(calls); err != nil || !contains {
 				notRegistered[nodename] = calls
 			}
 		}

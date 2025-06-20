@@ -17,7 +17,6 @@ limitations under the License.
 package nodeports
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -142,6 +142,34 @@ func TestNodePorts(t *testing.T) {
 			name:             "UDP hostPort conflict due to 0.0.0.0 hostIP",
 			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
 		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).Obj(),
+			nodeInfo: framework.NewNodeInfo(
+				newPod("m1", "TCP/0.0.0.0/8001")),
+			name:                "non-sidecar initContainer using hostPort",
+			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).Obj(),
+			nodeInfo: framework.NewNodeInfo(
+				newPod("m1", "TCP/0.0.0.0/8001")),
+			name:             "TCP hostPort conflict from sidecar initContainer",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+		},
 	}
 
 	for _, test := range tests {
@@ -182,123 +210,9 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(framework.ErrNotFound)
+	wantStatus := framework.AsStatus(fwk.ErrNotFound)
 	if diff := cmp.Diff(wantStatus, gotStatus); diff != "" {
 		t.Errorf("status does not match (-want,+got):\n%s", diff)
-	}
-}
-
-func TestGetContainerPorts(t *testing.T) {
-	tests := []struct {
-		pod1     *v1.Pod
-		pod2     *v1.Pod
-		expected []*v1.ContainerPort
-	}{
-		{
-			pod1: st.MakePod().ContainerPort([]v1.ContainerPort{
-				{
-					ContainerPort: 8001,
-					HostPort:      8001,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8002,
-					HostPort:      8002,
-					Protocol:      v1.ProtocolTCP,
-				}}).ContainerPort([]v1.ContainerPort{
-				{
-					ContainerPort: 8003,
-					HostPort:      8003,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8004,
-					HostPort:      8004,
-					Protocol:      v1.ProtocolTCP,
-				}}).ContainerPort([]v1.ContainerPort{
-				{
-					ContainerPort: 8005,
-					Protocol:      v1.ProtocolTCP,
-				},
-			}).Obj(),
-			pod2: st.MakePod().ContainerPort([]v1.ContainerPort{
-				{
-					ContainerPort: 8011,
-					HostPort:      8011,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8012,
-					HostPort:      8012,
-					Protocol:      v1.ProtocolTCP,
-				}}).ContainerPort([]v1.ContainerPort{
-				{
-					ContainerPort: 8013,
-					HostPort:      8013,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8014,
-					HostPort:      8014,
-					Protocol:      v1.ProtocolTCP,
-				}}).ContainerPort([]v1.ContainerPort{
-				{
-					ContainerPort: 8015,
-					Protocol:      v1.ProtocolTCP,
-				},
-			}).Obj(),
-			expected: []*v1.ContainerPort{
-				{
-					ContainerPort: 8001,
-					HostPort:      8001,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8002,
-					HostPort:      8002,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8003,
-					HostPort:      8003,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8004,
-					HostPort:      8004,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8011,
-					HostPort:      8011,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8012,
-					HostPort:      8012,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8013,
-					HostPort:      8013,
-					Protocol:      v1.ProtocolTCP,
-				},
-				{
-					ContainerPort: 8014,
-					HostPort:      8014,
-					Protocol:      v1.ProtocolTCP,
-				},
-			},
-		},
-	}
-
-	for i, test := range tests {
-		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			result := getContainerPorts(test.pod1, test.pod2)
-			if diff := cmp.Diff(test.expected, result); diff != "" {
-				t.Errorf("container ports: container ports does not match (-want,+got): %s", diff)
-			}
-		})
 	}
 }
 

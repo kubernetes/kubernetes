@@ -35,8 +35,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
@@ -47,6 +45,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 const (
@@ -574,8 +573,11 @@ func rsaKeySizeFromAlgorithmType(keyType kubeadmapi.EncryptionAlgorithmType) int
 
 // GeneratePrivateKey is the default function for generating private keys.
 func GeneratePrivateKey(keyType kubeadmapi.EncryptionAlgorithmType) (crypto.Signer, error) {
-	if keyType == kubeadmapi.EncryptionAlgorithmECDSAP256 {
+	switch keyType {
+	case kubeadmapi.EncryptionAlgorithmECDSAP256:
 		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	case kubeadmapi.EncryptionAlgorithmECDSAP384:
+		return ecdsa.GenerateKey(elliptic.P384(), cryptorand.Reader)
 	}
 
 	rsaKeySize := rsaKeySizeFromAlgorithmType(keyType)

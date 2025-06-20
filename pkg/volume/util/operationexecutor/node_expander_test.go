@@ -60,10 +60,14 @@ func TestNodeExpander(t *testing.T) {
 		actualSize *resource.Quantity
 
 		// expectations of test
-		expectedResizeStatus     v1.ClaimResourceStatus
-		expectedStatusSize       resource.Quantity
-		expectResizeCall         bool
-		expectFinalErrors        bool
+		expectedResizeStatus v1.ClaimResourceStatus
+		expectedStatusSize   resource.Quantity
+		// whether resize call was made to the plugin
+		expectResizeCall    bool
+		expectFinalErrors   bool
+		expectedReturnValue bool
+
+		// whether resize operation was assumed as finished
 		assumeResizeOpAsFinished bool
 		expectError              bool
 	}{
@@ -75,6 +79,7 @@ func TestNodeExpander(t *testing.T) {
 
 			expectedResizeStatus:     nodeResizeFailed,
 			expectResizeCall:         false,
+			expectedReturnValue:      false,
 			assumeResizeOpAsFinished: true,
 			expectFinalErrors:        false,
 			expectedStatusSize:       resource.MustParse("1G"),
@@ -87,6 +92,7 @@ func TestNodeExpander(t *testing.T) {
 
 			expectedResizeStatus:     "",
 			expectResizeCall:         true,
+			expectedReturnValue:      true,
 			assumeResizeOpAsFinished: true,
 			expectFinalErrors:        false,
 			expectedStatusSize:       resource.MustParse("2G"),
@@ -100,6 +106,7 @@ func TestNodeExpander(t *testing.T) {
 			expectedResizeStatus:          nodeResizeFailed,
 			expectResizeCall:              true,
 			assumeResizeOpAsFinished:      true,
+			expectedReturnValue:           false,
 			expectFinalErrors:             true,
 			expectedStatusSize:            resource.MustParse("1G"),
 		},
@@ -111,6 +118,7 @@ func TestNodeExpander(t *testing.T) {
 			expectError:                   true,
 			expectedResizeStatus:          v1.PersistentVolumeClaimNodeResizeInProgress,
 			expectResizeCall:              true,
+			expectedReturnValue:           false,
 			assumeResizeOpAsFinished:      true,
 			expectFinalErrors:             true,
 			expectedStatusSize:            resource.MustParse("1G"),
@@ -124,6 +132,7 @@ func TestNodeExpander(t *testing.T) {
 			expectedResizeStatus:     "",
 			expectResizeCall:         false,
 			assumeResizeOpAsFinished: true,
+			expectedReturnValue:      true,
 			expectFinalErrors:        false,
 			expectedStatusSize:       resource.MustParse("2G"),
 		},
@@ -136,6 +145,7 @@ func TestNodeExpander(t *testing.T) {
 			expectedResizeStatus:     "",
 			expectResizeCall:         true,
 			assumeResizeOpAsFinished: true,
+			expectedReturnValue:      true,
 			expectFinalErrors:        false,
 			expectedStatusSize:       resource.MustParse("2G"),
 		},
@@ -148,8 +158,22 @@ func TestNodeExpander(t *testing.T) {
 			expectedResizeStatus:          "",
 			expectResizeCall:              false,
 			assumeResizeOpAsFinished:      true,
+			expectedReturnValue:           true,
 			expectFinalErrors:             false,
 			expectedStatusSize:            resource.MustParse("2G"),
+		},
+		{
+			name:                          "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize, node-expansion-not-required",
+			pvc:                           addAnnotation(addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany), volumetypes.NodeExpansionNotRequired, "true"),
+			pv:                            getTestPV("test-vol0", "2G"),
+			recoverVolumeExpansionFailure: true,
+
+			expectedResizeStatus:     "",
+			expectedReturnValue:      true,
+			expectResizeCall:         false,
+			assumeResizeOpAsFinished: true,
+			expectFinalErrors:        false,
+			expectedStatusSize:       resource.MustParse("2G"),
 		},
 		{
 			name:                          "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, featuregate=disabled",
@@ -160,6 +184,7 @@ func TestNodeExpander(t *testing.T) {
 			expectedResizeStatus:     "",
 			expectResizeCall:         true,
 			assumeResizeOpAsFinished: true,
+			expectedReturnValue:      true,
 			expectFinalErrors:        false,
 			expectedStatusSize:       resource.MustParse("2G"),
 		},
@@ -205,7 +230,7 @@ func TestNodeExpander(t *testing.T) {
 			ogInstance, _ := og.(*operationGenerator)
 			nodeExpander := newNodeExpander(resizeOp, ogInstance.kubeClient, ogInstance.recorder)
 
-			_, _, err := nodeExpander.expandOnPlugin()
+			returnValue, _, err := nodeExpander.expandOnPlugin()
 			expansionResponse := nodeExpander.testStatus
 
 			pvc = nodeExpander.pvc
@@ -216,6 +241,10 @@ func TestNodeExpander(t *testing.T) {
 			}
 			if test.expectError && err == nil {
 				t.Errorf("For test %s, expected error but got none", test.name)
+			}
+
+			if test.expectedReturnValue != returnValue {
+				t.Errorf("For test %s, expected return value %t, got %t", test.name, test.expectedReturnValue, returnValue)
 			}
 
 			if test.expectResizeCall != expansionResponse.resizeCalledOnPlugin {

@@ -25,11 +25,8 @@ run_kuberc_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing kuberc"
 
-  # Enable KUBERC feature
-  export KUBECTL_KUBERC=true
-
   cat > "${TMPDIR:-/tmp}"/kuberc_file << EOF
-apiVersion: kubectl.config.k8s.io/v1alpha1
+apiVersion: kubectl.config.k8s.io/v1beta1
 kind: Preference
 aliases:
 - name: crns
@@ -40,22 +37,22 @@ aliases:
   command: get
   prependArgs:
    - namespace
-  flags:
+  options:
    - name: output
      default: wide
 - name: crole
   command: create role
-  flags:
+  options:
   - name: verb
     default: get,watch
 - name: getrole
   command: get
-  flags:
+  options:
   - name: output
     default: json
 - name: runx
   command: run
-  flags:
+  options:
   - name: image
     default: nginx
   - name: labels
@@ -74,9 +71,9 @@ aliases:
   appendArgs:
   - pod/test-pod-2
   - test-pod-2=busybox
-overrides:
+defaults:
 - command: apply
-  flags:
+  options:
   - name: server-side
     default: "true"
   - name: dry-run
@@ -84,11 +81,11 @@ overrides:
   - name: validate
     default: "strict"
 - command: delete
-  flags:
+  options:
   - name: interactive
     default: "true"
 - command: get
-  flags:
+  options:
   - name: namespace
     default: "test-kuberc-ns"
   - name: output
@@ -153,13 +150,24 @@ EOF
   output_message=$(kubectl get pod/test-pod-2 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
   kube::test::if_has_string "${output_message}" "test-pod-2"
 
+  # verify getn alias is working or not, depending if KUBECTL_KUBERC is on or off
+  output_message=$(! KUBECTL_KUBERC=false kubectl getn 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
+  kube::test::if_has_string "${output_message}" "error: unknown command \"getn\" for \"kubectl\""
+  KUBECTL_KUBERC=true kubectl getn "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/kuberc_file
+
+  # verify KUBERC=off is working as expected
+  output_message=$(! KUBERC=off kubectl getn 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
+  kube::test::if_has_string "${output_message}" "KUBERC=off and passing kuberc flag are mutually exclusive"
+  output_message=$(! KUBERC=off kubectl getn 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" "error: unknown command \"getn\" for \"kubectl\""
+
   cat > "${TMPDIR:-/tmp}"/kuberc_file_multi << EOF
 ---
-apiVersion: kubectl.config.k8s.io/v1alpha1
+apiVersion: kubectl.config.k8s.io/v1beta1
 kind: Preference
-overrides:
+defaults:
 - command: get
-  flags:
+  options:
   - name: namespace
     default: "test-kuberc-ns"
   - name: output
@@ -200,8 +208,6 @@ EOF
   # assure that explicit value supersedes
   output_message=$(kubectl delete namespace/test-kuberc-ns --interactive=false --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
   kube::test::if_has_string "${output_message}" 'namespace "test-kuberc-ns" deleted'
-
-  unset KUBECTL_KUBERC
 
   set +o nounset
   set +o errexit
