@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func seccompLocalhostRef(profileName string) string {
@@ -34,7 +35,8 @@ func seccompLocalhostRef(profileName string) string {
 }
 
 func TestGetSeccompProfile(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	unconfinedProfile := &runtimeapi.SecurityProfile{
@@ -134,7 +136,8 @@ func TestGetSeccompProfile(t *testing.T) {
 }
 
 func TestGetSeccompProfileDefaultSeccomp(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	require.NoError(t, err)
 
 	unconfinedProfile := &runtimeapi.SecurityProfile{
