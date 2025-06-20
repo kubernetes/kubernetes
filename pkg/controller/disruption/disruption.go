@@ -872,7 +872,6 @@ func (dc *DisruptionController) getExpectedScale(ctx context.Context, pdb *polic
 	// With ControllerRef, a pod can only have 1 controller.
 	for _, pod := range pods {
 
-
 		controllerRef := metav1.GetControllerOf(pod)
 		if controllerRef == nil {
 			unmanagedPods = append(unmanagedPods, pod.Name)
