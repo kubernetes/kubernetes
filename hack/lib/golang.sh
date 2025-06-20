@@ -529,8 +529,10 @@ kube::golang::internal::verify_go_version() {
     export GOTOOLCHAIN='local'
     if [[ ! -f "${KUBE_ROOT}/.gimme/envs/gomaster.env" && ! -f "${HOME}/.gimme/envs/gomaster.env" ]]; then
       # gimme tries to write to $HOME directory, in CI environments this may not be writable.
-      # shellcheck disable=SC2155
-      [ -w "${HOME:?Variable HOME is not set}" ] || export HOME="$(mktemp -d)"
+      if [ ! -w "${HOME:?Variable HOME is not set}" ]; then
+        tmp_home="$(mktemp -d)"
+        export HOME="${tmp_home}"
+      fi
       GOROOT_BOOTSTRAP="${GOROOT_BOOTSTRAP:-/usr/local/go}" "${KUBE_ROOT}/third_party/gimme/gimme" "master" >/dev/null 2>&1
     fi
 
