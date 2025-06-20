@@ -92,6 +92,10 @@ type Options struct {
 	SystemNamespaces []string
 
 	ServiceAccountSigningEndpoint string
+
+	LeaseDuration time.Duration
+	RenewDeadline time.Duration
+	RetryPeriod   time.Duration
 }
 
 // completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
@@ -125,6 +129,9 @@ func NewOptions() *Options {
 		EventTTL:                            1 * time.Hour,
 		AggregatorRejectForwardingRedirects: true,
 		SystemNamespaces:                    []string{metav1.NamespaceSystem, metav1.NamespacePublic, metav1.NamespaceDefault},
+		LeaseDuration:                       15 * time.Second,
+		RenewDeadline:                       10 * time.Second,
+		RetryPeriod:                         2 * time.Second,
 	}
 
 	// Overwrite the default for storage data format.
@@ -202,6 +209,13 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningEndpoint, "service-account-signing-endpoint", s.ServiceAccountSigningEndpoint, ""+
 		"Path to socket where a external JWT signer is listening. This flag is mutually exclusive with --service-account-signing-key-file and --service-account-key-file. Requires enabling feature gate (ExternalServiceAccountTokenSigner)")
+
+	fs.DurationVar(&s.LeaseDuration, "cle-lease-duration", s.LeaseDuration,
+		"The duration of the lease used for Coordinated Leader Election.")
+	fs.DurationVar(&s.RenewDeadline, "cle-renew-deadline", s.RenewDeadline,
+		"The deadline for renewing a coordinated leader election lease.")
+	fs.DurationVar(&s.RetryPeriod, "cle-retry-period", s.RetryPeriod,
+		"The period for retrying to renew a coordinated leader election lease.")
 }
 
 func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {
