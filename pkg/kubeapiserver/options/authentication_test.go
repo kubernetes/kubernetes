@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	goruntime "runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -1044,7 +1045,7 @@ jwt:
 			args: []string{
 				"--authentication-config=nonexistent-file",
 			},
-			expectErr:    `failed to load authentication configuration from file "nonexistent-file": open nonexistent-file: no such file or directory`,
+			expectErr:    fmt.Sprintf(`failed to load authentication configuration from file "nonexistent-file": open nonexistent-file: %s`, getFileNotFoundForOS()),
 			expectConfig: kubeauthenticator.Config{},
 		},
 		{
@@ -1792,4 +1793,15 @@ func (d *dummyPublicKeyGetter) GetCacheAgeMaxSeconds() int {
 
 func (d *dummyPublicKeyGetter) GetPublicKeys(ctx context.Context, keyIDHint string) []serviceaccount.PublicKey {
 	return []serviceaccount.PublicKey{}
+}
+
+// getFileNotFoundForOS returns the expected error message for a file not found error on the current OS
+// - on Windows, the error message is "The system cannot find the file specified"
+// - on other, the error message is "no such file or directory"
+func getFileNotFoundForOS() string {
+	if goruntime.GOOS == "windows" {
+		return "The system cannot find the file specified"
+	} else {
+		return "no such file or directory"
+	}
 }
