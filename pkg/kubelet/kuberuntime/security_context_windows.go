@@ -20,12 +20,14 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"fmt"
+	"strings"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"strings"
 )
 
 var (
@@ -39,22 +41,23 @@ var (
 // and then optimize this logic according to the best time.
 // https://docs.google.com/document/d/1Tjxzjjuy4SQsFSUVXZbvqVb64hjNAG5CQX8bK7Yda9w
 // note: usernames on Windows are NOT case sensitive!
-func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, username string) error {
+func verifyRunAsNonRoot(ctx context.Context, pod *v1.Pod, container *v1.Container, uid *int64, username string) error {
+	logger := klog.FromContext(ctx)
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	// If the option is not set, or if running as root is allowed, return nil.
 	if effectiveSc == nil || effectiveSc.RunAsNonRoot == nil || !*effectiveSc.RunAsNonRoot {
 		return nil
 	}
 	if effectiveSc.RunAsUser != nil {
-		klog.InfoS("Windows container does not support SecurityContext.RunAsUser, please use SecurityContext.WindowsOptions",
+		logger.Info("Windows container does not support SecurityContext.RunAsUser, please use SecurityContext.WindowsOptions",
 			"pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	if effectiveSc.SELinuxOptions != nil {
-		klog.InfoS("Windows container does not support SecurityContext.SELinuxOptions, please use SecurityContext.WindowsOptions",
+		logger.Info("Windows container does not support SecurityContext.SELinuxOptions, please use SecurityContext.WindowsOptions",
 			"pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	if effectiveSc.RunAsGroup != nil {
-		klog.InfoS("Windows container does not support SecurityContext.RunAsGroup", "pod", klog.KObj(pod), "containerName", container.Name)
+		logger.Info("Windows container does not support SecurityContext.RunAsGroup", "pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	// Verify that if runAsUserName is set for the pod and/or container that it is not set to 'ContainerAdministrator'
 	if effectiveSc.WindowsOptions != nil {
