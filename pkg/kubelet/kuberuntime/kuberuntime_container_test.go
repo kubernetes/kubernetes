@@ -141,6 +141,7 @@ func TestKillContainer(t *testing.T) {
 // the internal type (i.e., toKubeContainerStatus()) for containers in
 // different states.
 func TestToKubeContainerStatus(t *testing.T) {
+	ctx := context.Background()
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
@@ -229,7 +230,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 			},
 		},
 	} {
-		actual := toKubeContainerStatus(test.input, cid.Type)
+		actual := toKubeContainerStatus(ctx, test.input, cid.Type)
 		assert.Equal(t, test.expected, actual, desc)
 	}
 }
@@ -238,6 +239,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 // the internal type (i.e., toKubeContainerStatus()) for containers that returns Resources.
 func TestToKubeContainerStatusWithResources(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	ctx := context.Background()
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
@@ -363,7 +365,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 				// TODO: remove skip once the failing test has been fixed.
 				t.Skip("Skip failing test on Windows.")
 			}
-			actual := toKubeContainerStatus(test.input, cid.Type)
+			actual := toKubeContainerStatus(ctx, test.input, cid.Type)
 			assert.Equal(t, test.expected, actual, desc)
 		})
 	}
@@ -374,6 +376,7 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 		t.Skip("Updating Pod Container User is not supported on Windows.")
 	}
 
+	ctx := context.Background()
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
@@ -447,7 +450,7 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 				StartedAt: startedAt,
 				User:      test.input,
 			}
-			actual := toKubeContainerStatus(cStatus, cid.Type)
+			actual := toKubeContainerStatus(ctx, cStatus, cid.Type)
 			assert.EqualValues(t, test.expected, actual.User, desc)
 		})
 	}
@@ -553,7 +556,7 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 		ctx := context.Background()
 		// Fake all the things you need before trying to create a container
 		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
-		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(testPod, 0)
+		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(ctx, testPod, 0)
 		testContainer.Lifecycle = cmdPostStart
 		fakePodStatus := &kubecontainer.PodStatus{
 			ContainerStatuses: []*kubecontainer.Status{
@@ -963,7 +966,7 @@ func TestUpdateContainerResources(t *testing.T) {
 	assert.NoError(t, err)
 	containerID := cStatus[0].ID
 
-	err = m.updateContainerResources(pod, &pod.Spec.Containers[0], containerID)
+	err = m.updateContainerResources(ctx, pod, &pod.Spec.Containers[0], containerID)
 	assert.NoError(t, err)
 
 	// Verify container is updated

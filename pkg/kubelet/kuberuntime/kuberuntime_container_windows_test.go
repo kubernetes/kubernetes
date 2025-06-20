@@ -20,6 +20,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,6 +34,7 @@ import (
 )
 
 func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
+	ctx := context.Background()
 	_, _, fakeRuntimeSvc, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -81,7 +83,7 @@ func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
 		},
 	}
 
-	err = fakeRuntimeSvc.applyPlatformSpecificContainerConfig(containerConfig, &pod.Spec.Containers[0], pod, new(int64), "foo", nil)
+	err = fakeRuntimeSvc.applyPlatformSpecificContainerConfig(ctx, containerConfig, &pod.Spec.Containers[0], pod, new(int64), "foo", nil)
 	require.NoError(t, err)
 
 	limit := int64(3000)
@@ -154,6 +156,7 @@ func TestCalculateWindowsResources(t *testing.T) {
 	// TODO: remove skip once the failing test has been fixed.
 	t.Skip("Skip failing test on Windows.")
 
+	ctx := context.Background()
 	_, _, fakeRuntimeSvc, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -192,7 +195,7 @@ func TestCalculateWindowsResources(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		windowsContainerResources := fakeRuntimeSvc.calculateWindowsResources(&test.cpuLim, &test.memLim)
+		windowsContainerResources := fakeRuntimeSvc.calculateWindowsResources(ctx, &test.cpuLim, &test.memLim)
 		assert.Equal(t, test.expected, windowsContainerResources)
 	}
 }

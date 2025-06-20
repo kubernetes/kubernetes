@@ -59,7 +59,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 	restartCountUint32 := uint32(restartCount)
 	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
 
-	l, _ := m.generateLinuxContainerConfig(container, pod, new(int64), "", nil, enforceMemoryQoS)
+	l, _ := m.generateLinuxContainerConfig(ctx, container, pod, new(int64), "", nil, enforceMemoryQoS)
 
 	expectedConfig := &runtimeapi.ContainerConfig{
 		Metadata: &runtimeapi.ContainerMetadata{
@@ -71,7 +71,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 		Args:        []string(nil),
 		WorkingDir:  container.WorkingDir,
 		Labels:      newContainerLabels(container, pod),
-		Annotations: newContainerAnnotations(container, pod, restartCount, opts),
+		Annotations: newContainerAnnotations(ctx, container, pod, restartCount, opts),
 		Devices:     makeDevices(opts),
 		Mounts:      m.makeMounts(opts, container),
 		LogPath:     containerLogsPath,
@@ -167,6 +167,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerConfigResources(t *testing.T) {
+	ctx := context.Background()
 	_, _, m, err := createTestRuntimeManager()
 	m.cpuCFSQuota = true
 
@@ -261,7 +262,7 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			pod.Spec.Resources = test.podResources
 		}
 
-		linuxConfig, err := m.generateLinuxContainerConfig(&pod.Spec.Containers[0], pod, new(int64), "", nil, false)
+		linuxConfig, err := m.generateLinuxContainerConfig(ctx, &pod.Spec.Containers[0], pod, new(int64), "", nil, false)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expected.CpuPeriod, linuxConfig.GetResources().CpuPeriod, test.name)
 		assert.Equal(t, test.expected.CpuQuota, linuxConfig.GetResources().CpuQuota, test.name)
@@ -489,8 +490,9 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		memoryLow       int64
 		memoryHigh      int64
 	}
-	l1, _ := m.generateLinuxContainerConfig(&pod1.Spec.Containers[0], pod1, new(int64), "", nil, true)
-	l2, _ := m.generateLinuxContainerConfig(&pod2.Spec.Containers[0], pod2, new(int64), "", nil, true)
+	ctx := context.Background()
+	l1, _ := m.generateLinuxContainerConfig(ctx, &pod1.Spec.Containers[0], pod1, new(int64), "", nil, true)
+	l2, _ := m.generateLinuxContainerConfig(ctx, &pod2.Spec.Containers[0], pod2, new(int64), "", nil, true)
 	tests := []struct {
 		name     string
 		pod      *v1.Pod
@@ -517,7 +519,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		linuxConfig, err := m.generateLinuxContainerConfig(&test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
+		linuxConfig, err := m.generateLinuxContainerConfig(ctx, &test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expected.containerConfig, linuxConfig, test.name)
 		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.min"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
@@ -526,6 +528,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 }
 
 func TestGetHugepageLimitsFromResources(t *testing.T) {
+	ctx := context.Background()
 	var baseHugepage []*runtimeapi.HugepageLimit
 
 	// For each page size, limit to 0.
@@ -671,7 +674,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 			}
 		}
 
-		results := GetHugepageLimitsFromResources(test.resources)
+		results := GetHugepageLimitsFromResources(ctx, test.resources)
 		if !reflect.DeepEqual(expectedHugepages, results) {
 			t.Errorf("%s test failed. Expected %v but got %v", test.name, expectedHugepages, results)
 		}
@@ -683,6 +686,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
+	ctx := context.Background()
 	_, _, m, err := createTestRuntimeManager()
 	if err != nil {
 		t.Fatalf("error creating test RuntimeManager: %v", err)
@@ -740,7 +744,7 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target, false)
+			got, err := m.generateLinuxContainerConfig(ctx, &tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target, false)
 			assert.NoError(t, err)
 			if diff := cmp.Diff(tc.want, got.SecurityContext.NamespaceOptions); diff != "" {
 				t.Errorf("%v: diff (-want +got):\n%v", t.Name(), diff)
@@ -756,6 +760,7 @@ var (
 )
 
 func TestGenerateLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
+	ctx := context.Background()
 	_, _, m, err := createTestRuntimeManager()
 	if err != nil {
 		t.Fatalf("error creating test RuntimeManager: %v", err)
@@ -822,7 +827,7 @@ func TestGenerateLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 	},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", nil, false)
+			actual, err := m.generateLinuxContainerConfig(ctx, &tc.pod.Spec.Containers[0], tc.pod, nil, "", nil, false)
 			if !tc.expectErr {
 				assert.Emptyf(t, err, "Unexpected error")
 				assert.EqualValuesf(t, tc.expected, actual.SecurityContext.SupplementalGroupsPolicy, "SupplementalGroupPolicy for %s", tc.name)
@@ -836,6 +841,7 @@ func TestGenerateLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerResources(t *testing.T) {
+	ctx := context.Background()
 	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
@@ -921,7 +927,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 
 			m.singleProcessOOMKill = ptr.To(tc.singleProcessOOMKill)
 
-			resources := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
+			resources := m.generateLinuxContainerResources(ctx, pod, &pod.Spec.Containers[0], false)
 			tc.expected.HugepageLimits = resources.HugepageLimits
 			assert.Equal(t, tc.expected, resources)
 		})
@@ -1068,6 +1074,7 @@ func TestGetContainerSwapBehavior(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
+	ctx := context.Background()
 	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 	m.machineInfo.MemoryCapacity = 42949672960 // 40Gb == 40 * 1024^3
@@ -1374,8 +1381,8 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 				assert.True(t, types.IsCriticalPod(pod), "pod is expected to be critical")
 			}
 
-			resourcesC1 := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[0], false)
-			resourcesC2 := m.generateLinuxContainerResources(pod, &pod.Spec.Containers[1], false)
+			resourcesC1 := m.generateLinuxContainerResources(ctx, pod, &pod.Spec.Containers[0], false)
+			resourcesC2 := m.generateLinuxContainerResources(ctx, pod, &pod.Spec.Containers[1], false)
 
 			if tc.swapDisabledOnNode {
 				expectSwapDisabled(tc.cgroupVersion, resourcesC1, resourcesC2)
@@ -1839,7 +1846,7 @@ func TestUpdatePodSandboxResources(t *testing.T) {
 
 	resourceConfig := &cm.ResourceConfig{}
 
-	err = m.updatePodSandboxResources(fakeSandbox.Id, pod, resourceConfig)
+	err = m.updatePodSandboxResources(ctx, fakeSandbox.Id, pod, resourceConfig)
 	require.NoError(t, err)
 
 	// Verify sandbox is updated

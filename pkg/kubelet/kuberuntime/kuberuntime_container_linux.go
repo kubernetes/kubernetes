@@ -20,6 +20,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -52,14 +53,14 @@ import (
 var defaultPageSize = int64(os.Getpagesize())
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
-func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
+func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx context.Context, config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
 		isCgroup2UnifiedMode() {
 		enforceMemoryQoS = true
 	}
-	cl, err := m.generateLinuxContainerConfig(container, pod, uid, username, nsTarget, enforceMemoryQoS)
+	cl, err := m.generateLinuxContainerConfig(ctx, container, pod, uid, username, nsTarget, enforceMemoryQoS)
 	if err != nil {
 		return err
 	}
@@ -77,13 +78,13 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID, enforceMemoryQoS bool) (*runtimeapi.LinuxContainerConfig, error) {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID, enforceMemoryQoS bool) (*runtimeapi.LinuxContainerConfig, error) {
 	sc, err := m.determineEffectiveSecurityContext(pod, container, uid, username)
 	if err != nil {
 		return nil, err
 	}
 	lc := &runtimeapi.LinuxContainerConfig{
-		Resources:       m.generateLinuxContainerResources(pod, container, enforceMemoryQoS),
+		Resources:       m.generateLinuxContainerResources(ctx, pod, container, enforceMemoryQoS),
 		SecurityContext: sc,
 	}
 
@@ -124,7 +125,8 @@ func getMemoryLimit(pod *v1.Pod, container *v1.Container) *resource.Quantity {
 }
 
 // generateLinuxContainerResources generates linux container resources config for runtime
-func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod, container *v1.Container, enforceMemoryQoS bool) *runtimeapi.LinuxContainerResources {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, enforceMemoryQoS bool) *runtimeapi.LinuxContainerResources {
+	logger := klog.FromContext(ctx)
 	// set linux container resources
 	var cpuRequest *resource.Quantity
 	if _, cpuRequestExists := container.Resources.Requests[v1.ResourceCPU]; cpuRequestExists {
@@ -143,10 +145,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
 
-	lcr.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
+	lcr.HugepageLimits = GetHugepageLimitsFromResources(ctx, container.Resources)
 
 	// Configure swap for the container
-	m.configureContainerSwapResources(lcr, pod, container)
+	m.configureContainerSwapResources(ctx, lcr, pod, container)
 
 	// Set memory.min and memory.high to enforce MemoryQoS
 	if enforceMemoryQoS {
@@ -191,7 +193,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 					lcr.Unified[k] = v
 				}
 			}
-			klog.V(4).InfoS("MemoryQoS config for container", "pod", klog.KObj(pod), "containerName", container.Name, "unified", unified)
+			logger.V(4).Info("MemoryQoS config for container", "pod", klog.KObj(pod), "containerName", container.Name, "unified", unified)
 		}
 	}
 
@@ -200,7 +202,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 
 // configureContainerSwapResources configures the swap resources for a specified (linux) container.
 // Swap is only configured if a swap cgroup controller is available and the NodeSwap feature gate is enabled.
-func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
+func (m *kubeGenericRuntimeManager) configureContainerSwapResources(ctx context.Context, lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
 	if !swapControllerAvailable() {
 		return
 	}
@@ -210,11 +212,11 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 	// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
 	switch m.GetContainerSwapBehavior(pod, container) {
 	case types.NoSwap:
-		swapConfigurationHelper.ConfigureNoSwap(lcr)
+		swapConfigurationHelper.ConfigureNoSwap(ctx, lcr)
 	case types.LimitedSwap:
-		swapConfigurationHelper.ConfigureLimitedSwap(lcr, pod, container)
+		swapConfigurationHelper.ConfigureLimitedSwap(ctx, lcr, pod, container)
 	default:
-		swapConfigurationHelper.ConfigureNoSwap(lcr)
+		swapConfigurationHelper.ConfigureNoSwap(ctx, lcr)
 	}
 }
 
@@ -246,7 +248,7 @@ func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, contai
 }
 
 // generateContainerResources generates platform specific (linux) container resources config for runtime
-func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
+func (m *kubeGenericRuntimeManager) generateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
 	enforceMemoryQoS := false
 	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
@@ -254,7 +256,7 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 		enforceMemoryQoS = true
 	}
 	return &runtimeapi.ContainerResources{
-		Linux: m.generateLinuxContainerResources(pod, container, enforceMemoryQoS),
+		Linux: m.generateLinuxContainerResources(ctx, pod, container, enforceMemoryQoS),
 	}
 }
 
@@ -321,7 +323,8 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 }
 
 // GetHugepageLimitsFromResources returns limits of each hugepages from resources.
-func GetHugepageLimitsFromResources(resources v1.ResourceRequirements) []*runtimeapi.HugepageLimit {
+func GetHugepageLimitsFromResources(ctx context.Context, resources v1.ResourceRequirements) []*runtimeapi.HugepageLimit {
+	logger := klog.FromContext(ctx)
 	var hugepageLimits []*runtimeapi.HugepageLimit
 
 	// For each page size, limit to 0.
@@ -340,13 +343,13 @@ func GetHugepageLimitsFromResources(resources v1.ResourceRequirements) []*runtim
 
 		pageSize, err := v1helper.HugePageSizeFromResourceName(resourceObj)
 		if err != nil {
-			klog.InfoS("Failed to get hugepage size from resource", "object", resourceObj, "err", err)
+			logger.Info("Failed to get hugepage size from resource", "object", resourceObj, "err", err)
 			continue
 		}
 
 		sizeString, err := v1helper.HugePageUnitSizeFromByteSize(pageSize.Value())
 		if err != nil {
-			klog.InfoS("Size is invalid", "object", resourceObj, "err", err)
+			logger.Info("Size is invalid", "object", resourceObj, "err", err)
 			continue
 		}
 		requiredHugepageLimits[sizeString] = uint64(amountObj.Value())
@@ -404,16 +407,18 @@ var isCgroup2UnifiedMode = func() bool {
 // the swap controller availability would solely depend on the environment running the test.
 var swapControllerAvailable = sync.OnceValue(func() bool {
 	// See https://github.com/containerd/containerd/pull/7838/
+	ctx := context.Background()
+	logger := klog.FromContext(ctx)
 	const warn = "Failed to detect the availability of the swap controller, assuming not available"
 	p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
 	if isCgroup2UnifiedMode() {
 		// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
 		cm, err := libcontainercgroups.ParseCgroupFile("/proc/self/cgroup")
 		if err != nil {
-			klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
+			logger.V(5).Error(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
 			return false
 		}
-		// Fr cgroup v2 unified hierarchy, there are no per-controller
+		// For cgroup v2 unified hierarchy, there are no per-controller
 		// cgroup paths, so the cm map returned by ParseCgroupFile above
 		// has a single element where the key is empty string ("") and
 		// the value is the cgroup path the <pid> is in.
@@ -421,7 +426,7 @@ var swapControllerAvailable = sync.OnceValue(func() bool {
 	}
 	if _, err := os.Stat(p); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			klog.V(5).ErrorS(err, warn)
+			logger.V(5).Error(err, warn)
 		}
 		return false
 	}
@@ -437,19 +442,20 @@ func newSwapConfigurationHelper(machineInfo cadvisorv1.MachineInfo) *swapConfigu
 	return &swapConfigurationHelper{machineInfo: machineInfo}
 }
 
-func (m swapConfigurationHelper) ConfigureLimitedSwap(lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
+func (m swapConfigurationHelper) ConfigureLimitedSwap(ctx context.Context, lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
+	logger := klog.FromContext(ctx)
 	containerMemoryRequest := container.Resources.Requests.Memory()
 	swapLimit, err := calcSwapForBurstablePods(containerMemoryRequest.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
 	if err != nil {
-		klog.ErrorS(err, "cannot calculate swap allocation amount; disallowing swap")
-		m.ConfigureNoSwap(lcr)
+		logger.Error(err, "Cannot calculate swap allocation amount; disallowing swap")
+		m.ConfigureNoSwap(ctx, lcr)
 		return
 	}
 
-	m.configureSwap(lcr, swapLimit)
+	m.configureSwap(ctx, lcr, swapLimit)
 }
 
-func (m swapConfigurationHelper) ConfigureNoSwap(lcr *runtimeapi.LinuxContainerResources) {
+func (m swapConfigurationHelper) ConfigureNoSwap(ctx context.Context, lcr *runtimeapi.LinuxContainerResources) {
 	if !isCgroup2UnifiedMode() {
 		if swapControllerAvailable() {
 			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
@@ -460,12 +466,13 @@ func (m swapConfigurationHelper) ConfigureNoSwap(lcr *runtimeapi.LinuxContainerR
 		return
 	}
 
-	m.configureSwap(lcr, 0)
+	m.configureSwap(ctx, lcr, 0)
 }
 
-func (m swapConfigurationHelper) configureSwap(lcr *runtimeapi.LinuxContainerResources, swapMemory int64) {
+func (m swapConfigurationHelper) configureSwap(ctx context.Context, lcr *runtimeapi.LinuxContainerResources, swapMemory int64) {
+	logger := klog.FromContext(ctx)
 	if !isCgroup2UnifiedMode() {
-		klog.ErrorS(fmt.Errorf("swap configuration is not supported with cgroup v1"), "swap configuration under cgroup v1 is unexpected")
+		logger.Error(fmt.Errorf("swap configuration is not supported with cgroup v1"), "Swap configuration under cgroup v1 is unexpected")
 		return
 	}
 

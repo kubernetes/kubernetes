@@ -20,6 +20,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,7 @@ import (
 )
 
 func TestVerifyRunAsNonRoot(t *testing.T) {
+	ctx := context.Background()
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -140,7 +142,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		},
 	} {
 		pod.Spec.Containers[0].SecurityContext = test.sc
-		err := verifyRunAsNonRoot(pod, &pod.Spec.Containers[0], test.uid, test.username)
+		err := verifyRunAsNonRoot(ctx, pod, &pod.Spec.Containers[0], test.uid, test.username)
 		if test.fail {
 			assert.Error(t, err, test.desc)
 		} else {

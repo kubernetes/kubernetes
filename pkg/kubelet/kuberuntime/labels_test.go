@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -30,6 +31,7 @@ import (
 )
 
 func TestContainerLabels(t *testing.T) {
+	ctx := context.Background()
 	deletionGracePeriod := int64(10)
 	terminationGracePeriod := int64(10)
 	lifecycle := &v1.Lifecycle{
@@ -85,7 +87,7 @@ func TestContainerLabels(t *testing.T) {
 	// Test whether we can get right information from label
 	for _, test := range tests {
 		labels := newContainerLabels(container, pod)
-		containerInfo := getContainerInfoFromLabels(labels)
+		containerInfo := getContainerInfoFromLabels(ctx, labels)
 		if !reflect.DeepEqual(containerInfo, test.expected) {
 			t.Errorf("%v: expected %v, got %v", test.description, test.expected, containerInfo)
 		}
@@ -93,6 +95,7 @@ func TestContainerLabels(t *testing.T) {
 }
 
 func TestContainerAnnotations(t *testing.T) {
+	ctx := context.Background()
 	restartCount := 5
 	deletionGracePeriod := int64(10)
 	terminationGracePeriod := int64(10)
@@ -162,8 +165,8 @@ func TestContainerAnnotations(t *testing.T) {
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	// Test whether we can get right information from label
-	annotations := newContainerAnnotations(container, pod, restartCount, opts)
-	containerInfo := getContainerInfoFromAnnotations(annotations)
+	annotations := newContainerAnnotations(ctx, container, pod, restartCount, opts)
+	containerInfo := getContainerInfoFromAnnotations(ctx, annotations)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
 	}
@@ -181,8 +184,8 @@ func TestContainerAnnotations(t *testing.T) {
 	expected.PreStopHandler = nil
 	// Because container is changed, the Hash should be updated
 	expected.Hash = kubecontainer.HashContainer(container)
-	annotations = newContainerAnnotations(container, pod, restartCount, opts)
-	containerInfo = getContainerInfoFromAnnotations(annotations)
+	annotations = newContainerAnnotations(ctx, container, pod, restartCount, opts)
+	containerInfo = getContainerInfoFromAnnotations(ctx, annotations)
 	if !reflect.DeepEqual(containerInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, containerInfo)
 	}
@@ -192,6 +195,7 @@ func TestContainerAnnotations(t *testing.T) {
 }
 
 func TestPodLabels(t *testing.T) {
+	ctx := context.Background()
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pod",
@@ -212,7 +216,7 @@ func TestPodLabels(t *testing.T) {
 
 	// Test whether we can get right information from label
 	labels := newPodLabels(pod)
-	podSandboxInfo := getPodSandboxInfoFromLabels(labels)
+	podSandboxInfo := getPodSandboxInfoFromLabels(ctx, labels)
 	if !reflect.DeepEqual(podSandboxInfo, expected) {
 		t.Errorf("expected %v, got %v", expected, podSandboxInfo)
 	}
