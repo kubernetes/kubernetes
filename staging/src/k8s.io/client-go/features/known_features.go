@@ -49,15 +49,15 @@ const (
 	// "application/apply-patch+yaml".
 	ClientsPreferCBOR Feature = "ClientsPreferCBOR"
 
-	// owner: @nilekhc
-	// alpha: v1.30
-	InformerResourceVersion Feature = "InformerResourceVersion"
-
 	// owner: @deads2k
 	// beta: v1.33
 	//
 	// Refactor informers to deliver watch stream events in order instead of out of order.
 	InOrderInformers Feature = "InOrderInformers"
+
+	// owner: @nilekhc
+	// alpha: v1.30
+	InformerResourceVersion Feature = "InformerResourceVersion"
 
 	// owner: @p0lyn0mial
 	// beta: v1.30
