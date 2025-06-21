@@ -27,7 +27,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -43,7 +42,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -69,8 +67,6 @@ func Register(plugins *admission.Plugins) {
 // Plugin holds state for and implements the admission plugin.
 type Plugin struct {
 	*admission.Handler
-
-	inspectedFeatureGates bool
 
 	client          kubernetes.Interface
 	namespaceLister corev1listers.NamespaceLister
@@ -150,16 +146,8 @@ func (p *Plugin) updateDelegate() {
 	p.delegate.NamespaceGetter = podsecurityadmission.NamespaceGetterFromListerAndClient(p.namespaceLister, p.client)
 }
 
-func (c *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	c.inspectedFeatureGates = true
-	policy.RelaxPolicyForUserNamespacePods(featureGates.Enabled(features.UserNamespacesPodSecurityStandards))
-}
-
 // ValidateInitialization ensures all required options are set
 func (p *Plugin) ValidateInitialization() error {
-	if !p.inspectedFeatureGates {
-		return fmt.Errorf("%s did not see feature gates", PluginName)
-	}
 	if err := p.delegate.CompleteConfiguration(); err != nil {
 		return fmt.Errorf("%s configuration error: %w", PluginName, err)
 	}
