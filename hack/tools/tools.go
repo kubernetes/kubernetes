@@ -30,7 +30,7 @@ import (
 	_ "gotest.tools/gotestsum"
 
 	// mockery
-	_ "github.com/vektra/mockery/v2"
+	_ "github.com/vektra/mockery/v3"
 
 	// tools like cpu
 	_ "go.uber.org/automaxprocs"
