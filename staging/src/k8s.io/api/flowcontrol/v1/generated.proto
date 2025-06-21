@@ -509,6 +509,17 @@ message Subject {
   // `serviceAccount` matches ServiceAccounts.
   // +optional
   optional ServiceAccountSubject serviceAccount = 4;
+
+  // `userAgent` matches based on user-agent.
+  // +optional
+  optional UserAgentSubject userAgent = 5;
+}
+
+// UserAgentSubject holds detailed information for user-agent-kind subject.
+message UserAgentSubject {
+  // `nameRegexp` is the agent name regular expression that matches.
+  // Required.
+  optional string nameRegexp = 1;
 }
 
 // UserSubject holds detailed information for user-kind subject.
