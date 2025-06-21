@@ -283,6 +283,9 @@ type IngressValidationOptions struct {
 
 	// AllowInvalidWildcardHostRule indicates whether invalid rule values are allowed in rules with wildcard hostnames
 	AllowInvalidWildcardHostRule bool
+
+	// AllowedRelaxedServiceNameValidation indicates if the backend service name can be validated with apimachineryvalidation.NameIsDNSLabel
+	AllowedRelaxedServiceNameValidation bool
 }
 
 // ValidateIngress validates Ingresses on create and update.
@@ -312,8 +315,9 @@ func ValidateIngressCreate(ingress *networking.Ingress) field.ErrorList {
 func ValidateIngressUpdate(ingress, oldIngress *networking.Ingress) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ingress.ObjectMeta, &oldIngress.ObjectMeta, field.NewPath("metadata"))
 	opts := IngressValidationOptions{
-		AllowInvalidSecretName:       allowInvalidSecretName(oldIngress),
-		AllowInvalidWildcardHostRule: allowInvalidWildcardHostRule(oldIngress),
+		AllowInvalidSecretName:              allowInvalidSecretName(oldIngress),
+		AllowInvalidWildcardHostRule:        allowInvalidWildcardHostRule(oldIngress),
+		AllowedRelaxedServiceNameValidation: allowRelaxedServiceNameValidation(oldIngress),
 	}
 
 	allErrs = append(allErrs, validateIngress(ingress, opts)...)
@@ -513,9 +517,18 @@ func validateIngressBackend(backend *networking.IngressBackend, fldPath *field.P
 		if len(backend.Service.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("service", "name"), ""))
 		} else {
-			for _, msg := range apivalidation.ValidateServiceName(backend.Service.Name, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("service", "name"), backend.Service.Name, msg))
+			// If ingress uses a new validation type of Service name, then always validate using that
+			// Else, use whatever the gate allows
+			if opts.AllowedRelaxedServiceNameValidation {
+				for _, msg := range apimachineryvalidation.NameIsDNSLabel(backend.Service.Name, false) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("service", "name"), backend.Service.Name, msg))
+				}
+			} else {
+				for _, msg := range apivalidation.ValidateServiceName(backend.Service.Name, false) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("service", "name"), backend.Service.Name, msg))
+				}
 			}
+
 		}
 
 		hasPortName := len(backend.Service.Port.Name) > 0
@@ -679,6 +692,27 @@ func allowInvalidWildcardHostRule(oldIngress *networking.Ingress) bool {
 			if strings.Contains(rule.Host, "*") && len(validateIngressRuleValue(&rule.IngressRuleValue, nil, IngressValidationOptions{})) > 0 {
 				// backwards compatibility with existing invalid data
 				return true
+			}
+		}
+	}
+	return false
+}
+
+func allowRelaxedServiceNameValidation(oldIngress *networking.Ingress) bool {
+	if oldIngress != nil {
+		for _, rule := range oldIngress.Spec.Rules {
+			for _, path := range rule.HTTP.Paths {
+				if path.Backend.Service == nil {
+					continue
+				}
+				serviceName := path.Backend.Service.Name
+				// If a name doesn't validate with NameIsDNS1035Label, but does validate with NameIsDNSLabel,
+				// then we allow it to be used as a Service name in an Ingress.
+				new := apimachineryvalidation.NameIsDNSLabel(serviceName, false)
+				old := apimachineryvalidation.NameIsDNS1035Label(serviceName, false)
+				if new == nil && old != nil {
+					return true
+				}
 			}
 		}
 	}
