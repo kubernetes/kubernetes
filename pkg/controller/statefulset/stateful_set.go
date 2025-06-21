@@ -317,7 +317,7 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(ctx context.Context, set
 	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
 	//   but may be adopted later on if they have matching labels with the StatefulSet.
 	podsForSts := []*v1.Pod{}
-	for _, key := range []string{string(set.UID), controller.OrphanPodIndexKey} {
+	for _, key := range []string{string(set.UID), controller.OrphanPodIndexKeyForNamespace(set.Namespace)} {
 		podObjs, err := ssc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
 		if err != nil {
 			return nil, err

@@ -705,7 +705,7 @@ func (rsc *ReplicaSetController) getRSPods(rs *apps.ReplicaSet, orphanedPods boo
 
 	uidKeys := []string{string(rs.UID)}
 	if orphanedPods {
-		uidKeys = append(uidKeys, controller.OrphanPodIndexKey)
+		uidKeys = append(uidKeys, controller.OrphanPodIndexKeyForNamespace(rs.Namespace))
 	}
 
 	for _, key := range uidKeys {
