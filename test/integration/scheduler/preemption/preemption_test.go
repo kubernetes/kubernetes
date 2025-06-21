@@ -1694,6 +1694,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					t.Fatalf("Error creating node %v: %v", nodeName, err)
 				}
 
+				// Track pods that were nominated (NNN set) before node deletion
+				podsOnceNominated := []string{}
 				// Create pods and run post check if necessary.
 				for i, pods := range tt.podsToCreate {
 					for _, p := range pods {
@@ -1710,6 +1712,12 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 							}
 						}
 					}
+
+					for _, p := range pods {
+						if p.Status.NominatedNodeName != "" {
+							podsOnceNominated = append(podsOnceNominated, p.Name)
+						}
+					}
 				}
 
 				// Delete the fake node if necessary.
@@ -1719,26 +1727,24 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					}
 				}
 
+				// Verify that once-nominated pods retain their nominatedNodeName after node deletion
+				// Per KEP-5278, scheduler no longer clears NNN
+				for _, podName := range podsOnceNominated {
+					pod, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, podName, metav1.GetOptions{})
+					if err != nil {
+						t.Errorf("Error getting the pod %v: %v", podName, err)
+					}
+					if len(pod.Status.NominatedNodeName) == 0 {
+						t.Fatalf("Pod %v/%v was once nominated but lost its nominatedNodeName after node deletion", pod.Namespace, pod.Name)
+					}
+				}
+
 				// Force deleting the terminating pods if necessary.
 				// This is required if we demand to delete terminating Pods physically.
 				for _, podName := range tt.podNamesToDelete {
 					if err := deletePod(cs, podName, ns); err != nil {
 						t.Fatalf("Pod %v cannot be deleted: %v", podName, err)
 					}
-				}
-
-				// Verify if .status.nominatedNodeName is cleared.
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-					pod, err := cs.CoreV1().Pods(ns).Get(ctx, "medium", metav1.GetOptions{})
-					if err != nil {
-						t.Errorf("Error getting the medium pod: %v", err)
-					}
-					if len(pod.Status.NominatedNodeName) == 0 {
-						return true, nil
-					}
-					return false, err
-				}); err != nil {
-					t.Errorf(".status.nominatedNodeName of the medium pod was not cleared: %v", err)
 				}
 			})
 		}
