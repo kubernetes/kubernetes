@@ -94,7 +94,7 @@ func (svcStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (svcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return serviceapi.GetWarningsForService(obj.(*api.Service), nil)
+	return serviceapi.GetWarningsForService(obj.(*api.Service))
 }
 
 // Canonicalize normalizes the object after validation.
@@ -112,7 +112,7 @@ func (strategy svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime
 
 // WarningsOnUpdate returns warnings for the given update.
 func (svcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return serviceapi.GetWarningsForService(obj.(*api.Service), old.(*api.Service))
+	return serviceapi.GetWarningsForService(obj.(*api.Service))
 }
 
 func (svcStrategy) AllowUnconditionalUpdate() bool {
