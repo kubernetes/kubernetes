@@ -1266,7 +1266,7 @@ type DeviceRequestAllocationResult struct {
 	//
 	// +optional
 	// +featureGate=DRAAdminAccess
-	AdminAccess *bool `json:"adminAccess" protobuf:"bytes,5,name=adminAccess"`
+	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,5,opt,name=adminAccess"`
 
 	// A copy of all tolerations specified in the request at the time
 	// when the device got allocated.
