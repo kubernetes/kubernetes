@@ -1072,7 +1072,7 @@ func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
 		go func(c <-chan resourceupdates.Update) {
 			defer wg.Done()
 			for v := range c {
-				klog.Infof("[KEP-4680 DEBUG] Container Manager Fan-in: Forwarding update for pods: %v", v.PodUIDs)
+				klog.Infof("[KEP-4680 DEBUG] 2. Container Manager: Forwarding update for pods: %v", v.PodUIDs)
 
 				out <- v
 			}

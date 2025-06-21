@@ -785,7 +785,8 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 // watchResources starts a health monitoring stream for a DRA plugin.
 func (m *Manager) watchResources(ctx context.Context, pluginName string, p *draplugin.DRAPlugin) error {
 	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Starting to watch resources for plugin", "pluginName", pluginName)
+	// DEBUG
+	logger.Info("Starting to watch resources for plugin", "pluginName", pluginName)
 
 	stream, err := p.WatchResources(ctx)
 	if err != nil {
@@ -838,7 +839,8 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 				logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
 			}
 			if changed && len(changedDevices) > 0 {
-				logger.V(5).Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
+				// DEBUG: Change verbosity to 1 for log checks.
+				logger.Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
 
 				podsToUpdate := sets.New[string]()
 
@@ -859,17 +861,21 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 
 				if podsToUpdate.Len() > 0 {
 					podUIDs := podsToUpdate.UnsortedList()
-					logger.V(4).Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
+					// DEBUG: Change verbosity to 1 for log checks.
+					logger.Info("[KEP-4680 DEBUG] 1. DRA Manager: Sending update for pods: %v", podUIDs)
+					logger.Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
 					select {
 					case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
 					default:
 						logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pluginName", pluginName, "pods", podUIDs)
 					}
 				} else {
-					logger.V(5).Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
+					// DEBUG: Change verbosity to 1 for log checks.
+					logger.Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
 				}
 			} else if changed {
-				logger.V(5).Info("Health info updated, but no specific device changes detected", "pluginName", pluginName)
+				// DEBUG: Change verbosity to 1 for log checks.
+				logger.Info("Health info updated, but no specific device changes detected", "pluginName", pluginName)
 			}
 
 		}
