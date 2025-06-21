@@ -56,6 +56,7 @@ func TestCSIImageConfigs(t *testing.T) {
 	}
 	actualImages := sets.NewString()
 	for _, config := range configs {
+		t.Logf("found image: %s", config)
 		assert.NotEmpty(t, config.registry, "registry")
 		assert.NotEmpty(t, config.name, "name")
 		assert.NotEmpty(t, config.version, "version")
