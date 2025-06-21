@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"reflect"
 	"runtime"
 	"testing"
@@ -97,7 +98,7 @@ func TestFIFO_basic(t *testing.T) {
 	lastInt := int(0)
 	lastUint := uint64(0)
 	for i := 0; i < amount*2; i++ {
-		switch obj := Pop(f).(testFifoObject).val.(type) {
+		switch obj := Pop(context.Background(), f).(testFifoObject).val.(type) {
 		case int:
 			if obj <= lastInt {
 				t.Errorf("got %v (int) out of order, last was %v", obj, lastInt)
@@ -131,7 +132,7 @@ func TestFIFO_addUpdate(t *testing.T) {
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			obj := Pop(f)
+			obj := Pop(context.Background(), f)
 			if obj == nil {
 				return
 			}
@@ -162,7 +163,7 @@ func TestFIFO_addReplace(t *testing.T) {
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			obj := Pop(f)
+			obj := Pop(context.Background(), f)
 			if obj == nil {
 				return
 			}
@@ -194,21 +195,21 @@ func TestFIFO_detectLineJumpers(t *testing.T) {
 	f.Add(mkFifoObj("foo", 13))
 	f.Add(mkFifoObj("zab", 30))
 
-	if e, a := 13, Pop(f).(testFifoObject).val; a != e {
+	if e, a := 13, Pop(context.Background(), f).(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 
 	f.Add(mkFifoObj("foo", 14)) // ensure foo doesn't jump back in line
 
-	if e, a := 1, Pop(f).(testFifoObject).val; a != e {
+	if e, a := 1, Pop(context.Background(), f).(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 
-	if e, a := 30, Pop(f).(testFifoObject).val; a != e {
+	if e, a := 30, Pop(context.Background(), f).(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 
-	if e, a := 14, Pop(f).(testFifoObject).val; a != e {
+	if e, a := 14, Pop(context.Background(), f).(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 }
@@ -243,15 +244,15 @@ func TestFIFO_HasSynced(t *testing.T) {
 		{
 			actions: []func(f *FIFO){
 				func(f *FIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *FIFO) { Pop(f) },
+				func(f *FIFO) { Pop(context.Background(), f) },
 			},
 			expectedSynced: false,
 		},
 		{
 			actions: []func(f *FIFO){
 				func(f *FIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *FIFO) { Pop(f) },
-				func(f *FIFO) { Pop(f) },
+				func(f *FIFO) { Pop(context.Background(), f) },
+				func(f *FIFO) { Pop(context.Background(), f) },
 			},
 			expectedSynced: true,
 		},
@@ -278,7 +279,7 @@ func TestFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 	const jobs = 10
 	for i := 0; i < jobs; i++ {
 		go func() {
-			f.Pop(func(obj interface{}, isInInitialList bool) error {
+			f.Pop(context.Background(), func(obj interface{}, isInInitialList bool) error {
 				return nil
 			})
 			c <- struct{}{}
