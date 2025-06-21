@@ -25,16 +25,26 @@ import (
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds"
 )
 
 func TestForgivenessAdmission(t *testing.T) {
-	var defaultTolerationSeconds int64 = 300
+	var defaultNotReadyTolerationSeconds int64 = 300
+	var defaultUnreachableTolerationSeconds int64 = 300
 
 	genTolerationSeconds := func(s int64) *int64 {
 		return &s
 	}
 
-	handler := admissiontesting.WithReinvocationTesting(t, NewDefaultTolerationSeconds())
+	// Create plugin configuration
+	pluginConfig := &pluginapi.Configuration{
+		DefaultTolerationSecondsConfig: pluginapi.DefaultTolerationSecondsConfig{
+			NotReadyTolerationSeconds:    &defaultNotReadyTolerationSeconds,
+			UnreachableTolerationSeconds: &defaultUnreachableTolerationSeconds,
+		},
+	}
+
+	handler := admissiontesting.WithReinvocationTesting(t, NewDefaultTolerationSeconds(pluginConfig))
 	// NOTE: for anyone who want to modify this test, the order of tolerations matters!
 	tests := []struct {
 		description  string
@@ -53,13 +63,13 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               v1.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: &defaultNotReadyTolerationSeconds,
 						},
 						{
 							Key:               v1.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: &defaultUnreachableTolerationSeconds,
 						},
 					},
 				},
@@ -94,13 +104,13 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               v1.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: &defaultNotReadyTolerationSeconds,
 						},
 						{
 							Key:               v1.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: &defaultUnreachableTolerationSeconds,
 						},
 					},
 				},
@@ -133,7 +143,7 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               v1.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: &defaultUnreachableTolerationSeconds,
 						},
 					},
 				},
@@ -166,7 +176,7 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               v1.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: &defaultTolerationSeconds,
+							TolerationSeconds: &defaultNotReadyTolerationSeconds,
 						},
 					},
 				},
@@ -236,7 +246,7 @@ func TestForgivenessAdmission(t *testing.T) {
 							Key:               v1.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
-							TolerationSeconds: genTolerationSeconds(300),
+							TolerationSeconds: &defaultNotReadyTolerationSeconds,
 						},
 					},
 				},
@@ -277,7 +287,17 @@ func TestForgivenessAdmission(t *testing.T) {
 }
 
 func TestHandles(t *testing.T) {
-	handler := NewDefaultTolerationSeconds()
+	// Create a default plugin configuration for testing
+	var defaultNotReadyTolerationSeconds int64 = 300
+	var defaultUnreachableTolerationSeconds int64 = 300
+	pluginConfig := &pluginapi.Configuration{
+		DefaultTolerationSecondsConfig: pluginapi.DefaultTolerationSecondsConfig{
+			NotReadyTolerationSeconds:    &defaultNotReadyTolerationSeconds,
+			UnreachableTolerationSeconds: &defaultUnreachableTolerationSeconds,
+		},
+	}
+
+	handler := NewDefaultTolerationSeconds(pluginConfig)
 	tests := map[admission.Operation]bool{
 		admission.Update:  true,
 		admission.Create:  true,
