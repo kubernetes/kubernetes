@@ -22,6 +22,7 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 
 	"github.com/spf13/pflag"
 )
@@ -32,7 +33,7 @@ var (
 )
 
 func addProfilingFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&profileName, "profile", "none", "Name of profile to capture. One of (none|cpu|heap|goroutine|threadcreate|block|mutex)")
+	flags.StringVar(&profileName, "profile", "none", "Name of profile to capture. One of (none|cpu|heap|goroutine|threadcreate|block|mutex|trace)")
 	flags.StringVar(&profileOutput, "profile-output", "profile.pprof", "Name of the file to write the profile to")
 }
 
@@ -50,6 +51,18 @@ func initProfiling() error {
 			return err
 		}
 		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			return err
+		}
+	case "trace":
+		f, err = os.Create(profileOutput)
+		if err != nil {
+			return err
+		}
+		// Enable the CPU profiler. Samples will be captured in the
+		// execution trace.
+		runtime.SetCPUProfileRate(100)
+		err = trace.Start(f)
 		if err != nil {
 			return err
 		}
@@ -86,6 +99,9 @@ func flushProfiling() error {
 		return nil
 	case "cpu":
 		pprof.StopCPUProfile()
+	case "trace":
+		trace.Stop()
+		runtime.SetCPUProfileRate(0)
 	case "heap":
 		runtime.GC()
 		fallthrough
