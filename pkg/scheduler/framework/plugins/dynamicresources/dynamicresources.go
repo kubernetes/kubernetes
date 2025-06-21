@@ -797,6 +797,20 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	return nil
 }
 
+func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+	if !pl.enabled {
+		return framework.NewStatus(framework.Skip)
+	}
+	state, err := getStateData(cs)
+	if err != nil {
+		return statusError(klog.FromContext(ctx), err)
+	}
+	if len(state.claims) == 0 {
+		return framework.NewStatus(framework.Skip)
+	}
+	return nil
+}
+
 // bindClaim gets called by PreBind for claim which is not reserved for the pod yet.
 // It might not even be allocated. bindClaim then ensures that the allocation
 // and reservation are recorded. This finishes the work started in Reserve.
