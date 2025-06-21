@@ -261,6 +261,10 @@ type TLSClientConfig struct {
 	// To indicate to the server http/1.1 is preferred over http/2, set to ["http/1.1", "h2"] (though the server is free to ignore that preference).
 	// To use only http/1.1, set to ["http/1.1"].
 	NextProtos []string
+	// CipherSuites is a list of enabled TLS 1.0–1.2 cipher suites. The order of
+	// the list is ignored.
+	// Used to populate tls.Config.CipherSuites.
+	CipherSuites []uint16
 }
 
 var _ fmt.Stringer = TLSClientConfig{}
@@ -278,15 +282,16 @@ func (c TLSClientConfig) GoString() string {
 // TLSClientConfig to prevent accidental leaking via logs.
 func (c TLSClientConfig) String() string {
 	cc := sanitizedTLSClientConfig{
-		Insecure:   c.Insecure,
-		ServerName: c.ServerName,
-		CertFile:   c.CertFile,
-		KeyFile:    c.KeyFile,
-		CAFile:     c.CAFile,
-		CertData:   c.CertData,
-		KeyData:    c.KeyData,
-		CAData:     c.CAData,
-		NextProtos: c.NextProtos,
+		Insecure:     c.Insecure,
+		ServerName:   c.ServerName,
+		CertFile:     c.CertFile,
+		KeyFile:      c.KeyFile,
+		CAFile:       c.CAFile,
+		CertData:     c.CertData,
+		KeyData:      c.KeyData,
+		CAData:       c.CAData,
+		NextProtos:   c.NextProtos,
+		CipherSuites: c.CipherSuites,
 	}
 	// Explicitly mark non-empty credential fields as redacted.
 	if len(cc.CertData) != 0 {
@@ -637,11 +642,12 @@ func AnonymousClientConfig(config *Config) *Config {
 		APIPath:       config.APIPath,
 		ContentConfig: config.ContentConfig,
 		TLSClientConfig: TLSClientConfig{
-			Insecure:   config.Insecure,
-			ServerName: config.ServerName,
-			CAFile:     config.TLSClientConfig.CAFile,
-			CAData:     config.TLSClientConfig.CAData,
-			NextProtos: config.TLSClientConfig.NextProtos,
+			Insecure:     config.Insecure,
+			ServerName:   config.ServerName,
+			CAFile:       config.TLSClientConfig.CAFile,
+			CAData:       config.TLSClientConfig.CAData,
+			NextProtos:   config.TLSClientConfig.NextProtos,
+			CipherSuites: config.TLSClientConfig.CipherSuites,
 		},
 		RateLimiter:               config.RateLimiter,
 		WarningHandler:            config.WarningHandler,
@@ -676,15 +682,16 @@ func CopyConfig(config *Config) *Config {
 		AuthConfigPersister: config.AuthConfigPersister,
 		ExecProvider:        config.ExecProvider,
 		TLSClientConfig: TLSClientConfig{
-			Insecure:   config.TLSClientConfig.Insecure,
-			ServerName: config.TLSClientConfig.ServerName,
-			CertFile:   config.TLSClientConfig.CertFile,
-			KeyFile:    config.TLSClientConfig.KeyFile,
-			CAFile:     config.TLSClientConfig.CAFile,
-			CertData:   config.TLSClientConfig.CertData,
-			KeyData:    config.TLSClientConfig.KeyData,
-			CAData:     config.TLSClientConfig.CAData,
-			NextProtos: config.TLSClientConfig.NextProtos,
+			Insecure:     config.TLSClientConfig.Insecure,
+			ServerName:   config.TLSClientConfig.ServerName,
+			CertFile:     config.TLSClientConfig.CertFile,
+			KeyFile:      config.TLSClientConfig.KeyFile,
+			CAFile:       config.TLSClientConfig.CAFile,
+			CertData:     config.TLSClientConfig.CertData,
+			KeyData:      config.TLSClientConfig.KeyData,
+			CAData:       config.TLSClientConfig.CAData,
+			NextProtos:   config.TLSClientConfig.NextProtos,
+			CipherSuites: config.CipherSuites,
 		},
 		UserAgent:                 config.UserAgent,
 		DisableCompression:        config.DisableCompression,
