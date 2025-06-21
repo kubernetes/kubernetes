@@ -94,6 +94,15 @@ func ValidatePersistentVolumeClaimRetentionPolicy(policy *apps.StatefulSetPersis
 	return allErrs
 }
 
+func ValidateVolumeClaimTemplates(volumeClaimTemplates []api.PersistentVolumeClaim, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for i, pvc := range volumeClaimTemplates {
+		opts := apivalidation.PersistentVolumeClaimSpecValidationOptions{}
+		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeClaimSpec(&pvc.Spec, fldPath.Index(i).Child("spec"), opts)...)
+	}
+	return allErrs
+}
+
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
 func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions, setOpts StatefulSetValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -132,6 +141,7 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 	}
 
 	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(spec.PersistentVolumeClaimRetentionPolicy, fldPath.Child("persistentVolumeClaimRetentionPolicy"))...)
+	allErrs = append(allErrs, ValidateVolumeClaimTemplates(spec.VolumeClaimTemplates, fldPath.Child("volumeClaimTemplates"))...)
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
