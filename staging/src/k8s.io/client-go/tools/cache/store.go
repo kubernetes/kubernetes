@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -69,6 +70,19 @@ type Store interface {
 	// meaning in some implementations that have non-trivial
 	// additional behavior (e.g., DeltaFIFO).
 	Resync() error
+}
+
+type Transaction struct {
+	Object interface{}
+	OpType DeltaType
+}
+
+type TransactionStore interface {
+	// Transaction allows multiple operations to occur within a single lock acquisitio to
+	// ensure progress can be made when there is contention. A lock-free view of the store
+	// is passed to the specified function, and the programmer must not utilize it outside
+	// this closure.
+	Transaction(txns ...Transaction) error
 }
 
 // KeyFunc knows how to make a key from an object. Implementations should be deterministic.
@@ -164,6 +178,38 @@ type cache struct {
 }
 
 var _ Store = &cache{}
+
+func (c *cache) Transaction(txns ...Transaction) error {
+	txnStore, ok := c.cacheStorage.(ThreadSafeStoreWithTransaction)
+	if !ok {
+		return errors.New("transaction not supported")
+	}
+	fns := make([]TransactionFunc, 0)
+	for _, txn := range txns {
+		key, err := c.keyFunc(txn.Object)
+		if err != nil {
+			return KeyError{txn.Object, err}
+		}
+		switch txn.OpType {
+		case Added:
+			fns = append(fns, func(unsafe ThreadSafeStore) {
+				unsafe.Add(key, txn.Object)
+			})
+		case Updated:
+			fns = append(fns, func(unsafe ThreadSafeStore) {
+				unsafe.Update(key, txn.Object)
+			})
+		case Deleted:
+			fns = append(fns, func(unsafe ThreadSafeStore) {
+				unsafe.Delete(key)
+			})
+		default:
+			return fmt.Errorf("unrecognized transaction type: %v", txn.OpType)
+		}
+	}
+	txnStore.Transaction(fns...)
+	return nil
+}
 
 // Add inserts an item into the cache.
 func (c *cache) Add(obj interface{}) error {
