@@ -171,7 +171,8 @@ type LeaderElectionConfig struct {
 // possible future callbacks:
 //   - OnChallenge()
 type LeaderCallbacks struct {
-	// OnStartedLeading is called when a LeaderElector client starts leading
+	// OnStartedLeading is called when a LeaderElector client starts leading.
+	// The context will be cancelled when the client stops leading.
 	OnStartedLeading func(context.Context)
 	// OnStoppedLeading is called when a LeaderElector client stops leading.
 	// This callback is always called when the LeaderElector exits, even if it did not start leading.
