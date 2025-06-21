@@ -869,12 +869,17 @@ type mockMonitor struct {
 
 	metricComputationActionLabels map[autoscalingv2.MetricSourceType][]monitor.ActionLabel
 	metricComputationErrorLabels  map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel
+
+	cacheHits   map[string]int
+	cacheMisses map[string]int
 }
 
 func newMockMonitor() *mockMonitor {
 	return &mockMonitor{
 		metricComputationActionLabels: make(map[autoscalingv2.MetricSourceType][]monitor.ActionLabel),
 		metricComputationErrorLabels:  make(map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel),
+		cacheHits:                     make(map[string]int),
+		cacheMisses:                   make(map[string]int),
 	}
 }
 
@@ -905,6 +910,30 @@ func (m *mockMonitor) waitUntilRecorded(ctx context.Context, t *testing.T) {
 	}); err != nil {
 		t.Fatalf("no reconciliation is recorded in the monitor, len(monitor.reconciliationActionLabels)=%v len(monitor.reconciliationErrorLabels)=%v ", len(m.reconciliationActionLabels), len(m.reconciliationErrorLabels))
 	}
+}
+
+func (m *mockMonitor) ObserveCacheHit(resourceKind string) {
+	m.Lock()
+	defer m.Unlock()
+	m.cacheHits[resourceKind]++
+}
+
+func (m *mockMonitor) ObserveCacheMiss(resourceKind string) {
+	m.Lock()
+	defer m.Unlock()
+	m.cacheMisses[resourceKind]++
+}
+
+func (m *mockMonitor ) GetCacheHit (resourceKind string ) int {
+	m.RLock()
+	defer m.RUnlock()
+	return m.cacheHits[resourceKind]
+}
+
+func (m *mockMonitor ) GetCacheMiss (resourceKind string ) int {
+	m.RLock()
+	defer m.RUnlock()
+	return m.cacheMisses[resourceKind]
 }
 
 func TestScaleUp(t *testing.T) {

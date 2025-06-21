@@ -28,14 +28,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
 )
 
 // setupTestEnv creates and returns the basic test environment components
-func setupTestEnv() (dynamic.Interface, meta.RESTMapper) {
+func setupTestEnv() (dynamic.Interface, meta.RESTMapper, monitor.Monitor) {
 	scheme := runtime.NewScheme()
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
 	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{})
-	return dynamicClient, mapper
+	mockMonitor := newMockMonitor()
+	return dynamicClient, mapper, mockMonitor
 }
 
 func cleanupResource(client dynamic.Interface, t *testing.T) {
@@ -71,8 +73,8 @@ func createTestDeployment(client dynamic.Interface, t *testing.T) {
 }
 
 func TestControllerCache_GetResource(t *testing.T) {
-	dynamicClient, mapper := setupTestEnv()
-	cache := NewControllerCache(dynamicClient, mapper, 5*time.Minute)
+	dynamicClient, mapper, monitor := setupTestEnv()
+	cache := NewControllerCache(dynamicClient, mapper, 5*time.Minute, monitor)
 
 	// create and clean resource after
 	createTestDeployment(dynamicClient, t)
@@ -132,12 +134,11 @@ func TestControllerCache_GetResource(t *testing.T) {
 	}
 }
 
-// TODO: need to add metric for cache hit - this test is incomplete
 func TestControllerCache_CacheExpiry(t *testing.T) {
 	// Setup with short TTL for testing
-	dynamicClient, mapper := setupTestEnv()
+	dynamicClient, mapper, monitor := setupTestEnv()
 	cacheTTL := 100 * time.Millisecond
-	cache := NewControllerCache(dynamicClient, mapper, cacheTTL)
+	cache := NewControllerCache(dynamicClient, mapper, cacheTTL, monitor)
 
 	// create and clean resource after
 	createTestDeployment(dynamicClient, t)
@@ -148,17 +149,30 @@ func TestControllerCache_CacheExpiry(t *testing.T) {
 		Kind:       "Deployment",
 		Name:       "test-deployment",
 	}
+	
+    // Mock monitor for utility functions that are not part of the interface monitor.monitor
+	mockMon := monitor.(*mockMonitor)
 
 	// First request should hit the API - check cache miss +1
 	resource1, err := cache.GetResource("default", ownerRef)
 	if err != nil {
-		t.Fatalf("First GetResource() failed: %v", err)
+		t.Fatalf("Expected successful resource retrieval on first call, got error: %v", err)
+	}
+
+	currentCacheMiss := mockMon.GetCacheMiss("deployments")
+	if currentCacheMiss < 1 {
+		t.Errorf("Expected at least one cache miss metric for initial API call, got %d", currentCacheMiss)
 	}
 
 	// Immediate second request should hit the cache - check cache hit +1
 	resource2, err := cache.GetResource("default", ownerRef)
 	if err != nil {
-		t.Fatalf("Second GetResource() failed: %v", err)
+		t.Fatalf("Expected successful resource retrieval from cache, got error: %v", err)
+	}
+
+	currentCacheHit := mockMon.GetCacheHit("deployments")
+	if currentCacheHit < 1 {
+		t.Errorf("Expected at least one cache hit metric for cached response, got %d", currentCacheHit)
 	}
 
 	if resource1 != resource2 {
@@ -171,19 +185,24 @@ func TestControllerCache_CacheExpiry(t *testing.T) {
 	// Third request should hit the API again - check cache miss +1
 	resource3, err := cache.GetResource("default", ownerRef)
 	if err != nil {
-		t.Fatalf("Third GetResource() failed: %v", err)
+		t.Fatalf("Expected successful resource retrieval after cache expiry, got error: %v", err)
+	}
+
+	secondCacheMiss := mockMon.GetCacheMiss("deployments")
+	if secondCacheMiss <= currentCacheMiss {
+		t.Errorf("Expected cache miss metric to increase after expiry, got %d <= %d", secondCacheMiss, currentCacheMiss)
 	}
 
 	if resource1 == resource3 {
-		t.Error("Cache did not expire: third request returned same resource instance")
+		t.Error("Expected different resource instances after cache expiry, got same instance")
 	}
 }
 
 func TestControllerCache_Cleanup(t *testing.T) {
 	// Setup
-	dynamicClient, mapper := setupTestEnv()
+	dynamicClient, mapper, monitor := setupTestEnv()
 	cacheTTL := 100 * time.Millisecond
-	cache := NewControllerCache(dynamicClient, mapper, cacheTTL)
+	cache := NewControllerCache(dynamicClient, mapper, cacheTTL, monitor)
 
 	// create and clean resource after
 	createTestDeployment(dynamicClient, t)

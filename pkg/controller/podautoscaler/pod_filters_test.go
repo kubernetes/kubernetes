@@ -23,19 +23,14 @@ import (
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
 func TestOwnerReferencesFilter_Filter(t *testing.T) {
 	// Create a fake dynamic client and REST mapper for testing
-	scheme := runtime.NewScheme()
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
-	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{})
+	dynamicClient, mapper, monitor := setupTestEnv()
 
 	// Create test deployment
 	deployment := &unstructured.Unstructured{
@@ -71,7 +66,6 @@ func TestOwnerReferencesFilter_Filter(t *testing.T) {
 		},
 	}
 
-	// Add resources to the fake client
 	_, err := dynamicClient.
 		Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}).
 		Namespace("default").
@@ -88,7 +82,7 @@ func TestOwnerReferencesFilter_Filter(t *testing.T) {
 		t.Fatalf("Failed to create test replicaset: %v", err)
 	}
 
-	controllerCache := NewControllerCache(dynamicClient, mapper, 15*time.Minute)
+	controllerCache := NewControllerCache(dynamicClient, mapper, 15*time.Minute, monitor)
 
 	tests := []struct {
 		name           string
