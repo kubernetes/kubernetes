@@ -48,12 +48,12 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe("Pods Extended", func() {
@@ -370,7 +370,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 							},
 						},
 					},
-					TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+					TerminationGracePeriodSeconds: ptr.To(int64(-1)),
 				},
 			}
 
@@ -394,7 +394,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "failed to query for pod")
 				ginkgo.By("updating the pod to have a negative TerminationGracePeriodSeconds")
-				pod.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(-1)
+				pod.Spec.TerminationGracePeriodSeconds = ptr.To(int64(-1))
 				_, err = podClient.PodInterface.Update(ctx, pod, metav1.UpdateOptions{})
 				return err
 			})
@@ -573,7 +573,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 			pod.ObjectMeta.Labels = map[string]string{
 				"time": value,
 			}
-			pod.Spec.ActiveDeadlineSeconds = utilpointer.Int64(5000)
+			pod.Spec.ActiveDeadlineSeconds = ptr.To(int64(5000))
 
 			ginkgo.By("submitting the pod to kubernetes")
 			pod = podClient.CreateSync(ctx, pod)
@@ -713,6 +713,24 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 			ginkgo.By("verifying the pod conditions have updated observedGeneration values")
 			for _, condition := range expectedPodConditions {
 				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, 30*time.Second))
+			}
+		})
+
+		ginkgo.It("mirror pods", func(ctx context.Context) {
+			pods, err := f.ClientSet.CoreV1().Pods("kube-system").List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err, "failed to list pods in namespace kube-system")
+
+			if pods == nil || len(pods.Items) == 0 {
+				framework.Logf("no pods in namespace kube-system were found")
+			}
+
+			for _, pod := range pods.Items {
+				for annotationKey, _ := range pod.Annotations {
+					if annotationKey == v1.MirrorPodAnnotationKey {
+						gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(1))
+						gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(0))
+					}
+				}
 			}
 		})
 	})
