@@ -110,7 +110,7 @@ func (m *mockDiskGC) DeleteAllUnusedContainers(_ context.Context) error {
 
 func makePodWithMemoryStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*v1.Pod, statsapi.PodStats) {
 	pod := newPod(name, priority, []v1.Container{
-		newContainer(name, requests, limits),
+		newContainer(name, requests, limits, nil),
 	}, nil)
 	podStats := newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
 	return pod, podStats
@@ -118,7 +118,7 @@ func makePodWithMemoryStats(name string, priority int32, requests v1.ResourceLis
 
 func makePodWithPIDStats(name string, priority int32, processCount uint64) (*v1.Pod, statsapi.PodStats) {
 	pod := newPod(name, priority, []v1.Container{
-		newContainer(name, nil, nil),
+		newContainer(name, nil, nil, nil),
 	}, nil)
 	podStats := newPodProcessStats(pod, processCount)
 	return pod, podStats
@@ -126,7 +126,7 @@ func makePodWithPIDStats(name string, priority int32, processCount uint64) (*v1.
 
 func makePodWithDiskStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string, volumes []v1.Volume) (*v1.Pod, statsapi.PodStats) {
 	pod := newPod(name, priority, []v1.Container{
-		newContainer(name, requests, limits),
+		newContainer(name, requests, limits, nil),
 	}, volumes)
 	podStats := newPodDiskStats(pod, parseQuantity(rootFsUsed), parseQuantity(logsUsed), parseQuantity(perLocalVolumeUsed))
 	return pod, podStats
@@ -141,7 +141,7 @@ func makePodWithLocalStorageCapacityIsolationOpen(name string, priority int32, r
 	var vols []v1.Volume
 	vols = append(vols, vol)
 	pod := newPod(name, priority, []v1.Container{
-		newContainer(name, requests, limits),
+		newContainer(name, requests, limits, nil),
 	}, vols)
 
 	var podStats statsapi.PodStats
@@ -882,13 +882,13 @@ func makeContainersByQOS(class v1.PodQOSClass) []v1.Container {
 	resource := newResourceList("100m", "1Gi", "")
 	switch class {
 	case v1.PodQOSGuaranteed:
-		return []v1.Container{newContainer("guaranteed-container", resource, resource)}
+		return []v1.Container{newContainer("guaranteed-container", resource, resource, nil)}
 	case v1.PodQOSBurstable:
-		return []v1.Container{newContainer("burtable-container", resource, nil)}
+		return []v1.Container{newContainer("burtable-container", resource, nil, nil)}
 	case v1.PodQOSBestEffort:
 		fallthrough
 	default:
-		return []v1.Container{newContainer("best-effort-container", nil, nil)}
+		return []v1.Container{newContainer("best-effort-container", nil, nil, nil)}
 	}
 }
 
@@ -2096,7 +2096,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 func TestInodePressureFsInodes(t *testing.T) {
 	podMaker := func(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, rootInodes, logInodes, volumeInodes string) (*v1.Pod, statsapi.PodStats) {
 		pod := newPod(name, priority, []v1.Container{
-			newContainer(name, requests, limits),
+			newContainer(name, requests, limits, nil),
 		}, nil)
 		podStats := newPodInodeStats(pod, parseQuantity(rootInodes), parseQuantity(logInodes), parseQuantity(volumeInodes))
 		return pod, podStats
