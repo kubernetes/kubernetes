@@ -29,6 +29,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -313,6 +314,25 @@ func TestPatchCustomResource(t *testing.T) {
 	}
 }
 
+type testTimeoutPatcher struct {
+	t *testing.T
+}
+
+func (p *testTimeoutPatcher) New() runtime.Object {
+	return &example.Pod{}
+}
+
+func (p *testTimeoutPatcher) Update(ctx context.Context, _ string, _ rest.UpdatedObjectInfo, _ rest.ValidateObjectFunc, _ rest.ValidateObjectUpdateFunc, _ bool, _ *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// Block until the context is canceled to simulate a timeout scenario.
+	<-ctx.Done()
+	return nil, false, ctx.Err()
+}
+
+func (p *testTimeoutPatcher) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	p.t.Fatal("unexpected call to testPatcher.Get")
+	return nil, errors.New("unexpected call to testPatcher.Get")
+}
+
 type testPatcher struct {
 	t *testing.T
 
@@ -422,6 +442,9 @@ type patchTestCase struct {
 	expectedError string
 	// if set, indicates the number of times patching was expected to be attempted
 	expectedTries int
+
+	// isTimeout for this test case
+	isTimeout bool
 }
 
 func (tc *patchTestCase) Run(t *testing.T) {
@@ -554,8 +577,16 @@ func (tc *patchTestCase) Run(t *testing.T) {
 				FieldManager: "test-manager",
 			},
 		}
-
-		ctx, cancel := context.WithTimeout(ctx, time.Second)
+		var timeout time.Duration
+		if tc.isTimeout {
+			// Simulate timeout by using a zero-duration timeout and the timeout patcher
+			// replace testPatcher with the timeout simulator
+			timeout = 0
+			p.restPatcher = &testTimeoutPatcher{t: t}
+		} else {
+			timeout = time.Second
+		}
+		ctx, cancel := context.WithTimeout(ctx, timeout)
 		resultObj, _, err := p.patchResource(ctx, &RequestScope{
 			FieldManager: fieldmanager,
 		})
@@ -665,6 +696,20 @@ func TestPatchResourceNumberConversion(t *testing.T) {
 	setTcPod(tc.updatePod, name, namespace, uid, "2", examplev1.SchemeGroupVersion.String(), &thirty, "anywhere")
 
 	setTcPod(tc.expectedPod, name, namespace, uid, "2", "", &thirty, "anywhere")
+
+	tc.Run(t)
+}
+
+func TestPatchResourceTimeout(t *testing.T) {
+	tc := &patchTestCase{
+		name:          "TestPatchResourceTimeout",
+		startingPod:   &example.Pod{},
+		changedPod:    &example.Pod{},
+		updatePod:     &example.Pod{},
+		expectedPod:   nil,
+		isTimeout:     true,
+		expectedError: "Timeout: request did not complete within requested timeout - context deadline exceeded",
+	}
 
 	tc.Run(t)
 }
