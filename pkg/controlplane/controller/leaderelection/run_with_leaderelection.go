@@ -29,12 +29,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var (
-	// TODO: Eventually these should be configurable
-	LeaseDuration = 15 * time.Second
-	RenewDeadline = 10 * time.Second
-	RetryPeriod   = 2 * time.Second
-)
+type LeaderElectionTimers struct {
+	LeaseDuration time.Duration
+	RenewDeadline time.Duration
+	RetryPeriod   time.Duration
+}
 
 type NewRunner func() (func(ctx context.Context, workers int), error)
 
@@ -43,7 +42,7 @@ type NewRunner func() (func(ctx context.Context, workers int), error)
 // controller instance's Run method each time.
 // RunWithLeaderElection only returns when the context is done, or initial
 // leader election fails.
-func RunWithLeaderElection(ctx context.Context, config *rest.Config, newRunnerFn NewRunner) {
+func RunWithLeaderElection(ctx context.Context, config *rest.Config, newRunnerFn NewRunner, timers LeaderElectionTimers) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		klog.Infof("Error parsing hostname: %v", err)
@@ -83,9 +82,9 @@ func RunWithLeaderElection(ctx context.Context, config *rest.Config, newRunnerFn
 
 		le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 			Lock:            rl,
-			LeaseDuration:   LeaseDuration,
-			RenewDeadline:   RenewDeadline,
-			RetryPeriod:     RetryPeriod,
+			LeaseDuration:   timers.LeaseDuration,
+			RenewDeadline:   timers.RenewDeadline,
+			RetryPeriod:     timers.RetryPeriod,
 			Callbacks:       callbacks,
 			Name:            controllerName,
 			ReleaseOnCancel: true,
@@ -95,5 +94,5 @@ func RunWithLeaderElection(ctx context.Context, config *rest.Config, newRunnerFn
 			return
 		}
 		le.Run(ctx)
-	}, RetryPeriod, ctx.Done())
+	}, timers.RetryPeriod, ctx.Done())
 }
