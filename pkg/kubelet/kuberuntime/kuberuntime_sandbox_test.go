@@ -40,6 +40,7 @@ import (
 const testPodLogsDirectory = "/var/log/pods"
 
 func TestGeneratePodSandboxConfig(t *testing.T) {
+	ctx := context.Background()
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := newTestPod()
@@ -62,7 +63,7 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 		},
 	}
 
-	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 1)
+	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedLabels, podSandboxConfig.Labels)
 	assert.Equal(t, expectedLogDirectory, podSandboxConfig.LogDirectory)

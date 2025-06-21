@@ -20,6 +20,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -175,6 +176,7 @@ func TestApplySandboxResources(t *testing.T) {
 }
 
 func TestGeneratePodSandboxConfigWithLinuxSecurityContext(t *testing.T) {
+	ctx := context.Background()
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := newTestPodWithLinuxSecurityContext()
@@ -189,7 +191,7 @@ func TestGeneratePodSandboxConfigWithLinuxSecurityContext(t *testing.T) {
 		},
 	}
 
-	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 1)
+	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.SelinuxOptions, podSandboxConfig.Linux.SecurityContext.SelinuxOptions)
 	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.RunAsUser, podSandboxConfig.Linux.SecurityContext.RunAsUser)
