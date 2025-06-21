@@ -425,7 +425,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	progressRequester := progress.NewConditionalProgressRequester(config.Storage.RequestWatchProgress, config.Clock, contextMetadata)
 	watchCache := newWatchCache(
 		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers,
-		config.Clock, eventFreshDuration, config.GroupResource, progressRequester)
+		config.Clock, eventFreshDuration, config.GroupResource, progressRequester, config.Storage.GetCurrentResourceVersion)
 	listerWatcher := NewListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc, contextMetadata)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -698,8 +698,22 @@ func computeListLimit(opts storage.ListOptions) int64 {
 	return opts.Predicate.Limit
 }
 
-func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, opts storage.ListOptions) (listResp, string, error) {
+func (c *Cacher) listItems(ctx context.Context, key string, opts storage.ListOptions) (listResp, string, error) {
 	if !opts.Recursive {
+		var listRV uint64
+		var err error
+		if opts.ResourceVersionMatch == "" && opts.ResourceVersion == "" {
+			// Consistent read
+			listRV, err = c.storage.GetCurrentResourceVersion(ctx)
+			if err != nil {
+				return listResp{}, "", err
+			}
+		} else {
+			listRV, err = c.versioner.ParseResourceVersion(opts.ResourceVersion)
+			if err != nil {
+				return listResp{}, "", err
+			}
+		}
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, listRV, key)
 		if err != nil {
 			return listResp{}, "", err
@@ -709,7 +723,7 @@ func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, opts 
 		}
 		return listResp{ResourceVersion: readResourceVersion}, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, opts)
+	return c.watchCache.WaitUntilFreshAndList(ctx, key, opts)
 }
 
 type listResp struct {
@@ -727,7 +741,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		preparedKey += "/"
 	}
-	listRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
+	_, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return err
 	}
@@ -763,7 +777,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 
-	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, opts)
+	resp, indexUsed, err := c.listItems(ctx, preparedKey, opts)
 	if err != nil {
 		return err
 	}

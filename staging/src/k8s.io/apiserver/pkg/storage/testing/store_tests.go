@@ -697,6 +697,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		{
 			name:             "rejects resource version set too high",
 			prefix:           "/pods",
+			pred:             storage.Everything,
 			rv:               strconv.FormatInt(math.MaxInt64, 10),
 			expectRVTooLarge: true,
 		},
