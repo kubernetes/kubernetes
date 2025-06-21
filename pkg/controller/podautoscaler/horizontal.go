@@ -606,8 +606,9 @@ func (a *HorizontalController) computeStatusForResourceMetricGeneric(ctx context
 			return 0, nil, time.Time{}, "", condition, fmt.Errorf("failed to get %s usage: %v", resourceName, err)
 		}
 		metricNameProposal = fmt.Sprintf("%s resource", resourceName.String())
+		quantity := buildQuantity(resourceName, rawProposal)
 		status := autoscalingv2.MetricValueStatus{
-			AverageValue: resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
+			AverageValue: &quantity,
 		}
 		return replicaCountProposal, &status, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 	}
@@ -627,11 +628,26 @@ func (a *HorizontalController) computeStatusForResourceMetricGeneric(ctx context
 	if sourceType == autoscalingv2.ContainerResourceMetricSourceType {
 		metricNameProposal = fmt.Sprintf("%s container resource utilization (percentage of request)", resourceName)
 	}
+	quantity := buildQuantity(resourceName, rawProposal)
 	status := autoscalingv2.MetricValueStatus{
 		AverageUtilization: &percentageProposal,
-		AverageValue:       resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
+		AverageValue:       &quantity,
 	}
 	return replicaCountProposal, &status, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
+}
+
+// buildQuantity creates a resource.Quantity for HPA metrics based on the resource type.
+//
+// For memory, it converts bytes to KiB (by dividing by 1000) and uses BinarySI for display (Ki/Mi/Gi).
+// For CPU or other resources, it treats rawProposal as milli-units and uses DecimalSI (m).
+func buildQuantity(resourceName v1.ResourceName, rawProposal int64) resource.Quantity {
+	if resourceName == v1.ResourceMemory {
+		// Convert bytes to KiB
+		kib := rawProposal / 1000
+		return *resource.NewQuantity(kib, resource.BinarySI)
+	}
+	// For CPU or other resources: rawProposal is in milli-units
+	return *resource.NewMilliQuantity(rawProposal, resource.DecimalSI)
 }
 
 // computeStatusForResourceMetric computes the desired number of replicas for the specified metric of type ResourceMetricSourceType.
