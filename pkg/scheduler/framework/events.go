@@ -22,6 +22,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -43,26 +44,26 @@ const (
 
 var (
 	// EventAssignedPodAdd is the event when an assigned pod is added.
-	EventAssignedPodAdd = ClusterEvent{Resource: assignedPod, ActionType: Add}
+	EventAssignedPodAdd = fwk.ClusterEvent{Resource: assignedPod, ActionType: fwk.Add}
 	// EventAssignedPodUpdate is the event when an assigned pod is updated.
-	EventAssignedPodUpdate = ClusterEvent{Resource: assignedPod, ActionType: Update}
+	EventAssignedPodUpdate = fwk.ClusterEvent{Resource: assignedPod, ActionType: fwk.Update}
 	// EventAssignedPodDelete is the event when an assigned pod is deleted.
-	EventAssignedPodDelete = ClusterEvent{Resource: assignedPod, ActionType: Delete}
+	EventAssignedPodDelete = fwk.ClusterEvent{Resource: assignedPod, ActionType: fwk.Delete}
 	// EventUnscheduledPodAdd is the event when an unscheduled pod is added.
-	EventUnscheduledPodAdd = ClusterEvent{Resource: unschedulablePod, ActionType: Add}
+	EventUnscheduledPodAdd = fwk.ClusterEvent{Resource: unschedulablePod, ActionType: fwk.Add}
 	// EventUnscheduledPodUpdate is the event when an unscheduled pod is updated.
-	EventUnscheduledPodUpdate = ClusterEvent{Resource: unschedulablePod, ActionType: Update}
+	EventUnscheduledPodUpdate = fwk.ClusterEvent{Resource: unschedulablePod, ActionType: fwk.Update}
 	// EventUnscheduledPodDelete is the event when an unscheduled pod is deleted.
-	EventUnscheduledPodDelete = ClusterEvent{Resource: unschedulablePod, ActionType: Delete}
+	EventUnscheduledPodDelete = fwk.ClusterEvent{Resource: unschedulablePod, ActionType: fwk.Delete}
 	// EventUnschedulableTimeout is the event when a pod stays in unschedulable for longer than timeout.
-	EventUnschedulableTimeout = ClusterEvent{Resource: WildCard, ActionType: All, label: UnschedulableTimeout}
+	EventUnschedulableTimeout = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: UnschedulableTimeout}
 	// EventForceActivate is the event when a pod is moved from unschedulablePods/backoffQ to activeQ.
-	EventForceActivate = ClusterEvent{Resource: WildCard, ActionType: All, label: ForceActivate}
+	EventForceActivate = fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All, CustomLabel: ForceActivate}
 )
 
 // PodSchedulingPropertiesChange interprets the update of a pod and returns corresponding UpdatePodXYZ event(s).
 // Once we have other pod update events, we should update here as well.
-func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []ClusterEvent) {
+func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []fwk.ClusterEvent) {
 	r := assignedPod
 	if newPod.Spec.NodeName == "" {
 		r = unschedulablePod
@@ -79,24 +80,24 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []Clu
 	}
 
 	for _, fn := range podChangeExtractors {
-		if event := fn(newPod, oldPod); event != None {
-			events = append(events, ClusterEvent{Resource: r, ActionType: event})
+		if event := fn(newPod, oldPod); event != fwk.None {
+			events = append(events, fwk.ClusterEvent{Resource: r, ActionType: event})
 		}
 	}
 
 	if len(events) == 0 {
 		// When no specific event is found, we use the general Update action,
 		// which should only trigger plugins registering a general Pod/Update event.
-		events = append(events, ClusterEvent{Resource: r, ActionType: Update})
+		events = append(events, fwk.ClusterEvent{Resource: r, ActionType: fwk.Update})
 	}
 
 	return
 }
 
-type podChangeExtractor func(newPod *v1.Pod, oldPod *v1.Pod) ActionType
+type podChangeExtractor func(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType
 
 // extractPodScaleDown interprets the update of a pod and returns PodRequestScaledDown event if any pod's resource request(s) is scaled down.
-func extractPodScaleDown(newPod, oldPod *v1.Pod) ActionType {
+func extractPodScaleDown(newPod, oldPod *v1.Pod) fwk.ActionType {
 	opt := resource.PodResourcesOptions{
 		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 	}
@@ -107,56 +108,56 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) ActionType {
 		newReq, ok := newPodRequests[rName]
 		if !ok {
 			// The resource request of rName is removed.
-			return UpdatePodScaleDown
+			return fwk.UpdatePodScaleDown
 		}
 
 		if oldReq.MilliValue() > newReq.MilliValue() {
 			// The resource request of rName is scaled down.
-			return UpdatePodScaleDown
+			return fwk.UpdatePodScaleDown
 		}
 	}
 
-	return None
+	return fwk.None
 }
 
-func extractPodLabelsChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
+func extractPodLabelsChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType {
 	if isLabelChanged(newPod.GetLabels(), oldPod.GetLabels()) {
-		return UpdatePodLabel
+		return fwk.UpdatePodLabel
 	}
-	return None
+	return fwk.None
 }
 
-func extractPodTolerationChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
+func extractPodTolerationChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType {
 	if len(newPod.Spec.Tolerations) != len(oldPod.Spec.Tolerations) {
 		// A Pod got a new toleration.
 		// Due to API validation, the user can add, but cannot modify or remove tolerations.
 		// So, it's enough to just check the length of tolerations to notice the update.
 		// And, any updates in tolerations could make Pod schedulable.
-		return UpdatePodToleration
+		return fwk.UpdatePodToleration
 	}
 
-	return None
+	return fwk.None
 }
 
-func extractPodSchedulingGateEliminatedChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
+func extractPodSchedulingGateEliminatedChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType {
 	if len(newPod.Spec.SchedulingGates) == 0 && len(oldPod.Spec.SchedulingGates) != 0 {
 		// A scheduling gate on the pod is completely removed.
-		return UpdatePodSchedulingGatesEliminated
+		return fwk.UpdatePodSchedulingGatesEliminated
 	}
 
-	return None
+	return fwk.None
 }
 
-func extractPodGeneratedResourceClaimChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
+func extractPodGeneratedResourceClaimChange(newPod *v1.Pod, oldPod *v1.Pod) fwk.ActionType {
 	if !resourceclaim.PodStatusEqual(newPod.Status.ResourceClaimStatuses, oldPod.Status.ResourceClaimStatuses) {
-		return UpdatePodGeneratedResourceClaim
+		return fwk.UpdatePodGeneratedResourceClaim
 	}
 
-	return None
+	return fwk.None
 }
 
 // NodeSchedulingPropertiesChange interprets the update of a node and returns corresponding UpdateNodeXYZ event(s).
-func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events []ClusterEvent) {
+func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events []fwk.ClusterEvent) {
 	nodeChangeExtracters := []nodeChangeExtractor{
 		extractNodeSpecUnschedulableChange,
 		extractNodeAllocatableChange,
@@ -167,41 +168,41 @@ func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events 
 	}
 
 	for _, fn := range nodeChangeExtracters {
-		if event := fn(newNode, oldNode); event != None {
-			events = append(events, ClusterEvent{Resource: Node, ActionType: event})
+		if event := fn(newNode, oldNode); event != fwk.None {
+			events = append(events, fwk.ClusterEvent{Resource: fwk.Node, ActionType: event})
 		}
 	}
 	return
 }
 
-type nodeChangeExtractor func(newNode *v1.Node, oldNode *v1.Node) ActionType
+type nodeChangeExtractor func(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType
 
-func extractNodeAllocatableChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
+func extractNodeAllocatableChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {
-		return UpdateNodeAllocatable
+		return fwk.UpdateNodeAllocatable
 	}
-	return None
+	return fwk.None
 }
 
-func extractNodeLabelsChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
+func extractNodeLabelsChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if isLabelChanged(newNode.GetLabels(), oldNode.GetLabels()) {
-		return UpdateNodeLabel
+		return fwk.UpdateNodeLabel
 	}
-	return None
+	return fwk.None
 }
 
 func isLabelChanged(newLabels map[string]string, oldLabels map[string]string) bool {
 	return !equality.Semantic.DeepEqual(newLabels, oldLabels)
 }
 
-func extractNodeTaintsChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
+func extractNodeTaintsChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if !equality.Semantic.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints) {
-		return UpdateNodeTaint
+		return fwk.UpdateNodeTaint
 	}
-	return None
+	return fwk.None
 }
 
-func extractNodeConditionsChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
+func extractNodeConditionsChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	strip := func(conditions []v1.NodeCondition) map[v1.NodeConditionType]v1.ConditionStatus {
 		conditionStatuses := make(map[v1.NodeConditionType]v1.ConditionStatus, len(conditions))
 		for i := range conditions {
@@ -210,22 +211,22 @@ func extractNodeConditionsChange(newNode *v1.Node, oldNode *v1.Node) ActionType 
 		return conditionStatuses
 	}
 	if !equality.Semantic.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions)) {
-		return UpdateNodeCondition
+		return fwk.UpdateNodeCondition
 	}
-	return None
+	return fwk.None
 }
 
-func extractNodeSpecUnschedulableChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
+func extractNodeSpecUnschedulableChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && !newNode.Spec.Unschedulable {
 		// TODO: create UpdateNodeSpecUnschedulable ActionType
-		return UpdateNodeTaint
+		return fwk.UpdateNodeTaint
 	}
-	return None
+	return fwk.None
 }
 
-func extractNodeAnnotationsChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
+func extractNodeAnnotationsChange(newNode *v1.Node, oldNode *v1.Node) fwk.ActionType {
 	if !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations()) {
-		return UpdateNodeAnnotation
+		return fwk.UpdateNodeAnnotation
 	}
-	return None
+	return fwk.None
 }

@@ -641,7 +641,7 @@ type defaultEnqueueExtension struct {
 }
 
 func (p *defaultEnqueueExtension) Name() string { return p.pluginName }
-func (p *defaultEnqueueExtension) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (p *defaultEnqueueExtension) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	// need to return all specific cluster events with framework.All action instead of wildcard event
 	// because the returning values are used to register event handlers.
 	// If we return the wildcard here, it won't affect the event handlers registered by the plugin
