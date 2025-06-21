@@ -1616,3 +1616,26 @@ func verifyEventEmitted(t *testing.T, dc *disruptionController, expectedEvent st
 		}
 	}
 }
+
+func TestPodWithDeletionTimestampIsIgnoredForControllerCheck(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	dc, ps := newFakeDisruptionController(ctx)
+
+	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+	add(t, dc.pdbStore, pdb)
+	dc.sync(ctx, pdbName)
+	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
+	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+
+	pod, _ := newPod(t, "terminating")
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	add(t, dc.podStore, pod)
+	dc.sync(ctx, pdbName)
+
+	var pods []*v1.Pod
+	pods = append(pods, pod)
+	_, _, err := dc.getExpectedScale(ctx, pdb, pods)
+	if err != nil {
+		t.Fatalf("expected no error for pod with DeletionTimestamp, got: %v", err)
+	}
+}
