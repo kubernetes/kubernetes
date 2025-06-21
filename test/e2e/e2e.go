@@ -182,6 +182,11 @@ func setupSuite(ctx context.Context) {
 		logClusterImageSources()
 	}
 
+	if framework.TestContext.KubeConfig == "none" {
+		// Skip all pre-test checks, we don't have a cluster (yet).
+		return
+	}
+
 	c, err := framework.LoadClientset()
 	framework.ExpectNoError(err, "Error loading client")
 
@@ -371,6 +376,10 @@ func lookupClusterImageSources() (string, string, error) {
 // Because of the way Ginkgo runs tests in parallel, we must use SynchronizedBeforeSuite
 // Ref: https://onsi.github.io/ginkgo/#parallel-specs
 func setupSuitePerGinkgoNode(ctx context.Context) {
+	if framework.TestContext.KubeConfig == "none" {
+		return
+	}
+
 	// Obtain the default IP family of the cluster
 	// Some e2e test are designed to work on IPv4 only, this global variable
 	// allows to adapt those tests to work on both IPv4 and IPv6
