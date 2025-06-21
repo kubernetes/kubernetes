@@ -284,11 +284,11 @@ func TestConnectionHandling(t *testing.T) {
 		delay               time.Duration
 		requireSliceRemoval bool
 	}{
-		"wipe-slices-on-disconnect": {
+		"wipe-on-disconnect": {
 			delay:               time.Second, // very short wiping delay for testing
 			requireSliceRemoval: true,
 		},
-		"no-wipe-slices-on-reconnect": {
+		"no-wipe-on-reconnect": {
 			delay:               time.Hour, // long delay to avoid wiping while the test runs
 			requireSliceRemoval: false,
 		},
@@ -311,7 +311,7 @@ func TestConnectionHandling(t *testing.T) {
 			requireNoSlices(tCtx)
 
 			// Run GRPC service.
-			endpoint := path.Join(t.TempDir(), "dra-plugin-test.sock")
+			endpoint := path.Join(t.TempDir(), "dra.sock")
 			teardown, err := setupFakeGRPCServer(service, endpoint)
 			require.NoError(t, err)
 			defer teardown()
