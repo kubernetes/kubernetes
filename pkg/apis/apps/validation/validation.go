@@ -38,6 +38,8 @@ import (
 type StatefulSetValidationOptions struct {
 	// Allow invalid DNS1123 ServiceName
 	AllowInvalidServiceName bool
+	// Skip validating pod template spec, which is used for StatefulSet update
+	SkipValidatePodTemplateSpec bool
 }
 
 // ValidateStatefulSetName can be used to check whether the given StatefulSet name is valid.
@@ -51,7 +53,8 @@ func ValidateStatefulSetName(name string, prefix bool) []string {
 }
 
 // ValidatePodTemplateSpecForStatefulSet validates the given template and ensures that it is in accordance with the desired selector.
-func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, selector labels.Selector, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, selector labels.Selector, fldPath *field.Path, opts apivalidation.PodValidationOptions,
+	setOpts StatefulSetValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
@@ -63,10 +66,10 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
 			}
 		}
-		// TODO: Add validation for PodSpec, currently this will check volumes, which we know will
-		// fail. We should really check that the union of the given volumes and volumeClaims match
-		// volume mounts in the containers.
-		// allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
+		podSpecErrs := apivalidation.ValidatePodTemplateSpec(template, fldPath, opts)
+		if len(podSpecErrs) > 0 && !setOpts.SkipValidatePodTemplateSpec {
+			allErrs = append(allErrs, podSpecErrs...)
+		}
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(template.Labels, fldPath.Child("labels"))...)
 		allErrs = append(allErrs, apivalidation.ValidateAnnotations(template.Annotations, fldPath.Child("annotations"))...)
 		allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(template.Annotations, &template.Spec, fldPath.Child("annotations"), opts)...)
@@ -92,6 +95,25 @@ func ValidatePersistentVolumeClaimRetentionPolicy(policy *apps.StatefulSetPersis
 		allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicyType(policy.WhenScaled, fldPath.Child("whenScaled"))...)
 	}
 	return allErrs
+}
+
+func volumesToAddForTemplates(spec *apps.StatefulSetSpec) []api.Volume {
+	if len(spec.VolumeClaimTemplates) == 0 {
+		return nil
+	}
+	newVolumes := make([]api.Volume, 0, len(spec.VolumeClaimTemplates))
+	for i := range spec.VolumeClaimTemplates {
+		claimName := spec.VolumeClaimTemplates[i].Name
+		newVolumes = append(newVolumes, api.Volume{
+			Name: spec.VolumeClaimTemplates[i].Name,
+			VolumeSource: api.VolumeSource{
+				PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+					ClaimName: claimName,
+				},
+			},
+		})
+	}
+	return newVolumes
 }
 
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
@@ -158,7 +180,12 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
 	} else {
-		allErrs = append(allErrs, ValidatePodTemplateSpecForStatefulSet(&spec.Template, selector, fldPath.Child("template"), opts)...)
+		templateToValidate := &spec.Template
+		if newVolumes := volumesToAddForTemplates(spec); len(newVolumes) > 0 {
+			templateToValidate = templateToValidate.DeepCopy()
+			templateToValidate.Spec.Volumes = append(templateToValidate.Spec.Volumes, newVolumes...)
+		}
+		allErrs = append(allErrs, ValidatePodTemplateSpecForStatefulSet(templateToValidate, selector, fldPath.Child("template"), opts, setOpts)...)
 	}
 
 	if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
@@ -192,6 +219,10 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
 	setOpts := StatefulSetValidationOptions{
 		AllowInvalidServiceName: true, // serviceName is immutable, tolerate existing invalid names on update
+	}
+	// In order to tolerate the existing sts, we choose to skip the validation error of old sts podTemplateSpec.
+	if len(ValidateStatefulSetSpec(&oldStatefulSet.Spec, nil, opts, setOpts)) > 0 {
+		setOpts.SkipValidatePodTemplateSpec = true
 	}
 	allErrs = append(allErrs, ValidateStatefulSetSpec(&statefulSet.Spec, field.NewPath("spec"), opts, setOpts)...)
 
