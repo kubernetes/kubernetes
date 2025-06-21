@@ -149,6 +149,20 @@ func TestPrepareForUpdateSelectionStrategyEnabled(t *testing.T) {
 	if newHPA.Spec.SelectionStrategy == nil {
 		t.Error("Expected SelectionStrategy field, got none")
 	}
+
+	newHPA = prepareHPA(oneMinReplicas, withoutTolerance, withoutSelectionStrategy)
+	oldHPA = prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
+	if newHPA.Spec.SelectionStrategy != nil {
+		t.Errorf("Expected SelectionStrategy field wiped out, got %v", newHPA.Spec.SelectionStrategy)
+	}
+
+	newHPA = prepareHPA(oneMinReplicas, withoutTolerance, withSelectionStrategy)
+	oldHPA = prepareHPA(oneMinReplicas, withoutTolerance, withoutSelectionStrategy)
+	Strategy.PrepareForUpdate(context.Background(), &newHPA, &oldHPA)
+	if newHPA.Spec.SelectionStrategy == nil {
+		t.Error("Expected SelectionStrategy field, got none")
+	}
 }
 
 func TestPrepareForUpdateSelectionStrategyDisabled(t *testing.T) {
