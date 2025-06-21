@@ -131,7 +131,7 @@ func TestPrepareForCreateSelectionStrategyEnabled(t *testing.T) {
 }
 
 func TestPrepareForCreateSelectionStrategyDisabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPASelectionStrategy, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPASelectionStrategy, false)
 	hpa := prepareHPA(oneMinReplicas, withoutTolerance, withoutSelectionStrategy)
 
 	Strategy.PrepareForCreate(context.Background(), &hpa)
