@@ -88,6 +88,7 @@ type store struct {
 
 	resourcePrefix string
 	newListFunc    func() runtime.Object
+	sizer          *sizeCache
 }
 
 func (s *store) RequestWatchProgress(ctx context.Context) error {
@@ -191,6 +192,11 @@ func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc fu
 
 		resourcePrefix: resourcePrefix,
 		newListFunc:    newListFunc,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		sizer := newSizeCache()
+		s.sizer = sizer
+		w.sizer = sizer
 	}
 
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
@@ -617,26 +623,27 @@ func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Obje
 	}
 }
 
-func (s *store) Count(ctx context.Context, key string) (int64, error) {
-	preparedKey, err := s.prepareKey(key)
-	if err != nil {
-		return 0, err
-	}
-
-	// We need to make sure the key ended with "/" so that we only get children "directories".
-	// e.g. if we have key "/a", "/a/b", "/ab", getting keys with prefix "/a" will return all three,
-	// while with prefix "/a/" will return only "/a/b" which is the correct answer.
-	if !strings.HasSuffix(preparedKey, "/") {
-		preparedKey += "/"
-	}
-
+func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
 	startTime := time.Now()
-	count, err := s.client.Kubernetes.Count(ctx, preparedKey, kubernetes.CountOptions{})
+	if s.sizer != nil {
+		resp, err := s.client.KV.Get(ctx, s.pathPrefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
+		metrics.RecordEtcdRequest("listOnlyKeys", s.groupResource, err, startTime)
+		if err != nil {
+			return storage.Stats{}, err
+		}
+		return storage.Stats{
+			ObjectCount:                     resp.Count,
+			EstimatedAverageObjectSizeBytes: s.sizer.AverageObjectSize(resp.Kvs),
+		}, nil
+	}
+	count, err := s.client.Kubernetes.Count(ctx, s.pathPrefix, kubernetes.CountOptions{})
 	metrics.RecordEtcdRequest("listWithCount", s.groupResource, err, startTime)
 	if err != nil {
-		return 0, err
+		return storage.Stats{}, err
 	}
-	return count, nil
+	return storage.Stats{
+		ObjectCount: count,
+	}, nil
 }
 
 // ReadinessCheck implements storage.Interface.
@@ -803,6 +810,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			// being unable to set the version does not prevent the object from being extracted
 			if matched, err := opts.Predicate.Matches(obj); err == nil && matched {
+				if s.sizer != nil {
+					s.sizer.AddOrUpdate(string(kv.Key), kv.ModRevision, int64(len(kv.Value)))
+				}
 				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 			}
 

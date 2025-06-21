@@ -243,8 +243,8 @@ type Interface interface {
 		ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
-	// Count returns number of different entries under the key (generally being path prefix).
-	Count(ctx context.Context, key string) (int64, error)
+	// Stats returns storage stats.
+	Stats(ctx context.Context) (Stats, error)
 
 	// ReadinessCheck checks if the storage is ready for accepting requests.
 	ReadinessCheck() error
@@ -369,4 +369,13 @@ func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions
 		return withRev, "", fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
 	}
 	return withRev, "", nil
+}
+
+// Stats provides statistics information about storage.
+type Stats struct {
+	// ObjectCount informs about number of objects stored in the storage.
+	ObjectCount int64
+	// EstimatedAverageObjectSizeBytes informs about size of objects stored in the storage, based on size of serialized values.
+	// Value is an estimate, meaning it doesn't need to provide accurate nor consistent.
+	EstimatedAverageObjectSizeBytes int64
 }
