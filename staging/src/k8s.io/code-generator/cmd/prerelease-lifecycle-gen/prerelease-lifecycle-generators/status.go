@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"k8s.io/code-generator/cmd/prerelease-lifecycle-gen/args"
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -98,7 +99,11 @@ func extractRemovedTag(t *types.Type) (*tagValue, int, int, error) {
 func extractReplacementTag(t *types.Type) (group, version, kind string, hasReplacement bool, err error) {
 	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
 
-	tagVals := gengo.ExtractCommentTags("+", comments)[replacementTagName]
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{replacementTagName}, comments)
+	if err != nil {
+		return "", "", "", false, fmt.Errorf("failed to parse comments: %w", err)
+	}
+	tagVals := tags[replacementTagName]
 	if len(tagVals) == 0 {
 		// No match for the tag.
 		return "", "", "", false, nil
