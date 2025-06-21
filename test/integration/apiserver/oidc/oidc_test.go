@@ -1096,6 +1096,7 @@ jwt:
 				Groups:   []string{"system:authenticated"},
 			},
 			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_config_hash{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795"} FP`,
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
 			},
@@ -1144,6 +1145,7 @@ jwt:
 				Groups:   []string{"system:authenticated"},
 			},
 			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_config_hash{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795"} FP`,
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
 			},
@@ -1199,6 +1201,7 @@ jwt:
 				Groups:   []string{"system:authenticated"},
 			},
 			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_config_hash{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795"} FP`,
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
 			},
@@ -1300,6 +1303,7 @@ kind: AuthenticationConfiguration
 			newWantUser:         nil,
 			waitAfterConfigSwap: true,
 			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_config_hash{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795"} FP`,
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
 			},
@@ -1437,7 +1441,7 @@ jwt:
 			trimFP := regexp.MustCompile(`(.*)(} \d+\.\d+.*)`)
 			for _, line := range strings.Split(string(body), "\n") {
 				if strings.HasPrefix(line, "apiserver_authentication_config_controller_") {
-					if strings.Contains(line, "_seconds") {
+					if strings.Contains(line, "_seconds") || strings.Contains(line, "last_config_hash") {
 						line = trimFP.ReplaceAllString(line, `$1`) + "} FP" // ignore floating point metric values
 					}
 					gotMetricStrings = append(gotMetricStrings, line)
