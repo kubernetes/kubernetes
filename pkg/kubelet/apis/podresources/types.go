@@ -34,6 +34,7 @@ type DevicesProvider interface {
 
 // PodsProvider knows how to provide the pods admitted by the node
 type PodsProvider interface {
+	GetActivePods() []*v1.Pod
 	GetPods() []*v1.Pod
 	GetPodByName(namespace, name string) (*v1.Pod, bool)
 }
