@@ -458,7 +458,7 @@ func TestValidateJob(t *testing.T) {
 				},
 			},
 		},
-		`spec.successPolicy: Invalid value: batch.SuccessPolicy{Rules:[]batch.SuccessPolicyRule{}}: requires indexed completion mode`: {
+		`spec.successPolicy: Invalid value: {"Rules":[]}: requires indexed completion mode`: {
 			job: batch.Job{
 				ObjectMeta: validJobObjectMeta,
 				Spec: batch.JobSpec{
@@ -739,7 +739,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 		},
-		`spec.podFailurePolicy.rules[0].onExitCodes.values: Invalid value: []int32{19, 11}: must be ordered`: {
+		`spec.podFailurePolicy.rules[0].onExitCodes.values: Invalid value: [19,11]: must be ordered`: {
 			job: batch.Job{
 				ObjectMeta: validJobObjectMeta,
 				Spec: batch.JobSpec{
@@ -758,7 +758,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 		},
-		`spec.podFailurePolicy.rules[0].onExitCodes.values: Invalid value: []int32{}: at least one value is required`: {
+		`spec.podFailurePolicy.rules[0].onExitCodes.values: Invalid value: []: at least one value is required`: {
 			job: batch.Job{
 				ObjectMeta: validJobObjectMeta,
 				Spec: batch.JobSpec{
@@ -1239,7 +1239,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 		},
-		"spec.template.metadata.labels: Invalid value: map[string]string{\"y\":\"z\"}: `selector` does not match template `labels`": {
+		"spec.template.metadata.labels: Invalid value: {\"y\":\"z\"}: `selector` does not match template `labels`": {
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myjob",
@@ -1259,7 +1259,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 		},
-		"spec.template.metadata.labels: Invalid value: map[string]string{\"controller-uid\":\"4d5e6f\"}: `selector` does not match template `labels`": {
+		"spec.template.metadata.labels: Invalid value: {\"controller-uid\":\"4d5e6f\"}: `selector` does not match template `labels`": {
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myjob",
@@ -1407,7 +1407,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			opts: JobValidationOptions{},
 		},
-		"spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{\"a\":\"b\"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: `selector` not auto-generated": {
+		"spec.selector: Invalid value: {\"matchLabels\":{\"a\":\"b\"}}: `selector` not auto-generated": {
 			job: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myjob",
