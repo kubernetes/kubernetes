@@ -240,6 +240,30 @@ func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 	return im.imageCache.get(), nil
 }
 
+// isContainerActuallyUsingImage determines if a container is actually using its image.
+// Containers in error states or not running are not considered to be using their image
+// for garbage collection purposes.
+func isContainerActuallyUsingImage(container *container.Container) bool {
+	// Only consider containers that are actually running or in a valid state
+	// that indicates they are using the image
+	switch container.State {
+	case "running":
+		return true
+	case "created":
+		// Created containers may be using the image but haven't started yet
+		return true
+	case "exited":
+		// Exited containers are not currently using the image
+		return false
+	case "unknown":
+		// Unknown state containers are not considered to be using the image
+		return false
+	default:
+		// For any other state, be conservative and assume they're not using the image
+		return false
+	}
+}
+
 func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.Time) (sets.Set[string], error) {
 	isRuntimeClassInImageCriAPIEnabled := utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI)
 	imagesInUse := sets.New[string]()
@@ -256,6 +280,16 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	// Make a set of images in use by containers.
 	for _, pod := range pods {
 		for _, container := range pod.Containers {
+			// Skip containers that are not actually using the image
+			// This includes containers in error states like CreateContainerConfigError
+			if !isContainerActuallyUsingImage(container) {
+				klog.V(5).InfoS("Skipping container for image usage, container not actually using image",
+					"pod", klog.KRef(pod.Namespace, pod.Name),
+					"containerName", container.Name,
+					"containerState", container.State)
+				continue
+			}
+
 			if err := im.handleImageVolumes(ctx, imagesInUse, container, pod, images); err != nil {
 				return imagesInUse, err
 			}
