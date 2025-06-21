@@ -283,13 +283,16 @@ func run(ctx context.Context, config *hollowNodeConfig) error {
 		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "kube-proxy")
 
-		hollowProxy := kubemarkproxy.NewHollowProxy(
+		hollowProxy, err := kubemarkproxy.NewHollowProxy(
 			config.NodeName,
 			client,
 			client.CoreV1(),
 			eventBroadcaster,
 			recorder,
 		)
+		if err != nil {
+			return fmt.Errorf("failed to create a HollowProxy: %w", err)
+		}
 		return hollowProxy.Run()
 	}
 
