@@ -1597,6 +1597,30 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		return e.KeyFunc(genericapirequest.NewContext(), accessor.GetName())
 	}
 
+	// reverse key into namespace and name
+	// Examples:
+	//		key:    /registry/pods/namespace/name
+	//		prefix: /pods
+	reverseKeyFunc := func(key string) (name string, namespace string, err error) {
+		tokens := strings.Split(key, prefix)
+		if len(tokens) != 2 {
+			err = fmt.Errorf("invalid key %q, requiring resource prefix %q", key, prefix)
+			return
+		}
+		// trim leading /
+		namespacedName := tokens[1][1:]
+		if !isNamespaced {
+			return namespacedName, "", nil
+		}
+
+		tokens = strings.Split(namespacedName, "/")
+		if len(tokens) != 2 {
+			err = fmt.Errorf("invalid key %q, requiring namspace", key)
+			return
+		}
+		return tokens[1], tokens[0], nil
+	}
+
 	if e.DeleteCollectionWorkers == 0 {
 		e.DeleteCollectionWorkers = opts.DeleteCollectionWorkers
 	}
@@ -1622,6 +1646,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			keyFunc,
 			e.NewFunc,
 			e.NewListFunc,
+			reverseKeyFunc,
 			attrFunc,
 			options.TriggerFunc,
 			options.Indexers,
