@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,15 +35,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	quota "k8s.io/apiserver/pkg/quota/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // NamespacedResourcesFunc knows how to discover namespaced resources.
@@ -82,6 +86,8 @@ type Controller struct {
 	rqClient corev1client.ResourceQuotasGetter
 	// A lister/getter of resource quota objects
 	rqLister corelisters.ResourceQuotaLister
+	// A lister/getter of device class objects
+	dcLister resourcelisters.DeviceClassLister
 	// A list of functions that return true when their caches have synced
 	informerSyncedFuncs []cache.InformerSynced
 	// ResourceQuota objects that need to be synchronized
@@ -99,7 +105,8 @@ type Controller struct {
 	// controls the workers that process quotas
 	// this lock is acquired to control write access to the monitors and ensures that all
 	// monitors are synced before the controller can process quotas.
-	workerLock sync.RWMutex
+	workerLock                    sync.RWMutex
+	deviceClassToExtendedResource sync.Map
 }
 
 // NewController creates a quota controller with specified options
@@ -117,8 +124,9 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resourcequota_priority"},
 		),
-		resyncPeriod: options.ResyncPeriod,
-		registry:     options.Registry,
+		resyncPeriod:                  options.ResyncPeriod,
+		registry:                      options.Registry,
+		deviceClassToExtendedResource: sync.Map{},
 	}
 	// set the synchronization handler
 	rq.syncHandler = rq.syncResourceQuotaFromKey
@@ -206,6 +214,20 @@ func (rq *Controller) enqueueAll(ctx context.Context) {
 			continue
 		}
 		rq.queue.Add(key)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		dcs, err := rq.dcLister.List(labels.Everything())
+		if err != nil {
+			logger.V(4).Error(fmt.Errorf("resource quota controller cannot list resource device classes"), "")
+			return
+		}
+		for i := range dcs {
+			if dcs[i].Spec.ExtendedResourceName != nil {
+				rq.deviceClassToExtendedResource.Store(fmt.Sprintf("%s"+v1.ResourceClaimsPerClass, dcs[i].Name), *dcs[i].Spec.ExtendedResourceName)
+			} else {
+				rq.deviceClassToExtendedResource.Store(fmt.Sprintf("%s"+v1.ResourceClaimsPerClass, dcs[i].Name), fmt.Sprintf("%s%s", v1.ResourceDeviceClassPrefix, dcs[i].Name))
+			}
+		}
 	}
 }
 
@@ -375,17 +397,34 @@ func (rq *Controller) syncResourceQuota(ctx context.Context, resourceQuota *v1.R
 	for key, value := range newUsage {
 		used[key] = value
 	}
+	usedAdj := v1.ResourceList{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		for key, value := range used {
+			if strings.HasSuffix(string(key), v1.ResourceClaimsPerClass) {
+				if er, ok := rq.deviceClassToExtendedResource.Load(key); ok {
+					if ext, ok1 := er.(string); ok1 {
+						if v, ok2 := used[v1.ResourceName(ext)]; ok2 && value.Cmp(v) < 0 {
+							value = v
+						}
+					}
+				}
+			}
+			usedAdj[key] = value
+		}
+	} else {
+		usedAdj = used
+	}
 
 	// ensure set of used values match those that have hard constraints
 	hardResources := quota.ResourceNames(hardLimits)
-	used = quota.Mask(used, hardResources)
+	usedAdj = quota.Mask(usedAdj, hardResources)
 
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
 	usage := resourceQuota.DeepCopy()
 	usage.Status = v1.ResourceQuotaStatus{
 		Hard: hardLimits,
-		Used: used,
+		Used: usedAdj,
 	}
 
 	dirty = dirty || !quota.Equals(usage.Status.Used, resourceQuota.Status.Used)

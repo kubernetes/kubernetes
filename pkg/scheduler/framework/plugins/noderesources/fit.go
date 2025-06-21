@@ -91,6 +91,7 @@ type Fit struct {
 	enableSidecarContainers         bool
 	enableSchedulingQueueHint       bool
 	enablePodLevelResources         bool
+	enableDRAExtendedResource       bool
 	handle                          framework.Handle
 	resourceAllocationScorer
 }
@@ -178,12 +179,14 @@ func NewFit(_ context.Context, plArgs runtime.Object, h framework.Handle, fts fe
 		enableSchedulingQueueHint:       fts.EnableSchedulingQueueHint,
 		handle:                          h,
 		enablePodLevelResources:         fts.EnablePodLevelResources,
+		enableDRAExtendedResource:       fts.EnableDRAExtendedResource,
 		resourceAllocationScorer:        *scorePlugin(args),
 	}, nil
 }
 
 type ResourceRequestsOptions struct {
-	EnablePodLevelResources bool
+	EnablePodLevelResources   bool
+	EnableDRAExtendedResource bool
 }
 
 // computePodResourceRequest returns a framework.Resource that covers the largest
@@ -458,7 +461,9 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 		return framework.AsStatus(err)
 	}
 
-	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups)
+	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, ResourceRequestsOptions{
+		EnablePodLevelResources:   f.enablePodLevelResources,
+		EnableDRAExtendedResource: f.enableDRAExtendedResource})
 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
@@ -502,10 +507,10 @@ type InsufficientResource struct {
 
 // Fits checks if node have enough resources to host the pod.
 func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, opts ResourceRequestsOptions) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil)
+	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, opts)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string]) []InsufficientResource {
+func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], opts ResourceRequestsOptions) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.Allocatable.AllowedPodNumber
@@ -576,15 +581,19 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 			}
 		}
 
-		if rQuant > (nodeInfo.Allocatable.ScalarResources[rName] - nodeInfo.Requested.ScalarResources[rName]) {
-			insufficientResources = append(insufficientResources, InsufficientResource{
-				ResourceName: rName,
-				Reason:       fmt.Sprintf("Insufficient %v", rName),
-				Requested:    podRequest.ScalarResources[rName],
-				Used:         nodeInfo.Requested.ScalarResources[rName],
-				Capacity:     nodeInfo.Allocatable.ScalarResources[rName],
-				Unresolvable: rQuant > nodeInfo.Allocatable.ScalarResources[rName],
-			})
+		_, okScalar := nodeInfo.Allocatable.ScalarResources[rName]
+		_, okDynamic := nodeInfo.Allocatable.DynamicResources[rName]
+		if okScalar || !opts.EnableDRAExtendedResource || !okDynamic {
+			if rQuant > (nodeInfo.Allocatable.ScalarResources[rName] - nodeInfo.Requested.ScalarResources[rName]) {
+				insufficientResources = append(insufficientResources, InsufficientResource{
+					ResourceName: rName,
+					Reason:       fmt.Sprintf("Insufficient %v", rName),
+					Requested:    podRequest.ScalarResources[rName],
+					Used:         nodeInfo.Requested.ScalarResources[rName],
+					Capacity:     nodeInfo.Allocatable.ScalarResources[rName],
+					Unresolvable: rQuant > nodeInfo.Allocatable.ScalarResources[rName],
+				})
+			}
 		}
 	}
 

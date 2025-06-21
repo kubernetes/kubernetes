@@ -46,6 +46,7 @@ var (
 	kubernetesIOResourceA = v1.ResourceName("kubernetes.io/something")
 	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
 	hugePageResourceA     = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
+	extendedResourceDRA   = v1.ResourceName("extended.resource.dra.io/something")
 )
 
 var clusterEventCmpOpts = []cmp.Option{
@@ -130,13 +131,14 @@ func newPodLevelResourcesPod(pod *v1.Pod, podResources v1.ResourceRequirements) 
 
 func TestEnoughRequests(t *testing.T) {
 	enoughPodsTests := []struct {
-		pod                       *v1.Pod
-		nodeInfo                  *framework.NodeInfo
-		name                      string
-		args                      config.NodeResourcesFitArgs
-		podLevelResourcesEnabled  bool
-		wantInsufficientResources []InsufficientResource
-		wantStatus                *framework.Status
+		pod                        *v1.Pod
+		nodeInfo                   *framework.NodeInfo
+		name                       string
+		args                       config.NodeResourcesFitArgs
+		podLevelResourcesEnabled   bool
+		draExtendedResourceEnabled bool
+		wantInsufficientResources  []InsufficientResource
+		wantStatus                 *framework.Status
 	}{
 		{
 			pod: &v1.Pod{},
@@ -602,6 +604,53 @@ func TestEnoughRequests(t *testing.T) {
 				ResourceName: v1.ResourceMemory, Reason: getErrReason(v1.ResourceMemory), Requested: 2, Used: 19, Capacity: 20},
 			},
 		},
+		{
+			draExtendedResourceEnabled: true,
+			pod:                        newResourcePod(framework.Resource{ScalarResources: map[v1.ResourceName]int64{extendedResourceA: 1}}),
+			nodeInfo:                   framework.NewNodeInfo(newResourcePod(framework.Resource{})),
+			name:                       "extended resource backed by device plugin",
+			wantInsufficientResources:  []InsufficientResource{},
+		},
+		{
+			draExtendedResourceEnabled: true,
+			pod: newResourcePod(
+				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceDRA: 1}}),
+			nodeInfo:                  framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
+			name:                      "extended resource backed by DRA",
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			draExtendedResourceEnabled: false,
+			pod: newResourcePod(
+				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceDRA: 1}}),
+			nodeInfo:   framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
+			name:       "extended resource backed by DRA not enabled",
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, getErrReason(extendedResourceDRA)),
+			wantInsufficientResources: []InsufficientResource{
+				{
+					ResourceName: "extended.resource.dra.io/something",
+					Reason:       "Insufficient extended.resource.dra.io/something",
+					Requested:    1,
+					Unresolvable: true,
+				},
+			},
+		},
+		{
+			draExtendedResourceEnabled: true,
+			pod: newResourcePod(
+				framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
+			nodeInfo:   framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 0, Memory: 0})),
+			name:       "extended resource NOT backed by DRA",
+			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, getErrReason(extendedResourceB)),
+			wantInsufficientResources: []InsufficientResource{
+				{
+					ResourceName: "example.com/bbb",
+					Reason:       "Insufficient example.com/bbb",
+					Requested:    1,
+					Unresolvable: true,
+				},
+			},
+		},
 	}
 
 	for _, test := range enoughPodsTests {
@@ -609,6 +658,7 @@ func TestEnoughRequests(t *testing.T) {
 
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5), Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
+			test.nodeInfo.Allocatable.DynamicResources = map[v1.ResourceName]string{extendedResourceDRA: "device-class-name"}
 
 			if test.args.ScoringStrategy == nil {
 				test.args.ScoringStrategy = defaultScoringStrategy
@@ -617,7 +667,7 @@ func TestEnoughRequests(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			p, err := NewFit(ctx, &test.args, nil, plfeature.Features{EnablePodLevelResources: test.podLevelResourcesEnabled})
+			p, err := NewFit(ctx, &test.args, nil, plfeature.Features{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -631,8 +681,8 @@ func TestEnoughRequests(t *testing.T) {
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				t.Errorf("status does not match (-want,+got):\n%s", diff)
 			}
-
-			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod, ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled}), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
+			opts := ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled, EnableDRAExtendedResource: test.draExtendedResourceEnabled}
+			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod, opts), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, opts)
 			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
 				t.Errorf("insufficient resources do not match (-want,+got):\n%s", diff)
 			}
@@ -1612,7 +1662,7 @@ func TestIsFit(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if got := isFit(tc.pod, tc.node, ResourceRequestsOptions{tc.podLevelResourcesEnabled}); got != tc.expected {
+			if got := isFit(tc.pod, tc.node, ResourceRequestsOptions{EnablePodLevelResources: tc.podLevelResourcesEnabled}); got != tc.expected {
 				t.Errorf("expected: %v, got: %v", tc.expected, got)
 			}
 		})
