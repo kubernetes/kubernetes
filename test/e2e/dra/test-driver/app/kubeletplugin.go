@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -42,9 +43,17 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 )
 
+type DeviceHealthUpdate struct {
+	PoolName   string
+	DeviceName string
+	Health     string
+}
+
 type ExamplePlugin struct {
+	drahealthv1alpha1.UnimplementedNodeHealthServer
 	stopCh         <-chan struct{}
 	logger         klog.Logger
 	resourceClient cgoresource.ResourceV1beta2Interface
@@ -61,6 +70,10 @@ type ExamplePlugin struct {
 	mutex     sync.Mutex
 	prepared  map[ClaimID][]kubeletplugin.Device // prepared claims -> result of nodePrepareResource
 	gRPCCalls []GRPCCall
+
+	healthMutex       sync.Mutex
+	deviceHealth      map[string]string
+	HealthControlChan chan DeviceHealthUpdate
 
 	blockPrepareResourcesMutex   sync.Mutex
 	blockUnprepareResourcesMutex sync.Mutex
@@ -143,15 +156,18 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 			return nil
 		}
 	}
+
 	ex := &ExamplePlugin{
-		stopCh:         ctx.Done(),
-		logger:         logger,
-		resourceClient: draclient.New(kubeClient),
-		fileOps:        fileOps,
-		cdiDir:         cdiDir,
-		driverName:     driverName,
-		nodeName:       nodeName,
-		prepared:       make(map[ClaimID][]kubeletplugin.Device),
+		stopCh:            ctx.Done(),
+		logger:            logger,
+		resourceClient:    draclient.New(kubeClient),
+		fileOps:           fileOps,
+		cdiDir:            cdiDir,
+		driverName:        driverName,
+		nodeName:          nodeName,
+		prepared:          make(map[ClaimID][]kubeletplugin.Device),
+		deviceHealth:      make(map[string]string),
+		HealthControlChan: make(chan DeviceHealthUpdate, 10),
 	}
 
 	opts = append(opts,
@@ -536,4 +552,74 @@ func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resour
 // To restore normal GetInfo behavior, call SetGetInfoError(nil).
 func (ex *ExamplePlugin) SetGetInfoError(err error) {
 	ex.d.SetGetInfoError(err)
+}
+
+var _ drahealthv1alpha1.NodeHealthServer = &ExamplePlugin{}
+
+// In test/e2e/dra/test-driver/app/kubeletplugin.go
+// Replace the WatchResources function with this version
+
+func (ex *ExamplePlugin) WatchResources(req *drahealthv1alpha1.WatchResourcesRequest, srv drahealthv1alpha1.NodeHealth_WatchResourcesServer) error {
+	logger := klog.FromContext(srv.Context())
+	logger.Info("Starting dynamic WatchResources stream")
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	// Send an initial update immediately
+	if err := ex.sendHealthUpdate(srv); err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case <-srv.Context().Done():
+			logger.Info("WatchResources stream canceled by kubelet")
+			return srv.Context().Err()
+
+		case update := <-ex.HealthControlChan:
+			// An instruction came from the test case
+			logger.Info("Received health update from control channel", "update", update)
+			ex.healthMutex.Lock()
+			key := update.PoolName + "/" + update.DeviceName
+			ex.deviceHealth[key] = update.Health
+			ex.healthMutex.Unlock()
+			// Immediately send an update after the change
+			if err := ex.sendHealthUpdate(srv); err != nil {
+				logger.Error(err, "Failed to send health update after control message")
+			}
+
+		case <-ticker.C:
+			// Periodic refresh
+			if err := ex.sendHealthUpdate(srv); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// Helper function to avoid code duplication
+func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.NodeHealth_WatchResourcesServer) error {
+	ex.logger.Info("[KEP-4680-E2E-DEBUG] Test driver: sendHealthUpdate called.")
+	healthUpdates := []*drahealthv1alpha1.DeviceHealth{}
+	ex.healthMutex.Lock()
+	// Assume two devices for the test
+	devices := []struct{ Pool, Name string }{{"pool-a", "dev-0"}, {"pool-b", "dev-1"}}
+	for _, device := range devices {
+		key := device.Pool + "/" + device.Name
+		health, ok := ex.deviceHealth[key]
+		if !ok {
+			health = "Healthy"
+		}
+		healthUpdates = append(healthUpdates, &drahealthv1alpha1.DeviceHealth{
+			PoolName:    device.Pool,
+			DeviceName:  device.Name,
+			Health:      health,
+			LastUpdated: time.Now().Unix(),
+		})
+	}
+	ex.healthMutex.Unlock()
+
+	resp := &drahealthv1alpha1.WatchResourcesResponse{Devices: healthUpdates}
+	return srv.Send(resp)
 }
