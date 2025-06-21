@@ -158,7 +158,8 @@ func NewHorizontalController(
 	broadcaster.StartStructuredLogging(3)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
-	controllerCache := NewControllerCache(dynamicClient, mapper, 15*time.Minute) // TODO: should this be configurable?
+	m := monitor.New()
+	controllerCache := NewControllerCache(dynamicClient, mapper, 15*time.Minute, m) // TODO: should this be configurable?
 	go controllerCache.Start(ctx, 30*time.Minute)                                // TODO: should this be configurable?
 
 	hpaController := &HorizontalController{
@@ -167,7 +168,7 @@ func NewHorizontalController(
 		hpaNamespacer:                hpaNamespacer,
 		tolerance:                    tolerance,
 		downscaleStabilisationWindow: downscaleStabilisationWindow,
-		monitor:                      monitor.New(),
+		monitor:                      m,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			NewDefaultHPARateLimiter(resyncPeriod),
 			workqueue.TypedRateLimitingQueueConfig[string]{

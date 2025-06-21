@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
 )
 
 // ControllerCacheEntry stores a cached controller resource
@@ -43,15 +44,17 @@ type ControllerCache struct {
 	dynamicClient dynamic.Interface
 	restMapper    apimeta.RESTMapper
 	cacheTTL      time.Duration
+	monitor       monitor.Monitor
 }
 
 // NewControllerCache creates a new controller cache
-func NewControllerCache(dynamicClient dynamic.Interface, restMapper apimeta.RESTMapper, cacheTTL time.Duration) *ControllerCache {
+func NewControllerCache(dynamicClient dynamic.Interface, restMapper apimeta.RESTMapper, cacheTTL time.Duration, monitor monitor.Monitor) *ControllerCache {
 	return &ControllerCache{
 		resources:     make(map[string]*ControllerCacheEntry),
 		dynamicClient: dynamicClient,
 		restMapper:    restMapper,
 		cacheTTL:      cacheTTL,
+		monitor:       monitor,
 	}
 }
 
@@ -133,14 +136,16 @@ func (c *ControllerCache) getResourceByGVR(gvr schema.GroupVersionResource, name
 
 	now := time.Now()
 	if found && now.Sub(entry.LastFetched) < c.cacheTTL {
+		// in cache we can return it
+		c.monitor.ObserveCacheHit(gvr.Resource)
 		if entry.Error != nil {
 			return nil, entry.Error
 		}
-		// in cache we can return it
 		return entry.Resource, nil
 	}
 
 	// Not in cache or too old, fetch from API
+	c.monitor.ObserveCacheMiss(gvr.Resource)
 	var resource *unstructured.Unstructured
 	var err error
 	resource, err = c.dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
