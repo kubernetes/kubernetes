@@ -490,7 +490,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	pred := opts.Predicate
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 	}
 
 	var readyGeneration int
