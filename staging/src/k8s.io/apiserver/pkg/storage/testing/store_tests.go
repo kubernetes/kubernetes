@@ -1608,9 +1608,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			listCtx := context.WithValue(ctx, recorderContextKey, recorderKey)
 			err := store.GetList(listCtx, tt.prefix, storageOpts, out)
 			if tt.expectRVTooLarge {
-				// TODO: Clasify etcd future revision error as TooLargeResourceVersion
-				if err == nil || !(storage.IsTooLargeResourceVersion(err) || strings.Contains(err.Error(), "etcdserver: mvcc: required revision is a future revision")) {
-					t.Fatalf("expecting resource version too high error, but get: %q", err)
+				if !storage.IsTooLargeResourceVersion(err) {
+					t.Fatalf("expecting resource version too high error, but get: %v", err)
 				}
 				return
 			}
