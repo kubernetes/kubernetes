@@ -600,6 +600,7 @@ func (ex *ExamplePlugin) WatchResources(req *drahealthv1alpha1.WatchResourcesReq
 
 // Helper function to avoid code duplication
 func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.NodeHealth_WatchResourcesServer) error {
+	ex.logger.Info("[KEP-4680-E2E-DEBUG] Test driver: sendHealthUpdate called.")
 	healthUpdates := []*drahealthv1alpha1.DeviceHealth{}
 	ex.healthMutex.Lock()
 	// Assume two devices for the test

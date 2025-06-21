@@ -859,6 +859,7 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 
 				if podsToUpdate.Len() > 0 {
 					podUIDs := podsToUpdate.UnsortedList()
+					klog.Infof("[KEP-4680 DEBUG] 1. DRA Manager: Sending update for pods: %v", podUIDs)
 					logger.V(4).Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
 					select {
 					case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
