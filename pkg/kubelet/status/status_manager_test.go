@@ -2075,9 +2075,11 @@ func TestPodResizeConditions(t *testing.T) {
 	podUID := types.UID("12345")
 
 	testCases := []struct {
-		name       string
-		updateFunc func(types.UID)
-		expected   []*v1.PodCondition
+		name                          string
+		updateFunc                    func(types.UID)
+		expected                      []*v1.PodCondition
+		expectedIsPodResizeDeferred   bool
+		expectedIsPodResizeInfeasible bool
 	}{
 		{
 			name:       "initial empty conditions",
@@ -2087,60 +2089,104 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize in progress condition with reason and message",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message", false)
+				m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message", 1)
 			},
 			expected: []*v1.PodCondition{
 				{
-					Type:    v1.PodResizeInProgress,
-					Status:  v1.ConditionTrue,
-					Reason:  "some-reason",
-					Message: "some-message",
+					Type:               v1.PodResizeInProgress,
+					Status:             v1.ConditionTrue,
+					Reason:             "some-reason",
+					Message:            "some-message",
+					ObservedGeneration: 1,
 				},
 			},
 		},
 		{
-			name: "set pod resize in progress condition without reason and message/allowReasonToBeCleared=false",
+			name: "set pod resize in progress condition without reason and message",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizeInProgressCondition(podUID, "", "", false)
+				m.SetPodResizeInProgressCondition(podUID, "", "", 1)
 			},
 			expected: []*v1.PodCondition{
 				{
-					Type:    v1.PodResizeInProgress,
-					Status:  v1.ConditionTrue,
-					Reason:  "some-reason",
-					Message: "some-message",
+					Type:               v1.PodResizeInProgress,
+					Status:             v1.ConditionTrue,
+					Reason:             "some-reason",
+					Message:            "some-message",
+					ObservedGeneration: 1,
 				},
 			},
 		},
 		{
-			name: "set pod resize in progress condition without reason and message/allowReasonToBeCleared=true",
+			name: "attempt to overwrite pod resize in progress condition with a new observedGeneration",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizeInProgressCondition(podUID, "", "", true)
+				m.SetPodResizeInProgressCondition(podUID, "", "", 2)
 			},
 			expected: []*v1.PodCondition{
 				{
-					Type:   v1.PodResizeInProgress,
-					Status: v1.ConditionTrue,
+					Type:               v1.PodResizeInProgress,
+					Status:             v1.ConditionTrue,
+					Reason:             "some-reason",
+					Message:            "some-message",
+					ObservedGeneration: 1,
 				},
 			},
 		},
 		{
-			name: "set pod resize pending condition with reason and message",
+			name: "clear the pod resize in progress condition and set a new one",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizePendingCondition(podUID, "some-reason", "some-message")
+				m.ClearPodResizeInProgressCondition(podUID)
+				// Set a new condition with a different observedGeneration
+				m.SetPodResizeInProgressCondition(podUID, "", "", 2)
 			},
 			expected: []*v1.PodCondition{
 				{
-					Type:    v1.PodResizePending,
-					Status:  v1.ConditionTrue,
-					Reason:  "some-reason",
-					Message: "some-message",
-				},
-				{
-					Type:   v1.PodResizeInProgress,
-					Status: v1.ConditionTrue,
+					Type:               v1.PodResizeInProgress,
+					Status:             v1.ConditionTrue,
+					ObservedGeneration: 2,
 				},
 			},
+		},
+		{
+			name: "set pod resize pending condition to deferred with message",
+			updateFunc: func(podUID types.UID) {
+				m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "some-message", 1)
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonDeferred,
+					Message:            "some-message",
+					ObservedGeneration: 1,
+				},
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             v1.ConditionTrue,
+					ObservedGeneration: 2,
+				},
+			},
+			expectedIsPodResizeDeferred: true,
+		},
+		{
+			name: "set pod resize pending condition to infeasible with message",
+			updateFunc: func(podUID types.UID) {
+				m.SetPodResizePendingCondition(podUID, v1.PodReasonInfeasible, "some-message", 1)
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonInfeasible,
+					Message:            "some-message",
+					ObservedGeneration: 1,
+				},
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             v1.ConditionTrue,
+					ObservedGeneration: 2,
+				},
+			},
+			expectedIsPodResizeInfeasible: true,
 		},
 		{
 			name: "clear pod resize in progress condition",
@@ -2149,12 +2195,14 @@ func TestPodResizeConditions(t *testing.T) {
 			},
 			expected: []*v1.PodCondition{
 				{
-					Type:    v1.PodResizePending,
-					Status:  v1.ConditionTrue,
-					Reason:  "some-reason",
-					Message: "some-message",
+					Type:               v1.PodResizePending,
+					Status:             v1.ConditionTrue,
+					Reason:             v1.PodReasonInfeasible,
+					Message:            "some-message",
+					ObservedGeneration: 1,
 				},
 			},
+			expectedIsPodResizeInfeasible: true,
 		},
 		{
 			name: "clear pod resize pending condition",
@@ -2181,6 +2229,8 @@ func TestPodResizeConditions(t *testing.T) {
 				}
 				require.Equal(t, tc.expected, resizeConditions)
 			}
+			require.Equal(t, tc.expectedIsPodResizeDeferred, m.IsPodResizeDeferred(podUID))
+			require.Equal(t, tc.expectedIsPodResizeInfeasible, m.IsPodResizeInfeasible(podUID))
 		})
 	}
 }
