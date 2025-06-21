@@ -29,7 +29,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -316,7 +315,7 @@ func patchItemRecursively(f *framework.Framework, driverNamespace *v1.Namespace,
 		PatchName(f, &item.Name)
 	case *storagev1.StorageClass:
 		PatchName(f, &item.Name)
-	case *storagev1beta1.VolumeAttributesClass:
+	case *storagev1.VolumeAttributesClass:
 		PatchName(f, &item.Name)
 	case *storagev1.CSIDriver:
 		PatchName(f, &item.Name)
@@ -625,16 +624,16 @@ func (*storageClassFactory) Create(ctx context.Context, f *framework.Framework, 
 type volumeAttributesClassFactory struct{}
 
 func (f *volumeAttributesClassFactory) New() runtime.Object {
-	return &storagev1beta1.VolumeAttributesClass{}
+	return &storagev1.VolumeAttributesClass{}
 }
 
 func (*volumeAttributesClassFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
-	item, ok := i.(*storagev1beta1.VolumeAttributesClass)
+	item, ok := i.(*storagev1.VolumeAttributesClass)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	client := f.ClientSet.StorageV1beta1().VolumeAttributesClasses()
+	client := f.ClientSet.StorageV1().VolumeAttributesClasses()
 	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("create VolumeAttributesClass: %w", err)
 	}
