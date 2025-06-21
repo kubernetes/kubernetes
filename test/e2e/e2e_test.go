@@ -45,6 +45,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/feature"
 
 	// test sources
+	// comment
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
 	_ "k8s.io/kubernetes/test/e2e/apps"
 	_ "k8s.io/kubernetes/test/e2e/architecture"
