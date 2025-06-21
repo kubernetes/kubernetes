@@ -87,6 +87,15 @@ func cloudInitializer(config *config.CompletedConfig) cloudprovider.Interface {
 		klog.Fatalf("Cloud provider is nil")
 	}
 
+	// Cloud providers may require a ClusterID to identify and manage
+	// resources (e.g., load balancers, route tables) belonging to a specific cluster.
+	// For example, AWS uses it to tag and isolate resources in shared environments.
+	//
+	// If HasClusterID() returns false and --allow-untagged-cloud is not set,
+	// the controller will exit to prevent accidental resource conflicts.
+	//
+	// Providers that don’t use tagging can bypass this by always returning true.
+	// However, long-term, supporting ClusterID is encouraged for all providers.
 	if !cloud.HasClusterID() {
 		if config.ComponentConfig.KubeCloudShared.AllowUntaggedCloud {
 			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
