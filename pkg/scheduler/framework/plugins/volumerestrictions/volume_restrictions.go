@@ -163,7 +163,7 @@ func needsRestrictionsCheck(v v1.Volume) bool {
 }
 
 // PreFilter computes and stores cycleState containing details for enforcing ReadWriteOncePod.
-func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	needsCheck := false
 	for i := range pod.Spec.Volumes {
 		if needsRestrictionsCheck(pod.Spec.Volumes[i]) {
@@ -175,38 +175,38 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState fwk.Cycl
 	pvcs, err := pl.readWriteOncePodPVCsForPod(ctx, pod)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+			return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, err.Error())
 		}
-		return nil, framework.AsStatus(err)
+		return nil, fwk.AsStatus(err)
 	}
 
 	s, err := pl.calPreFilterState(ctx, pod, pvcs)
 	if err != nil {
-		return nil, framework.AsStatus(err)
+		return nil, fwk.AsStatus(err)
 	}
 
 	if !needsCheck && s.conflictingPVCRefCount == 0 {
-		return nil, framework.NewStatus(framework.Skip)
+		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	cycleState.Write(preFilterStateKey, s)
 	return nil, nil
 }
 
 // AddPod from pre-computed data in cycleState.
-func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	state.updateWithPod(podInfoToAdd, 1)
 	return nil
 }
 
 // RemovePod from pre-computed data in cycleState.
-func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	state.updateWithPod(podInfoToRemove, -1)
 	return nil
@@ -281,12 +281,12 @@ func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
 }
 
 // Checks if scheduling the pod would cause any ReadWriteOncePod PVC access mode conflicts.
-func satisfyReadWriteOncePod(ctx context.Context, state *preFilterState) *framework.Status {
+func satisfyReadWriteOncePod(ctx context.Context, state *preFilterState) *fwk.Status {
 	if state == nil {
 		return nil
 	}
 	if state.conflictingPVCRefCount > 0 {
-		return framework.NewStatus(framework.Unschedulable, ErrReasonReadWriteOncePodConflict)
+		return fwk.NewStatus(fwk.Unschedulable, ErrReasonReadWriteOncePodConflict)
 	}
 	return nil
 }
@@ -307,13 +307,13 @@ func (pl *VolumeRestrictions) PreFilterExtensions() framework.PreFilterExtension
 // - ISCSI forbids if any two pods share at least same IQN and ISCSI volume is read-only
 // If the pod uses PVCs with the ReadWriteOncePod access mode, it evaluates if
 // these PVCs are already in-use and if preemption will help.
-func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	if !satisfyVolumeConflicts(pod, nodeInfo) {
-		return framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
+		return fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	}
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	return satisfyReadWriteOncePod(ctx, state)
 }

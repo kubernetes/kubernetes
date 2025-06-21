@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -275,13 +276,13 @@ func TestTaintTolerationFilter(t *testing.T) {
 		name       string
 		pod        *v1.Pod
 		node       *v1.Node
-		wantStatus *framework.Status
+		wantStatus *fwk.Status
 	}{
 		{
 			name: "A pod having no tolerations can't be scheduled onto a node with nonempty taints",
 			pod:  podWithTolerations("pod1", []v1.Toleration{}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"node(s) had untolerated taint {dedicated: user1}"),
 		},
 		{
@@ -293,7 +294,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			name: "A pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"node(s) had untolerated taint {dedicated: user1}"),
 		},
 		{
@@ -317,7 +318,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 				"can't be scheduled onto the node",
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "PreferNoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "foo", Value: "bar", Effect: "NoSchedule"}}),
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"node(s) had untolerated taint {foo: bar}"),
 		},
 		{

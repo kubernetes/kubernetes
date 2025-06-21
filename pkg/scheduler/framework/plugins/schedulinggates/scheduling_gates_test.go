@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -33,7 +34,7 @@ func TestPreEnqueue(t *testing.T) {
 	tests := []struct {
 		name string
 		pod  *v1.Pod
-		want *framework.Status
+		want *fwk.Status
 	}{
 		{
 			name: "pod does not carry scheduling gates",
@@ -43,7 +44,7 @@ func TestPreEnqueue(t *testing.T) {
 		{
 			name: "pod carries scheduling gates",
 			pod:  st.MakePod().Name("p").SchedulingGates([]string{"foo", "bar"}).Obj(),
-			want: framework.NewStatus(framework.UnschedulableAndUnresolvable, "waiting for scheduling gates: [foo bar]"),
+			want: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for scheduling gates: [foo bar]"),
 		},
 	}
 
