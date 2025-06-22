@@ -130,6 +130,10 @@ type HorizontalPodAutoscalerSpec struct {
 	// only pods directly owned by the Deployment's ReplicaSets will be considered,
 	// even if other pods match the label selector.
 	//
+	// This is an alpha field and requires enabling the HPASelectionStrategy
+	// feature gate.
+	//
+	// +featureGate=HPASelectionStrategy
 	// +optional
 	SelectionStrategy *SelectionStrategy
 }
