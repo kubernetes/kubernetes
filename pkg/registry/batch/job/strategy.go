@@ -192,6 +192,9 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		suspended := oldJob.Spec.Suspend != nil && *oldJob.Spec.Suspend
 		notStarted := oldJob.Status.StartTime == nil
 		opts.AllowMutableSchedulingDirectives = suspended && notStarted
+		// Updating pod resources is allowed only for suspended jobs that never started before.
+		// This requires the MutableJobPodResourcesForSuspendedJobs feature gate to be enabled.
+		opts.AllowMutablePodResources = utilfeature.DefaultFeatureGate.Enabled(features.MutableJobPodResourcesForSuspendedJobs) && suspended && notStarted
 
 		// Validation should not fail jobs if they don't have the new labels.
 		// This can be removed once we have high confidence that both labels exist (1.30 at least)
