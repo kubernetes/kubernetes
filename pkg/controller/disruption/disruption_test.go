@@ -1226,6 +1226,7 @@ func TestDeploymentFinderFunction(t *testing.T) {
 				UID:        dep.UID,
 				Controller: &trueVal,
 			})
+			t.Logf("ReplicaSet object: %+v", rs)
 			add(t, dc.rsStore, rs)
 
 			controllerRef := &metav1.OwnerReference{
@@ -1619,23 +1620,42 @@ func verifyEventEmitted(t *testing.T, dc *disruptionController, expectedEvent st
 
 func TestPodWithDeletionTimestampIsIgnoredForControllerCheck(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	dc, ps := newFakeDisruptionController(ctx)
+	dc, _ := newFakeDisruptionController(ctx)
 
-	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
+	pdb, _ := newMinAvailablePodDisruptionBudget(t, intstr.FromInt32(1))
 	add(t, dc.pdbStore, pdb)
-	dc.sync(ctx, pdbName)
-	// This verifies that when a PDB has 0 pods, disruptions are not allowed.
-	ps.VerifyDisruptionAllowed(t, pdbName, 0)
+	dc.sync(ctx, pdb.Name)
 
-	pod, _ := newPod(t, "terminating")
-	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	add(t, dc.podStore, pod)
-	dc.sync(ctx, pdbName)
+	// Create a pod with a controller that is not in the finders list
+	// to represent already deleted replica set/deployment/statefulset but pod is not deleted yet
+	pod, _ := newPod(t, "test-pod")
+	var trueVar = true
+	pod.OwnerReferences = []metav1.OwnerReference{
+		{
+			APIVersion: customGVK.GroupVersion().String(),
+			Kind:       customGVK.Kind,
+			Name:       "test-controller",
+			UID:        types.UID("controller-uid"),
+			Controller: &trueVar,
+		},
+	}
 
-	var pods []*v1.Pod
-	pods = append(pods, pod)
-	_, _, err := dc.getExpectedScale(ctx, pdb, pods)
+	// Test case 1: Pod without deletion timestamp should error
+	_, _, err := dc.getExpectedScale(ctx, pdb, []*v1.Pod{pod})
+	if err == nil {
+		t.Fatalf("expected error for pod with missing controller and no DeletionTimestamp, got none")
+	}
+	if !strings.Contains(err.Error(), "found no controllers for pod") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Test case 2: Pod with deletion timestamp should NOT error
+	podWithDeletionTimestamp := pod.DeepCopy()
+	now := metav1.Now()
+	podWithDeletionTimestamp.DeletionTimestamp = &now
+
+	_, _, err = dc.getExpectedScale(ctx, pdb, []*v1.Pod{podWithDeletionTimestamp})
 	if err != nil {
-		t.Fatalf("expected no error for pod with DeletionTimestamp, got: %v", err)
+		t.Fatalf("unexpected error for pod with missing controller and DeletionTimestamp: %v", err)
 	}
 }
