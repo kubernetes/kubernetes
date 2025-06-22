@@ -149,8 +149,8 @@ func TestControllerCache_CacheExpiry(t *testing.T) {
 		Kind:       "Deployment",
 		Name:       "test-deployment",
 	}
-	
-    // Mock monitor for utility functions that are not part of the interface monitor.monitor
+
+	// Mock monitor for utility functions that are not part of the interface monitor.monitor
 	mockMon := monitor.(*mockMonitor)
 
 	// First request should hit the API - check cache miss +1

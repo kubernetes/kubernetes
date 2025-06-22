@@ -475,7 +475,6 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v1_HorizontalPodAu
 	out.DesiredReplicas = in.DesiredReplicas
 	// WARNING: in.CurrentMetrics requires manual conversion: does not exist in peer-type
 	// WARNING: in.Conditions requires manual conversion: does not exist in peer-type
-	// WARNING: in.CurrentSelectionStrategy requires manual conversion: does not exist in peer-type
 	return nil
 }
 

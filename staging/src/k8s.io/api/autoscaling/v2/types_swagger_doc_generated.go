@@ -162,14 +162,13 @@ func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscalerStatus = map[string]string{
-	"":                         "HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.",
-	"observedGeneration":       "observedGeneration is the most recent generation observed by this autoscaler.",
-	"lastScaleTime":            "lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods, used by the autoscaler to control how often the number of pods is changed.",
-	"currentReplicas":          "currentReplicas is current number of replicas of pods managed by this autoscaler, as last seen by the autoscaler.",
-	"desiredReplicas":          "desiredReplicas is the desired number of replicas of pods managed by this autoscaler, as last calculated by the autoscaler.",
-	"currentMetrics":           "currentMetrics is the last read state of the metrics used by this autoscaler.",
-	"conditions":               "conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met.",
-	"currentSelectionStrategy": "CurrentSelectionStrategy indicates which pod selection strategy is currently being used. This is an alpha field and requires enabling the HPASelectionStrategy feature gate.",
+	"":                   "HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.",
+	"observedGeneration": "observedGeneration is the most recent generation observed by this autoscaler.",
+	"lastScaleTime":      "lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods, used by the autoscaler to control how often the number of pods is changed.",
+	"currentReplicas":    "currentReplicas is current number of replicas of pods managed by this autoscaler, as last seen by the autoscaler.",
+	"desiredReplicas":    "desiredReplicas is the desired number of replicas of pods managed by this autoscaler, as last calculated by the autoscaler.",
+	"currentMetrics":     "currentMetrics is the last read state of the metrics used by this autoscaler.",
+	"conditions":         "conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met.",
 }
 
 func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {
