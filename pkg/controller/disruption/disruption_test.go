@@ -1226,7 +1226,6 @@ func TestDeploymentFinderFunction(t *testing.T) {
 				UID:        dep.UID,
 				Controller: &trueVal,
 			})
-			t.Logf("ReplicaSet object: %+v", rs)
 			add(t, dc.rsStore, rs)
 
 			controllerRef := &metav1.OwnerReference{
