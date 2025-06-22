@@ -528,6 +528,12 @@ const (
 	// Enables kubelet to support memory QoS with cgroups v2.
 	MemoryQoS featuregate.Feature = "MemoryQoS"
 
+	// owner: @kannon92
+	// kep: TBD
+	//
+	// Enables mutable pod resources for Jobs when the job is suspended.
+	MutableJobPodResourcesForSuspendedJobs featuregate.Feature = "MutableJobPodResourcesForSuspendedJobs"
+
 	// owner: @aojea
 	// kep: https://kep.k8s.io/1880
 	//
@@ -1343,6 +1349,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	MemoryQoS: {
 		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	MutableJobPodResourcesForSuspendedJobs: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	MultiCIDRServiceAllocator: {
