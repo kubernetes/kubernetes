@@ -295,7 +295,6 @@
         "reason": "reasonValue",
         "message": "messageValue"
       }
-    ],
-    "currentSelectionStrategy": "currentSelectionStrategyValue"
+    ]
   }
 }

@@ -42,7 +42,7 @@ type Monitor interface {
 	ObserveReconciliationResult(action ActionLabel, err ErrorLabel, duration time.Duration)
 	ObserveMetricComputationResult(action ActionLabel, err ErrorLabel, duration time.Duration, metricType v2.MetricSourceType)
 	ObserveCacheHit(resourceKind string)
-    ObserveCacheMiss(resourceKind string)
+	ObserveCacheMiss(resourceKind string)
 }
 
 type monitor struct{}
@@ -65,10 +65,10 @@ func (r *monitor) ObserveMetricComputationResult(action ActionLabel, err ErrorLa
 
 // ObserveCacheHit increments the cache hits counter for the given resource kind
 func (r *monitor) ObserveCacheHit(resourceKind string) {
-    cacheHitsTotal.WithLabelValues(resourceKind).Inc()
+	cacheHitsTotal.WithLabelValues(resourceKind).Inc()
 }
 
 // ObserveCacheMiss increments the cache misses counter for the given resource kind
 func (r *monitor) ObserveCacheMiss(resourceKind string) {
-    cacheMissesTotal.WithLabelValues(resourceKind).Inc()
+	cacheMissesTotal.WithLabelValues(resourceKind).Inc()
 }

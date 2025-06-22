@@ -659,7 +659,6 @@ func autoConvert_v2_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAu
 		out.CurrentMetrics = nil
 	}
 	out.Conditions = *(*[]autoscaling.HorizontalPodAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
-	out.CurrentSelectionStrategy = autoscaling.SelectionStrategy(in.CurrentSelectionStrategy)
 	return nil
 }
 
@@ -685,7 +684,6 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v2_HorizontalPodAu
 		out.CurrentMetrics = nil
 	}
 	out.Conditions = *(*[]autoscalingv2.HorizontalPodAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
-	out.CurrentSelectionStrategy = autoscalingv2.SelectionStrategy(in.CurrentSelectionStrategy)
 	return nil
 }
 

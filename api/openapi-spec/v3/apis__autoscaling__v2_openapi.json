@@ -450,10 +450,6 @@
             "format": "int32",
             "type": "integer"
           },
-          "currentSelectionStrategy": {
-            "description": "CurrentSelectionStrategy indicates which pod selection strategy is currently being used. This is an alpha field and requires enabling the HPASelectionStrategy feature gate.",
-            "type": "string"
-          },
           "desiredReplicas": {
             "default": 0,
             "description": "desiredReplicas is the desired number of replicas of pods managed by this autoscaler, as last calculated by the autoscaler.",
