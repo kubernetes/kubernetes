@@ -3033,6 +3033,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: currentReplicas
       type:
         scalar: numeric
+    - name: currentSelectionStrategy
+      type:
+        scalar: string
     - name: desiredReplicas
       type:
         scalar: numeric

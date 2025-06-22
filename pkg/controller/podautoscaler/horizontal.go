@@ -160,7 +160,7 @@ func NewHorizontalController(
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 	m := monitor.New()
 	controllerCache := NewControllerCache(dynamicClient, mapper, 15*time.Minute, m) // TODO: should this be configurable?
-	go controllerCache.Start(ctx, 30*time.Minute)                                   // TODO: should this be configurable?
+	go controllerCache.Start(ctx, 30*time.Minute)                                // TODO: should this be configurable?
 
 	hpaController := &HorizontalController{
 		eventRecorder:                recorder,
@@ -1453,12 +1453,21 @@ func (a *HorizontalController) setCurrentReplicasAndMetricsInStatus(hpa *autosca
 // setStatus recreates the status of the given HPA, updating the current and
 // desired replicas, as well as the metric statuses
 func (a *HorizontalController) setStatus(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, metricStatuses []autoscalingv2.MetricStatus, rescale bool) {
+	strategy := autoscalingv2.LabelSelector
+	if hpa.Spec.SelectionStrategy != nil {
+		strategy = *hpa.Spec.SelectionStrategy
+	}
+
 	hpa.Status = autoscalingv2.HorizontalPodAutoscalerStatus{
 		CurrentReplicas: currentReplicas,
 		DesiredReplicas: desiredReplicas,
 		LastScaleTime:   hpa.Status.LastScaleTime,
 		CurrentMetrics:  metricStatuses,
 		Conditions:      hpa.Status.Conditions,
+	}
+
+	if hpa.Spec.SelectionStrategy != nil {
+		hpa.Status.CurrentSelectionStrategy = strategy
 	}
 
 	if rescale {

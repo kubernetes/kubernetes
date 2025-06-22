@@ -924,13 +924,13 @@ func (m *mockMonitor) ObserveCacheMiss(resourceKind string) {
 	m.cacheMisses[resourceKind]++
 }
 
-func (m *mockMonitor) GetCacheHit(resourceKind string) int {
+func (m *mockMonitor ) GetCacheHit (resourceKind string ) int {
 	m.RLock()
 	defer m.RUnlock()
 	return m.cacheHits[resourceKind]
 }
 
-func (m *mockMonitor) GetCacheMiss(resourceKind string) int {
+func (m *mockMonitor ) GetCacheMiss (resourceKind string ) int {
 	m.RLock()
 	defer m.RUnlock()
 	return m.cacheMisses[resourceKind]

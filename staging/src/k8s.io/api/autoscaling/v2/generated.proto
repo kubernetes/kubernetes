@@ -314,6 +314,14 @@ message HorizontalPodAutoscalerStatus {
   // +listMapKey=type
   // +optional
   repeated HorizontalPodAutoscalerCondition conditions = 6;
+
+  // CurrentSelectionStrategy indicates which pod selection strategy
+  // is currently being used.
+  // This is an alpha field and requires enabling the HPASelectionStrategy
+  // feature gate.
+  // +featureGate=HPASelectionStrategy
+  // +optional
+  optional string currentSelectionStrategy = 7;
 }
 
 // MetricIdentifier defines the name and optionally selector for a metric

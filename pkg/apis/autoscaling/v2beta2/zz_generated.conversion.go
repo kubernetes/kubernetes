@@ -715,6 +715,7 @@ func autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_Horizontal
 		out.CurrentMetrics = nil
 	}
 	out.Conditions = *(*[]autoscalingv2beta2.HorizontalPodAutoscalerCondition)(unsafe.Pointer(&in.Conditions))
+	// WARNING: in.CurrentSelectionStrategy requires manual conversion: does not exist in peer-type
 	return nil
 }
 

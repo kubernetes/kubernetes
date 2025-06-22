@@ -430,6 +430,11 @@ type HorizontalPodAutoscalerStatus struct {
 	// Conditions is the set of conditions required for this autoscaler to scale its target,
 	// and indicates whether or not those conditions are met.
 	Conditions []HorizontalPodAutoscalerCondition
+
+	// CurrentSelectionStrategy is the selection strategy currently being used
+	// This field is set by the controller which also sets the spec.SelectionStrategy
+	// field to its value
+	CurrentSelectionStrategy SelectionStrategy
 }
 
 // ConditionStatus indicates the status of a condition (true, false, or unknown).

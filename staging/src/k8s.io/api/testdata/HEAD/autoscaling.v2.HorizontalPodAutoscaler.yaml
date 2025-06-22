@@ -198,6 +198,7 @@ status:
       name: nameValue
     type: typeValue
   currentReplicas: 3
+  currentSelectionStrategy: currentSelectionStrategyValue
   desiredReplicas: 4
   lastScaleTime: "2002-01-01T01:01:01Z"
   observedGeneration: 1
