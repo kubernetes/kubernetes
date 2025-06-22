@@ -34,6 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -4201,6 +4202,193 @@ func TestNodeSelectorUpdate(t *testing.T) {
 
 }
 
+func TestUpdateJobPodResources(t *testing.T) {
+	testCases := map[string]struct {
+		enableFeatureGate bool
+		suspend           bool
+		updateResources   bool
+		containers        []v1.Container
+		expectUpdate      bool
+		startThenSuspend  bool
+		initialResources  *v1.ResourceRequirements
+		jobName           string
+	}{
+		"suspended job, feature gate enabled, update resources": {
+			enableFeatureGate: true,
+			suspend:           true,
+			updateResources:   true,
+			containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			expectUpdate: true,
+			jobName:      "update-suspend",
+		},
+		"non-suspended job, feature gate enabled, update resources": {
+			enableFeatureGate: true,
+			suspend:           false,
+			updateResources:   true,
+			containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			expectUpdate: false,
+			jobName:      "update-fail-running",
+		},
+		"suspended job, feature gate disabled, update resources": {
+			enableFeatureGate: false,
+			suspend:           true,
+			updateResources:   true,
+			containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			expectUpdate: false,
+			jobName:      "no-update-with-feature-disabled",
+		},
+		"started then suspended job, feature gate enabled, update resources": {
+			enableFeatureGate: true,
+			suspend:           false,
+			updateResources:   true,
+			containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			expectUpdate:     true,
+			startThenSuspend: true,
+			jobName:          "suspend-resume-mutate",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutablePodResourcesForSuspendedJobs, tc.enableFeatureGate)
+
+			closeFn, restConfig, cs, ns := setup(t, "update-job-pod-resources")
+			defer closeFn()
+
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			defer cancel()
+
+			job := &batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tc.jobName,
+					Namespace: ns.Name,
+				},
+				Spec: batchv1.JobSpec{
+					Suspend:     ptr.To(tc.suspend),
+					Parallelism: ptr.To[int32](1),
+					Completions: ptr.To[int32](1),
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers:    tc.containers,
+							RestartPolicy: v1.RestartPolicyNever,
+						},
+					},
+				},
+			}
+
+			job, err := createJobWithDefaults(ctx, cs, ns.Name, job)
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+
+			jobClient := cs.BatchV1().Jobs(ns.Name)
+
+			// Handle start-then-suspend case
+			if tc.startThenSuspend {
+				t.Logf("Waiting for pods to be active on starting job")
+				waitForPodsToBeActive(ctx, t, jobClient, 1, job)
+				// Suspend the job
+				_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+					j.Spec.Suspend = ptr.To(true)
+				})
+				if err != nil {
+					t.Fatalf("Failed to suspend Job: %v", err)
+				}
+
+				// Wait for the job to be suspended
+				err = wait.PollUntilContextTimeout(ctx, time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+					j, err := jobClient.Get(ctx, job.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					return j.Spec.Suspend != nil && *j.Spec.Suspend, nil
+				})
+				if err != nil {
+					t.Fatalf("Failed to wait for job to be suspended: %v", err)
+				}
+				t.Logf("job is suspended")
+			}
+
+			waitForPodsToBeActive(ctx, t, jobClient, 0, job)
+
+			if tc.updateResources {
+				_, err := updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+					for i := range j.Spec.Template.Spec.Containers {
+						j.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("200m"),
+								v1.ResourceMemory: resource.MustParse("256Mi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("400m"),
+								v1.ResourceMemory: resource.MustParse("512Mi"),
+							},
+						}
+					}
+				})
+				if err != nil && tc.expectUpdate {
+					t.Fatalf("Failed to update Job: %v", err)
+				}
+			}
+
+			// Unsuspend the job if it was suspended or if it's the start-then-suspend case
+			if tc.suspend || tc.startThenSuspend {
+				_, err = updateJob(ctx, jobClient, job.Name, func(j *batchv1.Job) {
+					j.Spec.Suspend = ptr.To(false)
+				})
+				if err != nil {
+					t.Fatalf("Failed to unsuspend Job: %v", err)
+				}
+			}
+			waitForPodsToBeActive(ctx, t, jobClient, 1, job)
+			pods, err := getJobPods(ctx, t, cs, job, func(s v1.PodStatus) bool { return true })
+			if err != nil {
+				t.Fatalf("Failed to get Job pods: %v", err)
+			}
+			if len(pods) != 1 {
+				t.Fatalf("Expected 1 pod, got %d", len(pods))
+			}
+
+			pod := pods[0]
+			expectedResources := v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("200m"),
+					v1.ResourceMemory: resource.MustParse("256Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("400m"),
+					v1.ResourceMemory: resource.MustParse("512Mi"),
+				},
+			}
+
+			for i := range tc.containers {
+				if tc.expectUpdate {
+					if diff := cmp.Diff(expectedResources, pod.Spec.Containers[i].Resources); diff != "" {
+						t.Errorf("Unexpected resources in pod spec for container %q (-want +got):\n%s", pod.Spec.Containers[i].Name, diff)
+					}
+				} else {
+					if len(pod.Spec.Containers[i].Resources.Requests) > 0 ||
+						len(pod.Spec.Containers[i].Resources.Limits) > 0 {
+						t.Errorf("Expected no resource updates for container %q, but got: %+v", pod.Spec.Containers[i].Name, pod.Spec.Containers[i].Resources)
+					}
+				}
+			}
+		})
+	}
+}
+
 // TestDelayedJobUpdateEvent tests that a Job only creates one Pod even when
 // the job events are delayed. This test verfies the finishedJobStore is working
 // correctly and preventing from job controller creating a new pod if the job success
@@ -4431,7 +4619,7 @@ func getJobPods(ctx context.Context, t *testing.T, clientSet clientset.Interface
 	if err != nil {
 		return nil, err
 	}
-	jobPods := make([]*v1.Pod, 0, 0)
+	jobPods := make([]*v1.Pod, 0)
 	for _, pod := range allPods.Items {
 		if metav1.IsControlledBy(&pod, jobObj) && filter(pod.Status) {
 			p := pod
