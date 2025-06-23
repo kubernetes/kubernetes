@@ -165,7 +165,6 @@ var baseRules = dedent.Dedent(`
 	add chain ip kube-proxy filter-forward { type filter hook forward priority 0 ; }
 	add chain ip kube-proxy filter-input { type filter hook input priority 0 ; }
 	add chain ip kube-proxy filter-output { type filter hook output priority 0 ; }
-	add chain ip kube-proxy filter-output-post-dnat { type filter hook output priority -90 ; }
 	add chain ip kube-proxy firewall-check
 	add chain ip kube-proxy mark-for-masquerade
 	add chain ip kube-proxy masquerading
@@ -186,7 +185,7 @@ var baseRules = dedent.Dedent(`
 	add rule ip kube-proxy filter-input ct state new jump service-endpoints-check
 	add rule ip kube-proxy filter-output ct state new jump service-endpoints-check
 	add rule ip kube-proxy filter-output-pre-dnat ct state new jump firewall-check
-	add rule ip kube-proxy filter-output-post-dnat ct state new jump cluster-ips-check
+	add rule ip kube-proxy filter-output ct state new jump cluster-ips-check
 	add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips
 	add rule ip kube-proxy mark-for-masquerade mark set mark or 0x4000
 	add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
