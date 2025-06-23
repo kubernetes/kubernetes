@@ -483,7 +483,7 @@ func typeCheck(tag codetags.Tag, doc TagDoc) error {
 		if doc.PayloadsRequired {
 			return fmt.Errorf("missing required tag value of type %s", doc.PayloadsType)
 		}
-	} else if tag.ValueType != doc.PayloadsType {
+	} else if doc.PayloadsType != codetags.ValueTypeRaw && tag.ValueType != doc.PayloadsType {
 		return fmt.Errorf("tag value has wrong type: got %s, want %s", tag.ValueType, doc.PayloadsType)
 	}
 	return nil
