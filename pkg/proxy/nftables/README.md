@@ -131,7 +131,7 @@ by setting appropriate `priority` values for your base chains. In particular:
     will will see masqueraded source IPs for some traffic.)
 
   - Traffic to services with no endpoints will be dropped or rejected from a chain with
-    `type filter`, `priority dstnat-10`, and any of `hook input`, `hook output`, or `hook
+    `type filter`, `priority filter`, and any of `hook input`, `hook output`, or `hook
     forward`.
 
 Note that the use of `mark` to indicate what traffic needs to be masqueraded is *not*
