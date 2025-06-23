@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"path"
 	"strings"
 	"sync"
@@ -63,9 +62,6 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	teardown := func() {
 		cancel()
-		if err := os.RemoveAll(addr); err != nil {
-			panic(err)
-		}
 	}
 
 	listener, err := net.Listen("unix", addr)
