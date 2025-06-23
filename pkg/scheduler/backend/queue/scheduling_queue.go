@@ -1038,7 +1038,6 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	if pInfo := p.unschedulablePods.get(newPod); pInfo != nil {
 		_ = pInfo.Update(newPod)
 		p.UpdateNominatedPod(logger, oldPod, pInfo.PodInfo)
-		gated := pInfo.Gated()
 		if p.isSchedulingQueueHintEnabled {
 			// When unscheduled Pods are updated, we check with QueueingHint
 			// whether the update may make the pods schedulable.
@@ -1062,7 +1061,6 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 			// so we should check isPodBackingoff before moving the pod to backoffQ.
 			if p.backoffQ.isPodBackingoff(pInfo) {
 				if added := p.moveToBackoffQ(logger, pInfo, framework.EventUnscheduledPodUpdate.Label()); added {
-					p.unschedulablePods.delete(pInfo.Pod, gated)
 					if p.isPopFromBackoffQEnabled {
 						p.activeQ.broadcast()
 					}
