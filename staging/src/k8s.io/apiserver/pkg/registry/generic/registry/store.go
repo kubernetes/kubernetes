@@ -633,9 +633,12 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	}
 
 	out := e.NewFunc()
+
+	// only ignore a not found error if this type allows creating on update, or we're forcing allowing create (like for server-side-apply)
+	ignoreNotFound := e.UpdateStrategy.AllowCreateOnUpdate() || forceAllowCreate
 	// deleteObj is only used in case a deletion is carried out
 	var deleteObj runtime.Object
-	err = e.Storage.GuaranteedUpdate(ctx, key, out, true, storagePreconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+	err = e.Storage.GuaranteedUpdate(ctx, key, out, ignoreNotFound, storagePreconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
 		existingResourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, nil, err
