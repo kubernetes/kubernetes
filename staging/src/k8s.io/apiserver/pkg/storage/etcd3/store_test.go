@@ -578,7 +578,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 	}
 	client := setupOpts.client(t)
 	versioner := storage.APIObjectVersioner{}
-	store := newStore(
+	store := New(
 		client,
 		setupOpts.codec,
 		setupOpts.newFunc,
