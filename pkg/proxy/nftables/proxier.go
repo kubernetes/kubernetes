@@ -63,14 +63,15 @@ const (
 	kubeProxyTable = "kube-proxy"
 
 	// base chains
-	filterPreroutingChain     = "filter-prerouting"
-	filterInputChain          = "filter-input"
-	filterForwardChain        = "filter-forward"
-	filterOutputChain         = "filter-output"
-	filterOutputPostDNATChain = "filter-output-post-dnat"
-	natPreroutingChain        = "nat-prerouting"
-	natOutputChain            = "nat-output"
-	natPostroutingChain       = "nat-postrouting"
+	filterPreroutingPreDNATChain = "filter-prerouting-pre-dnat"
+	filterOutputPreDNATChain     = "filter-output-pre-dnat"
+	filterInputChain             = "filter-input"
+	filterForwardChain           = "filter-forward"
+	filterOutputChain            = "filter-output"
+	filterOutputPostDNATChain    = "filter-output-post-dnat"
+	natPreroutingChain           = "nat-prerouting"
+	natOutputChain               = "nat-output"
+	natPostroutingChain          = "nat-postrouting"
 
 	// service dispatch
 	servicesChain       = "services"
@@ -391,13 +392,19 @@ type nftablesBaseChain struct {
 }
 
 var nftablesBaseChains = []nftablesBaseChain{
-	// We want our filtering rules to operate on pre-DNAT dest IPs, so our filter
-	// chains have to run before DNAT.
-	{filterPreroutingChain, knftables.FilterType, knftables.PreroutingHook, knftables.DNATPriority + "-10"},
-	{filterInputChain, knftables.FilterType, knftables.InputHook, knftables.DNATPriority + "-10"},
-	{filterForwardChain, knftables.FilterType, knftables.ForwardHook, knftables.DNATPriority + "-10"},
-	{filterOutputChain, knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "-10"},
+	// filter base chains (pre-dnat priority) to operate on pre-DNAT dest IPs and Port for filtering load-balancer source ranges.
+	{filterPreroutingPreDNATChain, knftables.FilterType, knftables.PreroutingHook, knftables.DNATPriority + "-10"},
+	{filterOutputPreDNATChain, knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "-10"},
+
+	// filter base chains (filter priority)
+	{filterInputChain, knftables.FilterType, knftables.InputHook, knftables.FilterPriority},
+	{filterForwardChain, knftables.FilterType, knftables.ForwardHook, knftables.FilterPriority},
+	{filterOutputChain, knftables.FilterType, knftables.OutputHook, knftables.FilterPriority},
+
+	// filter base chain (post-dnat priority)
 	{filterOutputPostDNATChain, knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "+10"},
+
+	// nat base chains (dnat priority)
 	{natPreroutingChain, knftables.NATType, knftables.PreroutingHook, knftables.DNATPriority},
 	{natOutputChain, knftables.NATType, knftables.OutputHook, knftables.DNATPriority},
 	{natPostroutingChain, knftables.NATType, knftables.PostroutingHook, knftables.SNATPriority},
@@ -413,7 +420,7 @@ type nftablesJumpChain struct {
 }
 
 var nftablesJumpChains = []nftablesJumpChain{
-	// We can't jump to endpointsCheckChain from filter-prerouting like
+	// We can't jump to endpointsCheckChain from filter-prerouting-pre-dnat like
 	// firewallCheckChain because reject action is only valid in chains using the
 	// input, forward or output hooks with kernels before 5.9.
 	{nodePortEndpointsCheckChain, filterInputChain, "ct state new"},
@@ -421,8 +428,8 @@ var nftablesJumpChains = []nftablesJumpChain{
 	{serviceEndpointsCheckChain, filterForwardChain, "ct state new"},
 	{serviceEndpointsCheckChain, filterOutputChain, "ct state new"},
 
-	{firewallCheckChain, filterPreroutingChain, "ct state new"},
-	{firewallCheckChain, filterOutputChain, "ct state new"},
+	{firewallCheckChain, filterPreroutingPreDNATChain, "ct state new"},
+	{firewallCheckChain, filterOutputPreDNATChain, "ct state new"},
 
 	{servicesChain, natOutputChain, ""},
 	{servicesChain, natPreroutingChain, ""},
