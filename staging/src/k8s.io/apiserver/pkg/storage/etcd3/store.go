@@ -90,6 +90,8 @@ type store struct {
 	newListFunc    func() runtime.Object
 }
 
+var _ storage.Interface = (*store)(nil)
+
 func (s *store) RequestWatchProgress(ctx context.Context) error {
 	// Use watchContext to match ctx metadata provided when creating the watch.
 	// In best case scenario we would use the same context that watch was created, but there is no way access it from watchCache.
@@ -136,20 +138,7 @@ func (a *abortOnFirstError) Aggregate(key string, err error) bool {
 func (a *abortOnFirstError) Err() error { return a.err }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) storage.Interface {
-	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
-		transformer = WithCorruptObjErrorHandlingTransformer(transformer)
-		decoder = WithCorruptObjErrorHandlingDecoder(decoder)
-	}
-	var store storage.Interface
-	store = newStore(c, codec, newFunc, newListFunc, prefix, resourcePrefix, groupResource, transformer, leaseManagerConfig, decoder, versioner)
-	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
-		store = NewStoreWithUnsafeCorruptObjectDeletion(store, groupResource)
-	}
-	return store
-}
-
-func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
+func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
 	// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
