@@ -18,6 +18,7 @@ package etcd3
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"sync/atomic"
@@ -32,10 +33,12 @@ import (
 
 const sizerRefreshInterval = time.Minute
 
-type keysFunc func(context.Context) ([]string, error)
-
-func newStatsCache(getKeys keysFunc) *statsCache {
+func newStatsCache(prefix string, getKeys storage.KeysFunc) *statsCache {
+	if prefix[len(prefix)-1] != '/' {
+		prefix += "/"
+	}
 	sc := &statsCache{
+		prefix:  prefix,
 		getKeys: getKeys,
 		stop:    make(chan struct{}),
 		keys:    make(map[string]sizeRevision),
@@ -58,7 +61,8 @@ func newStatsCache(getKeys keysFunc) *statsCache {
 // This approach may leak keys if delete events are not observed,
 // thus we run a background goroutine to periodically cleanup keys if needed.
 type statsCache struct {
-	getKeys        keysFunc
+	prefix         string
+	getKeys        storage.KeysFunc
 	stop           chan struct{}
 	wg             sync.WaitGroup
 	lastKeyCleanup atomic.Pointer[time.Time]
@@ -87,6 +91,10 @@ func (sc *statsCache) Stats(ctx context.Context) (storage.Stats, error) {
 		stats.EstimatedAverageObjectSizeBytes = sc.keySizes() / int64(len(sc.keys))
 	}
 	return stats, nil
+}
+
+func (sc *statsCache) SetKeysFunc(keys storage.KeysFunc) {
+	sc.getKeys = keys
 }
 
 func (sc *statsCache) Close() {
@@ -122,6 +130,14 @@ func (sc *statsCache) cleanKeysIfNeeded(ctx context.Context) {
 func (sc *statsCache) cleanKeys(keepKeys []string) {
 	newKeys := make(map[string]sizeRevision, len(keepKeys))
 	for _, key := range keepKeys {
+		// Handle cacher keys not having prefix.
+		if !strings.HasPrefix(key, sc.prefix) {
+			startIndex := 0
+			if key[0] == '/' {
+				startIndex = 1
+			}
+			key = sc.prefix + key[startIndex:]
+		}
 		keySizeRevision, ok := sc.keys[key]
 		if !ok {
 			continue

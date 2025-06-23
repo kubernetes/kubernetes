@@ -192,6 +192,8 @@ func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.O
 func (d *dummyStorage) Stats(_ context.Context) (storage.Stats, error) {
 	return storage.Stats{}, fmt.Errorf("unimplemented")
 }
+func (d *dummyStorage) SetKeysFunc(storage.KeysFunc) {
+}
 func (d *dummyStorage) ReadinessCheck() error {
 	return nil
 }
