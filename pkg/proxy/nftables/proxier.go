@@ -68,7 +68,6 @@ const (
 	filterInputChain             = "filter-input"
 	filterForwardChain           = "filter-forward"
 	filterOutputChain            = "filter-output"
-	filterOutputPostDNATChain    = "filter-output-post-dnat"
 	natPreroutingChain           = "nat-prerouting"
 	natOutputChain               = "nat-output"
 	natPostroutingChain          = "nat-postrouting"
@@ -401,9 +400,6 @@ var nftablesBaseChains = []nftablesBaseChain{
 	{filterForwardChain, knftables.FilterType, knftables.ForwardHook, knftables.FilterPriority},
 	{filterOutputChain, knftables.FilterType, knftables.OutputHook, knftables.FilterPriority},
 
-	// filter base chain (post-dnat priority)
-	{filterOutputPostDNATChain, knftables.FilterType, knftables.OutputHook, knftables.DNATPriority + "+10"},
-
 	// nat base chains (dnat priority)
 	{natPreroutingChain, knftables.NATType, knftables.PreroutingHook, knftables.DNATPriority},
 	{natOutputChain, knftables.NATType, knftables.OutputHook, knftables.DNATPriority},
@@ -436,7 +432,7 @@ var nftablesJumpChains = []nftablesJumpChain{
 	{masqueradingChain, natPostroutingChain, ""},
 
 	{clusterIPsCheckChain, filterForwardChain, "ct state new"},
-	{clusterIPsCheckChain, filterOutputPostDNATChain, "ct state new"},
+	{clusterIPsCheckChain, filterOutputChain, "ct state new"},
 }
 
 // ensureChain adds commands to tx to ensure that chain exists and doesn't contain
