@@ -75,6 +75,7 @@ func TestResourceConfigForPod(t *testing.T) {
 		enforceCPULimits         bool
 		quotaPeriod              uint64 // in microseconds
 		podLevelResourcesEnabled bool
+		disableCPUCFSQuotaPeriod bool
 	}{
 		"besteffort": {
 			pod: &v1.Pod{
@@ -160,7 +161,22 @@ func TestResourceConfigForPod(t *testing.T) {
 				},
 			},
 			enforceCPULimits: true,
+			disableCPUCFSQuotaPeriod: false,
 			quotaPeriod:      tunedQuotaPeriod,
+			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
+		},
+		"burstable-with-limits-with-tuned-quota-enable-cpu-cfs-quota-period": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("200m", "200Mi")),
+						},
+					},
+				},
+			},
+			enforceCPULimits: true,
+			quotaPeriod:      defaultQuotaPeriod,
 			expected:         &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &tunedQuotaPeriod, Memory: &burstableMemory},
 		},
 		"burstable-with-limits-no-cpu-enforcement-with-tuned-quota": {
@@ -394,6 +410,7 @@ func TestResourceConfigForPod(t *testing.T) {
 
 	for testName, testCase := range testCases {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodLevelResources, testCase.podLevelResourcesEnabled)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUCFSQuotaPeriod, false)
 		actual := ResourceConfigForPod(testCase.pod, testCase.enforceCPULimits, testCase.quotaPeriod, false)
 		if !reflect.DeepEqual(actual.CPUPeriod, testCase.expected.CPUPeriod) {
 			t.Errorf("unexpected result, test: %v, cpu period not as expected. Expected: %v, Actual:%v", testName, *testCase.expected.CPUPeriod, *actual.CPUPeriod)
