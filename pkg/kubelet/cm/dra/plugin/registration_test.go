@@ -122,14 +122,13 @@ func TestRegistrationHandler(t *testing.T) {
 		},
 	}
 
-	tmp := t.TempDir()
-	endpointA := path.Join(tmp, "a.sock")
-	endpointB := path.Join(tmp, "b.sock")
+	socketFileA := "a.sock"
+	socketFileB := "b.sock"
 
 	for _, test := range []struct {
 		description       string
 		driverName        string
-		endpoint          string
+		socketFile        string
 		withClient        bool
 		supportedServices []string
 		shouldError       bool
@@ -138,27 +137,27 @@ func TestRegistrationHandler(t *testing.T) {
 		{
 			description: "no-services",
 			driverName:  pluginB,
-			endpoint:    endpointB,
+			socketFile:  socketFileB,
 			shouldError: true,
 		},
 		{
 			description:       "current-service",
 			driverName:        pluginB,
-			endpoint:          endpointB,
+			socketFile:        socketFileB,
 			supportedServices: []string{drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
 		},
 		{
 			description:       "two-services",
 			driverName:        pluginB,
-			endpoint:          endpointB,
+			socketFile:        socketFileB,
 			supportedServices: []string{drapbv1alpha4.NodeService, drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
 		},
 		{
 			description:       "old-service",
 			driverName:        pluginB,
-			endpoint:          endpointB,
+			socketFile:        socketFileB,
 			supportedServices: []string{drapbv1alpha4.NodeService},
 			chosenService:     drapbv1alpha4.NodeService,
 		},
@@ -166,14 +165,14 @@ func TestRegistrationHandler(t *testing.T) {
 			// Legacy behavior.
 			description:       "version",
 			driverName:        pluginB,
-			endpoint:          endpointB,
+			socketFile:        socketFileB,
 			supportedServices: []string{"1.0.0"},
 			chosenService:     drapbv1alpha4.NodeService,
 		},
 		{
 			description:       "replace",
 			driverName:        pluginA,
-			endpoint:          endpointB,
+			socketFile:        socketFileB,
 			supportedServices: []string{drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
 		},
@@ -181,7 +180,7 @@ func TestRegistrationHandler(t *testing.T) {
 			description:       "manage-resource-slices",
 			withClient:        true,
 			driverName:        pluginB,
-			endpoint:          endpointB,
+			socketFile:        socketFileB,
 			supportedServices: []string{drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
 		},
@@ -200,11 +199,14 @@ func TestRegistrationHandler(t *testing.T) {
 			// of the connection state.
 
 			service := drapb.DRAPluginService
+			tmp := t.TempDir()
+			endpointA := path.Join(tmp, socketFileA)
 			teardownA, err := setupFakeGRPCServer(service, endpointA)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardownA)
 
-			teardown, err := setupFakeGRPCServer(service, test.endpoint)
+			endpoint := path.Join(tmp, test.socketFile)
+			teardown, err := setupFakeGRPCServer(service, endpoint)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardown)
 
@@ -232,7 +234,7 @@ func TestRegistrationHandler(t *testing.T) {
 				draPlugins.DeRegisterPlugin(pluginA, endpointA)
 			})
 
-			err = draPlugins.ValidatePlugin(test.driverName, test.endpoint, test.supportedServices)
+			err = draPlugins.ValidatePlugin(test.driverName, endpoint, test.supportedServices)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -246,7 +248,7 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// Add plugin for the first time.
-			err = draPlugins.RegisterPlugin(test.driverName, test.endpoint, test.supportedServices, nil)
+			err = draPlugins.RegisterPlugin(test.driverName, endpoint, test.supportedServices, nil)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -262,9 +264,9 @@ func TestRegistrationHandler(t *testing.T) {
 				}
 
 				tCtx.Logf("Removing plugin %s", test.driverName)
-				draPlugins.DeRegisterPlugin(test.driverName, test.endpoint)
+				draPlugins.DeRegisterPlugin(test.driverName, endpoint)
 				// Nop.
-				draPlugins.DeRegisterPlugin(test.driverName, test.endpoint)
+				draPlugins.DeRegisterPlugin(test.driverName, endpoint)
 				if test.withClient {
 					requireNoSlices(tCtx)
 				}
