@@ -49,62 +49,62 @@ func TestPodTopology(t *testing.T) {
 		featureDisabled       bool                 // configure whether the SetPodTopologyLabels feature gate should be disabled.
 	}{
 		{
-			name: "copies topology.k8s.io/zone and region labels to binding labels",
+			name: "copies topology.kubernetes.io/zone and region labels to binding labels",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone":      "zone1",
-				"topology.k8s.io/region":    "region1",
-				"topology.k8s.io/arbitrary": "something",
-				"non-topology.k8s.io/label": "something", // verify we don't unexpectedly copy non topology.k8s.io labels.
+				"topology.kubernetes.io/zone":      "zone1",
+				"topology.kubernetes.io/region":    "region1",
+				"topology.kubernetes.io/arbitrary": "something",
+				"non-topology.kubernetes.io/label": "something", // verify we don't unexpectedly copy non topology.kubernetes.io labels.
 			},
 			expectedBindingLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone1",
-				"topology.k8s.io/region": "region1",
+				"topology.kubernetes.io/zone":   "zone1",
+				"topology.kubernetes.io/region": "region1",
 			},
 		},
 		{
 			name: "does not copy arbitrary topology labels",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone":      "zone1",
-				"topology.k8s.io/arbitrary": "something",
+				"topology.kubernetes.io/zone":      "zone1",
+				"topology.kubernetes.io/arbitrary": "something",
 			},
 			expectedBindingLabels: map[string]string{
-				"topology.k8s.io/zone": "zone1",
+				"topology.kubernetes.io/zone": "zone1",
 			},
 		},
 		{
 			name: "does not copy topology labels that use a subdomain",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/region":   "region1",
-				"sub.topology.k8s.io/zone": "value",
+				"topology.kubernetes.io/region":   "region1",
+				"sub.topology.kubernetes.io/zone": "value",
 			},
 			expectedBindingLabels: map[string]string{
-				"topology.k8s.io/region": "region1",
+				"topology.kubernetes.io/region": "region1",
 			},
 		},
 		{
 			name: "does not copy label keys that don't contain a / character",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io": "value",
+				"topology.kubernetes.io": "value",
 			},
 			existingBindingLabels: map[string]string{},
 		},
 		{
 			name: "overwrites existing topology labels",
 			existingBindingLabels: map[string]string{
-				"topology.k8s.io/zone": "oldValue",
+				"topology.kubernetes.io/zone": "oldValue",
 			},
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone": "newValue",
+				"topology.kubernetes.io/zone": "newValue",
 			},
 			expectedBindingLabels: map[string]string{
-				"topology.k8s.io/zone": "newValue",
+				"topology.kubernetes.io/zone": "newValue",
 			},
 		},
 		{
 			name: "does nothing if the SetPodTopologyLabels feature gate is disabled",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone1",
-				"topology.k8s.io/region": "region1",
+				"topology.kubernetes.io/zone":   "zone1",
+				"topology.kubernetes.io/region": "region1",
 			},
 			expectedBindingLabels: map[string]string{},
 			featureDisabled:       true,
