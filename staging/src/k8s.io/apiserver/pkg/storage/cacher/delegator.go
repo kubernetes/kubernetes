@@ -99,6 +99,10 @@ func (c *CacheDelegator) GetCurrentResourceVersion(ctx context.Context) (uint64,
 	return c.storage.GetCurrentResourceVersion(ctx)
 }
 
+func (c *CacheDelegator) SetKeysFunc(keys storage.KeysFunc) {
+	c.storage.SetKeysFunc(keys)
+}
+
 func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.

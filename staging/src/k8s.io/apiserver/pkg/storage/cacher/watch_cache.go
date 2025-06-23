@@ -512,6 +512,24 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 	return w.list(ctx, resourceVersion, key, opts)
 }
 
+// WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
+// with their ResourceVersion and the name of the index, if any, that was used.
+func (w *watchCache) WaitUntilFreshAndGetKeys(ctx context.Context, resourceVersion uint64) (keys []string, err error) {
+	if delegator.ConsistentReadSupported() && w.notFresh(resourceVersion) {
+		w.waitingUntilFresh.Add()
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+		w.waitingUntilFresh.Remove()
+	} else {
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+	}
+
+	defer w.RUnlock()
+	if err != nil {
+		return nil, err
+	}
+	return w.store.ListKeys(), nil
+}
+
 // NOTICE: Structure follows the shouldDelegateList function in
 // staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
 func (w *watchCache) list(ctx context.Context, resourceVersion uint64, key string, opts storage.ListOptions) (resp listResp, index string, err error) {

@@ -267,7 +267,14 @@ type Interface interface {
 	// GetCurrentResourceVersion gets the current resource version from etcd.
 	// This method issues an empty list request and reads only the ResourceVersion from the object metadata
 	GetCurrentResourceVersion(ctx context.Context) (uint64, error)
+
+	// SetKeysFunc allows to override the function used to get keys from storage.
+	// This allows to replace default function that fetches keys from storage with one using cache.
+	SetKeysFunc(KeysFunc)
 }
+
+// KeysFunc is a function prototype to fetch keys from storage.
+type KeysFunc func(context.Context) ([]string, error)
 
 // GetOptions provides the options that may be provided for storage get operations.
 type GetOptions struct {

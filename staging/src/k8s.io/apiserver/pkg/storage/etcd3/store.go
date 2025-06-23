@@ -183,7 +183,7 @@ func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() 
 		newListFunc:    newListFunc,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		stats := newStatsCache(s.getKeys)
+		stats := newStatsCache(pathPrefix, s.getKeys)
 		s.stats = stats
 		w.stats = stats
 	}
@@ -631,6 +631,12 @@ func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
 	return storage.Stats{
 		ObjectCount: count,
 	}, nil
+}
+
+func (s *store) SetKeysFunc(keys storage.KeysFunc) {
+	if s.stats != nil {
+		s.stats.SetKeysFunc(keys)
+	}
 }
 
 func (s *store) getKeys(ctx context.Context) ([]string, error) {
