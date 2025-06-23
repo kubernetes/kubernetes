@@ -48,6 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery/cached/memory"
 	resourceapiinformer "k8s.io/client-go/informers/resource/v1beta2"
@@ -68,6 +69,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -688,13 +690,26 @@ func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path
 			cmdCtx := klog.NewContext(cmdCtx, cmdLogger)
 			logger.V(1).Info("Starting...")
 			defer logger.V(1).Info("Stopped")
-			if err := execute(cmdCtx, req.URL(), d.f.ClientConfig(), 5); err != nil {
+
+			// This may fail temporarily, which is recoverable by executing again.
+			delayFn := wait.Backoff{
+				Duration: time.Second,
+				Cap:      30 * time.Second,
+				Steps:    30,
+				Factor:   2.0,
+				Jitter:   1.0,
+			}.DelayWithReset(clock.RealClock{}, 5*time.Minute)
+			runHostpathPlugin := func(ctx context.Context) (bool, error) {
 				// errors.Is(err, listenerDoneErr) would be nicer, but we don't get
 				// that error from remotecommand. Instead forgo logging when we already shut down.
-				if cmdCtx.Err() == nil {
-					logger.Error(err, "execution failed")
+				if err := execute(ctx, req.URL(), d.f.ClientConfig(), 5); err != nil && ctx.Err() == nil {
+					klog.FromContext(ctx).V(5).Info("execution failed, will retry", "err", err)
 				}
+				// There is no reason to stop except for context cancellation =>
+				// condition always false, no fatal errors.
+				return false, nil
 			}
+			_ = delayFn.Until(cmdCtx, true /* immediate */, true /* sliding */, runHostpathPlugin)
 
 			// Killing hostpathplugin does not remove the socket. Need to do that manually.
 			req := d.f.ClientSet.CoreV1().RESTClient().Post().
