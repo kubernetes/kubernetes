@@ -43,7 +43,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
-	"k8s.io/utils/ptr"
 	"k8s.io/utils/trace"
 )
 
@@ -130,7 +129,7 @@ type Reflector struct {
 	ShouldResync func() bool
 	// MaxInternalErrorRetryDuration defines how long we should retry internal errors returned by watch.
 	MaxInternalErrorRetryDuration time.Duration
-	// UseWatchList if turned on instructs the reflector to open a stream to bring data from the API server.
+	// useWatchList if turned on instructs the reflector to open a stream to bring data from the API server.
 	// Streaming has the primary advantage of using fewer server's resources to fetch data.
 	//
 	// The old behaviour establishes a LIST request which gets data in chunks.
@@ -138,9 +137,7 @@ type Reflector struct {
 	// might result in an increased memory consumption of the APIServer.
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
-	//
-	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
-	UseWatchList *bool
+	useWatchList bool
 }
 
 func (r *Reflector) Name() string {
@@ -293,11 +290,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 		r.expectedGVK = getExpectedGVKFromObject(expectedType)
 	}
 
-	// don't overwrite UseWatchList if already set
-	// because the higher layers (e.g. storage/cacher) disabled it on purpose
-	if r.UseWatchList == nil {
-		r.UseWatchList = ptr.To(clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient))
-	}
+	r.useWatchList = clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient)
 
 	return r
 }
@@ -403,8 +396,7 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 	logger.V(3).Info("Listing and watching", "type", r.typeDescription, "reflector", r.name)
 	var err error
 	var w watch.Interface
-	useWatchList := ptr.Deref(r.UseWatchList, false)
-	fallbackToList := !useWatchList
+	fallbackToList := !r.useWatchList
 
 	defer func() {
 		if w != nil {
@@ -412,7 +404,7 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 		}
 	}()
 
-	if useWatchList {
+	if r.useWatchList {
 		w, err = r.watchList(ctx)
 		if w == nil && err == nil {
 			// stopCh was closed
