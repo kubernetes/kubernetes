@@ -17,6 +17,7 @@ limitations under the License.
 package webhook
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
 	"strings"
@@ -28,6 +29,10 @@ import (
 
 func ValidateCABundle(fldPath *field.Path, caBundle []byte) field.ErrorList {
 	var allErrors field.ErrorList
+	// Treat whitespace-only caBundle as empty
+	if len(caBundle) > 0 && len(bytes.TrimSpace(caBundle)) == 0 {
+		caBundle = nil
+	}
 	_, err := transport.TLSConfigFor(&transport.Config{TLS: transport.TLSConfig{CAData: caBundle}})
 	if err != nil {
 		allErrors = append(allErrors, field.Invalid(fldPath, caBundle, err.Error()))

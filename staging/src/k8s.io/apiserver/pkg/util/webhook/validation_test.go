@@ -71,6 +71,10 @@ func TestValidateCABundle(t *testing.T) {
 			name:      "non empty caBundle with valid certificate should validate",
 			caBundle:  exampleCert,
 			expectErr: false,
+		}, {
+			name:      "whitespace-only caBundle is valid",
+			caBundle:  []byte("   \n\t  "),
+			expectErr: false,
 		},
 	}
 
