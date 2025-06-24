@@ -481,7 +481,7 @@ var _ = SIGDescribe("OrderedNamespaceDeletion", func() {
 	f := framework.NewDefaultFramework("namespacedeletion")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	f.It("namespace deletion should delete pod first", framework.WithFeatureGate(features.OrderedNamespaceDeletion), framework.WithSerial(), func(ctx context.Context) {
+	f.It("namespace deletion should delete pod first", framework.WithFeatureGate(features.OrderedNamespaceDeletion), func(ctx context.Context) {
 		ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx, f)
 	})
 })
@@ -538,33 +538,24 @@ func ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx context.Context, f 
 	ginkgo.By("Deleting the namespace")
 	err = f.ClientSet.CoreV1().Namespaces().Delete(ctx, nsName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "failed to delete namespace: %s", nsName)
-	// wait 10 seconds to allow the namespace controller to process
-	time.Sleep(10 * time.Second)
-	ginkgo.By("the pod should be deleted before processing deletion for other resources")
-	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 2*time.Second, 60*time.Second, true,
+
+	ginkgo.By("wait until namespace controller had time to process")
+	err = wait.PollUntilContextTimeout(ctx, 2*time.Second, framework.DefaultNamespaceDeletionTimeout, true,
 		func(ctx context.Context) (bool, error) {
-			_, err = f.ClientSet.CoreV1().ConfigMaps(nsName).Get(ctx, configMapName, metav1.GetOptions{})
-			framework.ExpectNoError(err, "configmap %q should still exist in namespace %q", configMapName, nsName)
-			// the pod should exist and has a deletionTimestamp set
-			pod, err = f.ClientSet.CoreV1().Pods(nsName).Get(ctx, pod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err, "failed to get pod %q in namespace %q", pod.Name, nsName)
-			if pod.DeletionTimestamp == nil {
-				framework.Logf("Pod %q in namespace %q does not yet have a metadata.deletionTimestamp set, retrying...", pod.Name, nsName)
+			ns, err := f.ClientSet.CoreV1().Namespaces().Get(ctx, nsName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return false, fmt.Errorf("namespace %s was deleted unexpectedly", nsName)
+				}
+				framework.Logf("Failed to get namespace %q: %v", nsName, err)
 				return false, nil
 			}
-			ns, err := f.ClientSet.CoreV1().Namespaces().Get(ctx, nsName, metav1.GetOptions{})
-			if err != nil && apierrors.IsNotFound(err) {
-				return false, fmt.Errorf("namespace %s was deleted unexpectedly", nsName)
+			if ns.Status.Phase != v1.NamespaceTerminating {
+				framework.Logf("Namespace %q is not in Terminating phase, retrying...", nsName)
+				return false, nil
 			}
-			ginkgo.By("Read namespace status")
-			nsResource := v1.SchemeGroupVersion.WithResource("namespaces")
-			unstruct, err := f.DynamicClient.Resource(nsResource).Get(ctx, ns.Name, metav1.GetOptions{}, "status")
-			framework.ExpectNoError(err, "failed to fetch NamespaceStatus %s", ns)
-			nsStatus, err := unstructuredToNamespace(unstruct)
-			framework.ExpectNoError(err, "Getting the status of the namespace %s", ns)
-			gomega.Expect(nsStatus.Status.Phase).To(gomega.Equal(v1.NamespaceTerminating), "The phase returned was %v", nsStatus.Status.Phase)
 			hasContextFailure := false
-			for _, cond := range nsStatus.Status.Conditions {
+			for _, cond := range ns.Status.Conditions {
 				if cond.Type == v1.NamespaceDeletionContentFailure {
 					hasContextFailure = true
 				}
@@ -574,12 +565,48 @@ func ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx context.Context, f 
 				return false, nil
 			}
 			return true, nil
-		}))
+		},
+	)
+	if err != nil {
+		framework.Failf("namespace %s has not been processed by namespace controller: %v", nsName, err)
+	}
+	ginkgo.By("the pod should be deleted before processing deletion for other resources")
+	err = wait.PollUntilContextTimeout(ctx, 2*time.Second, framework.DefaultNamespaceDeletionTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			_, err = f.ClientSet.CoreV1().ConfigMaps(nsName).Get(ctx, configMapName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return false, fmt.Errorf("configmap %q should still exist in namespace %q", configMapName, nsName)
+				}
+				framework.Logf("Failed to get configmap %q in namespace: %q: %v", configMapName, nsName, err)
+				return false, nil
+			}
+			// the pod should exist and has a deletionTimestamp set
+			pod, err = f.ClientSet.CoreV1().Pods(nsName).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return false, fmt.Errorf("failed to get pod %q in namespace %q", pod.Name, nsName)
+				}
+				framework.Logf("Failed to get pod %q in namespace: %q: %v", pod.Name, nsName, err)
+				return false, nil
+			}
+			if pod.DeletionTimestamp == nil {
+				framework.Logf("Pod %q in namespace %q does not yet have a metadata.deletionTimestamp set, retrying...", pod.Name, nsName)
+				return false, nil
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		framework.Failf("pod %s was not deleted before the configmap %s: %v", pod.Name, configMapName, err)
+	}
 
 	ginkgo.By(fmt.Sprintf("Removing finalizer from pod %q in namespace %q", podName, nsName))
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		pod, err = f.ClientSet.CoreV1().Pods(nsName).Get(ctx, podName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod %q in namespace %q", pod.Name, nsName)
+		if err != nil {
+			return err
+		}
 		pod.Finalizers = []string{}
 		_, err = f.ClientSet.CoreV1().Pods(nsName).Update(ctx, pod, metav1.UpdateOptions{})
 		return err
