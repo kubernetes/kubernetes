@@ -689,21 +689,28 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		tracer:        noopoteltrace.NewTracerProvider().Tracer(""),
 	}
 
-	// Expect 95% usage and little of it gets freed.
+	// Initial state: 95% usage, of which 5% is garbage images.
+	capacity := uint64(10 * 1024 * 1024 * 1024)
+	available := capacity / 20 // 5% available, 95% usage
 	imageFs := &statsapi.FsStats{
-		AvailableBytes: ptr.To(uint64(50)),
-		CapacityBytes:  ptr.To(uint64(1000)),
+		AvailableBytes: ptr.To(available),
+		CapacityBytes:  ptr.To(capacity),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil)
+	// This image is unused and eligible for deletion.
+	// Its size is less than the required amount to free.
+	imageSize := int64(500 * 1024 * 1024) // 500 MiB
 	fakeRuntime.ImageList = []container.Image{
-		makeImage(0, 50),
+		makeImage(0, imageSize),
 	}
 
 	err := manager.GarbageCollect(ctx, time.Now())
 	assert.Error(t, err)
 
 	// Check that a warning event was sent
-	expectedEvent := "Warning FreeDiskSpaceFailed Failed to garbage collect required amount of images. Attempted to free 150 bytes, but only found 50 bytes eligible to free."
+	expectedEvent := "Warning FreeDiskSpaceFailed Insufficient free disk space on the node's image filesystem" +
+		" (95.0% of 10.0 GiB used). Failed to free sufficient space by deleting unused images." +
+		" Consider resizing the disk or deleting unused files."
 	select {
 	case event := <-recorder.Events:
 		assert.Equal(t, expectedEvent, event)

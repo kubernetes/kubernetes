@@ -385,21 +385,28 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 	}
 
 	// If over the max threshold, free enough to place us at the lower threshold.
-	usagePercent := 100 - int(available*100/capacity)
-	if usagePercent >= im.policy.HighThresholdPercent {
+	usagePercent := 100 - float64(available)*100/float64(capacity)
+	if int(usagePercent) >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
 		klog.InfoS("Disk usage on image filesystem is over the high threshold, trying to free bytes down to the low threshold", "usage", usagePercent, "highThreshold", im.policy.HighThresholdPercent, "amountToFree", amountToFree, "lowThreshold", im.policy.LowThresholdPercent)
 		remainingImages, freed, err := im.freeSpace(ctx, amountToFree, freeTime, images)
 		if err != nil {
+			// Failed to delete images, eg due to a read-only filesystem.
 			return err
 		}
 
 		im.runPostGCHooks(remainingImages, freeTime)
 
 		if freed < amountToFree {
-			err := fmt.Errorf("Failed to garbage collect required amount of images. Attempted to free %d bytes, but only found %d bytes eligible to free.", amountToFree, freed)
-			im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.FreeDiskSpaceFailed, err.Error())
-			return err
+			// This usually means the disk is full for reasons other than container
+			// images, such as logs, volumes, or other files. However, it could also
+			// be due to an unusually large number or size of in-use container images.
+			message := fmt.Sprintf("Insufficient free disk space on the node's image filesystem (%.1f%% of %s used). "+
+				"Failed to free sufficient space by deleting unused images. "+
+				"Consider resizing the disk or deleting unused files.",
+				usagePercent, formatSize(capacity))
+			im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.FreeDiskSpaceFailed, "%s", message)
+			return fmt.Errorf("%s", message)
 		}
 	}
 
@@ -574,6 +581,31 @@ func (im *realImageGCManager) imagesInEvictionOrder(ctx context.Context, freeTim
 	}
 	sort.Sort(byLastUsedAndDetected(images))
 	return images, nil
+}
+
+// formatSize returns a human-readable string for a given size in bytes.
+func formatSize(sizeBytes int64) string {
+	const (
+		KiB = 1024
+		MiB = 1024 * KiB
+		GiB = 1024 * MiB
+		TiB = 1024 * GiB
+	)
+
+	size := float64(sizeBytes)
+
+	switch {
+	case size < KiB:
+		return fmt.Sprintf("%d B", int64(size))
+	case size < MiB:
+		return fmt.Sprintf("%.1f KiB", size/KiB)
+	case size < GiB:
+		return fmt.Sprintf("%.1f MiB", size/MiB)
+	case size < TiB:
+		return fmt.Sprintf("%.1f GiB", size/GiB)
+	default:
+		return fmt.Sprintf("%.1f TiB", size/TiB)
+	}
 }
 
 // If RuntimeClassInImageCriAPI feature gate is enabled, imageRecords
