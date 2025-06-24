@@ -117,7 +117,7 @@ var (
  * A better approach would be check what we do have in the node. This is deferred to a later stage alongside
  * other improvements.
  */
-var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), feature.CPUManager, func() {
+var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithSerial(), feature.CPUManager, func() {
 	f := framework.NewDefaultFramework("cpumanager-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
