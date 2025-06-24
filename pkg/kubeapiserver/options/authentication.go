@@ -715,6 +715,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 			return err
 		}
 		authenticatorConfig.CustomDial = egressDialer
+		authenticatorConfig.EgressLookup = egressSelector.Lookup
 	}
 
 	// var openAPIV3SecuritySchemes spec3.SecuritySchemes

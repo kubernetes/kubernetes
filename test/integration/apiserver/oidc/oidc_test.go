@@ -992,6 +992,52 @@ jwt:
 				Groups:   []string{"system:authenticated"},
 			},
 		},
+		{
+			name: "egress proxy is ok",
+			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    egressSelectorType: cluster ### NEEDS EGRESS ON START ###
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
+			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
+				idTokenLifetime := time.Second * 1200
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+					t,
+					signingPrivateKey,
+					map[string]interface{}{
+						"iss": oidcServer.URL(),
+						"sub": defaultOIDCClaimedUsername,
+						"aud": defaultOIDCClientID,
+						"exp": time.Now().Add(idTokenLifetime).Unix(),
+					},
+					defaultStubAccessToken,
+					defaultStubRefreshToken,
+				)).Times(1)
+			},
+			configureClient: configureClientFetchingOIDCCredentials,
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			wantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1074,6 +1120,69 @@ jwt:
   claimMappings:
     username:
       expression: "'panda-' + claims.sub"   # this is the only new part of the config
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			wantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+			newAssertErrFn: func(t *testing.T, errorToCheck error) {
+				_ = assert.True(t, apierrors.IsForbidden(errorToCheck)) &&
+					assert.Equal(
+						t,
+						`pods is forbidden: User "panda-john_doe" cannot list resource "pods" in API group "" in the namespace "default"`,
+						errorToCheck.Error(),
+					)
+			},
+			newWantUser: &authenticationv1.UserInfo{
+				Username: "panda-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
+				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+			},
+		},
+		{
+			name: "old to new config with egress", // both configs are valid, but need to keep the test name short otherwise the UDS name can get too long on macOS
+			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s ### NEEDS EGRESS ON START ###
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    egressSelectorType: cluster   # this is a new part of the config
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'panda-' + claims.sub"   # this is a new part of the config
 `, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
 			},
 			assertErrFn: func(t *testing.T, errorToCheck error) {
@@ -1789,6 +1898,23 @@ func startTestAPIServerForOIDC[L utilsoidc.JosePublicKey](t *testing.T, c apiSer
 	var customFlags []string
 	if len(c.authenticationConfigYAML) > 0 {
 		customFlags = []string{fmt.Sprintf("--authentication-config=%s", writeTempFile(t, c.authenticationConfigYAML))}
+		// super hacky way to also configure egress selector
+		if strings.Contains(c.authenticationConfigYAML, "### NEEDS EGRESS ON START ###") {
+			udsName := filepath.Join(t.TempDir(), "uds")
+			go runEgressProxy(t, udsName)
+			egressConfig := fmt.Sprintf(`
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    proxyProtocol: HTTPConnect
+    transport:
+      uds:
+        udsName: %s
+`, udsName)
+			customFlags = append(customFlags, fmt.Sprintf("--egress-selector-config-file=%s", writeTempFile(t, egressConfig)))
+		}
 	} else {
 		customFlags = []string{
 			fmt.Sprintf("--oidc-issuer-url=%s", c.oidcURL),
