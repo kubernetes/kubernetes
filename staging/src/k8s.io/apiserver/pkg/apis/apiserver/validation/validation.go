@@ -241,7 +241,7 @@ func validateClaimValidationRules(compiler authenticationcel.Compiler, state *va
 		fldPath := fldPath.Index(i)
 
 		if len(rule.Expression) > 0 && !structuredAuthnFeatureEnabled {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("expression"), rule.Expression, "expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("expression"), rule.Expression, "is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
 		}
 
 		switch {
@@ -251,7 +251,7 @@ func validateClaimValidationRules(compiler authenticationcel.Compiler, state *va
 			allErrs = append(allErrs, field.Required(fldPath, "claim or expression is required"))
 		case len(rule.Claim) > 0:
 			if len(rule.Message) > 0 {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("message"), rule.Message, "message can't be set when claim is set"))
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("message"), rule.Message, "can't be set when claim is set"))
 			}
 			if seenClaims.Has(rule.Claim) {
 				allErrs = append(allErrs, field.Duplicate(fldPath.Child("claim"), rule.Claim))
@@ -259,7 +259,7 @@ func validateClaimValidationRules(compiler authenticationcel.Compiler, state *va
 			seenClaims.Insert(rule.Claim)
 		case len(rule.Expression) > 0:
 			if len(rule.RequiredValue) > 0 {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("requiredValue"), rule.RequiredValue, "requiredValue can't be set when expression is set"))
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("requiredValue"), rule.RequiredValue, "can't be set when expression is set"))
 			}
 			if seenExpressions.Has(rule.Expression) {
 				allErrs = append(allErrs, field.Duplicate(fldPath.Child("expression"), rule.Expression))
@@ -295,16 +295,16 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 
 	if !structuredAuthnFeatureEnabled {
 		if len(m.Username.Expression) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("username").Child("expression"), m.Username.Expression, "expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("username").Child("expression"), m.Username.Expression, "is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
 		}
 		if len(m.Groups.Expression) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("groups").Child("expression"), m.Groups.Expression, "expression is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("groups").Child("expression"), m.Groups.Expression, "is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
 		}
 		if len(m.UID.Claim) > 0 || len(m.UID.Expression) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), "", "uid claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), "", "claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
 		}
 		if len(m.Extra) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("extra"), "", "extra claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("extra"), "", "claim mapping is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
 		}
 	}
 
@@ -350,7 +350,7 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 		// IsDomainPrefixedPath checks for non-empty key and that the key is prefixed with a domain name.
 		allErrs = append(allErrs, utilvalidation.IsDomainPrefixedPath(fldPath.Child("key"), mapping.Key)...)
 		if mapping.Key != strings.ToLower(mapping.Key) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), mapping.Key, "key must be lowercase"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), mapping.Key, "must be lowercase"))
 		}
 
 		if isKubernetesDomainPrefix(mapping.Key) {
@@ -532,7 +532,7 @@ func validatePrefixClaimOrExpression(compiler authenticationcel.Compiler, mappin
 		var err *field.Error
 
 		if mapping.Prefix != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("prefix"), *mapping.Prefix, "prefix can't be set when expression is set"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("prefix"), *mapping.Prefix, "can't be set when expression is set"))
 		}
 		compilationResult, err = compileClaimsCELExpression(compiler, &authenticationcel.ClaimMappingExpression{
 			Expression: mapping.Expression,
@@ -753,7 +753,7 @@ func compileMatchConditions(compiler authorizationcel.Compiler, matchConditions 
 	var allErrs field.ErrorList
 	// should fail when match conditions are used without feature enabled
 	if len(matchConditions) > 0 && !structuredAuthzFeatureEnabled {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchConditions"), "", "matchConditions are not supported when StructuredAuthorizationConfiguration feature gate is disabled"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("matchConditions"), "", "are not supported when StructuredAuthorizationConfiguration feature gate is disabled"))
 	}
 	if len(matchConditions) > 64 {
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("matchConditions"), len(matchConditions), 64))
