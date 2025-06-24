@@ -293,7 +293,9 @@ func (in wrapDevice) withDeviceCounterConsumption(deviceCounterConsumption ...re
 		c := make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity)
 		for _, dcc := range device.Basic.ConsumesCounters {
 			for name, cap := range dcc.Counters {
-				ccap := resourceapi.DeviceCapacity(cap)
+				ccap := resourceapi.DeviceCapacity{
+					Value: cap.Value,
+				}
 				c[resourceapi.QualifiedName(name)] = ccap
 			}
 		}
