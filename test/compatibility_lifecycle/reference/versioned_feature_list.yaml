@@ -1251,6 +1251,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.29"
+- name: SchedulerAsyncAPICalls
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: SchedulerAsyncPreemption
   versionedSpecs:
   - default: false

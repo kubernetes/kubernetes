@@ -669,6 +669,12 @@ const (
 	// which benefits to reduce the useless requeueing.
 	SchedulerQueueingHints featuregate.Feature = "SchedulerQueueingHints"
 
+	// owner: @macsko
+	// kep: http://kep.k8s.io/5229
+	//
+	// Makes all API calls during scheduling asynchronous, by introducing a new kube-scheduler-wide way of handling such calls.
+	SchedulerAsyncAPICalls featuregate.Feature = "SchedulerAsyncAPICalls"
+
 	// owner: @sanposhiho
 	// kep: http://kep.k8s.io/4832
 	//
@@ -1661,6 +1667,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	RuntimeClassInImageCriAPI: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	SchedulerAsyncAPICalls: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	SchedulerAsyncPreemption: {
