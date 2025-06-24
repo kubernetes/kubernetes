@@ -90,7 +90,7 @@ var _ = SIGDescribe("Events", func() {
 			framework.Failf("Failed to get pod: %v", err)
 		}
 		framework.Logf("%+v\n", podWithUID)
-		var events *v1.EventList
+
 		// Check for scheduler event about the pod.
 		ginkgo.By("checking for scheduler event about the pod")
 		schedulerSelector := fields.Set{
