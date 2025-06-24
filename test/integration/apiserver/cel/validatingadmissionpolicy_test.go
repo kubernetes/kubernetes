@@ -64,6 +64,8 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 )
 
 // Test_ValidateNamespace_NoParams tests a ValidatingAdmissionPolicy that validates creation of a Namespace with no params.
@@ -2870,8 +2872,17 @@ func serviceAccountClient(namespace, name string) clientFn {
 
 func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1.ValidatingAdmissionPolicy) *admissionregistrationv1.ValidatingAdmissionPolicy {
 	policy = policy.DeepCopy()
+
+	testMarkerName := fmt.Sprintf("test-marker-%s", utilrand.String(utilvalidation.DNS1123SubdomainMaxLength-len("test-marker-")))
+	annotations := policy.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations["test-marker-name"] = testMarkerName
+	policy.SetAnnotations(annotations)
+
 	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, admissionregistrationv1.NamedRuleWithOperations{
-		ResourceNames: []string{"test-marker"},
+		ResourceNames: []string{testMarkerName},
 		RuleWithOperations: admissionregistrationv1.RuleWithOperations{
 			Operations: []admissionregistrationv1.OperationType{
 				"UPDATE",
@@ -2890,7 +2901,7 @@ func withWaitReadyConstraintAndExpression(policy *admissionregistrationv1.Valida
 		},
 	})
 	policy.Spec.Validations = append([]admissionregistrationv1.Validation{{
-		Expression: "object.metadata.name != 'test-marker'",
+		Expression: fmt.Sprintf("object.metadata.name != '%s'", testMarkerName),
 		Message:    "marker denied; policy is ready",
 	}}, policy.Spec.Validations...)
 	return policy
@@ -2905,14 +2916,23 @@ func createAndWaitReadyNamespaced(t *testing.T, client clientset.Interface, bind
 }
 
 func createAndWaitReadyNamespacedWithWarnHandler(t *testing.T, client clientset.Interface, binding *admissionregistrationv1.ValidatingAdmissionPolicyBinding, matchLabels map[string]string, ns string, handler *warningHandler) error {
-	marker := &v1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "test-marker", Namespace: ns, Labels: matchLabels}}
+	policy, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(context.TODO(), binding.Spec.PolicyName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testMarkerName := "test-marker"
+	if testMarkerNameAnnotation, ok := policy.GetAnnotations()["test-marker-name"]; ok {
+		testMarkerName = testMarkerNameAnnotation
+	}
+
+	marker := &v1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: testMarkerName, Namespace: ns, Labels: matchLabels}}
 	defer func() {
 		err := client.CoreV1().Endpoints(ns).Delete(context.TODO(), marker.Name, metav1.DeleteOptions{})
 		if err != nil {
 			t.Logf("error deleting marker: %v", err)
 		}
 	}()
-	marker, err := client.CoreV1().Endpoints(ns).Create(context.TODO(), marker, metav1.CreateOptions{})
+	marker, err = client.CoreV1().Endpoints(ns).Create(context.TODO(), marker, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
