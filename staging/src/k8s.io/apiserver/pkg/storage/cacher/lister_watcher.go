@@ -75,11 +75,14 @@ func (lw *listerWatcher) List(options metav1.ListOptions) (runtime.Object, error
 
 // Implements cache.ListerWatcher interface.
 func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, error) {
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = options.AllowWatchBookmarks
 	opts := storage.ListOptions{
-		ResourceVersion: options.ResourceVersion,
-		Predicate:       storage.Everything,
-		Recursive:       true,
-		ProgressNotify:  true,
+		ResourceVersion:   options.ResourceVersion,
+		Predicate:         pred,
+		Recursive:         true,
+		ProgressNotify:    true,
+		SendInitialEvents: options.SendInitialEvents,
 	}
 	ctx := context.Background()
 	if lw.contextMetadata != nil {

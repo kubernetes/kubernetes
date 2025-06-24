@@ -22,7 +22,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/features"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestCacherListerWatcher(t *testing.T) {
@@ -118,4 +125,55 @@ func TestCacherListerWatcherPagination(t *testing.T) {
 		t.Errorf("Expected list2.Items[0] to be %s but got %s", objects[2].Name, limit2.Items[0].Name)
 	}
 
+}
+
+func TestCacherListerWatcherListWatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
+
+	prefix := "pods"
+	fn := func() runtime.Object { return &example.PodList{} }
+	server, store := newEtcdTestStorage(t, prefix)
+	defer server.Terminate(t)
+
+	makePodFn := func() *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"},
+		}
+	}
+	ctx := context.TODO()
+	pod := makePodFn()
+	key := computePodKey(pod)
+	createdPod := &example.Pod{}
+	if err := store.Create(ctx, key, makePodFn(), createdPod, 0); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	lw := NewListerWatcher(store, prefix, fn, nil)
+	target := cache.ToListerWatcherWithContext(lw)
+	watchListOptions := metav1.ListOptions{
+		Watch:               true,
+		AllowWatchBookmarks: true,
+		SendInitialEvents:   ptr.To(true),
+	}
+	w, err := target.WatchWithContext(ctx, watchListOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Stop()
+
+	expectedWatchEvents := []watch.Event{
+		{Type: watch.Added, Object: createdPod},
+		{
+			Type: watch.Bookmark,
+			Object: &example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: createdPod.ResourceVersion,
+					Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+				},
+			},
+		},
+	}
+
+	storagetesting.TestCheckResultsInStrictOrder(t, w, expectedWatchEvents)
+	storagetesting.TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
 }
