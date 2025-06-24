@@ -77,6 +77,7 @@ func Convert_v1beta1_DeviceRequest_To_resource_DeviceRequest(in *resourcev1beta1
 			tolerations = append(tolerations, toleration)
 		}
 		exactDeviceRequest.Tolerations = tolerations
+		exactDeviceRequest.CapacityRequests = (*resource.CapacityRequirements)(unsafe.Pointer(in.CapacityRequests))
 		out.Exactly = &exactDeviceRequest
 	}
 	return nil
@@ -88,7 +89,8 @@ func hasAnyMainRequestFieldsSet(deviceRequest *resourcev1beta1.DeviceRequest) bo
 		deviceRequest.AllocationMode != "" ||
 		deviceRequest.Count != 0 ||
 		deviceRequest.AdminAccess != nil ||
-		deviceRequest.Tolerations != nil
+		deviceRequest.Tolerations != nil ||
+		deviceRequest.CapacityRequests != nil
 }
 
 func Convert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.DeviceRequest, out *resourcev1beta1.DeviceRequest, s conversion.Scope) error {
@@ -121,6 +123,9 @@ func Convert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.Device
 			tolerations = append(tolerations, toleration)
 		}
 		out.Tolerations = tolerations
+		if in.Exactly.CapacityRequests != nil {
+			out.CapacityRequests = (*resourcev1beta1.CapacityRequirements)(unsafe.Pointer(in.Exactly.CapacityRequests))
+		}
 	}
 	return nil
 }
@@ -200,6 +205,7 @@ func Convert_v1beta1_Device_To_resource_Device(in *resourcev1beta1.Device, out *
 			taints = append(taints, taint)
 		}
 		out.Taints = taints
+		out.AllowMultipleAllocations = in.Basic.AllowMultipleAllocations
 	}
 	return nil
 }
@@ -245,6 +251,7 @@ func Convert_resource_Device_To_v1beta1_Device(in *resource.Device, out *resourc
 		taints = append(taints, taint)
 	}
 	out.Basic.Taints = taints
+	out.Basic.AllowMultipleAllocations = in.AllowMultipleAllocations
 	return nil
 }
 

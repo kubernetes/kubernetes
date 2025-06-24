@@ -24,8 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
@@ -80,13 +83,15 @@ func testResourceSlice(name, nodeName, driverName string, numDevices int) *resou
 func TestValidateResourceSlice(t *testing.T) {
 	goodName := "foo"
 	badName := "!@#$%^"
+	longName := strings.Repeat("a", resourceapi.DeviceMaxDomainLength)
 	driverName := "test.example.com"
 	now := metav1.Now()
 	badValue := "spaces not allowed"
 
 	scenarios := map[string]struct {
-		slice        *resourceapi.ResourceSlice
-		wantFailures field.ErrorList
+		slice                         *resourceapi.ResourceSlice
+		wantFailures                  field.ErrorList
+		consumableCapacityFeatureGate bool
 	}{
 		"good": {
 			slice: testResourceSlice(goodName, goodName, driverName, resourceapi.ResourceSliceMaxDevices),
@@ -320,6 +325,25 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"good-long-name-device": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 3)
+				slice.Spec.Devices[1].Name = longName
+				return slice
+			}(),
+		},
+		"bad-multi-alloc-devices-too-long": {
+			wantFailures: field.ErrorList{
+				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("name"), "", 56), // SharedDeviceNameMaxLength
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 3)
+				slice.Spec.Devices[1].Name = longName
+				slice.Spec.Devices[1].AllowMultipleAllocations = ptr.To(true)
+				return slice
+			}(),
+			consumableCapacityFeatureGate: true,
+		},
 		"bad-attribute": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), badName, "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
@@ -434,6 +458,28 @@ func TestValidateResourceSlice(t *testing.T) {
 				}
 				return slice
 			}(),
+		},
+		"forbidden-sharing-policy-on-single-allocatable-capacity": {
+			wantFailures: field.ErrorList{
+				field.Forbidden(field.NewPath("spec", "devices").Index(1).Child("capacity").Key("cap").Child("sharingPolicy"), "allowMultipleAllocations must be true"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 2)
+				capacity := resourceapi.DeviceCapacity{
+					Value: resource.MustParse("1Gi"),
+					SharingPolicy: &resourceapi.CapacitySharingPolicy{
+						Default: resource.MustParse("1Mi"),
+						ValidRange: &resourceapi.CapacitySharingPolicyRange{
+							Minimum: resource.MustParse("1Mi"),
+						},
+					},
+				}
+				slice.Spec.Devices[1].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+					"cap": capacity,
+				}
+				return slice
+			}(),
+			consumableCapacityFeatureGate: true,
 		},
 		"invalid-node-selecor-label-value": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
@@ -783,6 +829,7 @@ func TestValidateResourceSlice(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
 			errs := ValidateResourceSlice(scenario.slice)
 			assertFailures(t, scenario.wantFailures, errs)
 		})
