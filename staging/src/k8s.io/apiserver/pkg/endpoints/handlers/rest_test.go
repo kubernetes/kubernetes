@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -247,6 +248,15 @@ func TestJSONPatch(t *testing.T) {
 		{
 			name:  "valid-negative-index-patch",
 			patch: `[{"op": "test", "value": "foo", "path": "/metadata/finalizers/-1"}]`,
+		},
+		// This demonstrates out-of-spec behavior json-patch v4 allows,
+		// which Kubernetes clients may depend on, and which updating to json-patch v5 currently breaks
+		{
+			name: "replace-missing-path-allowed",
+			patch: `[
+				{"op":"replace", "path":"/metadata/path", "value":"foo"},
+				{"op":"test", "path":"/metadata/path", "value":"foo"}
+			]`,
 		},
 	} {
 		p := &patcher{
