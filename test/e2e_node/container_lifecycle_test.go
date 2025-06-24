@@ -80,7 +80,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 	ginkgo.When("Running a pod with init containers and regular containers, restartPolicy=Never", func() {
 		ginkgo.When("A pod initializes successfully", func() {
 			ginkgo.It("should launch init container serially before a regular container", func(ctx context.Context) {
-
 				init1 := "init-1"
 				init2 := "init-2"
 				init3 := "init-3"
@@ -190,7 +189,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 		ginkgo.When("an init container fails", func() {
 			ginkgo.It("should not launch regular containers if an init container fails", func(ctx context.Context) {
-
 				init1 := "init-1"
 				regular1 := "regular-1"
 
@@ -319,7 +317,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 		ginkgo.When("running a Pod with a failed regular container", func() {
 			ginkgo.It("should restart failing container when pod restartPolicy is Always", func(ctx context.Context) {
-
 				regular1 := "regular-1"
 
 				podSpec := &v1.Pod{
@@ -364,7 +361,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 		ginkgo.When("Running a pod with multiple containers and a PostStart hook", func() {
 			ginkgo.It("should not launch second container before PostStart of the first container completed", func(ctx context.Context) {
-
 				regular1 := "regular-1"
 				regular2 := "regular-2"
 
@@ -433,7 +429,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 
 		ginkgo.When("have init container in a Pod with restartPolicy=Never", func() {
 			ginkgo.When("an init container fails to start because of a bad image", ginkgo.Ordered, func() {
-
 				init1 := "init1-1"
 				regular1 := "regular-1"
 
@@ -1122,7 +1117,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 					framework.ExpectNoError(err)
 					err = client.Delete(ctx, podSpec.Name, metav1.DeleteOptions{})
 					framework.ExpectNoError(err)
-
 				})
 
 				ginkgo.By("updating the image", func() {
@@ -1624,13 +1618,12 @@ var _ = SIGDescribe(framework.WithSerial(), "Containers Lifecycle", func() {
 	})
 })
 
-var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
+var _ = SIGDescribe(feature.SidecarContainers, framework.WithSerial(), "Containers Lifecycle", func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.When("using a Pod with restartPolicy=Never, three init container and two restartable init containers", ginkgo.Ordered, func() {
-
 		init1 := "init-1"
 		restartableInit1 := "restartable-init-1"
 		init2 := "init-2"
@@ -2026,14 +2019,12 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 				framework.ExpectNoError(results.Exits(restartableInit1))
 				framework.ExpectNoError(results.Exits(init1))
 				framework.ExpectNoError(results.ExitsBefore(init2, restartableInit1))
-
 			})
 		})
 	})
 
 	ginkgo.When("using a restartable init container in a Pod with restartPolicy=Never", func() {
 		ginkgo.When("a restartable init container runs continuously", ginkgo.Ordered, func() {
-
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
 
@@ -2179,7 +2170,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("a restartable init container fails to start because of a bad image", ginkgo.Ordered, func() {
-
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
 
@@ -2237,7 +2227,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("a restartable init container starts and exits with exit code 0 continuously", ginkgo.Ordered, func() {
-
 			restartableInit1 := "restartable-init-1"
 			init1 := "init-1"
 			regular1 := "regular-1"
@@ -2381,7 +2370,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("an Init container before restartable init container fails", ginkgo.Ordered, func() {
-
 			init1 := "init-1"
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
@@ -2447,7 +2435,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("an Init container after restartable init container fails", ginkgo.Ordered, func() {
-
 			init1 := "init-1"
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
@@ -2513,13 +2500,11 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 				framework.ExpectNoError(results.RunTogether(restartableInit1, init1))
 			})
 		})
-
 	})
 
 	ginkgo.When("using a restartable init container in a Pod with restartPolicy=OnFailure", ginkgo.Ordered, func() {
 		// this test case the same as for restartPolicy=Never
 		ginkgo.When("a restartable init container runs continuously", func() {
-
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
 
@@ -2667,7 +2652,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("a restartable init container fails to start because of a bad image", ginkgo.Ordered, func() {
-
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
 
@@ -2726,7 +2710,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 
 		// this test case the same as for restartPolicy=Never
 		ginkgo.When("a restartable init container starts and exits with exit code 0 continuously", ginkgo.Ordered, func() {
-
 			restartableInit1 := "restartable-init-1"
 			init1 := "init-1"
 			regular1 := "regular-1"
@@ -2800,7 +2783,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 
 		// this test case the same as for restartPolicy=Never
 		ginkgo.When("a restartable init container starts and exits with exit code 1 continuously", ginkgo.Ordered, func() {
-
 			restartableInit1 := "restartable-init-1"
 			init1 := "init-1"
 			regular1 := "regular-1"
@@ -2873,7 +2855,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("an Init container before restartable init container continuously fails", ginkgo.Ordered, func() {
-
 			init1 := "init-1"
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
@@ -2948,7 +2929,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("an Init container after restartable init container fails", ginkgo.Ordered, func() {
-
 			init1 := "init-1"
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
@@ -3026,7 +3006,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 
 	ginkgo.When("using a restartable init container in a Pod with restartPolicy=Always", ginkgo.Ordered, func() {
 		ginkgo.When("a restartable init container runs continuously", func() {
-
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
 
@@ -3172,7 +3151,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("a restartable init container fails to start because of a bad image", ginkgo.Ordered, func() {
-
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
 
@@ -3230,7 +3208,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("a restartable init container starts and exits with exit code 0 continuously", ginkgo.Ordered, func() {
-
 			restartableInit1 := "restartable-init-1"
 			init1 := "init-1"
 			regular1 := "regular-1"
@@ -3300,7 +3277,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 
 		// this test case the same as for restartPolicy=Never
 		ginkgo.When("a restartable init container starts and exits with exit code 1 continuously", ginkgo.Ordered, func() {
-
 			restartableInit1 := "restartable-init-1"
 			init1 := "init-1"
 			regular1 := "regular-1"
@@ -3369,7 +3345,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("an Init container before restartable init container continuously fails", ginkgo.Ordered, func() {
-
 			init1 := "init-1"
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
@@ -3444,7 +3419,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 		})
 
 		ginkgo.When("an Init container after restartable init container fails", ginkgo.Ordered, func() {
-
 			init1 := "init-1"
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
@@ -3522,7 +3496,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 
 	ginkgo.When("running restartable init containers with startup probes", func() {
 		ginkgo.It("should launch restartable init containers serially considering the startup probe", func(ctx context.Context) {
-
 			restartableInit1 := "restartable-init-1"
 			restartableInit2 := "restartable-init-2"
 			regular1 := "regular-1"
@@ -3728,7 +3701,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 
 		ginkgo.When("using a PreStop hook", func() {
 			ginkgo.It("should call the container's preStop hook and not launch next container if the restartable init container's startup probe fails", func(ctx context.Context) {
-
 				restartableInit1 := "restartable-init-1"
 				regular1 := "regular-1"
 
@@ -3816,7 +3788,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 
 	ginkgo.When("running restartable init containers with liveness probes", func() {
 		ginkgo.It("should call the container's preStop hook and start the next container if the restartable init container's liveness probe fails", func(ctx context.Context) {
-
 			restartableInit1 := "restartable-init-1"
 			regular1 := "regular-1"
 
@@ -4406,7 +4377,6 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 					fmt.Sprintf("expected PreStop 2 to live for ~32 seconds, got %s", results))
 				gomega.Expect(ps3Last-ps3).To(gomega.BeNumerically("~", 32000, lifetimeToleration),
 					fmt.Sprintf("expected PreStop 3 to live for ~32 seconds, got %s", results))
-
 			})
 		})
 
