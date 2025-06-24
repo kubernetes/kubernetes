@@ -31,14 +31,6 @@ func Convert_autoscaling_MetricTarget_To_v2beta1_CrossVersionObjectReference(in 
 	return nil
 }
 
-func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta1_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *autoscalingv2beta1.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-	if err := autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta1_HorizontalPodAutoscalerStatus(in, out, s); err != nil {
-		return err
-	}
-	// v2beta1 doesn't have SelectionStrategy fields, they're stored in annotations
-	return nil
-}
-
 func Convert_v2beta1_CrossVersionObjectReference_To_autoscaling_MetricTarget(in *autoscalingv2beta1.CrossVersionObjectReference, out *autoscaling.MetricTarget, s conversion.Scope) error {
 	return nil
 }
@@ -312,6 +304,19 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta1_HorizontalPodAutosca
 			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
 		}
 		out.Annotations[autoscaling.BehaviorSpecsAnnotation] = string(behaviorEnc)
+	}
+
+	if in.Spec.SelectionStrategy != nil {
+		selectionStrategyEnc, err := json.Marshal(in.Spec.SelectionStrategy)
+		if err != nil {
+			return err
+		}
+		// copy before mutating
+		if !copiedAnnotations {
+			copiedAnnotations = true
+			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
+		}
+		out.Annotations[autoscaling.SelectionStrategyAnnotation] = string(selectionStrategyEnc)
 	}
 
 	return nil
