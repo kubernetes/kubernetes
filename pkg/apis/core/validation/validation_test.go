@@ -27220,6 +27220,43 @@ func TestValidatePodResize(t *testing.T) {
 	}
 }
 
+//------------
+//testing update for pod-based resource allocation
+func TestValidatePodResourceRequirements_SupportedVsUnsupported(t *testing.T) {
+	podClaimNames := sets.New[string]()
+	opts := PodValidationOptions{}
+
+	t.Run("supported pod-level resource (cpu) passes", func(t *testing.T) {
+		reqs := &core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceCPU: resource.MustParse("500m"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceCPU: resource.MustParse("250m"),
+			},
+		}
+		errs := validatePodResourceRequirements(reqs, podClaimNames, field.NewPath("spec"), opts)
+		if len(errs) != 0 {
+			t.Errorf("expected no error, got: %v", errs)
+		}
+	})
+
+	t.Run("unsupported pod-level resource is skipped", func(t *testing.T) {
+		reqs := &core.ResourceRequirements{
+			Limits: core.ResourceList{
+				"example.com/unsupported": resource.MustParse("1"),
+			},
+			Requests: core.ResourceList{
+				"example.com/unsupported": resource.MustParse("1"),
+			},
+		}
+		errs := validatePodResourceRequirements(reqs, podClaimNames, field.NewPath("spec"), opts)
+		if len(errs) != 0 {
+			t.Errorf("expected unsupported resource to be skipped, got: %v", errs)
+		}
+	})
+}
+//------------
 func TestValidateNodeSwapStatus(t *testing.T) {
 	makeNode := func(nodeSwapStatus *core.NodeSwapStatus) core.Node {
 		node := makeNode("test-node", nil)
