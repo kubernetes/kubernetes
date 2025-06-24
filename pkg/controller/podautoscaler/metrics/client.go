@@ -164,8 +164,6 @@ func (c *customMetricsClient) GetRawMetric(metricName string, namespace string, 
 			Window:    window,
 			Value:     int64(m.Value.MilliValue()),
 		}
-
-		m.Value.MilliValue()
 	}
 
 	timestamp := metrics.Items[0].Timestamp.Time
