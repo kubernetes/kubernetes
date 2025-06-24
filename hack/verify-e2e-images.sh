@@ -39,11 +39,14 @@ kube::util::read-array IMAGES < <("${e2e_test}" --list-images | sed -E 's/^(.+):
 # diff versus known permitted images
 ret=0
 >&2 echo "Diffing e2e image list ..."
-diff -Naupr <(printf '%s\n' "${IMAGES[@]}") <(printf '%s\n' "${PERMITTED_IMAGES[@]}") || ret=$?
+# diff context is irrelevant here because of sorting.
+# Instead we want to know about old images (no longer in use, need to be removed)
+# and new images (should not get added).
+diff <(printf '%s\n' "${PERMITTED_IMAGES[@]}") <(printf '%s\n' "${IMAGES[@]}") | sed -E -e '/^---$/d' -e '/^[[:digit:]]+[acd][[:digit:]]+$/d' -e 's/^</obsolete image:/' -e 's/^>/forbidden image:/' >&2 || ret=$?
 if [[ $ret -eq 0 ]]; then
   >&2 echo "PASS: e2e images used are OK."
 else
-  >&2 echo "FAIL: e2e images do not match the approved list!"
+  >&2 echo "FAIL: current e2e images do not match the approved list in test/images/.permitted-images!"
   >&2 echo ""
   >&2 echo "Please use registry.k8s.io/e2e-test-images/agnhost wherever possible, we are consolidating test images."
   >&2 echo "See: test/images/agnhost/README.md"
