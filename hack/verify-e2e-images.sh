@@ -22,6 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 cd "${KUBE_ROOT}"
 
 source hack/lib/init.sh
+ret=0
 
 # NOTE: Please do NOT add any to this list!!
 #
@@ -34,10 +35,28 @@ kube::util::read-array PERMITTED_IMAGES < <(sed '/^#/d' ./test/images/.permitted
 echo "Getting e2e image list ..."
 make WHAT=test/e2e/e2e.test
 e2e_test="$(kube::util::find-binary e2e.test)"
-kube::util::read-array IMAGES < <("${e2e_test}" --list-images | sed -E 's/^(.+):[^:]+$/\1/' | LC_ALL=C sort -u)
+
+# validate "e2e.test --list-images":
+# - no unexpected output (whether it's on stderr or stdout)
+# - zero exit code (indirectly ensures that tests are set up properly)
+output=$("${e2e_test}" --list-images 2>&1) || ret=$?
+if [[ $ret -ne 0 ]]; then
+  >&2 echo "FAIL: '${e2e_test} --list-images' failed:"
+  >&2 echo "${output}"
+  exit 1
+fi
+
+unexpected_output=$(echo "${output}" | grep -v -E '^([[:alnum:]/.-]+):[^:]+$' || true)
+if [[ -n "${unexpected_output}" ]]; then
+  >&2 echo "FAIL: '${e2e_test} --list-images' printed unexpected output:"
+  >&2 echo "${unexpected_output}"
+  exit 1
+fi
+
+# extract image names without the version
+kube::util::read-array IMAGES < <(echo "${output}" | sed -E 's/^([[:alnum:]/.-]+):[^:]+$/\1/' | LC_ALL=C sort -u)
 
 # diff versus known permitted images
-ret=0
 >&2 echo "Diffing e2e image list ..."
 # diff context is irrelevant here because of sorting.
 # Instead we want to know about old images (no longer in use, need to be removed)
