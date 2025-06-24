@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -308,6 +309,8 @@ func (o containerOutputList) TimeOfLastLoop(name string) (int64, error) {
 	return o[idx].timestamp.UnixMilli(), nil
 }
 
+var rfc3339Re = regexp.MustCompile(`((?:(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2}(?:\.\d+)?))(Z|[\+-]\d{2}:\d{2})?)`)
+
 // parseOutput combines the container log from all of the init and regular
 // containers and parses/sorts the outputs to produce an execution log
 func parseOutput(ctx context.Context, f *framework.Framework, pod *v1.Pod) containerOutputList {
@@ -334,7 +337,15 @@ func parseOutput(ctx context.Context, f *framework.Framework, pod *v1.Pod) conta
 	var res containerOutputList
 	for sc.Scan() {
 		log := sc.Text()
-		fields := strings.Fields(sc.Text())
+
+		// Trim possible prefixed output, for example "unable to retrieve container logs for ..."
+		timestampIndex := rfc3339Re.FindStringIndex(log)
+		if timestampIndex == nil {
+			framework.ExpectNoError(fmt.Errorf("log line contains no timestamp %v", log))
+		}
+		log = log[timestampIndex[0]:]
+
+		fields := strings.Fields(log)
 		if len(fields) < 3 {
 			framework.ExpectNoError(fmt.Errorf("%v should have at least length 3", fields))
 		}
