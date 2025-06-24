@@ -126,7 +126,7 @@ fi
 # openshift-hack/images/hyperkube/Dockerfile.rhel still has FROM pointing to old tag
 # we need to remove the prefix "v" from the $k8s_tag to stay compatible
 sed -i -E "s/(io.openshift.build.versions=\"kubernetes=)(1.[1-9]+.[1-9]+)/\1${k8s_tag:1}/" openshift-hack/images/hyperkube/Dockerfile.rhel
-go_mod_go_ver=$(grep -E 'go 1\.[1-9][0-9]?' go.mod | sed -E 's/go (1\.[1-9][0-9]?)/\1/')
+go_mod_go_ver=$(grep -E 'go 1\.[1-9][0-9]?' go.mod | sed -E 's/go (1\.[1-9][0-9]?)/\1/' | cut -d '.' -f 1,2) # Need to handle mod versions like 1.23 and 1.23.4; our release images only have major.minor
 tag="rhel-8-release-golang-${go_mod_go_ver}-openshift-${openshift_release#release-}"
 
 # update openshift go.mod dependencies
