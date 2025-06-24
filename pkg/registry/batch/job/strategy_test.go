@@ -516,6 +516,9 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 			if !tc.enableJobBackoffLimitPerIndex || !tc.enableJobSuccessPolicy {
 				// TODO: this will be removed in 1.36
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			} else if !tc.enableJobPodReplacementPolicy {
+				// TODO: this will be removed in 1.37.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
@@ -3541,6 +3544,9 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			if !tc.enableJobSuccessPolicy {
 				// TODO: this will be removed in 1.36.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			} else if !tc.enableJobPodReplacementPolicy {
+				// TODO: this will be removed in 1.37.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
