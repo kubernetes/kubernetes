@@ -1539,7 +1539,7 @@ func validateSimpleJSONPath(s string, fldPath *field.Path) field.ErrorList {
 
 	switch {
 	case len(s) == 0:
-		allErrs = append(allErrs, field.Invalid(fldPath, s, "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath, ""))
 	case s[0] != '.':
 		allErrs = append(allErrs, field.Invalid(fldPath, s, "must be a simple json path starting with ."))
 	case s != ".":

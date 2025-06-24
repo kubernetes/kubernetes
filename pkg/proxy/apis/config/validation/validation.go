@@ -301,7 +301,7 @@ func validateShowHiddenMetricsVersion(version string, fldPath *field.Path) field
 func validateInterface(iface string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(iface) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, iface, "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 	return allErrs
 }

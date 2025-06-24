@@ -101,7 +101,7 @@ func TestValidateSARSpec(t *testing.T) {
 		obj: authorizationapi.SubjectAccessReviewSpec{
 			ResourceAttributes: &authorizationapi.ResourceAttributes{},
 		},
-		msg: `spec.user: Invalid value: "": at least one of user or group must be specified`,
+		msg: `spec.user: Required value: at least one of user or group must be specified`,
 	}, {
 		name: "resource attributes: field selector specify both",
 		obj: authorizationapi.SubjectAccessReviewSpec{

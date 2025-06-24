@@ -6137,7 +6137,7 @@ func TestRelaxedValidateEnv(t *testing.T) {
 			Name:      "abc",
 			ValueFrom: &core.EnvVarSource{},
 		}},
-		expectedError: "[0].valueFrom: Invalid value: \"\": must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`",
+		expectedError: "[0].valueFrom: Required value: must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`",
 	}, {
 		name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
 		envs: []core.EnvVar{{
@@ -6547,7 +6547,7 @@ func TestValidateEnv(t *testing.T) {
 			Name:      "abc",
 			ValueFrom: &core.EnvVarSource{},
 		}},
-		expectedError: "[0].valueFrom: Invalid value: \"\": must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`",
+		expectedError: "[0].valueFrom: Required value: must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`",
 	}, {
 		name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
 		envs: []core.EnvVar{{
@@ -6930,7 +6930,7 @@ func TestValidateEnvFrom(t *testing.T) {
 		envs: []core.EnvFromSource{
 			{},
 		},
-		expectedError: "field: Invalid value: \"\": must specify one of: `configMapRef` or `secretRef`",
+		expectedError: "field: Required value: must specify one of: `configMapRef` or `secretRef`",
 	}, {
 		name: "multiple refs",
 		envs: []core.EnvFromSource{{
@@ -7046,7 +7046,7 @@ func TestRelaxedValidateEnvFrom(t *testing.T) {
 			envs: []core.EnvFromSource{
 				{},
 			},
-			expectedError: "field: Invalid value: \"\": must specify one of: `configMapRef` or `secretRef`",
+			expectedError: "field: Required value: must specify one of: `configMapRef` or `secretRef`",
 		}, {
 			name: "multiple refs",
 			envs: []core.EnvFromSource{{

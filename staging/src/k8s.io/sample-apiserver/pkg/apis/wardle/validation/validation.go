@@ -41,9 +41,9 @@ func ValidateFlunderSpec(s *wardle.FlunderSpec, fldPath *field.Path) field.Error
 	} else if len(s.FischerReference) != 0 && s.ReferenceType != wardle.FischerReferenceType {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("fischerReference"), s.FischerReference, "cannot be set if referenceType is not Fischer"))
 	} else if len(s.FischerReference) == 0 && s.ReferenceType == wardle.FischerReferenceType {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("fischerReference"), s.FischerReference, "cannot be empty if referenceType is Fischer"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("fischerReference"), "cannot be empty if referenceType is Fischer"))
 	} else if len(s.FlunderReference) == 0 && s.ReferenceType == wardle.FlunderReferenceType {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("flunderReference"), s.FlunderReference, "cannot be empty if referenceType is Flunder"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("flunderReference"), "cannot be empty if referenceType is Flunder"))
 	}
 
 	if len(s.ReferenceType) != 0 && s.ReferenceType != wardle.FischerReferenceType && s.ReferenceType != wardle.FlunderReferenceType {

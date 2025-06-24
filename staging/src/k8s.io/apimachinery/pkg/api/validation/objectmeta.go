@@ -71,16 +71,16 @@ func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field
 	gvk := schema.FromAPIVersionAndKind(ownerReference.APIVersion, ownerReference.Kind)
 	// gvk.Group is empty for the legacy group.
 	if len(gvk.Version) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ownerReference.APIVersion, "version must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("apiVersion"), ""))
 	}
 	if len(gvk.Kind) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ownerReference.Kind, "kind must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
 	}
 	if len(ownerReference.Name) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ownerReference.Name, "name must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
 	if len(ownerReference.UID) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), ownerReference.UID, "uid must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("uid"), ""))
 	}
 	if _, ok := BannedOwners[gvk]; ok {
 		allErrs = append(allErrs, field.Invalid(fldPath, ownerReference, fmt.Sprintf("%s is disallowed from being an owner", gvk)))
@@ -241,7 +241,7 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 
 	// Reject updates that don't specify a resource version
 	if len(newMeta.GetResourceVersion()) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newMeta.GetResourceVersion(), "must be specified for an update"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceVersion"), "must be specified for an update"))
 	}
 
 	// Generation shouldn't be decremented

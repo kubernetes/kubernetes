@@ -348,7 +348,7 @@ func validatePodFailurePolicyRule(spec *batch.JobSpec, rule *batch.PodFailurePol
 		allErrs = append(allErrs, field.Invalid(rulePath, field.OmitValueType{}, "specifying both OnExitCodes and OnPodConditions is not supported"))
 	}
 	if rule.OnExitCodes == nil && len(rule.OnPodConditions) == 0 {
-		allErrs = append(allErrs, field.Invalid(rulePath, field.OmitValueType{}, "specifying one of OnExitCodes and OnPodConditions is required"))
+		allErrs = append(allErrs, field.Required(rulePath, "specifying one of OnExitCodes and OnPodConditions is required"))
 	}
 	return allErrs
 }
@@ -384,7 +384,7 @@ func validatePodFailurePolicyRuleOnExitCodes(onExitCode *batch.PodFailurePolicyO
 	}
 	valuesPath := onExitCodesPath.Child("values")
 	if len(onExitCode.Values) == 0 {
-		allErrs = append(allErrs, field.Invalid(valuesPath, onExitCode.Values, "at least one value is required"))
+		allErrs = append(allErrs, field.Required(valuesPath, "at least one value is required"))
 	} else if len(onExitCode.Values) > maxPodFailurePolicyOnExitCodesValues {
 		allErrs = append(allErrs, field.TooMany(valuesPath, len(onExitCode.Values), maxPodFailurePolicyOnExitCodesValues))
 	}
@@ -474,7 +474,7 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 		for i, k := range status.UncountedTerminatedPods.Succeeded {
 			p := path.Child("succeeded").Index(i)
 			if k == "" {
-				allErrs = append(allErrs, field.Invalid(p, k, "must not be empty"))
+				allErrs = append(allErrs, field.Required(p, ""))
 			} else if seen.Has(k) {
 				allErrs = append(allErrs, field.Duplicate(p, k))
 			} else {
@@ -484,7 +484,7 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 		for i, k := range status.UncountedTerminatedPods.Failed {
 			p := path.Child("failed").Index(i)
 			if k == "" {
-				allErrs = append(allErrs, field.Invalid(p, k, "must not be empty"))
+				allErrs = append(allErrs, field.Required(p, ""))
 			} else if seen.Has(k) {
 				allErrs = append(allErrs, field.Duplicate(p, k))
 			} else {
