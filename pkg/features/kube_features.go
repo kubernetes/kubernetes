@@ -254,6 +254,12 @@ const (
 	// status from DRA drivers.
 	DRAResourceClaimDeviceStatus featuregate.Feature = "DRAResourceClaimDeviceStatus"
 
+	// owner: @sunya-ch
+	// kep: https://kep.k8s.io/5075
+	//
+	// DRAConsumableCapacity
+	DRAConsumableCapacity featuregate.Feature = "DRAConsumableCapacity"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//
@@ -1147,6 +1153,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	DRAResourceClaimDeviceStatus: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	DRAConsumableCapacity: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DynamicResourceAllocation: {
