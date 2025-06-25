@@ -4665,6 +4665,29 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 		}
 	}
 
+	// Pod level hugepage limits must be always equal or greater than the aggregated
+	// container level hugepage limits, this is due to the hugepage resources being
+	// treated as a non overcommitable resource (request and limit must be equal)
+	// for the current container level hugepage behavior.
+	// This is also why hugepages overcommitment is not allowed in pod level resources,
+	// the pod cgroup values must reflect the request/limit set at pod level, and the
+	// container level cgroup values must be within that limit.
+	aggrContainerLims := resourcehelper.AggregateContainerLimits(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
+	for resourceName, ctrLims := range aggrContainerLims {
+		if !helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+			continue
+		}
+
+		podSpecLimits, hasLimit := spec.Resources.Limits[core.ResourceName(resourceName)]
+		if !hasLimit {
+			continue
+		}
+
+		if ctrLims.Cmp(podSpecLimits) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("limits").Key(string(resourceName)), podSpecLimits.String(), fmt.Sprintf("must be greater than or equal to aggregate container limits of %s", ctrLims.String())))
+		}
+	}
+
 	// Individual Container limits must be <= Pod-level limits.
 	for i, ctr := range spec.Containers {
 		for resourceName, ctrLimit := range ctr.Resources.Limits {
