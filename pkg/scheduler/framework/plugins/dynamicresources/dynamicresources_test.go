@@ -380,8 +380,9 @@ func TestPlugin(t *testing.T) {
 		// doesn't need to be set.
 		disableDRA bool
 
-		enableDRAPrioritizedList bool
-		enableDRADeviceTaints    bool
+		enableDRAPrioritizedList        bool
+		enableDRADeviceTaints           bool
+		enableDRASchedulerFilterTimeout bool
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -997,6 +998,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"timeout": {
+			enableDRASchedulerFilterTimeout: true,
 			args: &config.DynamicResourcesArgs{
 				FilterTimeout: &metav1.Duration{Duration: time.Nanosecond},
 			},
@@ -1015,7 +1017,43 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"timeout_disabled": {
+			// This variant uses the normal test objects to avoid excessive runtime.
+			// It could theoretically pass even though the 1 ns limit is enforced
+			// although it shouldn't be (which then would be a false positive),
+			// but that's unlikely.
+			enableDRASchedulerFilterTimeout: false,
+			args: &config.DynamicResourcesArgs{
+				FilterTimeout: &metav1.Duration{Duration: time.Nanosecond},
+			},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: allocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
+				},
+			},
+		},
 		"timeout_zero": {
+			enableDRASchedulerFilterTimeout: true,
 			args: &config.DynamicResourcesArgs{
 				FilterTimeout: &metav1.Duration{Duration: 0},
 			},
@@ -1061,6 +1099,7 @@ func TestPlugin(t *testing.T) {
 				EnableDRADeviceTaints:           tc.enableDRADeviceTaints,
 				EnableDynamicResourceAllocation: !tc.disableDRA,
 				EnableDRAPrioritizedList:        tc.enableDRAPrioritizedList,
+				EnableDRASchedulerFilterTimeout: tc.enableDRASchedulerFilterTimeout,
 			}
 			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, features)
 			initialObjects := testCtx.listAll(t)

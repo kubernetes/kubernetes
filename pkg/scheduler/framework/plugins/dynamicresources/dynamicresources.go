@@ -111,6 +111,7 @@ type DynamicResources struct {
 	enableSchedulingQueueHint  bool
 	enablePartitionableDevices bool
 	enableDeviceTaints         bool
+	enableFilterTimeout        bool
 	filterTimeout              metav1.Duration
 
 	fh         framework.Handle
@@ -139,6 +140,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		enableAdminAccess:          fts.EnableDRAAdminAccess,
 		enableDeviceTaints:         fts.EnableDRADeviceTaints,
 		enablePrioritizedList:      fts.EnableDRAPrioritizedList,
+		enableFilterTimeout:        fts.EnableDRASchedulerFilterTimeout,
 		enableSchedulingQueueHint:  fts.EnableSchedulingQueueHint,
 		enablePartitionableDevices: fts.EnablePartitionableDevices,
 		filterTimeout:              ptr.Deref(args.FilterTimeout, metav1.Duration{}),
@@ -565,7 +567,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		}
 
 		// Apply timeout to the operation?
-		if pl.filterTimeout.Duration > 0 {
+		if pl.enableFilterTimeout && pl.filterTimeout.Duration > 0 {
 			c, cancel := context.WithTimeout(allocCtx, pl.filterTimeout.Duration)
 			defer cancel()
 			allocCtx = c
