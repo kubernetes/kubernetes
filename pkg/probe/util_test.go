@@ -195,3 +195,99 @@ func TestResolveContainerPort(t *testing.T) {
 		})
 	}
 }
+
+func TestGetURLParts(t *testing.T) {
+	testCases := []struct {
+		probe *v1.HTTPGetAction
+		ok    bool
+		host  string
+		port  int
+		path  string
+	}{
+		{&v1.HTTPGetAction{Host: "", Port: intstr.FromInt32(-1), Path: ""}, false, "", -1, ""},
+		{&v1.HTTPGetAction{Host: "", Port: intstr.FromString(""), Path: ""}, false, "", -1, ""},
+		{&v1.HTTPGetAction{Host: "", Port: intstr.FromString("-1"), Path: ""}, false, "", -1, ""},
+		{&v1.HTTPGetAction{Host: "", Port: intstr.FromString("not-found"), Path: ""}, false, "", -1, ""},
+		{&v1.HTTPGetAction{Host: "", Port: intstr.FromString("found"), Path: ""}, true, "127.0.0.1", 93, ""},
+		{&v1.HTTPGetAction{Host: "", Port: intstr.FromInt32(76), Path: ""}, true, "127.0.0.1", 76, ""},
+		{&v1.HTTPGetAction{Host: "", Port: intstr.FromString("118"), Path: ""}, true, "127.0.0.1", 118, ""},
+		{&v1.HTTPGetAction{Host: "hostname", Port: intstr.FromInt32(76), Path: "path"}, true, "hostname", 76, "path"},
+	}
+
+	for _, test := range testCases {
+		state := v1.PodStatus{PodIP: "127.0.0.1"}
+		container := v1.Container{
+			Ports: []v1.ContainerPort{{Name: "found", ContainerPort: 93}},
+			LivenessProbe: &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: test.probe,
+				},
+			},
+		}
+
+		scheme := test.probe.Scheme
+		if scheme == "" {
+			scheme = v1.URISchemeHTTP
+		}
+		host := test.probe.Host
+		if host == "" {
+			host = state.PodIP
+		}
+		port, err := ResolveContainerPort(test.probe.Port, &container)
+		if test.ok && err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		path := test.probe.Path
+
+		if !test.ok && err == nil {
+			t.Errorf("Expected error for %+v, got %s%s:%d/%s", test, scheme, host, port, path)
+		}
+		if test.ok {
+			if host != test.host || port != test.port || path != test.path {
+				t.Errorf("Expected %s:%d/%s, got %s:%d/%s",
+					test.host, test.port, test.path, host, port, path)
+			}
+		}
+	}
+}
+
+func TestGetTCPAddrParts(t *testing.T) {
+	testCases := []struct {
+		probe *v1.TCPSocketAction
+		ok    bool
+		host  string
+		port  int
+	}{
+		{&v1.TCPSocketAction{Port: intstr.FromInt32(-1)}, false, "", -1},
+		{&v1.TCPSocketAction{Port: intstr.FromString("")}, false, "", -1},
+		{&v1.TCPSocketAction{Port: intstr.FromString("-1")}, false, "", -1},
+		{&v1.TCPSocketAction{Port: intstr.FromString("not-found")}, false, "", -1},
+		{&v1.TCPSocketAction{Port: intstr.FromString("found")}, true, "1.2.3.4", 93},
+		{&v1.TCPSocketAction{Port: intstr.FromInt32(76)}, true, "1.2.3.4", 76},
+		{&v1.TCPSocketAction{Port: intstr.FromString("118")}, true, "1.2.3.4", 118},
+	}
+
+	for _, test := range testCases {
+		host := "1.2.3.4"
+		container := v1.Container{
+			Ports: []v1.ContainerPort{{Name: "found", ContainerPort: 93}},
+			LivenessProbe: &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					TCPSocket: test.probe,
+				},
+			},
+		}
+		port, err := ResolveContainerPort(test.probe.Port, &container)
+		if !test.ok && err == nil {
+			t.Errorf("Expected error for %+v, got %s:%d", test, host, port)
+		}
+		if test.ok && err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if test.ok {
+			if host != test.host || port != test.port {
+				t.Errorf("Expected %s:%d, got %s:%d", test.host, test.port, host, port)
+			}
+		}
+	}
+}
