@@ -4393,6 +4393,22 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 		}
 	}
 
+	// Pod-level hugepage limits must be >= aggregate limits of all containers in a pod.
+	aggrContainerLims := resourcehelper.AggregateContainerLimits(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
+	for resourceName, ctrLims := range aggrContainerLims {
+		if !helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+			continue
+		}
+
+		key := resourceName.String()
+		podSpecLimits := spec.Resources.Limits[core.ResourceName(key)]
+		fldPath := fldPath.Child("limits").Key(key)
+
+		if ctrLims.Cmp(podSpecLimits) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath, podSpecLimits.String(), fmt.Sprintf("must be greater than or equal to aggregate container limits of %s", ctrLims.String())))
+		}
+	}
+
 	// Individual Container limits must be <= Pod-level limits.
 	for i, ctr := range spec.Containers {
 		for resourceName, ctrLimit := range ctr.Resources.Limits {
