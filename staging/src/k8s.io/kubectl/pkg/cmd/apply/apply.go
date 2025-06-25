@@ -63,15 +63,16 @@ type ApplyFlags struct {
 
 	DeleteFlags *cmddelete.DeleteFlags
 
-	FieldManager   string
-	Selector       string
-	Prune          bool
-	PruneResources []prune.Resource
-	ApplySetRef    string
-	All            bool
-	Overwrite      bool
-	OpenAPIPatch   bool
-	Subresource    string
+	FieldManager      string
+	Selector          string
+	Prune             bool
+	PruneResources    []prune.Resource
+	ApplySetRef       string
+	ApplySetNamespace string
+	All               bool
+	Overwrite         bool
+	OpenAPIPatch      bool
+	Subresource       string
 
 	PruneAllowlist []string
 
@@ -234,7 +235,7 @@ func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &flags.FieldManager, FieldManagerClientSideApply)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &flags.Selector)
-	cmdutil.AddPruningFlags(cmd, &flags.Prune, &flags.PruneAllowlist, &flags.All, &flags.ApplySetRef)
+	cmdutil.AddPruningFlags(cmd, &flags.Prune, &flags.PruneAllowlist, &flags.All, &flags.ApplySetRef, &flags.ApplySetNamespace)
 	cmd.Flags().BoolVar(&flags.Overwrite, "overwrite", flags.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
 	cmd.Flags().BoolVar(&flags.OpenAPIPatch, "openapi-patch", flags.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmdutil.AddSubresourceFlags(cmd, &flags.Subresource, "If specified, apply will operate on the subresource of the requested object.  Only allowed when using --server-side.")
@@ -322,6 +323,9 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		// This means the namespace flag is required when using a namespaced parent.
 		if enforceNamespace && parent.IsNamespaced() {
 			parent.Namespace = namespace
+		}
+		if flags.ApplySetNamespace != "" {
+			parent.Namespace = flags.ApplySetNamespace
 		}
 		tooling := ApplySetTooling{Name: baseName, Version: ApplySetToolVersion}
 		restClient, err := f.UnstructuredClientForMapping(parent.RESTMapping)

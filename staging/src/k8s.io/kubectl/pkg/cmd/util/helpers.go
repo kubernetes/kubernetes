@@ -545,7 +545,7 @@ func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
 	cmd.Flags().StringVarP(p, "selector", "l", *p, "Selector (label query) to filter on, supports '=', '==', '!=', 'in', 'notin'.(e.g. -l key1=value1,key2=value2,key3 in (value3)). Matching objects must satisfy all of the specified label constraints.")
 }
 
-func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, all *bool, applySetRef *string) {
+func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, all *bool, applySetRef *string, applySetNamespace *string) {
 	// Flags associated with the original allowlist-based alpha
 	cmd.Flags().StringArrayVar(pruneAllowlist, "prune-allowlist", *pruneAllowlist, "Overwrite the default allowlist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(all, "all", *all, "Select all resources in the namespace of the specified resource types.")
@@ -554,6 +554,7 @@ func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, 
 	if ApplySet.IsEnabled() {
 		cmd.Flags().StringVar(applySetRef, "applyset", *applySetRef, "[alpha] The name of the ApplySet that tracks which resources are being managed, for the purposes of determining what to prune. Live resources that are part of the ApplySet but have been removed from the provided configs will be deleted. Format: [RESOURCE][.GROUP]/NAME. A Secret will be used if no resource or group is specified.")
 		cmd.Flags().BoolVar(prune, "prune", *prune, "Automatically delete previously applied resource objects that do not appear in the provided configs. For alpha1, use with either -l or --all. For alpha2, use with --applyset.")
+		cmd.Flags().StringVar(applySetNamespace, "applyset-namespace", *applySetNamespace, "[alpha] The namespace inside which to store parent resource for the ApplySet")
 	} else {
 		// different docs for the shared --prune flag if only alpha1 is enabled
 		cmd.Flags().BoolVar(prune, "prune", *prune, "Automatically delete resource objects, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")

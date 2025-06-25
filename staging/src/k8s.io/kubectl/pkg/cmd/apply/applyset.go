@@ -180,7 +180,7 @@ func (a ApplySet) ID() string {
 func (a ApplySet) Validate(ctx context.Context, client dynamic.Interface) error {
 	var errors []error
 	if a.parentRef.IsNamespaced() && a.parentRef.Namespace == "" {
-		errors = append(errors, fmt.Errorf("namespace is required to use namespace-scoped ApplySet"))
+		errors = append(errors, fmt.Errorf("namespace is required to use namespace-scoped ApplySet. You can provide it either using --applyset-namespace or --namespace parameter"))
 	}
 	if !builtinApplySetParentGVRs.Has(a.parentRef.Resource) {
 		// Determine which custom resource types are allowed as ApplySet parents.
