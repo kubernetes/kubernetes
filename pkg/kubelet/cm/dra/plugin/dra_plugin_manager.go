@@ -307,7 +307,7 @@ func (pm *DRAPluginManager) get(driverName string) *DRAPlugin {
 // name>" format (e.g. "v1beta1.DRAPlugin"). This allows kubelet to determine
 // in advance which version to use resp. which optional services the plugin
 // supports.
-func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
+func (pm *DRAPluginManager) RegisterPlugin(_ context.Context, driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
 	chosenService, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
@@ -383,7 +383,7 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 // The plugin manager calls it after it has detected that
 // the plugin removed its registration socket,
 // signaling that it is no longer available.
-func (pm *DRAPluginManager) DeRegisterPlugin(driverName, endpoint string) {
+func (pm *DRAPluginManager) DeRegisterPlugin(_ context.Context, driverName, endpoint string) {
 	// remove could be removed (no pun intended) but is kept for the sake of symmetry.
 	pm.remove(driverName, endpoint)
 }
@@ -462,7 +462,7 @@ func (pm *DRAPluginManager) usable(driverName string) bool {
 //
 // The plugin manager calls it upon detection of a new registration socket
 // opened by DRA plugin.
-func (pm *DRAPluginManager) ValidatePlugin(driverName string, endpoint string, supportedServices []string) error {
+func (pm *DRAPluginManager) ValidatePlugin(_ context.Context, driverName string, endpoint string, supportedServices []string) error {
 	_, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)

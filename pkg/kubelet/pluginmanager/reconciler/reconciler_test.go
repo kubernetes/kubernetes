@@ -17,6 +17,7 @@ limitations under the License.
 package reconciler
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -122,17 +123,17 @@ func NewDummyImpl() *DummyImpl {
 }
 
 // ValidatePlugin is a dummy implementation
-func (d *DummyImpl) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+func (d *DummyImpl) ValidatePlugin(ctx context.Context, pluginName string, endpoint string, versions []string) error {
 	return nil
 }
 
 // RegisterPlugin is a dummy implementation
-func (d *DummyImpl) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+func (d *DummyImpl) RegisterPlugin(ctx context.Context, pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
 	return nil
 }
 
 // DeRegisterPlugin is a dummy implementation
-func (d *DummyImpl) DeRegisterPlugin(pluginName, endpoint string) {
+func (d *DummyImpl) DeRegisterPlugin(ctx context.Context, pluginName, endpoint string) {
 }
 
 // Calls Run()
