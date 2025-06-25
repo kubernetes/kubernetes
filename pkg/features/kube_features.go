@@ -918,6 +918,11 @@ const (
 	// Enables the image volume source.
 	ImageVolume featuregate.Feature = "ImageVolume"
 
+	// owner: @sreeram-venkitesh
+	//
+	// Denies pod admission if static pods reference other API objects.
+	PreventStaticPodAPIReferences featuregate.Feature = "PreventStaticPodAPIReferences"
+
 	// owner: @zhifei92
 	//
 	// Enables the systemd watchdog for the kubelet. When enabled, the kubelet will
@@ -1753,6 +1758,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.32, remove in 1.35
+	},
+
+	PreventStaticPodAPIReferences: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	StorageCapacityScoring: {

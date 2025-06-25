@@ -305,38 +305,12 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 	}
 
 	// don't allow a node to create a pod that references any other API objects
-	if pod.Spec.ServiceAccountName != "" {
-		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference a service account", nodeName))
+	isPodReferencingAPIObjects, resource, err := podutil.HasAPIObjectReference(pod)
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("error checking mirror pod for API references: %w", err))
 	}
-	hasSecrets := false
-	podutil.VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false }, podutil.AllContainers)
-	if hasSecrets {
-		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference secrets", nodeName))
-	}
-	hasConfigMaps := false
-	podutil.VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false }, podutil.AllContainers)
-	if hasConfigMaps {
-		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference configmaps", nodeName))
-	}
-
-	for _, vol := range pod.Spec.Volumes {
-		if vol.VolumeSource.Projected != nil {
-			for _, src := range vol.VolumeSource.Projected.Sources {
-				if src.ClusterTrustBundle != nil {
-					return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference clustertrustbundles", nodeName))
-				}
-			}
-		}
-	}
-
-	for _, v := range pod.Spec.Volumes {
-		if v.PersistentVolumeClaim != nil {
-			return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference persistentvolumeclaims", nodeName))
-		}
-	}
-
-	if len(pod.Spec.ResourceClaims) > 0 {
-		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference resourceclaims", nodeName))
+	if isPodReferencingAPIObjects {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference %s", nodeName, resource))
 	}
 
 	return nil
