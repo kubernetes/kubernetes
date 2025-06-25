@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	fwk "k8s.io/kube-scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -262,26 +263,26 @@ func TestIsStatusEqual(t *testing.T) {
 	}
 }
 
-type nodeInfoLister []*NodeInfo
+type nodeInfoLister []fwk.NodeInfo
 
-func (nodes nodeInfoLister) Get(nodeName string) (*NodeInfo, error) {
+func (nodes nodeInfoLister) Get(nodeName string) (fwk.NodeInfo, error) {
 	for _, node := range nodes {
-		if node != nil && node.Node().Name == nodeName {
+		if node != nil && node.GetNode().Name == nodeName {
 			return node, nil
 		}
 	}
 	return nil, fmt.Errorf("unable to find node: %s", nodeName)
 }
 
-func (nodes nodeInfoLister) List() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) List() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
-func (nodes nodeInfoLister) HavePodsWithAffinityList() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) HavePodsWithAffinityList() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
-func (nodes nodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
@@ -368,7 +369,7 @@ func TestNodesForStatusCode(t *testing.T) {
 				t.Errorf("Number of nodes is not the same as expected. expected: %d, got: %d. Nodes: %v", len(tt.expected), len(nodes), nodes)
 			}
 			for _, node := range nodes {
-				name := node.Node().Name
+				name := node.GetNode().Name
 				if _, found := tt.expected[name]; !found {
 					t.Errorf("Node %v is not expected", name)
 				}

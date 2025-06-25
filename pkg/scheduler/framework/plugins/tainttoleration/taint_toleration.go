@@ -59,25 +59,25 @@ func (pl *TaintToleration) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *TaintToleration) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *TaintToleration) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	if pl.enableSchedulingQueueHint {
-		return []framework.ClusterEventWithHint{
+		return []fwk.ClusterEventWithHint{
 			// When the QueueingHint feature is enabled, preCheck is eliminated and we don't need additional UpdateNodeLabel.
-			{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+			{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 			// When the QueueingHint feature is enabled,
 			// the scheduling queue uses Pod/Update Queueing Hint
 			// to determine whether a Pod's update makes the Pod schedulable or not.
 			// https://github.com/kubernetes/kubernetes/pull/122234
-			{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
+			{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
 		}, nil
 	}
 
-	return []framework.ClusterEventWithHint{
+	return []fwk.ClusterEventWithHint{
 		// A note about UpdateNodeLabel event:
 		// Ideally, it's supposed to register only Add | UpdateNodeTaint because UpdateNodeLabel will never change the result from this plugin.
 		// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
 		// See: https://github.com/kubernetes/kubernetes/issues/109437
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint | framework.UpdateNodeLabel}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 		// No need to register the Pod event; the update to the unschedulable Pods already triggers the scheduling retry when QHint is disabled.
 	}, nil
 }
@@ -85,10 +85,10 @@ func (pl *TaintToleration) EventsToRegister(_ context.Context) ([]framework.Clus
 // isSchedulableAfterNodeChange is invoked for all node events reported by
 // an informer. It checks whether that change made a previously unschedulable
 // pod schedulable.
-func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	wasUntolerated := true
@@ -100,16 +100,16 @@ func (pl *TaintToleration) isSchedulableAfterNodeChange(logger klog.Logger, pod 
 
 	if wasUntolerated && !isUntolerated {
 		logger.V(5).Info("node was created or updated, and this may make the Pod rejected by TaintToleration plugin in the previous scheduling cycle schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	logger.V(5).Info("node was created or updated, but it doesn't change the TaintToleration plugin's decision", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // Filter invoked at the filter extension point.
-func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	node := nodeInfo.Node()
+func (pl *TaintToleration) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *framework.Status {
+	node := nodeInfo.GetNode()
 
 	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, helper.DoNotScheduleTaintsFilterFunc())
 	if !isUntolerated {
@@ -143,7 +143,7 @@ func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationLi
 }
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
-func (pl *TaintToleration) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
+func (pl *TaintToleration) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *framework.Status {
 	tolerationsPreferNoSchedule := getAllTolerationPreferNoSchedule(pod.Spec.Tolerations)
 	state := &preScoreState{
 		tolerationsPreferNoSchedule: tolerationsPreferNoSchedule,
@@ -181,8 +181,8 @@ func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.
 }
 
 // Score invoked at the Score extension point.
-func (pl *TaintToleration) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
-	node := nodeInfo.Node()
+func (pl *TaintToleration) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *framework.Status) {
+	node := nodeInfo.GetNode()
 
 	s, err := getPreScoreState(state)
 	if err != nil {
@@ -212,19 +212,19 @@ func New(_ context.Context, _ runtime.Object, h framework.Handle, fts feature.Fe
 }
 
 // isSchedulableAfterPodTolerationChange is invoked whenever a pod's toleration changed.
-func (pl *TaintToleration) isSchedulableAfterPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *TaintToleration) isSchedulableAfterPodTolerationChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	if pod.UID == modifiedPod.UID {
 		// The updated Pod is the unschedulable Pod.
 		logger.V(5).Info("a new toleration is added for the unschedulable Pod, and it may make it schedulable", "pod", klog.KObj(modifiedPod))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	logger.V(5).Info("a new toleration is added for a Pod, but it's an unrelated Pod and wouldn't change the TaintToleration plugin's decision", "pod", klog.KObj(modifiedPod))
 
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }

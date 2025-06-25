@@ -65,7 +65,7 @@ func (pl *NodePorts) Name() string {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	s := util.GetHostPorts(pod)
 	// Skip if a pod has no ports.
 	if len(s) == 0 {
@@ -96,65 +96,65 @@ func getPreFilterState(cycleState fwk.CycleState) (preFilterState, error) {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodePorts) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *NodePorts) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	// A note about UpdateNodeTaint/UpdateNodeLabel event:
 	// Ideally, it's supposed to register only Add because NodeUpdated event never means to have any free ports for the Pod.
 	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
 	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := framework.Add | framework.UpdateNodeTaint | framework.UpdateNodeLabel
+	nodeActionType := fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel
 	if pl.enableSchedulingQueueHint {
 		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
-		nodeActionType = framework.Add
+		nodeActionType = fwk.Add
 	}
 
-	return []framework.ClusterEventWithHint{
+	return []fwk.ClusterEventWithHint{
 		// Due to immutable fields `spec.containers[*].ports`, pod update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		// We don't need the QueueingHintFn here because the scheduling of Pods will be always retried with backoff when this Event happens.
 		// (the same as Queue)
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
 	}, nil
 }
 
 // isSchedulableAfterPodDeleted is invoked whenever a pod deleted. It checks whether
 // that change made a previously unschedulable pod schedulable.
-func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, nil)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	// If the deleted pod is unscheduled, it doesn't make the target pod schedulable.
 	if deletedPod.Spec.NodeName == "" && deletedPod.Status.NominatedNodeName == "" {
 		logger.V(4).Info("the deleted pod is unscheduled and it doesn't make the target pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	// If the deleted pod doesn't use any host ports, it doesn't make the target pod schedulable.
 	ports := util.GetHostPorts(deletedPod)
 	if len(ports) == 0 {
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	// Construct a fake NodeInfo that only has the deleted Pod.
 	// If we can schedule `pod` to this fake node, it means that `pod` and the deleted pod don't have any common port(s).
 	// So, deleting that pod couldn't make `pod` schedulable.
-	usedPorts := make(framework.HostPortInfo, len(ports))
+	usedPorts := make(fwk.HostPortInfo, len(ports))
 	for _, p := range ports {
 		usedPorts.Add(p.HostIP, string(p.Protocol), p.HostPort)
 	}
 	nodeInfo := framework.NodeInfo{UsedPorts: usedPorts}
 	if Fits(pod, &nodeInfo) {
 		logger.V(4).Info("the deleted pod and the target pod don't have any common port(s), returning QueueSkip as deleting this Pod won't make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	logger.V(4).Info("the deleted pod and the target pod have any common port(s), returning Queue as deleting this Pod may make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
-	return framework.Queue, nil
+	return fwk.Queue, nil
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *framework.Status {
 	wantPorts, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -169,13 +169,13 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 }
 
 // Fits checks if the pod fits the node.
-func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
+func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
 	return fitsPorts(util.GetHostPorts(pod), nodeInfo)
 }
 
-func fitsPorts(wantPorts []v1.ContainerPort, nodeInfo *framework.NodeInfo) bool {
+func fitsPorts(wantPorts []v1.ContainerPort, nodeInfo fwk.NodeInfo) bool {
 	// try to see whether existingPorts and wantPorts will conflict or not
-	existingPorts := nodeInfo.UsedPorts
+	existingPorts := nodeInfo.GetUsedPorts()
 	for _, cp := range wantPorts {
 		if existingPorts.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
 			return false
