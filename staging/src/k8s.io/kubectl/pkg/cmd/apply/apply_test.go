@@ -2282,12 +2282,13 @@ func TestDontAllowApplyWithPodGeneratedName(t *testing.T) {
 
 func TestApplySetParentValidation(t *testing.T) {
 	for name, test := range map[string]struct {
-		applysetFlag        string
-		namespaceFlag       string
-		setup               func(*testing.T, *cmdtesting.TestFactory)
-		expectParentKind    string
-		expectBlankParentNs bool
-		expectErr           string
+		applysetFlag          string
+		applysetNamespaceFlag string
+		namespaceFlag         string
+		setup                 func(*testing.T, *cmdtesting.TestFactory)
+		expectParentKind      string
+		expectBlankParentNs   bool
+		expectErr             string
 	}{
 		"parent type must be valid": {
 			applysetFlag: "doesnotexist/thename",
@@ -2306,6 +2307,11 @@ func TestApplySetParentValidation(t *testing.T) {
 			applysetFlag:     "secret/thename",
 			namespaceFlag:    "mynamespace",
 			expectParentKind: "Secret",
+		},
+		"parents in custom namespace are valid": {
+			applysetFlag:          "secret/thename",
+			applysetNamespaceFlag: "thenamespace",
+			expectParentKind:      "Secret",
 		},
 		"plural resource works": {
 			applysetFlag:     "secrets/thename",
@@ -2371,6 +2377,9 @@ func TestApplySetParentValidation(t *testing.T) {
 				cmd.Flags().Set("filename", filenameRC)
 				cmd.Flags().Set("applyset", test.applysetFlag)
 				cmd.Flags().Set("prune", "true")
+				if test.applysetNamespaceFlag != "" {
+					cmd.Flags().Set("applyset-namespace", test.applysetNamespaceFlag)
+				}
 				f := cmdtesting.NewTestFactory()
 				defer f.Cleanup()
 				setUpClientsForApplySetWithSSA(t, f)
@@ -2381,6 +2390,9 @@ func TestApplySetParentValidation(t *testing.T) {
 					if !test.expectBlankParentNs {
 						expectedParentNs = test.namespaceFlag
 					}
+				}
+				if test.applysetNamespaceFlag != "" && !test.expectBlankParentNs {
+					expectedParentNs = test.applysetNamespaceFlag
 				}
 
 				if test.setup != nil {
