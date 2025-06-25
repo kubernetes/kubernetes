@@ -19,6 +19,7 @@ package etcd3
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"reflect"
@@ -31,6 +32,7 @@ import (
 	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.opentelemetry.io/otel/attribute"
 
+	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -733,6 +735,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		})
 		metrics.RecordEtcdRequest(metricsOp, s.groupResource, err, startTime)
 		if err != nil {
+			if errors.Is(err, etcdrpc.ErrFutureRev) {
+				currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
+				if getRVErr != nil {
+					// If we can't get the current RV, use 0 as a fallback.
+					currentRV = 0
+				}
+				return storage.NewTooLargeResourceVersionError(uint64(withRev), currentRV, 0)
+			}
 			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 		}
 		numFetched += len(getResp.Kvs)
