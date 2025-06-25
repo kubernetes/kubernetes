@@ -52,7 +52,7 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestAuthenticationValidate(t *testing.T) {
@@ -346,7 +346,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "sub",
-							Prefix: pointer.String("https://testIssuerURL#"),
+							Prefix: ptr.To("https://testIssuerURL#"),
 						},
 					},
 				},
@@ -732,7 +732,7 @@ jwt:
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 						},
@@ -824,7 +824,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -860,7 +860,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String("https://testIssuerURL#"),
+									Prefix: ptr.To("https://testIssuerURL#"),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -896,7 +896,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "email",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -933,7 +933,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String("k8s-"),
+									Prefix: ptr.To("k8s-"),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -972,11 +972,11 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 								Groups: apiserver.PrefixedClaimOrExpression{
 									Claim:  "groups",
-									Prefix: pointer.String("oidc:"),
+									Prefix: ptr.To("oidc:"),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1019,7 +1019,7 @@ jwt:
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 						},
@@ -1399,7 +1399,7 @@ jwt:
 						ClaimMappings: apiserver.ClaimMappings{
 							Username: apiserver.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String(""),
+								Prefix: ptr.To(""),
 							},
 						},
 					},
@@ -1475,7 +1475,7 @@ jwt:
 						ClaimMappings: apiserver.ClaimMappings{
 							Username: apiserver.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String(""),
+								Prefix: ptr.To(""),
 							},
 						},
 					},
@@ -1551,7 +1551,7 @@ jwt:
 						ClaimMappings: apiserver.ClaimMappings{
 							Username: apiserver.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String(""),
+								Prefix: ptr.To(""),
 							},
 						},
 					},
