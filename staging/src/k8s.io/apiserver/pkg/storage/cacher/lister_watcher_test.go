@@ -177,3 +177,29 @@ func TestCacherListerWatcherListWatch(t *testing.T) {
 	storagetesting.TestCheckResultsInStrictOrder(t, w, expectedWatchEvents)
 	storagetesting.TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
 }
+
+func TestCacherListerWatcherWhenListWatchDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, false)
+
+	prefix := "pods"
+	fn := func() runtime.Object { return &example.PodList{} }
+	server, store := newEtcdTestStorage(t, prefix)
+	defer server.Terminate(t)
+
+	lw := NewListerWatcher(store, prefix, fn, nil)
+	target := cache.ToListerWatcherWithContext(lw)
+	watchListOptions := metav1.ListOptions{
+		Watch:               true,
+		AllowWatchBookmarks: true,
+		SendInitialEvents:   ptr.To(true),
+	}
+	_, err := target.WatchWithContext(context.TODO(), watchListOptions)
+	if err == nil {
+		t.Fatalf("Expected error, but got none")
+	}
+
+	expectedErrMsg := "sendInitialEvents is forbidden for watch unless the WatchList feature gate is enabled"
+	if err.Error() != expectedErrMsg {
+		t.Fatalf("Expected error %q, but got %q", expectedErrMsg, err.Error())
+	}
+}
