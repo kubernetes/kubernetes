@@ -26,8 +26,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	utilpointer "k8s.io/utils/pointer"
 	kjson "sigs.k8s.io/json"
+
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/cel/environment"
+	utilpointer "k8s.io/utils/pointer"
 
 	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 
@@ -158,6 +161,7 @@ type failingObject struct {
 func TestValidateCustomResource(t *testing.T) {
 	tests := []struct {
 		name           string
+		compatVersion  *version.Version
 		schema         apiextensions.JSONSchemaProps
 		objects        []interface{}
 		oldObjects     []interface{}
@@ -598,10 +602,49 @@ func TestValidateCustomResource(t *testing.T) {
 				}},
 			},
 		},
+		{name: "k8sLongName",
+			compatVersion: version.MajorMinor(1, 34),
+			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"fieldX": {
+						Type:   "string",
+						Format: "k8s-long-name",
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"fieldX": "a.-"}, expectErrs: []string{
+					`fieldX: Invalid value: "a.-": fieldX in body must be of type k8s-long-name: "a.-"`,
+				}},
+			},
+		},
+		{name: "k8sShortName",
+			compatVersion: version.MajorMinor(1, 34),
+			schema: apiextensions.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"fieldX": {
+						Type:   "string",
+						Format: "k8s-short-name",
+					},
+				},
+			},
+			failingObjects: []failingObject{
+				{object: map[string]interface{}{"fieldX": "a-"}, expectErrs: []string{
+					`fieldX: Invalid value: "a-": fieldX in body must be of type k8s-short-name: "a-"`,
+				}},
+			},
+		},
 	}
 	for _, tt := range tests {
+		compatVersion := tt.compatVersion
+		if compatVersion == nil {
+			compatVersion = environment.DefaultCompatibilityVersion()
+		}
+
 		t.Run(tt.name, func(t *testing.T) {
-			validator, _, err := NewSchemaValidator(&tt.schema)
+			validator, _, err := NewSchemaValidatorForVersion(&tt.schema, compatVersion)
 			if err != nil {
 				t.Fatal(err)
 			}
