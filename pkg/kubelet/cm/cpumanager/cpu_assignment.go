@@ -242,10 +242,10 @@ func (s sortCPUsSpread) sort() []int {
 //
 // - CPUSortingOptionPacked sorts CPUs in a packed manner, where CPUs are grouped by core
 // before moving to the next core, resulting in packed cores, like:
-// 0, 2, 4, 6, 8, 10, 1, 3, 5, 7, 9, 11
+// 0, 6, 2, 8, 4, 10, 1, 7, 3, 9, 5, 11
 // - CPUSortingOptionSpread sorts CPUs in a spread manner, where CPUs are spread across cores
 // before moving to the next CPU, resulting in spread-out cores, like:
-// 0, 6, 2, 8, 4, 10, 1, 7, 3, 9, 5, 11
+// 0, 2, 4, 6, 8, 10, 1, 3, 5, 7, 9, 11
 //
 // By default, CPUSortingOptionPacked will be used, and CPUSortingOptionSpread will only be activated
 // when the user specifies the `DistributeCPUsAcrossCoresOption` static policy option.
