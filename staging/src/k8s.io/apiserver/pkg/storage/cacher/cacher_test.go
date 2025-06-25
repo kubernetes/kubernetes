@@ -646,3 +646,18 @@ func BenchmarkStoreList(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkStoreStats(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	data := storagetesting.PrepareBenchchmarkData(50, 3_000, 5_000)
+	ctx, cacher, _, terminate := testSetupWithEtcdServer(b)
+	b.Cleanup(terminate)
+	var out example.Pod
+	for _, pod := range data.Pods {
+		err := cacher.Create(ctx, computePodKey(pod), pod, &out, 0)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	storagetesting.RunBenchmarkStoreStats(ctx, b, cacher)
+}
