@@ -149,6 +149,9 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	fs.StringVar(&s.KubeletConfig.TLSClientConfig.CAFile, "kubelet-certificate-authority", s.KubeletConfig.TLSClientConfig.CAFile,
 		"Path to a cert file for the certificate authority.")
 
+	fs.BoolVar(&s.KubeletConfig.TLSClientConfig.ValidateNodeName, "kubelet-validate-node-name", s.KubeletConfig.TLSClientConfig.ValidateNodeName,
+		"Check that the kubelet's serving certificate common name matches the name of the kubelet.")
+
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
 		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
 	fs.MarkDeprecated("apiserver-count", "apiserver-count is deprecated and will be removed in a future version.")
