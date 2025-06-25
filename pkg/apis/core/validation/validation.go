@@ -4399,6 +4399,10 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 
 	// Pod-level requests must be >= aggregate requests of all containers in a pod.
 	for resourceName, ctrReqs := range aggrContainerReqs {
+		// Skip resources not supported at pod-level to avoid the comparison below for efficiency.
+		if !resourcehelper.IsSupportedPodLevelResource(resourceName) {
+			continue
+		}
 		key := resourceName.String()
 		podSpecRequests := spec.Resources.Requests[core.ResourceName(key)]
 
@@ -4411,6 +4415,7 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// Individual Container limits must be <= Pod-level limits.
 	for i, ctr := range spec.Containers {
 		for resourceName, ctrLimit := range ctr.Resources.Limits {
+			// Skip if the pod-level limit of the resource is not set.
 			podSpecLimits, exists := spec.Resources.Limits[core.ResourceName(resourceName.String())]
 			if !exists {
 				continue
