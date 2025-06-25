@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -1126,6 +1127,402 @@ func TestHasAnyActiveRegularContainerStarted(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			actual := HasAnyActiveRegularContainerStarted(tc.spec, tc.podStatus)
 			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestExpandContainerCommandOnlyStatic(t *testing.T) {
+	testCases := []struct {
+		name     string
+		command  []string
+		envs     []v1.EnvVar
+		expected []string
+	}{
+		{
+			name:     "no command",
+			command:  nil,
+			envs:     nil,
+			expected: nil,
+		},
+		{
+			name:    "static env expansion",
+			command: []string{"echo", "$(FOO)", "$(BAR)"},
+			envs: []v1.EnvVar{
+				{Name: "FOO", Value: "foo-value"},
+				{Name: "BAR", Value: "bar-value"},
+			},
+			expected: []string{"echo", "foo-value", "bar-value"},
+		},
+		{
+			name:    "missing env variable",
+			command: []string{"echo", "$(FOO)", "$(MISSING)"},
+			envs: []v1.EnvVar{
+				{Name: "FOO", Value: "foo-value"},
+			},
+			expected: []string{"echo", "foo-value", "$(MISSING)"}, // should this behave as "echo", "foo-value", "" ?
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := ExpandContainerCommandOnlyStatic(tc.command, tc.envs)
+			if !reflect.DeepEqual(tc.expected, actual) {
+				t.Errorf("ExpandContainerCommandOnlyStatic(%v, %v) = %v, want %v", tc.command, tc.envs, actual, tc.expected)
+			}
+		})
+	}
+}
+
+type fakeRecorder struct {
+	events  []string
+	fEvents []string
+	aEvents []string
+}
+
+func (f *fakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
+	f.events = append(f.events, eventtype+":"+reason+":"+message)
+}
+
+func (f *fakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	f.fEvents = append(f.fEvents, eventtype+":"+reason+":"+messageFmt)
+}
+
+func (f *fakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	f.aEvents = append(f.aEvents, eventtype+":"+reason+":"+messageFmt)
+}
+
+func TestFilterEventRecorder(t *testing.T) {
+	recorder := &fakeRecorder{}
+	filtered := FilterEventRecorder(recorder)
+
+	// record a normal event
+	obj := &v1.ObjectReference{FieldPath: "foo"}
+	filtered.Event(obj, "Normal", "Reason", "Message")
+	filtered.Eventf(obj, "Normal", "Reason", "MessageFmt")
+	filtered.AnnotatedEventf(obj, map[string]string{"a": "b"}, "Normal", "Reason", "MessageFmt")
+
+	// don't record events for implicit container
+	implicit := &v1.ObjectReference{FieldPath: "implicitly required container foo"}
+	filtered.Event(implicit, "Normal", "Reason", "Message")
+	filtered.Eventf(implicit, "Normal", "Reason", "MessageFmt")
+	filtered.AnnotatedEventf(implicit, map[string]string{"a": "b"}, "Normal", "Reason", "MessageFmt")
+
+	if len(recorder.events) != 1 || len(recorder.fEvents) != 1 || len(recorder.aEvents) != 1 {
+		t.Errorf("Expected only one event of each type to be recorded, got events: %v, fEvents: %v, aEvents: %v", recorder.events, recorder.fEvents, recorder.aEvents)
+	}
+}
+
+func TestIsHostNetworkPod(t *testing.T) {
+	pod := &v1.Pod{Spec: v1.PodSpec{HostNetwork: true}}
+	if !IsHostNetworkPod(pod) {
+		t.Errorf("expected true for HostNetwork pod")
+	}
+	pod = &v1.Pod{Spec: v1.PodSpec{HostNetwork: false}}
+	if IsHostNetworkPod(pod) {
+		t.Errorf("expected false for non-HostNetwork pod")
+	}
+}
+
+func TestConvertPodStatusToRunningPod(t *testing.T) {
+	podStatus := &PodStatus{
+		ID:        "poduid",
+		Name:      "podname",
+		Namespace: "podns",
+		ContainerStatuses: []*Status{
+			{
+				ID:    ContainerID{Type: "docker", ID: "c1"},
+				Name:  "c1",
+				Image: "img1",
+				State: ContainerStateRunning,
+			},
+			{
+				ID:    ContainerID{Type: "docker", ID: "c2"},
+				Name:  "c2",
+				Image: "img2",
+				State: ContainerStateExited,
+			},
+		},
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+			{
+				Id:    "sandbox1",
+				State: runtimeapi.PodSandboxState_SANDBOX_READY,
+			},
+			{
+				Id:    "sandbox2",
+				State: runtimeapi.PodSandboxState_SANDBOX_NOTREADY,
+			},
+		},
+	}
+	runtimeName := "docker"
+	runningPod := ConvertPodStatusToRunningPod(runtimeName, podStatus)
+	if runningPod.ID != podStatus.ID || runningPod.Name != podStatus.Name || runningPod.Namespace != podStatus.Namespace {
+		t.Errorf("ConvertPodStatusToRunningPod did not copy pod metadata correctly")
+	}
+	if len(runningPod.Containers) != 1 {
+		t.Errorf("expected 1 running container, got %d", len(runningPod.Containers))
+	}
+	if runningPod.Containers[0].Name != "c1" {
+		t.Errorf("expected running container name 'c1', got %q", runningPod.Containers[0].Name)
+	}
+	if len(runningPod.Sandboxes) != 2 {
+		t.Errorf("expected 2 sandboxes, got %d", len(runningPod.Sandboxes))
+	}
+	if runningPod.Sandboxes[0].ID.ID != "sandbox1" || runningPod.Sandboxes[0].State != ContainerStateRunning {
+		t.Errorf("expected sandbox1 to be running")
+	}
+	if runningPod.Sandboxes[1].ID.ID != "sandbox2" || runningPod.Sandboxes[1].State != ContainerStateExited {
+		t.Errorf("expected sandbox2 to be exited")
+	}
+}
+
+func TestSandboxToContainerState(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    runtimeapi.PodSandboxState
+		expected State
+	}{
+		{"ready", runtimeapi.PodSandboxState_SANDBOX_READY, ContainerStateRunning},
+		{"notready", runtimeapi.PodSandboxState_SANDBOX_NOTREADY, ContainerStateExited},
+		{"unknown", 99, ContainerStateUnknown},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := SandboxToContainerState(tc.input)
+			if actual != tc.expected {
+				t.Errorf("SandboxToContainerState(%v) = %v, want %v", tc.input, actual, tc.expected)
+			}
+		})
+	}
+}
+
+func TestAllContainersAreWindowsHostProcess(t *testing.T) {
+	trueVar := true
+	falseVar := false
+	containerName := "container"
+	testCases := []struct {
+		name           string
+		podSpec        *v1.PodSpec
+		expectedResult bool
+	}{
+		{
+			name: "all containers hostprocess true",
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "one container hostprocess false",
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &falseVar,
+						},
+					},
+				}},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "mixed containers",
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: containerName,
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								HostProcess: &trueVar,
+							},
+						},
+					},
+					{
+						Name: containerName,
+						SecurityContext: &v1.SecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
+								HostProcess: &falseVar,
+							},
+						},
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "no containers",
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{},
+			},
+			expectedResult: true, // by definition true ?
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{}
+			pod.Spec = *tc.podSpec
+			result := AllContainersAreWindowsHostProcess(pod)
+			assert.Equal(t, tc.expectedResult, result)
+		})
+	}
+}
+
+func TestHasAnyRegularContainerStarted(t *testing.T) {
+	testCases := []struct {
+		name          string
+		spec          *v1.PodSpec
+		statuses      []v1.ContainerStatus
+		expectStarted bool
+	}{
+		{
+			name: "no statuses",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "regular"},
+				},
+			},
+			statuses:      []v1.ContainerStatus{},
+			expectStarted: false,
+		},
+		{
+			name: "no regular containers started",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "init"},
+				},
+				Containers: []v1.Container{
+					{Name: "regular"},
+				},
+			},
+			statuses: []v1.ContainerStatus{
+				{
+					Name: "init",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+			expectStarted: false,
+		},
+		{
+			name: "regular container running",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "init"},
+				},
+				Containers: []v1.Container{
+					{Name: "regular"},
+				},
+			},
+			statuses: []v1.ContainerStatus{
+				{
+					Name: "init",
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{},
+					},
+				},
+				{
+					Name: "regular",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+			expectStarted: true,
+		},
+		{
+			name: "regular container terminated",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "regular"},
+				},
+			},
+			statuses: []v1.ContainerStatus{
+				{
+					Name: "regular",
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{},
+					},
+				},
+			},
+			expectStarted: true,
+		},
+		{
+			name: "regular container waiting",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "regular"},
+				},
+			},
+			statuses: []v1.ContainerStatus{
+				{
+					Name: "regular",
+					State: v1.ContainerState{
+						Waiting: &v1.ContainerStateWaiting{},
+					},
+				},
+			},
+			expectStarted: false,
+		},
+		{
+			name: "ephemeral container running",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "regular"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "debug"}},
+				},
+			},
+			statuses: []v1.ContainerStatus{
+				{
+					Name: "debug",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+			expectStarted: false,
+		},
+		{
+			name: "multiple regular containers",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "regular1"},
+					{Name: "regular2"},
+				},
+			},
+			statuses: []v1.ContainerStatus{
+				{
+					Name: "regular1",
+					State: v1.ContainerState{
+						Waiting: &v1.ContainerStateWaiting{},
+					},
+				},
+				{
+					Name: "regular2",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+			expectStarted: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := HasAnyRegularContainerStarted(tc.spec, tc.statuses)
+			if actual != tc.expectStarted {
+				t.Errorf("HasAnyRegularContainerStarted(%v, %v) = %v, want %v", tc.spec, tc.statuses, actual, tc.expectStarted)
+			}
 		})
 	}
 }
