@@ -559,6 +559,10 @@ type FilterPlugin interface {
 	// For example, during preemption, we may pass a copy of the original
 	// nodeInfo object that has some pods removed from it to evaluate the
 	// possibility of preempting them to schedule the target pod.
+	//
+	// Note that ctx could be canceled by the framework when the framework finds the enough number of nodes that passed all the filter plugins.
+	// For a better performance, in such cases, it's better to return `UnschedulableAndUnresolvable` status immediately,
+	// instead of keeping and completing the filter processing.
 	Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *Status
 }
 
