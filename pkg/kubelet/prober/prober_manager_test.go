@@ -130,6 +130,37 @@ func TestAddRemovePods(t *testing.T) {
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
 	}
+
+	// Adding duplicate probes, should not add probe worker
+	probeSetters := map[probeType]func(c *v1.Container){
+		liveness:  func(c *v1.Container) { c.LivenessProbe = defaultProbe },
+		readiness: func(c *v1.Container) { c.ReadinessProbe = defaultProbe },
+		startup:   func(c *v1.Container) { c.StartupProbe = defaultProbe },
+	}
+	repeatContainerCnt := 2
+	for probeType, probeTypeEnum := range map[string]probeType{
+		"liveness":  liveness,
+		"readiness": readiness,
+		"startup":   startup,
+	} {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: types.UID("dup_" + probeType + "_probe_pod"),
+			},
+		}
+		for range repeatContainerCnt {
+			container := v1.Container{Name: probeType}
+			probeSetters[probeTypeEnum](&container)
+			pod.Spec.Containers = append(pod.Spec.Containers, container)
+		}
+		m.AddPod(pod)
+		workerCnt := m.workerCount()
+		if workerCnt != 1 {
+			t.Fatalf("expected one "+probeType+" probe worker to be created without duplication, got %d", workerCnt)
+		}
+		m.RemovePod(pod)
+		m.removeWorker(pod.UID, pod.Spec.Containers[0].Name, probeTypeEnum)
+	}
 }
 
 func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
@@ -685,5 +716,193 @@ func cleanup(t *testing.T, m *manager) {
 	}
 	if err := wait.Poll(interval, wait.ForeverTestTimeout, condition); err != nil {
 		t.Fatalf("Error during cleanup: %v", err)
+	}
+}
+
+func TestStopLivenessAndStartup(t *testing.T) {
+	// This test verifies the behavior of the manager when stopping liveness and startup probes.
+	// It ensures that duplicate workers are not created and that workers are properly stopped
+	// when the StopLivenessAndStartup function is called. The test cases define the expected
+	// state of probes before and after stopping, as well as the probes that should be stopped.
+	testCases := []struct {
+		name              string
+		pod               *v1.Pod
+		expectedInitial   []probeKey // probes expected after AddPod
+		expectedAfterStop []probeKey // probes expected after StopLivenessAndStartup
+		expectedStopped   []probeKey // probes that should be stopped
+	}{
+		{
+			name: "regular containers with all probe types",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "regular_pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:           "container1",
+						LivenessProbe:  defaultProbe,
+						ReadinessProbe: defaultProbe,
+						StartupProbe:   defaultProbe,
+					}, {
+						Name:          "container2",
+						LivenessProbe: defaultProbe,
+						StartupProbe:  defaultProbe,
+					}, {
+						Name:           "container3",
+						ReadinessProbe: defaultProbe,
+					}},
+				},
+			},
+			expectedInitial: []probeKey{
+				{"regular_pod", "container1", liveness},
+				{"regular_pod", "container1", readiness},
+				{"regular_pod", "container1", startup},
+				{"regular_pod", "container2", liveness},
+				{"regular_pod", "container2", startup},
+				{"regular_pod", "container3", readiness},
+			},
+			expectedAfterStop: []probeKey{
+				{"regular_pod", "container1", readiness},
+				{"regular_pod", "container3", readiness},
+			},
+			expectedStopped: []probeKey{
+				{"regular_pod", "container1", liveness},
+				{"regular_pod", "container1", startup},
+				{"regular_pod", "container2", liveness},
+				{"regular_pod", "container2", startup},
+			},
+		},
+		{
+			name: "pod with no probes",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "no_probes_pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "container1",
+					}, {
+						Name: "container2",
+					}},
+				},
+			},
+			expectedInitial:   []probeKey{},
+			expectedAfterStop: []probeKey{},
+			expectedStopped:   []probeKey{},
+		},
+		{
+			name: "pod with only readiness probes",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "readiness_only_pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:           "container1",
+						ReadinessProbe: defaultProbe,
+					}, {
+						Name:           "container2",
+						ReadinessProbe: defaultProbe,
+					}},
+				},
+			},
+			expectedInitial: []probeKey{
+				{"readiness_only_pod", "container1", readiness},
+				{"readiness_only_pod", "container2", readiness},
+			},
+			expectedAfterStop: []probeKey{
+				{"readiness_only_pod", "container1", readiness},
+				{"readiness_only_pod", "container2", readiness},
+			},
+			expectedStopped: []probeKey{},
+		},
+		{
+			name: "empty pod",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "empty_pod",
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{},
+				},
+			},
+			expectedInitial:   []probeKey{},
+			expectedAfterStop: []probeKey{},
+			expectedStopped:   []probeKey{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			m := newTestManager()
+			defer cleanup(t, m)
+
+			m.AddPod(tc.pod)
+			if err := expectProbes(m, tc.expectedInitial); err != nil {
+				t.Errorf("Expected initial probes not found after AddPod: %v", err)
+			}
+
+			m.StopLivenessAndStartup(tc.pod)
+
+			if len(tc.expectedStopped) > 0 {
+				if err := waitForWorkerExit(t, m, tc.expectedStopped); err != nil {
+					t.Errorf("Workers failed to exit after StopLivenessAndStartup: %v", err)
+				}
+			}
+			// Verify stop operation doesn't affect ReadinessProbe
+			if err := expectProbes(m, tc.expectedAfterStop); err != nil {
+				t.Errorf("Expected remaining probes not found: %v", err)
+			}
+			// Verify stopped workers are actually stopped
+			for _, key := range tc.expectedStopped {
+				if worker, exists := m.getWorker(key.podUID, key.containerName, key.probeType); exists {
+					t.Errorf("Worker %v should have been stopped but still exists", key)
+					select {
+					case <-worker.stopCh:
+					default:
+						t.Errorf("Worker %v exists but stopCh is not closed", key)
+					}
+				}
+			}
+			// Verify remaining workers are still active
+			for _, key := range tc.expectedAfterStop {
+				if worker, exists := m.getWorker(key.podUID, key.containerName, key.probeType); !exists {
+					t.Errorf("Worker %v should still be running but not found", key)
+				} else {
+					select {
+					case <-worker.stopCh:
+						t.Errorf("Worker %v should still be running but stopCh is closed", key)
+					default:
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestStopLivenessAndStartupNonExistentPod(t *testing.T) {
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	// Do not add the pod to manager
+	nonExistentPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "regular_pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:          "container1",
+				LivenessProbe: defaultProbe,
+				StartupProbe:  defaultProbe,
+			}},
+		},
+	}
+
+	// Should not panic or cause issues
+	m.StopLivenessAndStartup(nonExistentPod)
+
+	if err := expectProbes(m, nil); err != nil {
+		t.Errorf("Expected no probes but found some: %v", err)
 	}
 }
