@@ -2177,10 +2177,7 @@ type VolumeDevice struct {
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
 	// Required: Name of the environment variable.
-	// When the RelaxedEnvironmentVariableValidation feature gate is disabled, this must consist of alphabetic characters,
-	// digits, '_', '-', or '.', and must not start with a digit.
-	// When the RelaxedEnvironmentVariableValidation feature gate is enabled,
-	// this may contain any printable ASCII characters except '='.
+	// May consist of any printable ASCII characters except '='.
 	Name string
 	// Optional: no more than one of the following may be specified.
 	// Optional: Defaults to ""; variable references $(VAR_NAME) are expanded

@@ -236,26 +236,29 @@ func (r *Requirement) hasValue(value string) bool {
 func (r *Requirement) Matches(ls Labels) bool {
 	switch r.operator {
 	case selection.In, selection.Equals, selection.DoubleEquals:
-		if !ls.Has(r.key) {
+		val, exists := ls.Lookup(r.key)
+		if !exists {
 			return false
 		}
-		return r.hasValue(ls.Get(r.key))
+		return r.hasValue(val)
 	case selection.NotIn, selection.NotEquals:
-		if !ls.Has(r.key) {
+		val, exists := ls.Lookup(r.key)
+		if !exists {
 			return true
 		}
-		return !r.hasValue(ls.Get(r.key))
+		return !r.hasValue(val)
 	case selection.Exists:
 		return ls.Has(r.key)
 	case selection.DoesNotExist:
 		return !ls.Has(r.key)
 	case selection.GreaterThan, selection.LessThan:
-		if !ls.Has(r.key) {
+		val, exists := ls.Lookup(r.key)
+		if !exists {
 			return false
 		}
-		lsValue, err := strconv.ParseInt(ls.Get(r.key), 10, 64)
+		lsValue, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
-			klog.V(10).Infof("ParseInt failed for value %+v in label %+v, %+v", ls.Get(r.key), ls, err)
+			klog.V(10).Infof("ParseInt failed for value %+v in label %+v, %+v", val, ls, err)
 			return false
 		}
 
@@ -996,7 +999,8 @@ type ValidatedSetSelector Set
 
 func (s ValidatedSetSelector) Matches(labels Labels) bool {
 	for k, v := range s {
-		if !labels.Has(k) || v != labels.Get(k) {
+		val, exists := labels.Lookup(k)
+		if !exists || v != val {
 			return false
 		}
 	}

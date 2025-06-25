@@ -94,9 +94,10 @@ const (
 
 // hostpathCSI
 type hostpathCSIDriver struct {
-	driverInfo       storageframework.DriverInfo
-	manifests        []string
-	volumeAttributes []map[string]string
+	driverInfo               storageframework.DriverInfo
+	manifests                []string
+	volumeAttributes         []map[string]string
+	enableDynamicAllocatable bool
 }
 
 func initHostPathCSIDriver(name string, capabilities map[storageframework.Capability]bool, volumeAttributes []map[string]string, manifests ...string) storageframework.TestDriver {
@@ -183,6 +184,13 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-plugin.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 	)
+}
+
+func InitHostPathCSIDriverWithDynamicAllocatable() storageframework.TestDriver {
+	driver := InitHostPathCSIDriver()
+	hostpathDriver := driver.(*hostpathCSIDriver)
+	hostpathDriver.enableDynamicAllocatable = true
+	return driver
 }
 
 func (h *hostpathCSIDriver) GetDriverInfo() *storageframework.DriverInfo {
@@ -272,6 +280,16 @@ func (h *hostpathCSIDriver) PrepareTest(ctx context.Context, f *framework.Framew
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
 	})
+
+	if h.enableDynamicAllocatable {
+		patches = append(patches, utils.PatchCSIOptions{
+			NodeAllocatableUpdatePeriodSeconds: &[]int64{10}[0],
+		})
+		patches = append(patches, utils.PatchCSIOptions{
+			DriverContainerName:      "hostpath",
+			DriverContainerArguments: []string{"--attach-limit=-1"},
+		})
+	}
 
 	// VAC E2E HostPath patch
 	// Enables ModifyVolume support in the hostpath CSI driver, and adds an enabled parameter name

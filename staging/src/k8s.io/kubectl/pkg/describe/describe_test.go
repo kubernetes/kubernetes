@@ -713,6 +713,32 @@ func TestDescribeConfigMap(t *testing.T) {
 	if !strings.Contains(out, "binarykey1") || !strings.Contains(out, "5 bytes") || !strings.Contains(out, "binarykey2") || !strings.Contains(out, "6 bytes") {
 		t.Errorf("unexpected out: %s", out)
 	}
+
+	expectedOut := `Name:         mycm
+Namespace:    foo
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+key1:
+----
+value1
+
+key2:
+----
+value2
+
+
+BinaryData
+====
+binarykey1: 5 bytes
+binarykey2: 6 bytes
+
+Events:  <none>
+`
+
+	assert.Equal(t, expectedOut, out)
 }
 
 func TestDescribeLimitRange(t *testing.T) {

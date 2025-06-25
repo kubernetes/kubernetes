@@ -135,7 +135,7 @@ func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepreca
 	}
 
 	if len(resetBytes) == 0 {
-		return nil, errors.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
+		return nil, errors.Errorf("no %s found in the supplied config", constants.ResetConfigurationKind)
 	}
 
 	internalcfg := &kubeadmapi.ResetConfiguration{}

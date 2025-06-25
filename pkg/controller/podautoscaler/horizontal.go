@@ -48,6 +48,7 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
@@ -865,11 +866,35 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		}
 		rescale = desiredReplicas != currentReplicas
 	}
-
 	if rescale {
-		scale.Spec.Replicas = desiredReplicas
-		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(ctx, targetGR, scale, metav1.UpdateOptions{})
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			// On each retry, set the desired replicas on the scale object.
+			// A deep copy is not needed here as the 'scale' object was read
+			// directly from the API server and is not from a shared cache.
+			scale.Spec.Replicas = desiredReplicas
+
+			// Attempt to UPDATE the scale subresource.
+			_, updateErr := a.scaleNamespacer.Scales(hpa.Namespace).Update(ctx, targetGR, scale, metav1.UpdateOptions{})
+
+			if updateErr == nil {
+				return nil // Success
+			}
+
+			// If the update failed, get the latest version of the scale object to refresh the resource version for the next retry.
+			latestScale, getErr := a.scaleNamespacer.Scales(hpa.Namespace).Get(ctx, targetGR, hpa.Spec.ScaleTargetRef.Name, metav1.GetOptions{})
+			if getErr == nil {
+				// Update our scale object to the latest version for the next attempt.
+				scale = latestScale
+			} else {
+				utilruntime.HandleError(fmt.Errorf("error getting latest scale for %s during conflict retry: %w", reference, getErr))
+			}
+
+			// Return the original update error to be checked by RetryOnConflict.
+			return updateErr
+		})
+
 		if err != nil {
+			// This block executes if retries were exhausted or a non-conflict error occurred.
 			a.eventRecorder.Eventf(hpa, v1.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
 			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedUpdateScale", "the HPA controller was unable to update the target scale: %v", err)
 			a.setCurrentReplicasAndMetricsInStatus(hpa, currentReplicas, metricStatuses)
@@ -878,6 +903,8 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 			}
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
 		}
+
+		// This block executes only on a successful rescale.
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededRescale", "the HPA controller was able to update the target scale to %d", desiredReplicas)
 		a.eventRecorder.Eventf(hpa, v1.EventTypeNormal, "SuccessfulRescale", "New size: %d; reason: %s", desiredReplicas, rescaleReason)
 		a.storeScaleEvent(hpa.Spec.Behavior, key, currentReplicas, desiredReplicas)

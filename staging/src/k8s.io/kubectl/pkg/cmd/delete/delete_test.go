@@ -375,7 +375,7 @@ func TestDeleteObjectWithInteractive(t *testing.T) {
 	}
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "You are about to delete the following 1 resource(s):\nreplicationcontroller/redis-master\nDo you want to continue? (y/n): replicationcontroller/redis-master\n" {
+	if buf.String() != "You are about to delete the following 1 resource(s):\nreplicationcontroller/redis-master\nDo you want to continue? (y/N): replicationcontroller/redis-master\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
@@ -396,7 +396,7 @@ func TestDeleteObjectWithInteractive(t *testing.T) {
 	}
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "You are about to delete the following 1 resource(s):\nreplicationcontroller/redis-master\nDo you want to continue? (y/n): deletion is cancelled\n" {
+	if buf.String() != "You are about to delete the following 1 resource(s):\nreplicationcontroller/redis-master\nDo you want to continue? (y/N): deletion is cancelled\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 	if buf.String() == ": replicationcontroller/redis-master\n" {

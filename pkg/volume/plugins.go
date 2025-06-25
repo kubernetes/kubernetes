@@ -174,8 +174,6 @@ type VolumePlugin interface {
 	ConstructVolumeSpec(volumeName, volumePath string) (ReconstructedVolume, error)
 
 	// SupportsMountOption returns true if volume plugins supports Mount options
-	// Specifying mount options in a volume plugin that doesn't support
-	// user specified mount options will result in error creating persistent volumes
 	SupportsMountOption() bool
 
 	// SupportsSELinuxContextMount returns true if volume plugins supports

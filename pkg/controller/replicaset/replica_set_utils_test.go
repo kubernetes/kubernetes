@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -29,6 +30,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
 
@@ -38,13 +40,16 @@ func TestCalculateStatus(t *testing.T) {
 	notFullyLabelledRS := newReplicaSet(1, labelMap)
 	// Set replica num to 2 for status condition testing (diff < 0, diff > 0)
 	fullyLabelledRS := newReplicaSet(2, fullLabelMap)
+	longMinReadySeconds := 3600
 	longMinReadySecondsRS := newReplicaSet(1, fullLabelMap)
-	longMinReadySecondsRS.Spec.MinReadySeconds = 3600
+	longMinReadySecondsRS.Spec.MinReadySeconds = int32(longMinReadySeconds)
 
 	asTerminating := func(pod *v1.Pod) *v1.Pod {
 		pod.DeletionTimestamp = ptr.To(meta.Now())
 		return pod
 	}
+
+	clock := clocktesting.NewFakePassiveClock(time.Now())
 
 	rsStatusTests := []struct {
 		name                                          string
@@ -52,6 +57,7 @@ func TestCalculateStatus(t *testing.T) {
 		replicaset                                    *apps.ReplicaSet
 		activePods                                    []*v1.Pod
 		terminatingPods                               []*v1.Pod
+		controllerFeatures                            *ReplicaSetControllerFeatures
 		expectedReplicaSetStatus                      apps.ReplicaSetStatus
 	}{
 		{
@@ -61,6 +67,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
+			nil,
 			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
@@ -77,6 +84,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, true),
 			},
+			nil,
 			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
@@ -95,6 +103,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
 			nil,
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             2,
 				FullyLabeledReplicas: 2,
@@ -111,6 +120,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, true),
 				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
+			nil,
 			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             2,
@@ -129,6 +139,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod2", notFullyLabelledRS, v1.PodRunning, nil, true),
 			},
 			nil,
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             2,
 				FullyLabeledReplicas: 0,
@@ -146,6 +157,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
 			nil,
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             2,
 				FullyLabeledReplicas: 1,
@@ -162,6 +174,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod1", fullyLabelledRS, v1.PodPending, nil, true),
 			},
 			nil,
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
@@ -175,14 +188,49 @@ func TestCalculateStatus(t *testing.T) {
 			false,
 			longMinReadySecondsRS,
 			[]*v1.Pod{
-				newPod("pod1", longMinReadySecondsRS, v1.PodRunning, nil, true),
+				newPod("pod1", longMinReadySecondsRS, v1.PodRunning, &meta.Time{Time: clock.Now()}, true),
 			},
+			nil,
 			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
 				ReadyReplicas:        1,
 				AvailableReplicas:    0,
+				TerminatingReplicas:  nil,
+			},
+		},
+		{
+			"1 available pod with minReadySeconds",
+			false,
+			longMinReadySecondsRS,
+			[]*v1.Pod{
+				newPod("pod1", longMinReadySecondsRS, v1.PodRunning, &meta.Time{Time: clock.Now().Add(-time.Duration(longMinReadySeconds) * time.Second)}, true),
+			},
+			nil,
+			nil,
+			apps.ReplicaSetStatus{
+				Replicas:             1,
+				FullyLabeledReplicas: 1,
+				ReadyReplicas:        1,
+				AvailableReplicas:    1,
+				TerminatingReplicas:  nil,
+			},
+		},
+		{
+			"1 available pod for a long time with minReadySeconds",
+			false,
+			longMinReadySecondsRS,
+			[]*v1.Pod{
+				newPod("pod1", longMinReadySecondsRS, v1.PodRunning, &meta.Time{Time: clock.Now().Add(2 * -time.Duration(longMinReadySeconds) * time.Second)}, true),
+			},
+			nil,
+			nil,
+			apps.ReplicaSetStatus{
+				Replicas:             1,
+				FullyLabeledReplicas: 1,
+				ReadyReplicas:        1,
+				AvailableReplicas:    1,
 				TerminatingReplicas:  nil,
 			},
 		},
@@ -196,6 +244,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				asTerminating(newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true)),
 			},
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
@@ -215,6 +264,7 @@ func TestCalculateStatus(t *testing.T) {
 				asTerminating(newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true)),
 				asTerminating(newPod("pod3", fullyLabelledRS, v1.PodRunning, nil, true)),
 			},
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
@@ -223,13 +273,37 @@ func TestCalculateStatus(t *testing.T) {
 				TerminatingReplicas:  ptr.To[int32](2),
 			},
 		},
+		{
+			"1 fully labelled pods and 2 terminating with DeploymentReplicaSetTerminatingReplicas (ReplicationController)",
+			true,
+			fullyLabelledRS,
+			[]*v1.Pod{
+				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, true),
+			},
+			[]*v1.Pod{
+				asTerminating(newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true)),
+				asTerminating(newPod("pod3", fullyLabelledRS, v1.PodRunning, nil, true)),
+			},
+			&ReplicaSetControllerFeatures{
+				EnableStatusTerminatingReplicas: false,
+			},
+			apps.ReplicaSetStatus{
+				Replicas:             1,
+				FullyLabeledReplicas: 1,
+				ReadyReplicas:        1,
+				AvailableReplicas:    1,
+				TerminatingReplicas:  nil,
+			},
+		},
 	}
 
 	for _, test := range rsStatusTests {
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, test.enableDeploymentReplicaSetTerminatingReplicas)
 
-			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, test.terminatingPods, nil)
+			// test ReplicaSet controller default behavior unless specified otherwise in the test case
+			controllerFeatures := ptr.Deref(test.controllerFeatures, DefaultReplicaSetControllerFeatures())
+			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, test.terminatingPods, nil, controllerFeatures, clock)
 			if !reflect.DeepEqual(replicaSetStatus, test.expectedReplicaSetStatus) {
 				t.Errorf("unexpected replicaset status: expected %v, got %v", test.expectedReplicaSetStatus, replicaSetStatus)
 			}
@@ -326,7 +400,8 @@ func TestCalculateStatusConditions(t *testing.T) {
 
 	for _, test := range rsStatusConditionTests {
 		t.Run(test.name, func(t *testing.T) {
-			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, nil, test.manageReplicasErr)
+			clock := clocktesting.NewFakePassiveClock(time.Now())
+			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, nil, test.manageReplicasErr, DefaultReplicaSetControllerFeatures(), clock)
 			// all test cases have at most 1 status condition
 			if len(replicaSetStatus.Conditions) > 0 {
 				test.expectedReplicaSetConditions[0].LastTransitionTime = replicaSetStatus.Conditions[0].LastTransitionTime

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -253,6 +254,11 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 			framework.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)
 		}
 	})
+})
+
+var _ = common.SIGDescribe("KubeProxyNFAcct", feature.KubeProxyNFAcct, func() {
+	fr := framework.NewDefaultFramework("kube-proxy-nfacct")
+	fr.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should update metric for tracking accepted packets destined for localhost nodeports", func(ctx context.Context) {
 		if framework.TestContext.ClusterIsIPv6() {
@@ -285,7 +291,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 		// get proxyMode
 		stdout, err := e2epodoutput.RunHostCmd(fr.Namespace.Name, hostExecPodName, fmt.Sprintf("curl --silent 127.0.0.1:%d/proxyMode", ports.ProxyStatusPort))
 		if err != nil {
-			e2eskipper.Skipf("kube-proxy is not running or could not determine kube-proxy mode (%v)", err)
+			framework.Failf("failed to get proxy mode: err: %v; stdout: %s", stdout, err)
 		}
 		proxyMode := strings.TrimSpace(stdout)
 
@@ -354,7 +360,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 				}
 				return true, nil
 			}); err != nil {
-				e2eskipper.Skipf("skipping test as localhost nodeports are not acceesible in this environment")
+				framework.ExpectNoError(err, "failed to access nodeport service on localhost")
 			}
 		}
 

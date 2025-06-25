@@ -83,7 +83,7 @@ const (
 	auditPolicyFileName      = "audit-policy.yaml"
 	auditLogFileName         = "audit.log"
 	encryptionConfigFileName = "encryption.conf"
-	metricPrefix             = "apiserver_encryption_config_controller_automatic_reload_success_total"
+	metricPrefix             = "apiserver_encryption_config_controller_automatic_reloads_total"
 	defaultNamespace         = "default"
 	crdName                  = "testcrd"
 	crdGroup                 = "stable.example.com"
@@ -540,7 +540,7 @@ func (svm *svmTest) getAutomaticReloadSuccessTotal(ctx context.Context, t *testi
 		t.Fatal(err)
 	}
 
-	metricRegex := regexp.MustCompile(fmt.Sprintf(`%s{.*} (\d+)`, metricPrefix))
+	metricRegex := regexp.MustCompile(fmt.Sprintf(`%s\s*{apiserver_id_hash="[^"]*",status="success"} (\d+)`, metricPrefix))
 	for _, line := range strings.Split(string(body), "\n") {
 		if strings.HasPrefix(line, metricPrefix) {
 			matches := metricRegex.FindStringSubmatch(line)

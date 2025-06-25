@@ -218,13 +218,13 @@ linters:
             contextual k8s.io/kubernetes/pkg/kubelet/oom/.*
             contextual k8s.io/kubernetes/pkg/kubelet/status/.*
             contextual k8s.io/kubernetes/pkg/kubelet/sysctl/.*
-            contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
             
             # As long as contextual logging is alpha or beta, all WithName, WithValues,
             # NewContext calls have to go through klog. Once it is GA, we can lift
             # this restriction. Whether we then do a global search/replace remains
             # to be decided.
             with-helpers .*
+            contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
       kubeapilinter:
         path: _output/local/bin/kube-api-linter.so
         description: kube-api-linter and lints Kube like APIs based on API conventions and best practices.
@@ -266,9 +266,13 @@ linters:
             - $all
             - "!$test"
             - "!**/test/**"
+            - "!**/testing/**"
+            - "!**/apitesting/**"
           deny:
             - pkg: "github.com/google/go-cmp/cmp"
               desc: "cmp is allowed only in test files"
+            - pkg: "html/template"
+              desc: "template is allowed only in test files as it disables dead code elimination"
     forbidigo:
       analyze-types: true
       forbid:

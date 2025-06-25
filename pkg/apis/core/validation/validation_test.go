@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
@@ -15475,11 +15474,11 @@ func TestValidateServiceCreate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 
 	testCases := []struct {
-		name         string
-		tweakSvc     func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs      int
-		featureGates []featuregate.Feature
-		legacyIPs    bool
+		name           string
+		tweakSvc       func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs        int
+		legacyIPs      bool
+		newTrafficDist bool
 	}{{
 		name:     "default",
 		tweakSvc: func(s *core.Service) {},
@@ -16738,15 +16737,15 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameZone")
 			},
-			featureGates: []featuregate.Feature{features.PreferSameTrafficDistribution},
-			numErrs:      0,
+			newTrafficDist: true,
+			numErrs:        0,
 		}, {
 			name: "valid: trafficDistribution field set to PreferSameNode with feature gate",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
-			featureGates: []featuregate.Feature{features.PreferSameTrafficDistribution},
-			numErrs:      0,
+			newTrafficDist: true,
+			numErrs:        0,
 		}, {
 			name: "invalid: trafficDistribution field set to Random",
 			tweakSvc: func(s *core.Service) {
@@ -16770,9 +16769,7 @@ func TestValidateServiceCreate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			for i := range tc.featureGates {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates[i], true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, tc.newTrafficDist)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			svc := makeValidService()
 			tc.tweakSvc(&svc)

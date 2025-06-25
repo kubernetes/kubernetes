@@ -2172,3 +2172,353 @@ func TestNodeInfoKMetadata(t *testing.T) {
 		tCtx.Fatalf("unexpected output:\n%s", output)
 	}
 }
+
+func TestUpdateUsedPorts_PodAdd(t *testing.T) {
+	testCases := []struct {
+		ports HostPortInfo
+		pod   *v1.Pod
+		want  HostPortInfo
+	}{
+		{
+			ports: HostPortInfo{},
+			pod:   nil,
+			want:  HostPortInfo{},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: nil,
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{},
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{},
+		},
+		{
+			ports: HostPortInfo{},
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+					ProtocolPort{"TCP", 8002}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{},
+			pod: st.MakePod().
+				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{},
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+					ProtocolPort{"TCP", 8002}: struct{}{},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		ni := NodeInfo{UsedPorts: tc.ports}
+		ni.updateUsedPorts(tc.pod, true)
+		if diff := cmp.Diff(tc.want, ni.UsedPorts); diff != "" {
+			t.Errorf("updateUsedPorts() unexpected diff (-want, +got):\n%s", diff)
+		}
+	}
+}
+
+func TestUpdateUsedPorts_PodRemove(t *testing.T) {
+	testCases := []struct {
+		ports HostPortInfo
+		pod   *v1.Pod
+		want  HostPortInfo
+	}{
+		{
+			ports: HostPortInfo{},
+			pod:   nil,
+			want:  HostPortInfo{},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: nil,
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{},
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+					ProtocolPort{"TCP", 8002}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				InitContainerPort(false /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+		{
+			ports: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+					ProtocolPort{"TCP", 8002}: struct{}{},
+				},
+			},
+			pod: st.MakePod().
+				InitContainerPort(true /* sidecar */, []v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					}}).
+				Obj(),
+			want: HostPortInfo{
+				"0.0.0.0": {
+					ProtocolPort{"TCP", 8001}: struct{}{},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		ni := NodeInfo{UsedPorts: tc.ports}
+		ni.updateUsedPorts(tc.pod, false)
+		if diff := cmp.Diff(tc.want, ni.UsedPorts); diff != "" {
+			t.Errorf("updateUsedPorts() unexpected diff (-want, +got):\n%s", diff)
+		}
+	}
+}

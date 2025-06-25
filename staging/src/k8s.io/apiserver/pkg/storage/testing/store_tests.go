@@ -29,7 +29,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -3130,7 +3130,7 @@ func RunTestCount(ctx context.Context, t *testing.T, store storage.Interface) {
 		}
 	}
 
-	resourceACountGot, err := store.Count(resourceA)
+	resourceACountGot, err := store.Count(t.Context(), resourceA)
 	if err != nil {
 		t.Fatalf("store.Count failed: %v", err)
 	}

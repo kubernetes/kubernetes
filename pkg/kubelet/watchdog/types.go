@@ -19,11 +19,14 @@ package watchdog
 import (
 	"context"
 	"net/http"
+
+	"k8s.io/apiserver/pkg/server/healthz"
 )
 
 // HealthChecker defines the interface of health checkers.
 type HealthChecker interface {
 	Start(ctx context.Context)
+	SetHealthCheckers(syncLoop syncLoopHealthChecker, checkers []healthz.HealthChecker)
 }
 
 // syncLoopHealthChecker contains the health check method for syncLoop.

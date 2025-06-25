@@ -524,6 +524,18 @@ kube::golang::internal::verify_go_version() {
   if [ "${GOTOOLCHAIN:-auto}" != 'auto' ]; then
     # no-op, just respect GOTOOLCHAIN
     :
+  elif [ "${GO_VERSION:-}" == 'devel' ]; then
+    # get the latest master version of Go, build and use that version
+    export GOTOOLCHAIN='local'
+    if [[ ! -f "${KUBE_ROOT}/.gimme/envs/gomaster.env" && ! -f "${HOME}/.gimme/envs/gomaster.env" ]]; then
+      GOROOT_BOOTSTRAP="${GOROOT_BOOTSTRAP:-/usr/local/go}" "${KUBE_ROOT}/third_party/gimme/gimme" "master" >/dev/null 2>&1
+    fi
+
+    if [[ -f "${KUBE_ROOT}/.gimme/envs/gomaster.env" ]]; then
+      source "${KUBE_ROOT}/.gimme/envs/gomaster.env"
+    elif [[ -f "${HOME}/.gimme/envs/gomaster.env" ]]; then
+      source "${HOME}/.gimme/envs/gomaster.env"
+    fi
   elif [ -n "${FORCE_HOST_GO:-}" ]; then
     # ensure existing host version is used, like before GOTOOLCHAIN existed
     export GOTOOLCHAIN='local'
@@ -824,7 +836,7 @@ kube::golang::build_binaries_for_platform() {
    done
 
   V=2 kube::log::info "Env for ${platform}: GOPATH=${GOPATH-} GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
-  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags}"
+  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} LDFLAGS=${goldflags} and -tags=${gotags:-}"
 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
@@ -915,6 +927,9 @@ kube::golang::build_binaries() {
   gogcflags="${GOGCFLAGS:-}"
   goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
 
+  local grpcnotrace
+  grpcnotrace=""
+
   if [[ "${DBG:-}" == 1 ]]; then
       # Debugging - disable optimizations and inlining and trimPath
       gogcflags="${gogcflags} all=-N -l"
@@ -922,10 +937,12 @@ kube::golang::build_binaries() {
       # Not debugging - disable symbols and DWARF, trim embedded paths
       goldflags="${goldflags} -s -w"
       goflags+=("-trimpath")
+      # build non-debug binaries with "grpcnotrace" tag to avoid x/net trace usage and enable dead code elimination
+      grpcnotrace=",grpcnotrace"
   fi
 
   # Extract tags if any specified in GOFLAGS
-  gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
+  gotags="selinux,notest${grpcnotrace},$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
 
   local -a targets=()
   local arg

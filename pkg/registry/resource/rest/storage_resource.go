@@ -71,39 +71,6 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, nsClient v1.NamespaceInterface) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 
-	if resource := "deviceclasses"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		deviceclassStorage, err := deviceclassstore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
-		}
-		storage[resource] = deviceclassStorage
-	}
-
-	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient)
-		if err != nil {
-			return nil, err
-		}
-		storage[resource] = resourceClaimStorage
-		storage[resource+"/status"] = resourceClaimStatusStorage
-	}
-
-	if resource := "resourceclaimtemplates"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimTemplateStorage, err := resourceclaimtemplatestore.NewREST(restOptionsGetter, nsClient)
-		if err != nil {
-			return nil, err
-		}
-		storage[resource] = resourceClaimTemplateStorage
-	}
-
-	if resource := "resourceslices"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		resourceSliceStorage, err := resourceslicestore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
-		}
-		storage[resource] = resourceSliceStorage
-	}
-
 	if resource := "devicetaintrules"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		deviceTaintStorage, err := devicetaintrulestore.NewREST(restOptionsGetter)
 		if err != nil {

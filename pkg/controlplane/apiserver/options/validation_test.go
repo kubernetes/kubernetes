@@ -387,9 +387,7 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 				}
 			}
 
-			if test.featureEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, test.featureEnabled)
 			errs := validateServiceAccountTokenSigningConfig(test.options)
 			if !reflect.DeepEqual(errs, test.expectedErrors) {
 				t.Errorf("Expected errors message: %v \n but got: %v", test.expectedErrors, errs)

@@ -46,6 +46,16 @@ func Test(t *testing.T) {
 		field.Invalid(field.NewPath("typedefField"), 0, content.MinError(1)),
 		field.Invalid(field.NewPath("typedefPtrField"), 0, content.MinError(1)),
 	)
+	// Test validation ratcheting
+	st.Value(&Struct{
+		IntPtrField:     ptr.To(0),
+		UintPtrField:    ptr.To(uint(0)),
+		TypedefPtrField: ptr.To(IntType(0)),
+	}).OldValue(&Struct{
+		IntPtrField:     ptr.To(0),
+		UintPtrField:    ptr.To(uint(0)),
+		TypedefPtrField: ptr.To(IntType(0)),
+	}).ExpectValid()
 
 	st.Value(&Struct{
 		IntField:        1,

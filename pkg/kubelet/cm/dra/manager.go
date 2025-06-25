@@ -32,7 +32,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
-	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
+	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -46,14 +46,34 @@ const draManagerStateFileName = "dra_manager_state"
 // defaultReconcilePeriod is the default reconciliation period to keep all claim info state in sync.
 const defaultReconcilePeriod = 60 * time.Second
 
+// The time that DRA drivers have to come back after being unregistered
+// before the kubelet removes their ResourceSlices.
+//
+// This must be long enough to actually allow stopping a pod and
+// starting the replacement (otherwise ResourceSlices get deleted
+// unnecessarily) and not too long (otherwise the time window were
+// pods might still get scheduled to the node after removal of a
+// driver is too long).
+//
+// 30 seconds might be long enough for a simple container restart.
+// If a DRA driver wants to be sure that slices don't get wiped,
+// it should use rolling updates.
+const defaultWipingDelay = 30 * time.Second
+
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
 type ActivePodsFunc func() []*v1.Pod
 
 // GetNodeFunc is a function that returns the node object using the kubelet's node lister.
 type GetNodeFunc func() (*v1.Node, error)
 
-// ManagerImpl is the structure in charge of managing DRA drivers.
-type ManagerImpl struct {
+// Manager is responsible for managing ResourceClaims.
+// It ensures that they are prepared before starting pods
+// and that they are unprepared before the last consuming
+// pod is declared as terminated.
+type Manager struct {
+	// draPlugins manages the registered plugins.
+	draPlugins *draplugin.DRAPluginManager
+
 	// cache contains cached claim info
 	cache *claimInfoCache
 
@@ -70,12 +90,9 @@ type ManagerImpl struct {
 
 	// KubeClient reference
 	kubeClient clientset.Interface
-
-	// getNode is a function that returns the node object using the kubelet's node lister.
-	getNode GetNodeFunc
 }
 
-// NewManagerImpl creates a new manager.
+// NewManager creates a new DRA manager.
 //
 // Most errors returned by the manager show up in the context of a pod.
 // They try to adhere to the following convention:
@@ -84,7 +101,7 @@ type ManagerImpl struct {
 // - Don't include the namespace, it can be inferred from the context.
 // - Avoid repeated "failed to ...: failed to ..." when wrapping errors.
 // - Avoid wrapping when it does not provide relevant additional information to keep the user-visible error short.
-func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, nodeName types.NodeName) (*ManagerImpl, error) {
+func NewManager(kubeClient clientset.Interface, stateFileDirectory string) (*Manager, error) {
 	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
 	if err != nil {
 		return nil, fmt.Errorf("create ResourceClaim cache: %w", err)
@@ -94,7 +111,7 @@ func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, n
 	// We should consider making it configurable in the future.
 	reconcilePeriod := defaultReconcilePeriod
 
-	manager := &ManagerImpl{
+	manager := &Manager{
 		cache:           claimInfoCache,
 		kubeClient:      kubeClient,
 		reconcilePeriod: reconcilePeriod,
@@ -105,34 +122,29 @@ func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, n
 	return manager, nil
 }
 
-func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
-	// The time that DRA drivers have to come back after being unregistered
-	// before the kubelet removes their ResourceSlices.
-	//
-	// This must be long enough to actually allow stopping a pod and
-	// starting the replacement (otherwise ResourceSlices get deleted
-	// unnecessarily) and not too long (otherwise the time window were
-	// pods might still get scheduled to the node after removal of a
-	// driver is too long).
-	//
-	// 30 seconds might be long enough for a simple container restart.
-	// If a DRA driver wants to be sure that slices don't get wiped,
-	// it should use rolling updates.
-	wipingDelay := 30 * time.Second
-	return cache.PluginHandler(dra.NewRegistrationHandler(m.kubeClient, m.getNode, wipingDelay))
+// GetWatcherHandler must be called after Start, it indirectly depends
+// on parameters which only get passed to Start, for example the context.
+func (m *Manager) GetWatcherHandler() cache.PluginHandler {
+	return m.draPlugins
 }
 
 // Start starts the reconcile loop of the manager.
-func (m *ManagerImpl) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady) error {
+func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady) error {
+	m.initDRAPluginManager(ctx, getNode, defaultWipingDelay)
 	m.activePods = activePods
-	m.getNode = getNode
 	m.sourcesReady = sourcesReady
 	go wait.UntilWithContext(ctx, func(ctx context.Context) { m.reconcileLoop(ctx) }, m.reconcilePeriod)
 	return nil
 }
 
+// initPluginManager can be used instead of Start to make the manager useable
+// for calls to prepare/unprepare. It exists primarily for testing purposes.
+func (m *Manager) initDRAPluginManager(ctx context.Context, getNode GetNodeFunc, wipingDelay time.Duration) {
+	m.draPlugins = draplugin.NewDRAPluginManager(ctx, m.kubeClient, getNode, wipingDelay)
+}
+
 // reconcileLoop ensures that any stale state in the manager's claimInfoCache gets periodically reconciled.
-func (m *ManagerImpl) reconcileLoop(ctx context.Context) {
+func (m *Manager) reconcileLoop(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	// Only once all sources are ready do we attempt to reconcile.
 	// This ensures that the call to m.activePods() below will succeed with
@@ -184,7 +196,7 @@ func (m *ManagerImpl) reconcileLoop(ctx context.Context) {
 // for the input container, issue NodePrepareResources rpc requests
 // for each new resource requirement, process their responses and update the cached
 // containerResources on success.
-func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
+func (m *Manager) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.prepareResources(ctx, pod)
 	metrics.DRAOperationsDuration.WithLabelValues("PrepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
@@ -194,10 +206,10 @@ func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 	return nil
 }
 
-func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
+func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	var err error
 	logger := klog.FromContext(ctx)
-	batches := make(map[*dra.Plugin][]*drapb.Claim)
+	batches := make(map[*draplugin.DRAPlugin][]*drapb.Claim)
 	resourceClaims := make(map[types.UID]*resourceapi.ResourceClaim)
 
 	// Do a validation pass *without* changing the claim info cache.
@@ -213,7 +225,7 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		resourceClaim *resourceapi.ResourceClaim
 		podClaim      *v1.PodResourceClaim
 		claimInfo     *ClaimInfo
-		drivers       map[string]*dra.Plugin
+		plugins       map[string]*draplugin.DRAPlugin
 	}, len(pod.Spec.ResourceClaims))
 	for i := range pod.Spec.ResourceClaims {
 		podClaim := &pod.Spec.ResourceClaims[i]
@@ -260,17 +272,17 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			return fmt.Errorf("ResourceClaim %s: %w", resourceClaim.Name, err)
 		}
 		infos[i].claimInfo = claimInfo
-		infos[i].drivers = make(map[string]*dra.Plugin, len(claimInfo.DriverState))
+		infos[i].plugins = make(map[string]*draplugin.DRAPlugin, len(claimInfo.DriverState))
 		for driverName := range claimInfo.DriverState {
-			if plugin := infos[i].drivers[driverName]; plugin != nil {
+			if plugin := infos[i].plugins[driverName]; plugin != nil {
 				continue
 			}
-			client, err := dra.NewDRAPluginClient(driverName)
+			plugin, err := m.draPlugins.GetPlugin(driverName)
 			if err != nil {
 				// No wrapping, error includes driver name already.
 				return err
 			}
-			infos[i].drivers[driverName] = client
+			infos[i].plugins[driverName] = plugin
 		}
 	}
 
@@ -326,8 +338,8 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				Name:      claimInfo.ClaimName,
 			}
 			for driverName := range claimInfo.DriverState {
-				client := infos[i].drivers[driverName]
-				batches[client] = append(batches[client], claim)
+				plugin := infos[i].plugins[driverName]
+				batches[plugin] = append(batches[plugin], claim)
 			}
 		}
 
@@ -342,9 +354,9 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	// Call NodePrepareResources for all claims in each batch.
 	// If there is any error, processing gets aborted.
 	// We could try to continue, but that would make the code more complex.
-	for client, claims := range batches {
+	for plugin, claims := range batches {
 		// Call NodePrepareResources RPC for all resource handles.
-		response, err := client.NodePrepareResources(ctx, &drapb.NodePrepareResourcesRequest{Claims: claims})
+		response, err := plugin.NodePrepareResources(ctx, &drapb.NodePrepareResourcesRequest{Claims: claims})
 		if err != nil {
 			// General error unrelated to any particular claim.
 			return fmt.Errorf("NodePrepareResources: %w", err)
@@ -367,7 +379,7 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s", claim.Name)
 				}
 				for _, device := range result.GetDevices() {
-					info.addDevice(client.Name(), state.Device{PoolName: device.PoolName, DeviceName: device.DeviceName, RequestNames: device.RequestNames, CDIDeviceIDs: device.CDIDeviceIDs})
+					info.addDevice(plugin.DriverName(), state.Device{PoolName: device.PoolName, DeviceName: device.DeviceName, RequestNames: device.RequestNames, CDIDeviceIDs: device.CDIDeviceIDs})
 				}
 				return nil
 			})
@@ -421,7 +433,7 @@ func lookupClaimRequest(claims []*drapb.Claim, claimUID string) *drapb.Claim {
 
 // GetResources gets a ContainerInfo object from the claimInfo cache.
 // This information is used by the caller to update a container config.
-func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
+func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
 	cdiDevices := []kubecontainer.CDIDevice{}
 
 	for i := range pod.Spec.ResourceClaims {
@@ -466,7 +478,7 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 // This function is idempotent and may be called multiple times against the same pod.
 // As such, calls to the underlying NodeUnprepareResource API are skipped for claims that have
 // already been successfully unprepared.
-func (m *ManagerImpl) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
+func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.unprepareResourcesForPod(ctx, pod)
 	metrics.DRAOperationsDuration.WithLabelValues("UnprepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
@@ -476,7 +488,7 @@ func (m *ManagerImpl) UnprepareResources(ctx context.Context, pod *v1.Pod) error
 	return nil
 }
 
-func (m *ManagerImpl) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod) error {
+func (m *Manager) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod) error {
 	var claimNames []string
 	for i := range pod.Spec.ResourceClaims {
 		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
@@ -495,7 +507,7 @@ func (m *ManagerImpl) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod)
 	return m.unprepareResources(ctx, pod.UID, pod.Namespace, claimNames)
 }
 
-func (m *ManagerImpl) unprepareResources(ctx context.Context, podUID types.UID, namespace string, claimNames []string) error {
+func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, namespace string, claimNames []string) error {
 	logger := klog.FromContext(ctx)
 	batches := make(map[string][]*drapb.Claim)
 	claimNamesMap := make(map[types.UID]string)
@@ -549,12 +561,12 @@ func (m *ManagerImpl) unprepareResources(ctx context.Context, podUID types.UID, 
 	// We could try to continue, but that would make the code more complex.
 	for driverName, claims := range batches {
 		// Call NodeUnprepareResources RPC for all resource handles.
-		client, err := dra.NewDRAPluginClient(driverName)
-		if client == nil {
+		plugin, err := m.draPlugins.GetPlugin(driverName)
+		if plugin == nil {
 			// No wrapping, error includes driver name already.
 			return err
 		}
-		response, err := client.NodeUnprepareResources(ctx, &drapb.NodeUnprepareResourcesRequest{Claims: claims})
+		response, err := plugin.NodeUnprepareResources(ctx, &drapb.NodeUnprepareResourcesRequest{Claims: claims})
 		if err != nil {
 			// General error unrelated to any particular claim.
 			return fmt.Errorf("NodeUnprepareResources: %w", err)
@@ -601,14 +613,14 @@ func (m *ManagerImpl) unprepareResources(ctx context.Context, podUID types.UID, 
 
 // PodMightNeedToUnprepareResources returns true if the pod might need to
 // unprepare resources
-func (m *ManagerImpl) PodMightNeedToUnprepareResources(uid types.UID) bool {
+func (m *Manager) PodMightNeedToUnprepareResources(uid types.UID) bool {
 	m.cache.Lock()
 	defer m.cache.Unlock()
 	return m.cache.hasPodReference(uid)
 }
 
 // GetContainerClaimInfos gets Container's ClaimInfo
-func (m *ManagerImpl) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error) {
+func (m *Manager) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error) {
 	claimInfos := make([]*ClaimInfo, 0, len(pod.Spec.ResourceClaims))
 
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {

@@ -19,7 +19,7 @@ package util
 import (
 	"bytes"
 	"crypto/x509"
-	"html/template"
+	"html/template" //nolint:depguard
 	"strings"
 
 	"k8s.io/client-go/tools/clientcmd"

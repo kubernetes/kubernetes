@@ -25,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
 	clientset "k8s.io/client-go/kubernetes"
 
 	v1 "k8s.io/api/core/v1"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -1027,7 +1027,7 @@ func (m *manager) needsReconcile(logger klog.Logger, uid types.UID, status v1.Po
 	}
 	logger.V(3).Info("Pod status is inconsistent with cached status for pod, a reconciliation should be triggered",
 		"pod", klog.KObj(pod),
-		"statusDiff", cmp.Diff(podStatus, &status))
+		"statusDiff", diff.Diff(podStatus, &status))
 
 	return true
 }
