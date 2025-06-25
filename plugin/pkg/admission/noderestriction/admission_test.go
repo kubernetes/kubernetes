@@ -1032,7 +1032,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of pod referencing service account",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(sapod, nil, podKind, sapod.Namespace, sapod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			err:        "reference a service account",
+			err:        "can not create pods that reference serviceaccounts",
 		},
 		{
 			name:       "forbid create of pod referencing secret",
@@ -1056,7 +1056,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of pod referencing persistentvolumeclaim",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(pvcpod, nil, podKind, pvcpod.Namespace, pvcpod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			err:        "reference persistentvolumeclaims",
+			err:        "can not create pods that reference persistentvolumeclaims",
 		},
 		{
 			name:       "forbid create of pod referencing resourceclaim",
