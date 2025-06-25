@@ -160,12 +160,12 @@ type failingObject struct {
 
 func TestValidateCustomResource(t *testing.T) {
 	tests := []struct {
-		name           string
-		compatVersion  *version.Version
-		schema         apiextensions.JSONSchemaProps
-		objects        []interface{}
-		oldObjects     []interface{}
-		failingObjects []failingObject
+		name             string
+		emulationVersion *version.Version
+		schema           apiextensions.JSONSchemaProps
+		objects          []interface{}
+		oldObjects       []interface{}
+		failingObjects   []failingObject
 	}{
 		{name: "!nullable",
 			schema: apiextensions.JSONSchemaProps{
@@ -603,7 +603,7 @@ func TestValidateCustomResource(t *testing.T) {
 			},
 		},
 		{name: "k8sLongName",
-			compatVersion: version.MajorMinor(1, 34),
+			emulationVersion: version.MajorMinor(1, 34),
 			schema: apiextensions.JSONSchemaProps{
 				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
@@ -620,7 +620,7 @@ func TestValidateCustomResource(t *testing.T) {
 			},
 		},
 		{name: "k8sShortName",
-			compatVersion: version.MajorMinor(1, 34),
+			emulationVersion: version.MajorMinor(1, 34),
 			schema: apiextensions.JSONSchemaProps{
 				Type: "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
@@ -638,7 +638,7 @@ func TestValidateCustomResource(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		compatVersion := tt.compatVersion
+		compatVersion := tt.emulationVersion
 		if compatVersion == nil {
 			compatVersion = environment.DefaultCompatibilityVersion()
 		}

@@ -26,6 +26,18 @@ import (
 // so the emulation version cannot go lower than that.
 var minimumKubeEmulationVersion *version.Version = version.MajorMinor(1, 31)
 
+// KubeComponentEffectiveVersion returns the effective version of the kube component.
+// If the kube component is registered in the DefaultComponentGlobalsRegistry, the
+// effective version from the registry is returned. Otherwise, the DefaultBuildEffectiveVersion
+// is returned.
+func KubeComponentEffectiveVersion() basecompatibility.EffectiveVersion {
+	effectiveVer := DefaultComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent)
+	if effectiveVer == nil {
+		effectiveVer = DefaultBuildEffectiveVersion()
+	}
+	return effectiveVer
+}
+
 // DefaultBuildEffectiveVersion returns the MutableEffectiveVersion based on the
 // current build information.
 func DefaultBuildEffectiveVersion() basecompatibility.MutableEffectiveVersion {
