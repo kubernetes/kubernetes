@@ -1483,6 +1483,18 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), "items must be a schema object and not an array"))
 	}
 
+	if schema.Items != nil && schema.Type != "" && schema.Type != "array" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("items"), schema.Type, "`items` is only valid when `type` is set to \"array\""))
+	}
+
+	if len(schema.Properties) > 0 && schema.Type != "" && schema.Type != "object" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("properties"), schema.Type, "`properties` is only valid when `type` is set to \"object\""))
+	}
+
+	if schema.AdditionalProperties != nil && schema.Type != "" && schema.Type != "object" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("additionalProperties"), schema.Type, "`additionalProperties` is only valid when `type` is set to \"object\""))
+	}
+
 	if v.isInsideResourceMeta && schema.XEmbeddedResource {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-embedded-resource"), "must not be used inside of resource meta"))
 	}
