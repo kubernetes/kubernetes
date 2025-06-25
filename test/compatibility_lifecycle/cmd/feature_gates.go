@@ -30,9 +30,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 
+	yaml "go.yaml.in/yaml/v2"
 	"k8s.io/apimachinery/pkg/util/version"
 	baseversion "k8s.io/component-base/version"
-	yaml "go.yaml.in/yaml/v2"
 )
 
 var (

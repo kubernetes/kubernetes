@@ -27,8 +27,8 @@ import (
 
 	flag "github.com/spf13/pflag"
 
-	"k8s.io/component-base/metrics"
 	yaml "go.yaml.in/yaml/v2"
+	"k8s.io/component-base/metrics"
 )
 
 var (
