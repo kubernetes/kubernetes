@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -28,31 +29,35 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
-func (s *server) GetPluginHandler() cache.PluginHandler {
+func (s *server) GetPluginHandler(ctx context.Context) cache.PluginHandler {
+	logger := klog.FromContext(ctx)
 	if f, err := os.Create(s.socketDir + "DEPRECATION"); err != nil {
-		klog.ErrorS(err, "Failed to create deprecation file at socket dir", "path", s.socketDir)
+		logger.Error(err, "Failed to create deprecation file at socket dir", "path", s.socketDir)
 	} else {
 		f.Close()
-		klog.V(4).InfoS("Created deprecation file", "path", f.Name())
+		logger.V(4).Info("Created deprecation file", "path", f.Name())
 	}
 	return s
 }
 
-func (s *server) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
-	klog.V(2).InfoS("Registering plugin at endpoint", "plugin", pluginName, "endpoint", endpoint)
-	return s.connectClient(pluginName, endpoint)
+func (s *server) RegisterPlugin(ctx context.Context, pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Registering plugin at endpoint", "plugin", pluginName, "endpoint", endpoint)
+	return s.connectClient(ctx, pluginName, endpoint)
 }
 
-func (s *server) DeRegisterPlugin(pluginName, endpoint string) {
-	klog.V(2).InfoS("Deregistering plugin", "plugin", pluginName, "endpoint", endpoint)
+func (s *server) DeRegisterPlugin(ctx context.Context, pluginName, endpoint string) {
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Deregistering plugin", "plugin", pluginName, "endpoint", endpoint)
 	client := s.getClient(pluginName)
 	if client != nil {
-		s.disconnectClient(pluginName, client)
+		s.disconnectClient(ctx, pluginName, client)
 	}
 }
 
-func (s *server) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	klog.V(2).InfoS("Got plugin at endpoint with versions", "plugin", pluginName, "endpoint", endpoint, "versions", versions)
+func (s *server) ValidatePlugin(ctx context.Context, pluginName string, endpoint string, versions []string) error {
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Got plugin at endpoint with versions", "plugin", pluginName, "endpoint", endpoint, "versions", versions)
 
 	if !s.isVersionCompatibleWithPlugin(versions...) {
 		return fmt.Errorf("manager version, %s, is not among plugin supported versions %v", api.Version, versions)
@@ -62,58 +67,61 @@ func (s *server) ValidatePlugin(pluginName string, endpoint string, versions []s
 		return fmt.Errorf("invalid name of device plugin socket: %s", fmt.Sprintf(errInvalidResourceName, pluginName))
 	}
 
-	klog.V(2).InfoS("Device plugin validated", "plugin", pluginName, "endpoint", endpoint, "versions", versions)
+	logger.V(2).Info("Device plugin validated", "plugin", pluginName, "endpoint", endpoint, "versions", versions)
 	return nil
 }
 
-func (s *server) connectClient(name string, socketPath string) error {
+func (s *server) connectClient(ctx context.Context, name string, socketPath string) error {
+	logger := klog.FromContext(ctx)
 	c := NewPluginClient(name, socketPath, s.chandler)
 
-	s.registerClient(name, c)
-	if err := c.Connect(); err != nil {
-		s.deregisterClient(name)
-		klog.ErrorS(err, "Failed to connect to new client", "resource", name)
+	s.registerClient(ctx, name, c)
+	if err := c.Connect(ctx); err != nil {
+		s.deregisterClient(ctx, name)
+		logger.Error(err, "Failed to connect to new client", "resource", name)
 		return err
 	}
 
-	klog.V(2).InfoS("Connected to new client", "resource", name)
+	logger.V(2).Info("Connected to new client", "resource", name)
 	go func() {
-		s.runClient(name, c)
+		s.runClient(ctx, name, c)
 	}()
 
 	return nil
 }
 
-func (s *server) disconnectClient(name string, c Client) error {
-	s.deregisterClient(name)
-	return c.Disconnect()
+func (s *server) disconnectClient(ctx context.Context, name string, c Client) error {
+	s.deregisterClient(ctx, name)
+	return c.Disconnect(ctx)
 }
-func (s *server) registerClient(name string, c Client) {
+func (s *server) registerClient(ctx context.Context, name string, c Client) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	logger := klog.FromContext(ctx)
 
 	s.clients[name] = c
-	klog.V(2).InfoS("Registered client", "name", name)
+	logger.V(2).Info("Registered client", "name", name)
 }
 
-func (s *server) deregisterClient(name string) {
+func (s *server) deregisterClient(ctx context.Context, name string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	logger := klog.FromContext(ctx)
 
 	delete(s.clients, name)
-	klog.V(2).InfoS("Deregistered client", "name", name)
+	logger.V(2).Info("Deregistered client", "name", name)
 }
 
-func (s *server) runClient(name string, c Client) {
-	c.Run()
+func (s *server) runClient(ctx context.Context, name string, c Client) {
+	c.Run(ctx)
 
 	c = s.getClient(name)
 	if c == nil {
 		return
 	}
-
-	if err := s.disconnectClient(name, c); err != nil {
-		klog.ErrorS(err, "Unable to disconnect client", "resource", name, "client", c)
+	logger := klog.FromContext(ctx)
+	if err := s.disconnectClient(ctx, name, c); err != nil {
+		logger.Error(err, "Unable to disconnect client", "resource", name, "client", c)
 	}
 }
 

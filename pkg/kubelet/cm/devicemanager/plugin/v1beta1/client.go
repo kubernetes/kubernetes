@@ -39,9 +39,9 @@ type DevicePlugin interface {
 
 // Client interface provides methods for establishing/closing gRPC connection and running the device plugin gRPC client.
 type Client interface {
-	Connect() error
-	Run()
-	Disconnect() error
+	Connect(ctx context.Context) error
+	Run(ctx context.Context)
+	Disconnect(ctx context.Context) error
 }
 
 type client struct {
@@ -63,10 +63,11 @@ func NewPluginClient(r string, socketPath string, h ClientHandler) Client {
 }
 
 // Connect is for establishing a gRPC connection between device manager and device plugin.
-func (c *client) Connect() error {
+func (c *client) Connect(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
 	client, conn, err := dial(c.socket)
 	if err != nil {
-		klog.ErrorS(err, "Unable to connect to device plugin client with socket path", "path", c.socket)
+		logger.Error(err, "Unable to connect to device plugin client with socket path", "path", c.socket)
 		return err
 	}
 	c.mutex.Lock()
@@ -77,37 +78,39 @@ func (c *client) Connect() error {
 }
 
 // Run is for running the device plugin gRPC client.
-func (c *client) Run() {
+func (c *client) Run(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	stream, err := c.client.ListAndWatch(context.Background(), &api.Empty{})
 	if err != nil {
-		klog.ErrorS(err, "ListAndWatch ended unexpectedly for device plugin", "resource", c.resource)
+		logger.Error(err, "ListAndWatch ended unexpectedly for device plugin", "resource", c.resource)
 		return
 	}
 
 	for {
 		response, err := stream.Recv()
 		if err != nil {
-			klog.ErrorS(err, "ListAndWatch ended unexpectedly for device plugin", "resource", c.resource)
+			logger.Error(err, "ListAndWatch ended unexpectedly for device plugin", "resource", c.resource)
 			return
 		}
-		klog.V(2).InfoS("State pushed for device plugin", "resource", c.resource, "resourceCapacity", len(response.Devices))
+		logger.V(2).Info("State pushed for device plugin", "resource", c.resource, "resourceCapacity", len(response.Devices))
 		c.handler.PluginListAndWatchReceiver(c.resource, response)
 	}
 }
 
 // Disconnect is for closing gRPC connection between device manager and device plugin.
-func (c *client) Disconnect() error {
+func (c *client) Disconnect(ctx context.Context) error {
 	c.mutex.Lock()
+	logger := klog.FromContext(ctx)
 	if c.grpc != nil {
 		if err := c.grpc.Close(); err != nil {
-			klog.V(2).ErrorS(err, "Failed to close grcp connection", "resource", c.Resource())
+			logger.V(2).Error(err, "Failed to close grcp connection", "resource", c.Resource())
 		}
 		c.grpc = nil
 	}
 	c.mutex.Unlock()
 	c.handler.PluginDisconnected(c.resource)
 
-	klog.V(2).InfoS("Device plugin disconnected", "resource", c.resource)
+	logger.V(2).Info("Device plugin disconnected", "resource", c.resource)
 	return nil
 }
 

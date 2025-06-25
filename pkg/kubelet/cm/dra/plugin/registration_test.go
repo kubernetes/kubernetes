@@ -227,14 +227,14 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// Simulate one existing plugin A.
-			err = draPlugins.RegisterPlugin(pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
+			err = draPlugins.RegisterPlugin(tCtx, pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				tCtx.Logf("Removing plugin %s", pluginA)
-				draPlugins.DeRegisterPlugin(pluginA, endpointA)
+				draPlugins.DeRegisterPlugin(tCtx, pluginA, endpointA)
 			})
 
-			err = draPlugins.ValidatePlugin(test.driverName, endpoint, test.supportedServices)
+			err = draPlugins.ValidatePlugin(tCtx, test.driverName, endpoint, test.supportedServices)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -248,7 +248,7 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// Add plugin for the first time.
-			err = draPlugins.RegisterPlugin(test.driverName, endpoint, test.supportedServices, nil)
+			err = draPlugins.RegisterPlugin(tCtx, test.driverName, endpoint, test.supportedServices, nil)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -264,9 +264,9 @@ func TestRegistrationHandler(t *testing.T) {
 				}
 
 				tCtx.Logf("Removing plugin %s", test.driverName)
-				draPlugins.DeRegisterPlugin(test.driverName, endpoint)
+				draPlugins.DeRegisterPlugin(tCtx, test.driverName, endpoint)
 				// Nop.
-				draPlugins.DeRegisterPlugin(test.driverName, endpoint)
+				draPlugins.DeRegisterPlugin(tCtx, test.driverName, endpoint)
 				if test.withClient {
 					requireNoSlices(tCtx)
 				}
@@ -318,7 +318,7 @@ func TestConnectionHandling(t *testing.T) {
 			require.NoError(t, err)
 			defer teardown()
 
-			err = draPlugins.RegisterPlugin(driverName, endpoint, []string{service}, nil)
+			err = draPlugins.RegisterPlugin(tCtx, driverName, endpoint, []string{service}, nil)
 			require.NoError(t, err)
 
 			plugin := draPlugins.get(driverName)

@@ -129,16 +129,17 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+func NewManagerImpl(ctx context.Context, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
 	socketPath := pluginapi.KubeletSocket
 	if runtime.GOOS == "windows" {
 		socketPath = os.Getenv("SYSTEMDRIVE") + pluginapi.KubeletSocketWindows
 	}
-	return newManagerImpl(socketPath, topology, topologyAffinityStore)
+	return newManagerImpl(ctx, socketPath, topology, topologyAffinityStore)
 }
 
-func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
-	klog.V(2).InfoS("Creating Device Plugin manager", "path", socketPath)
+func newManagerImpl(ctx context.Context, socketPath string, topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Creating Device Plugin manager", "path", socketPath)
 
 	var numaNodes []int
 	for _, node := range topology {
@@ -159,7 +160,7 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 		update:                make(chan resourceupdates.Update, 100),
 	}
 
-	server, err := plugin.NewServer(socketPath, manager, manager)
+	server, err := plugin.NewServer(ctx, socketPath, manager, manager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create plugin server: %v", err)
 	}
@@ -337,8 +338,9 @@ func (m *ManagerImpl) checkpointFile() string {
 // Start starts the Device Plugin Manager and start initialization of
 // podDevices and allocatedDevices information from checkpointed state and
 // starts device plugin registration service.
-func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.Set[string]) error {
-	klog.V(2).InfoS("Starting Device Plugin manager")
+func (m *ManagerImpl) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.Set[string]) error {
+	logger := klog.FromContext(ctx)
+	logger.V(2).Info("Starting Device Plugin manager")
 
 	m.activePods = activePods
 	m.sourcesReady = sourcesReady
@@ -348,17 +350,17 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	// Loads in allocatedDevices information from disk.
 	err := m.readCheckpoint()
 	if err != nil {
-		klog.ErrorS(err, "Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date")
+		logger.Error(err, "Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date")
 	}
 
-	return m.server.Start()
+	return m.server.Start(ctx)
 }
 
 // Stop is the function that can stop the plugin server.
 // Can be called concurrently, more than once, and is safe to call
 // without a prior Start.
-func (m *ManagerImpl) Stop() error {
-	return m.server.Stop()
+func (m *ManagerImpl) Stop(ctx context.Context) error {
+	return m.server.Stop(ctx)
 }
 
 // Allocate is the call that you can use to allocate a set of devices

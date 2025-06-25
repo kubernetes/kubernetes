@@ -102,12 +102,17 @@ var PluginHandler = &RegistrationHandler{}
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
-func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	klog.Info(log("Trying to validate a new CSI Driver with name: %s endpoint: %s versions: %s",
-		pluginName, endpoint, strings.Join(versions, ",")))
+func (h *RegistrationHandler) ValidatePlugin(ctx context.Context, pluginName string, endpoint string, versions []string) error {
+	logger := klog.FromContext(ctx).WithValues(
+		"pluginName", pluginName,
+		"endpoint", endpoint,
+		"versions", strings.Join(versions, ","),
+	)
+	logger.Info("Trying to validate a new CSI Driver")
 
 	_, err := h.validateVersions("ValidatePlugin", pluginName, endpoint, versions)
 	if err != nil {
+		logger.Error(err, "Validation failed for CSI Driver")
 		return fmt.Errorf("validation failed for CSI Driver %s at endpoint %s: %v", pluginName, endpoint, err)
 	}
 
@@ -115,8 +120,12 @@ func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string,
 }
 
 // RegisterPlugin is called when a plugin can be registered
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
-	klog.Info(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
+func (h *RegistrationHandler) RegisterPlugin(ctx context.Context, pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+	logger := klog.FromContext(ctx).WithValues(
+		"pluginName", pluginName,
+		"endpoint", endpoint,
+	)
+	logger.Info("Register new plugin")
 
 	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, endpoint, versions)
 	if err != nil {
@@ -149,7 +158,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
 	if err != nil {
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
-			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
+			logger.Error(err, "registrationHandler.RegisterPlugin failed to unregister plugin due to previous error")
 		}
 		return err
 	}
@@ -157,7 +166,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	err = nim.InstallCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
 		if unregErr := unregisterDriver(pluginName); unregErr != nil {
-			klog.Error(log("registrationHandler.RegisterPlugin failed to unregister plugin due to previous error: %v", unregErr))
+			logger.Error(err, "registrationHandler.RegisterPlugin failed to unregister plugin due to previous error")
 		}
 		return err
 	}
@@ -265,10 +274,14 @@ func (h *RegistrationHandler) validateVersions(callerName, pluginName string, en
 
 // DeRegisterPlugin is called when a plugin removed its socket, signaling
 // it is no longer available
-func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
-	klog.Info(log("registrationHandler.DeRegisterPlugin request for plugin %s, endpoint %s", pluginName, endpoint))
+func (h *RegistrationHandler) DeRegisterPlugin(ctx context.Context, pluginName, endpoint string) {
+	logger := klog.FromContext(ctx).WithValues(
+		"pluginName", pluginName,
+		"endpoint", endpoint,
+	)
+	logger.Info("registrationHandler.DeRegisterPlugin request")
 	if err := unregisterDriver(pluginName); err != nil {
-		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
+		logger.Error(err, "registrationHandler.DeRegisterPlugin failed")
 	}
 
 	if csiNodeUpdaterVar != nil {
