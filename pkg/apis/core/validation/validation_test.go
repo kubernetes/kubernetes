@@ -20173,12 +20173,12 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 				Resources: core.ResourceRequirements{
 					Requests: core.ResourceList{
 						core.ResourceCPU:    resource.MustParse("8"),
-						core.ResourceMemory: resource.MustParse("3Mi"),
+						core.ResourceMemory: resource.MustParse("7Mi"),
 					},
 				},
 			},
 		},
-		expectedErrors: []string{"must be greater than or equal to aggregate container requests"},
+		expectedErrors: []string{"must be greater than or equal to aggregate container requests", "must be greater than or equal to aggregate container requests"},
 	}, {
 		name: "container requests with resources unsupported at pod-level",
 		podResources: core.ResourceRequirements{
@@ -20212,6 +20212,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			Limits: core.ResourceList{
 				core.ResourceCPU:    resource.MustParse("10"),
 				core.ResourceMemory: resource.MustParse("10Mi"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("10Mi"),
 			},
 		},
 		containers: []core.Container{
@@ -20220,6 +20221,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 					Limits: core.ResourceList{
 						core.ResourceCPU:    resource.MustParse("5"),
 						core.ResourceMemory: resource.MustParse("5Mi"),
+						core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("4Mi"),
 					},
 				},
 			}, {
@@ -20227,6 +20229,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 					Limits: core.ResourceList{
 						core.ResourceCPU:    resource.MustParse("4"),
 						core.ResourceMemory: resource.MustParse("3Mi"),
+						core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("4Mi"),
 					},
 				},
 			},
@@ -20237,6 +20240,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			Limits: core.ResourceList{
 				core.ResourceCPU:    resource.MustParse("10"),
 				core.ResourceMemory: resource.MustParse("10Mi"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("8Mi"),
 			},
 		},
 		containers: []core.Container{
@@ -20245,6 +20249,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 					Limits: core.ResourceList{
 						core.ResourceCPU:    resource.MustParse("5"),
 						core.ResourceMemory: resource.MustParse("5Mi"),
+						core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("4Mi"),
 					},
 				},
 			}, {
@@ -20252,6 +20257,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 					Limits: core.ResourceList{
 						core.ResourceCPU:    resource.MustParse("5"),
 						core.ResourceMemory: resource.MustParse("5Mi"),
+						core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("4Mi"),
 					},
 				},
 			},
@@ -20282,11 +20288,40 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			},
 		},
 	}, {
+		name: "hugepage aggregate container limits greater than pod limits",
+		podResources: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceCPU: resource.MustParse("10"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("4Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU: resource.MustParse("6"),
+						core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("4Mi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{
+						core.ResourceCPU: resource.MustParse("6"),
+						core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("4Mi"),
+					},
+				},
+			},
+		},
+		expectedErrors: []string{
+			"must be greater than or equal to aggregate container limits",
+		},
+	}, {
 		name: "individual container limits greater than pod limits",
 		podResources: core.ResourceRequirements{
 			Limits: core.ResourceList{
 				core.ResourceCPU:    resource.MustParse("10"),
 				core.ResourceMemory: resource.MustParse("10Mi"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
 			},
 		},
 		containers: []core.Container{
@@ -20295,11 +20330,14 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 					Limits: core.ResourceList{
 						core.ResourceCPU:    resource.MustParse("11"),
 						core.ResourceMemory: resource.MustParse("12Mi"),
+						core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("4Mi"),
 					},
 				},
 			},
 		},
 		expectedErrors: []string{
+			"must be greater than or equal to aggregate container limits",
+			"must be less than or equal to pod limits",
 			"must be less than or equal to pod limits",
 			"must be less than or equal to pod limits",
 		},
