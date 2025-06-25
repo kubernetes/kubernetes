@@ -2,7 +2,7 @@
 //
 // Source code and other details for the project are available at GitHub:
 //
-//   https://github.com/go-yaml/yaml
+//   https://github.com/yaml/go-yaml
 //
 package yaml
 
