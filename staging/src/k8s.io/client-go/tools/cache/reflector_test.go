@@ -47,6 +47,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -533,6 +535,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 	}
 	for _, tc := range table {
 		t.Run(tc.name, func(t *testing.T) {
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, tc.useWatchList)
 			watcherCh := make(chan *watch.FakeWatcher)
 			var listOpts, watchOpts []metav1.ListOptions
 
@@ -563,7 +566,6 @@ func TestReflectorListAndWatch(t *testing.T) {
 			}
 			s := NewFIFO(MetaNamespaceKeyFunc)
 			r := NewReflector(lw, &v1.Pod{}, s, 0)
-			r.UseWatchList = ptr.To(tc.useWatchList)
 
 			// Start ListAndWatch in the background.
 			// When it returns, it will send an error or nil on the error
