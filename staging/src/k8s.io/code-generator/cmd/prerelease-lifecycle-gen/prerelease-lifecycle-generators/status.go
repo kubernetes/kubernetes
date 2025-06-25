@@ -137,21 +137,24 @@ func extractReplacementTag(t *types.Type) (group, version, kind string, hasRepla
 }
 
 func extractTag(tagName string, comments []string) *tagValue {
-	tagVals := gengo.ExtractCommentTags("+", comments)[tagName]
-	if tagVals == nil {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagName}, comments)
+	if err != nil {
+		klog.Fatalf("Error extracting %s tags: %v", tagName, err)
+	}
+	if tags[tagName] == nil {
 		// No match for the tag.
 		return nil
 	}
 	// If there are multiple values, abort.
-	if len(tagVals) > 1 {
-		klog.Fatalf("Found %d %s tags: %q", len(tagVals), tagName, tagVals)
+	if len(tags[tagName]) > 1 {
+		klog.Fatalf("Found %d %s tags: %q", len(tags[tagName]), tagName, tags[tagName])
 	}
 
 	// If we got here we are returning something.
 	tag := &tagValue{}
 
 	// Get the primary value.
-	parts := strings.Split(tagVals[0], ",")
+	parts := strings.Split(tags[tagName][0], ",")
 	if len(parts) >= 1 {
 		tag.value = parts[0]
 	}
