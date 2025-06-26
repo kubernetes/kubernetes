@@ -682,7 +682,7 @@ func ValidateDeployment(obj *apps.Deployment, opts apivalidation.PodValidationOp
 func ValidateDeploymentRollback(obj *apps.DeploymentRollback) field.ErrorList {
 	allErrs := apivalidation.ValidateAnnotations(obj.UpdatedAnnotations, field.NewPath("updatedAnnotations"))
 	if len(obj.Name) == 0 {
-		allErrs = append(allErrs, field.Required(field.NewPath("name"), "name is required"))
+		allErrs = append(allErrs, field.Required(field.NewPath("name"), ""))
 	}
 	allErrs = append(allErrs, ValidateRollback(&obj.RollbackTo, field.NewPath("rollback"))...)
 	return allErrs

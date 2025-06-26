@@ -128,7 +128,7 @@ func validateIssuer(issuer api.Issuer, disallowedIssuers sets.Set[string], fldPa
 
 func validateIssuerURL(issuerURL string, disallowedIssuers sets.Set[string], fldPath *field.Path) field.ErrorList {
 	if len(issuerURL) == 0 {
-		return field.ErrorList{field.Required(fldPath, "URL is required")}
+		return field.ErrorList{field.Required(fldPath, "")}
 	}
 
 	return validateURL(issuerURL, disallowedIssuers, fldPath)
@@ -198,7 +198,7 @@ func validateAudiences(audiences []string, audienceMatchPolicy api.AudienceMatch
 	for i, audience := range audiences {
 		fldPath := fldPath.Index(i)
 		if len(audience) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath, "audience can't be empty"))
+			allErrs = append(allErrs, field.Required(fldPath, ""))
 		}
 		if seenAudiences.Has(audience) {
 			allErrs = append(allErrs, field.Duplicate(fldPath, audience))
@@ -364,7 +364,7 @@ func validateClaimMappings(compiler authenticationcel.Compiler, state *validatio
 		seenExtraKeys.Insert(mapping.Key)
 
 		if len(mapping.ValueExpression) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("valueExpression"), "valueExpression is required"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("valueExpression"), ""))
 			continue
 		}
 
@@ -564,7 +564,7 @@ func validateUserValidationRules(compiler authenticationcel.Compiler, state *val
 		fldPath := fldPath.Index(i)
 
 		if len(rule.Expression) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("expression"), "expression is required"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("expression"), ""))
 			continue
 		}
 

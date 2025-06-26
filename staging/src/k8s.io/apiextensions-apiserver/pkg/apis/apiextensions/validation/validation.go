@@ -370,7 +370,7 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 		if spec.Validation == nil || spec.Validation.OpenAPIV3Schema == nil {
 			for i, v := range spec.Versions {
 				if v.Schema == nil || v.Schema.OpenAPIV3Schema == nil {
-					allErrs = append(allErrs, field.Required(fldPath.Child("versions").Index(i).Child("schema").Child("openAPIV3Schema"), "schemas are required"))
+					allErrs = append(allErrs, field.Required(fldPath.Child("versions").Index(i).Child("schema").Child("openAPIV3Schema"), ""))
 				}
 			}
 		}

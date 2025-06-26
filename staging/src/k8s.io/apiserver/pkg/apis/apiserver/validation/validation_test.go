@@ -685,7 +685,7 @@ func TestValidateIssuerURL(t *testing.T) {
 		{
 			name: "url is empty",
 			in:   "",
-			want: "issuer.url: Required value: URL is required",
+			want: "issuer.url: Required value",
 		},
 		{
 			name: "url parse error",
@@ -857,7 +857,7 @@ func TestValidateAudiences(t *testing.T) {
 		{
 			name: "audience is empty",
 			in:   []string{""},
-			want: "issuer.audiences[0]: Required value: audience can't be empty",
+			want: "issuer.audiences[0]: Required value",
 		},
 		{
 			name:        "invalid match policy with single audience",
@@ -1282,7 +1282,7 @@ func TestValidateClaimMappings(t *testing.T) {
 				},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimMappings.extra[0].valueExpression: Required value: valueExpression is required`,
+			want:                          `issuer.claimMappings.extra[0].valueExpression: Required value`,
 		},
 		{
 			name: "extra mapping value expression is invalid",
@@ -1655,7 +1655,7 @@ func TestValidateUserValidationRules(t *testing.T) {
 			name:                          "user info validation rule, expression is empty",
 			in:                            []api.UserValidationRule{{}},
 			structuredAuthnFeatureEnabled: true,
-			want:                          "issuer.userValidationRules[0].expression: Required value: expression is required",
+			want:                          "issuer.userValidationRules[0].expression: Required value",
 		},
 		{
 			name: "duplicate expression",
