@@ -19,7 +19,6 @@ package kuberuntime
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"time"
