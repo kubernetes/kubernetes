@@ -54,6 +54,7 @@ type DRAPluginManager struct {
 	kubeClient    kubernetes.Interface
 	getNode       func() (*v1.Node, error)
 	wipingDelay   time.Duration
+	streamHandler StreamHandler
 
 	wg    sync.WaitGroup
 	mutex sync.RWMutex
@@ -79,7 +80,7 @@ var _ cache.PluginHandler = &DRAPluginManager{}
 // The context can be used to cancel all background activities.
 // If desired, Stop can be called in addition or instead of canceling
 // the context. It then also waits for background activities to stop.
-func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *DRAPluginManager {
+func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), streamHandler StreamHandler, wipingDelay time.Duration) *DRAPluginManager {
 	ctx, cancel := context.WithCancelCause(ctx)
 	pm := &DRAPluginManager{
 		backgroundCtx: klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA registration handler")),
@@ -88,6 +89,7 @@ func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, g
 		getNode:       getNode,
 		wipingDelay:   wipingDelay,
 		pendingWipes:  make(map[string]*context.CancelCauseFunc),
+		streamHandler: streamHandler,
 	}
 
 	// When kubelet starts up, no DRA driver has registered yet. None of
@@ -259,6 +261,25 @@ func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, s
 		clientCallTimeout: timeout,
 	}
 
+	// Create a separate context derived from the plugin's context for the stream attempt/lifecycle.
+	streamCtx, streamAttemptCancel := context.WithCancel(ctx)
+	stream, err := plugin.WatchResources(streamCtx)
+	if err != nil {
+		streamAttemptCancel()
+		logger.Error(err, "Failed to start WatchResources stream")
+		// Log and continue without health monitoring.
+		plugin.SetHealthStream(nil, nil)
+
+	} else {
+		// Stream started successfully.
+		logger.Info("Successfully started WatchResources health stream")
+		// Store the stream's specific context and its cancel function
+		plugin.SetHealthStream(streamCtx, streamAttemptCancel)
+
+		// Start handling the stream messages using the draManager
+		go pm.streamHandler.HandleWatchResourcesStream(streamCtx, stream, driverName)
+	}
+
 	// Storing endpoint of newly registered DRA Plugin into the map, where the DRA driver name will be the key
 	// under which the manager will be able to get a plugin when it needs to call it.
 	if err := pm.add(plugin); err != nil {
@@ -322,6 +343,15 @@ func (pm *DRAPluginManager) remove(driverName, endpoint string) {
 		// TODO: remove this in favor of non-blocking connection management.
 		p.cancel(errors.New("plugin got removed"))
 	}
+
+	// Cancel the plugin's health stream if it was active.
+	healthCancel := p.HealthStreamCancel()
+	if healthCancel != nil {
+		logger := klog.FromContext(p.backgroundCtx)
+		logger.V(4).Info("Canceling health stream during deregistration")
+		healthCancel()
+	}
+
 	logger := klog.FromContext(p.backgroundCtx)
 	logger.V(3).Info("Unregistered DRA plugin", "numInstances", len(pm.store[driverName]))
 	pm.sync(driverName)

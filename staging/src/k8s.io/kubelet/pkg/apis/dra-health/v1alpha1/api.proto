@@ -1,0 +1,28 @@
+syntax = "proto3";
+package v1alpha1;
+option go_package = "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1";
+
+service NodeHealth {
+  rpc WatchResources(WatchResourcesRequest) returns (stream WatchResourcesResponse) {}
+}
+
+message WatchResourcesRequest {
+  // Optional: Filter by driver or resource if needed in the future.
+}
+
+message DeviceHealth {
+  // resource_name is the full system-wide identifier: "<driver name>/<pool name>/<device name>".
+  string resource_name = 1;
+  // pool_name identifies the pool within the driver.
+  string pool_name = 2;
+  // device_name identifies the device within the pool.
+  string device_name = 3;
+  // health is the device's status: "Healthy", "Unhealthy", "Unknown".
+  string health = 4;
+  // last_updated is the Unix timestamp (seconds) of the last health update.
+  int64 last_updated = 5;
+}
+
+message WatchResourcesResponse {
+  repeated DeviceHealth devices = 1;
+}
