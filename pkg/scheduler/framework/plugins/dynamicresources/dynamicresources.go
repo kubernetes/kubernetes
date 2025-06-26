@@ -131,7 +131,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DynamiccResourcesArgs", plArgs)
 	}
-	if err := validation.ValidateDynamicResourcesArgs(nil, args); err != nil {
+	if err := validation.ValidateDynamicResourcesArgs(nil, args, fts); err != nil {
 		return nil, err
 	}
 

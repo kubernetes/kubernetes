@@ -33,6 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 var (
@@ -1159,8 +1160,9 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 
 func TestValidateDynamicResourcesArgs(t *testing.T) {
 	cases := map[string]struct {
-		args     config.DynamicResourcesArgs
-		wantErrs field.ErrorList
+		args                  config.DynamicResourcesArgs
+		wantErrs              field.ErrorList
+		filterTimeoutDisabled bool
 	}{
 		"valid args (default)": {
 			args: config.DynamicResourcesArgs{
@@ -1181,11 +1183,17 @@ func TestValidateDynamicResourcesArgs(t *testing.T) {
 				},
 			},
 		},
+		"negative FilterTimeout, disabled": {
+			args: config.DynamicResourcesArgs{
+				FilterTimeout: &metav1.Duration{Duration: -time.Second},
+			},
+			filterTimeoutDisabled: true,
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateDynamicResourcesArgs(nil, &tc.args)
+			err := ValidateDynamicResourcesArgs(nil, &tc.args, schedfeature.Features{EnableDRASchedulerFilterTimeout: !tc.filterTimeoutDisabled})
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateDynamicResourcesArgs returned err (-want,+got):\n%s", diff)
 			}
