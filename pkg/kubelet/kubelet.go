@@ -146,9 +146,6 @@ const (
 	// terminated and container runtime not being ready is logged without verbosity guard.
 	nodeReadyGracePeriod = 120 * time.Second
 
-	// DefaultContainerLogsDir is the location of container logs.
-	DefaultContainerLogsDir = "/var/log/containers"
-
 	// MaxCrashLoopBackOff is the max backoff period for container restarts, exported for the e2e test
 	MaxCrashLoopBackOff = v1beta1.MaxContainerBackOff
 
@@ -230,9 +227,7 @@ const (
 )
 
 var (
-	// ContainerLogsDir can be overwritten for testing usage
-	ContainerLogsDir = DefaultContainerLogsDir
-	etcHostsPath     = getContainerEtcHostsPath()
+	etcHostsPath = getContainerEtcHostsPath()
 
 	admissionRejectionReasons = sets.New[string](
 		lifecycle.AppArmorNotAdmittedReason,
@@ -1592,21 +1587,6 @@ func (kl *Kubelet) initializeModules(ctx context.Context) error {
 	// Setup filesystem directories.
 	if err := kl.setupDataDirs(); err != nil {
 		return err
-	}
-
-	// If the container logs directory does not exist, create it.
-	if _, err := os.Stat(ContainerLogsDir); err != nil {
-		if err := kl.os.MkdirAll(ContainerLogsDir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %q: %v", ContainerLogsDir, err)
-		}
-	}
-
-	if goos == "windows" {
-		// On Windows we should not allow other users to read the logs directory
-		// to avoid allowing non-root containers from reading the logs of other containers.
-		if err := utilfs.Chmod(ContainerLogsDir, 0750); err != nil {
-			return fmt.Errorf("failed to set permissions on directory %q: %w", ContainerLogsDir, err)
-		}
 	}
 
 	// Start the image manager.

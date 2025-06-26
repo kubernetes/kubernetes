@@ -22,8 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/kubelet"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -88,7 +86,7 @@ var _ = SIGDescribe("ContainerLogPath", framework.WithNodeConformance(), func() 
 								VolumeMounts: []v1.VolumeMount{
 									{
 										Name: "logdir",
-										// mount ContainerLogsDir to the same path in container
+										// mount the expected log directory to the same path in container
 										MountPath: expectedLogPath,
 										ReadOnly:  true,
 									},
@@ -122,23 +120,6 @@ var _ = SIGDescribe("ContainerLogPath", framework.WithNodeConformance(), func() 
 				err := createAndWaitPod(ctx, makeLogPod(logPodName, logString))
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 			})
-			ginkgo.It("should print log to correct log path", func(ctx context.Context) {
-
-				logDir := kubelet.ContainerLogsDir
-
-				// get containerID from created Pod
-				createdLogPod, err := podClient.Get(ctx, logPodName, metav1.GetOptions{})
-				logContainerID := kubecontainer.ParseContainerID(createdLogPod.Status.ContainerStatuses[0].ContainerID)
-				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
-
-				// build log file path
-				expectedlogFile := logDir + "/" + logPodName + "_" + f.Namespace.Name + "_" + logContainerName + "-" + logContainerID.ID + ".log"
-
-				logCheckPodName := "log-check-" + string(uuid.NewUUID())
-				err = createAndWaitPod(ctx, makeLogCheckPod(logCheckPodName, logString, expectedlogFile))
-				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logCheckPodName)
-			})
-
 			ginkgo.It("should print log to correct cri log path", func(ctx context.Context) {
 
 				logCRIDir := "/var/log/pods"
