@@ -157,7 +157,7 @@ func (pl *DynamicResources) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	if !pl.enabled {
 		return nil, nil
 	}
@@ -168,22 +168,22 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]framework.Clu
 	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
 	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
 	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint
+	nodeActionType := fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint
 	if pl.enableSchedulingQueueHint {
 		// When QHint is enabled, the problematic preCheck is already removed, and we can remove UpdateNodeTaint.
-		nodeActionType = framework.Add | framework.UpdateNodeLabel
+		nodeActionType = fwk.Add | fwk.UpdateNodeLabel
 	}
 
-	events := []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
+	events := []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterPodChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterPodChange},
 		// A pod might be waiting for a class to get created or modified.
-		{Event: framework.ClusterEvent{Resource: framework.DeviceClass, ActionType: framework.Add | framework.Update}},
+		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
 		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
-		{Event: framework.ClusterEvent{Resource: framework.ResourceSlice, ActionType: framework.Add | framework.Update}},
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceSlice, ActionType: fwk.Add | fwk.Update}},
 	}
 
 	return events, nil
@@ -207,11 +207,11 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 // an informer. It checks whether that change made a previously unschedulable
 // pod schedulable. It errs on the side of letting a pod scheduling attempt
 // happen. The delete claim event will not invoke it, so newObj will never be nil.
-func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalClaim, modifiedClaim, err := schedutil.As[*resourceapi.ResourceClaim](oldObj, newObj)
 	if err != nil {
 		// Shouldn't happen.
-		return framework.Queue, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
 	}
 
 	usesClaim := false
@@ -227,7 +227,7 @@ func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 			owner := metav1.GetControllerOf(modifiedClaim)
 			loggerV.Info("pod is not schedulable after resource claim change", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "claimOwner", owner, "reason", err.Error())
 		}
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	if originalClaim != nil &&
@@ -236,18 +236,18 @@ func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 		// A claim with structured parameters was deallocated. This might have made
 		// resources available for other pods.
 		logger.V(6).Info("claim with structured parameters got deallocated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	if !usesClaim {
 		// This was not the claim the pod was waiting for.
 		logger.V(6).Info("unrelated claim got modified", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	if originalClaim == nil {
 		logger.V(5).Info("claim for pod got created", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	// Modifications may or may not be relevant. If the entire
@@ -261,26 +261,26 @@ func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 		} else {
 			logger.V(6).Info("claim for pod got modified where the pod doesn't care", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
 		}
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	logger.V(5).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
-	return framework.Queue, nil
+	return fwk.Queue, nil
 }
 
 // isSchedulableAfterPodChange is invoked for update pod events reported by
 // an informer. It checks whether that change adds the ResourceClaim(s) that the
 // pod has been waiting for.
-func (pl *DynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *DynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, modifiedPod, err := schedutil.As[*v1.Pod](nil, newObj)
 	if err != nil {
 		// Shouldn't happen.
-		return framework.Queue, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
 	}
 
 	if pod.UID != modifiedPod.UID {
 		logger.V(7).Info("pod is not schedulable after change in other pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	if err := pl.foreachPodResourceClaim(modifiedPod, nil); err != nil {
@@ -288,11 +288,11 @@ func (pl *DynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod 
 		// foreachPodResourceClaim only returns errors for "not
 		// schedulable".
 		logger.V(6).Info("pod is not schedulable after being updated", "pod", klog.KObj(pod))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	logger.V(5).Info("pod got updated and is schedulable", "pod", klog.KObj(pod))
-	return framework.Queue, nil
+	return fwk.Queue, nil
 }
 
 // podResourceClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.

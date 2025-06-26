@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -1239,14 +1240,14 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 		args           *config.NodeAffinityArgs
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"backoff-wrong-new-object": {
 			args:         &config.NodeAffinityArgs{},
 			pod:          podWithNodeAffinity.Obj(),
 			newObj:       "not-a-node",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"backoff-wrong-old-object": {
@@ -1254,55 +1255,55 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			pod:          podWithNodeAffinity.Obj(),
 			oldObj:       "not-a-node",
 			newObj:       st.MakeNode().Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"skip-queue-on-add": {
 			args:         &config.NodeAffinityArgs{},
 			pod:          podWithNodeAffinity.Obj(),
 			newObj:       st.MakeNode().Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"queue-on-add": {
 			args:         &config.NodeAffinityArgs{},
 			pod:          podWithNodeAffinity.Obj(),
 			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"skip-unrelated-changes": {
 			args:         &config.NodeAffinityArgs{},
 			pod:          podWithNodeAffinity.Obj(),
 			oldObj:       st.MakeNode().Obj(),
 			newObj:       st.MakeNode().Capacity(nil).Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"skip-unrelated-changes-on-labels": {
 			args:         &config.NodeAffinityArgs{},
 			pod:          podWithNodeAffinity.DeepCopy(),
 			oldObj:       st.MakeNode().Obj(),
 			newObj:       st.MakeNode().Label("k", "v").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"skip-labels-changes-on-node-from-suitable-to-unsuitable": {
 			args:         &config.NodeAffinityArgs{},
 			pod:          podWithNodeAffinity.DeepCopy(),
 			oldObj:       st.MakeNode().Label("foo", "bar").Obj(),
 			newObj:       st.MakeNode().Label("k", "v").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"queue-on-labels-change-makes-pod-schedulable": {
 			args:         &config.NodeAffinityArgs{},
 			pod:          podWithNodeAffinity.Obj(),
 			oldObj:       st.MakeNode().Obj(),
 			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"skip-unrelated-change-that-keeps-pod-schedulable": {
 			args:         &config.NodeAffinityArgs{},
 			pod:          podWithNodeAffinity.Obj(),
 			oldObj:       st.MakeNode().Label("foo", "bar").Obj(),
 			newObj:       st.MakeNode().Capacity(nil).Label("foo", "bar").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"skip-queue-on-add-scheduler-enforced-node-affinity": {
 			args: &config.NodeAffinityArgs{
@@ -1324,7 +1325,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			},
 			pod:          podWithNodeAffinity.Obj(),
 			newObj:       st.MakeNode().Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"queue-on-add-scheduler-enforced-node-affinity": {
 			args: &config.NodeAffinityArgs{
@@ -1346,7 +1347,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			},
 			pod:          podWithNodeAffinity.Obj(),
 			newObj:       st.MakeNode().Label("foo", "bar").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 	}
 

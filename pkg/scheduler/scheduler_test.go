@@ -616,42 +616,42 @@ func Test_buildQueueingHintMap(t *testing.T) {
 	tests := []struct {
 		name                string
 		plugins             []framework.Plugin
-		want                map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction
+		want                map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction
 		featuregateDisabled bool
 		wantErr             error
 	}{
 		{
 			name:    "filter without EnqueueExtensions plugin",
 			plugins: []framework.Plugin{&filterWithoutEnqueueExtensionsPlugin{}},
-			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: framework.Pod, ActionType: framework.All}: {
+			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: fwk.Pod, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.Node, ActionType: framework.All}: {
+				{Resource: fwk.Node, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.CSINode, ActionType: framework.All}: {
+				{Resource: fwk.CSINode, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.CSIDriver, ActionType: framework.All}: {
+				{Resource: fwk.CSIDriver, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.CSIStorageCapacity, ActionType: framework.All}: {
+				{Resource: fwk.CSIStorageCapacity, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.PersistentVolume, ActionType: framework.All}: {
+				{Resource: fwk.PersistentVolume, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.StorageClass, ActionType: framework.All}: {
+				{Resource: fwk.StorageClass, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: {
+				{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.ResourceClaim, ActionType: framework.All}: {
+				{Resource: fwk.ResourceClaim, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.DeviceClass, ActionType: framework.All}: {
+				{Resource: fwk.DeviceClass, ActionType: fwk.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
 			},
@@ -659,14 +659,14 @@ func Test_buildQueueingHintMap(t *testing.T) {
 		{
 			name:    "node and pod plugin",
 			plugins: []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
-			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: framework.Pod, ActionType: framework.Add}: {
+			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: fwk.Pod, ActionType: fwk.Add}: {
 					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
 				},
-				{Resource: framework.Node, ActionType: framework.Add}: {
+				{Resource: fwk.Node, ActionType: fwk.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
 				},
-				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+				{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}: {
 					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 				},
 			},
@@ -675,14 +675,14 @@ func Test_buildQueueingHintMap(t *testing.T) {
 			name:                "node and pod plugin (featuregate is disabled)",
 			plugins:             []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
 			featuregateDisabled: true,
-			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: framework.Pod, ActionType: framework.Add}: {
+			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: fwk.Pod, ActionType: fwk.Add}: {
 					{PluginName: fakePod, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
 				},
-				{Resource: framework.Node, ActionType: framework.Add}: {
+				{Resource: fwk.Node, ActionType: fwk.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // default queueing hint due to disabled feature gate.
 				},
-				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+				{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}: {
 					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 				},
 			},
@@ -690,19 +690,19 @@ func Test_buildQueueingHintMap(t *testing.T) {
 		{
 			name:    "register plugin with empty event",
 			plugins: []framework.Plugin{&emptyEventPlugin{}},
-			want:    map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{},
+			want:    map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{},
 		},
 		{
 			name:    "register plugins including emptyEventPlugin",
 			plugins: []framework.Plugin{&emptyEventPlugin{}, &fakeNodePlugin{}},
-			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
-				{Resource: framework.Pod, ActionType: framework.Add}: {
+			want: map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{
+				{Resource: fwk.Pod, ActionType: fwk.Add}: {
 					{PluginName: fakePod, QueueingHintFn: fakePodPluginQueueingFn},
 				},
-				{Resource: framework.Node, ActionType: framework.Add}: {
+				{Resource: fwk.Node, ActionType: fwk.Add}: {
 					{PluginName: fakeNode, QueueingHintFn: fakeNodePluginQueueingFn},
 				},
-				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: {
+				{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}: {
 					{PluginName: fakeNode, QueueingHintFn: defaultQueueingHintFn}, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 				},
 			},
@@ -710,7 +710,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 		{
 			name:    "one EventsToRegister returns an error",
 			plugins: []framework.Plugin{&errorEventsToRegisterPlugin{}},
-			want:    map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{},
+			want:    map[fwk.ClusterEvent][]*internalqueue.QueueingHintFunction{},
 			wantErr: errors.New("mock error"),
 		},
 	}
@@ -793,7 +793,7 @@ func Test_UnionedGVKs(t *testing.T) {
 	tests := []struct {
 		name                            string
 		plugins                         schedulerapi.PluginSet
-		want                            map[framework.EventResource]framework.ActionType
+		want                            map[fwk.EventResource]fwk.ActionType
 		enableInPlacePodVerticalScaling bool
 		enableSchedulerQueueingHints    bool
 	}{
@@ -807,17 +807,17 @@ func Test_UnionedGVKs(t *testing.T) {
 				},
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.All,
-				framework.Node:                  framework.All,
-				framework.CSINode:               framework.All,
-				framework.CSIDriver:             framework.All,
-				framework.CSIStorageCapacity:    framework.All,
-				framework.PersistentVolume:      framework.All,
-				framework.PersistentVolumeClaim: framework.All,
-				framework.StorageClass:          framework.All,
-				framework.ResourceClaim:         framework.All,
-				framework.DeviceClass:           framework.All,
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.Pod:                   fwk.All,
+				fwk.Node:                  fwk.All,
+				fwk.CSINode:               fwk.All,
+				fwk.CSIDriver:             fwk.All,
+				fwk.CSIStorageCapacity:    fwk.All,
+				fwk.PersistentVolume:      fwk.All,
+				fwk.PersistentVolumeClaim: fwk.All,
+				fwk.StorageClass:          fwk.All,
+				fwk.ResourceClaim:         fwk.All,
+				fwk.DeviceClass:           fwk.All,
 			},
 		},
 		{
@@ -830,8 +830,8 @@ func Test_UnionedGVKs(t *testing.T) {
 				},
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Node: framework.Add | framework.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.Node: fwk.Add | fwk.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 			},
 		},
 		{
@@ -844,8 +844,8 @@ func Test_UnionedGVKs(t *testing.T) {
 				},
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod: framework.Add,
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.Pod: fwk.Add,
 			},
 		},
 		{
@@ -859,9 +859,9 @@ func Test_UnionedGVKs(t *testing.T) {
 				},
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:  framework.Add,
-				framework.Node: framework.Add | framework.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.Pod:  fwk.Add,
+				fwk.Node: fwk.Add | fwk.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
 			},
 		},
 		{
@@ -874,52 +874,52 @@ func Test_UnionedGVKs(t *testing.T) {
 				},
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
-			want: map[framework.EventResource]framework.ActionType{},
+			want: map[fwk.EventResource]fwk.ActionType{},
 		},
 		{
 			name:    "plugins with default profile (No feature gate enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.Delete,
-				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
-				framework.CSINode:               framework.All - framework.Delete,
-				framework.CSIDriver:             framework.Update,
-				framework.CSIStorageCapacity:    framework.All - framework.Delete,
-				framework.PersistentVolume:      framework.All - framework.Delete,
-				framework.PersistentVolumeClaim: framework.All - framework.Delete,
-				framework.StorageClass:          framework.All - framework.Delete,
-				framework.VolumeAttachment:      framework.Delete,
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.Pod:                   fwk.Add | fwk.UpdatePodLabel | fwk.Delete,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.CSINode:               fwk.All - fwk.Delete,
+				fwk.CSIDriver:             fwk.Update,
+				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
+				fwk.PersistentVolume:      fwk.All - fwk.Delete,
+				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
+				fwk.StorageClass:          fwk.All - fwk.Delete,
+				fwk.VolumeAttachment:      fwk.Delete,
 			},
 		},
 		{
 			name:    "plugins with default profile (InPlacePodVerticalScaling: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.Delete,
-				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
-				framework.CSINode:               framework.All - framework.Delete,
-				framework.CSIDriver:             framework.Update,
-				framework.CSIStorageCapacity:    framework.All - framework.Delete,
-				framework.PersistentVolume:      framework.All - framework.Delete,
-				framework.PersistentVolumeClaim: framework.All - framework.Delete,
-				framework.StorageClass:          framework.All - framework.Delete,
-				framework.VolumeAttachment:      framework.Delete,
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.Pod:                   fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.Delete,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.CSINode:               fwk.All - fwk.Delete,
+				fwk.CSIDriver:             fwk.Update,
+				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
+				fwk.PersistentVolume:      fwk.All - fwk.Delete,
+				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
+				fwk.StorageClass:          fwk.All - fwk.Delete,
+				fwk.VolumeAttachment:      fwk.Delete,
 			},
 			enableInPlacePodVerticalScaling: true,
 		},
 		{
 			name:    "plugins with default profile (queueingHint/InPlacePodVerticalScaling: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
-			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.UpdatePodToleration | framework.UpdatePodSchedulingGatesEliminated | framework.Delete,
-				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
-				framework.CSINode:               framework.All - framework.Delete,
-				framework.CSIDriver:             framework.Update,
-				framework.CSIStorageCapacity:    framework.All - framework.Delete,
-				framework.PersistentVolume:      framework.All - framework.Delete,
-				framework.PersistentVolumeClaim: framework.All - framework.Delete,
-				framework.StorageClass:          framework.All - framework.Delete,
-				framework.VolumeAttachment:      framework.Delete,
+			want: map[fwk.EventResource]fwk.ActionType{
+				fwk.Pod:                   fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodScaleDown | fwk.UpdatePodToleration | fwk.UpdatePodSchedulingGatesEliminated | fwk.Delete,
+				fwk.Node:                  fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.Delete,
+				fwk.CSINode:               fwk.All - fwk.Delete,
+				fwk.CSIDriver:             fwk.Update,
+				fwk.CSIStorageCapacity:    fwk.All - fwk.Delete,
+				fwk.PersistentVolume:      fwk.All - fwk.Delete,
+				fwk.PersistentVolumeClaim: fwk.All - fwk.Delete,
+				fwk.StorageClass:          fwk.All - fwk.Delete,
+				fwk.VolumeAttachment:      fwk.Delete,
 			},
 			enableInPlacePodVerticalScaling: true,
 			enableSchedulerQueueingHints:    true,
@@ -1164,11 +1164,11 @@ func (*filterWithoutEnqueueExtensionsPlugin) Filter(_ context.Context, _ fwk.Cyc
 	return nil
 }
 
-var hintFromFakeNode = framework.QueueingHint(100)
+var hintFromFakeNode = fwk.QueueingHint(100)
 
 type fakeNodePlugin struct{}
 
-var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
+var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
 	return hintFromFakeNode, nil
 }
 
@@ -1178,17 +1178,17 @@ func (*fakeNodePlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ 
 	return nil
 }
 
-func (pl *fakeNodePlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}, QueueingHintFn: fakeNodePluginQueueingFn},
+func (pl *fakeNodePlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add}, QueueingHintFn: fakeNodePluginQueueingFn},
 	}, nil
 }
 
-var hintFromFakePod = framework.QueueingHint(101)
+var hintFromFakePod = fwk.QueueingHint(101)
 
 type fakePodPlugin struct{}
 
-var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
+var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
 	return hintFromFakePod, nil
 }
 
@@ -1198,9 +1198,9 @@ func (*fakePodPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *
 	return nil
 }
 
-func (pl *fakePodPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add}, QueueingHintFn: fakePodPluginQueueingFn},
+func (pl *fakePodPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add}, QueueingHintFn: fakePodPluginQueueingFn},
 	}, nil
 }
 
@@ -1212,7 +1212,7 @@ func (*emptyEventPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, 
 	return nil
 }
 
-func (pl *emptyEventPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *emptyEventPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 
@@ -1225,7 +1225,7 @@ func (*errorEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, 
 	return nil
 }
 
-func (*errorEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (*errorEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, errors.New("mock error")
 }
 
@@ -1240,7 +1240,7 @@ func (*emptyEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, 
 	return nil
 }
 
-func (*emptyEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (*emptyEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 

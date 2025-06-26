@@ -222,34 +222,34 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 	testcases := map[string]struct {
 		pod          *v1.Pod
 		oldObj       interface{}
-		expectedHint framework.QueueingHint
+		expectedHint fwk.QueueingHint
 		expectedErr  bool
 	}{
 		"backoff-wrong-old-object": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       "not-a-pod",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"skip-queue-on-unscheduled": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"skip-queue-on-non-hostport": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Node("fake-node").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"skip-queue-on-unrelated-hostport": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Node("fake-node").HostPort(8081).Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"queue-on-released-hostport": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Node("fake-node").HostPort(8080).Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 	}
 

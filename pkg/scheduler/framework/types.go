@@ -35,339 +35,124 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	resourcehelper "k8s.io/component-helpers/resource"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var generation int64
 
-// ActionType is an integer to represent one type of resource change.
-// Different ActionTypes can be bit-wised to compose new semantics.
-type ActionType int64
-
-// Constants for ActionTypes.
-// CAUTION for contributors: When you add a new ActionType, you must update the following:
-// - The list of basic, podOnly, and nodeOnly.
-// - String() method.
-const (
-	Add ActionType = 1 << iota
-	Delete
-
-	// UpdateNodeXYZ is only applicable for Node events.
-	// If you use UpdateNodeXYZ,
-	// your plugin's QueueingHint is only executed for the specific sub-Update event.
-	// It's better to narrow down the scope of the event by using them instead of just using Update event
-	// for better performance in requeueing.
-	UpdateNodeAllocatable
-	UpdateNodeLabel
-	// UpdateNodeTaint is an update for node's taints or node.Spec.Unschedulable.
-	UpdateNodeTaint
-	UpdateNodeCondition
-	UpdateNodeAnnotation
-
-	// UpdatePodXYZ is only applicable for Pod events.
-	// If you use UpdatePodXYZ,
-	// your plugin's QueueingHint is only executed for the specific sub-Update event.
-	// It's better to narrow down the scope of the event by using them instead of Update event
-	// for better performance in requeueing.
-	UpdatePodLabel
-	// UpdatePodScaleDown is an update for pod's scale down (i.e., any resource request is reduced).
-	UpdatePodScaleDown
-	// UpdatePodToleration is an addition for pod's tolerations.
-	// (Due to API validation, we can add, but cannot modify or remove tolerations.)
-	UpdatePodToleration
-	// UpdatePodSchedulingGatesEliminated is an update for pod's scheduling gates, which eliminates all scheduling gates in the Pod.
-	UpdatePodSchedulingGatesEliminated
-	// UpdatePodGeneratedResourceClaim is an update of the list of ResourceClaims generated for the pod.
-	// Depends on the DynamicResourceAllocation feature gate.
-	UpdatePodGeneratedResourceClaim
-
-	All ActionType = 1<<iota - 1
-
-	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
-
-	// None is a special ActionType that is only used internally.
-	None ActionType = 0
-)
-
 var (
-	// basicActionTypes is a list of basicActionTypes ActionTypes.
-	basicActionTypes = []ActionType{Add, Delete, Update}
+	// basicActionTypes is a list of basic ActionTypes.
+	basicActionTypes = []fwk.ActionType{fwk.Add, fwk.Delete, fwk.Update}
 	// podActionTypes is a list of ActionTypes that are only applicable for Pod events.
-	podActionTypes = []ActionType{UpdatePodLabel, UpdatePodScaleDown, UpdatePodToleration, UpdatePodSchedulingGatesEliminated, UpdatePodGeneratedResourceClaim}
+	podActionTypes = []fwk.ActionType{fwk.UpdatePodLabel, fwk.UpdatePodScaleDown, fwk.UpdatePodToleration, fwk.UpdatePodSchedulingGatesEliminated, fwk.UpdatePodGeneratedResourceClaim}
 	// nodeActionTypes is a list of ActionTypes that are only applicable for Node events.
-	nodeActionTypes = []ActionType{UpdateNodeAllocatable, UpdateNodeLabel, UpdateNodeTaint, UpdateNodeCondition, UpdateNodeAnnotation}
+	nodeActionTypes = []fwk.ActionType{fwk.UpdateNodeAllocatable, fwk.UpdateNodeLabel, fwk.UpdateNodeTaint, fwk.UpdateNodeCondition, fwk.UpdateNodeAnnotation}
 )
-
-func (a ActionType) String() string {
-	switch a {
-	case Add:
-		return "Add"
-	case Delete:
-		return "Delete"
-	case UpdateNodeAllocatable:
-		return "UpdateNodeAllocatable"
-	case UpdateNodeLabel:
-		return "UpdateNodeLabel"
-	case UpdateNodeTaint:
-		return "UpdateNodeTaint"
-	case UpdateNodeCondition:
-		return "UpdateNodeCondition"
-	case UpdateNodeAnnotation:
-		return "UpdateNodeAnnotation"
-	case UpdatePodLabel:
-		return "UpdatePodLabel"
-	case UpdatePodScaleDown:
-		return "UpdatePodScaleDown"
-	case UpdatePodToleration:
-		return "UpdatePodToleration"
-	case UpdatePodSchedulingGatesEliminated:
-		return "UpdatePodSchedulingGatesEliminated"
-	case UpdatePodGeneratedResourceClaim:
-		return "UpdatePodGeneratedResourceClaim"
-	case All:
-		return "All"
-	case Update:
-		return "Update"
-	}
-
-	// Shouldn't reach here.
-	return ""
-}
-
-// EventResource is basically short for group/version/kind, which can uniquely represent a particular API resource.
-type EventResource string
 
 // Constants for GVKs.
-//
-// CAUTION for contributors: When you add a new EventResource, you must register a new one to allResources.
-//
-// Note:
-// - UpdatePodXYZ or UpdateNodeXYZ: triggered by updating particular parts of a Pod or a Node, e.g. updatePodLabel.
-// Use specific events rather than general ones (updatePodLabel vs update) can make the requeueing process more efficient
-// and consume less memory as less events will be cached at scheduler.
 const (
-	// There are a couple of notes about how the scheduler notifies the events of Pods:
-	// - Add: add events could be triggered by either a newly created Pod or an existing Pod that is scheduled to a Node.
-	// - Delete: delete events could be triggered by:
-	//           - a Pod that is deleted
-	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
-	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
-	//
-	// Note that the Pod event type includes the events for the unscheduled Pod itself.
-	// i.e., when unscheduled Pods are updated, the scheduling queue checks with Pod/Update QueueingHint(s) whether the update may make the pods schedulable,
-	// and requeues them to activeQ/backoffQ when at least one QueueingHint(s) return Queue.
-	// Plugins **have to** implement a QueueingHint for Pod/Update event
-	// if the rejection from them could be resolved by updating unscheduled Pods themselves.
-	// Example: Pods that require excessive resources may be rejected by the noderesources plugin,
-	// if this unscheduled pod is updated to require fewer resources,
-	// the previous rejection from noderesources plugin can be resolved.
-	// this plugin would implement QueueingHint for Pod/Update event
-	// that returns Queue when such label changes are made in unscheduled Pods.
-	Pod EventResource = "Pod"
-
 	// These assignedPod and unschedulablePod are internal resources that are used to represent the type of Pod.
 	// We don't expose them to the plugins deliberately because we don't publish Pod events with unschedulable Pods in the first place.
-	assignedPod      EventResource = "AssignedPod"
-	unschedulablePod EventResource = "UnschedulablePod"
-
-	// A note about NodeAdd event and UpdateNodeTaint event:
-	// When QHint is disabled, NodeAdd often isn't worked expectedly because of the internal feature called preCheck.
-	// It's definitely not something expected for plugin developers,
-	// and registering UpdateNodeTaint event is the only mitigation for now.
-	// So, kube-scheduler registers UpdateNodeTaint event for plugins that has NodeAdded event, but don't have UpdateNodeTaint event.
-	// It has a bad impact for the requeuing efficiency though, a lot better than some Pods being stuck in the
-	// unschedulable pod pool.
-	// This problematic preCheck feature is disabled when QHint is enabled,
-	// and eventually will be removed along with QHint graduation.
-	// See: https://github.com/kubernetes/kubernetes/issues/110175
-	Node                  EventResource = "Node"
-	PersistentVolume      EventResource = "PersistentVolume"
-	PersistentVolumeClaim EventResource = "PersistentVolumeClaim"
-	CSINode               EventResource = "storage.k8s.io/CSINode"
-	CSIDriver             EventResource = "storage.k8s.io/CSIDriver"
-	VolumeAttachment      EventResource = "storage.k8s.io/VolumeAttachment"
-	CSIStorageCapacity    EventResource = "storage.k8s.io/CSIStorageCapacity"
-	StorageClass          EventResource = "storage.k8s.io/StorageClass"
-	ResourceClaim         EventResource = "resource.k8s.io/ResourceClaim"
-	ResourceSlice         EventResource = "resource.k8s.io/ResourceSlice"
-	DeviceClass           EventResource = "resource.k8s.io/DeviceClass"
-
-	// WildCard is a special EventResource to match all resources.
-	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
-	// all coming clusterEvents will be admitted. Be careful to register it, it will
-	// increase the computing pressure in requeueing unless you really need it.
-	//
-	// Meanwhile, if the coming clusterEvent is a wildcard one, all pods
-	// will be moved from unschedulablePod pool to activeQ/backoffQ forcibly.
-	WildCard EventResource = "*"
+	assignedPod      fwk.EventResource = "AssignedPod"
+	unschedulablePod fwk.EventResource = "UnschedulablePod"
 )
 
 var (
 	// allResources is a list of all resources.
-	allResources = []EventResource{
-		Pod,
+	allResources = []fwk.EventResource{
+		fwk.Pod,
 		assignedPod,
 		unschedulablePod,
-		Node,
-		PersistentVolume,
-		PersistentVolumeClaim,
-		CSINode,
-		CSIDriver,
-		CSIStorageCapacity,
-		StorageClass,
-		VolumeAttachment,
-		ResourceClaim,
-		ResourceSlice,
-		DeviceClass,
+		fwk.Node,
+		fwk.PersistentVolume,
+		fwk.PersistentVolumeClaim,
+		fwk.CSINode,
+		fwk.CSIDriver,
+		fwk.CSIStorageCapacity,
+		fwk.StorageClass,
+		fwk.VolumeAttachment,
+		fwk.ResourceClaim,
+		fwk.ResourceSlice,
+		fwk.DeviceClass,
 	}
 )
-
-type ClusterEventWithHint struct {
-	Event ClusterEvent
-	// QueueingHintFn is executed for the Pod rejected by this plugin when the above Event happens,
-	// and filters out events to reduce useless retry of Pod's scheduling.
-	// It's an optional field. If not set,
-	// the scheduling of Pods will be always retried with backoff when this Event happens.
-	// (the same as Queue)
-	QueueingHintFn QueueingHintFn
-}
-
-// QueueingHintFn returns a hint that signals whether the event can make a Pod,
-// which was rejected by this plugin in the past scheduling cycle, schedulable or not.
-// It's called before a Pod gets moved from unschedulableQ to backoffQ or activeQ.
-// If it returns an error, we'll take the returned QueueingHint as `Queue` at the caller whatever we returned here so that
-// we can prevent the Pod from being stuck in the unschedulable pod pool.
-//
-// - `pod`: the Pod to be enqueued, which is rejected by this plugin in the past.
-// - `oldObj` `newObj`: the object involved in that event.
-//   - For example, the given event is "Node deleted", the `oldObj` will be that deleted Node.
-//   - `oldObj` is nil if the event is add event.
-//   - `newObj` is nil if the event is delete event.
-type QueueingHintFn func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (QueueingHint, error)
-
-type QueueingHint int
-
-const (
-	// QueueSkip implies that the cluster event has no impact on
-	// scheduling of the pod.
-	QueueSkip QueueingHint = iota
-
-	// Queue implies that the Pod may be schedulable by the event.
-	Queue
-)
-
-func (s QueueingHint) String() string {
-	switch s {
-	case QueueSkip:
-		return "QueueSkip"
-	case Queue:
-		return "Queue"
-	}
-	return ""
-}
-
-// ClusterEvent abstracts how a system resource's state gets changed.
-// Resource represents the standard API resources such as Pod, Node, etc.
-// ActionType denotes the specific change such as Add, Update or Delete.
-type ClusterEvent struct {
-	Resource   EventResource
-	ActionType ActionType
-
-	// label describes this cluster event.
-	// It's an optional field to control String(), which is used in logging and metrics.
-	// Normally, it's not necessary to set this field; only used for special events like UnschedulableTimeout.
-	label string
-}
-
-// Label is used for logging and metrics.
-func (ce ClusterEvent) Label() string {
-	if ce.label != "" {
-		return ce.label
-	}
-
-	return fmt.Sprintf("%v%v", ce.Resource, ce.ActionType)
-}
 
 // AllClusterEventLabels returns all possible cluster event labels given to the metrics.
 func AllClusterEventLabels() []string {
 	labels := []string{UnschedulableTimeout, ForceActivate}
 	for _, r := range allResources {
 		for _, a := range basicActionTypes {
-			labels = append(labels, ClusterEvent{Resource: r, ActionType: a}.Label())
+			labels = append(labels, fwk.ClusterEvent{Resource: r, ActionType: a}.Label())
 		}
-		if r == Pod {
-			for _, a := range podActionTypes {
-				labels = append(labels, ClusterEvent{Resource: r, ActionType: a}.Label())
-			}
-		} else if r == Node {
-			for _, a := range nodeActionTypes {
-				labels = append(labels, ClusterEvent{Resource: r, ActionType: a}.Label())
-			}
-		}
+	}
+	for _, a := range podActionTypes {
+		labels = append(labels, fwk.ClusterEvent{Resource: fwk.Pod, ActionType: a}.Label())
+	}
+	for _, a := range nodeActionTypes {
+		labels = append(labels, fwk.ClusterEvent{Resource: fwk.Node, ActionType: a}.Label())
 	}
 	return labels
 }
 
-// IsWildCard returns true if ClusterEvent follows WildCard semantics
-func (ce ClusterEvent) IsWildCard() bool {
-	return ce.Resource == WildCard && ce.ActionType == All
+// ClusterEventIsWildCard returns true if the given ClusterEvent follows WildCard semantics
+func ClusterEventIsWildCard(ce fwk.ClusterEvent) bool {
+	return ce.Resource == fwk.WildCard && ce.ActionType == fwk.All
 }
 
-// Match returns true if ClusterEvent is matched with the coming event.
-// "match" means the coming event is the same or more specific than the ce.
-// i.e., when ce.ActionType is Update, it return true if a coming event is UpdateNodeLabel
+// MatchClusterEvents returns true if ce is matched with incomingEvent.
+// "match" means that incomingEvent is the same or more specific than the ce.
+// e.g. when ce.ActionType is Update and incomingEvent.ActionType is UpdateNodeLabel, it will return true
 // because UpdateNodeLabel is more specific than Update.
-// On the other hand, when ce.ActionType is UpdateNodeLabel, it doesn't return true if a coming event is Update.
-// This is based on the fact that the scheduler interprets the coming cluster event as specific event if possible;
-// meaning, if a coming event is Node/Update, it means that Node's update is not something
-// that can be interpreted as any of Node's specific Update events.
+// On the other hand, when ce.ActionType is UpdateNodeLabel and incomingEvent.ActionType is Update, it returns false.
+// This is based on the fact that the scheduler interprets the incoming cluster event as specific event as possible;
+// meaning, if incomingEvent is Node/Update, it means that Node's update is not something that can be interpreted
+// as any of Node's specific Update events.
 //
-// If the ce.Resource is "*", there's no requirement for the coming event' Resource.
-// Contrarily, if the coming event's Resource is "*", the ce.Resource should only be "*".
-// (which should never happen in the current implementation of the scheduling queue.)
+// If the ce.Resource is "*", there's no requirement for incomingEvent.Resource.
+// Contrarily, if incomingEvent.Resource is "*", the only accepted ce.Resource is "*" (which should never
+// happen in the current implementation of the scheduling queue).
 //
-// Note: we have a special case here when the coming event is a wildcard event,
-// it will force all Pods to move to activeQ/backoffQ,
-// but we take it as an unmatched event unless the ce is also a wildcard one.
-func (ce ClusterEvent) Match(incomingEvent ClusterEvent) bool {
-	return ce.IsWildCard() ||
-		ce.Resource.match(incomingEvent.Resource) && ce.ActionType&incomingEvent.ActionType != 0 && incomingEvent.ActionType <= ce.ActionType
+// Note: we have a special case here when incomingEvent is a wildcard event, it will force all Pods to move
+// to activeQ/backoffQ, but we take it as an unmatched event unless ce is also a wildcard event.
+func MatchClusterEvents(ce, incomingEvent fwk.ClusterEvent) bool {
+	return ClusterEventIsWildCard(ce) ||
+		matchEventResources(ce.Resource, incomingEvent.Resource) && ce.ActionType&incomingEvent.ActionType != 0 && incomingEvent.ActionType <= ce.ActionType
 }
 
 // match returns true if the resource is matched with the coming resource.
-func (r EventResource) match(resource EventResource) bool {
+func matchEventResources(r, resource fwk.EventResource) bool {
 	// WildCard matches all resources
-	return r == WildCard ||
+	return r == fwk.WildCard ||
 		// Exact match
 		r == resource ||
-		// Pod matches assignedPod and unscheduledPod.
-		// (assignedPod and unscheduledPod aren't exposed and hence only used for incoming events and never used in EventsToRegister)
-		r == Pod && (resource == assignedPod || resource == unschedulablePod)
+		// Pod matches assignedPod and unschedulablePod.
+		// (assignedPod and unschedulablePod aren't exposed and hence only used for incoming events and never used in EventsToRegister)
+		r == fwk.Pod && (resource == assignedPod || resource == unschedulablePod)
 }
 
-func (ce ClusterEvent) MatchAny(events []ClusterEvent) bool {
-	for _, e := range events {
-		if e.Match(ce) {
+func MatchAnyClusterEvent(ce fwk.ClusterEvent, incomingEvents []fwk.ClusterEvent) bool {
+	for _, e := range incomingEvents {
+		if MatchClusterEvents(e, ce) {
 			return true
 		}
 	}
 	return false
 }
 
-func UnrollWildCardResource() []ClusterEventWithHint {
-	return []ClusterEventWithHint{
-		{Event: ClusterEvent{Resource: Pod, ActionType: All}},
-		{Event: ClusterEvent{Resource: Node, ActionType: All}},
-		{Event: ClusterEvent{Resource: PersistentVolume, ActionType: All}},
-		{Event: ClusterEvent{Resource: PersistentVolumeClaim, ActionType: All}},
-		{Event: ClusterEvent{Resource: CSINode, ActionType: All}},
-		{Event: ClusterEvent{Resource: CSIDriver, ActionType: All}},
-		{Event: ClusterEvent{Resource: CSIStorageCapacity, ActionType: All}},
-		{Event: ClusterEvent{Resource: StorageClass, ActionType: All}},
-		{Event: ClusterEvent{Resource: ResourceClaim, ActionType: All}},
-		{Event: ClusterEvent{Resource: DeviceClass, ActionType: All}},
+func UnrollWildCardResource() []fwk.ClusterEventWithHint {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolume, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.CSINode, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.CSIDriver, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.CSIStorageCapacity, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.StorageClass, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.All}},
 	}
 }
 
@@ -420,7 +205,7 @@ type QueuedPodInfo struct {
 	GatingPlugin string
 	// GatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
 	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
-	GatingPluginEvents []ClusterEvent
+	GatingPluginEvents []fwk.ClusterEvent
 }
 
 // Gated returns true if the pod is gated by any plugin.

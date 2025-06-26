@@ -421,8 +421,8 @@ func New(ctx context.Context,
 
 // defaultQueueingHintFn is the default queueing hint function.
 // It always returns Queue as the queueing hint.
-var defaultQueueingHintFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
-	return framework.Queue, nil
+var defaultQueueingHintFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
+	return fwk.Queue, nil
 }
 
 func buildQueueingHintMap(ctx context.Context, es []framework.EnqueueExtensions) (internalqueue.QueueingHintMap, error) {
@@ -454,11 +454,11 @@ func buildQueueingHintMap(ctx context.Context, es []framework.EnqueueExtensions)
 				fn = defaultQueueingHintFn
 			}
 
-			if event.Event.Resource == framework.Node {
-				if event.Event.ActionType&framework.Add != 0 {
+			if event.Event.Resource == fwk.Node {
+				if event.Event.ActionType&fwk.Add != 0 {
 					registerNodeAdded = true
 				}
-				if event.Event.ActionType&framework.UpdateNodeTaint != 0 {
+				if event.Event.ActionType&fwk.UpdateNodeTaint != 0 {
 					registerNodeTaintUpdated = true
 				}
 			}
@@ -479,8 +479,8 @@ func buildQueueingHintMap(ctx context.Context, es []framework.EnqueueExtensions)
 			// unschedulable pod pool.
 			// This behavior will be removed when we remove the preCheck feature.
 			// See: https://github.com/kubernetes/kubernetes/issues/110175
-			queueingHintMap[framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}] =
-				append(queueingHintMap[framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}],
+			queueingHintMap[fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}] =
+				append(queueingHintMap[fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}],
 					&internalqueue.QueueingHintFunction{
 						PluginName:     e.Name(),
 						QueueingHintFn: defaultQueueingHintFn,
@@ -585,8 +585,8 @@ func buildExtenders(logger klog.Logger, extenders []schedulerapi.Extender, profi
 
 type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time)
 
-func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[framework.EventResource]framework.ActionType {
-	gvkMap := make(map[framework.EventResource]framework.ActionType)
+func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[fwk.EventResource]fwk.ActionType {
+	gvkMap := make(map[fwk.EventResource]fwk.ActionType)
 	for _, queueingHints := range queueingHintsPerProfile {
 		for evt := range queueingHints {
 			if _, ok := gvkMap[evt.Resource]; ok {

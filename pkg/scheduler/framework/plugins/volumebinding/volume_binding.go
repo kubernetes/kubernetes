@@ -97,7 +97,7 @@ func (pl *VolumeBinding) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	// Pods may fail to find available PVs because the node labels do not
 	// match the storage class's allowed topologies or PV's node affinity.
 	// A new or updated node may make pods schedulable.
@@ -106,43 +106,43 @@ func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]framework.Cluste
 	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
 	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
 	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint
+	nodeActionType := fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint
 	if pl.fts.EnableSchedulingQueueHint {
 		// When scheduling queue hint is enabled, we don't use the problematic preCheck and don't need to register UpdateNodeTaint event.
-		nodeActionType = framework.Add | framework.UpdateNodeLabel
+		nodeActionType = fwk.Add | fwk.UpdateNodeLabel
 	}
-	events := []framework.ClusterEventWithHint{
+	events := []fwk.ClusterEventWithHint{
 		// Pods may fail because of missing or mis-configured storage class
 		// (e.g., allowedTopologies, volumeBindingMode), and hence may become
 		// schedulable upon StorageClass Add or Update events.
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterStorageClassChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.StorageClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterStorageClassChange},
 
 		// We bind PVCs with PVs, so any changes may make the pods schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
+		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolume, ActionType: fwk.Add | fwk.Update}},
 
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
 
 		// We rely on CSI node to translate in-tree PV to CSI.
 		// TODO: kube-schduler will unregister the CSINode events once all the volume plugins has completed their CSI migration.
-		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSINodeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.CSINode, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterCSINodeChange},
 
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
-		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSIDriverChange},
-		{Event: framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSIStorageCapacityChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.CSIDriver, ActionType: fwk.Update}, QueueingHintFn: pl.isSchedulableAfterCSIDriverChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.CSIStorageCapacity, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterCSIStorageCapacityChange},
 	}
 	return events, nil
 }
 
-func (pl *VolumeBinding) isSchedulableAfterCSINodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeBinding) isSchedulableAfterCSINodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	if oldObj == nil {
 		logger.V(5).Info("CSINode creation could make the pod schedulable")
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 	oldCSINode, modifiedCSINode, err := util.As[*storagev1.CSINode](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	logger = klog.LoggerWithValues(
@@ -153,17 +153,17 @@ func (pl *VolumeBinding) isSchedulableAfterCSINodeChange(logger klog.Logger, pod
 
 	if oldCSINode.ObjectMeta.Annotations[v1.MigratedPluginsAnnotationKey] != modifiedCSINode.ObjectMeta.Annotations[v1.MigratedPluginsAnnotationKey] {
 		logger.V(5).Info("CSINode's migrated plugins annotation is updated and that may make the pod schedulable")
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	logger.V(5).Info("CISNode was created or updated but it doesn't make this pod schedulable")
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
-func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, newPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	logger = klog.LoggerWithValues(
@@ -174,7 +174,7 @@ func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeClaimChange(logger kl
 
 	if pod.Namespace != newPVC.Namespace {
 		logger.V(5).Info("PersistentVolumeClaim was created or updated, but it doesn't make this pod schedulable because the PVC belongs to a different namespace")
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	for _, vol := range pod.Spec.Volumes {
@@ -192,22 +192,22 @@ func (pl *VolumeBinding) isSchedulableAfterPersistentVolumeClaimChange(logger kl
 			// Return Queue because, in this case,
 			// all PVC creations and almost all PVC updates could make the Pod schedulable.
 			logger.V(5).Info("PersistentVolumeClaim the pod requires was created or updated, potentially making the target Pod schedulable")
-			return framework.Queue, nil
+			return fwk.Queue, nil
 		}
 	}
 
 	logger.V(5).Info("PersistentVolumeClaim was created or updated, but it doesn't make this pod schedulable")
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // isSchedulableAfterStorageClassChange checks whether an StorageClass event might make a Pod schedulable or not.
 // Any StorageClass addition and a StorageClass update to allowedTopologies
 // might make a Pod schedulable.
 // Note that an update to volume binding mode is not allowed and we don't have to consider while examining the update event.
-func (pl *VolumeBinding) isSchedulableAfterStorageClassChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeBinding) isSchedulableAfterStorageClassChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	oldSC, newSC, err := util.As[*storagev1.StorageClass](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	logger = klog.LoggerWithValues(
@@ -220,16 +220,16 @@ func (pl *VolumeBinding) isSchedulableAfterStorageClassChange(logger klog.Logger
 		// No further filtering can be made for a creation event,
 		// and we just always return Queue.
 		logger.V(5).Info("A new StorageClass was created, which could make a Pod schedulable")
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	if !apiequality.Semantic.DeepEqual(newSC.AllowedTopologies, oldSC.AllowedTopologies) {
 		logger.V(5).Info("StorageClass got an update in AllowedTopologies", "AllowedTopologies", newSC.AllowedTopologies)
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	logger.V(5).Info("StorageClass was updated, but it doesn't make this pod schedulable")
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // isSchedulableAfterCSIStorageCapacityChange checks whether a CSIStorageCapacity event
@@ -238,10 +238,10 @@ func (pl *VolumeBinding) isSchedulableAfterStorageClassChange(logger klog.Logger
 // (calculated based on capacity and maximumVolumeSize) might make a Pod schedulable.
 // Note that an update to nodeTopology and storageClassName is not allowed and
 // we don't have to consider while examining the update event.
-func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	oldCap, newCap, err := util.As[*storagev1.CSIStorageCapacity](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	if oldCap == nil {
@@ -250,7 +250,7 @@ func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.
 			"Pod", klog.KObj(pod),
 			"CSIStorageCapacity", klog.KObj(newCap),
 		)
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	oldLimit := volumeLimit(oldCap)
@@ -266,17 +266,17 @@ func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.
 
 	if newLimit != nil && (oldLimit == nil || newLimit.Value() > oldLimit.Value()) {
 		logger.V(5).Info("VolumeLimit was increased, which could make a Pod schedulable")
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	logger.V(5).Info("CSIStorageCapacity was updated, but it doesn't make this pod schedulable")
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
-func (pl *VolumeBinding) isSchedulableAfterCSIDriverChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeBinding) isSchedulableAfterCSIDriverChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalCSIDriver, modifiedCSIDriver, err := util.As[*storagev1.CSIDriver](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	logger = klog.LoggerWithValues(
@@ -292,12 +292,12 @@ func (pl *VolumeBinding) isSchedulableAfterCSIDriverChange(logger klog.Logger, p
 		if (originalCSIDriver.Spec.StorageCapacity != nil && *originalCSIDriver.Spec.StorageCapacity) &&
 			(modifiedCSIDriver.Spec.StorageCapacity == nil || !*modifiedCSIDriver.Spec.StorageCapacity) {
 			logger.V(5).Info("CSIDriver was updated and storage capacity got disabled, which may make the pod schedulable")
-			return framework.Queue, nil
+			return fwk.Queue, nil
 		}
 	}
 
 	logger.V(5).Info("CSIDriver was created or updated but it doesn't make this pod schedulable")
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // podHasPVCs returns 2 values:
