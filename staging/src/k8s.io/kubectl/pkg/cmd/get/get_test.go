@@ -587,6 +587,7 @@ func TestNoBlankLinesForGetAll(t *testing.T) {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 	expectedErr := `No resources found in test namespace.
+warning: Setting --ignore-not-found only suppresses error message above; it won't alter the exit code as the operation is considered successful by the HTTP status. See "kubectl get -h" for details of the flags.
 `
 	if e, a := expectedErr, errbuf.String(); e != a {
 		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
@@ -613,7 +614,8 @@ func TestNotFoundMessageForGetNonNamespacedResources(t *testing.T) {
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
-	expectedErr := `No resources found
+	expectedErr := `No resources found.
+warning: Setting --ignore-not-found only suppresses error message above; it won't alter the exit code as the operation is considered successful by the HTTP status. See "kubectl get -h" for details of the flags.
 `
 	if e, a := expectedErr, errbuf.String(); e != a {
 		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
@@ -706,6 +708,7 @@ func TestGetEmptyTable(t *testing.T) {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 	expectedErr := `No resources found in test namespace.
+warning: Setting --ignore-not-found only suppresses error message above; it won't alter the exit code as the operation is considered successful by the HTTP status. See "kubectl get -h" for details of the flags.
 `
 	if e, a := expectedErr, errbuf.String(); e != a {
 		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
