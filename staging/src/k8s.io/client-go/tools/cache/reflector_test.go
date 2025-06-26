@@ -600,7 +600,7 @@ func TestReflectorListAndWatch(t *testing.T) {
 
 			// Verify we received the right objects with the right resource versions.
 			for _, expectedObj := range tc.expectedStore {
-				storeObj := Pop(context.Background(), s).(metav1.Object)
+				storeObj := Pop(s).(metav1.Object)
 				assert.Equal(t, expectedObj.GetName(), storeObj.GetName())
 				assert.Equal(t, expectedObj.GetResourceVersion(), storeObj.GetResourceVersion())
 			}

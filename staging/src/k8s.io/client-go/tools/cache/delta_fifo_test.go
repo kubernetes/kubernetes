@@ -17,7 +17,6 @@ limitations under the License.
 package cache
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -87,12 +86,12 @@ func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err err
 
 // helper function to reduce stuttering
 func testPop(f *DeltaFIFO) testFifoObject {
-	return Pop(context.Background(), f).(Deltas).Newest().Object.(testFifoObject)
+	return Pop(f).(Deltas).Newest().Object.(testFifoObject)
 }
 
 // testPopIfAvailable returns `{}, false` if Pop returns a nil object
 func testPopIfAvailable(f *DeltaFIFO) (testFifoObject, bool) {
-	obj := Pop(context.Background(), f)
+	obj := Pop(f)
 	if obj == nil {
 		return testFifoObject{}, false
 	}
@@ -180,7 +179,7 @@ func TestDeltaFIFO_replaceWithDeleteDeltaIn(t *testing.T) {
 	f.Delete(oldObj)
 	f.Replace([]interface{}{newObj}, "")
 
-	actualDeltas := Pop(context.Background(), f)
+	actualDeltas := Pop(f)
 	expectedDeltas := Deltas{
 		Delta{Type: Deleted, Object: oldObj},
 		Delta{Type: Sync, Object: newObj},
@@ -290,7 +289,7 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				}),
 			})
 			tt.operations(fWithKnownObjects)
-			actualDeltasWithKnownObjects := Pop(context.Background(), fWithKnownObjects)
+			actualDeltasWithKnownObjects := Pop(fWithKnownObjects)
 			if !reflect.DeepEqual(tt.expectedDeltas, actualDeltasWithKnownObjects) {
 				t.Errorf("expected %#v, got %#v", tt.expectedDeltas, actualDeltasWithKnownObjects)
 			}
@@ -303,7 +302,7 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 				KeyFunction: testFifoObjectKeyFunc,
 			})
 			tt.operations(fWithoutKnownObjects)
-			actualDeltasWithoutKnownObjects := Pop(context.Background(), fWithoutKnownObjects)
+			actualDeltasWithoutKnownObjects := Pop(fWithoutKnownObjects)
 			if !reflect.DeepEqual(tt.expectedDeltas, actualDeltasWithoutKnownObjects) {
 				t.Errorf("expected %#v, got %#v", tt.expectedDeltas, actualDeltasWithoutKnownObjects)
 			}
@@ -403,7 +402,7 @@ func TestDeltaFIFO_transformer(t *testing.T) {
 	}
 
 	for i := 0; i < 2; i++ {
-		obj, err := f.Pop(context.Background(), func(o interface{}, isInInitialList bool) error { return nil })
+		obj, err := f.Pop(func(o interface{}, isInInitialList bool) error { return nil })
 		if err != nil {
 			t.Fatalf("got nothing on try %v?", i)
 		}
@@ -593,7 +592,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(context.Background(), f).(Deltas)
+		cur := Pop(f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -619,7 +618,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(context.Background(), f).(Deltas)
+		cur := Pop(f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -649,7 +648,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(context.Background(), f).(Deltas)
+		cur := Pop(f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -680,7 +679,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(context.Background(), f).(Deltas)
+		cur := Pop(f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -698,7 +697,7 @@ func TestDeltaFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(context.Background(), f).(Deltas)
+		cur := Pop(f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -728,7 +727,7 @@ func TestDeltaFIFO_ReplaceMakesDeletionsReplaced(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(context.Background(), f).(Deltas)
+		cur := Pop(f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -752,7 +751,7 @@ func TestDeltaFIFO_ReplaceDeltaType(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(context.Background(), f).(Deltas)
+		cur := Pop(f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -774,18 +773,18 @@ func TestDeltaFIFO_UpdateResyncRace(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(context.Background(), f).(Deltas)
+		cur := Pop(f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
 	}
 }
 
-// pop2 captures both parameters, unlike Pop(context.Background(), ).
+// pop2 captures both parameters, unlike Pop().
 func pop2[T any](queue Queue) (T, bool) {
 	var result interface{}
 	var isList bool
-	queue.Pop(context.Background(), func(obj interface{}, isInInitialList bool) error {
+	queue.Pop(func(obj interface{}, isInInitialList bool) error {
 		result = obj
 		isList = isInInitialList
 		return nil
@@ -910,15 +909,15 @@ func TestDeltaFIFO_HasSynced(t *testing.T) {
 		{
 			actions: []func(f *DeltaFIFO){
 				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *DeltaFIFO) { Pop(context.Background(), f) },
+				func(f *DeltaFIFO) { Pop(f) },
 			},
 			expectedSynced: false,
 		},
 		{
 			actions: []func(f *DeltaFIFO){
 				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *DeltaFIFO) { Pop(context.Background(), f) },
-				func(f *DeltaFIFO) { Pop(context.Background(), f) },
+				func(f *DeltaFIFO) { Pop(f) },
+				func(f *DeltaFIFO) { Pop(f) },
 			},
 			expectedSynced: true,
 		},
@@ -927,7 +926,7 @@ func TestDeltaFIFO_HasSynced(t *testing.T) {
 			// there cannot be duplicate keys in the list or apiserver is broken.
 			actions: []func(f *DeltaFIFO){
 				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("a", 2)}, "0") },
-				func(f *DeltaFIFO) { Pop(context.Background(), f) },
+				func(f *DeltaFIFO) { Pop(f) },
 			},
 			expectedSynced: true,
 		},
@@ -959,7 +958,7 @@ func TestDeltaFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 	const jobs = 10
 	for i := 0; i < jobs; i++ {
 		go func() {
-			f.Pop(context.Background(), func(obj interface{}, isInInitialList bool) error {
+			f.Pop(func(obj interface{}, isInInitialList bool) error {
 				return nil
 			})
 			c <- struct{}{}
