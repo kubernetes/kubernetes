@@ -1471,6 +1471,11 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		kubeletconfigv1beta1.CredentialProvider{}.OpenAPIModelName():                                                    schema_k8sio_kubelet_config_v1beta1_CredentialProvider(ref),
 		kubeletconfigv1beta1.CredentialProviderConfig{}.OpenAPIModelName():                                              schema_k8sio_kubelet_config_v1beta1_CredentialProviderConfig(ref),
 		kubeletconfigv1beta1.ExecEnvVar{}.OpenAPIModelName():                                                            schema_k8sio_kubelet_config_v1beta1_ExecEnvVar(ref),
+		kubeletconfigv1beta1.ImagePullCredentials{}.OpenAPIModelName():                                                  schema_k8sio_kubelet_config_v1beta1_ImagePullCredentials(ref),
+		kubeletconfigv1beta1.ImagePullIntent{}.OpenAPIModelName():                                                       schema_k8sio_kubelet_config_v1beta1_ImagePullIntent(ref),
+		kubeletconfigv1beta1.ImagePullSecret{}.OpenAPIModelName():                                                       schema_k8sio_kubelet_config_v1beta1_ImagePullSecret(ref),
+		kubeletconfigv1beta1.ImagePullServiceAccount{}.OpenAPIModelName():                                               schema_k8sio_kubelet_config_v1beta1_ImagePullServiceAccount(ref),
+		kubeletconfigv1beta1.ImagePulledRecord{}.OpenAPIModelName():                                                     schema_k8sio_kubelet_config_v1beta1_ImagePulledRecord(ref),
 		kubeletconfigv1beta1.KubeletAnonymousAuthentication{}.OpenAPIModelName():                                        schema_k8sio_kubelet_config_v1beta1_KubeletAnonymousAuthentication(ref),
 		kubeletconfigv1beta1.KubeletAuthentication{}.OpenAPIModelName():                                                 schema_k8sio_kubelet_config_v1beta1_KubeletAuthentication(ref),
 		kubeletconfigv1beta1.KubeletAuthorization{}.OpenAPIModelName():                                                  schema_k8sio_kubelet_config_v1beta1_KubeletAuthorization(ref),
@@ -71411,6 +71416,239 @@ func schema_k8sio_kubelet_config_v1beta1_ExecEnvVar(ref common.ReferenceCallback
 				Required: []string{"name", "value"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_ImagePullCredentials(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullCredentials describe credentials that can be used to pull an image.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kubernetesSecrets": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "KubernetesSecretCoordinates is an index of coordinates of all the kubernetes secrets that were used to pull the image.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(kubeletconfigv1beta1.ImagePullSecret{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"kubernetesServiceAccounts": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "KubernetesServiceAccounts is an index of coordinates of all the kubernetes service accounts that were used to pull the image.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(kubeletconfigv1beta1.ImagePullServiceAccount{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"nodePodsAccessible": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodePodsAccessible is a flag denoting the pull credentials are accessible by all the pods on the node, or that no credentials are needed for the pull.\n\nIf true, it is mutually exclusive with the `kubernetesSecrets` field.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			kubeletconfigv1beta1.ImagePullSecret{}.OpenAPIModelName(), kubeletconfigv1beta1.ImagePullServiceAccount{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_ImagePullIntent(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullIntent is a record of the kubelet attempting to pull an image.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"image": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Image is the image spec from a Container's `image` field. The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe characters like ':' and '/'.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"image"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_ImagePullSecret(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullSecret is a representation of a Kubernetes secret object coordinates along with a credential hash of the pull secret credentials this object contains.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"credentialHash": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CredentialHash is a SHA-256 retrieved by hashing the image pull credentials content of the secret specified by the UID/Namespace/Name coordinates.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"uid", "namespace", "name", "credentialHash"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_ImagePullServiceAccount(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullServiceAccount is a representation of a Kubernetes service account object coordinates for which the kubelet sent service account token to the credential provider plugin for image pull credentials.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"uid", "namespace", "name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_ImagePulledRecord(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullRecord is a record of an image that was pulled by the kubelet.\n\nIf there are no records in the `kubernetesSecrets` field and both `nodeWideCredentials` and `anonymous` are `false`, credentials must be re-checked the next time an image represented by this record is being requested.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastUpdatedTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastUpdatedTime is the time of the last update to this record",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"imageRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ImageRef is a reference to the image represented by this file as received from the CRI. The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe characters like ':' and '/'.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"credentialMapping": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CredentialMapping maps `image` to the set of credentials that it was previously pulled with. `image` in this case is the content of a pod's container `image` field that's got its tag/digest removed.\n\nExample:\n  Container requests the `hello-world:latest@sha256:91fb4b041da273d5a3273b6d587d62d518300a6ad268b28628f74997b93171b2` image:\n    \"credentialMapping\": {\n      \"hello-world\": { \"nodePodsAccessible\": true }\n    }",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(kubeletconfigv1beta1.ImagePullCredentials{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"lastUpdatedTime", "imageRef"},
+			},
+		},
+		Dependencies: []string{
+			metav1.Time{}.OpenAPIModelName(), kubeletconfigv1beta1.ImagePullCredentials{}.OpenAPIModelName()},
 	}
 }
 
