@@ -99,8 +99,7 @@ func (volumeAttachmentStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 func (volumeAttachmentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newVolumeAttachmentObj := obj.(*storage.VolumeAttachment)
 	oldVolumeAttachmentObj := old.(*storage.VolumeAttachment)
-	errorList := validation.ValidateVolumeAttachment(newVolumeAttachmentObj)
-	return append(errorList, validation.ValidateVolumeAttachmentUpdate(newVolumeAttachmentObj, oldVolumeAttachmentObj)...)
+	return validation.ValidateVolumeAttachmentUpdate(newVolumeAttachmentObj, oldVolumeAttachmentObj)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
