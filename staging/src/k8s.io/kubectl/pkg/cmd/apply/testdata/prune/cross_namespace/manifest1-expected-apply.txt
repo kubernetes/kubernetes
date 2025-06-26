@@ -1,2 +1,0 @@
-configmap/a created
-configmap/b created
