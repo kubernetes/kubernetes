@@ -835,6 +835,9 @@ message ImageSpec {
     // If the runtime handler is unknown, the request should be rejected.
     // An empty string would select the default runtime handler.
     string runtime_handler = 19;
+    // The digest of the image used for this volume.
+    // It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+    string image_ref = 20;
 }
 
 message KeyValue {
