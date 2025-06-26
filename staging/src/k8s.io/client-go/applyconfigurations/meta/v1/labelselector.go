@@ -30,7 +30,6 @@ type LabelSelectorApplyConfiguration struct {
 func LabelSelector() *LabelSelectorApplyConfiguration {
 	return &LabelSelectorApplyConfiguration{}
 }
-func (b LabelSelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMatchLabels puts the entries into the MatchLabels field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

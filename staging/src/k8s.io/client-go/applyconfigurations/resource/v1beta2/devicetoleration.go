@@ -37,7 +37,6 @@ type DeviceTolerationApplyConfiguration struct {
 func DeviceToleration() *DeviceTolerationApplyConfiguration {
 	return &DeviceTolerationApplyConfiguration{}
 }
-func (b DeviceTolerationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKey sets the Key field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

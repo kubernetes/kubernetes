@@ -31,7 +31,6 @@ type NFSVolumeSourceApplyConfiguration struct {
 func NFSVolumeSource() *NFSVolumeSourceApplyConfiguration {
 	return &NFSVolumeSourceApplyConfiguration{}
 }
-func (b NFSVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithServer sets the Server field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -32,7 +32,6 @@ type grpcServer struct {
 	grpcVerbosity int
 	wg            sync.WaitGroup
 	endpoint      endpoint
-	socketpath    string
 	server        *grpc.Server
 }
 
@@ -50,7 +49,7 @@ func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []
 
 	listener, err := endpoint.listen(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("listen on %q: %w", s.socketpath, err)
+		return nil, fmt.Errorf("listen on %q: %w", s.endpoint.path(), err)
 	}
 
 	// Run a gRPC server. It will close the listening socket when

@@ -34,7 +34,6 @@ type AttachedVolumeApplyConfiguration struct {
 func AttachedVolume() *AttachedVolumeApplyConfiguration {
 	return &AttachedVolumeApplyConfiguration{}
 }
-func (b AttachedVolumeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

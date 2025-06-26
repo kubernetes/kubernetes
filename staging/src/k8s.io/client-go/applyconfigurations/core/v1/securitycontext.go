@@ -44,7 +44,6 @@ type SecurityContextApplyConfiguration struct {
 func SecurityContext() *SecurityContextApplyConfiguration {
 	return &SecurityContextApplyConfiguration{}
 }
-func (b SecurityContextApplyConfiguration) IsApplyConfiguration() {}
 
 // WithCapabilities sets the Capabilities field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

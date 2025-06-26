@@ -23,12 +23,16 @@ import (
 	"k8s.io/component-base/featuregate"
 )
 
+// Every feature gate should have an entry here following this template:
+//
+// // owner: @username
+// MyFeature() bool
+//
+// Feature gates should be listed in alphabetical, case-sensitive
+// (upper before any lower case character) order. This reduces the risk
+// of code conflicts because changes are more likely to be scattered
+// across the file.
 const (
-	// Every feature gate should add method here following this template:
-	//
-	// // owner: @username
-	// MyFeature() bool
-
 	// owner: @alexzielenski
 	//
 	// Ignores errors raised on unchanged fields of Custom Resources

@@ -29,7 +29,6 @@ type NodeDaemonEndpointsApplyConfiguration struct {
 func NodeDaemonEndpoints() *NodeDaemonEndpointsApplyConfiguration {
 	return &NodeDaemonEndpointsApplyConfiguration{}
 }
-func (b NodeDaemonEndpointsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKubeletEndpoint sets the KubeletEndpoint field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

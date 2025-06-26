@@ -95,12 +95,6 @@ func (w *Waiter) WaitForControlPlaneComponents(podsMap map[string]*v1.Pod, apiSe
 	return nil
 }
 
-// WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForAPI() error {
-	fmt.Println("[dryrun] Would wait for the API Server's /healthz endpoint to return 'ok'")
-	return nil
-}
-
 // WaitForPodsWithLabel just returns a dummy nil, to indicate that the program should just proceed
 func (w *Waiter) WaitForPodsWithLabel(kvLabel string) error {
 	fmt.Printf("[dryrun] Would wait for the Pods with the label %q in the %s namespace to become Running\n", kvLabel, metav1.NamespaceSystem)

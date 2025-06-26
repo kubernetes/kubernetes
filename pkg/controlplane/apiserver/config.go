@@ -102,6 +102,11 @@ type Extra struct {
 	SystemNamespaces []string
 
 	VersionedInformers clientgoinformers.SharedInformerFactory
+
+	// Coordinated Leader Election timers
+	CoordinatedLeadershipLeaseDuration time.Duration
+	CoordinatedLeadershipRenewDeadline time.Duration
+	CoordinatedLeadershipRetryPeriod   time.Duration
 }
 
 // BuildGenericConfig takes the generic controlplane apiserver options and produces
@@ -302,6 +307,10 @@ func CreateConfig(
 			ExtendExpiration:                    opts.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
+
+			CoordinatedLeadershipLeaseDuration: opts.CoordinatedLeadershipLeaseDuration,
+			CoordinatedLeadershipRenewDeadline: opts.CoordinatedLeadershipRenewDeadline,
+			CoordinatedLeadershipRetryPeriod:   opts.CoordinatedLeadershipRetryPeriod,
 		},
 	}
 

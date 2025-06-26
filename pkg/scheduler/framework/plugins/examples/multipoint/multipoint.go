@@ -52,9 +52,9 @@ func (s *stateData) Clone() fwk.StateData {
 }
 
 // Reserve is the function invoked by the framework at "reserve" extension point.
-func (mc CommunicatingPlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (mc CommunicatingPlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	if pod == nil {
-		return framework.NewStatus(framework.Error, "pod cannot be nil")
+		return fwk.NewStatus(fwk.Error, "pod cannot be nil")
 	}
 	if pod.Name == "my-test-pod" {
 		state.Write(fwk.StateKey(pod.Name), &stateData{data: "never bind"})
@@ -74,13 +74,13 @@ func (mc CommunicatingPlugin) Unreserve(ctx context.Context, state fwk.CycleStat
 }
 
 // PreBind is the function invoked by the framework at "prebind" extension point.
-func (mc CommunicatingPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (mc CommunicatingPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	if pod == nil {
-		return framework.NewStatus(framework.Error, "pod cannot be nil")
+		return fwk.NewStatus(fwk.Error, "pod cannot be nil")
 	}
 	if v, e := state.Read(fwk.StateKey(pod.Name)); e == nil {
 		if value, ok := v.(*stateData); ok && value.data == "never bind" {
-			return framework.NewStatus(framework.Unschedulable, "pod is not permitted")
+			return fwk.NewStatus(fwk.Unschedulable, "pod is not permitted")
 		}
 	}
 	return nil

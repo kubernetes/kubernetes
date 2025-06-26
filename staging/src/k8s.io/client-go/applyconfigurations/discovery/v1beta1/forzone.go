@@ -29,7 +29,6 @@ type ForZoneApplyConfiguration struct {
 func ForZone() *ForZoneApplyConfiguration {
 	return &ForZoneApplyConfiguration{}
 }
-func (b ForZoneApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

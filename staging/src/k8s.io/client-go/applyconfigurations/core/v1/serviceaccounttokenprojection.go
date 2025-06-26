@@ -31,7 +31,6 @@ type ServiceAccountTokenProjectionApplyConfiguration struct {
 func ServiceAccountTokenProjection() *ServiceAccountTokenProjectionApplyConfiguration {
 	return &ServiceAccountTokenProjectionApplyConfiguration{}
 }
-func (b ServiceAccountTokenProjectionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAudience sets the Audience field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

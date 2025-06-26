@@ -30,7 +30,6 @@ type IngressRuleApplyConfiguration struct {
 func IngressRule() *IngressRuleApplyConfiguration {
 	return &IngressRuleApplyConfiguration{}
 }
-func (b IngressRuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithHost sets the Host field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

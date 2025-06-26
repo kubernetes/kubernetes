@@ -38,7 +38,6 @@ type AzureDiskVolumeSourceApplyConfiguration struct {
 func AzureDiskVolumeSource() *AzureDiskVolumeSourceApplyConfiguration {
 	return &AzureDiskVolumeSourceApplyConfiguration{}
 }
-func (b AzureDiskVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDiskName sets the DiskName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

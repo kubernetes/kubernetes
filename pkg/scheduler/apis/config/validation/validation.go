@@ -30,6 +30,7 @@ import (
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
@@ -156,6 +157,9 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 		"NodeResourcesFitArgs":            ValidateNodeResourcesFitArgs,
 		"PodTopologySpread":               ValidatePodTopologySpreadArgs,
 		"VolumeBinding":                   ValidateVolumeBindingArgs,
+		"DynamicResources": func(path *field.Path, args *config.DynamicResourcesArgs) error {
+			return ValidateDynamicResourcesArgs(path, args, feature.NewFeatures())
+		},
 	}
 
 	if profile.Plugins != nil {

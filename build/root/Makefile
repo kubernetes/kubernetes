@@ -327,27 +327,6 @@ clean:
 	hack/make-rules/clean.sh
 endif
 
-define VET_HELP_INFO
-# Run 'go vet'.
-#
-# Args:
-#   WHAT: Directory names to vet.  All *.go files under these
-#     directories will be vetted.  If not specified, "everything" will be
-#     vetted.
-#
-# Example:
-#   make vet
-#   make vet WHAT=./pkg/kubelet
-endef
-.PHONY: vet
-ifeq ($(PRINT_HELP),y)
-vet:
-	echo "$$VET_HELP_INFO"
-else
-vet:
-	hack/make-rules/vet.sh $(WHAT)
-endif
-
 define LINT_HELP_INFO
 # Run golangci-lint
 #

@@ -146,6 +146,7 @@ linters:
     - kubeapilinter
     - logcheck
     - revive
+    - sortedfeatures
     - staticcheck
     - testifylint
     - unused
@@ -224,6 +225,21 @@ linters:
             # this restriction. Whether we then do a global search/replace remains
             # to be decided.
             with-helpers .*
+      sortedfeatures:
+        # Installed there by hack/verify-golangci-lint.sh.
+        path: _output/local/bin/sortedfeatures.so
+        description: check if feature gates are sorted
+        original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sortedfeatures
+        settings:
+          files:
+            - cmd/kubeadm/app/features/features.go
+            - pkg/features/kube_features.go
+            - staging/src/k8s.io/apiserver/pkg/features/kube_features.go
+            - staging/src/k8s.io/client-go/features/known_features.go
+            - staging/src/k8s.io/controller-manager/pkg/features/kube_features.go
+            - staging/src/k8s.io/apiextensions-apiserver/pkg/features/kube_features.go
+            - test/e2e/feature/feature.go
+            - test/e2e/environment/environment.go
       kubeapilinter:
         path: _output/local/bin/kube-api-linter.so
         description: kube-api-linter and lints Kube like APIs based on API conventions and best practices.

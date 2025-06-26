@@ -31,7 +31,6 @@ type EnvFromSourceApplyConfiguration struct {
 func EnvFromSource() *EnvFromSourceApplyConfiguration {
 	return &EnvFromSourceApplyConfiguration{}
 }
-func (b EnvFromSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPrefix sets the Prefix field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

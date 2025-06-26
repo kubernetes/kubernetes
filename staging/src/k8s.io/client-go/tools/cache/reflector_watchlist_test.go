@@ -36,10 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
-	"k8s.io/utils/ptr"
 )
 
 func TestInitialEventsEndBookmarkTicker(t *testing.T) {
@@ -474,6 +475,7 @@ func TestWatchList(t *testing.T) {
 		t.Run(s.name, func(t *testing.T) {
 			scenario := s // capture as local variable
 			_, ctx := ktesting.NewTestContext(t)
+			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, !scenario.disableUseWatchList)
 			listWatcher, store, reflector, ctx, cancel := testData(ctx)
 			go func() {
 				for i, e := range scenario.watchEvents {
@@ -491,9 +493,6 @@ func TestWatchList(t *testing.T) {
 			listWatcher.closeAfterWatchRequests = scenario.closeAfterWatchRequests
 			listWatcher.customListResponse = scenario.podList
 			listWatcher.closeAfterListRequests = scenario.closeAfterListRequests
-			if scenario.disableUseWatchList {
-				reflector.UseWatchList = ptr.To(false)
-			}
 
 			err := reflector.ListAndWatchWithContext(ctx)
 			if scenario.expectedError != nil && err == nil {
@@ -582,7 +581,6 @@ func testData(ctx context.Context) (*fakeListWatcher, Store, *Reflector, context
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
-	r.UseWatchList = ptr.To(true)
 
 	return lw, s, r, ctx, cancel
 }

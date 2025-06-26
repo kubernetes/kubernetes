@@ -37,25 +37,19 @@ import (
 )
 
 func TestCoordinatedLeaderElectionLeaseTransfer(t *testing.T) {
-	// Reset the coordinated leader election variables after the test
-	defaultLeaseDuration := leaderelection.LeaseDuration
-	defaultRenewDeadline := leaderelection.RenewDeadline
-	defaultRetryPeriod := leaderelection.RetryPeriod
-	defer func() {
-		leaderelection.LeaseDuration = defaultLeaseDuration
-		leaderelection.RenewDeadline = defaultRenewDeadline
-		leaderelection.RetryPeriod = defaultRetryPeriod
-	}()
-
 	// Use shorter interval for lease duration in integration test
-	leaderelection.LeaseDuration = 5 * time.Second
-	leaderelection.RenewDeadline = 3 * time.Second
-	leaderelection.RetryPeriod = 2 * time.Second
+	timers := leaderelection.LeaderElectionTimers{
+		LeaseDuration: 5 * time.Second,
+		RenewDeadline: 3 * time.Second,
+		RetryPeriod:   2 * time.Second,
+	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 	etcd := framework.SharedEtcd()
 
 	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
+	// Set the timers on the apiserver .
+	flags = append(flags, fmt.Sprintf("--coordinated-leadership-lease-duration=%s", timers.LeaseDuration.String()), fmt.Sprintf("--coordinated-leadership-renew-deadline=%s", timers.RenewDeadline.String()), fmt.Sprintf("--coordinated-leadership-retry-period=%s", timers.RetryPeriod.String()))
 	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), flags, etcd)
 	defer server.TearDownFn()
 

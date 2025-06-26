@@ -34,7 +34,6 @@ type RuleWithOperationsApplyConfiguration struct {
 func RuleWithOperations() *RuleWithOperationsApplyConfiguration {
 	return &RuleWithOperationsApplyConfiguration{}
 }
-func (b RuleWithOperationsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithOperations adds the given value to the Operations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

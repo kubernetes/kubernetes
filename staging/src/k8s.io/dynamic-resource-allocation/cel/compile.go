@@ -260,6 +260,10 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 
 	result, details, err := c.Program.ContextEval(ctx, variables)
 	if err != nil {
+		// CEL does not wrap the context error. We have to deduce why it failed.
+		if strings.Contains(err.Error(), "operation interrupted") && ctx.Err() != nil {
+			return false, details, fmt.Errorf("%w: %w", err, context.Cause(ctx))
+		}
 		return false, details, err
 	}
 	resultAny, err := result.ConvertToNative(boolType)

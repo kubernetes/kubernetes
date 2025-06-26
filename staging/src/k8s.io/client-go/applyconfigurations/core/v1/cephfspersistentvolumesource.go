@@ -34,7 +34,6 @@ type CephFSPersistentVolumeSourceApplyConfiguration struct {
 func CephFSPersistentVolumeSource() *CephFSPersistentVolumeSourceApplyConfiguration {
 	return &CephFSPersistentVolumeSourceApplyConfiguration{}
 }
-func (b CephFSPersistentVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMonitors adds the given value to the Monitors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

@@ -29,7 +29,6 @@ type VolumeNodeAffinityApplyConfiguration struct {
 func VolumeNodeAffinity() *VolumeNodeAffinityApplyConfiguration {
 	return &VolumeNodeAffinityApplyConfiguration{}
 }
-func (b VolumeNodeAffinityApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRequired sets the Required field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

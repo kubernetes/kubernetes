@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -117,7 +118,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 		name                   string
 		args                   config.NodeResourcesBalancedAllocationArgs
 		runPreScore            bool
-		wantPreScoreStatusCode framework.Code
+		wantPreScoreStatusCode fwk.Code
 	}{
 		{
 			// bestEffort pods, skip in PreScore
@@ -126,7 +127,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			name:                   "nothing scheduled, nothing requested, skip in PreScore",
 			args:                   config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
 			runPreScore:            true,
-			wantPreScoreStatusCode: framework.Skip,
+			wantPreScoreStatusCode: fwk.Skip,
 		},
 		{
 			// Node1 scores on 0-MaxNodeScore scale
@@ -306,7 +307,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 				if status.Code() != test.wantPreScoreStatusCode {
 					t.Errorf("unexpected status code, want: %v, got: %v", test.wantPreScoreStatusCode, status.Code())
 				}
-				if status.Code() == framework.Skip {
+				if status.Code() == fwk.Skip {
 					t.Log("skipping score test as PreScore returned skip")
 					return
 				}

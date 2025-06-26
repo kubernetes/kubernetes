@@ -30,7 +30,6 @@ type PersistentVolumeClaimVolumeSourceApplyConfiguration struct {
 func PersistentVolumeClaimVolumeSource() *PersistentVolumeClaimVolumeSourceApplyConfiguration {
 	return &PersistentVolumeClaimVolumeSourceApplyConfiguration{}
 }
-func (b PersistentVolumeClaimVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithClaimName sets the ClaimName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

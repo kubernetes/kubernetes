@@ -29,7 +29,6 @@ type JSONPatchApplyConfiguration struct {
 func JSONPatch() *JSONPatchApplyConfiguration {
 	return &JSONPatchApplyConfiguration{}
 }
-func (b JSONPatchApplyConfiguration) IsApplyConfiguration() {}
 
 // WithExpression sets the Expression field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

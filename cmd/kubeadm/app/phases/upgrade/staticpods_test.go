@@ -104,11 +104,6 @@ func (w *fakeWaiter) WaitForControlPlaneComponents(podsMap map[string]*v1.Pod, a
 	return nil
 }
 
-// WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
-func (w *fakeWaiter) WaitForAPI() error {
-	return nil
-}
-
 // WaitForPodsWithLabel just returns an error if set from errsToReturn
 func (w *fakeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 	return w.errsToReturn[waitForPodsWithLabel]

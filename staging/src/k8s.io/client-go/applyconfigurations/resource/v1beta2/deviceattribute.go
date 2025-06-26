@@ -32,7 +32,6 @@ type DeviceAttributeApplyConfiguration struct {
 func DeviceAttribute() *DeviceAttributeApplyConfiguration {
 	return &DeviceAttributeApplyConfiguration{}
 }
-func (b DeviceAttributeApplyConfiguration) IsApplyConfiguration() {}
 
 // WithIntValue sets the IntValue field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

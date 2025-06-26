@@ -30,7 +30,6 @@ type StorageVersionMigrationSpecApplyConfiguration struct {
 func StorageVersionMigrationSpec() *StorageVersionMigrationSpecApplyConfiguration {
 	return &StorageVersionMigrationSpecApplyConfiguration{}
 }
-func (b StorageVersionMigrationSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithResource sets the Resource field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

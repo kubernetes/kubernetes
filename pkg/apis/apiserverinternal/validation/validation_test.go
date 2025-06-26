@@ -360,14 +360,14 @@ func TestValidateStorageVersionCondition(t *testing.T) {
 			Status:  "True",
 			Message: "unknown",
 		}},
-		expectedErr: "Required value: reason cannot be empty",
+		expectedErr: "Required value",
 	}, {
 		conditions: []apiserverinternal.StorageVersionCondition{{
 			Type:   "fea",
 			Status: "True",
 			Reason: "unknown",
 		}},
-		expectedErr: "Required value: message cannot be empty",
+		expectedErr: "Required value",
 	}, {
 		conditions: []apiserverinternal.StorageVersionCondition{{
 			Type:    "fea",

@@ -301,6 +301,7 @@ type KubeletConfiguration struct {
 	ClusterDNS []string `json:"clusterDNS,omitempty"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
+	// Deprecated: no longer has any effect.
 	// Default: "4h"
 	// +optional
 	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout,omitempty"`

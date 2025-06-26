@@ -35,7 +35,6 @@ type EmptyDirVolumeSourceApplyConfiguration struct {
 func EmptyDirVolumeSource() *EmptyDirVolumeSourceApplyConfiguration {
 	return &EmptyDirVolumeSourceApplyConfiguration{}
 }
-func (b EmptyDirVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMedium sets the Medium field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

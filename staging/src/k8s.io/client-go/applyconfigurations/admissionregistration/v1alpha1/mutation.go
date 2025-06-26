@@ -35,7 +35,6 @@ type MutationApplyConfiguration struct {
 func Mutation() *MutationApplyConfiguration {
 	return &MutationApplyConfiguration{}
 }
-func (b MutationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPatchType sets the PatchType field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -45,7 +45,6 @@ type PodSecurityContextApplyConfiguration struct {
 func PodSecurityContext() *PodSecurityContextApplyConfiguration {
 	return &PodSecurityContextApplyConfiguration{}
 }
-func (b PodSecurityContextApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSELinuxOptions sets the SELinuxOptions field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

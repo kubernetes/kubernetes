@@ -39,7 +39,6 @@ type DaemonSetConditionApplyConfiguration struct {
 func DaemonSetCondition() *DaemonSetConditionApplyConfiguration {
 	return &DaemonSetConditionApplyConfiguration{}
 }
-func (b DaemonSetConditionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -32,7 +32,6 @@ type TypedObjectReferenceApplyConfiguration struct {
 func TypedObjectReference() *TypedObjectReferenceApplyConfiguration {
 	return &TypedObjectReferenceApplyConfiguration{}
 }
-func (b TypedObjectReferenceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAPIGroup sets the APIGroup field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
