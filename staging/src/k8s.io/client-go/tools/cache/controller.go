@@ -208,9 +208,9 @@ func (c *controller) processLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			_, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
+			_, err := c.config.Pop(PopProcessFunc(c.config.Process))
 			if err != nil {
-				if err == ErrFIFOClosed {
+				if errors.Is(err, ErrFIFOClosed) {
 					return
 				}
 			}
