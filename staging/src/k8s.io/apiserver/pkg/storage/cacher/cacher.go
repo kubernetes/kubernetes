@@ -51,7 +51,6 @@ import (
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/ptr"
 )
 
 var (
@@ -437,9 +436,6 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	// We don't want to terminate all watchers as recreating all watchers puts high load on api-server.
 	// In most of the cases, leader is reelected within few cycles.
 	reflector.MaxInternalErrorRetryDuration = time.Second * 30
-	// since the watch-list is provided by the watch cache instruct
-	// the reflector to issue a regular LIST against the store
-	reflector.UseWatchList = ptr.To(false)
 
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector

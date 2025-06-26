@@ -162,10 +162,9 @@ func yaml_emitter_emit(emitter *yaml_emitter_t, event *yaml_event_t) bool {
 // Check if we need to accumulate more events before emitting.
 //
 // We accumulate extra
-//  - 1 event for DOCUMENT-START
-//  - 2 events for SEQUENCE-START
-//  - 3 events for MAPPING-START
-//
+//   - 1 event for DOCUMENT-START
+//   - 2 events for SEQUENCE-START
+//   - 3 events for MAPPING-START
 func yaml_emitter_need_more_events(emitter *yaml_emitter_t) bool {
 	if emitter.events_head == len(emitter.events) {
 		return true
@@ -483,6 +482,18 @@ func yaml_emitter_emit_document_start(emitter *yaml_emitter_t, event *yaml_event
 	}
 
 	return yaml_emitter_set_emitter_error(emitter, "expected DOCUMENT-START or STREAM-END")
+}
+
+// yaml_emitter_increase_indent preserves the original signature and delegates to
+// yaml_emitter_increase_indent_compact without compact-sequence indentation
+func yaml_emitter_increase_indent(emitter *yaml_emitter_t, flow, indentless bool) bool {
+	return yaml_emitter_increase_indent_compact(emitter, flow, indentless, false)
+}
+
+// yaml_emitter_process_line_comment preserves the original signature and delegates to
+// yaml_emitter_process_line_comment_linebreak passing false for linebreak
+func yaml_emitter_process_line_comment(emitter *yaml_emitter_t) bool {
+	return yaml_emitter_process_line_comment_linebreak(emitter, false)
 }
 
 // Expect the root node.

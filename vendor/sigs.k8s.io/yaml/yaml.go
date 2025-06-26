@@ -24,7 +24,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"sigs.k8s.io/yaml/goyaml.v2"
+	"go.yaml.in/yaml/v2"
 )
 
 // Marshal marshals obj into JSON using stdlib json.Marshal, and then converts JSON to YAML using JSONToYAML (see that method for more reference)
@@ -92,7 +92,7 @@ func jsonUnmarshal(reader io.Reader, obj interface{}, opts ...JSONOpt) error {
 		d = opt(d)
 	}
 	if err := d.Decode(&obj); err != nil {
-		return fmt.Errorf("while decoding JSON: %v", err)
+		return fmt.Errorf("while decoding JSON: %w", err)
 	}
 	return nil
 }
@@ -416,4 +416,11 @@ func jsonToYAMLValue(j interface{}) interface{} {
 		return j
 	}
 	return j
+}
+
+// DisallowUnknownFields configures the JSON decoder to error out if unknown
+// fields come along, instead of dropping them by default.
+func DisallowUnknownFields(d *json.Decoder) *json.Decoder {
+	d.DisallowUnknownFields()
+	return d
 }

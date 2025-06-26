@@ -13,7 +13,6 @@ reviewers:
   - pohly
   - SataQiu
   - smarterclayton
-  - spiffxp
   - sttts
   - thockin
   - wojtek-t
@@ -31,7 +30,6 @@ approvers:
   - SataQiu
   - smarterclayton
   - soltysh # for sig-cli related stuff
-  - spiffxp
   - sttts
   - thockin
   - wojtek-t
@@ -43,3 +41,4 @@ emeritus_approvers:
   - lavalamp
   - zmerlynn
   - vishh
+  - spiffxp

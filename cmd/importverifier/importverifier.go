@@ -27,7 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
+	yaml "go.yaml.in/yaml/v2"
 )
 
 // Package is a subset of cmd/go.Package
