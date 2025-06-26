@@ -586,6 +586,7 @@ func TestNoBlankLinesForGetAll(t *testing.T) {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 	expectedErr := `No resources found in test namespace.
+warning: Setting --ignore-not-found only suppresses error message above; it won't alter the exit code as the operation is considered successful by the HTTP status. See "kubectl get -h" for details of the flags.
 `
 	if e, a := expectedErr, errbuf.String(); e != a {
 		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
@@ -612,7 +613,36 @@ func TestNotFoundMessageForGetNonNamespacedResources(t *testing.T) {
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
-	expectedErr := `No resources found
+	expectedErr := `No resources found.
+warning: Setting --ignore-not-found only suppresses error message above; it won't alter the exit code as the operation is considered successful by the HTTP status. See "kubectl get -h" for details of the flags.
+`
+	if e, a := expectedErr, errbuf.String(); e != a {
+		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestNotFoundMessageForGetNonNamespacedResourcesIgnoreNotFound(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)},
+	}
+
+	streams, _, buf, errbuf := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.Flags().Set("ignore-not-found", "true") //nolint:errcheck
+	cmd.Run(cmd, []string{"persistentvolumes"})
+
+	expected := ``
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+	expectedErr := `warning: Error message suppressed. Removing --ignore-not-found won't alter the exit code as the operation is considered successful by the HTTP status. See "kubectl get -h" for details of the flags.
 `
 	if e, a := expectedErr, errbuf.String(); e != a {
 		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
@@ -705,6 +735,7 @@ func TestGetEmptyTable(t *testing.T) {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 	expectedErr := `No resources found in test namespace.
+warning: Setting --ignore-not-found only suppresses error message above; it won't alter the exit code as the operation is considered successful by the HTTP status. See "kubectl get -h" for details of the flags.
 `
 	if e, a := expectedErr, errbuf.String(); e != a {
 		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
