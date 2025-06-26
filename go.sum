@@ -11,6 +11,8 @@ github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab h1:UKkYhof1njT1
 github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab/go.mod h1:3VYc5hodBMJ5+l/7J4xAyMeuM2PNuepvHlGs8yilUCA=
 github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14 h1:H0fvhiZ5Dd1o8MdJGjCrE6cjhpLylg82Hpkn0tR2QGg=
 github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14/go.mod h1:nxL+Hfrom4doGZYEwZxRWXK19XpOMlKD9TkR9jQuFGI=
+github.com/Jefftree/kube-openapi v0.0.8-gnostic.0.20250626155838-4e3cf96231a2 h1:hliBTLcaKIIHOt/RTVThnyyhd32cbLpnCske6Z0dJ8k=
+github.com/Jefftree/kube-openapi v0.0.8-gnostic.0.20250626155838-4e3cf96231a2/go.mod h1:AhlOnfuhSvADbp04cXeC4lUuQzjuznR7yFm5miE25Gw=
 github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ4pzQ=
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
@@ -481,8 +483,6 @@ k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f h1:SLb+kxmzfA87x4E4brQzB33VBb
 k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f/go.mod h1:EJykeLsmFC60UQbYJezXkEsG2FLrt0GPNkU5iK5GWxU=
 k8s.io/klog/v2 v2.130.1 h1:n9Xl7H1Xvksem4KFG4PYbdQCQxqc/tTUyrgXaOhHSzk=
 k8s.io/klog/v2 v2.130.1/go.mod h1:3Jpz1GvMt720eyJH1ckRHK1EDfpxISzJ7I9OYgaDtPE=
-k8s.io/kube-openapi v0.0.0-20250610211856-8b98d1ed966a h1:ZV3Zr+/7s7aVbjNGICQt+ppKWsF1tehxggNfbM7XnG8=
-k8s.io/kube-openapi v0.0.0-20250610211856-8b98d1ed966a/go.mod h1:5jIi+8yX4RIb8wk3XwBo5Pq2ccx4FP10ohkbSKCZoK8=
 k8s.io/system-validators v1.10.1 h1:bIO3YRgxJkh/W3ghcd5ViXNPGmjwQKlHk/ySPdw6K00=
 k8s.io/system-validators v1.10.1/go.mod h1:awfSS706v9R12VC7u7K89FKfqVy44G+E0L1A0FX9Wmw=
 k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 h1:hwvWFiBzdWw1FhfY1FooPn3kzWuJ8tmbZBHi4zVsl1Y=
