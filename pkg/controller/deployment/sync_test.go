@@ -18,6 +18,7 @@ package deployment
 
 import (
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
@@ -589,6 +591,77 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 		if !test.expectedDeletedRSs.Equal(deletedRSs) {
 			t.Errorf("expect to delete old replica sets %v, but got %v", test.expectedDeletedRSs, deletedRSs)
 			continue
+		}
+	}
+}
+
+func TestDeploymentController_generateReplicaSetName(t *testing.T) {
+	tests := []struct {
+		name             string
+		deploymentName   string
+		wantRSNamePrefix string
+	}{
+		{
+			name:             "short name",
+			deploymentName:   "my-deployment",
+			wantRSNamePrefix: "my-deployment-",
+		},
+		{
+			name:             "very long name truncated",
+			deploymentName:   strings.Repeat("a", 250),
+			wantRSNamePrefix: strings.Repeat("a", 242) + "-",
+		},
+		{
+			name:             "very long name not truncated",
+			deploymentName:   strings.Repeat("a", 242),
+			wantRSNamePrefix: strings.Repeat("a", 242) + "-",
+		},
+	}
+
+	for _, test := range tests {
+		_, ctx := ktesting.NewTestContext(t)
+
+		fake := &fake.Clientset{}
+		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
+		controller, err := NewDeploymentController(ctx, informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		if err != nil {
+			t.Fatalf("error creating Deployment controller: %v", err)
+		}
+
+		controller.eventRecorder = &record.FakeRecorder{}
+		controller.dListerSynced = alwaysReady
+		controller.rsListerSynced = alwaysReady
+		controller.podListerSynced = alwaysReady
+
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		informers.Start(stopCh)
+
+		d := newDeployment(test.deploymentName, 1, nil, nil, nil, map[string]string{"foo": "bar"})
+
+		if _, err := controller.getNewReplicaSet(ctx, d, []*apps.ReplicaSet{}, []*apps.ReplicaSet{}, true); err != nil {
+			t.Errorf("failed to create new ReplicaSet: %v", err)
+			return
+		}
+
+		rsName := ""
+		for _, action := range fake.Actions() {
+			if createAction, ok := action.(testclient.CreateAction); ok {
+				if createdRS, ok := createAction.GetObject().(*apps.ReplicaSet); ok {
+					if createdRS.ObjectMeta.Name != "" {
+						rsName = createdRS.ObjectMeta.Name
+						break
+					}
+				}
+			}
+		}
+
+		if len(rsName) > validation.DNS1123SubdomainMaxLength {
+			t.Errorf("generated name length %d, want <= %d", len(rsName), validation.DNS1123SubdomainMaxLength)
+		}
+
+		if !strings.HasPrefix(rsName, test.wantRSNamePrefix) {
+			t.Errorf("generated name %q, want prefix %q", rsName, test.wantRSNamePrefix)
 		}
 	}
 }
