@@ -25,12 +25,13 @@ import (
 // ExactDeviceRequestApplyConfiguration represents a declarative configuration of the ExactDeviceRequest type for use
 // with apply.
 type ExactDeviceRequestApplyConfiguration struct {
-	DeviceClassName *string                               `json:"deviceClassName,omitempty"`
-	Selectors       []DeviceSelectorApplyConfiguration    `json:"selectors,omitempty"`
-	AllocationMode  *resourcev1beta2.DeviceAllocationMode `json:"allocationMode,omitempty"`
-	Count           *int64                                `json:"count,omitempty"`
-	AdminAccess     *bool                                 `json:"adminAccess,omitempty"`
-	Tolerations     []DeviceTolerationApplyConfiguration  `json:"tolerations,omitempty"`
+	DeviceClassName  *string                                 `json:"deviceClassName,omitempty"`
+	Selectors        []DeviceSelectorApplyConfiguration      `json:"selectors,omitempty"`
+	AllocationMode   *resourcev1beta2.DeviceAllocationMode   `json:"allocationMode,omitempty"`
+	Count            *int64                                  `json:"count,omitempty"`
+	AdminAccess      *bool                                   `json:"adminAccess,omitempty"`
+	Tolerations      []DeviceTolerationApplyConfiguration    `json:"tolerations,omitempty"`
+	CapacityRequests *CapacityRequirementsApplyConfiguration `json:"capacityRequests,omitempty"`
 }
 
 // ExactDeviceRequestApplyConfiguration constructs a declarative configuration of the ExactDeviceRequest type for use with
@@ -95,5 +96,13 @@ func (b *ExactDeviceRequestApplyConfiguration) WithTolerations(values ...*Device
 		}
 		b.Tolerations = append(b.Tolerations, *values[i])
 	}
+	return b
+}
+
+// WithCapacityRequests sets the CapacityRequests field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CapacityRequests field is set to the value of the last call.
+func (b *ExactDeviceRequestApplyConfiguration) WithCapacityRequests(value *CapacityRequirementsApplyConfiguration) *ExactDeviceRequestApplyConfiguration {
+	b.CapacityRequests = value
 	return b
 }

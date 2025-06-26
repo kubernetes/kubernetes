@@ -68,7 +68,12 @@
                 "effect": "effectValue",
                 "tolerationSeconds": 5
               }
-            ]
+            ],
+            "capacityRequests": {
+              "minimum": {
+                "minimumKey": "0"
+              }
+            }
           },
           "firstAvailable": [
             {
@@ -91,7 +96,12 @@
                   "effect": "effectValue",
                   "tolerationSeconds": 5
                 }
-              ]
+              ],
+              "capacityRequests": {
+                "minimum": {
+                  "minimumKey": "0"
+                }
+              }
             }
           ]
         }
@@ -101,7 +111,8 @@
           "requests": [
             "requestsValue"
           ],
-          "matchAttribute": "matchAttributeValue"
+          "matchAttribute": "matchAttributeValue",
+          "distinctAttribute": "distinctAttributeValue"
         }
       ],
       "config": [
@@ -144,7 +155,11 @@
                 "effect": "effectValue",
                 "tolerationSeconds": 5
               }
-            ]
+            ],
+            "shareID": "shareIDValue",
+            "consumedCapacities": {
+              "consumedCapacitiesKey": "0"
+            }
           }
         ],
         "config": [

@@ -25,12 +25,13 @@ import (
 // DeviceSubRequestApplyConfiguration represents a declarative configuration of the DeviceSubRequest type for use
 // with apply.
 type DeviceSubRequestApplyConfiguration struct {
-	Name            *string                               `json:"name,omitempty"`
-	DeviceClassName *string                               `json:"deviceClassName,omitempty"`
-	Selectors       []DeviceSelectorApplyConfiguration    `json:"selectors,omitempty"`
-	AllocationMode  *resourcev1beta2.DeviceAllocationMode `json:"allocationMode,omitempty"`
-	Count           *int64                                `json:"count,omitempty"`
-	Tolerations     []DeviceTolerationApplyConfiguration  `json:"tolerations,omitempty"`
+	Name             *string                                 `json:"name,omitempty"`
+	DeviceClassName  *string                                 `json:"deviceClassName,omitempty"`
+	Selectors        []DeviceSelectorApplyConfiguration      `json:"selectors,omitempty"`
+	AllocationMode   *resourcev1beta2.DeviceAllocationMode   `json:"allocationMode,omitempty"`
+	Count            *int64                                  `json:"count,omitempty"`
+	Tolerations      []DeviceTolerationApplyConfiguration    `json:"tolerations,omitempty"`
+	CapacityRequests *CapacityRequirementsApplyConfiguration `json:"capacityRequests,omitempty"`
 }
 
 // DeviceSubRequestApplyConfiguration constructs a declarative configuration of the DeviceSubRequest type for use with
@@ -95,5 +96,13 @@ func (b *DeviceSubRequestApplyConfiguration) WithTolerations(values ...*DeviceTo
 		}
 		b.Tolerations = append(b.Tolerations, *values[i])
 	}
+	return b
+}
+
+// WithCapacityRequests sets the CapacityRequests field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CapacityRequests field is set to the value of the last call.
+func (b *DeviceSubRequestApplyConfiguration) WithCapacityRequests(value *CapacityRequirementsApplyConfiguration) *DeviceSubRequestApplyConfiguration {
+	b.CapacityRequests = value
 	return b
 }

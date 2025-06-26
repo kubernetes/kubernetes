@@ -25,14 +25,15 @@ import (
 // DeviceRequestApplyConfiguration represents a declarative configuration of the DeviceRequest type for use
 // with apply.
 type DeviceRequestApplyConfiguration struct {
-	Name            *string                               `json:"name,omitempty"`
-	DeviceClassName *string                               `json:"deviceClassName,omitempty"`
-	Selectors       []DeviceSelectorApplyConfiguration    `json:"selectors,omitempty"`
-	AllocationMode  *resourcev1beta1.DeviceAllocationMode `json:"allocationMode,omitempty"`
-	Count           *int64                                `json:"count,omitempty"`
-	AdminAccess     *bool                                 `json:"adminAccess,omitempty"`
-	FirstAvailable  []DeviceSubRequestApplyConfiguration  `json:"firstAvailable,omitempty"`
-	Tolerations     []DeviceTolerationApplyConfiguration  `json:"tolerations,omitempty"`
+	Name             *string                                 `json:"name,omitempty"`
+	DeviceClassName  *string                                 `json:"deviceClassName,omitempty"`
+	Selectors        []DeviceSelectorApplyConfiguration      `json:"selectors,omitempty"`
+	AllocationMode   *resourcev1beta1.DeviceAllocationMode   `json:"allocationMode,omitempty"`
+	Count            *int64                                  `json:"count,omitempty"`
+	AdminAccess      *bool                                   `json:"adminAccess,omitempty"`
+	FirstAvailable   []DeviceSubRequestApplyConfiguration    `json:"firstAvailable,omitempty"`
+	Tolerations      []DeviceTolerationApplyConfiguration    `json:"tolerations,omitempty"`
+	CapacityRequests *CapacityRequirementsApplyConfiguration `json:"capacityRequests,omitempty"`
 }
 
 // DeviceRequestApplyConfiguration constructs a declarative configuration of the DeviceRequest type for use with
@@ -118,5 +119,13 @@ func (b *DeviceRequestApplyConfiguration) WithTolerations(values ...*DeviceToler
 		}
 		b.Tolerations = append(b.Tolerations, *values[i])
 	}
+	return b
+}
+
+// WithCapacityRequests sets the CapacityRequests field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CapacityRequests field is set to the value of the last call.
+func (b *DeviceRequestApplyConfiguration) WithCapacityRequests(value *CapacityRequirementsApplyConfiguration) *DeviceRequestApplyConfiguration {
+	b.CapacityRequests = value
 	return b
 }
