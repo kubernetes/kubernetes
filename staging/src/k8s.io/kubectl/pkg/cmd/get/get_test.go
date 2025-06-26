@@ -2218,8 +2218,8 @@ func TestWatchNonExistObject(t *testing.T) {
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
-	cmd.Flags().Set("watch", "true")
-	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("watch", "true")  //nolint:errcheck
+	cmd.Flags().Set("output", "yaml") //nolint:errcheck
 	cmd.Run(cmd, []string{"pods", "nonexistentpod"})
 
 	if buf.String() != "" {
@@ -2261,9 +2261,9 @@ func TestWatchNonExistObjectIgnoreNotFound(t *testing.T) {
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
-	cmd.Flags().Set("ignore-not-found", "true")
-	cmd.Flags().Set("watch", "true")
-	cmd.Flags().Set("output", "yaml")
+	cmd.Flags().Set("ignore-not-found", "true") //nolint:errcheck
+	cmd.Flags().Set("watch", "true")            //nolint:errcheck
+	cmd.Flags().Set("output", "yaml")           //nolint:errcheck
 	cmd.Run(cmd, []string{"pods", "nonexistentpod"})
 
 	if buf.String() != "" {
