@@ -17,6 +17,7 @@ limitations under the License.
 package diff
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -118,6 +119,13 @@ type DiffOptions struct {
 	Builder          *resource.Builder
 	Diff             *DiffProgram
 
+	Prune          bool
+	PruneAllowlist []string
+	All            bool
+	ApplySetRef    string
+
+	applySet *apply.ApplySet
+
 	pruner  *pruner
 	tracker *tracker
 }
@@ -166,15 +174,13 @@ func NewCmdDiff(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 	})
 
 	usage := "contains the configuration to diff"
-	cmd.Flags().StringArray("prune-allowlist", []string{}, "Overwrite the default allowlist with <group/version/kind> for --prune")
-	cmd.Flags().Bool("prune", false, "Include resources that would be deleted by pruning. Can be used with -l and default shows all resources would be pruned")
 	cmd.Flags().BoolVar(&options.ShowManagedFields, "show-managed-fields", options.ShowManagedFields, "If true, include managed fields in the diff.")
 	cmd.Flags().IntVar(&options.Concurrency, "concurrency", 1, "Number of objects to process in parallel when diffing against the live version. Larger number = faster, but more memory, I/O and CPU over that shorter period of time.")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &options.Selector)
-
+	cmdutil.AddPruningFlags(cmd, &options.Prune, &options.PruneAllowlist, &options.All, &options.ApplySetRef)
 	return cmd
 }
 
@@ -662,18 +668,49 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 
-	if cmdutil.GetFlagBool(cmd, "prune") {
+	if o.Prune {
 		mapper, err := f.ToRESTMapper()
+		o.tracker = newTracker()
+
 		if err != nil {
 			return err
 		}
 
-		resources, err := prune.ParseResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-allowlist"))
-		if err != nil {
-			return err
+		// Taken from apply.go
+		if o.ApplySetRef != "" {
+			parent, err := apply.ParseApplySetParentRef(o.ApplySetRef, mapper)
+
+			if err != nil {
+				return fmt.Errorf("invalid parent reference %q: %w", o.ApplySetRef, err)
+			}
+
+			if o.EnforceNamespace && parent.IsNamespaced() {
+				parent.Namespace = o.CmdNamespace
+			}
+
+			tooling := apply.ApplySetTooling{Name: "kubectl", Version: apply.ApplySetToolVersion}
+			restClient, err := f.UnstructuredClientForMapping(parent.RESTMapping)
+			if err != nil {
+				return fmt.Errorf("failed to initialize RESTClient for ApplySet: %w", err)
+			}
+			if restClient == nil {
+				return fmt.Errorf("could not build RESTClient for ApplySet")
+			}
+
+			o.applySet = apply.NewApplySet(parent, tooling, mapper, restClient)
+
+			if err := o.applySet.Validate(cmd.Context(), o.DynamicClient); err != nil {
+				return err
+			}
+
+		} else {
+			resources, err := prune.ParseResources(mapper, cmdutil.GetFlagStringArray(cmd, "prune-allowlist"))
+			if err != nil {
+				return err
+			}
+
+			o.pruner = newPruner(o.DynamicClient, mapper, resources, o.Selector)
 		}
-		o.tracker = newTracker()
-		o.pruner = newPruner(o.DynamicClient, mapper, resources, o.Selector)
 	}
 
 	o.Builder = f.NewBuilder()
@@ -754,14 +791,32 @@ func (o *DiffOptions) Run() error {
 		return err
 	})
 
-	if o.pruner != nil {
-		prunedObjs, err := o.pruner.pruneAll(o.tracker, o.CmdNamespace != "")
-		if err != nil {
-			klog.Warningf("pruning failed and could not be evaluated err: %v", err)
+	if err != nil {
+		return err
+	}
+
+	if o.Prune {
+		var prunedObjs []runtime.Object
+
+		if o.applySet != nil {
+			applyPruneObjs, err := o.applySet.FindAllObjectsToPrune(context.TODO(), o.DynamicClient, o.tracker.visitedUids)
+
+			if err != nil {
+				klog.Warningf("applyset pruning failed and could not be evaluated: %v", err)
+			}
+
+			for _, p := range applyPruneObjs {
+				prunedObjs = append(prunedObjs, p.Object)
+			}
 		}
 
-		// Print pruned objects into old file and thus, diff
-		// command will show them as pruned.
+		if o.pruner != nil {
+			prunedObjs, err = o.pruner.pruneAll(o.tracker, o.CmdNamespace != "")
+			if err != nil {
+				klog.Warningf("pruning failed and could not be evaluated err: %v", err)
+			}
+		}
+
 		for _, p := range prunedObjs {
 			name, err := getObjectName(p)
 			if err != nil {
@@ -774,15 +829,33 @@ func (o *DiffOptions) Run() error {
 		}
 	}
 
-	if err != nil {
-		return err
-	}
-
 	return differ.Run(o.Diff)
 }
 
 // Validate makes sure provided values for DiffOptions are valid
 func (o *DiffOptions) Validate() error {
+	if o.ApplySetRef != "" && !o.Prune {
+		return fmt.Errorf("--applyset requires --prune")
+	}
+
+	if o.Prune {
+		if o.ApplySetRef != "" {
+			if o.All {
+				return fmt.Errorf("--all is incompatible with --applyset")
+			} else if o.Selector != "" {
+				return fmt.Errorf("--selector is incompatible with --applyset")
+			} else if len(o.PruneAllowlist) > 0 {
+				return fmt.Errorf("--prune-allowlist is incompatible with --applyset")
+			}
+		} else {
+			// Old pruning logic validation
+			if !o.All && o.Selector == "" {
+				return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
+			}
+			// No server-side apply check for diff, as it's a dry-run operation anyway.
+		}
+	}
+
 	return nil
 }
 
