@@ -17,7 +17,6 @@ limitations under the License.
 package cache
 
 import (
-	"context"
 	"fmt"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -192,16 +191,11 @@ func (f *RealFIFO) IsClosed() bool {
 // The item is removed from the queue (and the store) before it is processed.
 // process function is called under lock, so it is safe
 // update data structures in it that need to be in sync with the queue.
-func (f *RealFIFO) Pop(ctx context.Context, process PopProcessFunc) (interface{}, error) {
+func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
 	for len(f.items) == 0 {
-		// if the length of the queue is 0 and ctx is done, return here
-		if ctx.Err() != nil {
-			return nil, ErrCtxDone
-		}
-
 		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
 		// When Close() is called, the f.closed is set and the condition is broadcasted.
 		// Which causes this loop to continue and return from the Pop().

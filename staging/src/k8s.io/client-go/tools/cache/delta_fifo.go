@@ -17,7 +17,6 @@ limitations under the License.
 package cache
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -491,16 +490,11 @@ func (f *DeltaFIFO) IsClosed() bool {
 //
 // Pop returns a 'Deltas', which has a complete list of all the things
 // that happened to the object (deltas) while it was sitting in the queue.
-func (f *DeltaFIFO) Pop(ctx context.Context, process PopProcessFunc) (interface{}, error) {
+func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	for {
 		for len(f.queue) == 0 {
-			// if the length of the queue is 0 and ctx is done, return here
-			if ctx.Err() != nil {
-				return nil, ErrCtxDone
-			}
-
 			// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
 			// When Close() is called, the f.closed is set and the condition is broadcasted.
 			// Which causes this loop to continue and return from the Pop().
