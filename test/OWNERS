@@ -35,7 +35,6 @@ approvers:
   - SataQiu
   - smarterclayton
   - soltysh
-  - spiffxp
   - sttts
   - thockin
   - wojtek-t
@@ -56,6 +55,7 @@ emeritus_approvers:
   - ncdc
   - vishh
   - shyamjvs
+  - spiffxp
   - enisoc
   - alejandrox1
   - timothysc
