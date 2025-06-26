@@ -425,7 +425,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	}, nil
 }
 
-func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc func() runtime.Object, resourcePrefix string) (storage.Interface, DestroyFunc, error) {
+func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc func() runtime.Object, reverseKeyFunc func(string) (string, string, error), resourcePrefix string) (storage.Interface, DestroyFunc, error) {
 	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
 	if err != nil {
 		return nil, nil, err
@@ -469,7 +469,7 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 		decoder = etcd3.WithCorruptObjErrorHandlingDecoder(decoder)
 	}
 	var store storage.Interface
-	store = etcd3.New(client, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
+	store = etcd3.New(client, c.Codec, newFunc, newListFunc, reverseKeyFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowUnsafeMalformedObjectDeletion) {
 		store = etcd3.NewStoreWithUnsafeCorruptObjectDeletion(store, c.GroupResource)
 	}
