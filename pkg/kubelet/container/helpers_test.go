@@ -1159,7 +1159,7 @@ func TestExpandContainerCommandOnlyStatic(t *testing.T) {
 			envs: []v1.EnvVar{
 				{Name: "FOO", Value: "foo-value"},
 			},
-			expected: []string{"echo", "foo-value", "$(MISSING)"}, // should this behave as "echo", "foo-value", "" ?
+			expected: []string{"echo", "foo-value", "$(MISSING)"},
 		},
 	}
 
