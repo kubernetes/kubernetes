@@ -43,10 +43,13 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 )
 
@@ -343,9 +346,15 @@ func TestListResourceVersionMatch(t *testing.T) {
 	storagetesting.RunTestListResourceVersionMatch(ctx, t, &storeWithPrefixTransformer{store})
 }
 
-func TestCount(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestCount(ctx, t, store)
+func TestStats(t *testing.T) {
+	for _, sizeBasedListCostEstimate := range []bool{true, false} {
+		t.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v", sizeBasedListCostEstimate), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedListCostEstimate)
+			// Match transformer with cacher tests.
+			ctx, store, _ := testSetup(t)
+			storagetesting.RunTestStats(ctx, t, store, store.codec, store.transformer, sizeBasedListCostEstimate)
+		})
+	}
 }
 
 // =======================================================================
@@ -591,6 +600,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		NewDefaultDecoder(setupOpts.codec, versioner),
 		versioner,
 	)
+	t.Cleanup(store.Close)
 	ctx := context.Background()
 	return ctx, store, client
 }
@@ -666,8 +676,6 @@ func TestInvalidKeys(t *testing.T) {
 	expectInvalidKey("Get", store.Get(ctx, invalidKey, storage.GetOptions{}, nil))
 	expectInvalidKey("GetList", store.GetList(ctx, invalidKey, storage.ListOptions{}, nil))
 	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
-	_, countErr := store.Count(t.Context(), invalidKey)
-	expectInvalidKey("Count", countErr)
 }
 
 func BenchmarkStore_GetList(b *testing.B) {
@@ -836,18 +844,21 @@ func BenchmarkStoreList(b *testing.B) {
 		},
 	}
 	for _, dims := range dimensions {
-		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
-			data := storagetesting.PrepareBenchchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
-			ctx, store, _ := testSetup(b)
-			var out example.Pod
-			for _, pod := range data.Pods {
-				err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
-				if err != nil {
-					b.Fatal(err)
+		for _, sizeBasedEnabled := range []bool{true, false} {
+			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedEnabled)
+			b.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v/Namespaces=%d/Pods=%d/Nodes=%d", sizeBasedEnabled, dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+				data := storagetesting.PrepareBenchchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+				ctx, store, _ := testSetup(b)
+				var out example.Pod
+				for _, pod := range data.Pods {
+					err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
+					if err != nil {
+						b.Fatal(err)
+					}
 				}
-			}
-			storagetesting.RunBenchmarkStoreList(ctx, b, store, data, false)
-		})
+				storagetesting.RunBenchmarkStoreList(ctx, b, store, data, false)
+			})
+		}
 	}
 }
 
@@ -899,4 +910,55 @@ func TestGetCurrentResourceVersion(t *testing.T) {
 	currentPodRV, err := store.versioner.ParseResourceVersion(currentPod.ResourceVersion)
 	require.NoError(t, err)
 	require.Equal(t, currentPodRV, podRV, "didn't expect to see the pod's RV changed")
+}
+
+func BenchmarkStoreStats(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	data := storagetesting.PrepareBenchchmarkData(50, 3_000, 5_000)
+	ctx, store, _ := testSetup(b)
+	var out example.Pod
+	for _, pod := range data.Pods {
+		err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	storagetesting.RunBenchmarkStoreStats(ctx, b, store)
+}
+
+// BenchmarkStatsCacheCleanKeys measures execution time of cleanupKeys which is important for watch latency as blocks watch updates.
+func BenchmarkStatsCacheCleanKeys(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	namespaceCount := 50
+	podPerNamespaceCount := 3_000
+	data := storagetesting.PrepareBenchchmarkData(namespaceCount, podPerNamespaceCount, 5_000)
+	ctx, store, _ := testSetup(b)
+	var out example.Pod
+	for _, pod := range data.Pods {
+		err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	// List to fetch object sizes for statsCache.
+	listOut := &example.PodList{}
+	err := store.GetList(ctx, "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, listOut)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if len(store.stats.keys) < namespaceCount*podPerNamespaceCount {
+		b.Fatalf("Unexpected number of keys in stats, want: %d, got: %d", namespaceCount*podPerNamespaceCount, len(store.stats.keys))
+	}
+	// Get keys to measure only cleanupKeys time
+	keys, err := store.getKeys(ctx)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		store.stats.cleanKeys(keys)
+	}
+	if len(store.stats.keys) < namespaceCount*podPerNamespaceCount {
+		b.Fatalf("Unexpected number of keys in stats, want: %d, got: %d", namespaceCount*podPerNamespaceCount, len(store.stats.keys))
+	}
 }

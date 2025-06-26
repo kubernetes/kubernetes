@@ -27,10 +27,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func newListWorkEstimator(countFn objectCountGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
+func newListWorkEstimator(countFn statsGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
 	estimator := &listWorkEstimator{
 		config:        config,
-		countGetterFn: countFn,
+		statsGetterFn: countFn,
 		maxSeatsFn:    maxSeatsFn,
 	}
 	return estimator.estimate
@@ -38,7 +38,7 @@ func newListWorkEstimator(countFn objectCountGetterFunc, config *WorkEstimatorCo
 
 type listWorkEstimator struct {
 	config        *WorkEstimatorConfig
-	countGetterFn objectCountGetterFunc
+	statsGetterFn statsGetterFunc
 	maxSeatsFn    maxSeatsFunc
 }
 
@@ -90,7 +90,8 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	listFromStorage := result.ShouldDelegate
 	isListFromCache := requestInfo.Verb == "watch" || !listFromStorage
 
-	numStored, err := e.countGetterFn(key(requestInfo))
+	stats, err := e.statsGetterFn(key(requestInfo))
+	numStored := stats.ObjectCount
 	switch {
 	case err == ObjectCountStaleErr:
 		// object count going stale is indicative of degradation, so we should

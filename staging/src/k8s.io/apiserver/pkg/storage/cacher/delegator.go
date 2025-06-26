@@ -99,6 +99,10 @@ func (c *CacheDelegator) GetCurrentResourceVersion(ctx context.Context) (uint64,
 	return c.storage.GetCurrentResourceVersion(ctx)
 }
 
+func (c *CacheDelegator) SetKeysFunc(keys storage.KeysFunc) {
+	c.storage.SetKeysFunc(keys)
+}
+
 func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
@@ -257,8 +261,8 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
 	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
 }
 
-func (c *CacheDelegator) Count(ctx context.Context, pathPrefix string) (int64, error) {
-	return c.storage.Count(ctx, pathPrefix)
+func (c *CacheDelegator) Stats(ctx context.Context) (storage.Stats, error) {
+	return c.storage.Stats(ctx)
 }
 
 func (c *CacheDelegator) ReadinessCheck() error {

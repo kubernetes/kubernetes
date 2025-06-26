@@ -455,7 +455,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 			}, time.Second, stopCh,
 		)
 	}()
-
+	config.Storage.SetKeysFunc(cacher.getKeys)
 	return cacher, nil
 }
 
@@ -1269,6 +1269,14 @@ func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCach
 
 		cacheInterval.initialEventsEndBookmark = initialEventsEndBookmark
 	}
+}
+
+func (c *Cacher) getKeys(ctx context.Context) ([]string, error) {
+	rev, err := c.storage.GetCurrentResourceVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return c.watchCache.WaitUntilFreshAndGetKeys(ctx, rev)
 }
 
 func (c *Cacher) Ready() bool {
