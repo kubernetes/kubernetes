@@ -294,25 +294,6 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	}
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Started container %v", container.Name)
 
-	// Symlink container logs to the legacy container log location for cluster logging
-	// support.
-	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
-	containerMeta := containerConfig.GetMetadata()
-	sandboxMeta := podSandboxConfig.GetMetadata()
-	legacySymlink := legacyLogSymlink(containerID, containerMeta.Name, sandboxMeta.Name,
-		sandboxMeta.Namespace)
-	containerLog := filepath.Join(podSandboxConfig.LogDirectory, containerConfig.LogPath)
-	// only create legacy symlink if containerLog path exists (or the error is not IsNotExist).
-	// Because if containerLog path does not exist, only dangling legacySymlink is created.
-	// This dangling legacySymlink is later removed by container gc, so it does not make sense
-	// to create it in the first place. it happens when journald logging driver is used with docker.
-	if _, err := m.osInterface.Stat(containerLog); !os.IsNotExist(err) {
-		if err := m.osInterface.Symlink(containerLog, legacySymlink); err != nil {
-			klog.ErrorS(err, "Failed to create legacy symbolic link", "path", legacySymlink,
-				"containerID", containerID, "containerLogPath", containerLog)
-		}
-	}
-
 	// Step 4: execute the post start hook.
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
 		kubeContainerID := kubecontainer.ContainerID{
@@ -1399,15 +1380,6 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(ctx context.Context, cont
 	status := resp.GetStatus()
 	if status == nil {
 		return remote.ErrContainerStatusNil
-	}
-	// Remove the legacy container log symlink.
-	// TODO(random-liu): Remove this after cluster logging supports CRI container log path.
-	labeledInfo := getContainerInfoFromLabels(status.Labels)
-	legacySymlink := legacyLogSymlink(containerID, labeledInfo.ContainerName, labeledInfo.PodName,
-		labeledInfo.PodNamespace)
-	if err := m.osInterface.Remove(legacySymlink); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove container %q log legacy symbolic link %q: %v",
-			containerID, legacySymlink, err)
 	}
 	return nil
 }
