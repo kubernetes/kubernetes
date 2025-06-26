@@ -384,7 +384,7 @@ func (sp *ScorePlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (sp *ScorePlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (sp *ScorePlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 
@@ -438,9 +438,9 @@ func (fp *FilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v
 	return nil
 }
 
-func (fp *FilterPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+func (fp *FilterPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}},
 	}, nil
 }
 
@@ -511,7 +511,7 @@ func (pp *PreBindPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod 
 	return nil
 }
 
-func (pp *PreBindPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pp *PreBindPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 
@@ -681,7 +681,7 @@ func (pp *PermitPlugin) rejectAllPods() {
 	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject(pp.name, "rejectAllPods") })
 }
 
-func (pp *PermitPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pp *PermitPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 
@@ -2769,9 +2769,9 @@ func (pl *SchedulingGatesPluginWithEvents) PreEnqueue(ctx context.Context, p *v1
 	return pl.SchedulingGates.PreEnqueue(ctx, p)
 }
 
-func (pl *SchedulingGatesPluginWithEvents) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}},
+func (pl *SchedulingGatesPluginWithEvents) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Update}},
 	}, nil
 }
 
@@ -2790,7 +2790,7 @@ func (pl *SchedulingGatesPluginWOEvents) PreEnqueue(ctx context.Context, p *v1.P
 	return pl.SchedulingGates.PreEnqueue(ctx, p)
 }
 
-func (pl *SchedulingGatesPluginWOEvents) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *SchedulingGatesPluginWOEvents) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 

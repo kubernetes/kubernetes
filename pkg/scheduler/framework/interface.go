@@ -498,7 +498,7 @@ type EnqueueExtensions interface {
 	// Do not change the result during runtime, for example, based on the cluster's state etc.
 	//
 	// Appropriate implementation of this function will make Pod's re-scheduling accurate and performant.
-	EventsToRegister(context.Context) ([]ClusterEventWithHint, error)
+	EventsToRegister(context.Context) ([]fwk.ClusterEventWithHint, error)
 }
 
 // PreFilterExtensions is an interface that is included in plugins that allow specifying

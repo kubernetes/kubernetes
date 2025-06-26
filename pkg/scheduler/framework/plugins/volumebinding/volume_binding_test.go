@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -1136,14 +1137,14 @@ func TestIsSchedulableAfterCSINodeChange(t *testing.T) {
 		oldObj interface{}
 		newObj interface{}
 		err    bool
-		expect framework.QueueingHint
+		expect fwk.QueueingHint
 	}{
 		{
 			name:   "unexpected objects are passed",
 			oldObj: new(struct{}),
 			newObj: new(struct{}),
 			err:    true,
-			expect: framework.Queue,
+			expect: fwk.Queue,
 		},
 		{
 			name: "CSINode is newly created",
@@ -1154,7 +1155,7 @@ func TestIsSchedulableAfterCSINodeChange(t *testing.T) {
 			},
 			oldObj: nil,
 			err:    false,
-			expect: framework.Queue,
+			expect: fwk.Queue,
 		},
 		{
 			name: "CSINode's migrated-plugins annotations is added",
@@ -1175,7 +1176,7 @@ func TestIsSchedulableAfterCSINodeChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.Queue,
+			expect: fwk.Queue,
 		},
 		{
 			name: "CSINode's migrated-plugins annotation is updated",
@@ -1196,7 +1197,7 @@ func TestIsSchedulableAfterCSINodeChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.Queue,
+			expect: fwk.Queue,
 		},
 		{
 			name: "CSINode is updated but migrated-plugins annotation gets unchanged",
@@ -1217,7 +1218,7 @@ func TestIsSchedulableAfterCSINodeChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.QueueSkip,
+			expect: fwk.QueueSkip,
 		},
 	}
 	for _, item := range table {
@@ -1243,7 +1244,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 		oldPVC  interface{}
 		newPVC  interface{}
 		wantErr bool
-		expect  framework.QueueingHint
+		expect  fwk.QueueingHint
 	}{
 		{
 			name:    "pod has no pvc or ephemeral volumes",
@@ -1251,7 +1252,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 			oldPVC:  makePVC("pvc-b", "sc-a").PersistentVolumeClaim,
 			newPVC:  makePVC("pvc-b", "sc-a").PersistentVolumeClaim,
 			wantErr: false,
-			expect:  framework.QueueSkip,
+			expect:  fwk.QueueSkip,
 		},
 		{
 			name: "pvc with the same name as the one used by the pod in a different namespace is modified",
@@ -1263,7 +1264,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 			oldPVC:  nil,
 			newPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
 			wantErr: false,
-			expect:  framework.QueueSkip,
+			expect:  fwk.QueueSkip,
 		},
 		{
 			name: "pod has no pvc that is being modified",
@@ -1274,7 +1275,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 			oldPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
 			newPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
 			wantErr: false,
-			expect:  framework.QueueSkip,
+			expect:  fwk.QueueSkip,
 		},
 		{
 			name: "pod has no generic ephemeral volume that is being modified",
@@ -1285,7 +1286,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 			oldPVC:  makePVC("pod-a-ephemeral-b", "").PersistentVolumeClaim,
 			newPVC:  makePVC("pod-a-ephemeral-b", "").PersistentVolumeClaim,
 			wantErr: false,
-			expect:  framework.QueueSkip,
+			expect:  fwk.QueueSkip,
 		},
 		{
 			name: "pod has the pvc that is being modified",
@@ -1296,7 +1297,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 			oldPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
 			newPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
 			wantErr: false,
-			expect:  framework.Queue,
+			expect:  fwk.Queue,
 		},
 		{
 			name: "pod has the generic ephemeral volume that is being modified",
@@ -1307,14 +1308,14 @@ func TestIsSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 			oldPVC:  makePVC("pod-a-ephemeral-b", "").PersistentVolumeClaim,
 			newPVC:  makePVC("pod-a-ephemeral-b", "").PersistentVolumeClaim,
 			wantErr: false,
-			expect:  framework.Queue,
+			expect:  fwk.Queue,
 		},
 		{
 			name:    "type conversion error",
 			oldPVC:  new(struct{}),
 			newPVC:  new(struct{}),
 			wantErr: true,
-			expect:  framework.Queue,
+			expect:  fwk.Queue,
 		},
 	}
 
@@ -1341,7 +1342,7 @@ func TestIsSchedulableAfterStorageClassChange(t *testing.T) {
 		newSC     interface{}
 		pvcLister tf.PersistentVolumeClaimLister
 		err       bool
-		expect    framework.QueueingHint
+		expect    fwk.QueueingHint
 	}{
 		{
 			name:  "When a new StorageClass is created, it returns Queue",
@@ -1353,7 +1354,7 @@ func TestIsSchedulableAfterStorageClassChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.Queue,
+			expect: fwk.Queue,
 		},
 		{
 			name: "When the AllowedTopologies are changed, it returns Queue",
@@ -1379,7 +1380,7 @@ func TestIsSchedulableAfterStorageClassChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.Queue,
+			expect: fwk.Queue,
 		},
 		{
 			name: "When there are no changes to the StorageClass, it returns QueueSkip",
@@ -1395,14 +1396,14 @@ func TestIsSchedulableAfterStorageClassChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.QueueSkip,
+			expect: fwk.QueueSkip,
 		},
 		{
 			name:   "type conversion error",
 			oldSC:  new(struct{}),
 			newSC:  new(struct{}),
 			err:    true,
-			expect: framework.Queue,
+			expect: fwk.Queue,
 		},
 	}
 
@@ -1428,7 +1429,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 		oldCap  interface{}
 		newCap  interface{}
 		wantErr bool
-		expect  framework.QueueingHint
+		expect  fwk.QueueingHint
 	}{
 		{
 			name:   "When a new CSIStorageCapacity is created, it returns Queue",
@@ -1440,7 +1441,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				},
 			},
 			wantErr: false,
-			expect:  framework.Queue,
+			expect:  fwk.Queue,
 		},
 		{
 			name: "When the volume limit is increase(Capacity set), it returns Queue",
@@ -1457,7 +1458,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				Capacity: resource.NewQuantity(100, resource.DecimalSI),
 			},
 			wantErr: false,
-			expect:  framework.Queue,
+			expect:  fwk.Queue,
 		},
 		{
 			name: "When the volume limit is increase(MaximumVolumeSize set), it returns Queue",
@@ -1474,7 +1475,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				MaximumVolumeSize: resource.NewQuantity(100, resource.DecimalSI),
 			},
 			wantErr: false,
-			expect:  framework.Queue,
+			expect:  fwk.Queue,
 		},
 		{
 			name: "When the volume limit is increase(Capacity increase), it returns Queue",
@@ -1492,7 +1493,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				Capacity: resource.NewQuantity(100, resource.DecimalSI),
 			},
 			wantErr: false,
-			expect:  framework.Queue,
+			expect:  fwk.Queue,
 		},
 		{
 			name: "When the volume limit is increase(MaximumVolumeSize unset), it returns Queue",
@@ -1511,7 +1512,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				Capacity: resource.NewQuantity(100, resource.DecimalSI),
 			},
 			wantErr: false,
-			expect:  framework.Queue,
+			expect:  fwk.Queue,
 		},
 		{
 			name: "When the volume limit is increase(MaximumVolumeSize increase), it returns Queue",
@@ -1531,7 +1532,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				MaximumVolumeSize: resource.NewQuantity(60, resource.DecimalSI),
 			},
 			wantErr: false,
-			expect:  framework.Queue,
+			expect:  fwk.Queue,
 		},
 		{
 			name: "When there are no changes to the CSIStorageCapacity, it returns QueueSkip",
@@ -1551,7 +1552,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				MaximumVolumeSize: resource.NewQuantity(50, resource.DecimalSI),
 			},
 			wantErr: false,
-			expect:  framework.QueueSkip,
+			expect:  fwk.QueueSkip,
 		},
 		{
 			name: "When the volume limit is equal(Capacity), it returns QueueSkip",
@@ -1569,7 +1570,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				Capacity: resource.NewQuantity(100, resource.DecimalSI),
 			},
 			wantErr: false,
-			expect:  framework.QueueSkip,
+			expect:  fwk.QueueSkip,
 		},
 		{
 			name: "When the volume limit is equal(MaximumVolumeSize unset), it returns QueueSkip",
@@ -1588,7 +1589,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				Capacity: resource.NewQuantity(50, resource.DecimalSI),
 			},
 			wantErr: false,
-			expect:  framework.QueueSkip,
+			expect:  fwk.QueueSkip,
 		},
 		{
 			name: "When the volume limit is decrease(Capacity), it returns QueueSkip",
@@ -1606,7 +1607,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				Capacity: resource.NewQuantity(90, resource.DecimalSI),
 			},
 			wantErr: false,
-			expect:  framework.QueueSkip,
+			expect:  fwk.QueueSkip,
 		},
 		{
 			name: "When the volume limit is decrease(MaximumVolumeSize), it returns QueueSkip",
@@ -1624,14 +1625,14 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 				MaximumVolumeSize: resource.NewQuantity(90, resource.DecimalSI),
 			},
 			wantErr: false,
-			expect:  framework.QueueSkip,
+			expect:  fwk.QueueSkip,
 		},
 		{
 			name:    "type conversion error",
 			oldCap:  new(struct{}),
 			newCap:  new(struct{}),
 			wantErr: true,
-			expect:  framework.Queue,
+			expect:  fwk.Queue,
 		},
 	}
 
@@ -1657,7 +1658,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 		newObj interface{}
 		oldObj interface{}
 		err    bool
-		expect framework.QueueingHint
+		expect fwk.QueueingHint
 	}{
 		{
 			name: "pod has no CSIDriver",
@@ -1676,7 +1677,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.QueueSkip,
+			expect: fwk.QueueSkip,
 		},
 		{
 			name:   "unexpected objects are passed",
@@ -1684,7 +1685,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 			newObj: new(struct{}),
 			oldObj: new(struct{}),
 			err:    true,
-			expect: framework.Queue,
+			expect: fwk.Queue,
 		},
 		{
 			name: "driver name in pod and csidriver name are different",
@@ -1706,7 +1707,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.QueueSkip,
+			expect: fwk.QueueSkip,
 		},
 		{
 			name: "original StorageCapacity is nil",
@@ -1728,7 +1729,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.QueueSkip,
+			expect: fwk.QueueSkip,
 		},
 		{
 			name: "original StorageCapacity is false",
@@ -1750,7 +1751,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.QueueSkip,
+			expect: fwk.QueueSkip,
 		},
 		{
 			name: "modified StorageCapacity is nil",
@@ -1772,7 +1773,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.Queue,
+			expect: fwk.Queue,
 		},
 		{
 			name: "modified StorageCapacity is true",
@@ -1794,7 +1795,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.QueueSkip,
+			expect: fwk.QueueSkip,
 		},
 
 		{
@@ -1817,7 +1818,7 @@ func TestIsSchedulableAfterCSIDriverChange(t *testing.T) {
 				},
 			},
 			err:    false,
-			expect: framework.Queue,
+			expect: fwk.Queue,
 		},
 	}
 	for _, item := range table {

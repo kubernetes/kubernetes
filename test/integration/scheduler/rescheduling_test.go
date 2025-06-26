@@ -67,12 +67,12 @@ func (rp *ReservePlugin) Unreserve(ctx context.Context, state fwk.CycleState, p 
 	rp.numUnreserveCalled += 1
 }
 
-func (rp *ReservePlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
+func (rp *ReservePlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
 		{
-			Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add},
-			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-				return framework.Queue, nil
+			Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add},
+			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				return fwk.Queue, nil
 			},
 		},
 	}, nil
@@ -104,12 +104,12 @@ func (pp *PermitPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.
 	return nil, 0
 }
 
-func (pp *PermitPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
+func (pp *PermitPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
 		{
-			Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add},
-			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-				return framework.Queue, nil
+			Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add},
+			QueueingHintFn: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				return fwk.Queue, nil
 			},
 		},
 	}, nil
