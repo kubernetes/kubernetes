@@ -556,9 +556,9 @@ func (dc *DeploymentController) isScalingEvent(ctx context.Context, d *apps.Depl
 func generateReplicaSetName(deploymentName, podTemplateSpecHash string) string {
 	maxDeploymentNameLength := validation.DNS1123SubdomainMaxLength - 1 - len(podTemplateSpecHash)
 
-	if len(deploymentName) <= maxDeploymentNameLength {
-		return deploymentName + "-" + podTemplateSpecHash
+	if len(deploymentName) > maxDeploymentNameLength && maxDeploymentNameLength > 0 {
+		return deploymentName[:maxDeploymentNameLength] + "-" + podTemplateSpecHash
 	}
 
-	return deploymentName[:maxDeploymentNameLength] + "-" + podTemplateSpecHash
+	return deploymentName + "-" + podTemplateSpecHash
 }

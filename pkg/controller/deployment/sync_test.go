@@ -648,8 +648,8 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 		for _, action := range fake.Actions() {
 			if createAction, ok := action.(testclient.CreateAction); ok {
 				if createdRS, ok := createAction.GetObject().(*apps.ReplicaSet); ok {
-					if createdRS.ObjectMeta.Name != "" {
-						rsName = createdRS.ObjectMeta.Name
+					if createdRS.Name != "" {
+						rsName = createdRS.Name
 						break
 					}
 				}
@@ -662,6 +662,10 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 
 		if !strings.HasPrefix(rsName, test.wantRSNamePrefix) {
 			t.Errorf("generated name %q, want prefix %q", rsName, test.wantRSNamePrefix)
+		}
+
+		if h := strings.TrimPrefix(rsName, test.wantRSNamePrefix); len(h) != 10 {
+			t.Errorf("generated name hash %q length %d, want length 10", h, len(h))
 		}
 	}
 }
