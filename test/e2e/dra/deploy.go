@@ -216,6 +216,10 @@ func NewDriverInstance(f *framework.Framework) *Driver {
 		// By default, test only with the latest gRPC API.
 		NodeV1alpha4: false,
 		NodeV1beta1:  true,
+		// By default, assume that the kubelet supports DRA and that
+		// the driver's removal causes ResourceSlice cleanup.
+		WithKubelet:                true,
+		ExpectResourceSliceRemoval: true,
 	}
 	d.initName()
 	return d
@@ -257,6 +261,10 @@ type Driver struct {
 	// for different pods and thus seamless upgrades. Must be supported by the kubelet!
 	RollingUpdate bool
 
+	// Normally, tearing down the driver should cause ResourceSlices to get removed eventually.
+	// The exception is when the driver is part of a rolling update and is torn down first.
+	ExpectResourceSliceRemoval bool
+
 	// Name gets derived automatically from the current test namespace and
 	// (if set) the NameSuffix while setting up the driver for a test.
 	Name string
@@ -267,6 +275,9 @@ type Driver struct {
 
 	NodeV1alpha4 bool
 	NodeV1beta1  bool
+
+	// Register the DRA test driver with the kubelet and expect DRA to work (= feature.DynamicResourceAllocation).
+	WithKubelet bool
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -298,11 +309,26 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, func(context.Context) { cancel() })
 
-	driverResource, found := driverResources[multiHostDriverResources]
+	// After shutdown, check that all ResourceSlices were removed, either by the kubelet
+	// or our own test code. This runs last because it gets registered first.
+	if d.ExpectResourceSliceRemoval {
+		ginkgo.DeferCleanup(d.IsGone)
+	}
+
+	driverResource, useMultiHostDriverResources := driverResources[multiHostDriverResources]
+	if useMultiHostDriverResources || !d.WithKubelet {
+		// We have to remove ResourceSlices ourselves.
+		// Otherwise the kubelet does it after unregistering the driver.
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
+			framework.ExpectNoError(err, "delete ResourceSlices of the driver")
+		})
+	}
+
 	// If found, we create ResourceSlices that are associated with multiple nodes
 	// through the node selector. Thus, the ResourceSlices are published here
 	// rather than through the driver on a specific node.
-	if found {
+	if useMultiHostDriverResources {
 		for poolName, pool := range driverResource.Pools {
 			for i, slice := range pool.Slices {
 				resourceSlice := &resourceapi.ResourceSlice{
@@ -322,9 +348,6 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 				}
 				_, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().Create(ctx, resourceSlice, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
-				ginkgo.DeferCleanup(func(ctx context.Context) {
-					framework.ExpectNoError(d.f.ClientSet.ResourceV1beta2().ResourceSlices().Delete(ctx, resourceSlice.Name, metav1.DeleteOptions{}))
-				})
 			}
 		}
 	}
@@ -477,10 +500,10 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 			kubeletplugin.FlockDirectoryPath(nodes.tempDir),
 
 			kubeletplugin.PluginDataDirectoryPath(pluginDataDirectoryPath),
-			kubeletplugin.PluginListener(listen(d.f, &pod, &listenerPort)),
+			kubeletplugin.PluginListener(d.listen(&pod, &listenerPort)),
 
 			kubeletplugin.RegistrarDirectoryPath(registrarDirectoryPath),
-			kubeletplugin.RegistrarListener(listen(d.f, &pod, &listenerPort)),
+			kubeletplugin.RegistrarListener(d.listen(&pod, &listenerPort)),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
 		d.cleanup = append(d.cleanup, func(ctx context.Context) {
@@ -499,6 +522,10 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 			}
 		})
 		d.Nodes[nodename] = KubeletPlugin{ExamplePlugin: plugin, ClientSet: driverClient}
+	}
+
+	if !d.WithKubelet {
+		return
 	}
 
 	// Wait for registration.
@@ -620,8 +647,13 @@ var errListenerDone = errors.New("listener is shutting down")
 // listen returns the function which the kubeletplugin helper needs to open a listening socket.
 // For that it spins up hostpathplugin in the pod for the desired node
 // and connects to hostpathplugin via port forwarding.
-func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.Context, path string) (net.Listener, error) {
+func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path string) (net.Listener, error) {
 	return func(ctx context.Context, path string) (l net.Listener, e error) {
+		// No need create sockets, the kubelet is not expected to use them.
+		if !d.WithKubelet {
+			return newNullListener(), nil
+		}
+
 		// "Allocate" a new port by by bumping the per-pod counter by one.
 		port := atomic.AddInt32(port, 1)
 
@@ -631,9 +663,9 @@ func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.C
 		ctx = klog.NewContext(ctx, logger)
 
 		// Start hostpathplugin in proxy mode and keep it running until the listener gets closed.
-		req := f.ClientSet.CoreV1().RESTClient().Post().
+		req := d.f.ClientSet.CoreV1().RESTClient().Post().
 			Resource("pods").
-			Namespace(f.Namespace.Name).
+			Namespace(d.f.Namespace.Name).
 			Name(pod.Name).
 			SubResource("exec").
 			VersionedParams(&v1.PodExecOptions{
@@ -656,7 +688,7 @@ func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.C
 			cmdCtx := klog.NewContext(cmdCtx, cmdLogger)
 			logger.V(1).Info("Starting...")
 			defer logger.V(1).Info("Stopped")
-			if err := execute(cmdCtx, req.URL(), f.ClientConfig(), 5); err != nil {
+			if err := execute(cmdCtx, req.URL(), d.f.ClientConfig(), 5); err != nil {
 				// errors.Is(err, listenerDoneErr) would be nicer, but we don't get
 				// that error from remotecommand. Instead forgo logging when we already shut down.
 				if cmdCtx.Err() == nil {
@@ -665,9 +697,9 @@ func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.C
 			}
 
 			// Killing hostpathplugin does not remove the socket. Need to do that manually.
-			req := f.ClientSet.CoreV1().RESTClient().Post().
+			req := d.f.ClientSet.CoreV1().RESTClient().Post().
 				Resource("pods").
-				Namespace(f.Namespace.Name).
+				Namespace(d.f.Namespace.Name).
 				Name(pod.Name).
 				SubResource("exec").
 				VersionedParams(&v1.PodExecOptions{
@@ -682,7 +714,7 @@ func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.C
 				}, scheme.ParameterCodec)
 			cleanupLogger := klog.LoggerWithName(logger, "cleanup")
 			cleanupCtx := klog.NewContext(ctx, cleanupLogger)
-			if err := execute(cleanupCtx, req.URL(), f.ClientConfig(), 0); err != nil {
+			if err := execute(cleanupCtx, req.URL(), d.f.ClientConfig(), 0); err != nil {
 				cleanupLogger.Error(err, "Socket removal failed")
 			}
 		}()
@@ -698,12 +730,12 @@ func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.C
 		}
 
 		addr := proxy.Addr{
-			Namespace:     f.Namespace.Name,
+			Namespace:     d.f.Namespace.Name,
 			PodName:       pod.Name,
 			ContainerName: pod.Spec.Containers[0].Name,
 			Port:          int(port),
 		}
-		listener, err := proxy.Listen(ctx, f.ClientSet, f.ClientConfig(), addr)
+		listener, err := proxy.Listen(ctx, d.f.ClientSet, d.f.ClientConfig(), addr)
 		if err != nil {
 			return nil, fmt.Errorf("listen for connections from %+v: %w", addr, err)
 		}
@@ -723,6 +755,31 @@ func (l *listenerWithClose) Close() error {
 	err := l.Listener.Close()
 	l.close()
 	return err
+}
+
+func newNullListener() net.Listener {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	return &nullListener{ctx: ctx, cancel: cancel}
+}
+
+// nullListener blocks all Accept calls until the listener is closed.
+type nullListener struct {
+	ctx    context.Context
+	cancel func(err error)
+}
+
+func (l *nullListener) Accept() (net.Conn, error) {
+	<-l.ctx.Done()
+	return nil, context.Cause(l.ctx)
+}
+
+func (l *nullListener) Close() error {
+	l.cancel(errors.New("listener was closed"))
+	return nil
+}
+
+func (l *nullListener) Addr() net.Addr {
+	return &net.UnixAddr{}
 }
 
 // execute runs a remote command with stdout/stderr redirected to log messages at the chosen verbosity level.
@@ -775,17 +832,13 @@ func (d *Driver) TearDown(ctx context.Context) {
 
 // IsGone checks that the kubelet is done with the driver.
 // This is done by waiting for the kubelet to remove the
-// driver's ResourceSlices, which takes at least 5 minutes
-// because of the delay in the kubelet. Only use this in slow
-// tests...
+// driver's ResourceSlices, which takes at least 30 seconds
+// because of the delay in the kubelet.
+//
+// Only use this in tests where kubelet support for DRA is guaranteed.
 func (d *Driver) IsGone(ctx context.Context) {
-	gomega.Eventually(ctx, func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
-		slices, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
-		if err != nil {
-			return nil, err
-		}
-		return slices.Items, err
-	}).WithTimeout(7 * time.Minute).Should(gomega.BeEmpty())
+	ginkgo.By(fmt.Sprintf("Waiting for ResourceSlices of driver %s to be removed...", d.Name))
+	gomega.Eventually(ctx, d.NewGetSlices()).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.BeEmpty()))
 }
 
 func (d *Driver) interceptor(nodename string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
