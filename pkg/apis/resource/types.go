@@ -382,9 +382,8 @@ const CapacitySharingPolicyDiscreteMaxOptions = 10
 
 // CapacitySharingPolicy defines how requests consume the available capacity.
 // A policy must have a default value to be applied when no value is explicitly provided.
-// It can either specify a range of valid values or a discrete set of them.
-// Exactly one of them must be defined.
-// The default value must be a valid value.
+// Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range.
+// If valid values are specified, the default must be included within them.
 type CapacitySharingPolicy struct {
 	// Default specifies the default capacity to be used for a consumption request.
 	//
@@ -435,6 +434,8 @@ type CapacitySharingPolicyRange struct {
 	// +optional
 	Maximum *resource.Quantity
 
+	// Alternatively, use LimitRange match
+
 	// ChunkSize defines the step size between valid capacity amounts within the range.
 	//
 	// Maximum and default must be a multiple of the chunk size.
@@ -442,6 +443,8 @@ type CapacitySharingPolicyRange struct {
 	//
 	// +optional
 	ChunkSize *resource.Quantity
+
+	// Alternative words: StepSize, UnitSize
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
@@ -1265,6 +1268,10 @@ type ResourceClaimStatus struct {
 	// +listMapKey=pool
 	// +featureGate=DRAResourceClaimDeviceStatus
 	Devices []AllocatedDeviceStatus
+
+	// listType=map doesn’t support adding an optional map key (identifier) like shareID, which limits flexibility.
+	// However, this structure is useful because different DRA drivers own separate entries and can manage them using SSA.
+	// Current solution appends a new identifier to the device name using a slash-separated format.
 }
 
 // ResourceClaimReservedForMaxSize is the maximum number of entries in
@@ -1428,7 +1435,7 @@ type DeviceRequestAllocationResult struct {
 
 	// ConsumedCapacities tracks the amount of capacity consumed per device as part of the claim request.
 	// The consumed amount may differ from the requested amount: it is rounded up to the nearest valid
-	// value based on the device’s sharing policy if applicable.
+	// value based on the device’s sharing policy if applicable (i.e., may not be less than the requested amount).
 	//
 	// The total consumed capacity for each device must not exceed its available capacity.
 	//
