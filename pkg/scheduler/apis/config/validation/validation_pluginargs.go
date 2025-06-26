@@ -29,6 +29,7 @@ import (
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 // supportedScoringStrategyTypes has to be a set of strings for use with field.Unsupported
@@ -329,9 +330,9 @@ func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFi
 }
 
 // ValidateDynamicResourcesArgs validates that DynamicResourcesArgs are correct.
-func ValidateDynamicResourcesArgs(path *field.Path, args *config.DynamicResourcesArgs) error {
+func ValidateDynamicResourcesArgs(path *field.Path, args *config.DynamicResourcesArgs, fts feature.Features) error {
 	var allErrs field.ErrorList
-	if args.FilterTimeout != nil && args.FilterTimeout.Duration < 0 {
+	if fts.EnableDRASchedulerFilterTimeout && args.FilterTimeout != nil && args.FilterTimeout.Duration < 0 {
 		allErrs = append(allErrs, field.Invalid(path.Child("filterTimeout"), args.FilterTimeout, "must be zero or positive"))
 	}
 	return allErrs.ToAggregate()
