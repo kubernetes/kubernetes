@@ -346,6 +346,14 @@ type FilterPlugin interface {
 	// For example, during preemption, we may pass a copy of the original
 	// nodeInfo object that has some pods removed from it to evaluate the
 	// possibility of preempting them to schedule the target pod.
+	//
+	// Plugins are encouraged to check the context for cancellation.
+	// Once canceled, they should return as soon as possible with
+	// an UnschedulableAndUnresolvable status that includes the
+	// `context.Cause(ctx)` error explanation. For example, the
+	// context gets canceled when a sufficient number of suitable
+	// nodes have been found and searching for more isn't necessary
+	// anymore.
 	Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *fwk.Status
 }
 
