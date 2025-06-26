@@ -230,6 +230,9 @@ type SharedInformer interface {
 	// Please see the comment on TransformFunc for more details.
 	SetTransform(handler TransformFunc) error
 
+	// HasTransform reports whether a transform function has already been set for the informer.
+	HasTransform() bool
+
 	// IsStopped reports whether the informer has already been stopped.
 	// Adding event handlers to already stopped informers is not possible.
 	// An informer already stopped will never be started again.
@@ -520,6 +523,13 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 
 	s.transform = handler
 	return nil
+}
+
+func (s *sharedIndexInformer) HasTransform() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	return s.transform != nil
 }
 
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
