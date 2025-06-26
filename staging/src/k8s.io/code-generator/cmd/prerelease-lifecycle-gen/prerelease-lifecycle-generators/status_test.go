@@ -248,8 +248,6 @@ func TestArgsFromType(t *testing.T) {
 				"introducedMinor": 5,
 				"deprecatedMajor": 1,
 				"deprecatedMinor": 8,
-				"removedMajor":    1,
-				"removedMinor":    11,
 			},
 		},
 	}
