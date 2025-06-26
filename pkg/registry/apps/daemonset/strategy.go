@@ -144,10 +144,7 @@ func (daemonSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	opts := pod.GetValidationOptionsFromPodTemplate(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
 	opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldDaemonSet.Spec.Selector)
 
-	allErrs := validation.ValidateDaemonSet(obj.(*apps.DaemonSet), opts)
-	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet, opts)...)
-
-	return allErrs
+	return validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
