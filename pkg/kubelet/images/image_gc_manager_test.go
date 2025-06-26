@@ -700,8 +700,19 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 	// This image is unused and eligible for deletion.
 	// Its size is less than the required amount to free.
 	imageSize := int64(500 * 1024 * 1024) // 500 MiB
+	// Add an in-use image and a container referencing it to ensure inUseSize is non-zero.
+	inUseImageSize := int64(700 * 1024 * 1024) // 700 MiB
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, imageSize),
+		makeImage(1, inUseImageSize),
+	}
+	// Set up a pod/container using image-1 so it is considered in-use
+	fakeRuntime.AllPodList = []*containertest.FakePod{
+		{Pod: &container.Pod{
+			Containers: []*container.Container{
+				makeContainer(1),
+			},
+		}},
 	}
 
 	err := manager.GarbageCollect(ctx, time.Now())
@@ -709,7 +720,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 
 	// Check that a warning event was sent
 	expectedEvent := "Warning FreeDiskSpaceFailed Insufficient free disk space on the node's image filesystem" +
-		" (95.0% of 10.0 GiB used). Failed to free sufficient space by deleting unused images." +
+		" (95.0% of 10.0 GiB used). Failed to free sufficient space by deleting unused images (700.0 MiB used for active images)." +
 		" Consider resizing the disk or deleting unused files."
 	select {
 	case event := <-recorder.Events:

@@ -187,6 +187,19 @@ type imageRecord struct {
 	pinned bool
 }
 
+// IsInUse returns true if the image was observed in a container by
+// imageDetect() more recently than freeTime.
+func (rec *imageRecord) IsInUse(freeTime time.Time) bool {
+	return rec.lastUsed.Equal(freeTime) || rec.lastUsed.After(freeTime)
+}
+
+// IsTooNew returns true if the image was first detected more recently than the
+// minimum garbage collection age. In such a case, the image may have just
+// been pulled down, and will be used by a container right away.
+func (rec *imageRecord) IsTooNew(freeTime time.Time, minAge time.Duration) bool {
+	return freeTime.Sub(rec.firstDetected) < minAge
+}
+
 // NewImageGCManager instantiates a new ImageGCManager object.
 func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, postGCHooks []PostImageGCHook, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, tracerProvider trace.TracerProvider) (ImageGCManager, error) {
 	// Validate policy.
@@ -398,13 +411,24 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 		im.runPostGCHooks(remainingImages, freeTime)
 
 		if freed < amountToFree {
+			// Calculate total size of all images that cannot be garbage collected.
+			// This should match the logic in freeSpace() but look at all present images,
+			// not just the unused images returned by imagesInEvictionOrder().
+			unreclaimableImageSize := int64(0)
+			im.imageRecordsLock.Lock()
+			for _, rec := range im.imageRecords {
+				if rec.IsInUse(freeTime) || rec.IsTooNew(freeTime, im.policy.MinAge) {
+					unreclaimableImageSize += rec.size
+				}
+			}
+			im.imageRecordsLock.Unlock()
 			// This usually means the disk is full for reasons other than container
 			// images, such as logs, volumes, or other files. However, it could also
 			// be due to an unusually large number or size of in-use container images.
 			message := fmt.Sprintf("Insufficient free disk space on the node's image filesystem (%.1f%% of %s used). "+
-				"Failed to free sufficient space by deleting unused images. "+
+				"Failed to free sufficient space by deleting unused images (%s used for active images). "+
 				"Consider resizing the disk or deleting unused files.",
-				usagePercent, formatSize(capacity))
+				usagePercent, formatSize(capacity), formatSize(unreclaimableImageSize))
 			im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.FreeDiskSpaceFailed, "%s", message)
 			return fmt.Errorf("%s", message)
 		}
@@ -481,16 +505,13 @@ func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, 
 	var imagesLeft []string
 	for _, image := range images {
 		klog.V(5).InfoS("Evaluating image ID for possible garbage collection based on disk usage", "imageID", image.id, "runtimeHandler", image.imageRecord.runtimeHandlerUsedToPullImage)
-		// Images that are currently in used were given a newer lastUsed.
-		if image.lastUsed.Equal(freeTime) || image.lastUsed.After(freeTime) {
+		if image.imageRecord.IsInUse(freeTime) {
 			klog.V(5).InfoS("Image ID was used too recently, not eligible for garbage collection", "imageID", image.id, "lastUsed", image.lastUsed, "freeTime", freeTime)
 			imagesLeft = append(imagesLeft, image.id)
 			continue
 		}
 
-		// Avoid garbage collect the image if the image is not old enough.
-		// In such a case, the image may have just been pulled down, and will be used by a container right away.
-		if freeTime.Sub(image.firstDetected) < im.policy.MinAge {
+		if image.imageRecord.IsTooNew(freeTime, im.policy.MinAge) {
 			klog.V(5).InfoS("Image ID's age is less than the policy's minAge, not eligible for garbage collection", "imageID", image.id, "age", freeTime.Sub(image.firstDetected), "minAge", im.policy.MinAge)
 			imagesLeft = append(imagesLeft, image.id)
 			continue
