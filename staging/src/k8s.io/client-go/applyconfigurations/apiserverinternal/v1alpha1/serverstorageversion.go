@@ -32,7 +32,6 @@ type ServerStorageVersionApplyConfiguration struct {
 func ServerStorageVersion() *ServerStorageVersionApplyConfiguration {
 	return &ServerStorageVersionApplyConfiguration{}
 }
-func (b ServerStorageVersionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAPIServerID sets the APIServerID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

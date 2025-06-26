@@ -34,7 +34,6 @@ type CustomResourceDefinitionNamesApplyConfiguration struct {
 func CustomResourceDefinitionNames() *CustomResourceDefinitionNamesApplyConfiguration {
 	return &CustomResourceDefinitionNamesApplyConfiguration{}
 }
-func (b CustomResourceDefinitionNamesApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPlural sets the Plural field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

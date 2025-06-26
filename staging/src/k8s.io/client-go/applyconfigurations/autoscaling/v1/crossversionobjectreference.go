@@ -31,7 +31,6 @@ type CrossVersionObjectReferenceApplyConfiguration struct {
 func CrossVersionObjectReference() *CrossVersionObjectReferenceApplyConfiguration {
 	return &CrossVersionObjectReferenceApplyConfiguration{}
 }
-func (b CrossVersionObjectReferenceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

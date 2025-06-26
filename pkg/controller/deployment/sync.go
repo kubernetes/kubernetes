@@ -27,12 +27,18 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/features"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+)
+
+const (
+	// replicaSetNameSeparator is the character used to separate deployment name from hash
+	replicaSetNameSeparator = "-"
 )
 
 // syncStatusOnly only updates Deployments Status and doesn't take any mutating actions.
@@ -198,7 +204,7 @@ func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.De
 	newRS := apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			// Make the name deterministic, to ensure idempotence
-			Name:            d.Name + "-" + podTemplateSpecHash,
+			Name:            generateReplicaSetName(d.Name, podTemplateSpecHash),
 			Namespace:       d.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
 			Labels:          newRSTemplate.Labels,
@@ -548,4 +554,16 @@ func (dc *DeploymentController) isScalingEvent(ctx context.Context, d *apps.Depl
 		}
 	}
 	return false, nil
+}
+
+// generateReplicaSetName generates a ReplicaSet name by adding a pod template spec hash
+// to a Deployment name, optionally truncating it to ensure the ReplicaSet name is within the limit.
+func generateReplicaSetName(deploymentName, podTemplateSpecHash string) string {
+	maxDeploymentNameLength := validation.DNS1123SubdomainMaxLength - len(replicaSetNameSeparator) - len(podTemplateSpecHash)
+
+	if len(deploymentName) > maxDeploymentNameLength && maxDeploymentNameLength > 0 {
+		return deploymentName[:maxDeploymentNameLength] + replicaSetNameSeparator + podTemplateSpecHash
+	}
+
+	return deploymentName + replicaSetNameSeparator + podTemplateSpecHash
 }

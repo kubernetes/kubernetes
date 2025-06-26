@@ -34,7 +34,6 @@ type NamedRuleWithOperationsApplyConfiguration struct {
 func NamedRuleWithOperations() *NamedRuleWithOperationsApplyConfiguration {
 	return &NamedRuleWithOperationsApplyConfiguration{}
 }
-func (b NamedRuleWithOperationsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithResourceNames adds the given value to the ResourceNames field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

@@ -48,11 +48,11 @@ type GetOpenAPIDefinitions func(ReferenceCallback) map[string]OpenAPIDefinition
 // GetOpenAPITypeFormat for more information about trade-offs of using this interface or GetOpenAPITypeFormat method when
 // possible.
 type OpenAPIDefinitionGetter interface {
-	OpenAPIDefinition() *OpenAPIDefinition
+	OpenAPIDefinition() OpenAPIDefinition
 }
 
 type OpenAPIV3DefinitionGetter interface {
-	OpenAPIV3Definition() *OpenAPIDefinition
+	OpenAPIV3Definition() OpenAPIDefinition
 }
 
 type PathHandler interface {

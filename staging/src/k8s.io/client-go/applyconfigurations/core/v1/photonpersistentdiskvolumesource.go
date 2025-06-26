@@ -30,7 +30,6 @@ type PhotonPersistentDiskVolumeSourceApplyConfiguration struct {
 func PhotonPersistentDiskVolumeSource() *PhotonPersistentDiskVolumeSourceApplyConfiguration {
 	return &PhotonPersistentDiskVolumeSourceApplyConfiguration{}
 }
-func (b PhotonPersistentDiskVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPdID sets the PdID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

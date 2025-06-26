@@ -34,7 +34,6 @@ type SchedulingApplyConfiguration struct {
 func Scheduling() *SchedulingApplyConfiguration {
 	return &SchedulingApplyConfiguration{}
 }
-func (b SchedulingApplyConfiguration) IsApplyConfiguration() {}
 
 // WithNodeSelector puts the entries into the NodeSelector field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

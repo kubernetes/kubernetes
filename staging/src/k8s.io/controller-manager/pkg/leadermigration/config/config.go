@@ -100,10 +100,10 @@ func validateControllerLeaderConfiguration(path *field.Path, config *internal.Co
 		return
 	}
 	if config.Component == "" {
-		allErrs = append(allErrs, field.Required(path.Child("component"), "component must be set"))
+		allErrs = append(allErrs, field.Required(path.Child("component"), ""))
 	}
 	if config.Name == "" {
-		allErrs = append(allErrs, field.Required(path.Child("name"), "name must be set"))
+		allErrs = append(allErrs, field.Required(path.Child("name"), ""))
 	}
 	return
 }

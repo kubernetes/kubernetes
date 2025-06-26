@@ -39,7 +39,6 @@ type ContainerStateTerminatedApplyConfiguration struct {
 func ContainerStateTerminated() *ContainerStateTerminatedApplyConfiguration {
 	return &ContainerStateTerminatedApplyConfiguration{}
 }
-func (b ContainerStateTerminatedApplyConfiguration) IsApplyConfiguration() {}
 
 // WithExitCode sets the ExitCode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

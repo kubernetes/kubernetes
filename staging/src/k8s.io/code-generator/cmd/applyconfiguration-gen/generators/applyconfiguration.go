@@ -115,7 +115,10 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 			sw.Do(constructor, typeParams)
 		}
 	}
-	g.generateIsApplyConfiguration(typeParams.ApplyConfig.ApplyConfiguration, sw)
+
+	if typeParams.Tags.GenerateClient || hasTypeMetaField(t) {
+		g.generateIsApplyConfiguration(typeParams.ApplyConfig.ApplyConfiguration, sw)
+	}
 	g.generateWithFuncs(t, typeParams, sw, nil, &[]string{})
 	g.generateGetters(t, typeParams, sw, nil)
 	return sw.Error()

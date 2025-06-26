@@ -34,7 +34,6 @@ type ResourceStatusApplyConfiguration struct {
 func ResourceStatus() *ResourceStatusApplyConfiguration {
 	return &ResourceStatusApplyConfiguration{}
 }
-func (b ResourceStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

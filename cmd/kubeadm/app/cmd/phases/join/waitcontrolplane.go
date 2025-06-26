@@ -21,11 +21,9 @@ import (
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
@@ -35,10 +33,8 @@ import (
 // NewWaitControlPlanePhase is a hidden phase that runs after the control-plane and etcd phases
 func NewWaitControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
-		Name: "wait-control-plane",
-		// TODO: remove this EXPERIMENTAL prefix once WaitForAllControlPlaneComponents goes GA:
-		// https://github.com/kubernetes/kubeadm/issues/2907
-		Short: "EXPERIMENTAL: Wait for the control plane to start",
+		Name:  "wait-control-plane",
+		Short: "Wait for the control plane to start",
 		Run:   runWaitControlPlanePhase,
 	}
 	return phase
@@ -51,18 +47,6 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	if data.Cfg().ControlPlane == nil {
-		return nil
-	}
-
-	initCfg, err := data.InitCfg()
-	if err != nil {
-		return errors.Wrap(err, "could not obtain InitConfiguration during the wait-control-plane phase")
-	}
-
-	// TODO: remove this check once WaitForAllControlPlaneComponents goes GA
-	// https://github.com/kubernetes/kubeadm/issues/2907
-	if !features.Enabled(initCfg.ClusterConfiguration.FeatureGates, features.WaitForAllControlPlaneComponents) {
-		klog.V(5).Infof("[wait-control-plane] Skipping phase as the feature gate WaitForAllControlPlaneComponents is disabled")
 		return nil
 	}
 

@@ -338,7 +338,7 @@ func ValidateFlowSchemaStatusUpdate(old, fs *flowcontrol.FlowSchema) field.Error
 func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(condition.Type) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
 	}
 	return allErrs
 }
@@ -530,7 +530,7 @@ func ValidatePriorityLevelConfigurationStatusUpdate(old, pl *flowcontrol.Priorit
 func ValidatePriorityLevelConfigurationCondition(condition *flowcontrol.PriorityLevelConfigurationCondition, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(condition.Type) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), ""))
 	}
 	return allErrs
 }

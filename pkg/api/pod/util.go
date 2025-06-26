@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"fmt"
 	"iter"
 	"strings"
 
@@ -1487,4 +1488,76 @@ func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+// HasAPIObjectReference returns true if a reference to an API object is found in the pod spec,
+// along with the plural resource of the referenced API type, or an error if an unknown field is encountered.
+func HasAPIObjectReference(pod *api.Pod) (bool, string, error) {
+	if pod.Spec.ServiceAccountName != "" {
+		return true, "serviceaccounts", nil
+	}
+
+	hasSecrets := false
+	VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false }, AllContainers)
+	if hasSecrets {
+		return true, "secrets", nil
+	}
+
+	hasConfigMaps := false
+	VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false }, AllContainers)
+	if hasConfigMaps {
+		return true, "configmaps", nil
+	}
+
+	if len(pod.Spec.ResourceClaims) > 0 {
+		return true, "resourceclaims", nil
+	}
+
+	for _, v := range pod.Spec.Volumes {
+		switch {
+		case v.AWSElasticBlockStore != nil, v.AzureDisk != nil, v.CephFS != nil, v.Cinder != nil,
+			v.DownwardAPI != nil, v.EmptyDir != nil, v.FC != nil, v.FlexVolume != nil, v.Flocker != nil, v.GCEPersistentDisk != nil,
+			v.GitRepo != nil, v.HostPath != nil, v.Image != nil, v.ISCSI != nil, v.NFS != nil, v.PhotonPersistentDisk != nil,
+			v.PortworxVolume != nil, v.Quobyte != nil, v.RBD != nil, v.ScaleIO != nil, v.StorageOS != nil, v.VsphereVolume != nil:
+			continue
+		case v.ConfigMap != nil:
+			return true, "configmaps (via configmap volumes)", nil
+		case v.Secret != nil:
+			return true, "secrets (via secret volumes)", nil
+		case v.CSI != nil:
+			return true, "csidrivers (via CSI volumes)", nil
+		case v.Glusterfs != nil:
+			return true, "endpoints (via glusterFS volumes)", nil
+		case v.PersistentVolumeClaim != nil:
+			return true, "persistentvolumeclaims", nil
+		case v.Ephemeral != nil:
+			return true, "persistentvolumeclaims (via ephemeral volumes)", nil
+		case v.AzureFile != nil:
+			return true, "secrets (via azureFile volumes)", nil
+		case v.Projected != nil:
+			for _, s := range v.Projected.Sources {
+				// Reject projected volume sources that require the Kubernetes API
+				switch {
+				case s.ConfigMap != nil:
+					return true, "configmaps (via projected volumes)", nil
+				case s.Secret != nil:
+					return true, "secrets (via projected volumes)", nil
+				case s.ServiceAccountToken != nil:
+					return true, "serviceaccounts (via projected volumes)", nil
+				case s.ClusterTrustBundle != nil:
+					return true, "clustertrustbundles", nil
+				case s.DownwardAPI != nil:
+					// Allow projected volume sources that don't require the Kubernetes API
+					continue
+				default:
+					// Reject unknown volume types
+					return true, "", fmt.Errorf("unknown source for projected volume %q", v.Name)
+				}
+			}
+		default:
+			return true, "", fmt.Errorf("unknown volume type for volume  %q", v.Name)
+		}
+	}
+
+	return false, "", nil
 }

@@ -154,7 +154,7 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 		seenProviderNames.Insert(provider.Name)
 
 		if provider.APIVersion == "" {
-			allErrs = append(allErrs, field.Required(fieldPath.Child("apiVersion"), "apiVersion is required"))
+			allErrs = append(allErrs, field.Required(fieldPath.Child("apiVersion"), ""))
 		} else if _, ok := apiVersions[provider.APIVersion]; !ok {
 			validAPIVersions := sets.StringKeySet(apiVersions).List()
 			allErrs = append(allErrs, field.NotSupported(fieldPath.Child("apiVersion"), provider.APIVersion, validAPIVersions))
@@ -171,7 +171,7 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 		}
 
 		if provider.DefaultCacheDuration == nil {
-			allErrs = append(allErrs, field.Required(fieldPath.Child("defaultCacheDuration"), "defaultCacheDuration is required"))
+			allErrs = append(allErrs, field.Required(fieldPath.Child("defaultCacheDuration"), ""))
 		}
 
 		if provider.DefaultCacheDuration != nil && provider.DefaultCacheDuration.Duration < 0 {
@@ -184,10 +184,10 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 				allErrs = append(allErrs, field.Forbidden(fldPath, "tokenAttributes is not supported when KubeletServiceAccountTokenForCredentialProviders feature gate is disabled"))
 			}
 			if len(provider.TokenAttributes.ServiceAccountTokenAudience) == 0 {
-				allErrs = append(allErrs, field.Required(fldPath.Child("serviceAccountTokenAudience"), "serviceAccountTokenAudience is required"))
+				allErrs = append(allErrs, field.Required(fldPath.Child("serviceAccountTokenAudience"), ""))
 			}
 			if provider.TokenAttributes.RequireServiceAccount == nil {
-				allErrs = append(allErrs, field.Required(fldPath.Child("requireServiceAccount"), "requireServiceAccount is required"))
+				allErrs = append(allErrs, field.Required(fldPath.Child("requireServiceAccount"), ""))
 			}
 			if provider.APIVersion != credentialproviderv1.SchemeGroupVersion.String() {
 				allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("tokenAttributes is only supported for %s API version", credentialproviderv1.SchemeGroupVersion.String())))

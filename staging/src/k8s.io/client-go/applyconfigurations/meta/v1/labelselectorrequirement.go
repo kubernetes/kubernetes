@@ -35,7 +35,6 @@ type LabelSelectorRequirementApplyConfiguration struct {
 func LabelSelectorRequirement() *LabelSelectorRequirementApplyConfiguration {
 	return &LabelSelectorRequirementApplyConfiguration{}
 }
-func (b LabelSelectorRequirementApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKey sets the Key field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

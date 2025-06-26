@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -1495,13 +1496,13 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
-				NodeToStatus: NewNodeToStatus(map[string]*Status{
+				NodeToStatus: NewNodeToStatus(map[string]*fwk.Status{
 					// They're inserted by the framework.
 					// We don't include them in the reason message because they'd be just duplicates.
-					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
-					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
-					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
-				}, NewStatus(UnschedulableAndUnresolvable)),
+					"node1": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node2": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node3": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+				}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter.",
 		},
@@ -1510,13 +1511,13 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
-				NodeToStatus: NewNodeToStatus(map[string]*Status{
+				NodeToStatus: NewNodeToStatus(map[string]*fwk.Status{
 					// They're inserted by the framework.
 					// We don't include them in the reason message because they'd be just duplicates.
-					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
-					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
-					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
-				}, NewStatus(UnschedulableAndUnresolvable)),
+					"node1": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node2": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+					"node3": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
+				}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 				// PostFilterMsg will be included.
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
@@ -1527,11 +1528,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatus: NewNodeToStatus(map[string]*Status{
-					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-				}, NewStatus(UnschedulableAndUnresolvable)),
+				NodeToStatus: NewNodeToStatus(map[string]*fwk.Status{
+					"node1": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
+					"node2": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
+					"node3": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
+				}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1.",
 		},
@@ -1540,11 +1541,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatus: NewNodeToStatus(map[string]*Status{
-					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-				}, NewStatus(UnschedulableAndUnresolvable)),
+				NodeToStatus: NewNodeToStatus(map[string]*fwk.Status{
+					"node1": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
+					"node2": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
+					"node3": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
+				}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
 			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
@@ -1554,11 +1555,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatus: NewNodeToStatus(map[string]*Status{
-					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-2"),
-				}, NewStatus(UnschedulableAndUnresolvable)),
+				NodeToStatus: NewNodeToStatus(map[string]*fwk.Status{
+					"node1": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
+					"node2": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
+					"node3": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-2"),
+				}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1.",
 		},
@@ -1567,11 +1568,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatus: NewNodeToStatus(map[string]*Status{
-					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-2"),
-				}, NewStatus(UnschedulableAndUnresolvable)),
+				NodeToStatus: NewNodeToStatus(map[string]*fwk.Status{
+					"node1": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
+					"node2": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
+					"node3": fwk.NewStatus(fwk.Unschedulable, "Node(s) failed Filter plugin FalseFilter-2"),
+				}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
 			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
@@ -1580,10 +1581,10 @@ func TestFitError_Error(t *testing.T) {
 			name:        "failed to Permit on node",
 			numAllNodes: 1,
 			diagnosis: Diagnosis{
-				NodeToStatus: NewNodeToStatus(map[string]*Status{
+				NodeToStatus: NewNodeToStatus(map[string]*fwk.Status{
 					// There should be only one node here.
-					"node1": NewStatus(Unschedulable, "Node failed Permit plugin Permit-1"),
-				}, NewStatus(UnschedulableAndUnresolvable)),
+					"node1": fwk.NewStatus(fwk.Unschedulable, "Node failed Permit plugin Permit-1"),
+				}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/1 nodes are available: 1 Node failed Permit plugin Permit-1.",
 		},
@@ -1591,10 +1592,10 @@ func TestFitError_Error(t *testing.T) {
 			name:        "failed to Reserve on node",
 			numAllNodes: 1,
 			diagnosis: Diagnosis{
-				NodeToStatus: NewNodeToStatus(map[string]*Status{
+				NodeToStatus: NewNodeToStatus(map[string]*fwk.Status{
 					// There should be only one node here.
-					"node1": NewStatus(Unschedulable, "Node failed Reserve plugin Reserve-1"),
-				}, NewStatus(UnschedulableAndUnresolvable)),
+					"node1": fwk.NewStatus(fwk.Unschedulable, "Node failed Reserve plugin Reserve-1"),
+				}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/1 nodes are available: 1 Node failed Reserve plugin Reserve-1.",
 		},
@@ -2095,63 +2096,63 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 func TestCloudEvent_Match(t *testing.T) {
 	testCases := []struct {
 		name        string
-		event       ClusterEvent
-		comingEvent ClusterEvent
+		event       fwk.ClusterEvent
+		comingEvent fwk.ClusterEvent
 		wantResult  bool
 	}{
 		{
 			name:        "wildcard event matches with all kinds of coming events",
-			event:       ClusterEvent{Resource: WildCard, ActionType: All},
-			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			event:       fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.All},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
 			name:        "event with resource = 'Pod' matching with coming events carries same actionType",
-			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel | UpdateNodeTaint},
-			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel | fwk.UpdateNodeTaint},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
 			name:        "event with resource = 'Pod' matching with coming events carries unschedulablePod",
-			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel | UpdateNodeTaint},
-			comingEvent: ClusterEvent{Resource: unschedulablePod, ActionType: UpdateNodeLabel},
+			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel | fwk.UpdateNodeTaint},
+			comingEvent: fwk.ClusterEvent{Resource: unschedulablePod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
 			name:        "event with resource = '*' matching with coming events carries same actionType",
-			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
-			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			event:       fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.UpdateNodeLabel},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
 		{
 			name:        "event with resource = '*' matching with coming events carries different actionType",
-			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
-			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeAllocatable},
+			event:       fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.UpdateNodeLabel},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeAllocatable},
 			wantResult:  false,
 		},
 		{
 			name:        "event matching with coming events carries '*' resources",
-			event:       ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
-			comingEvent: ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			event:       fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  false,
 		},
 		{
 			name:        "event with resource = '*' matching with coming events carrying a too broad actionType",
-			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
-			comingEvent: ClusterEvent{Resource: Pod, ActionType: Update},
+			event:       fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.UpdateNodeLabel},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Update},
 			wantResult:  false,
 		},
 		{
 			name:        "event with resource = '*' matching with coming events carrying a more specific actionType",
-			event:       ClusterEvent{Resource: WildCard, ActionType: Update},
-			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			event:       fwk.ClusterEvent{Resource: fwk.WildCard, ActionType: fwk.Update},
+			comingEvent: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdateNodeLabel},
 			wantResult:  true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := tc.event.Match(tc.comingEvent)
+			got := MatchClusterEvents(tc.event, tc.comingEvent)
 			if got != tc.wantResult {
 				t.Fatalf("unexpected result")
 			}

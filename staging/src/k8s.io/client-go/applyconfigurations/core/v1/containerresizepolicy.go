@@ -34,7 +34,6 @@ type ContainerResizePolicyApplyConfiguration struct {
 func ContainerResizePolicy() *ContainerResizePolicyApplyConfiguration {
 	return &ContainerResizePolicyApplyConfiguration{}
 }
-func (b ContainerResizePolicyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithResourceName sets the ResourceName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

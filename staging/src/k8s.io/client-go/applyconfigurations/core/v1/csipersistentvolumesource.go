@@ -38,7 +38,6 @@ type CSIPersistentVolumeSourceApplyConfiguration struct {
 func CSIPersistentVolumeSource() *CSIPersistentVolumeSourceApplyConfiguration {
 	return &CSIPersistentVolumeSourceApplyConfiguration{}
 }
-func (b CSIPersistentVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDriver sets the Driver field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

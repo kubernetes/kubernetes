@@ -53,14 +53,14 @@ func TestNodePorts(t *testing.T) {
 		pod                 *v1.Pod
 		nodeInfo            *framework.NodeInfo
 		name                string
-		wantPreFilterStatus *framework.Status
-		wantFilterStatus    *framework.Status
+		wantPreFilterStatus *fwk.Status
+		wantFilterStatus    *fwk.Status
 	}{
 		{
 			pod:                 &v1.Pod{},
 			nodeInfo:            framework.NewNodeInfo(),
 			name:                "skip filter",
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			pod: newPod("m1", "UDP/127.0.0.1/8080"),
@@ -73,14 +73,14 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "UDP/127.0.0.1/8080")),
 			name:             "same udp port",
-			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8080"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8080")),
 			name:             "same tcp port",
-			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8080"),
@@ -99,35 +99,35 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "UDP/127.0.0.1/8080")),
 			name:             "second udp port conflict",
-			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8001", "UDP/127.0.0.1/8080"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001", "UDP/127.0.0.1/8081")),
 			name:             "first tcp port conflict",
-			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
 		},
 		{
 			pod: newPod("m1", "TCP/0.0.0.0/8001"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001")),
 			name:             "first tcp port conflict due to 0.0.0.0 hostIP",
-			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
 		},
 		{
 			pod: newPod("m1", "TCP/10.0.10.10/8001", "TCP/0.0.0.0/8001"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/127.0.0.1/8001")),
 			name:             "TCP hostPort conflict due to 0.0.0.0 hostIP",
-			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
 		},
 		{
 			pod: newPod("m1", "TCP/127.0.0.1/8001"),
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001")),
 			name:             "second tcp port conflict to 0.0.0.0 hostIP",
-			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
 		},
 		{
 			pod: newPod("m1", "UDP/127.0.0.1/8001"),
@@ -140,7 +140,7 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001", "UDP/0.0.0.0/8001")),
 			name:             "UDP hostPort conflict due to 0.0.0.0 hostIP",
-			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
 		},
 		{
 			pod: st.MakePod().
@@ -154,7 +154,7 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001")),
 			name:                "non-sidecar initContainer using hostPort",
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			pod: st.MakePod().
@@ -168,7 +168,7 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001")),
 			name:             "TCP hostPort conflict from sidecar initContainer",
-			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
 		},
 	}
 
@@ -210,7 +210,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(fwk.ErrNotFound)
+	wantStatus := fwk.AsStatus(fwk.ErrNotFound)
 	if diff := cmp.Diff(wantStatus, gotStatus); diff != "" {
 		t.Errorf("status does not match (-want,+got):\n%s", diff)
 	}
@@ -222,34 +222,34 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 	testcases := map[string]struct {
 		pod          *v1.Pod
 		oldObj       interface{}
-		expectedHint framework.QueueingHint
+		expectedHint fwk.QueueingHint
 		expectedErr  bool
 	}{
 		"backoff-wrong-old-object": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       "not-a-pod",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"skip-queue-on-unscheduled": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"skip-queue-on-non-hostport": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Node("fake-node").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"skip-queue-on-unrelated-hostport": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Node("fake-node").HostPort(8081).Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"queue-on-released-hostport": {
 			pod:          podWithHostPort.Obj(),
 			oldObj:       st.MakePod().Node("fake-node").HostPort(8080).Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 	}
 

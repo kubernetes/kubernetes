@@ -29,7 +29,6 @@ type DownwardAPIProjectionApplyConfiguration struct {
 func DownwardAPIProjection() *DownwardAPIProjectionApplyConfiguration {
 	return &DownwardAPIProjectionApplyConfiguration{}
 }
-func (b DownwardAPIProjectionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithItems adds the given value to the Items field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

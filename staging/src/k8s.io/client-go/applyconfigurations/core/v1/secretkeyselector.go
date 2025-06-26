@@ -31,7 +31,6 @@ type SecretKeySelectorApplyConfiguration struct {
 func SecretKeySelector() *SecretKeySelectorApplyConfiguration {
 	return &SecretKeySelectorApplyConfiguration{}
 }
-func (b SecretKeySelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

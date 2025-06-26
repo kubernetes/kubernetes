@@ -30,7 +30,6 @@ type PodAffinityApplyConfiguration struct {
 func PodAffinity() *PodAffinityApplyConfiguration {
 	return &PodAffinityApplyConfiguration{}
 }
-func (b PodAffinityApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRequiredDuringSchedulingIgnoredDuringExecution adds the given value to the RequiredDuringSchedulingIgnoredDuringExecution field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

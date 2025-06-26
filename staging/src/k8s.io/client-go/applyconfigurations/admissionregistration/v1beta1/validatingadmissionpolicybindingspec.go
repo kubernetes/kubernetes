@@ -36,7 +36,6 @@ type ValidatingAdmissionPolicyBindingSpecApplyConfiguration struct {
 func ValidatingAdmissionPolicyBindingSpec() *ValidatingAdmissionPolicyBindingSpecApplyConfiguration {
 	return &ValidatingAdmissionPolicyBindingSpecApplyConfiguration{}
 }
-func (b ValidatingAdmissionPolicyBindingSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPolicyName sets the PolicyName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

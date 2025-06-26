@@ -30,7 +30,6 @@ type NonResourcePolicyRuleApplyConfiguration struct {
 func NonResourcePolicyRule() *NonResourcePolicyRuleApplyConfiguration {
 	return &NonResourcePolicyRuleApplyConfiguration{}
 }
-func (b NonResourcePolicyRuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithVerbs adds the given value to the Verbs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

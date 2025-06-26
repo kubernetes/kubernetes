@@ -445,17 +445,6 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 		return nil, nil, err
 	}
 
-	var once sync.Once
-	destroyFunc := func() {
-		// we know that storage destroy funcs are called multiple times (due to reuse in subresources).
-		// Hence, we only destroy once.
-		// TODO: fix duplicated storage destroy calls higher level
-		once.Do(func() {
-			stopCompactor()
-			stopDBSizeMonitor()
-			client.Close()
-		})
-	}
 	transformer := c.Transformer
 	if transformer == nil {
 		transformer = identity.NewEncryptCheckTransformer()
@@ -468,12 +457,24 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 		transformer = etcd3.WithCorruptObjErrorHandlingTransformer(transformer)
 		decoder = etcd3.WithCorruptObjErrorHandlingDecoder(decoder)
 	}
-	var store storage.Interface
-	store = etcd3.New(client, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowUnsafeMalformedObjectDeletion) {
-		store = etcd3.NewStoreWithUnsafeCorruptObjectDeletion(store, c.GroupResource)
+	store := etcd3.New(client, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
+	var once sync.Once
+	destroyFunc := func() {
+		// we know that storage destroy funcs are called multiple times (due to reuse in subresources).
+		// Hence, we only destroy once.
+		// TODO: fix duplicated storage destroy calls higher level
+		once.Do(func() {
+			stopCompactor()
+			stopDBSizeMonitor()
+			store.Close()
+			_ = client.Close()
+		})
 	}
-	return store, destroyFunc, nil
+	var storage storage.Interface = store
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AllowUnsafeMalformedObjectDeletion) {
+		storage = etcd3.NewStoreWithUnsafeCorruptObjectDeletion(storage, c.GroupResource)
+	}
+	return storage, destroyFunc, nil
 }
 
 // startDBSizeMonitorPerEndpoint starts a loop to monitor etcd database size and update the

@@ -42,7 +42,6 @@ type PersistentVolumeClaimSpecApplyConfiguration struct {
 func PersistentVolumeClaimSpec() *PersistentVolumeClaimSpecApplyConfiguration {
 	return &PersistentVolumeClaimSpecApplyConfiguration{}
 }
-func (b PersistentVolumeClaimSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAccessModes adds the given value to the AccessModes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

@@ -60,6 +60,25 @@ var supportedVersionedFormats = []versionedFormats{
 			"datetime",     // a date time string like "2014-12-15T19:30:20.000Z" as defined by date-time in RFC3339
 		),
 	},
+	{
+		introducedVersion: version.MajorMinor(1, 34),
+		formats: sets.New(
+			// a short Kubernetes name, up to 63 characters in length, composed of alphanumeric
+			// characters and dashes, which cannot begin or end with a dash.
+			// k8s-short-name almost conforms to the definition of a label in DNS (RFC 1123),
+			// except that uppercase letters are not allowed.
+			"k8s-short-name",
+
+			// a long Kubernetes name, up to 253 characters in length, composed of dot-separated
+			// segments; each segment uses only alphanumerics and dashes (no
+			// leading/trailing).
+			// k8s-long-name almost conforms to the definition of a subdomain in DNS (RFC 1123),
+			// except that uppercase letters are not allowed, and there is no max length
+			// limit of 63 for each of the dot-separated DNS Labels that make up the
+			// subdomain.
+			"k8s-long-name",
+		),
+	},
 }
 
 // StripUnsupportedFormatsPostProcess sets unsupported formats to empty string.
@@ -120,8 +139,14 @@ func newFormatsAtVersion(ver *version.Version, versionedFormats []versionedForma
 		supported:            sets.New[string](),
 	}
 	for _, vf := range versionedFormats {
+		// go-openapi default format name normalization
+		normalized := sets.Set[string]{}
+		for format := range vf.formats {
+			normalized.Insert(strings.ReplaceAll(format, "-", ""))
+		}
+
 		if ver.AtLeast(vf.introducedVersion) {
-			result.supported = result.supported.Union(vf.formats)
+			result.supported = result.supported.Union(normalized)
 
 		}
 	}

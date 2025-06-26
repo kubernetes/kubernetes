@@ -171,11 +171,11 @@ func validateCondition(condition storagemigration.MigrationCondition, fldPath *f
 	}
 
 	if condition.LastUpdateTime.IsZero() {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lastTransitionTime"), "must be set"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("lastTransitionTime"), ""))
 	}
 
 	if len(condition.Reason) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), "must be set"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), ""))
 	} else {
 		for _, currErr := range isValidConditionReason(condition.Reason) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, currErr))

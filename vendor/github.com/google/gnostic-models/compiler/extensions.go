@@ -20,9 +20,9 @@ import (
 	"os/exec"
 	"strings"
 
+	yaml "go.yaml.in/yaml/v3"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	yaml "gopkg.in/yaml.v3"
 
 	extensions "github.com/google/gnostic-models/extensions"
 )

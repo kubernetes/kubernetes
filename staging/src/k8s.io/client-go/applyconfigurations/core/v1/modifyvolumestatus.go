@@ -34,7 +34,6 @@ type ModifyVolumeStatusApplyConfiguration struct {
 func ModifyVolumeStatus() *ModifyVolumeStatusApplyConfiguration {
 	return &ModifyVolumeStatusApplyConfiguration{}
 }
-func (b ModifyVolumeStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithTargetVolumeAttributesClassName sets the TargetVolumeAttributesClassName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

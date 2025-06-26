@@ -32,7 +32,6 @@ type GCEPersistentDiskVolumeSourceApplyConfiguration struct {
 func GCEPersistentDiskVolumeSource() *GCEPersistentDiskVolumeSourceApplyConfiguration {
 	return &GCEPersistentDiskVolumeSourceApplyConfiguration{}
 }
-func (b GCEPersistentDiskVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPDName sets the PDName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

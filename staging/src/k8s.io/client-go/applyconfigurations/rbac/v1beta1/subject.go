@@ -32,7 +32,6 @@ type SubjectApplyConfiguration struct {
 func Subject() *SubjectApplyConfiguration {
 	return &SubjectApplyConfiguration{}
 }
-func (b SubjectApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

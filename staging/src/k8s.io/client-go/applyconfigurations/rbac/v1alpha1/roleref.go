@@ -31,7 +31,6 @@ type RoleRefApplyConfiguration struct {
 func RoleRef() *RoleRefApplyConfiguration {
 	return &RoleRefApplyConfiguration{}
 }
-func (b RoleRefApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAPIGroup sets the APIGroup field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
