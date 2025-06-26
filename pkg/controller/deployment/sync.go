@@ -36,6 +36,11 @@ import (
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
+const (
+	// replicaSetNameSeparator is the character used to separate deployment name from hash
+	replicaSetNameSeparator = "-"
+)
+
 // syncStatusOnly only updates Deployments Status and doesn't take any mutating actions.
 func (dc *DeploymentController) syncStatusOnly(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet) error {
 	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(ctx, d, rsList, false)
@@ -554,11 +559,11 @@ func (dc *DeploymentController) isScalingEvent(ctx context.Context, d *apps.Depl
 // generateReplicaSetName generates a ReplicaSet name by adding a pod template spec hash
 // to a Deployment name, optionally truncating it to ensure the ReplicaSet name is within the limit.
 func generateReplicaSetName(deploymentName, podTemplateSpecHash string) string {
-	maxDeploymentNameLength := validation.DNS1123SubdomainMaxLength - 1 - len(podTemplateSpecHash)
+	maxDeploymentNameLength := validation.DNS1123SubdomainMaxLength - len(replicaSetNameSeparator) - len(podTemplateSpecHash)
 
 	if len(deploymentName) > maxDeploymentNameLength && maxDeploymentNameLength > 0 {
-		return deploymentName[:maxDeploymentNameLength] + "-" + podTemplateSpecHash
+		return deploymentName[:maxDeploymentNameLength] + replicaSetNameSeparator + podTemplateSpecHash
 	}
 
-	return deploymentName + "-" + podTemplateSpecHash
+	return deploymentName + replicaSetNameSeparator + podTemplateSpecHash
 }

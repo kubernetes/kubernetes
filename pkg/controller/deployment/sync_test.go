@@ -602,19 +602,16 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 		wantRSNamePrefix string
 	}{
 		{
-			name:             "short name",
-			deploymentName:   "my-deployment",
-			wantRSNamePrefix: "my-deployment-",
+			name:           "short name",
+			deploymentName: "my-deployment",
 		},
 		{
-			name:             "very long name truncated",
-			deploymentName:   strings.Repeat("a", 250),
-			wantRSNamePrefix: strings.Repeat("a", 242) + "-",
+			name:           "very long name truncated",
+			deploymentName: strings.Repeat("a", 250),
 		},
 		{
-			name:             "very long name not truncated",
-			deploymentName:   strings.Repeat("a", 242),
-			wantRSNamePrefix: strings.Repeat("a", 242) + "-",
+			name:           "very long name not truncated",
+			deploymentName: strings.Repeat("a", 242),
 		},
 	}
 
@@ -657,15 +654,64 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 		}
 
 		if len(rsName) > validation.DNS1123SubdomainMaxLength {
-			t.Errorf("generated name length %d, want <= %d", len(rsName), validation.DNS1123SubdomainMaxLength)
+			t.Errorf("ReplicaSet name length %d, want <= %d", len(rsName), validation.DNS1123SubdomainMaxLength)
 		}
 
-		if !strings.HasPrefix(rsName, test.wantRSNamePrefix) {
-			t.Errorf("generated name %q, want prefix %q", rsName, test.wantRSNamePrefix)
+		parts := strings.Split(rsName, "-")
+		if len(parts) < 2 {
+			t.Errorf("ReplicaSet name should contain at least one hyphen separator")
 		}
 
-		if h := strings.TrimPrefix(rsName, test.wantRSNamePrefix); len(h) != 10 {
-			t.Errorf("generated name hash %q length %d, want length 10", h, len(h))
+		deploymentPortion := strings.Join(parts[:len(parts)-1], "-")
+		if len(test.deploymentName) <= 242 {
+			if deploymentPortion != test.deploymentName {
+				t.Errorf("Deployment name portion mismatch: got %q, want %q", deploymentPortion, test.deploymentName)
+			}
+		} else {
+			if len(deploymentPortion) != 242 {
+				t.Errorf("Truncated deployment name should be 242 chars, got %d", len(deploymentPortion))
+			}
+			if want := test.deploymentName[:242]; deploymentPortion != want {
+				t.Errorf("Deployment name portion mismatch: got %q, want %q", deploymentPortion, want)
+			}
 		}
+	}
+}
+
+func TestGenerateReplicaSetName(t *testing.T) {
+	tests := []struct {
+		name           string
+		deploymentName string
+		hash           string
+		want           string
+	}{
+		{
+			name:           "short name",
+			deploymentName: "my-deployment",
+			hash:           "abcde12345",
+			want:           "my-deployment-abcde12345",
+		},
+		{
+			name:           "maximum length without truncating",
+			deploymentName: strings.Repeat("a", 242),
+			hash:           "abcde12345",
+			want:           strings.Repeat("a", 242) + "-abcde12345",
+		},
+		{
+			name:           "too long need truncating",
+			deploymentName: strings.Repeat("b", 250),
+			hash:           "abcde12345",
+			want:           strings.Repeat("b", 242) + "-abcde12345",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := generateReplicaSetName(test.deploymentName, test.hash)
+
+			if got != test.want {
+				t.Errorf("generateReplicaSetName(%q, %q) = %q, want %q", test.deploymentName, test.hash, got, test.want)
+			}
+		})
 	}
 }
