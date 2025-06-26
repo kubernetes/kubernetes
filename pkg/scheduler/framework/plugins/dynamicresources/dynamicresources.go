@@ -41,6 +41,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -108,6 +109,7 @@ type DynamicResources struct {
 	enableSchedulingQueueHint  bool
 	enablePartitionableDevices bool
 	enableDeviceTaints         bool
+	enableConsumableCapacity   bool
 
 	fh         framework.Handle
 	clientset  kubernetes.Interface
@@ -129,6 +131,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		enablePrioritizedList:      fts.EnableDRAPrioritizedList,
 		enableSchedulingQueueHint:  fts.EnableSchedulingQueueHint,
 		enablePartitionableDevices: fts.EnablePartitionableDevices,
+		enableConsumableCapacity:   fts.EnableConsumableCapacity,
 
 		fh:        fh,
 		clientset: fh.ClientSet(),
@@ -448,10 +451,15 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		// Claims (and thus their devices) are treated as "allocated" if they are in the assume cache
 		// or currently their allocation is in-flight. This does not change
 		// during filtering, so we can determine that once.
-		allAllocatedDevices, err := pl.draManager.ResourceClaims().ListAllAllocatedDevices()
+		allocatedState, err := pl.draManager.ResourceClaims().GatherAllocatedState()
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
+		if allocatedState == nil {
+			return nil, statusError(logger, fmt.Errorf("nil allocated state"))
+		}
+		shareIDFactory := structured.NewUniqueHexStringFactory(resource.ShareIDNBytes)
+		shareIDFactory.SetUsedShareIDs(allocatedState.AllocatedSharedDeviceIDs)
 		slices, err := pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
 		if err != nil {
 			return nil, statusError(logger, err)
@@ -461,8 +469,9 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			PrioritizedList:      pl.enablePrioritizedList,
 			PartitionableDevices: pl.enablePartitionableDevices,
 			DeviceTaints:         pl.enableDeviceTaints,
+			ConsumableCapacity:   pl.enableConsumableCapacity,
 		}
-		allocator, err := structured.NewAllocator(ctx, features, allocateClaims, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
+		allocator, err := structured.NewAllocator(ctx, features, allocateClaims, *allocatedState, shareIDFactory, pl.draManager.DeviceClasses(), slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}

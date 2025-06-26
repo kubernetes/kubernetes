@@ -38,6 +38,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/cel"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
+	apiresource "k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
@@ -329,21 +330,47 @@ claims:
 		claims, err := draManager.ResourceClaims().List()
 		tCtx.ExpectNoError(err, "list claims")
 		allocatedDevices := sets.New[structured.DeviceID]()
+		allocatedSharedDeviceIDs := make(structured.SharedDeviceIDList, 0)
+		aggregatedCapacity := structured.NewConsumedCapacityCollection()
 		for _, claim := range claims {
 			if claim.Status.Allocation == nil {
 				continue
 			}
 			for _, result := range claim.Status.Allocation.Devices.Results {
-				allocatedDevices.Insert(structured.MakeDeviceID(result.Driver, result.Pool, result.Device))
+				deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+				allocatedDevices.Insert(deviceID)
+				if result.ShareID != nil {
+					sharedDeviceID := structured.MakeSharedDeviceID(deviceID, *result.ShareID)
+					allocatedSharedDeviceIDs[sharedDeviceID] = struct{}{}
+				} else {
+					allocatedDevices.Insert(deviceID)
+					continue
+				}
+				claimedCapacity := result.ConsumedCapacities
+				if claimedCapacity != nil {
+					allocatedCapacity := structured.NewDeviceConsumedCapacity(deviceID, claimedCapacity)
+					if _, found := aggregatedCapacity[deviceID]; found {
+						aggregatedCapacity[deviceID].Add(allocatedCapacity.ConsumedCapacity)
+					} else {
+						aggregatedCapacity[deviceID] = allocatedCapacity.ConsumedCapacity.Clone()
+					}
+				}
 			}
 		}
-
+		shareIDFactory := structured.NewUniqueHexStringFactory(apiresource.ShareIDNBytes)
+		shareIDFactory.SetUsedShareIDs(allocatedSharedDeviceIDs)
+		allocatedState := structured.AllocatedState{
+			AllocatedDevices:         allocatedDevices,
+			AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
+			AggregatedCapacity:       aggregatedCapacity,
+		}
 		allocator, err := structured.NewAllocator(tCtx, structured.Features{
 			PrioritizedList:      utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
 			AdminAccess:          utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
-		}, []*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
+			ConsumableCapacity:   utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		}, []*resourceapi.ResourceClaim{claim}, allocatedState, shareIDFactory, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {

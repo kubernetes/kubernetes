@@ -39,12 +39,12 @@ func (s SharedDeviceIDList) Clone() SharedDeviceIDList {
 	return cloneList
 }
 
-func MakeSharedDeviceID(deviceID DeviceID, ShareID string) SharedDeviceID {
+func MakeSharedDeviceID(deviceID DeviceID, shareID string) SharedDeviceID {
 	return SharedDeviceID{
 		Driver:  deviceID.Driver,
 		Pool:    deviceID.Pool,
 		Device:  deviceID.Device,
-		ShareID: draapi.MakeUniqueString(ShareID),
+		ShareID: draapi.MakeUniqueString(shareID),
 	}
 }
 
@@ -52,8 +52,8 @@ func (d SharedDeviceID) String() string {
 	return d.Driver.String() + "/" + d.Pool.String() + "/" + GetSharedDeviceName(d.Device.String(), d.ShareID.String())
 }
 
-func GetSharedDeviceName(device, ShareID string) string {
-	return device + "/" + ShareID
+func GetSharedDeviceName(device, shareID string) string {
+	return device + "/" + shareID
 }
 
 type UniqueHexStringFactory struct {
@@ -107,10 +107,10 @@ func (f *UniqueHexStringFactory) GenerateNewShareID(deviceID DeviceID, maxTry in
 	}
 }
 
-func (f *UniqueHexStringFactory) DeleteShareID(deviceID DeviceID, ShareID string) {
+func (f *UniqueHexStringFactory) DeleteShareID(deviceID DeviceID, shareID string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	sharedDeviceID := MakeSharedDeviceID(deviceID, ShareID)
+	sharedDeviceID := MakeSharedDeviceID(deviceID, shareID)
 	if _, exists := f.usedIDs[sharedDeviceID]; !exists {
 		delete(f.usedIDs, sharedDeviceID)
 	}
