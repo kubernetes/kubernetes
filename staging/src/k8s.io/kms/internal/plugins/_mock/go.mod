@@ -23,3 +23,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace github.com/google/gnostic-models => github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14

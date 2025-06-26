@@ -39,6 +39,7 @@ require (
 )
 
 replace (
+	github.com/google/gnostic-models => github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 )

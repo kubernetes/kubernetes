@@ -286,8 +286,8 @@ github.com/google/cel-go/interpreter
 github.com/google/cel-go/interpreter/functions
 github.com/google/cel-go/parser
 github.com/google/cel-go/parser/gen
-# github.com/google/gnostic-models v0.6.9
-## explicit; go 1.21
+# github.com/google/gnostic-models v0.6.9 => github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14
+## explicit; go 1.24
 github.com/google/gnostic-models/compiler
 github.com/google/gnostic-models/extensions
 github.com/google/gnostic-models/jsonschema
@@ -1294,3 +1294,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
+# github.com/google/gnostic-models => github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14

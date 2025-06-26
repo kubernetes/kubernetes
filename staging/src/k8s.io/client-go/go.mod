@@ -57,6 +57,7 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
+	go.yaml.in/yaml/v3 v3.0.3 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
@@ -65,6 +66,7 @@ require (
 )
 
 replace (
+	github.com/google/gnostic-models => github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 )

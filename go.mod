@@ -225,6 +225,7 @@ require (
 )
 
 replace (
+	github.com/google/gnostic-models => github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery

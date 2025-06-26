@@ -35,4 +35,7 @@ require (
 	sigs.k8s.io/yaml v1.5.0 // indirect
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	github.com/google/gnostic-models => github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14
+	k8s.io/apimachinery => ../apimachinery
+)

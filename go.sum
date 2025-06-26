@@ -9,6 +9,8 @@ github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161/go.mod h1:xomTg6
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.26.0/go.mod h1:2bIszWvQRlJVmJLiuLhukLImRjKPcYdzzsx6darK02A=
 github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab h1:UKkYhof1njT1/xq4SEg5z+VpTgjmNeHwPGRQl7takDI=
 github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab/go.mod h1:3VYc5hodBMJ5+l/7J4xAyMeuM2PNuepvHlGs8yilUCA=
+github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14 h1:H0fvhiZ5Dd1o8MdJGjCrE6cjhpLylg82Hpkn0tR2QGg=
+github.com/Jefftree/gnostic-models v0.0.0-20250626140421-d6753a26ee14/go.mod h1:nxL+Hfrom4doGZYEwZxRWXK19XpOMlKD9TkR9jQuFGI=
 github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ4pzQ=
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
@@ -155,8 +157,6 @@ github.com/google/cadvisor v0.52.1 h1:sC8SZ6jio9ds+P2dk51bgbeYeufxo55n0X3tmrpA9a
 github.com/google/cadvisor v0.52.1/go.mod h1:OAhPcx1nOm5YwMh/JhpUOMKyv1YKLRtS9KgzWPndHmA=
 github.com/google/cel-go v0.25.0 h1:jsFw9Fhn+3y2kBbltZR4VEz5xKkcIFRPDnuEzAGv5GY=
 github.com/google/cel-go v0.25.0/go.mod h1:hjEb6r5SuOSlhCHmFoLzu8HGCERvIsDAbxDAyNU/MmI=
-github.com/google/gnostic-models v0.6.9 h1:MU/8wDLif2qCXZmzncUQ/BOfxWfthHi63KqpoNbWqVw=
-github.com/google/gnostic-models v0.6.9/go.mod h1:CiWsm0s6BSQd1hRn8/QmxqB6BesYcbSZxsz9b0KuDBw=
 github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
