@@ -1784,7 +1784,8 @@
               "request": "requestValue"
             }
           ]
-        }
+        },
+        "hostnameOverride": "hostnameOverrideValue"
       }
     },
     "strategy": {
