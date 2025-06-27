@@ -573,6 +573,18 @@ func (kl *Kubelet) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler 
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
 	clusterDomain := kl.dnsConfigurer.ClusterDomain
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.HostnameOverride) && pod.Spec.HostnameOverride != nil {
+		hostname := *pod.Spec.HostnameOverride
+		if msgs := utilvalidation.IsDNS1123Label(hostname); len(msgs) != 0 {
+			return "", "", fmt.Errorf("pod HostnameOverride %q is not a valid DNS label: %s", hostname, strings.Join(msgs, ";"))
+		}
+		truncatedHostname, err := truncatePodHostnameIfNeeded(pod.Name, hostname)
+		if err != nil {
+			return "", "", err
+		}
+		return truncatedHostname, "", nil
+	}
+
 	hostname := pod.Name
 	if len(pod.Spec.Hostname) > 0 {
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Hostname); len(msgs) != 0 {
