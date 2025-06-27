@@ -30,7 +30,6 @@ type DeviceClassSpecApplyConfiguration struct {
 func DeviceClassSpec() *DeviceClassSpecApplyConfiguration {
 	return &DeviceClassSpecApplyConfiguration{}
 }
-func (b DeviceClassSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSelectors adds the given value to the Selectors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

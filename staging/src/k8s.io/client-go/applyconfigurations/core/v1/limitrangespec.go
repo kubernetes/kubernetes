@@ -29,7 +29,6 @@ type LimitRangeSpecApplyConfiguration struct {
 func LimitRangeSpec() *LimitRangeSpecApplyConfiguration {
 	return &LimitRangeSpecApplyConfiguration{}
 }
-func (b LimitRangeSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithLimits adds the given value to the Limits field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

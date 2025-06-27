@@ -30,7 +30,6 @@ type EndpointHintsApplyConfiguration struct {
 func EndpointHints() *EndpointHintsApplyConfiguration {
 	return &EndpointHintsApplyConfiguration{}
 }
-func (b EndpointHintsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithForZones adds the given value to the ForZones field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

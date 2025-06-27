@@ -33,7 +33,6 @@ type StorageOSVolumeSourceApplyConfiguration struct {
 func StorageOSVolumeSource() *StorageOSVolumeSourceApplyConfiguration {
 	return &StorageOSVolumeSourceApplyConfiguration{}
 }
-func (b StorageOSVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithVolumeName sets the VolumeName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -34,7 +34,6 @@ type CustomResourceConversionApplyConfiguration struct {
 func CustomResourceConversion() *CustomResourceConversionApplyConfiguration {
 	return &CustomResourceConversionApplyConfiguration{}
 }
-func (b CustomResourceConversionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithStrategy sets the Strategy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

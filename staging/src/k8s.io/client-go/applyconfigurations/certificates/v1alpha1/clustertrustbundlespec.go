@@ -30,7 +30,6 @@ type ClusterTrustBundleSpecApplyConfiguration struct {
 func ClusterTrustBundleSpec() *ClusterTrustBundleSpecApplyConfiguration {
 	return &ClusterTrustBundleSpecApplyConfiguration{}
 }
-func (b ClusterTrustBundleSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSignerName sets the SignerName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

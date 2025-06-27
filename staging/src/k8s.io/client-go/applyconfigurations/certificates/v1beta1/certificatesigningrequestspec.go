@@ -40,7 +40,6 @@ type CertificateSigningRequestSpecApplyConfiguration struct {
 func CertificateSigningRequestSpec() *CertificateSigningRequestSpecApplyConfiguration {
 	return &CertificateSigningRequestSpecApplyConfiguration{}
 }
-func (b CertificateSigningRequestSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRequest adds the given value to the Request field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

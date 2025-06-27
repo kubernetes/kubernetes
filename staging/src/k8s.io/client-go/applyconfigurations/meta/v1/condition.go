@@ -38,7 +38,6 @@ type ConditionApplyConfiguration struct {
 func Condition() *ConditionApplyConfiguration {
 	return &ConditionApplyConfiguration{}
 }
-func (b ConditionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

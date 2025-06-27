@@ -38,7 +38,6 @@ type PodDisruptionBudgetSpecApplyConfiguration struct {
 func PodDisruptionBudgetSpec() *PodDisruptionBudgetSpecApplyConfiguration {
 	return &PodDisruptionBudgetSpecApplyConfiguration{}
 }
-func (b PodDisruptionBudgetSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMinAvailable sets the MinAvailable field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
