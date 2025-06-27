@@ -355,6 +355,19 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		out.Annotations[autoscaling.BehaviorSpecsAnnotation] = string(behaviorEnc)
 	}
 
+	if in.Spec.SelectionStrategy != nil {
+		selectionStrategyEnc, err := json.Marshal(in.Spec.SelectionStrategy)
+		if err != nil {
+			return err
+		}
+		// copy before mutating
+		if !copiedAnnotations {
+			copiedAnnotations = true
+			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
+		}
+		out.Annotations[autoscaling.SelectionStrategyAnnotation] = string(selectionStrategyEnc)
+	}
+
 	if len(in.Status.Conditions) > 0 {
 		currentConditionsEnc, err := json.Marshal(currentConditions)
 		if err != nil {
