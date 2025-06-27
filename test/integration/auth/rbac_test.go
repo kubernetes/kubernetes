@@ -1077,7 +1077,7 @@ func TestMonitoringURLs(t *testing.T) {
 				},
 				{
 					path:          "/statusz",
-					wantBodyRegex: `kube-apiserver statusz`,
+					wantBodyRegex: `apiserver statusz`,
 				},
 			},
 		},

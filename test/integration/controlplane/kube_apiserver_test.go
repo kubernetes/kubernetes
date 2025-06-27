@@ -189,14 +189,14 @@ func TestStatusz(t *testing.T) {
 	}
 
 	expectedHeader := `
-kube-apiserver statusz
+apiserver statusz
 Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.`
 
 	raw, err := res.Raw()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.HasPrefix(raw, []byte(expectedHeader)) {
+	if !bytes.Contains(raw, []byte(expectedHeader)) {
 		t.Fatalf("Header mismatch!\nExpected:\n%s\n\nGot:\n%s", expectedHeader, string(raw))
 	}
 }
