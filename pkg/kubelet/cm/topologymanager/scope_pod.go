@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -79,6 +79,8 @@ func (s *podScope) accumulateProvidersHints(pod *v1.Pod) []map[string][]Topology
 
 	for _, provider := range s.hintProviders {
 		// Get the TopologyHints for a Pod from a provider.
+		// TODO (https://github.com/kubernetes/kubernetes/issues/130069):
+		// Plumb context to GetTopologyHints when migrating global klog to context logging
 		hints := provider.GetPodTopologyHints(pod)
 		providersHints = append(providersHints, hints)
 		klog.InfoS("TopologyHints", "hints", hints, "pod", klog.KObj(pod))
