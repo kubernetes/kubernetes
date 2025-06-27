@@ -85,14 +85,14 @@ func populateStatuszData(reg statuszRegistry, componentName string) (string, err
 	}
 	var apiserverLinks string
 	if componentName == "kube-apiserver" {
-		apiserverLinks = fmt.Sprintf(`
+		apiserverLinks = `
 Useful Endpoints:
 ----------------
 "healthz":  "/healthz",
 "livez":	"/livez",
 "readyz":	"/readyz",
 "version":  "/version",
-"metrics":	"/metrics"`)
+"metrics":	"/metrics"`
 	}
 
 	status := fmt.Sprintf(`

@@ -36,6 +36,7 @@ Up: %s
 Go version: %s
 Binary version: %v
 Emulation version: %v
+
 `
 
 const wantTmplWithoutEmulation = `
@@ -46,6 +47,8 @@ Started: %v
 Up: %s
 Go version: %s
 Binary version: %v
+
+
 `
 
 const wantTmplWithKubeApiserverComp = `
@@ -56,6 +59,8 @@ Started: %v
 Up: %s
 Go version: %s
 Binary version: %v
+
+
 Useful Endpoints:
 ----------------
 "healthz":  "/healthz",
