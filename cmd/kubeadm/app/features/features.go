@@ -29,17 +29,25 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
+// Feature gates should be listed in alphabetical, case-sensitive
+// (upper before any lower case character) order. This reduces the risk
+// of code conflicts because changes are more likely to be scattered
+// across the file.
 const (
-	// PublicKeysECDSA is expected to be alpha in v1.19
-	PublicKeysECDSA = "PublicKeysECDSA"
-	// RootlessControlPlane is expected to be in alpha in v1.22
-	RootlessControlPlane = "RootlessControlPlane"
-	// WaitForAllControlPlaneComponents is expected to be alpha in v1.30
-	WaitForAllControlPlaneComponents = "WaitForAllControlPlaneComponents"
 	// ControlPlaneKubeletLocalMode is expected to be in alpha in v1.31, beta in v1.33
 	ControlPlaneKubeletLocalMode = "ControlPlaneKubeletLocalMode"
+
 	// NodeLocalCRISocket is expected to be in alpha in v1.32, beta in v1.34, ga in v1.36
 	NodeLocalCRISocket = "NodeLocalCRISocket"
+
+	// PublicKeysECDSA is expected to be alpha in v1.19
+	PublicKeysECDSA = "PublicKeysECDSA"
+
+	// RootlessControlPlane is expected to be in alpha in v1.22
+	RootlessControlPlane = "RootlessControlPlane"
+
+	// WaitForAllControlPlaneComponents is expected to be alpha in v1.30
+	WaitForAllControlPlaneComponents = "WaitForAllControlPlaneComponents"
 )
 
 // InitFeatureGates are the default feature gates for the init command
