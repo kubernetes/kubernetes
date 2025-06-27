@@ -99,19 +99,14 @@ var _ = SIGDescribe("Events", func() {
 			"involvedObject.namespace": f.Namespace.Name,
 			"source":                   v1.DefaultSchedulerName,
 		}.AsSelector().String()
-
-		framework.ExpectNoError(framework.Gomega().Eventually(ctx, func(ctx context.Context) (int, error) {
-			options := metav1.ListOptions{FieldSelector: schedulerSelector}
-			events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, options)
-			if err != nil {
-				return 0, err
-			}
-			return len(events.Items), nil
-		}).WithTimeout(5*time.Minute).Should(gomega.BeNumerically(">", 0)), "expected at least one scheduler event")
+		options = metav1.ListOptions{FieldSelector: schedulerSelector}
+		gomega.Eventually(ctx, framework.ListObjects(f.ClientSet.CoreV1().Events(f.Namespace.Name).List, options)).
+			WithContext(ctx).
+			WithTimeout(5*time.Minute).
+			ShouldNot(gomega.BeEmpty(), "expected at least one scheduler event")
 		framework.Logf("Saw scheduler event for our pod.")
 
 		// Check for kubelet event about the pod.
-		ginkgo.By("checking for kubelet event about the pod")
 		ginkgo.By("checking for kubelet event about the pod")
 		kubeletSelector := fields.Set{
 			"involvedObject.uid":       string(podWithUID.UID),
@@ -119,15 +114,11 @@ var _ = SIGDescribe("Events", func() {
 			"involvedObject.namespace": f.Namespace.Name,
 			"source":                   "kubelet",
 		}.AsSelector().String()
-
-		framework.ExpectNoError(framework.Gomega().Eventually(ctx, func(ctx context.Context) (int, error) {
-			options := metav1.ListOptions{FieldSelector: kubeletSelector}
-			events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, options)
-			if err != nil {
-				return 0, err
-			}
-			return len(events.Items), nil
-		}).WithTimeout(5*time.Minute).Should(gomega.BeNumerically(">", 0)), "expected at least one kubelet event")
+		options = metav1.ListOptions{FieldSelector: kubeletSelector}
+		gomega.Eventually(framework.ListObjects(f.ClientSet.CoreV1().Events(f.Namespace.Name).List, options)).
+			WithContext(ctx).
+			WithTimeout(5*time.Minute).
+			ShouldNot(gomega.BeEmpty(), "expected atleast one kubelet event")
 		framework.Logf("Saw kubelet event for our pod.")
 	})
 })
