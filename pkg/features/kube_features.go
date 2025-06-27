@@ -1156,7 +1156,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	DockerCredentialUTF8Validation: {
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA}, // remove in v1.35
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta}, // remove in v1.35
 	},
 
 	DRAAdminAccess: {
