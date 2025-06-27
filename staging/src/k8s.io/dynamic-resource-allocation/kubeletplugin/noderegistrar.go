@@ -30,11 +30,11 @@ type nodeRegistrar struct {
 }
 
 // startRegistrar returns a running instance.
-func startRegistrar(logger klog.Logger, grpcVerbosity int, interceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, driverName string, supportedServices []string, socketpath string, pluginRegistrationEndpoint endpoint) (*nodeRegistrar, error) {
+func startRegistrar(logger klog.Logger, grpcVerbosity int, interceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, driverName string, supportedServices []string, draEndpointPath string, pluginRegistrationEndpoint endpoint) (*nodeRegistrar, error) {
 	n := &nodeRegistrar{
 		registrationServer: registrationServer{
 			driverName:        driverName,
-			endpoint:          socketpath,
+			draEndpointPath:   draEndpointPath,
 			supportedVersions: supportedServices, // DRA uses this field to describe provided services (e.g. "v1beta1.DRAPlugin").
 		},
 	}
