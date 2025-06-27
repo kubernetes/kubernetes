@@ -115,7 +115,8 @@ type DRAPlugin interface {
 	// and serialization.
 	//
 	// The conventions for returning one overall error and several per-ResourceClaim
-	// errors are the same as in PrepareResourceClaims.
+	// errors are the same as in PrepareResourceClaims. In particular, all claims
+	// must have an entry in the response, even if that entry is nil.
 	UnprepareResourceClaims(ctx context.Context, claims []NamespacedObject) (result map[types.UID]error, err error)
 
 	// ErrorHandler gets called for each error encountered while publishing

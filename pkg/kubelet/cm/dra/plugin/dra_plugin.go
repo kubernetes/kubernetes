@@ -25,7 +25,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"k8s.io/klog/v2"
-	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -38,6 +37,12 @@ import (
 // This is half of the kubelet retry period (according to
 // https://github.com/kubernetes/kubernetes/commit/0449cef8fd5217d394c5cd331d852bd50983e6b3).
 const defaultClientCallTimeout = 45 * time.Second
+
+// All API versions supported by this wrapper.
+// Sorted by most recent first, oldest last.
+var servicesSupportedByKubelet = []string{
+	drapbv1beta1.DRAPluginService,
+}
 
 // DRAPlugin contains information about one registered plugin of a DRA driver.
 // It implements the kubelet operations for preparing/unpreparing by calling
@@ -73,9 +78,6 @@ func (p *DRAPlugin) NodePrepareResources(
 	case drapbv1beta1.DRAPluginService:
 		nodeClient := drapbv1beta1.NewDRAPluginClient(p.conn)
 		response, err = nodeClient.NodePrepareResources(ctx, req)
-	case drapbv1alpha4.NodeService:
-		nodeClient := drapbv1alpha4.NewNodeClient(p.conn)
-		response, err = drapbv1alpha4.V1Alpha4ClientWrapper{NodeClient: nodeClient}.NodePrepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
@@ -104,9 +106,6 @@ func (p *DRAPlugin) NodeUnprepareResources(
 	case drapbv1beta1.DRAPluginService:
 		nodeClient := drapbv1beta1.NewDRAPluginClient(p.conn)
 		response, err = nodeClient.NodeUnprepareResources(ctx, req)
-	case drapbv1alpha4.NodeService:
-		nodeClient := drapbv1alpha4.NewNodeClient(p.conn)
-		response, err = drapbv1alpha4.V1Alpha4ClientWrapper{NodeClient: nodeClient}.NodeUnprepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.

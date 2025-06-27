@@ -36,8 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
-	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction" // TODO (?): move this common helper somewhere else?
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/utils/ptr"
@@ -482,12 +480,8 @@ func (pm *DRAPluginManager) validateSupportedServices(driverName string, support
 
 	// Pick most recent version if available.
 	chosenService := ""
-	for _, service := range []string{
-		// Sorted by most recent first, oldest last.
-		drapbv1beta1.DRAPluginService,
-		drapbv1alpha4.NodeService,
-	} {
-		if slices.Contains(supportedServices, service) {
+	for _, service := range supportedServices {
+		if slices.Contains(servicesSupportedByKubelet, service) {
 			chosenService = service
 			break
 		}
@@ -496,7 +490,7 @@ func (pm *DRAPluginManager) validateSupportedServices(driverName string, support
 	// Fall back to alpha if necessary because
 	// plugins at that time didn't advertise gRPC services.
 	if chosenService == "" {
-		chosenService = drapbv1alpha4.NodeService
+		return "", fmt.Errorf("none of services supported by the plugin (%q) are supported by the kubelet (%q)", supportedServices, servicesSupportedByKubelet)
 	}
 
 	return chosenService, nil
