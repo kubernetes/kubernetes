@@ -95,19 +95,18 @@ type testParameters struct {
 	enableResizing      bool   // enable resizing for both CSI mock driver and storageClass.
 	enableNodeExpansion bool   // enable node expansion for CSI mock driver
 	// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
-	disableResizingOnDriver       bool
-	disableControllerExpansion    bool
-	enableSnapshot                bool
-	enableVolumeMountGroup        bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
-	enableNodeVolumeCondition     bool
-	hooks                         *drivers.Hooks
-	tokenRequests                 []storagev1.TokenRequest
-	requiresRepublish             *bool
-	fsGroupPolicy                 *storagev1.FSGroupPolicy
-	enableSELinuxMount            *bool
-	enableRecoverExpansionFailure bool
-	enableCSINodeExpandSecret     bool
-	reclaimPolicy                 *v1.PersistentVolumeReclaimPolicy
+	disableResizingOnDriver    bool
+	disableControllerExpansion bool
+	enableSnapshot             bool
+	enableVolumeMountGroup     bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
+	enableNodeVolumeCondition  bool
+	hooks                      *drivers.Hooks
+	tokenRequests              []storagev1.TokenRequest
+	requiresRepublish          *bool
+	fsGroupPolicy              *storagev1.FSGroupPolicy
+	enableSELinuxMount         *bool
+	enableCSINodeExpandSecret  bool
+	reclaimPolicy              *v1.PersistentVolumeReclaimPolicy
 }
 
 type mockDriverSetup struct {
@@ -164,23 +163,22 @@ func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 
 	var err error
 	driverOpts := drivers.CSIMockDriverOpts{
-		RegisterDriver:                tp.registerDriver,
-		PodInfo:                       tp.podInfo,
-		StorageCapacity:               tp.storageCapacity,
-		EnableTopology:                tp.enableTopology,
-		AttachLimit:                   tp.attachLimit,
-		DisableAttach:                 tp.disableAttach,
-		EnableResizing:                tp.enableResizing,
-		EnableNodeExpansion:           tp.enableNodeExpansion,
-		EnableNodeVolumeCondition:     tp.enableNodeVolumeCondition,
-		DisableControllerExpansion:    tp.disableControllerExpansion,
-		EnableSnapshot:                tp.enableSnapshot,
-		EnableVolumeMountGroup:        tp.enableVolumeMountGroup,
-		TokenRequests:                 tp.tokenRequests,
-		RequiresRepublish:             tp.requiresRepublish,
-		FSGroupPolicy:                 tp.fsGroupPolicy,
-		EnableSELinuxMount:            tp.enableSELinuxMount,
-		EnableRecoverExpansionFailure: tp.enableRecoverExpansionFailure,
+		RegisterDriver:             tp.registerDriver,
+		PodInfo:                    tp.podInfo,
+		StorageCapacity:            tp.storageCapacity,
+		EnableTopology:             tp.enableTopology,
+		AttachLimit:                tp.attachLimit,
+		DisableAttach:              tp.disableAttach,
+		EnableResizing:             tp.enableResizing,
+		EnableNodeExpansion:        tp.enableNodeExpansion,
+		EnableNodeVolumeCondition:  tp.enableNodeVolumeCondition,
+		DisableControllerExpansion: tp.disableControllerExpansion,
+		EnableSnapshot:             tp.enableSnapshot,
+		EnableVolumeMountGroup:     tp.enableVolumeMountGroup,
+		TokenRequests:              tp.tokenRequests,
+		RequiresRepublish:          tp.requiresRepublish,
+		FSGroupPolicy:              tp.fsGroupPolicy,
+		EnableSELinuxMount:         tp.enableSELinuxMount,
 	}
 
 	// At the moment, only tests which need hooks are
@@ -507,7 +505,7 @@ func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes 
 	return class, claim, pod
 }
 
-func (m *mockDriverSetup) createResourceQuota(ctx context.Context, quota *v1.ResourceQuota) (*v1.ResourceQuota, error) {
+func (m *mockDriverSetup) createResourceQuota(ctx context.Context, quota *v1.ResourceQuota) *v1.ResourceQuota {
 	ginkgo.By("Creating Resource Quota")
 	f := m.f
 
@@ -520,7 +518,7 @@ func (m *mockDriverSetup) createResourceQuota(ctx context.Context, quota *v1.Res
 	quota, err = f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, quota, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create resourceQuota")
 	m.quotas = append(m.quotas, quota)
-	return quota, err
+	return quota
 }
 
 func waitForCSIDriver(cs clientset.Interface, driverName string) error {
