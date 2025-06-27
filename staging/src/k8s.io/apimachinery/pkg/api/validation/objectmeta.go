@@ -46,11 +46,11 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	for k := range annotations {
 		// The rule is QualifiedName except that case doesn't matter, so convert to lowercase before checking.
 		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, k, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath, k, msg).WithOrigin("format=qualified-name"))
 		}
 	}
 	if err := ValidateAnnotationsSize(annotations); err != nil {
-		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, TotalAnnotationSizeLimitB))
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, TotalAnnotationSizeLimitB).WithOrigin("annotations"))
 	}
 	return allErrs
 }
@@ -71,19 +71,19 @@ func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field
 	gvk := schema.FromAPIVersionAndKind(ownerReference.APIVersion, ownerReference.Kind)
 	// gvk.Group is empty for the legacy group.
 	if len(gvk.Version) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ownerReference.APIVersion, "version must not be empty"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ownerReference.APIVersion, "version must not be empty").WithOrigin("owner-reference"))
 	}
 	if len(gvk.Kind) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ownerReference.Kind, "kind must not be empty"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ownerReference.Kind, "kind must not be empty").WithOrigin("owner-reference"))
 	}
 	if len(ownerReference.Name) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ownerReference.Name, "name must not be empty"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ownerReference.Name, "name must not be empty").WithOrigin("owner-reference"))
 	}
 	if len(ownerReference.UID) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), ownerReference.UID, "uid must not be empty"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), ownerReference.UID, "uid must not be empty").WithOrigin("owner-reference"))
 	}
 	if _, ok := BannedOwners[gvk]; ok {
-		allErrs = append(allErrs, field.Invalid(fldPath, ownerReference, fmt.Sprintf("%s is disallowed from being an owner", gvk)))
+		allErrs = append(allErrs, field.Invalid(fldPath, ownerReference, fmt.Sprintf("%s is disallowed from being an owner", gvk)).WithOrigin("owner-reference"))
 	}
 	return allErrs
 }
@@ -98,7 +98,7 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 			curControllerName := ref.Kind + "/" + ref.Name
 			if firstControllerName != "" {
 				allErrs = append(allErrs, field.Invalid(fldPath, ownerReferences,
-					fmt.Sprintf("Only one reference can have Controller set to true. Found \"true\" in references for %v and %v", firstControllerName, curControllerName)))
+					fmt.Sprintf("Only one reference can have Controller set to true. Found \"true\" in references for %v and %v", firstControllerName, curControllerName)).WithOrigin("owner-references"))
 			} else {
 				firstControllerName = curControllerName
 			}
@@ -111,7 +111,7 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 func ValidateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(stringValue) {
-		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg).WithOrigin("format=qualified-name"))
 	}
 
 	return allErrs
@@ -208,7 +208,7 @@ func ValidateFinalizers(finalizers []string, fldPath *field.Path) field.ErrorLis
 		}
 	}
 	if hasFinalizerDeleteDependents && hasFinalizerOrphanDependents {
-		allErrs = append(allErrs, field.Invalid(fldPath, finalizers, fmt.Sprintf("finalizer %s and %s cannot be both set", metav1.FinalizerOrphanDependents, metav1.FinalizerDeleteDependents)))
+		allErrs = append(allErrs, field.Invalid(fldPath, finalizers, fmt.Sprintf("finalizer %s and %s cannot be both set", metav1.FinalizerOrphanDependents, metav1.FinalizerDeleteDependents)).WithOrigin("finalizers"))
 	}
 	return allErrs
 }

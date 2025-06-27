@@ -53,7 +53,7 @@ func TestValidateClass(t *testing.T) {
 			class:        testClass(""),
 		},
 		"bad-name": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')") /* no WithOrigin https://github.com/kubernetes/kubernetes/blob/6ed5b60f71930d51bfcf8bfa6f3506b099811318/staging/src/k8s.io/apimachinery/pkg/api/validation/objectmeta.go#L160 */},
 			class:        testClass(badName),
 		},
 		"generate-name": {
@@ -145,7 +145,7 @@ func TestValidateClass(t *testing.T) {
 			}(),
 		},
 		"bad-labels": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "").WithOrigin("format=label-value")},
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)
 				class.Labels = map[string]string{
@@ -164,7 +164,7 @@ func TestValidateClass(t *testing.T) {
 			}(),
 		},
 		"bad-annotations": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"), badName, "").WithOrigin("format=qualified-name")},
 			class: func() *resource.DeviceClass {
 				class := testClass(goodName)
 				class.Annotations = map[string]string{
@@ -222,7 +222,7 @@ func TestValidateClass(t *testing.T) {
 		"configuration": {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "config").Index(1).Child("opaque", "driver"), ""),
-				field.Invalid(field.NewPath("spec", "config").Index(1).Child("opaque", "driver"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Invalid(field.NewPath("spec", "config").Index(1).Child("opaque", "driver"), "", "").WithOrigin("format=dns-subdomain"),
 				field.Required(field.NewPath("spec", "config").Index(1).Child("opaque", "parameters"), ""),
 				field.Invalid(field.NewPath("spec", "config").Index(2).Child("opaque", "parameters"), "<value omitted>", "error parsing data as JSON: invalid character 'x' looking for beginning of value"),
 				field.Invalid(field.NewPath("spec", "config").Index(3).Child("opaque", "parameters"), "<value omitted>", "parameters must be a valid JSON object"),

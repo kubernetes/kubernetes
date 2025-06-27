@@ -152,7 +152,7 @@ func ValidateQualifiedName(value string, fldPath *field.Path) field.ErrorList {
 func ValidateDNS1123SubdomainWithUnderScore(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsDNS1123SubdomainWithUnderscore(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg)).WithOrigin("format=dns-subdomain-with-underscore")
 	}
 	return allErrs
 }
@@ -161,7 +161,7 @@ func ValidateDNS1123SubdomainWithUnderScore(value string, fldPath *field.Path) f
 func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsDNS1123Subdomain(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg)).WithOrigin("format=dns-subdomain")
 	}
 	return allErrs
 }
@@ -1700,7 +1700,7 @@ func ValidateCSIDriverName(driverName string, fldPath *field.Path) field.ErrorLi
 	}
 
 	for _, msg := range validation.IsDNS1123Subdomain(strings.ToLower(driverName)) {
-		allErrs = append(allErrs, field.Invalid(fldPath, driverName, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, driverName, msg).WithOrigin("format=dns-subdomain"))
 	}
 
 	return allErrs
@@ -4544,26 +4544,26 @@ func ValidateNodeSelectorRequirement(rq core.NodeSelectorRequirement, allowInval
 	switch rq.Operator {
 	case core.NodeSelectorOpIn, core.NodeSelectorOpNotIn:
 		if len(rq.Values) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'In' or 'NotIn'"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified when `operator` is 'In' or 'NotIn'").WithOrigin("node-selector-requirement"))
 		}
 	case core.NodeSelectorOpExists, core.NodeSelectorOpDoesNotExist:
 		if len(rq.Values) > 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "may not be specified when `operator` is 'Exists' or 'DoesNotExist'").WithOrigin("node-selector-requirement"))
 		}
 
 	case core.NodeSelectorOpGt, core.NodeSelectorOpLt:
 		if len(rq.Values) != 1 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified single value when `operator` is 'Lt' or 'Gt'"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must be specified single value when `operator` is 'Lt' or 'Gt'").WithOrigin("node-selector-requirement"))
 		}
 	default:
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), rq.Operator, "not a valid selector operator"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), rq.Operator, "not a valid selector operator").WithOrigin("node-selector-requirement"))
 	}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(rq.Key, fldPath.Child("key"))...)
 	if !allowInvalidLabelValueInRequiredNodeAffinity {
 		path := fldPath.Child("values")
 		for valueIndex, value := range rq.Values {
 			for _, msg := range validation.IsValidLabelValue(value) {
-				allErrs = append(allErrs, field.Invalid(path.Index(valueIndex), value, msg))
+				allErrs = append(allErrs, field.Invalid(path.Index(valueIndex), value, msg).WithOrigin("format=label-value"))
 			}
 		}
 	}
@@ -4582,14 +4582,14 @@ func ValidateNodeFieldSelectorRequirement(req core.NodeSelectorRequirement, fldP
 	case core.NodeSelectorOpIn, core.NodeSelectorOpNotIn:
 		if len(req.Values) != 1 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("values"),
-				"must be only one value when `operator` is 'In' or 'NotIn' for node field selector"))
+				"must be only one value when `operator` is 'In' or 'NotIn' for node field selector").WithOrigin("node-field-selector-requirement"))
 		}
 	default:
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), req.Operator, "not a valid selector operator"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), req.Operator, "not a valid selector operator").WithOrigin("node-field-selector-requirement"))
 	}
 
 	if vf, found := nodeFieldSelectorValidators[req.Key]; !found {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), req.Key, "not a valid field selector key"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), req.Key, "not a valid field selector key").WithOrigin("node-field-selector-requirement"))
 	} else {
 		for i, v := range req.Values {
 			for _, msg := range vf(v, false) {

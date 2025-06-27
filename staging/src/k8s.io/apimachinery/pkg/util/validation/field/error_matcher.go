@@ -37,6 +37,7 @@ type ErrorMatcher struct {
 	matchOrigin              bool
 	matchDetail              func(want, got string) bool
 	requireOriginWhenInvalid bool
+	uniqueMatches            bool
 }
 
 // Matches returns true if the two Error objects match according to the
@@ -171,6 +172,13 @@ func (m ErrorMatcher) ByDetailRegexp() ErrorMatcher {
 	return m
 }
 
+// WithUniqueMatches returns a derived ErrorMatcher which requires
+// that each wanted error matches exactly one actual error.
+func (m ErrorMatcher) WithUniqueMatches() ErrorMatcher {
+	m.uniqueMatches = true
+	return m
+}
+
 // TestIntf lets users pass a testing.T while not coupling this package to Go's
 // testing package.
 type TestIntf interface {
@@ -191,9 +199,15 @@ func (m ErrorMatcher) Test(tb TestIntf, want, got ErrorList) {
 	for _, w := range want {
 		tmp := make(ErrorList, 0, len(remaining))
 		n := 0
-		for _, g := range remaining {
+		for i, g := range remaining {
 			if m.Matches(w, g) {
 				n++
+				if m.uniqueMatches {
+					// No additional matches against the same wanted error,
+					// stop matching remaining errors with it.
+					tmp = append(tmp, remaining[i+1:]...)
+					break
+				}
 			} else {
 				tmp = append(tmp, g)
 			}
