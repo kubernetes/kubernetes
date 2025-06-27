@@ -4434,3 +4434,149 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 		})
 	}
 }
+
+func TestAllocationManagerAddPod(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	const containerName = "c1"
+
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{
+				Capacity: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("8"),
+					v1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("4"),
+					v1.ResourceMemory: resource.MustParse("4Gi"),
+					v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+				},
+			},
+		},
+	}
+	kubelet.nodeLister = testNodeLister{nodes: nodes}
+
+	basePod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "111", Name: "pod1", Namespace: "ns1"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: containerName, Image: "i1"}}},
+	}
+	basePod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "222", Name: "pod2", Namespace: "ns2"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: containerName, Image: "i2"}}},
+	}
+
+	cpu1Mem1G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")}
+	cpu2Mem2G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("2Gi")}
+
+	newPodWithResources := func(basePod *v1.Pod, resources v1.ResourceList) *v1.Pod {
+		podCopy := basePod.DeepCopy()
+		podCopy.Spec.Containers[0].Resources = v1.ResourceRequirements{Requests: resources}
+		return podCopy
+	}
+
+	pod1v1 := newPodWithResources(basePod1, cpu1Mem1G) // Pod1 with 1 CPU and 1G Memory
+	pod1v2 := newPodWithResources(basePod1, cpu2Mem2G) // Pod1 with 2 CPU and 2G Memory
+	pod2v1 := newPodWithResources(basePod2, cpu1Mem1G) // Pod2 with 1 CPU and 1G Memory
+
+	testCases := []struct {
+		name                            string
+		initialAllocatedResourcesState  map[types.UID]v1.ResourceList
+		activePods                      []*v1.Pod
+		podToAdd                        *v1.Pod
+		admitPod                        bool
+		expectedAllocatedResourcesState map[types.UID]v1.ResourceList
+	}{
+		{
+			name:                           "Pod added without resources changes",
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+			activePods:                     []*v1.Pod{pod1v1, pod2v1},
+			podToAdd:                       pod1v1,
+			admitPod:                       true,
+			// exppected state is the same as initial state
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+		},
+		{
+			name:                           "Pod added with resources changes.",
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+			activePods:                     []*v1.Pod{pod1v2, pod2v1},
+			podToAdd:                       pod1v2,
+			admitPod:                       true,
+			//  Allocated Resources state must not be updated.
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+		},
+		{
+			name:                           "allocated resources updated when pod is admitted",
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G},
+			activePods:                     []*v1.Pod{pod1v1, pod2v1},
+			podToAdd:                       pod2v1,
+			admitPod:                       true,
+			// pod2's resources added to allocated resources
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+		},
+		{
+			name:                           "allocated resources not modified when pod is not admitted",
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+			activePods:                     []*v1.Pod{pod1v1, pod2v1},
+			podToAdd:                       pod1v2,
+			admitPod:                       false,
+			// pod1's allocated resources not modified
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			podForAllocation := func(uid types.UID, resources v1.ResourceList) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{UID: uid},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Name:      containerName,
+							Resources: v1.ResourceRequirements{Requests: resources},
+						}},
+					},
+				}
+			}
+
+			for podUID, resources := range tc.initialAllocatedResourcesState {
+				err := kubelet.allocationManager.SetAllocatedResources(podForAllocation(podUID, resources))
+				require.NoError(t, err)
+			}
+
+			if !tc.admitPod {
+				kubelet.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{podsToReject: []*v1.Pod{tc.podToAdd}}})
+			}
+			ok, _, _ := kubelet.allocationManager.AddPod(tc.activePods, tc.podToAdd)
+			require.Equal(t, tc.admitPod, ok)
+
+			for podUID, resources := range tc.expectedAllocatedResourcesState {
+				pod := podForAllocation(podUID, resources)
+				for _, container := range pod.Spec.Containers {
+					allocatedResources, found := kubelet.allocationManager.GetContainerResourceAllocation(pod.UID, container.Name)
+					if pod.UID == tc.podToAdd.UID {
+						if tc.admitPod && !found {
+							t.Fatalf("resource allocation should exis for pod: %s", tc.podToAdd.Name)
+						}
+						if !tc.admitPod && found {
+							initialResources := tc.initialAllocatedResourcesState[pod.UID]
+							// allocated resources should not be modified when the pod is not admitted
+							assert.Equal(t, initialResources, allocatedResources.Requests, tc.name)
+						}
+					}
+					assert.Equal(t, container.Resources, allocatedResources, tc.name)
+				}
+			}
+
+			// Undo current modifications
+			kubelet.allocationManager.RemovePod(tc.podToAdd.UID)
+		})
+	}
+}
