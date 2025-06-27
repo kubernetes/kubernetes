@@ -21,6 +21,8 @@ import (
 	"html"
 	"math/rand"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"k8s.io/component-base/compatibility"
@@ -29,7 +31,14 @@ import (
 )
 
 var (
-	delimiters = []string{":", ": ", "=", " "}
+	delimiters            = []string{":", ": ", "=", " "}
+	nonDebuggingEndpoints = map[string]bool{
+		"/apis":        true,
+		"/api":         true,
+		"/openid":      true,
+		"/openapi":     true,
+		"/.well-known": true,
+	}
 )
 
 const DefaultStatuszPath = "/statusz"
@@ -43,8 +52,15 @@ type mux interface {
 	Handle(path string, handler http.Handler)
 }
 
-func NewRegistry(effectiveVersion compatibility.EffectiveVersion) statuszRegistry {
-	return &registry{effectiveVersion: effectiveVersion}
+type ListedPathsOption []string
+
+func NewRegistry(effectiveVersion compatibility.EffectiveVersion, opts ...func(*registry)) statuszRegistry {
+	r := &registry{effectiveVersion: effectiveVersion}
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 func Install(m mux, componentName string, reg statuszRegistry) {
@@ -59,7 +75,7 @@ func handleStatusz(componentName string, reg statuszRegistry) http.HandlerFunc {
 		}
 
 		fmt.Fprintf(w, headerFmt, componentName)
-		data, err := populateStatuszData(reg)
+		data, err := populateStatuszData(reg, componentName)
 		if err != nil {
 			klog.Errorf("error while populating statusz data: %v", err)
 			http.Error(w, "error while populating statusz data", http.StatusInternalServerError)
@@ -71,7 +87,7 @@ func handleStatusz(componentName string, reg statuszRegistry) http.HandlerFunc {
 	}
 }
 
-func populateStatuszData(reg statuszRegistry) (string, error) {
+func populateStatuszData(reg statuszRegistry, componentName string) (string, error) {
 	randomIndex := rand.Intn(len(delimiters))
 	delim := html.EscapeString(delimiters[randomIndex])
 	startTime := html.EscapeString(reg.processStartTime().Format(time.UnixDate))
@@ -83,6 +99,10 @@ func populateStatuszData(reg statuszRegistry) (string, error) {
 	if reg.emulationVersion() != nil {
 		emulationVersion = fmt.Sprintf(`Emulation version%s %s`, delim, html.EscapeString(reg.emulationVersion().String()))
 	}
+	paths := aggregatePaths(reg.paths())
+	if paths != "" {
+		paths = fmt.Sprintf(`Paths%s %s`, delim, html.EscapeString(paths))
+	}
 
 	status := fmt.Sprintf(`
 Started%[1]s %[2]s
@@ -90,7 +110,8 @@ Up%[1]s %[3]s
 Go version%[1]s %[4]s
 Binary version%[1]s %[5]s
 %[6]s
-`, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion)
+%[7]s
+`, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion, paths)
 
 	return status, nil
 }
@@ -99,4 +120,27 @@ func uptime(t time.Time) string {
 	upSince := int64(time.Since(t).Seconds())
 	return fmt.Sprintf("%d hr %02d min %02d sec",
 		upSince/3600, (upSince/60)%60, upSince%60)
+}
+
+func aggregatePaths(listedPaths []string) string {
+	paths := make(map[string]bool)
+	for _, listedPath := range listedPaths {
+		folder := "/" + strings.Split(listedPath, "/")[1]
+		if !paths[folder] && !nonDebuggingEndpoints[folder] {
+			paths[folder] = true
+		}
+	}
+
+	var sortedPaths []string
+	for p := range paths {
+		sortedPaths = append(sortedPaths, p)
+	}
+	sort.Strings(sortedPaths)
+
+	var path string
+	for _, p := range sortedPaths {
+		path += " " + p
+	}
+
+	return path
 }
