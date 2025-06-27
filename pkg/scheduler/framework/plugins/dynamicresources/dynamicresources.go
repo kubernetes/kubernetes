@@ -41,10 +41,13 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -108,6 +111,8 @@ type DynamicResources struct {
 	enableSchedulingQueueHint  bool
 	enablePartitionableDevices bool
 	enableDeviceTaints         bool
+	enableFilterTimeout        bool
+	filterTimeout              metav1.Duration
 
 	fh         framework.Handle
 	clientset  kubernetes.Interface
@@ -122,13 +127,23 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		return &DynamicResources{}, nil
 	}
 
+	args, ok := plArgs.(*config.DynamicResourcesArgs)
+	if !ok {
+		return nil, fmt.Errorf("got args of type %T, want *DynamiccResourcesArgs", plArgs)
+	}
+	if err := validation.ValidateDynamicResourcesArgs(nil, args, fts); err != nil {
+		return nil, err
+	}
+
 	pl := &DynamicResources{
 		enabled:                    true,
 		enableAdminAccess:          fts.EnableDRAAdminAccess,
 		enableDeviceTaints:         fts.EnableDRADeviceTaints,
 		enablePrioritizedList:      fts.EnableDRAPrioritizedList,
+		enableFilterTimeout:        fts.EnableDRASchedulerFilterTimeout,
 		enableSchedulingQueueHint:  fts.EnableSchedulingQueueHint,
 		enablePartitionableDevices: fts.EnablePartitionableDevices,
+		filterTimeout:              ptr.Deref(args.FilterTimeout, metav1.Duration{}),
 
 		fh:        fh,
 		clientset: fh.ClientSet(),
@@ -551,8 +566,20 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "node", klog.KObj(node)))
 		}
 
+		// Apply timeout to the operation?
+		if pl.enableFilterTimeout && pl.filterTimeout.Duration > 0 {
+			c, cancel := context.WithTimeout(allocCtx, pl.filterTimeout.Duration)
+			defer cancel()
+			allocCtx = c
+		}
+
 		a, err := state.allocator.Allocate(allocCtx, node)
-		if err != nil {
+		switch {
+		case errors.Is(err, context.DeadlineExceeded):
+			return statusUnschedulable(logger, "timed out trying to allocate devices", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.allocator.ClaimsToAllocate()))
+		case ctx.Err() != nil:
+			return statusUnschedulable(logger, "asked by caller to stop allocating devices", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.allocator.ClaimsToAllocate()), "cause", context.Cause(ctx))
+		case err != nil:
 			// This should only fail if there is something wrong with the claim or class.
 			// Return an error to abort scheduling of it.
 			//
