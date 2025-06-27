@@ -18,6 +18,7 @@ package allocation
 
 import (
 	"fmt"
+	"reflect"
 	goruntime "runtime"
 	"testing"
 	"time"
@@ -992,4 +993,164 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 
 	return allocationManager
+}
+
+// testPodAdmitHandler is a lifecycle.PodAdmitHandler for testing.
+type testPodAdmitHandler struct {
+	// admitFunc contains the custom logic for admitting or rejecting a pod.
+	admitFunc func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
+}
+
+// Admit rejects all pods in the podsToReject list with a matching UID.
+func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	if a.admitFunc == nil {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
+	return a.admitFunc(attrs)
+}
+
+func TestAllocationManagerAddPod(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	const containerName = "c1"
+
+	basePod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "111", Name: "pod1", Namespace: "ns1"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: containerName, Image: "i1"}}},
+	}
+	basePod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{UID: "222", Name: "pod2", Namespace: "ns2"},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: containerName, Image: "i2"}}},
+	}
+
+	cpu1Mem1G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")}
+	cpu2Mem2G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("2Gi")}
+
+	newPodWithResources := func(basePod *v1.Pod, resources v1.ResourceList) *v1.Pod {
+		podCopy := basePod.DeepCopy()
+		podCopy.Spec.Containers[0].Resources = v1.ResourceRequirements{Requests: resources}
+		return podCopy
+	}
+
+	pod1v1 := newPodWithResources(basePod1, cpu1Mem1G) // Pod1 with 1 CPU and 1G Memory
+	pod1v2 := newPodWithResources(basePod1, cpu2Mem2G) // Pod1 with 2 CPU and 2G Memory
+	pod2v1 := newPodWithResources(basePod2, cpu1Mem1G) // Pod2 with 1 CPU and 1G Memory
+
+	testCases := []struct {
+		name                            string
+		initialAllocatedResourcesState  map[types.UID]v1.ResourceList
+		activePods                      []*v1.Pod
+		podToAdd                        *v1.Pod
+		admitFunc                       func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
+		expectAdmit                     bool
+		expectedAllocatedResourcesState map[types.UID]v1.ResourceList
+	}{
+		{
+			name:                           "pod request matches allocated resources state - no changes in allocated resources state",
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+			activePods:                     []*v1.Pod{pod1v1, pod2v1},
+			podToAdd:                       pod1v1,
+			admitFunc:                      nil,
+			expectAdmit:                    true,
+			// expected state is the same as initial state
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+		},
+		{
+			name:                           "pod request does not match allocated resources state - pod admitted based on allocated resources",
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+			activePods:                     []*v1.Pod{pod1v2, pod2v1},
+			podToAdd:                       pod1v2,
+			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+				podResources := attrs.Pod.Spec.Containers[0].Resources.Requests
+				if (attrs.Pod.UID == basePod1.UID) && reflect.DeepEqual(podResources, cpu2Mem2G) {
+					return lifecycle.PodAdmitResult{Admit: false, Reason: "Test rejecting high resources"}
+				}
+				return lifecycle.PodAdmitResult{Admit: true}
+			},
+			// pod is still admitted as allocated resources are considered during admission.
+			expectAdmit: true,
+			//  allocated Resources state must not be updated.
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+		},
+		{
+			name:                           "allocated resources updated when pod is admitted",
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G},
+			activePods:                     []*v1.Pod{pod1v1, pod2v1},
+			podToAdd:                       pod2v1,
+			admitFunc:                      nil,
+			expectAdmit:                    true,
+			// pod2's resources added to allocated resources
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+		},
+		{
+			name:                           "allocated resources not modified if pod is not admitted",
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+			activePods:                     []*v1.Pod{pod1v1, pod2v1},
+			podToAdd:                       pod1v2,
+			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+				if attrs.Pod.UID == basePod1.UID {
+					return lifecycle.PodAdmitResult{Admit: false, Reason: "Test rejecting pod 1"}
+				}
+				return lifecycle.PodAdmitResult{Admit: true}
+			},
+			expectAdmit: false,
+			// pod1's allocated resources not modified
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{basePod1.UID: cpu1Mem1G, basePod2.UID: cpu1Mem1G},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{})
+
+			podForAllocation := func(uid types.UID, resources v1.ResourceList) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{UID: uid},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Name:      containerName,
+							Resources: v1.ResourceRequirements{Requests: resources},
+						}},
+					},
+				}
+			}
+
+			for podUID, resources := range tc.initialAllocatedResourcesState {
+				err := allocationManager.SetAllocatedResources(podForAllocation(podUID, resources))
+				require.NoError(t, err)
+			}
+
+			if tc.admitFunc != nil {
+				handler := &testPodAdmitHandler{admitFunc: tc.admitFunc}
+				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
+			}
+
+			ok, _, _ := allocationManager.AddPod(tc.activePods, tc.podToAdd)
+			require.Equal(t, tc.expectAdmit, ok)
+
+			for podUID, resources := range tc.expectedAllocatedResourcesState {
+				pod := podForAllocation(podUID, resources)
+				for _, container := range pod.Spec.Containers {
+					allocatedResources, found := allocationManager.GetContainerResourceAllocation(pod.UID, container.Name)
+					if pod.UID == tc.podToAdd.UID {
+						if tc.expectAdmit && !found {
+							t.Fatalf("resource allocation should exist for pod: %s", tc.podToAdd.Name)
+						}
+						if !tc.expectAdmit && found {
+							initialResources := tc.initialAllocatedResourcesState[pod.UID]
+							// allocated resources should not be modified when the pod is not admitted
+							assert.Equal(t, initialResources, allocatedResources.Requests, tc.name)
+						}
+					}
+					assert.Equal(t, container.Resources, allocatedResources, tc.name)
+				}
+			}
+
+			// Undo current modifications
+			allocationManager.RemovePod(tc.podToAdd.UID)
+		})
+	}
 }
