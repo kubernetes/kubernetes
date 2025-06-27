@@ -698,10 +698,16 @@ func TestGenerateReplicaSetName(t *testing.T) {
 			want:           strings.Repeat("a", 242) + "-abcde12345",
 		},
 		{
-			name:           "too long need truncating",
+			name:           "very long deployment name is truncated",
 			deploymentName: strings.Repeat("b", 250),
 			hash:           "abcde12345",
 			want:           strings.Repeat("b", 242) + "-abcde12345",
+		},
+		{
+			name:           "very long hash is not truncated",
+			deploymentName: strings.Repeat("d", 252),
+			hash:           strings.Repeat("h", 252),
+			want:           strings.Repeat("d", 252) + "-" + strings.Repeat("h", 252),
 		},
 	}
 
