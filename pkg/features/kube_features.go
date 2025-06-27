@@ -987,6 +987,18 @@ const (
 	// operation when scheduling a Pod by setting the `metadata.labels` field on the submitted Binding,
 	// similar to how `metadata.annotations` behaves.
 	PodTopologyLabelsAdmission featuregate.Feature = "PodTopologyLabelsAdmission"
+
+	// owner: @ffromani
+	// beta: v1.34
+	//
+	// When allocating cpus to a container which need exclusive CPUs,
+	// inherit the reusable CPUs first before allocate other available CPUs.
+	// This can prevent CPU leakage, which may cause UnexpectedAdmissionError when other Pod creation.
+	// CPU leakage means that the CPU not be used by the app container, and also can
+	// not be used by other pod, because it not release to the defaultCpuSet.
+	// Reusable CPUs is the CPUs of the non-restartable InitContainer.
+	// The Feature Gate will be locked to true and then removed in +2 releases (1.36) if there are no bug reported
+	InheritReusableCPUsFirst featuregate.Feature = "InheritReusableCPUsFirst"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -1885,6 +1897,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 	DisableCPUQuotaWithExclusiveCPUs: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+	InheritReusableCPUsFirst: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 }
 

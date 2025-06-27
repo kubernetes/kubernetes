@@ -38,6 +38,7 @@ import (
 	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -1162,6 +1163,281 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, nonReusableCPUs))
 		})
 	})
+
+	f.Context("When checking the inheritance of reusable CPUs", func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0)
+		})
+		ginkgo.It("a app container(2) should inherit exclusively CPUs of a init container(1) for a pod", func(ctx context.Context) {
+			cpuCount := 2 // total
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:               string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:       reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+				inheritReusableCPUsFirst: true,
+			}))
+
+			pod := makeCPUManagerMultiTypeContainersPod("gu-pod-multi-type-container", []ctnAttribute{
+				{
+					ctnName:    "init-gu-container-1",
+					cpuRequest: "1000m",
+					cpuLimit:   "1000m",
+				},
+			}, []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+			})
+			ginkgo.By("running a Gu pod with a init container and a app container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			// when we get there the real initcontainer terminated, so we can only check its logs
+			ginkgo.By("checking if the expected cpuset was assigned")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, pod.Spec.InitContainers[0].Name)
+			framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[0].Name, pod.Name)
+
+			// Get reusable CPUs
+			reusableCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[0].Name, logs)
+			gomega.Expect(reusableCPUs.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", reusableCPUs.String())
+
+			// Get nonReusable CPUs
+			nonReusableCPUs, err := getContainerAllowedCPUs(pod, pod.Spec.Containers[0].Name, false)
+			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", pod.Namespace, pod.Name)
+			gomega.Expect(nonReusableCPUs.Size()).To(gomega.Equal(2), "expected cpu set size == 2, got %q", nonReusableCPUs.String())
+
+			appContainerName := pod.Spec.Containers[0].Name
+			gomega.Expect(pod).To(HaveContainerCPUsCount(appContainerName, 2))
+			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(appContainerName, onlineCPUs))
+			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, reservedCPUs))
+			// check the CPUs of app container inherit reusable CPUs.
+			gomega.Expect(pod).To(HaveCPUsInheritTo(nonReusableCPUs, reusableCPUs))
+		})
+
+		ginkgo.It("a app container(1) should inherit exclusively CPUs of a init container(2) for a pod", func(ctx context.Context) {
+			cpuCount := 2 // total
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			pod := makeCPUManagerMultiTypeContainersPod("gu-pod-multi-type-container", []ctnAttribute{
+				{
+					ctnName:    "init-gu-container-1",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+			}, []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "1000m",
+					cpuLimit:   "1000m",
+				},
+			})
+			ginkgo.By("running a Gu pod with a init container and a app container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			// when we get there the real initcontainer terminated, so we can only check its logs
+			ginkgo.By("checking if the expected cpuset was assigned")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, pod.Spec.InitContainers[0].Name)
+			framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[0].Name, pod.Name)
+
+			// Get reusable CPUs
+			reusableCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[0].Name, logs)
+			gomega.Expect(reusableCPUs.Size()).To(gomega.Equal(2), "expected cpu set size == 2, got %q", reusableCPUs.String())
+
+			// Get nonReusable CPUs
+			nonReusableCPUs, err := getContainerAllowedCPUs(pod, pod.Spec.Containers[0].Name, false)
+			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", pod.Namespace, pod.Name)
+			gomega.Expect(nonReusableCPUs.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", nonReusableCPUs.String())
+
+			appContainerName := pod.Spec.Containers[0].Name
+			gomega.Expect(pod).To(HaveContainerCPUsCount(appContainerName, 1))
+			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(appContainerName, onlineCPUs))
+			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, reservedCPUs))
+			// check the CPUs of app container inherit reusable CPUs.
+			gomega.Expect(pod).To(HaveCPUsInheritTo(nonReusableCPUs, reusableCPUs))
+		})
+
+		ginkgo.It("a app container(3) should inherit exclusively CPUs of a init container(3) for a pod", func(ctx context.Context) {
+			cpuCount := 3 // total
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			pod := makeCPUManagerMultiTypeContainersPod("gu-pod-multi-type-container", []ctnAttribute{
+				{
+					ctnName:    "init-gu-container-1",
+					cpuRequest: "3000m",
+					cpuLimit:   "3000m",
+				},
+			}, []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "3000m",
+					cpuLimit:   "3000m",
+				},
+			})
+			ginkgo.By("running a Gu pod with a init container and a app container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			// when we get there the real initcontainer terminated, so we can only check its logs
+			ginkgo.By("checking if the expected cpuset was assigned")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, pod.Spec.InitContainers[0].Name)
+			framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[0].Name, pod.Name)
+
+			// Get reusable CPUs
+			reusableCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[0].Name, logs)
+			gomega.Expect(reusableCPUs.Size()).To(gomega.Equal(3), "expected cpu set size == 3, got %q", reusableCPUs.String())
+
+			// Get nonReusable CPUs
+			nonReusableCPUs, err := getContainerAllowedCPUs(pod, pod.Spec.Containers[0].Name, false)
+			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", pod.Namespace, pod.Name)
+			gomega.Expect(nonReusableCPUs.Size()).To(gomega.Equal(3), "expected cpu set size == 3, got %q", nonReusableCPUs.String())
+
+			appContainerName := pod.Spec.Containers[0].Name
+			gomega.Expect(pod).To(HaveContainerCPUsCount(appContainerName, 3))
+			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(appContainerName, onlineCPUs))
+			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, reservedCPUs))
+			// check the CPUs of app container inherit reusable CPUs.
+			gomega.Expect(pod).To(HaveCPUsInheritTo(nonReusableCPUs, reusableCPUs))
+		})
+
+		ginkgo.It("two app container(2 + 1) should inherit exclusively CPUs of a init container(3) for a pod", func(ctx context.Context) {
+			cpuCount := 3 // total
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			pod := makeCPUManagerMultiTypeContainersPod("gu-pod-multi-type-container", []ctnAttribute{
+				{
+					ctnName:    "init-gu-container-1",
+					cpuRequest: "3000m",
+					cpuLimit:   "3000m",
+				},
+			}, []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+				{
+					ctnName:    "gu-container-2",
+					cpuRequest: "1000m",
+					cpuLimit:   "1000m",
+				},
+			})
+			ginkgo.By("running a Gu pod with a init container and a app container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			// when we get there the real initcontainer terminated, so we can only check its logs
+			ginkgo.By("checking if the expected cpuset was assigned")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, pod.Spec.InitContainers[0].Name)
+			framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[0].Name, pod.Name)
+
+			// Get reusable CPUs
+			reusableCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[0].Name, logs)
+			gomega.Expect(reusableCPUs.Size()).To(gomega.Equal(3), "expected cpu set size == 3, got %q", reusableCPUs.String())
+
+			// Get nonReusable CPUs of first app container
+			nonReusableCPUs1, err := getContainerAllowedCPUs(pod, pod.Spec.Containers[0].Name, false)
+			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", pod.Namespace, pod.Name)
+			gomega.Expect(nonReusableCPUs1.Size()).To(gomega.Equal(2), "expected cpu set size == 2, got %q", nonReusableCPUs1.String())
+			// Get nonReusable CPUs of second app container
+			nonReusableCPUs2, err := getContainerAllowedCPUs(pod, pod.Spec.Containers[1].Name, false)
+			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", pod.Namespace, pod.Name)
+			gomega.Expect(nonReusableCPUs2.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", nonReusableCPUs2.String())
+			nonReusableCPUs := nonReusableCPUs1.Union(nonReusableCPUs2)
+
+			gomega.Expect(pod).To(HaveContainerCPUsCount("gu-container-1", 2))
+			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf("gu-container-1", onlineCPUs))
+			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith("gu-container-1", reservedCPUs))
+			gomega.Expect(pod).To(HaveContainerCPUsCount("gu-container-2", 1))
+			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf("gu-container-2", onlineCPUs))
+			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith("gu-container-2", reservedCPUs))
+			// check the CPUs of app container inherit reusable CPUs.
+			gomega.Expect(pod).To(HaveCPUsInheritTo(nonReusableCPUs, reusableCPUs))
+		})
+
+		ginkgo.It("two app container(2 + 2) should inherit exclusively CPUs of a init container(3) for a pod", func(ctx context.Context) {
+			cpuCount := 3 // total
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			pod := makeCPUManagerMultiTypeContainersPod("gu-pod-multi-type-container", []ctnAttribute{
+				{
+					ctnName:    "init-gu-container-1",
+					cpuRequest: "3000m",
+					cpuLimit:   "3000m",
+				},
+			}, []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+				{
+					ctnName:    "gu-container-2",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+			})
+			ginkgo.By("running a Gu pod with a init container and a app container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			// when we get there the real initcontainer terminated, so we can only check its logs
+			ginkgo.By("checking if the expected cpuset was assigned")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, pod.Spec.InitContainers[0].Name)
+			framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[0].Name, pod.Name)
+
+			// Get reusable CPUs
+			reusableCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[0].Name, logs)
+			gomega.Expect(reusableCPUs.Size()).To(gomega.Equal(3), "expected cpu set size == 3, got %q", reusableCPUs.String())
+
+			// Get nonReusable CPUs of first app container
+			nonReusableCPUs1, err := getContainerAllowedCPUs(pod, pod.Spec.Containers[0].Name, false)
+			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", pod.Namespace, pod.Name)
+			gomega.Expect(nonReusableCPUs1.Size()).To(gomega.Equal(2), "expected cpu set size == 2, got %q", nonReusableCPUs1.String())
+			// Get nonReusable CPUs of second app container
+			nonReusableCPUs2, err := getContainerAllowedCPUs(pod, pod.Spec.Containers[1].Name, false)
+			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", pod.Namespace, pod.Name)
+			gomega.Expect(nonReusableCPUs2.Size()).To(gomega.Equal(2), "expected cpu set size == 2, got %q", nonReusableCPUs2.String())
+			nonReusableCPUs := nonReusableCPUs1.Union(nonReusableCPUs2)
+
+			gomega.Expect(pod).To(HaveContainerCPUsCount("gu-container-1", 2))
+			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf("gu-container-1", onlineCPUs))
+			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith("gu-container-1", reservedCPUs))
+			gomega.Expect(pod).To(HaveContainerCPUsCount("gu-container-2", 2))
+			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf("gu-container-2", onlineCPUs))
+			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith("gu-container-2", reservedCPUs))
+			// check the CPUs of app container inherit reusable CPUs.
+			gomega.Expect(pod).To(HaveCPUsInheritTo(nonReusableCPUs, reusableCPUs))
+		})
+	})
 })
 
 // Matching helpers
@@ -1177,14 +1453,16 @@ func HaveStatusReasonMatchingRegex(expr string) types.GomegaMatcher {
 }
 
 type msgData struct {
-	Name           string
-	CurrentCPUs    string
-	ExpectedCPUs   string
-	MismatchedCPUs string
-	Count          int
-	Aligned        int
-	CurrentQuota   string
-	ExpectedQuota  string
+	Name            string
+	CurrentCPUs     string
+	ExpectedCPUs    string
+	MismatchedCPUs  string
+	Count           int
+	Aligned         int
+	CurrentQuota    string
+	ExpectedQuota   string
+	reusableCPUs    string
+	nonReusableCPUs string
 }
 
 func HaveContainerCPUsCount(ctnName string, val int) types.GomegaMatcher {
@@ -1266,6 +1544,23 @@ func HaveContainerCPUsEqualTo(ctnName string, expectedCPUs cpuset.CPUSet) types.
 		}
 		return cpus.Equals(expectedCPUs), nil
 	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has allowed CPUs <{{.Data.CurrentCPUs}}> not matching the expected value <{{.Data.ExpectedCPUs}}> for container {{.Data.Name}}", md)
+}
+
+func HaveCPUsInheritTo(nonReusableCPUs cpuset.CPUSet, reusableCPUs cpuset.CPUSet) types.GomegaMatcher {
+	var compareCPUs cpuset.CPUSet
+	md := &msgData{
+		reusableCPUs:    reusableCPUs.String(),
+		nonReusableCPUs: nonReusableCPUs.String(),
+	}
+	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
+		inheritCPUs := nonReusableCPUs.Intersection(reusableCPUs)
+		if nonReusableCPUs.Size() > reusableCPUs.Size() {
+			compareCPUs = reusableCPUs
+		} else {
+			compareCPUs = nonReusableCPUs
+		}
+		return compareCPUs.Equals(inheritCPUs), nil
+	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has allowed CPUs <{{.Data.nonReusableCPUs}}> not inherit the reusable CPUs value <{{.Data.reusableCPUs}}>", md)
 }
 
 func HaveSandboxQuota(expectedQuota string) types.GomegaMatcher {
@@ -1589,6 +1884,66 @@ func makeCPUManagerBEPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 					},
 				},
 			},
+		},
+	}
+}
+
+func makeCPUManagerMultiTypeContainersPod(podName string, initCtnAttributes []ctnAttribute, ctnAttributes []ctnAttribute) *v1.Pod {
+	var containers []v1.Container
+	var initContainers []v1.Container
+	cpusetCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2"
+	cpusetAndSleepCmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
+
+	for _, ictnAttr := range initCtnAttributes {
+		ictn := v1.Container{
+			Name:  ictnAttr.ctnName,
+			Image: busyboxImage,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ictnAttr.cpuRequest),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ictnAttr.cpuLimit),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			Command:       []string{"sh", "-c", cpusetCmd},
+			RestartPolicy: ictnAttr.restartPolicy,
+		}
+		if ictnAttr.restartPolicy != nil && *ictnAttr.restartPolicy == v1.ContainerRestartPolicyAlways {
+			ictn.Command = []string{"sh", "-c", cpusetAndSleepCmd}
+		}
+		initContainers = append(initContainers, ictn)
+	}
+
+	for _, ctnAttr := range ctnAttributes {
+		ctn := v1.Container{
+			Name:  ctnAttr.ctnName,
+			Image: busyboxImage,
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuRequest),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(ctnAttr.cpuLimit),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			},
+			Command: []string{"sh", "-c", cpusetAndSleepCmd},
+		}
+		containers = append(containers, ctn)
+	}
+
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:  v1.RestartPolicyNever,
+			InitContainers: initContainers,
+			Containers:     containers,
 		},
 	}
 }
