@@ -460,6 +460,71 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	}
 }
 
+func ToHumanReadableString(q *Quantity) string {
+	if q.IsZero() {
+		return "0"
+	}
+
+	bytes := q.Value()
+
+	const (
+		KiB = 1024
+		MiB = 1024 * KiB // 1024^2
+		GiB = 1024 * MiB // 1024^3
+	)
+
+	isExactWholeMultiple := func(valBytes int64, unitBytes int64) bool {
+		return valBytes%unitBytes == 0
+	}
+
+	// Check for Exact Whole KiB, MiB, or GiB.
+	// Prioritize the exact unit that was provided if it's a whole number of that unit. This ensures 512Mi stays 512Mi, not 0.5Gi.
+	// Do not support unit smaller than Mi. This ensures 1234.5Mi stays 1234.5Mi, not 1264128Ki.
+	// todo: support larger units?
+	if isExactWholeMultiple(bytes, GiB) {
+		return fmt.Sprintf("%dGi", bytes/GiB)
+	}
+	if isExactWholeMultiple(bytes, MiB) {
+		return fmt.Sprintf("%dMi", bytes/MiB)
+	}
+
+	// Helper to check if 'val' when scaled by 'unitBytes' matches 'targetBytes'
+	isExactEnoughForDisplay := func(val float64, unitBytes int64, targetBytes int64, precision int) bool {
+		formattedStr := strconv.FormatFloat(val, 'f', precision, 64)
+		reparsedVal, err := strconv.ParseFloat(formattedStr, 64)
+		if err != nil {
+			return false
+		}
+
+		expectedBytes := math.Round(reparsedVal * float64(unitBytes))
+		return math.Abs(float64(targetBytes)-expectedBytes) <= 1 // Within 1 byte
+	}
+
+	// Clean Fractional GiB/MiB
+	// Attempt to represent as X.YGi or X.YYMi, only if the representation is "exact enough" for display.
+	// Try GiB
+	if bytes >= MiB {
+		gibibytes := float64(bytes) / GiB
+		if isExactEnoughForDisplay(gibibytes, GiB, bytes, 1) {
+			return fmt.Sprintf("%.*fGi", 1, gibibytes)
+		}
+	}
+
+	// Try MiB
+	if bytes >= KiB {
+		mebibytes := float64(bytes) / MiB
+		if isExactEnoughForDisplay(mebibytes, MiB, bytes, 1) {
+			return fmt.Sprintf("%.*fMi", 1, mebibytes)
+		}
+	}
+
+	// Fallback to original canonical string
+	result := make([]byte, 0, int64QuantityExpectedBytes)
+	number, suffix := q.CanonicalizeBytes(result)
+	number = append(number, suffix...)
+	return string(number)
+}
+
 // AsApproximateFloat64 returns a float64 representation of the quantity which
 // may lose precision. If precision matter more than performance, see
 // AsFloat64Slow. If the value of the quantity is outside the range of a
@@ -685,6 +750,18 @@ func (q *Quantity) String() string {
 		number, suffix := q.CanonicalizeBytes(result)
 		number = append(number, suffix...)
 		q.s = string(number)
+	}
+	return q.s
+}
+
+// String formats the Quantity as a human readable string, caching the result if not calculated.
+func (q *Quantity) HumanReadableString() string {
+	if q == nil {
+		return "<nil>"
+	}
+	if len(q.s) == 0 {
+		str := ToHumanReadableString(q)
+		q.s = str
 	}
 	return q.s
 }
