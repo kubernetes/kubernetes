@@ -180,7 +180,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 
 		// k8s.io/kubernetes/pkg/apis/autoscaling/v1
 		gvr("autoscaling", "v1", "horizontalpodautoscalers"): {
-			Stub:              `{"metadata": {"name": "hpa2"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
+			Stub:              `{"metadata": {"name": "hpa2"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross", "apiVersion": "apps/v1"}}}`,
 			ExpectedEtcdPath:  "/registry/horizontalpodautoscalers/" + namespace + "/hpa2",
 			ExpectedGVK:       gvkP("autoscaling", "v2", "HorizontalPodAutoscaler"),
 			IntroducedVersion: "1.2",
@@ -189,7 +189,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 
 		// k8s.io/kubernetes/pkg/apis/autoscaling/v2
 		gvr("autoscaling", "v2", "horizontalpodautoscalers"): {
-			Stub:              `{"metadata": {"name": "hpa4"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
+			Stub:              `{"metadata": {"name": "hpa4"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross", "apiVersion": "apps/v1"}}}`,
 			ExpectedEtcdPath:  "/registry/horizontalpodautoscalers/" + namespace + "/hpa4",
 			IntroducedVersion: "1.23",
 		},
