@@ -119,6 +119,7 @@ func Convert_credentialprovider_CredentialProviderRequest_To_v1_CredentialProvid
 func autoConvert_v1_CredentialProviderResponse_To_credentialprovider_CredentialProviderResponse(in *CredentialProviderResponse, out *credentialprovider.CredentialProviderResponse, s conversion.Scope) error {
 	out.CacheKeyType = credentialprovider.PluginCacheKeyType(in.CacheKeyType)
 	out.CacheDuration = (*metav1.Duration)(unsafe.Pointer(in.CacheDuration))
+	out.ServiceAccountTokenCacheType = credentialprovider.ServiceAccountTokenCacheType(in.ServiceAccountTokenCacheType)
 	out.Auth = *(*map[string]credentialprovider.AuthConfig)(unsafe.Pointer(&in.Auth))
 	return nil
 }
@@ -131,6 +132,7 @@ func Convert_v1_CredentialProviderResponse_To_credentialprovider_CredentialProvi
 func autoConvert_credentialprovider_CredentialProviderResponse_To_v1_CredentialProviderResponse(in *credentialprovider.CredentialProviderResponse, out *CredentialProviderResponse, s conversion.Scope) error {
 	out.CacheKeyType = PluginCacheKeyType(in.CacheKeyType)
 	out.CacheDuration = (*metav1.Duration)(unsafe.Pointer(in.CacheDuration))
+	out.ServiceAccountTokenCacheType = ServiceAccountTokenCacheType(in.ServiceAccountTokenCacheType)
 	out.Auth = *(*map[string]AuthConfig)(unsafe.Pointer(&in.Auth))
 	return nil
 }

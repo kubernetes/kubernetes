@@ -25,3 +25,8 @@ func Convert_credentialprovider_CredentialProviderRequest_To_v1beta1_CredentialP
 	// This conversion intentionally omits the serviceAccountToken and serviceAccountAnnotations fields which are only supported in v1 CredentialProviderRequest.
 	return autoConvert_credentialprovider_CredentialProviderRequest_To_v1beta1_CredentialProviderRequest(in, out, s)
 }
+
+func Convert_credentialprovider_CredentialProviderResponse_To_v1beta1_CredentialProviderResponse(in *credentialprovider.CredentialProviderResponse, out *CredentialProviderResponse, s conversion.Scope) error {
+	// This conversion intentionally omits the pluginCacheKeyType field which is only supported in v1 CredentialProviderResponse.
+	return autoConvert_credentialprovider_CredentialProviderResponse_To_v1beta1_CredentialProviderResponse(in, out, s)
+}
