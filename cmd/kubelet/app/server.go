@@ -844,6 +844,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 
 		kubeDeps.ContainerManager, err = cm.NewContainerManager(
+			ctx,
 			kubeDeps.Mounter,
 			kubeDeps.CAdvisorInterface,
 			cm.NodeConfig{

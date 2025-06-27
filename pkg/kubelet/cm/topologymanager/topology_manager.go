@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -132,19 +133,21 @@ func (th *TopologyHint) LessThan(other TopologyHint) bool {
 var _ Manager = &manager{}
 
 // NewManager creates a new TopologyManager based on provided policy and scope
-func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
+func NewManager(ctx context.Context, topology []cadvisorapi.Node, topologyPolicyName string, topologyScopeName string, topologyPolicyOptions map[string]string) (Manager, error) {
+	logger := klog.FromContext(ctx)
+
 	// When policy is none, the scope is not relevant, so we can short circuit here.
 	if topologyPolicyName == PolicyNone {
-		klog.InfoS("Creating topology manager with none policy")
+		logger.Info("Creating topology manager with none policy")
 		return &manager{scope: NewNoneScope()}, nil
 	}
 
-	opts, err := NewPolicyOptions(topologyPolicyOptions)
+	opts, err := NewPolicyOptions(ctx, topologyPolicyOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.InfoS("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName, "topologyPolicyOptions", opts)
+	logger.Info("Creating topology manager with policy per scope", "topologyPolicyName", topologyPolicyName, "topologyScopeName", topologyScopeName, "topologyPolicyOptions", opts)
 
 	numaInfo, err := NewNUMAInfo(topology, opts)
 	if err != nil {
@@ -218,17 +221,20 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 }
 
 func (m *manager) RemoveContainer(containerID string) error {
-	return m.scope.RemoveContainer(containerID)
+	return m.scope.RemoveContainer(context.TODO(), containerID)
 }
 
 func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	klog.V(4).InfoS("Topology manager admission check", "pod", klog.KObj(attrs.Pod))
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+
+	logger.V(4).Info("Topology manager admission check", "pod", klog.KObj(attrs.Pod))
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
 	startTime := time.Now()
-	podAdmitResult := m.scope.Admit(attrs.Pod)
+	podAdmitResult := m.scope.Admit(ctx, attrs.Pod)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
 
-	klog.V(4).InfoS("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
+	logger.V(4).Info("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
 	return podAdmitResult
 }

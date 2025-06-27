@@ -16,6 +16,8 @@ limitations under the License.
 
 package topologymanager
 
+import "context"
+
 type nonePolicy struct{}
 
 var _ Policy = &nonePolicy{}
@@ -36,6 +38,6 @@ func (p *nonePolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return true
 }
 
-func (p *nonePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+func (p *nonePolicy) Merge(_ context.Context, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
 	return TopologyHint{}, p.canAdmitPodResult(nil)
 }
