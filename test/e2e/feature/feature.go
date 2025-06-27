@@ -197,6 +197,10 @@ var (
 	// owner: sig-node
 	HostAccess = framework.WithFeature(framework.ValidFeatures.Add("HostAccess"))
 
+	// owner: sig-network
+	// Allows setting any FQDN as the pod's hostname (https://kep.k8s.io/4762).
+	HostnameOverride = framework.WithFeature(framework.ValidFeatures.Add("HostnameOverride"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	HugePages = framework.WithFeature(framework.ValidFeatures.Add("HugePages"))
 
