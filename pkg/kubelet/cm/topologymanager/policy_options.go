@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -62,7 +63,9 @@ type PolicyOptions struct {
 	MaxAllowableNUMANodes int
 }
 
-func NewPolicyOptions(policyOptions map[string]string) (PolicyOptions, error) {
+func NewPolicyOptions(ctx context.Context, policyOptions map[string]string) (PolicyOptions, error) {
+	logger := klog.FromContext()
+
 	opts := PolicyOptions{
 		// Set MaxAllowableNUMANodes to the default. This will be overwritten
 		// if the user has specified a policy option for MaxAllowableNUMANodes.
@@ -92,7 +95,7 @@ func NewPolicyOptions(policyOptions map[string]string) (PolicyOptions, error) {
 			}
 
 			if optValue > defaultMaxAllowableNUMANodes {
-				klog.InfoS("WARNING: the value of max-allowable-numa-nodes is more than the default recommended value", "max-allowable-numa-nodes", optValue, "defaultMaxAllowableNUMANodes", defaultMaxAllowableNUMANodes)
+				logger.Info("WARNING: the value of max-allowable-numa-nodes is more than the default recommended value", "max-allowable-numa-nodes", optValue, "defaultMaxAllowableNUMANodes", defaultMaxAllowableNUMANodes)
 			}
 			opts.MaxAllowableNUMANodes = optValue
 		default:

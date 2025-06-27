@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
@@ -1280,7 +1280,7 @@ func testPolicyMerge(policy Policy, tcases []policyMergeTestCase, t *testing.T) 
 			providersHints = append(providersHints, hints)
 		}
 
-		actual, _ := policy.Merge(providersHints)
+		actual, _ := policy.Merge(t.Context(), providersHints)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("%v: Expected Topology Hint to be %v, got %v:", tc.name, tc.expected, actual)
 		}
