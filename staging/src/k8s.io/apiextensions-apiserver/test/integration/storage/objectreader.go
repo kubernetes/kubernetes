@@ -136,8 +136,8 @@ func (s *EtcdObjectReader) SetStoredCustomResourceDefinition(name string, crd *a
 		return err
 	}
 	key := path.Join("/", s.storagePrefix, "apiextensions.k8s.io", "customresourcedefinitions", name)
-	if _, err := s.etcdClient.KV.Put(context.Background(), key, string(bs)); err != nil {
-		return fmt.Errorf("error setting CRD %s in etcd at key %s: %v", name, key, err)
+	if _, err := s.etcdClient.Put(context.Background(), key, string(bs)); err != nil {
+		return fmt.Errorf("error setting CRD %s in etcd at key %s: %w", name, key, err)
 	}
 	return nil
 }

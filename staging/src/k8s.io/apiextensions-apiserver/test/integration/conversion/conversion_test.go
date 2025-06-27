@@ -1365,7 +1365,12 @@ func TestWebhookConversion_WhitespaceCABundleEtcdBypass(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer etcdClient.Close()
+	defer func() {
+		err = etcdClient.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 	etcdObjectReader := storage.NewEtcdObjectReader(etcdClient, &restOptions, crd)
 
 	ctcTearDown, ctc := newConversionTestContext(t, apiExtensionsClient, dynamicClient, etcdObjectReader, crd)
@@ -1402,11 +1407,25 @@ func TestWebhookConversion_WhitespaceCABundleEtcdBypass(t *testing.T) {
 		Kind:       "CustomResourceDefinition",
 	}
 
-	ctc.apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), crd, metav1.UpdateOptions{})
+	// Fetch the latest CRD from the API server to get the current resourceVersion
+	crdFromAPI, err := ctc.apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+		context.TODO(), crd.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	crd.ResourceVersion = crdFromAPI.ResourceVersion
+	_, err = ctc.apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Update(
+		context.TODO(), crd, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Replace the CABundle with empty spaces
 	crd.Spec.Conversion.Webhook.ClientConfig.CABundle = []byte("    \n\t   ")
-	etcdObjectReader.SetStoredCustomResourceDefinition(crd.Name, crd)
+	err = etcdObjectReader.SetStoredCustomResourceDefinition(crd.Name, crd)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Try to read the CR instance (should succeed, as no conversion is needed)
 	obj, err = ctc.etcdObjectReader.GetStoredCustomResource(ns, name)
