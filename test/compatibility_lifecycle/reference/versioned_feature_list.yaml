@@ -167,6 +167,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: CloudControllerManagerWatchBasedRoutesReconciliation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: CloudControllerManagerWebhook
   versionedSpecs:
   - default: false
