@@ -59,7 +59,7 @@ func handleStatusz(componentName string, reg statuszRegistry) http.HandlerFunc {
 		}
 
 		fmt.Fprintf(w, headerFmt, componentName)
-		data, err := populateStatuszData(reg)
+		data, err := populateStatuszData(reg, componentName)
 		if err != nil {
 			klog.Errorf("error while populating statusz data: %v", err)
 			http.Error(w, "error while populating statusz data", http.StatusInternalServerError)
@@ -71,7 +71,7 @@ func handleStatusz(componentName string, reg statuszRegistry) http.HandlerFunc {
 	}
 }
 
-func populateStatuszData(reg statuszRegistry) (string, error) {
+func populateStatuszData(reg statuszRegistry, componentName string) (string, error) {
 	randomIndex := rand.Intn(len(delimiters))
 	delim := html.EscapeString(delimiters[randomIndex])
 	startTime := html.EscapeString(reg.processStartTime().Format(time.UnixDate))
@@ -83,6 +83,17 @@ func populateStatuszData(reg statuszRegistry) (string, error) {
 	if reg.emulationVersion() != nil {
 		emulationVersion = fmt.Sprintf(`Emulation version%s %s`, delim, html.EscapeString(reg.emulationVersion().String()))
 	}
+	var apiserverLinks string
+	if componentName == "kube-apiserver" {
+		apiserverLinks = fmt.Sprintf(`
+Useful Endpoints:
+----------------
+"healthz":  "/healthz",
+"livez":	"/livez",
+"readyz":	"/readyz",
+"version":  "/version",
+"metrics":	"/metrics"`)
+	}
 
 	status := fmt.Sprintf(`
 Started%[1]s %[2]s
@@ -90,7 +101,8 @@ Up%[1]s %[3]s
 Go version%[1]s %[4]s
 Binary version%[1]s %[5]s
 %[6]s
-`, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion)
+%[7]s
+`, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion, apiserverLinks)
 
 	return status, nil
 }

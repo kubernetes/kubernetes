@@ -46,7 +46,23 @@ Started: %v
 Up: %s
 Go version: %s
 Binary version: %v
+`
 
+const wantTmplWithKubeApiserverComp = `
+%s statusz
+Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.
+
+Started: %v
+Up: %s
+Go version: %s
+Binary version: %v
+Useful Endpoints:
+----------------
+"healthz":  "/healthz",
+"livez":	"/livez",
+"readyz":	"/readyz",
+"version":  "/version",
+"metrics":	"/metrics"
 `
 
 func TestStatusz(t *testing.T) {
@@ -106,6 +122,26 @@ func TestStatusz(t *testing.T) {
 			wantBody: fmt.Sprintf(
 				wantTmplWithoutEmulation,
 				"test-server",
+				fakeStartTime.Format(time.UnixDate),
+				fakeUptime,
+				fakeGoVersion,
+				fakeBinaryVersion,
+			),
+		},
+		{
+			name:          "valid request for kube-apiserver",
+			componentName: "kube-apiserver",
+			reqHeader:     "text/plain; charset=utf-8",
+			registry: fakeRegistry{
+				startTime:    fakeStartTime,
+				goVer:        fakeGoVersion,
+				binaryVer:    fakeBinaryVersion,
+				emulationVer: nil,
+			},
+			wantStatusCode: http.StatusOK,
+			wantBody: fmt.Sprintf(
+				wantTmplWithKubeApiserverComp,
+				"kube-apiserver",
 				fakeStartTime.Format(time.UnixDate),
 				fakeUptime,
 				fakeGoVersion,
