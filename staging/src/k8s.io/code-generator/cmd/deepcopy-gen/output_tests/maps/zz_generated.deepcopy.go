@@ -54,7 +54,7 @@ func (in *Ttest) DeepCopyInto(out *Ttest) {
 	}
 	if in.Uint8 != nil {
 		in, out := &in.Uint8, &out.Uint8
-		*out = make(map[string]byte, len(*in))
+		*out = make(map[string]uint8, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}

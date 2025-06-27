@@ -241,6 +241,7 @@ replace (
 	k8s.io/dynamic-resource-allocation => ./staging/src/k8s.io/dynamic-resource-allocation
 	k8s.io/endpointslice => ./staging/src/k8s.io/endpointslice
 	k8s.io/externaljwt => ./staging/src/k8s.io/externaljwt
+	k8s.io/gengo/v2 => github.com/tmartinuson/gengo/v2 v2.0.0-20250624211311-32c1bbc3f3d4 //v2.0.0-20250624211311-32c1bbc3f3d4
 	k8s.io/kms => ./staging/src/k8s.io/kms
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager

@@ -46,7 +46,7 @@ func (in *Ttest) DeepCopyInto(out *Ttest) {
 	}
 	if in.Uint8 != nil {
 		in, out := &in.Uint8, &out.Uint8
-		*out = make([]byte, len(*in))
+		*out = make([]uint8, len(*in))
 		copy(*out, *in)
 	}
 	if in.Uint16 != nil {
