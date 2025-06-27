@@ -208,8 +208,17 @@ var (
 	// Marks tests that require a cluster with dual-stack pod and service networks.
 	IPv6DualStack = framework.WithFeature(framework.ValidFeatures.Add("IPv6DualStack"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-testing
+	// Marks tests which need to run in a kind cluster.
 	Kind = framework.WithFeature(framework.ValidFeatures.Add("Kind"))
+
+	// Owner: sig-testing
+	//
+	// The kind, make and docker commands must be in the PATH.
+	// They must support bringing up a cluster with a node image built from
+	// the current Kubernetes version on the host on which the E2E suite runs.
+	// The repo root must point to the Kubernetes source code.
+	KindCommand = framework.WithFeature(framework.ValidFeatures.Add("KindCommand"))
 
 	// Owner: sig-network
 	// Marks tests that require kube-dns-autoscaler

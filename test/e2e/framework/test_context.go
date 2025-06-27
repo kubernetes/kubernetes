@@ -411,7 +411,7 @@ func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.
 func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.BoolVar(&TestContext.VerifyServiceAccount, "e2e-verify-service-account", true, "If true tests will verify the service account before running.")
-	flags.StringVar(&TestContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, os.Getenv(clientcmd.RecommendedConfigPathEnvVar), "Path to kubeconfig containing embedded authinfo.")
+	flags.StringVar(&TestContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, os.Getenv(clientcmd.RecommendedConfigPathEnvVar), "Path to kubeconfig containing embedded authinfo. Use 'none' to disable access to a cluster during the E2E suite setup. Tests then must manage clusters themselves.")
 	flags.StringVar(&TestContext.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
 	flags.StringVar(&TestContext.KubeAPIContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType used to communicate with apiserver")
 
