@@ -117,6 +117,177 @@ func TestValidateOptionsScaleToZeroDisabled(t *testing.T) {
 	}
 }
 
+func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
+	hpa := func(minReplicas int32, scaleTargetAPIVersion string, metrics []autoscaling.MetricSpec) *autoscaling.HorizontalPodAutoscaler {
+		return &autoscaling.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{Name: "myhpa", Namespace: "default"},
+			Spec: autoscaling.HorizontalPodAutoscalerSpec{
+				MinReplicas: &minReplicas,
+				MaxReplicas: 5,
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+					Kind:       "ReplicationController",
+					Name:       "myrc",
+					APIVersion: scaleTargetAPIVersion,
+				},
+				Metrics: metrics,
+			},
+		}
+	}
+
+	objectMetric := func(apiVersion string) autoscaling.MetricSpec {
+		return autoscaling.MetricSpec{
+			Type: autoscaling.ObjectMetricSourceType,
+			Object: &autoscaling.ObjectMetricSource{
+				DescribedObject: autoscaling.CrossVersionObjectReference{
+					Kind:       "Deployment",
+					Name:       "mydeployment",
+					APIVersion: apiVersion,
+				},
+				Metric: autoscaling.MetricIdentifier{Name: "my-metric"},
+				Target: autoscaling.MetricTarget{Type: autoscaling.ValueMetricType, Value: resource.NewQuantity(10, resource.DecimalSI)},
+			},
+		}
+	}
+
+	podsMetric := autoscaling.MetricSpec{
+		Type: autoscaling.PodsMetricSourceType,
+		Pods: &autoscaling.PodsMetricSource{
+			Metric: autoscaling.MetricIdentifier{Name: "my-metric"},
+			Target: autoscaling.MetricTarget{Type: autoscaling.AverageValueMetricType, AverageValue: resource.NewQuantity(10, resource.DecimalSI)},
+		},
+	}
+
+	testCases := []struct {
+		name                      string
+		newHPA                    *autoscaling.HorizontalPodAutoscaler
+		oldHPA                    *autoscaling.HorizontalPodAutoscaler
+		scaleToZeroEnabled        bool
+		expectMinReplicasLower    int32
+		expectScaleTargetValidate bool
+		expectMetricsValidate     bool
+	}{
+		// MinReplicasLowerBound tests
+		{
+			name:                      "scale to zero disabled, no old hpa",
+			newHPA:                    hpa(1, "", nil),
+			oldHPA:                    nil,
+			scaleToZeroEnabled:        false,
+			expectMinReplicasLower:    1,
+			expectScaleTargetValidate: true,
+			expectMetricsValidate:     true,
+		},
+		{
+			name:                      "scale to zero disabled, old hpa has minReplicas=1",
+			newHPA:                    hpa(1, "", nil),
+			oldHPA:                    hpa(1, "", nil),
+			scaleToZeroEnabled:        false,
+			expectMinReplicasLower:    1,
+			expectScaleTargetValidate: false,
+			expectMetricsValidate:     true,
+		},
+		{
+			name:                      "scale to zero disabled, old hpa has minReplicas=0",
+			newHPA:                    hpa(0, "", nil),
+			oldHPA:                    hpa(0, "", nil),
+			scaleToZeroEnabled:        false,
+			expectMinReplicasLower:    0,
+			expectScaleTargetValidate: false,
+			expectMetricsValidate:     true,
+		},
+		{
+			name:                      "scale to zero enabled",
+			newHPA:                    hpa(1, "", nil),
+			oldHPA:                    nil,
+			scaleToZeroEnabled:        true,
+			expectMinReplicasLower:    0,
+			expectScaleTargetValidate: true,
+			expectMetricsValidate:     true,
+		},
+		// ScaleTargetRefValidationOptions tests
+		{
+			name:                      "scale target ref api version changed",
+			newHPA:                    hpa(1, "apps/v1", nil),
+			oldHPA:                    hpa(1, "extensions/v1beta1", nil),
+			scaleToZeroEnabled:        false,
+			expectMinReplicasLower:    1,
+			expectScaleTargetValidate: true,
+			expectMetricsValidate:     true,
+		},
+		{
+			name:                      "scale target ref api version unchanged",
+			newHPA:                    hpa(1, "apps/v1", nil),
+			oldHPA:                    hpa(1, "apps/v1", nil),
+			scaleToZeroEnabled:        false,
+			expectMinReplicasLower:    1,
+			expectScaleTargetValidate: false,
+			expectMetricsValidate:     true,
+		},
+		// MetricsValidationOptions tests
+		{
+			name:                      "no metrics",
+			newHPA:                    hpa(1, "", nil),
+			oldHPA:                    nil,
+			scaleToZeroEnabled:        false,
+			expectMinReplicasLower:    1,
+			expectScaleTargetValidate: true,
+			expectMetricsValidate:     true,
+		},
+		{
+			name:                      "non-object metric",
+			newHPA:                    hpa(1, "", []autoscaling.MetricSpec{podsMetric}),
+			oldHPA:                    nil,
+			scaleToZeroEnabled:        false,
+			expectMinReplicasLower:    1,
+			expectScaleTargetValidate: true,
+			expectMetricsValidate:     true,
+		},
+		{
+			name:                      "new object metric with valid api version",
+			newHPA:                    hpa(1, "", []autoscaling.MetricSpec{objectMetric("apps/v1")}),
+			oldHPA:                    nil,
+			scaleToZeroEnabled:        false,
+			expectMinReplicasLower:    1,
+			expectScaleTargetValidate: true,
+			expectMetricsValidate:     true,
+		},
+		{
+			name:                      "old object metric with invalid api version",
+			newHPA:                    hpa(1, "", []autoscaling.MetricSpec{objectMetric("apps/v1/v3")}),
+			oldHPA:                    hpa(2, "", []autoscaling.MetricSpec{objectMetric("apps/v1/v2")}),
+			scaleToZeroEnabled:        false,
+			expectMinReplicasLower:    1,
+			expectScaleTargetValidate: false,
+			expectMetricsValidate:     false,
+		},
+		{
+			name:                      "new object metric with invalid api version",
+			newHPA:                    hpa(1, "", []autoscaling.MetricSpec{objectMetric("apps/v1/v2")}),
+			oldHPA:                    nil,
+			scaleToZeroEnabled:        false,
+			expectMinReplicasLower:    1,
+			expectScaleTargetValidate: true,
+			expectMetricsValidate:     true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, tc.scaleToZeroEnabled)
+			opts := validationOptionsForHorizontalPodAutoscaler(tc.newHPA, tc.oldHPA)
+
+			if opts.MinReplicasLowerBound != tc.expectMinReplicasLower {
+				t.Errorf("expected MinReplicasLowerBound %d, got %d", tc.expectMinReplicasLower, opts.MinReplicasLowerBound)
+			}
+			if opts.ScaleTargetRefValidationOptions.ValidateAPIVersion != tc.expectScaleTargetValidate {
+				t.Errorf("expected ScaleTargetRefValidationOptions.ValidateAPIVersion to be %v, got %v", tc.expectScaleTargetValidate, opts.ScaleTargetRefValidationOptions.ValidateAPIVersion)
+			}
+			if opts.ObjectMetricsValidationOptions.ValidateAPIVersion != tc.expectMetricsValidate {
+				t.Errorf("expected MetricsValidationOptions.ValidateAPIVersion to be %v, got %v", tc.expectMetricsValidate, opts.ObjectMetricsValidationOptions.ValidateAPIVersion)
+			}
+		})
+	}
+}
+
 func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet, hasTolerance toleranceSet) autoscaling.HorizontalPodAutoscaler {
 	tolerance := ptr.To(resource.MustParse("0.1"))
 	if !hasTolerance {

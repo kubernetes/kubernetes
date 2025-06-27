@@ -170,12 +170,32 @@ func (autoscalerStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 
 func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) validation.HorizontalPodAutoscalerSpecValidationOptions {
 	opts := validation.HorizontalPodAutoscalerSpecValidationOptions{
-		MinReplicasLowerBound: 1,
+		MinReplicasLowerBound:           1,
+		ScaleTargetRefValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{ValidateAPIVersion: true, AllowEmptyAPIVersion: false},
+		ObjectMetricsValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{
+			ValidateAPIVersion: true, AllowEmptyAPIVersion: true,
+		},
 	}
 
 	oldHasZeroMinReplicas := oldHPA != nil && (oldHPA.Spec.MinReplicas != nil && *oldHPA.Spec.MinReplicas == 0)
 	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) || oldHasZeroMinReplicas {
 		opts.MinReplicasLowerBound = 0
+	}
+
+	if oldHPA != nil && oldHPA.Spec.ScaleTargetRef.APIVersion == newHPA.Spec.ScaleTargetRef.APIVersion {
+		opts.ScaleTargetRefValidationOptions.ValidateAPIVersion = false
+	}
+
+	if oldHPA != nil {
+		for _, metric := range oldHPA.Spec.Metrics {
+			if metric.Type == autoscaling.ObjectMetricSourceType {
+				if err := validation.ValidateAPIVersion(metric.Object.DescribedObject, opts.ObjectMetricsValidationOptions); err != nil {
+					// metrics are already invalid.
+					opts.ObjectMetricsValidationOptions.ValidateAPIVersion = false
+					break
+				}
+			}
+		}
 	}
 	return opts
 }
