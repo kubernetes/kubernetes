@@ -597,21 +597,24 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 
 func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 	tests := []struct {
-		name             string
-		deploymentName   string
-		wantRSNamePrefix string
+		name                  string
+		deploymentName        string
+		wantDeploymentPortion string
 	}{
 		{
-			name:           "short name",
-			deploymentName: "my-deployment",
+			name:                  "short name",
+			deploymentName:        "my-deployment",
+			wantDeploymentPortion: "my-deployment",
 		},
 		{
-			name:           "very long name truncated",
-			deploymentName: strings.Repeat("a", 250),
+			name:                  "very long name truncated",
+			deploymentName:        strings.Repeat("a", 250),
+			wantDeploymentPortion: strings.Repeat("a", 242),
 		},
 		{
-			name:           "very long name not truncated",
-			deploymentName: strings.Repeat("a", 242),
+			name:                  "very long name not truncated",
+			deploymentName:        strings.Repeat("a", 242),
+			wantDeploymentPortion: strings.Repeat("a", 242),
 		},
 	}
 
@@ -664,16 +667,17 @@ func TestDeploymentController_generateReplicaSetName(t *testing.T) {
 
 		deploymentPortion := strings.Join(parts[:len(parts)-1], "-")
 		if len(test.deploymentName) <= 242 {
-			if deploymentPortion != test.deploymentName {
-				t.Errorf("Deployment name portion mismatch: got %q, want %q", deploymentPortion, test.deploymentName)
+			if len(deploymentPortion) != len(test.deploymentName) {
+				t.Errorf("Deployment name portion should be %d chars, got %d", len(test.deploymentName), len(deploymentPortion))
 			}
 		} else {
 			if len(deploymentPortion) != 242 {
 				t.Errorf("Truncated deployment name should be 242 chars, got %d", len(deploymentPortion))
 			}
-			if want := test.deploymentName[:242]; deploymentPortion != want {
-				t.Errorf("Deployment name portion mismatch: got %q, want %q", deploymentPortion, want)
-			}
+		}
+
+		if deploymentPortion != test.wantDeploymentPortion {
+			t.Errorf("Deployment name portion mismatch: got %q, want %q", deploymentPortion, test.wantDeploymentPortion)
 		}
 	}
 }
