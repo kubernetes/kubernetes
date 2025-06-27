@@ -1348,7 +1348,7 @@ const ShareIDLength = ShareIDNBytes * 2
 
 // Max length for shared device name, accounting for suffix format "-[ShareUID]",
 // where ShareUID is 2 * ShareUIDNBytes characters.
-const SharedDeviceNameMaxLength = DeviceMaxDomainLength - ShareIDNBytes - 1
+const SharedDeviceNameMaxLength = DeviceMaxDomainLength - ShareIDLength - 1 // 56
 
 // DeviceRequestAllocationResult contains the allocation result for one request.
 type DeviceRequestAllocationResult struct {
