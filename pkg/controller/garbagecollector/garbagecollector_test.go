@@ -1433,6 +1433,64 @@ func TestConflictingData(t *testing.T) {
 			},
 		},
 		{
+			name: "Foreground deletion",
+			steps: []step{
+				// 0,1: setup
+				createObjectInClient("apps", "v1", "deployments", "ns1", makeMetadataObj(deployment1apps)),
+				createObjectInClient("", "v1", "pods", "ns1", makeMetadataObj(pod1ns1, deployment1apps)),
+				// 2,3,4: observe creation
+				processEvent(makeAddEvent(deployment1apps)),
+				processEvent(makeAddEvent(pod1ns1, deployment1apps)),
+				assertState(state{
+					graphNodes:             []*node{makeNode(pod1ns1, withOwners(deployment1apps)), makeNode(deployment1apps)},
+					pendingAttemptToDelete: []*node{},
+				}),
+				// 5,6,7: parent marked for deletion
+				deleteForgroundObjectFromClient("apps", "v1", "deployments", "ns1", "deployment1"),
+				processEvent(makeDeleteForegroundEvent(deployment1apps)),
+				assertState(state{
+					graphNodes:             []*node{makeNode(pod1ns1, withOwners(deployment1apps)), makeNode(deployment1apps)},
+					pendingAttemptToDelete: []*node{makeNode(pod1ns1, withOwners(deployment1apps)), makeNode(deployment1apps)},
+				}),
+				// 8,9: delete child
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname1",
+						"get apps/v1, Resource=deployments ns=ns1 name=deployment1",
+						"delete /v1, Resource=pods ns=ns1 name=podname1",
+					},
+					graphNodes:             []*node{makeNode(pod1ns1, withOwners(deployment1apps)), makeNode(deployment1apps)},
+					pendingAttemptToDelete: []*node{makeNode(deployment1apps)},
+				}),
+				// 10,11: child deleted
+				processEvent(makeDeleteEvent(pod1ns1, deployment1apps)),
+				assertState(state{
+					graphNodes:             []*node{makeNode(deployment1apps)},
+					pendingAttemptToDelete: []*node{makeNode(deployment1apps)},
+				}),
+				// 12,13: update parent
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get apps/v1, Resource=deployments ns=ns1 name=deployment1",
+						"get apps/v1, Resource=deployments ns=ns1 name=deployment1",
+						"patch apps/v1, Resource=deployments ns=ns1 name=deployment1",
+					},
+					graphNodes: []*node{makeNode(deployment1apps)},
+				}),
+				// 14,15: parent updated
+				processEvent(makeUpdateEvent(deployment1apps)),
+				assertState(state{
+					graphNodes: []*node{makeNode(deployment1apps)},
+				}),
+				// 16,17,18: delete parent
+				deleteObjectFromClient("apps", "v1", "deployments", "ns1", "deployment1"),
+				processEvent(makeDeleteEvent(deployment1apps)),
+				assertState(state{}),
+			},
+		},
+		{
 			name: "child -> existing owner with inaccessible API version (owner first)",
 			steps: []step{
 				// setup
@@ -2462,6 +2520,34 @@ func makeDeleteEvent(identity objectReference, owners ...objectReference) *event
 	}
 }
 
+func makeUpdateEvent(identity objectReference, owners ...objectReference) *event {
+	gv, err := schema.ParseGroupVersion(identity.APIVersion)
+	if err != nil {
+		panic(err)
+	}
+	return &event{
+		eventType: updateEvent,
+		gvk:       gv.WithKind(identity.Kind),
+		obj:       makeObj(identity, owners...),
+	}
+}
+
+func makeDeleteForegroundEvent(identity objectReference, owners ...objectReference) *event {
+	gv, err := schema.ParseGroupVersion(identity.APIVersion)
+	if err != nil {
+		panic(err)
+	}
+	obj := makeObj(identity, owners...)
+	now := metav1.Now()
+	obj.DeletionTimestamp = &now
+	obj.Finalizers = append(obj.Finalizers, "foregroundDeletion")
+	return &event{
+		eventType: updateEvent,
+		gvk:       gv.WithKind(identity.Kind),
+		obj:       obj,
+	}
+}
+
 func makeObj(identity objectReference, owners ...objectReference) *metaonly.MetadataOnlyObject {
 	obj := &metaonly.MetadataOnlyObject{
 		TypeMeta:   metav1.TypeMeta{APIVersion: identity.APIVersion, Kind: identity.Kind},
@@ -2623,6 +2709,36 @@ func deleteObjectFromClient(group, version, resource, namespace, name string) st
 				c = ctx.metadataClient.Resource(gvr).Namespace(namespace).(fakemetadata.MetadataClient)
 			}
 			if err := c.Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
+				ctx.t.Fatal(err)
+			}
+			ctx.metadataClient.ClearActions()
+		},
+	}
+}
+
+func deleteForgroundObjectFromClient(group, version, resource, namespace, name string) step {
+	return step{
+		name: "deleteForgroundObjectFromClient",
+		check: func(ctx stepContext) {
+			ctx.t.Helper()
+			if len(ctx.metadataClient.Actions()) > 0 {
+				ctx.t.Fatal("cannot call deleteForgroundObjectFromClient with pending client actions, call assertClientActions to check and clear first")
+			}
+			gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
+			var c fakemetadata.MetadataClient
+			if namespace == "" {
+				c = ctx.metadataClient.Resource(gvr).(fakemetadata.MetadataClient)
+			} else {
+				c = ctx.metadataClient.Resource(gvr).Namespace(namespace).(fakemetadata.MetadataClient)
+			}
+			obj, err := c.Get(context.TODO(), name, metav1.GetOptions{})
+			if err != nil {
+				ctx.t.Fatal(err)
+			}
+			now := metav1.Now()
+			obj.DeletionTimestamp = &now
+			obj.Finalizers = append(obj.Finalizers, "foregroundDeletion")
+			if _, err := c.UpdateFake(obj, metav1.UpdateOptions{}); err != nil {
 				ctx.t.Fatal(err)
 			}
 			ctx.metadataClient.ClearActions()
