@@ -65,6 +65,7 @@ type PodSpecApplyConfiguration struct {
 	SchedulingGates               []PodSchedulingGateApplyConfiguration        `json:"schedulingGates,omitempty"`
 	ResourceClaims                []PodResourceClaimApplyConfiguration         `json:"resourceClaims,omitempty"`
 	Resources                     *ResourceRequirementsApplyConfiguration      `json:"resources,omitempty"`
+	HostnameOverride              *string                                      `json:"hostnameOverride,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs a declarative configuration of the PodSpec type for use with
@@ -451,5 +452,13 @@ func (b *PodSpecApplyConfiguration) WithResourceClaims(values ...*PodResourceCla
 // If called multiple times, the Resources field is set to the value of the last call.
 func (b *PodSpecApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *PodSpecApplyConfiguration {
 	b.Resources = value
+	return b
+}
+
+// WithHostnameOverride sets the HostnameOverride field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HostnameOverride field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithHostnameOverride(value string) *PodSpecApplyConfiguration {
+	b.HostnameOverride = &value
 	return b
 }

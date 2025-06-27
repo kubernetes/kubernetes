@@ -1809,7 +1809,8 @@
               "request": "requestValue"
             }
           ]
-        }
+        },
+        "hostnameOverride": "hostnameOverrideValue"
       }
     },
     "updateStrategy": {
