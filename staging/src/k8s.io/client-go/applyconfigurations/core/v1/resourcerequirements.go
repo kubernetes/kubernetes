@@ -35,7 +35,6 @@ type ResourceRequirementsApplyConfiguration struct {
 func ResourceRequirements() *ResourceRequirementsApplyConfiguration {
 	return &ResourceRequirementsApplyConfiguration{}
 }
-func (b ResourceRequirementsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithLimits sets the Limits field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

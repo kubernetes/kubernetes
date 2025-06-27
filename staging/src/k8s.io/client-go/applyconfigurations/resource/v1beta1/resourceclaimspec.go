@@ -29,7 +29,6 @@ type ResourceClaimSpecApplyConfiguration struct {
 func ResourceClaimSpec() *ResourceClaimSpecApplyConfiguration {
 	return &ResourceClaimSpecApplyConfiguration{}
 }
-func (b ResourceClaimSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDevices sets the Devices field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

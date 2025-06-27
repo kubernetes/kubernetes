@@ -30,7 +30,6 @@ type FlockerVolumeSourceApplyConfiguration struct {
 func FlockerVolumeSource() *FlockerVolumeSourceApplyConfiguration {
 	return &FlockerVolumeSourceApplyConfiguration{}
 }
-func (b FlockerVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDatasetName sets the DatasetName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

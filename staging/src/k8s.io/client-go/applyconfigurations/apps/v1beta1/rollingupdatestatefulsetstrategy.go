@@ -34,7 +34,6 @@ type RollingUpdateStatefulSetStrategyApplyConfiguration struct {
 func RollingUpdateStatefulSetStrategy() *RollingUpdateStatefulSetStrategyApplyConfiguration {
 	return &RollingUpdateStatefulSetStrategyApplyConfiguration{}
 }
-func (b RollingUpdateStatefulSetStrategyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPartition sets the Partition field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

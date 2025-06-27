@@ -29,7 +29,6 @@ type PriorityLevelConfigurationReferenceApplyConfiguration struct {
 func PriorityLevelConfigurationReference() *PriorityLevelConfigurationReferenceApplyConfiguration {
 	return &PriorityLevelConfigurationReferenceApplyConfiguration{}
 }
-func (b PriorityLevelConfigurationReferenceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

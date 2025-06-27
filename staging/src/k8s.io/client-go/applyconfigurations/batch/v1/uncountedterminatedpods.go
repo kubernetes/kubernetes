@@ -34,7 +34,6 @@ type UncountedTerminatedPodsApplyConfiguration struct {
 func UncountedTerminatedPods() *UncountedTerminatedPodsApplyConfiguration {
 	return &UncountedTerminatedPodsApplyConfiguration{}
 }
-func (b UncountedTerminatedPodsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSucceeded adds the given value to the Succeeded field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

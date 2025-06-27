@@ -32,7 +32,6 @@ type ServiceReferenceApplyConfiguration struct {
 func ServiceReference() *ServiceReferenceApplyConfiguration {
 	return &ServiceReferenceApplyConfiguration{}
 }
-func (b ServiceReferenceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithNamespace sets the Namespace field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

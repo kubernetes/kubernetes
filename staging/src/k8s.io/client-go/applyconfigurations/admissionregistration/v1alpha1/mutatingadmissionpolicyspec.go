@@ -40,7 +40,6 @@ type MutatingAdmissionPolicySpecApplyConfiguration struct {
 func MutatingAdmissionPolicySpec() *MutatingAdmissionPolicySpecApplyConfiguration {
 	return &MutatingAdmissionPolicySpecApplyConfiguration{}
 }
-func (b MutatingAdmissionPolicySpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithParamKind sets the ParamKind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

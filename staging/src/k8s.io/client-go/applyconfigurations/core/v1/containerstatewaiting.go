@@ -30,7 +30,6 @@ type ContainerStateWaitingApplyConfiguration struct {
 func ContainerStateWaiting() *ContainerStateWaitingApplyConfiguration {
 	return &ContainerStateWaitingApplyConfiguration{}
 }
-func (b ContainerStateWaitingApplyConfiguration) IsApplyConfiguration() {}
 
 // WithReason sets the Reason field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

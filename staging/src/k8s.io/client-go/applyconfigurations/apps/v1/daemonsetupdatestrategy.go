@@ -34,7 +34,6 @@ type DaemonSetUpdateStrategyApplyConfiguration struct {
 func DaemonSetUpdateStrategy() *DaemonSetUpdateStrategyApplyConfiguration {
 	return &DaemonSetUpdateStrategyApplyConfiguration{}
 }
-func (b DaemonSetUpdateStrategyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

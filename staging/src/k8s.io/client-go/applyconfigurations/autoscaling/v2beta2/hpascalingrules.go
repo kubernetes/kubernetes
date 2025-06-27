@@ -35,7 +35,6 @@ type HPAScalingRulesApplyConfiguration struct {
 func HPAScalingRules() *HPAScalingRulesApplyConfiguration {
 	return &HPAScalingRulesApplyConfiguration{}
 }
-func (b HPAScalingRulesApplyConfiguration) IsApplyConfiguration() {}
 
 // WithStabilizationWindowSeconds sets the StabilizationWindowSeconds field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -31,7 +31,6 @@ type PolicyRulesWithSubjectsApplyConfiguration struct {
 func PolicyRulesWithSubjects() *PolicyRulesWithSubjectsApplyConfiguration {
 	return &PolicyRulesWithSubjectsApplyConfiguration{}
 }
-func (b PolicyRulesWithSubjectsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSubjects adds the given value to the Subjects field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

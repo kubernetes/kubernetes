@@ -32,7 +32,6 @@ type VsphereVirtualDiskVolumeSourceApplyConfiguration struct {
 func VsphereVirtualDiskVolumeSource() *VsphereVirtualDiskVolumeSourceApplyConfiguration {
 	return &VsphereVirtualDiskVolumeSourceApplyConfiguration{}
 }
-func (b VsphereVirtualDiskVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithVolumePath sets the VolumePath field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

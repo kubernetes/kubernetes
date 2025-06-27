@@ -29,7 +29,6 @@ type CELDeviceSelectorApplyConfiguration struct {
 func CELDeviceSelector() *CELDeviceSelectorApplyConfiguration {
 	return &CELDeviceSelectorApplyConfiguration{}
 }
-func (b CELDeviceSelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithExpression sets the Expression field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
