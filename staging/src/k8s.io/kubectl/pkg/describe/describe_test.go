@@ -3425,6 +3425,54 @@ func TestDescribeJob(t *testing.T) {
 	}
 }
 
+func TestDescribeCronJob(t *testing.T) {
+	cases := map[string]struct {
+		job          *batchv1.CronJob
+		wantElements []string
+	}{
+		"empty cronjob": {
+			job: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: batchv1.CronJobSpec{},
+			},
+			wantElements: []string{"bar", "foo"},
+		},
+		"schedule cronjob": {
+			job: &batchv1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: batchv1.CronJobSpec{Schedule: "* * * * *"},
+			},
+			wantElements: []string{"Schedule:", "* * * * *", "bar", "foo"},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			client := &describeClient{
+				T:         t,
+				Namespace: tc.job.Namespace,
+				Interface: fake.NewSimpleClientset(tc.job),
+			}
+			describer := CronJobDescriber{client}
+			out, err := describer.Describe(tc.job.Namespace, tc.job.Name, DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Fatalf("unexpected error describing object: %v", err)
+			}
+
+			for _, expected := range tc.wantElements {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output:\n %s", expected, out)
+				}
+			}
+		})
+	}
+}
+
 func TestDescribeIngress(t *testing.T) {
 	ingresClassName := "test"
 	backendV1beta1 := networkingv1beta1.IngressBackend{
