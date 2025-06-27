@@ -170,6 +170,7 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
+	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -229,4 +230,23 @@ func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
 		}
 	}
 	return false
+}
+
+func dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].AllowMultipleAllocations = nil
+		if newSlice.Spec.Devices[i].Capacity != nil {
+			for ci, capacity := range newSlice.Spec.Devices[i].Capacity {
+				newSlice.Spec.Devices[i].Capacity[ci] = func() resource.DeviceCapacity {
+					capacity = *capacity.DeepCopy()
+					capacity.SharingPolicy = nil
+					return capacity
+				}()
+			}
+		}
+	}
 }

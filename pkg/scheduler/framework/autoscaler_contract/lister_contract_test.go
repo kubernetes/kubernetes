@@ -23,7 +23,6 @@ package contract
 import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -96,7 +95,7 @@ func (r *resourceClaimTrackerContract) Get(_, _ string) (*resourceapi.ResourceCl
 	return nil, nil
 }
 
-func (r *resourceClaimTrackerContract) ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error) {
+func (r *resourceClaimTrackerContract) GatherAllocatedState() (*structured.AllocatedState, error) {
 	return nil, nil
 }
 
