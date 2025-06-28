@@ -79,10 +79,6 @@ var (
 type Waiter interface {
 	// WaitForControlPlaneComponents waits for all control plane components to be ready.
 	WaitForControlPlaneComponents(podMap map[string]*v1.Pod, apiServerAddress string) error
-	// WaitForAPI waits for the API Server's /healthz endpoint to become "ok"
-	// TODO: remove WaitForAPI once WaitForAllControlPlaneComponents goes GA:
-	// https://github.com/kubernetes/kubeadm/issues/2907
-	WaitForAPI() error
 	// WaitForPodsWithLabel waits for Pods in the kube-system namespace to become Ready
 	WaitForPodsWithLabel(kvLabel string) error
 	// WaitForStaticPodSingleHash fetches sha256 hash for the control plane static pod
@@ -320,32 +316,6 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 		}
 	}
 	return utilerrors.NewAggregate(errs)
-}
-
-// WaitForAPI waits for the API Server's /healthz endpoint to report "ok"
-func (w *KubeWaiter) WaitForAPI() error {
-	_, _ = fmt.Fprintf(w.writer, "[api-check] Waiting for a healthy API server. This can take up to %v\n", w.timeout)
-
-	start := time.Now()
-	err := wait.PollUntilContextTimeout(
-		context.Background(),
-		constants.KubernetesAPICallRetryInterval,
-		w.timeout,
-		true, func(ctx context.Context) (bool, error) {
-			healthStatus := 0
-			w.client.Discovery().RESTClient().Get().AbsPath("/healthz").Do(ctx).StatusCode(&healthStatus)
-			if healthStatus != http.StatusOK {
-				return false, nil
-			}
-			return true, nil
-		})
-	if err != nil {
-		_, _ = fmt.Fprintf(w.writer, "[api-check] The API server is not healthy after %v\n", time.Since(start))
-		return err
-	}
-
-	_, _ = fmt.Fprintf(w.writer, "[api-check] The API server is healthy after %v\n", time.Since(start))
-	return nil
 }
 
 // WaitForPodsWithLabel will lookup pods with the given label and wait until they are all
