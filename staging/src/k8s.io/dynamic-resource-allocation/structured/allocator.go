@@ -24,6 +24,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -66,6 +67,11 @@ type Allocator struct {
 	// access to this map must be synchronized.
 	availableCounters map[string]counterSets
 	mutex             sync.RWMutex
+	// numAllocateOneInvocations counts the number of times the allocateOne
+	// function is called for the allocator. This is a measurement of the
+	// amount of work the allocator had to do to allocate devices
+	// for the claims.
+	numAllocateOneInvocations int64
 }
 
 type Features struct {
@@ -385,6 +391,20 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	}
 
 	return result, nil
+}
+
+// Stats shows statistics from the allocation process.
+type Stats struct {
+	// NumAllocateOneInvocations counts the number of times the allocateOne function
+	// got called.
+	NumAllocateOneInvocations int64
+}
+
+func (a *Allocator) GetStats() Stats {
+	s := Stats{
+		NumAllocateOneInvocations: atomic.LoadInt64(&a.numAllocateOneInvocations),
+	}
+	return s
 }
 
 func (a *allocator) validateDeviceRequest(request requestAccessor, parentRequest requestAccessor, requestKey requestIndices, pools []*Pool) (requestData, error) {
@@ -711,6 +731,7 @@ func lookupAttribute(device *draapi.BasicDevice, deviceID DeviceID, attributeNam
 // This allows the logic for subrequests to call allocateOne with the same
 // device index without causing infinite recursion.
 func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (bool, error) {
+	atomic.AddInt64(&alloc.numAllocateOneInvocations, 1)
 	if r.claimIndex >= len(alloc.claimsToAllocate) {
 		// Done! If we were doing scoring, we would compare the current allocation result
 		// against the previous one, keep the best, and continue. Without scoring, we stop
@@ -748,7 +769,9 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 		// Keep track of whether all attempts to do allocation with the
 		// subrequests results in the allocation result limit exceeded.
 		// If so, there is no need to make attempts with other devices
-		// the in the previous request (if any).
+		// in the previous request (if any), except when
+		// it is a firstAvailable request where some sub-requests
+		// need less devices than others.
 		allAllocationExceeded := true
 		for subRequestIndex := 0; ; subRequestIndex++ {
 			nextSubRequestKey := requestKey

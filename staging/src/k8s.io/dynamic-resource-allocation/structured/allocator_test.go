@@ -613,8 +613,9 @@ func TestAllocator(t *testing.T) {
 		slices           []*resourceapi.ResourceSlice
 		node             *v1.Node
 
-		expectResults []any
-		expectError   types.GomegaMatcher // can be used to check for no error or match specific error types
+		expectResults                   []any
+		expectError                     types.GomegaMatcher // can be used to check for no error or match specific error
+		expectNumAllocateOneInvocations int64
 	}{
 
 		"empty": {},
@@ -3491,6 +3492,7 @@ func TestAllocator(t *testing.T) {
 					multipleDeviceAllocationResults(req1SubReq1, driverA, pool1, resourceapi.AllocationResultsMaxSize/2, resourceapi.AllocationResultsMaxSize/2),
 				)...,
 			)},
+			expectNumAllocateOneInvocations: 75,
 		},
 		"prioritized-list-max-allocation-allocation-mode-all": {
 			features: Features{
@@ -3522,6 +3524,7 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req1, driverB, pool2, "device-0", false),
 				deviceAllocationResult(req1, driverB, pool2, "device-1", false),
 			)},
+			expectNumAllocateOneInvocations: 42,
 		},
 	}
 
@@ -3557,6 +3560,11 @@ func TestAllocator(t *testing.T) {
 			g.Expect(allocatedDevices).To(gomega.HaveExactElements(tc.allocatedDevices))
 			g.Expect(slices).To(gomega.ConsistOf(tc.slices))
 			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
+
+			if tc.expectNumAllocateOneInvocations > 0 {
+				stats := allocator.GetStats()
+				g.Expect(stats.NumAllocateOneInvocations).To(gomega.Equal(tc.expectNumAllocateOneInvocations))
+			}
 		})
 	}
 }
