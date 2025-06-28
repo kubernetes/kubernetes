@@ -5931,14 +5931,7 @@ var supportedServiceIPFamilyPolicy = sets.New(
 // ValidateService tests if required fields/annotations of a Service are valid.
 func ValidateService(service, oldService *core.Service) field.ErrorList {
 	metaPath := field.NewPath("metadata")
-
-	// Avoid re-validating the name on update, to avoid problems when rolling back RelaxedServiceNameValidation.
-	nameFn := ValidateServiceName
-	if oldService != nil {
-		nameFn = func(_ string, _ bool) []string { return nil }
-	}
-
-	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, nameFn, metaPath)
+	var allErrs field.ErrorList
 
 	topologyHintsVal, topologyHintsSet := service.Annotations[core.DeprecatedAnnotationTopologyAwareHints]
 	topologyModeVal, topologyModeSet := service.Annotations[core.AnnotationTopologyMode]
@@ -6288,7 +6281,10 @@ func validateServiceTrafficDistribution(service *core.Service) field.ErrorList {
 
 // ValidateServiceCreate validates Services as they are created.
 func ValidateServiceCreate(service *core.Service) field.ErrorList {
-	return ValidateService(service, nil)
+	metaPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, metaPath)
+
+	return append(allErrs, ValidateService(service, nil)...)
 }
 
 // ValidateServiceUpdate tests if required fields in the service are set during an update
