@@ -645,7 +645,7 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 	manager, _ := newRealImageGCManager(policy, mockStatsProvider)
 
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(&statsapi.FsStats{}, &statsapi.FsStats{}, fmt.Errorf("error"))
-	assert.Error(t, manager.GarbageCollect(ctx, time.Now()))
+	require.Error(t, manager.GarbageCollect(ctx, time.Now()))
 }
 
 func TestGarbageCollectBelowSuccess(t *testing.T) {
@@ -705,7 +705,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 	}
 
 	err := manager.GarbageCollect(ctx, time.Now())
-	assert.Error(t, err)
+	require.Error(t, err)
 
 	// Check that a warning event was sent
 	expectedEvent := "Warning FreeDiskSpaceFailed Insufficient free disk space on the node's image filesystem" +
