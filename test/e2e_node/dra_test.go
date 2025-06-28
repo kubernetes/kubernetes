@@ -27,6 +27,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path"
 	"regexp"
@@ -453,6 +454,49 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				kubeletplugin.PluginDataDirectoryPath(kubeletplugin.KubeletRegistryDir),
 				kubeletplugin.PluginSocket(driverName+"-common.sock"),
 			),
+		)
+
+		failOnClosedListener := func(
+			ctx context.Context,
+			service func(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string, opts ...kubeletplugin.Option) *testdriver.ExamplePlugin,
+			listenerOptionFun func(listen func(ctx context.Context, path string) (net.Listener, error)) kubeletplugin.Option,
+		) {
+			ginkgo.By("create a closed listener")
+			getListener := func(ctx context.Context, socketPath string) (net.Listener, error) {
+				// Create a closed listener to make the grpc.Server.Serve() fail.
+				listener, err := net.Listen("unix", socketPath)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create listener: %w", err)
+				}
+				if err := listener.Close(); err != nil {
+					return nil, fmt.Errorf("failed to close listener: %w", err)
+				}
+				return listener, nil
+			}
+
+			errorChannel := make(chan error, 1)
+			defer close(errorChannel)
+
+			ginkgo.By("start service")
+			service(
+				ctx,
+				f.ClientSet,
+				getNodeName(ctx, f),
+				driverName,
+				listenerOptionFun(getListener),
+				kubeletplugin.ErrorChannel(errorChannel),
+			)
+
+			ginkgo.By("wait for error on the error channel")
+			expectedErrorRegexp := "gRPC server failed to serve: accept unix .*: use of closed network connection"
+			gomega.Eventually(errorChannel).WithTimeout(time.Second * 20).Should(gomega.Receive(
+				gomega.MatchError(gomega.MatchRegexp(expectedErrorRegexp)),
+			))
+		}
+		ginkgo.DescribeTable("must report gRPC serving error",
+			failOnClosedListener,
+			ginkgo.Entry("registrar", newRegistrar, kubeletplugin.RegistrarListener),
+			ginkgo.Entry("plugin", newDRAService, kubeletplugin.PluginListener),
 		)
 	})
 
