@@ -34,7 +34,7 @@ func TestNodeUnschedulable(t *testing.T) {
 		name       string
 		pod        *v1.Pod
 		node       *v1.Node
-		wantStatus *framework.Status
+		wantStatus *fwk.Status
 	}{
 		{
 			name: "Does not schedule pod to unschedulable node (node.Spec.Unschedulable==true)",
@@ -44,7 +44,7 @@ func TestNodeUnschedulable(t *testing.T) {
 					Unschedulable: true,
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonUnschedulable),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonUnschedulable),
 		},
 		{
 			name: "Schedule pod to normal node",

@@ -46,7 +46,7 @@ func (pl *SchedulingGates) Name() string {
 	return Name
 }
 
-func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
 	if len(p.Spec.SchedulingGates) == 0 {
 		return nil
 	}
@@ -54,7 +54,7 @@ func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *framework
 	for _, gate := range p.Spec.SchedulingGates {
 		gates = append(gates, gate.Name)
 	}
-	return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for scheduling gates: %v", gates))
+	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("waiting for scheduling gates: %v", gates))
 }
 
 // EventsToRegister returns the possible events that may make a Pod

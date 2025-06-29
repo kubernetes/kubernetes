@@ -100,8 +100,8 @@ func TestSingleZone(t *testing.T) {
 		name                string
 		Pod                 *v1.Pod
 		Node                *v1.Node
-		wantPreFilterStatus *framework.Status
-		wantFilterStatus    *framework.Status
+		wantPreFilterStatus *fwk.Status
+		wantFilterStatus    *fwk.Status
 	}{
 		{
 			name: "pod without volume",
@@ -112,7 +112,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-a"},
 				},
 			},
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "node without labels",
@@ -152,7 +152,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaRegion: "no_us-west1", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "beta zone label doesn't match",
@@ -163,7 +163,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "no_us-west1-a", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "zone label matched",
@@ -194,7 +194,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelTopologyRegion: "no_us-west1", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "zone label doesn't match",
@@ -205,7 +205,7 @@ func TestSingleZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelTopologyZone: "no_us-west1-a", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "pv with zone and region, node with only zone",
@@ -218,7 +218,7 @@ func TestSingleZone(t *testing.T) {
 					},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "pv with zone,node with beta zone",
@@ -231,7 +231,7 @@ func TestSingleZone(t *testing.T) {
 					},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "pv with beta label,node with ga label, matched",
@@ -256,7 +256,7 @@ func TestSingleZone(t *testing.T) {
 					},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 	}
 
@@ -337,8 +337,8 @@ func TestMultiZone(t *testing.T) {
 		name                string
 		Pod                 *v1.Pod
 		Node                *v1.Node
-		wantPreFilterStatus *framework.Status
-		wantFilterStatus    *framework.Status
+		wantPreFilterStatus *fwk.Status
+		wantFilterStatus    *fwk.Status
 	}{
 		{
 			name: "node without labels",
@@ -368,7 +368,7 @@ func TestMultiZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 		{
 			name: "zone label matched",
@@ -389,7 +389,7 @@ func TestMultiZone(t *testing.T) {
 					Labels: map[string]string{v1.LabelTopologyZone: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict),
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict),
 		},
 	}
 
@@ -478,8 +478,8 @@ func TestWithBinding(t *testing.T) {
 		name                string
 		Pod                 *v1.Pod
 		Node                *v1.Node
-		wantPreFilterStatus *framework.Status
-		wantFilterStatus    *framework.Status
+		wantPreFilterStatus *fwk.Status
+		wantFilterStatus    *fwk.Status
 	}{
 		{
 			name: "label zone failure domain matched",
@@ -490,32 +490,32 @@ func TestWithBinding(t *testing.T) {
 			name: "unbound volume empty storage class",
 			Pod:  createPodWithVolume("pod_1", "PVC_EmptySC"),
 			Node: testNode,
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"PersistentVolumeClaim had no pv name and storageClass name"),
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				"PersistentVolumeClaim had no pv name and storageClass name"),
 		},
 		{
 			name: "unbound volume no storage class",
 			Pod:  createPodWithVolume("pod_1", "PVC_NoSC"),
 			Node: testNode,
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				`storageclasses.storage.k8s.io "Class_0" not found`),
-			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
+			wantFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable,
 				`storageclasses.storage.k8s.io "Class_0" not found`),
 		},
 		{
 			name:                "unbound volume immediate binding mode",
 			Pod:                 createPodWithVolume("pod_1", "PVC_ImmediateSC"),
 			Node:                testNode,
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
-			wantFilterStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
+			wantFilterStatus:    fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "VolumeBindingMode not set for StorageClass \"Class_Immediate\""),
 		},
 		{
 			name:                "unbound volume wait binding mode",
 			Pod:                 createPodWithVolume("pod_1", "PVC_WaitSC"),
 			Node:                testNode,
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 	}
 

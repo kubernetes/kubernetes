@@ -100,11 +100,11 @@ func TestVolumeBinding(t *testing.T) {
 		fts                     feature.Features
 		args                    *config.VolumeBindingArgs
 		wantPreFilterResult     *framework.PreFilterResult
-		wantPreFilterStatus     *framework.Status
+		wantPreFilterStatus     *fwk.Status
 		wantStateAfterPreFilter *stateData
-		wantFilterStatus        []*framework.Status
+		wantFilterStatus        []*fwk.Status
 		wantScores              []int64
-		wantPreScoreStatus      *framework.Status
+		wantPreScoreStatus      *fwk.Status
 	}{
 		{
 			name: "pod has not pvcs",
@@ -112,11 +112,11 @@ func TestVolumeBinding(t *testing.T) {
 			nodes: []*v1.Node{
 				makeNode("node-a").Node,
 			},
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
-			wantFilterStatus: []*framework.Status{
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
+			wantFilterStatus: []*fwk.Status{
 				nil,
 			},
-			wantPreScoreStatus: framework.NewStatus(framework.Skip),
+			wantPreScoreStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "all bound",
@@ -140,10 +140,10 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
+			wantFilterStatus: []*fwk.Status{
 				nil,
 			},
-			wantPreScoreStatus: framework.NewStatus(framework.Skip),
+			wantPreScoreStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "PVC does not exist",
@@ -152,8 +152,8 @@ func TestVolumeBinding(t *testing.T) {
 				makeNode("node-a").Node,
 			},
 			pvcs:                []*v1.PersistentVolumeClaim{},
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-a" not found`),
-			wantFilterStatus: []*framework.Status{
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-a" not found`),
+			wantFilterStatus: []*fwk.Status{
 				nil,
 			},
 			wantScores: []int64{
@@ -169,8 +169,8 @@ func TestVolumeBinding(t *testing.T) {
 			pvcs: []*v1.PersistentVolumeClaim{
 				makePVC("pvc-a", waitSC.Name).withBoundPV("pv-a").PersistentVolumeClaim,
 			},
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-b" not found`),
-			wantFilterStatus: []*framework.Status{
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-b" not found`),
+			wantFilterStatus: []*fwk.Status{
 				nil,
 			},
 			wantScores: []int64{
@@ -186,8 +186,8 @@ func TestVolumeBinding(t *testing.T) {
 			pvcs: []*v1.PersistentVolumeClaim{
 				makePVC("pvc-a", immediateSC.Name).PersistentVolumeClaim,
 			},
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "pod has unbound immediate PersistentVolumeClaims"),
-			wantFilterStatus: []*framework.Status{
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "pod has unbound immediate PersistentVolumeClaims"),
+			wantFilterStatus: []*fwk.Status{
 				nil,
 			},
 			wantScores: []int64{
@@ -213,10 +213,10 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, string(ErrReasonBindConflict)),
+			wantFilterStatus: []*fwk.Status{
+				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, string(ErrReasonBindConflict)),
 			},
-			wantPreScoreStatus: framework.NewStatus(framework.Skip),
+			wantPreScoreStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "bound and unbound unsatisfied",
@@ -251,10 +251,10 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, string(ErrReasonNodeConflict), string(ErrReasonBindConflict)),
+			wantFilterStatus: []*fwk.Status{
+				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, string(ErrReasonNodeConflict), string(ErrReasonBindConflict)),
 			},
-			wantPreScoreStatus: framework.NewStatus(framework.Skip),
+			wantPreScoreStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "pv not found",
@@ -276,10 +276,10 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) unavailable due to one or more pvc(s) bound to non-existent pv(s)`),
+			wantFilterStatus: []*fwk.Status{
+				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `node(s) unavailable due to one or more pvc(s) bound to non-existent pv(s)`),
 			},
-			wantPreScoreStatus: framework.NewStatus(framework.Skip),
+			wantPreScoreStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "pv not found claim lost",
@@ -290,8 +290,8 @@ func TestVolumeBinding(t *testing.T) {
 			pvcs: []*v1.PersistentVolumeClaim{
 				makePVC("pvc-a", waitSC.Name).withBoundPV("pv-a").withPhase(v1.ClaimLost).PersistentVolumeClaim,
 			},
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-a" bound to non-existent persistentvolume "pv-a"`),
-			wantFilterStatus: []*framework.Status{
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-a" bound to non-existent persistentvolume "pv-a"`),
+			wantFilterStatus: []*fwk.Status{
 				nil,
 			},
 			wantScores: []int64{
@@ -360,10 +360,10 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
+			wantFilterStatus: []*fwk.Status{
 				nil,
 				nil,
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
+				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
 			},
 			wantScores: []int64{
 				25,
@@ -469,10 +469,10 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
+			wantFilterStatus: []*fwk.Status{
 				nil,
 				nil,
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
+				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
 			},
 			wantScores: []int64{
 				38,
@@ -581,13 +581,13 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
+			wantFilterStatus: []*fwk.Status{
 				nil,
 				nil,
 				nil,
 				nil,
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
+				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
+				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
 			},
 			wantScores: []int64{
 				25,
@@ -717,13 +717,13 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
+			wantFilterStatus: []*fwk.Status{
 				nil,
 				nil,
 				nil,
 				nil,
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
+				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
+				fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `node(s) didn't find available persistent volumes to bind`),
 			},
 			wantScores: []int64{
 				15,
@@ -764,7 +764,7 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
+			wantFilterStatus: []*fwk.Status{
 				nil,
 				nil,
 				nil,
@@ -837,7 +837,7 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
+			wantFilterStatus: []*fwk.Status{
 				nil,
 				nil,
 				nil,
@@ -876,7 +876,7 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
+			wantFilterStatus: []*fwk.Status{
 				nil,
 			},
 			wantScores: []int64{
@@ -913,7 +913,7 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
+			wantFilterStatus: []*fwk.Status{
 				nil,
 				nil,
 				nil,
@@ -967,7 +967,7 @@ func TestVolumeBinding(t *testing.T) {
 				},
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
-			wantFilterStatus: []*framework.Status{
+			wantFilterStatus: []*fwk.Status{
 				nil,
 				nil,
 				nil,

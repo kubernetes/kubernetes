@@ -34,7 +34,7 @@ func TestPreEnqueue(t *testing.T) {
 	tests := []struct {
 		name string
 		pod  *v1.Pod
-		want *framework.Status
+		want *fwk.Status
 	}{
 		{
 			name: "pod does not carry scheduling gates",
@@ -44,7 +44,7 @@ func TestPreEnqueue(t *testing.T) {
 		{
 			name: "pod carries scheduling gates",
 			pod:  st.MakePod().Name("p").SchedulingGates([]string{"foo", "bar"}).Obj(),
-			want: framework.NewStatus(framework.UnschedulableAndUnresolvable, "waiting for scheduling gates: [foo bar]"),
+			want: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for scheduling gates: [foo bar]"),
 		},
 	}
 
