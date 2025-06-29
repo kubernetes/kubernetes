@@ -111,7 +111,9 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 	}
 
 	informer = NewFilteredMetadataInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
-	informer.Informer().SetTransform(f.transform)
+	if !informer.Informer().HasTransform() {
+		informer.Informer().SetTransform(f.transform)
+	}
 	f.informers[key] = informer
 
 	return informer

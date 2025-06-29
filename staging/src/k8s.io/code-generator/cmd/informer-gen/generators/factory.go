@@ -262,7 +262,9 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
   }
 
   informer = newFunc(f.client, resyncPeriod)
-  informer.SetTransform(f.transform)
+  if !informer.HasTransform() {
+    informer.SetTransform(f.transform)
+  }
   f.informers[informerType] = informer
 
   return informer
