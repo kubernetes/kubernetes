@@ -1004,10 +1004,8 @@ func TestGetFeaturesAndVerifyCleanup(t *testing.T) {
 						t.Fatalf("expected error message to not contain %q, got %q", msg, err.Error())
 					}
 				}
-			} else {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}
