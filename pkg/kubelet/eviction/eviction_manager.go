@@ -603,30 +603,34 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 }
 
 func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string, condition *v1.PodCondition) bool {
-	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
-	// do not evict such pods. Static pods are not re-admitted after evictions.
-	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if kubelettypes.IsCriticalPod(pod) {
-		klog.ErrorS(nil, "Eviction manager: cannot evict a critical pod", "pod", klog.KObj(pod))
-		return false
-	}
-	// record that we are evicting the pod
-	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
-	// this is a blocking call and should only return when the pod and its containers are killed.
-	klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
-	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
-		status.Phase = v1.PodFailed
-		status.Reason = Reason
-		status.Message = evictMsg
-		if condition != nil {
-			condition.ObservedGeneration = podutil.CalculatePodConditionObservedGeneration(status, pod.Generation, v1.DisruptionTarget)
-			podutil.UpdatePodCondition(status, condition)
-		}
-	})
-	if err != nil {
-		klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
-	} else {
-		klog.InfoS("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pod))
-	}
-	return true
+    // If the pod is marked as critical and static, and support for critical pod annotations is enabled,
+    // do not evict such pods. Static pods are not re-admitted after evictions.
+    // https://github.com/kubernetes/kubernetes/issues/40573 has more details.
+    if kubelettypes.IsCriticalPod(pod) {
+        klog.ErrorS(nil, "Eviction manager: cannot evict a critical pod", "pod", klog.KObj(pod))
+        return false
+    }
+    // record that we are evicting the pod
+    m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
+    // Always record a node-level event as a fallback for visibility
+    if m.nodeRef != nil {
+        m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, Reason, "Evicted pod %s: %s", pod.Name, evictMsg)
+    }
+    // this is a blocking call and should only return when the pod and its containers are killed.
+    klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
+    err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
+        status.Phase = v1.PodFailed
+        status.Reason = Reason
+        status.Message = evictMsg
+        if condition != nil {
+            condition.ObservedGeneration = podutil.CalculatePodConditionObservedGeneration(status, pod.Generation, v1.DisruptionTarget)
+            podutil.UpdatePodCondition(status, condition)
+        }
+    })
+    if err != nil {
+        klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
+    } else {
+        klog.InfoS("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pod))
+    }
+    return true
 }
