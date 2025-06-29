@@ -64,7 +64,7 @@ func TestAPIResourcesValidate(t *testing.T) {
 		{
 			name: "invalid output",
 			optionSetupFn: func(o *APIResourceOptions) {
-				o.Output = "foo"
+				*o.PrintFlags.OutputFormat = "foo"
 			},
 			expectedError: "--output foo is not available",
 		},
@@ -299,6 +299,121 @@ foos     f,fo         v1             false        Foo
 bazzes   b            somegroup/v1   true         Baz
 `,
 			expectedInvalidations: 0,
+		},
+		{
+			name: "json",
+			commandSetupFn: func(cmd *cobra.Command) {
+				cmd.Flags().Set("output", "json")
+			},
+			expectedOutput: `{
+    "kind": "APIResourceList",
+    "apiVersion": "v1",
+    "groupVersion": "",
+    "resources": [
+        {
+            "name": "foos",
+            "singularName": "",
+            "namespaced": false,
+            "version": "v1",
+            "kind": "Foo",
+            "verbs": [
+                "get",
+                "list"
+            ],
+            "shortNames": [
+                "f",
+                "fo"
+            ],
+            "categories": [
+                "some-category"
+            ]
+        },
+        {
+            "name": "bars",
+            "singularName": "",
+            "namespaced": true,
+            "version": "v1",
+            "kind": "Bar",
+            "verbs": [
+                "get",
+                "list",
+                "create"
+            ]
+        },
+        {
+            "name": "bazzes",
+            "singularName": "",
+            "namespaced": true,
+            "group": "somegroup",
+            "version": "v1",
+            "kind": "Baz",
+            "verbs": [
+                "get",
+                "list",
+                "create",
+                "delete"
+            ],
+            "shortNames": [
+                "b"
+            ],
+            "categories": [
+                "some-category",
+                "another-category"
+            ]
+        }
+    ]
+}
+`,
+			expectedInvalidations: 1,
+		},
+		{
+			name: "yaml",
+			commandSetupFn: func(cmd *cobra.Command) {
+				cmd.Flags().Set("output", "yaml")
+			},
+			expectedOutput: `apiVersion: v1
+groupVersion: ""
+kind: APIResourceList
+resources:
+- categories:
+  - some-category
+  kind: Foo
+  name: foos
+  namespaced: false
+  shortNames:
+  - f
+  - fo
+  singularName: ""
+  verbs:
+  - get
+  - list
+  version: v1
+- kind: Bar
+  name: bars
+  namespaced: true
+  singularName: ""
+  verbs:
+  - get
+  - list
+  - create
+  version: v1
+- categories:
+  - some-category
+  - another-category
+  kind: Baz
+  name: bazzes
+  namespaced: true
+  shortNames:
+  - b
+  singularName: ""
+  verbs:
+  - get
+  - list
+  - create
+  - delete
+  version: v1
+`,
+			expectedInvalidations: 1,
 		},
 	}
 
