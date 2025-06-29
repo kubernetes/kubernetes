@@ -36,7 +36,7 @@ Up: %s
 Go version: %s
 Binary version: %v
 Emulation version: %v
-`
+%s`
 
 const wantTmplWithoutEmulation = `
 %s statusz
@@ -46,8 +46,7 @@ Started: %v
 Up: %s
 Go version: %s
 Binary version: %v
-
-`
+%s`
 
 func TestStatusz(t *testing.T) {
 	delimiters = []string{":"}
@@ -90,6 +89,7 @@ func TestStatusz(t *testing.T) {
 				fakeGoVersion,
 				fakeBinaryVersion,
 				fakeEmulationVersion,
+				"",
 			),
 		},
 		{
@@ -110,6 +110,35 @@ func TestStatusz(t *testing.T) {
 				fakeUptime,
 				fakeGoVersion,
 				fakeBinaryVersion,
+				"\n",
+			),
+		},
+		{
+			name:          "kube-scheduler with useful links",
+			componentName: "kube-scheduler",
+			reqHeader:     "text/plain; charset=utf-8",
+			registry: fakeRegistry{
+				startTime:    fakeStartTime,
+				goVer:        fakeGoVersion,
+				binaryVer:    fakeBinaryVersion,
+				emulationVer: fakeEmulationVersion,
+			},
+			wantStatusCode: http.StatusOK,
+			wantBody: fmt.Sprintf(
+				wantTmpl,
+				"kube-scheduler",
+				fakeStartTime.Format(time.UnixDate),
+				fakeUptime,
+				fakeGoVersion,
+				fakeBinaryVersion,
+				fakeEmulationVersion,
+				`
+Useful Endpoints:
+----------------
+"healthz": "/healthz",
+"livez": "/livez",
+"readyz": "/readyz",
+"metrics": "/metrics"`,
 			),
 		},
 	}

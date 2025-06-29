@@ -59,7 +59,7 @@ func handleStatusz(componentName string, reg statuszRegistry) http.HandlerFunc {
 		}
 
 		fmt.Fprintf(w, headerFmt, componentName)
-		data, err := populateStatuszData(reg)
+		data, err := populateStatuszData(componentName, reg)
 		if err != nil {
 			klog.Errorf("error while populating statusz data: %v", err)
 			http.Error(w, "error while populating statusz data", http.StatusInternalServerError)
@@ -71,7 +71,7 @@ func handleStatusz(componentName string, reg statuszRegistry) http.HandlerFunc {
 	}
 }
 
-func populateStatuszData(reg statuszRegistry) (string, error) {
+func populateStatuszData(componentName string, reg statuszRegistry) (string, error) {
 	randomIndex := rand.Intn(len(delimiters))
 	delim := html.EscapeString(delimiters[randomIndex])
 	startTime := html.EscapeString(reg.processStartTime().Format(time.UnixDate))
@@ -91,6 +91,22 @@ Go version%[1]s %[4]s
 Binary version%[1]s %[5]s
 %[6]s
 `, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion)
+
+	// Add useful links for specific components
+	var usefulLinks string
+	if componentName == "kube-scheduler" {
+		usefulLinks = `
+Useful Endpoints:
+----------------
+"healthz": "/healthz",
+"livez": "/livez",
+"readyz": "/readyz",
+"metrics": "/metrics"`
+	}
+
+	if usefulLinks != "" {
+		status += usefulLinks
+	}
 
 	return status, nil
 }
