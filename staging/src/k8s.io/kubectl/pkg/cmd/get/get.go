@@ -182,7 +182,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().BoolVar(&o.OutputWatchEvents, "output-watch-events", o.OutputWatchEvents, "Output watch event objects when --watch or --watch-only is used. Existing objects are output as initial ADDED events.")
-	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
+	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If set to true, suppresses NotFound error for object(s) that do not exist and returns exit code 0. Using this flag with commands that query for collections of resources has no effect on the exit code.")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	addServerPrintColumnFlags(cmd, o)
@@ -563,12 +563,21 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		printer.PrintObj(info.Object, w)
 	}
 	w.Flush()
-	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
-		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
-		if allResourcesNamespaced {
-			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+	if trackingWriter.Written == 0 && len(allErrs) == 0 {
+		if o.IgnoreNotFound {
+			// Output an additional warning states that --ignore-not-found has nothing to do with the error code.
+			fmt.Fprintln(o.ErrOut, "warning: Error message suppressed. Removing --ignore-not-found won't alter the exit code as the operation is considered successful by the HTTP status. "+ //nolint:errcheck
+				"See `kubectl get -h` for details of the flags.")
 		} else {
-			fmt.Fprintln(o.ErrOut, "No resources found")
+			// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
+			if allResourcesNamespaced {
+				fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace) //nolint:errcheck
+			} else {
+				fmt.Fprintln(o.ErrOut, "No resources found.") //nolint:errcheck
+			}
+			// Output an additional warning states that --ignore-not-found has nothing to do with the error code.
+			fmt.Fprintln(o.ErrOut, "warning: Setting --ignore-not-found only suppresses error message above; it won't alter the exit code as the operation is considered successful by the HTTP status. "+ //nolint:errcheck
+				"See \"kubectl get -h\" for details of the flags.")
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)
@@ -623,6 +632,11 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 	}
 	infos, err := r.Infos()
 	if err != nil {
+		// Ignore "NotFound" error when ignore-not-found is set to true
+		if apierrors.IsNotFound(err) && o.IgnoreNotFound {
+			r.IgnoreErrors(apierrors.IsNotFound)
+			return nil
+		}
 		return err
 	}
 	if multipleGVKsRequested(infos) {
