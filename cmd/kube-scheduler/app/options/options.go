@@ -244,7 +244,7 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 	// Build kubeconfig first to so that if it fails, it doesn't cause leaking
 	// goroutines (started from initializing secure serving - which underneath
 	// creates a queue which in its constructor starts a goroutine).
-	kubeConfig, err := createKubeConfig(c.ComponentConfig.ClientConnection, o.Master)
+	kubeConfig, err := createKubeConfig(c.ComponentConfig.ClientConnection, o.Master, c.ComponentGlobalsRegistry)
 	if err != nil {
 		return err
 	}
@@ -305,6 +305,7 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	}
 
 	c := &schedulerappconfig.Config{}
+	c.ComponentGlobalsRegistry = o.ComponentGlobalsRegistry
 	if err := o.ApplyTo(logger, c); err != nil {
 		return nil, err
 	}
@@ -337,7 +338,6 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	dynClient := dynamic.NewForConfigOrDie(c.KubeConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
 	c.LeaderElection = leaderElectionConfig
-	c.ComponentGlobalsRegistry = o.ComponentGlobalsRegistry
 
 	return c, nil
 }
@@ -378,7 +378,7 @@ func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfigura
 
 // createKubeConfig creates a kubeConfig from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (*restclient.Config, error) {
+func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string, componentGlobalRegistry basecompatibility.ComponentGlobalsRegistry) (*restclient.Config, error) {
 	kubeConfig, err := clientcmd.BuildConfigFromFlags(masterOverride, config.Kubeconfig)
 	if err != nil {
 		return nil, err
@@ -389,7 +389,7 @@ func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, 
 	kubeConfig.ContentType = config.ContentType
 	kubeConfig.QPS = config.QPS
 	kubeConfig.Burst = int(config.Burst)
-
+	kubeConfig.VersionInfo = componentGlobalRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent)
 	return kubeConfig, nil
 }
 
