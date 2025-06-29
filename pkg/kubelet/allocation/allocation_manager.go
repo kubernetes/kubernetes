@@ -407,29 +407,31 @@ func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, strin
 // Returns true if the resize can proceed; returns a reason and message
 // otherwise.
 func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
-	// TODO: Move this logic into a PodAdmitHandler by introducing an operation field to
-	// lifecycle.PodAdmitAttributes, and combine canResizePod with canAdmitPod.
-	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		if m.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
+	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
+	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
+
+	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
+		cpuAllocated := resource.GetResourceAllocated(pod, v1.ResourceCPU)
+		needsCpuResize := cpuRequests > cpuAllocated
+		if m.containerManager.GetNodeConfig().CPUManagerPolicy == "static" && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) && needsCpuResize {
 			msg := "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy"
 			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
 			return false, v1.PodReasonInfeasible, msg
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
-			if m.containerManager.GetNodeConfig().MemoryManagerPolicy == "Static" {
-				msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
-				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
-				return false, v1.PodReasonInfeasible, msg
 
-			}
+		memAllocated := resource.GetResourceAllocated(pod, v1.ResourceMemory)
+		needsMemoryResize := memRequests > memAllocated
+		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) && m.containerManager.GetNodeConfig().MemoryManagerPolicy == "Static" && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingStaticMemoryPolicy) && needsMemoryResize {
+			msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
+			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
+			return false, v1.PodReasonInfeasible, msg
+
 		}
 	}
 
 	allocatable := m.containerManager.GetNodeAllocatableAbsolute()
 	cpuAvailable := allocatable.Cpu().MilliValue()
 	memAvailable := allocatable.Memory().Value()
-	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
-	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
 	if cpuRequests > cpuAvailable || memRequests > memAvailable {
 		var msg string
 		if memRequests > memAvailable {

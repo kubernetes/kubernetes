@@ -106,6 +106,8 @@ type Reader interface {
 	GetMachineState() NUMANodeMap
 	// GetMemoryBlocks returns memory assignments of a container
 	GetMemoryBlocks(podUID string, containerName string) []Block
+	// GetMemoryBlocks returns the promised memory assignments of a container.
+	GetPromisedMemoryBlocks(podUID string, containerName string) []Block
 	// GetMemoryAssignments returns ContainerMemoryAssignments
 	GetMemoryAssignments() ContainerMemoryAssignments
 }
@@ -115,6 +117,8 @@ type writer interface {
 	SetMachineState(memoryMap NUMANodeMap)
 	// SetMemoryBlocks stores memory assignments of a container
 	SetMemoryBlocks(podUID string, containerName string, blocks []Block)
+	// SetPromisedMemoryBlocks stores memory assignments of a container during its first assignment (before potential resize requests).
+	SetPromisedMemoryBlocks(podUID string, containerName string, blocks []Block)
 	// SetMemoryAssignments sets ContainerMemoryAssignments by using the passed parameter
 	SetMemoryAssignments(assignments ContainerMemoryAssignments)
 	// Delete deletes corresponding Blocks from ContainerMemoryAssignments
