@@ -21793,6 +21793,7 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.VolumeMounts[*]",
 		"HostAliases",
 		"Hostname",
+		"HostnameOverride",
 		"ImagePullSecrets",
 		"InitContainers[*].Args",
 		"InitContainers[*].Command",
@@ -24997,6 +24998,90 @@ func TestValidateHostUsers(t *testing.T) {
 			}
 			if tc.success && len(allErrs) != 0 {
 				t.Errorf("Unexpected error(s): %v", allErrs)
+			}
+		})
+	}
+}
+
+func TestValidatePodHostName(t *testing.T) {
+	trueVal := true
+	falseVal := false
+	tests := []struct {
+		name     string
+		spec     core.PodSpec
+		hasError bool
+	}{
+		{
+			name: "SetHostnameAsFQDN=true and HostnameOverride is set should error",
+			spec: core.PodSpec{
+				SetHostnameAsFQDN: &trueVal,
+				HostnameOverride:  ptr.To("custom-host"),
+			},
+			hasError: true,
+		},
+		{
+			name: "SetHostnameAsFQDN=true and HostnameOverride is nil should not error",
+			spec: core.PodSpec{
+				SetHostnameAsFQDN: &trueVal,
+				HostnameOverride:  nil,
+			},
+			hasError: false,
+		},
+		{
+			name: "SetHostnameAsFQDN=false and HostnameOverride is set should not error",
+			spec: core.PodSpec{
+				SetHostnameAsFQDN: &falseVal,
+				HostnameOverride:  ptr.To("custom-host"),
+			},
+			hasError: false,
+		},
+		{
+			name: "SetHostnameAsFQDN is nil and HostnameOverride is set should not error",
+			spec: core.PodSpec{
+				SetHostnameAsFQDN: nil,
+				HostnameOverride:  ptr.To("custom-host"),
+			},
+			hasError: false,
+		},
+		{
+			name: "SetHostnameAsFQDN is nil, HostNetwork=true and HostnameOverride is set should error",
+			spec: core.PodSpec{
+				SetHostnameAsFQDN: nil,
+				HostnameOverride:  ptr.To("custom-host"),
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+				},
+			},
+			hasError: true,
+		},
+		{
+			name: "SetHostnameAsFQDN=false, HostNetwork=true and HostnameOverride is set should error",
+			spec: core.PodSpec{
+				SetHostnameAsFQDN: &falseVal,
+				HostnameOverride:  ptr.To("custom-host"),
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+				},
+			},
+			hasError: true,
+		},
+		{
+			name: "Set HostnameOverride, but not RFC 1123 DNS subdomain should error",
+			spec: core.PodSpec{
+				HostnameOverride: ptr.To("Not-RFC1123"),
+			},
+			hasError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validatePodHostName(&tt.spec, field.NewPath("spec"))
+			if tt.hasError && len(errs) == 0 {
+				t.Errorf("expected error but got none")
+			}
+			if !tt.hasError && len(errs) > 0 {
+				t.Errorf("expected no error but got: %v", errs)
 			}
 		})
 	}

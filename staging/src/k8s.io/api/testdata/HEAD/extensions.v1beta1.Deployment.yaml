@@ -652,6 +652,7 @@ spec:
       hostPID: true
       hostUsers: true
       hostname: hostnameValue
+      hostnameOverride: hostnameOverrideValue
       imagePullSecrets:
       - name: nameValue
       initContainers:
