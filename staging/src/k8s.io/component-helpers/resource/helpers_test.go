@@ -1554,6 +1554,58 @@ func TestIsPodLevelResourcesSet(t *testing.T) {
 
 }
 
+func TestIsPodLevelLimitsSet(t *testing.T) {
+	testCases := []struct {
+		name         string
+		podResources *v1.ResourceRequirements
+		expected     bool
+	}{
+		{
+			name:     "nil resources struct",
+			expected: false,
+		},
+		{
+			name:         "empty resources struct",
+			podResources: &v1.ResourceRequirements{},
+			expected:     false,
+		},
+		{
+			name: "only resource requests set",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+			expected: false,
+		},
+		{
+			name: "only unsupported resource limits set",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Mi")},
+			},
+			expected: false,
+		},
+		{
+			name: "unsupported and suported resources limits set",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("1Mi"),
+					v1.ResourceCPU:              resource.MustParse("1m"),
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testPod := &v1.Pod{Spec: v1.PodSpec{Resources: tc.podResources}}
+			if got := IsPodLevelLimitsSet(testPod); got != tc.expected {
+				t.Errorf("got=%t, want=%t", got, tc.expected)
+			}
+		})
+	}
+
+}
+
 func TestPodLevelResourceRequests(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 	testCases := []struct {
