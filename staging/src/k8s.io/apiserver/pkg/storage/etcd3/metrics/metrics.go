@@ -284,6 +284,7 @@ func (c *monitorCollector) DescribeWithStability(ch chan<- *compbasemetrics.Desc
 func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric) {
 	monitors, err := c.getGetter()()
 	if err != nil {
+		klog.ErrorS(err, "Failed to get monitors")
 		return
 	}
 
@@ -296,7 +297,7 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 		cancel()
 		m.Close()
 		if err != nil {
-			klog.InfoS("Failed to get storage metrics", "storage_cluster_id", storageClusterID, "err", err)
+			klog.ErrorS(err, "Failed to get storage metrics", "storage_cluster_id", storageClusterID)
 			continue
 		}
 
