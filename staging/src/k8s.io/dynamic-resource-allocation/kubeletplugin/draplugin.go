@@ -274,7 +274,7 @@ func PluginSocket(name string) Option {
 	}
 }
 
-// PluginListener configures how to create the registrar socket.
+// PluginListener configures how to create the DRA service socket.
 // The default is to remove the file if it exists and to then
 // create a socket.
 //
