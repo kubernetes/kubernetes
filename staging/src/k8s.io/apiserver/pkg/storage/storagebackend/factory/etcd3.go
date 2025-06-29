@@ -274,6 +274,9 @@ func (t *etcd3ProberMonitor) Monitor(ctx context.Context) (metrics.StorageMetric
 	if t.closed {
 		return metrics.StorageMetrics{}, fmt.Errorf("closed")
 	}
+	if len(t.endpoints) == 0 {
+		return metrics.StorageMetrics{}, fmt.Errorf("zero endpoints")
+	}
 	status, err := t.client.Status(ctx, t.endpoints[rand.Int()%len(t.endpoints)])
 	if err != nil {
 		return metrics.StorageMetrics{}, err
