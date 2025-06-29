@@ -404,7 +404,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 	for _, test := range tests {
 		tc := test
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := context.TODO()
 			provider := summaryprovidertest.NewMockSummaryProvider(t)
 			provider.EXPECT().GetCPUAndMemoryStats(ctx).Return(tc.summary, tc.summaryErr).Maybe()
 			collector := NewResourceMetricsCollector(provider)
