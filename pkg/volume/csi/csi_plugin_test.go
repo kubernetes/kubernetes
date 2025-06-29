@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -1266,6 +1267,7 @@ func TestPluginConstructBlockVolumeSpec(t *testing.T) {
 }
 
 func TestValidatePlugin(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := []struct {
 		pluginName string
 		endpoint   string
@@ -1354,7 +1356,7 @@ func TestValidatePlugin(t *testing.T) {
 
 	for _, tc := range testCases {
 		// Arrange & Act
-		err := PluginHandler.ValidatePlugin(tc.pluginName, tc.endpoint, tc.versions)
+		err := PluginHandler.ValidatePlugin(tCtx, tc.pluginName, tc.endpoint, tc.versions)
 
 		// Assert
 		if tc.shouldFail && err == nil {
@@ -1367,6 +1369,7 @@ func TestValidatePlugin(t *testing.T) {
 }
 
 func TestValidatePluginExistingDriver(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := []struct {
 		pluginName1 string
 		endpoint1   string
@@ -1419,7 +1422,7 @@ func TestValidatePluginExistingDriver(t *testing.T) {
 		})
 
 		// Arrange & Act
-		err = PluginHandler.ValidatePlugin(tc.pluginName2, tc.endpoint2, tc.versions2)
+		err = PluginHandler.ValidatePlugin(tCtx, tc.pluginName2, tc.endpoint2, tc.versions2)
 
 		// Assert
 		if tc.shouldFail && err == nil {
