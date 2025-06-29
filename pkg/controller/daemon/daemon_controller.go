@@ -1460,7 +1460,7 @@ func (dsc *DaemonSetsController) syncNodeUpdate(ctx context.Context, nodeName st
 	}
 
 	for _, ds := range dsList {
-		shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(node, ds)
+		shouldRun, _ := NodeShouldRunDaemonPod(node, ds)
 
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
@@ -1469,7 +1469,7 @@ func (dsc *DaemonSetsController) syncNodeUpdate(ctx context.Context, nodeName st
 		daemonPods := podsByDS[dsKey]
 		scheduled := len(daemonPods) > 0
 
-		if (shouldRun && !scheduled) || (!shouldContinueRunning && scheduled) {
+		if shouldRun || scheduled {
 			dsc.enqueueDaemonSet(ds)
 		}
 	}
