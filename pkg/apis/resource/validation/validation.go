@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -635,71 +636,235 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			"exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set"))
 	}
 
-	sharedCounterToCounterNames := gatherSharedCounterCounterNames(spec.SharedCounters)
+	sharedCounterToCounterNames := gatherSharedCounterCounterNames(spec.SharedCounters, spec.Mixins)
+	deviceCounterConsumptionMixinToCounterMap := gatherDeviceCounterConsumptionMixinCounterNames(spec.Mixins)
+	var deviceMixins []resource.DeviceMixin
+	if spec.Mixins != nil {
+		deviceMixins = spec.Mixins.Device
+	}
 	allErrs = append(allErrs, validateSet(spec.Devices, resource.ResourceSliceMaxDevices,
 		func(device resource.Device, fldPath *field.Path) field.ErrorList {
-			return validateDevice(device, fldPath, sharedCounterToCounterNames, spec.PerDeviceNodeSelection)
+			return validateDevice(device, fldPath, sharedCounterToCounterNames, deviceCounterConsumptionMixinToCounterMap, deviceMixins, spec.PerDeviceNodeSelection)
 		},
 		func(device resource.Device) (string, string) {
 			return device.Name, "name"
 		}, fldPath.Child("devices"))...)
 
-	// Size limit for total number of counters in devices enforced here.
+	// Size limit for total number of attributes and capacities in a ResourceSlice enforced here.
+	numAttributesAndCapacities := 0
+	for _, device := range spec.Devices {
+		numAttributesAndCapacities += len(device.Attributes) + len(device.Capacity)
+	}
+	if spec.Mixins != nil {
+		for _, mixin := range spec.Mixins.Device {
+			numAttributesAndCapacities += len(mixin.Attributes) + len(mixin.Capacity)
+		}
+	}
+	if numAttributesAndCapacities > resource.ResourceSliceMaxAttributesAndCapacitiesPerResourceSlice {
+		allErrs = append(allErrs, field.Invalid(fldPath, numAttributesAndCapacities, fmt.Sprintf("the total number of attributes and capacities in devices and mixins must not exceed %d", resource.ResourceSliceMaxAttributesAndCapacitiesPerResourceSlice)))
+	}
+
+	// Size limit for total number of consumed counters across devices and mixins in a ResourceSlice enforced here.
 	numDeviceCounters := 0
 	for _, device := range spec.Devices {
 		for _, c := range device.ConsumesCounters {
 			numDeviceCounters += len(c.Counters)
 		}
 	}
-	if numDeviceCounters > resource.ResourceSliceMaxDeviceCountersPerSlice {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("devices"), numDeviceCounters, fmt.Sprintf("the total number of counters in devices must not exceed %d", resource.ResourceSliceMaxDeviceCountersPerSlice)))
+	if spec.Mixins != nil {
+		for _, mixin := range spec.Mixins.DeviceCounterConsumption {
+			numDeviceCounters += len(mixin.Counters)
+		}
+	}
+	if numDeviceCounters > resource.ResourceSliceMaxConsumedCountersPerResourceSlice {
+		allErrs = append(allErrs, field.Invalid(fldPath, numDeviceCounters, fmt.Sprintf("the total number of consumed counters in devices and mixins must not exceed %d", resource.ResourceSliceMaxConsumedCountersPerResourceSlice)))
 	}
 
-	// Size limit for all shared counters enforced here.
+	// Size limit for all shared counters and counter set mixins enforced here.
 	numCounters := 0
 	for _, set := range spec.SharedCounters {
 		numCounters += len(set.Counters)
 	}
-	if numCounters > resource.ResourceSliceMaxSharedCounters {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("sharedCounters"), numCounters, fmt.Sprintf("the total number of shared counters must not exceed %d", resource.ResourceSliceMaxSharedCounters)))
+	if spec.Mixins != nil {
+		for _, mixin := range spec.Mixins.CounterSet {
+			numCounters += len(mixin.Counters)
+		}
 	}
+	if numCounters > resource.ResourceSliceMaxCountersPerResourceSlice {
+		allErrs = append(allErrs, field.Invalid(fldPath, numCounters, fmt.Sprintf("the total number of counters in shared counters and counter set mixins must not exceed %d", resource.ResourceSliceMaxCountersPerResourceSlice)))
+	}
+
+	counterSetMixinNames := gatherCounterSetMixinNames(spec.Mixins)
 	allErrs = append(allErrs, validateSet(spec.SharedCounters, -1,
-		validateCounterSet,
+		func(counterSet resource.CounterSet, fldPath *field.Path) field.ErrorList {
+			return validateCounterSet(counterSet, fldPath, counterSetMixinNames)
+		},
 		func(counterSet resource.CounterSet) (string, string) {
 			return counterSet.Name, "name"
 		}, fldPath.Child("sharedCounters"))...)
 
+	allErrs = append(allErrs, validateResourceSliceMixins(spec.Mixins, fldPath.Child("mixins"))...)
+
 	return allErrs
 }
 
-func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) field.ErrorList {
+func validateResourceSliceMixins(mixins *resource.ResourceSliceMixins, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if counterSet.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
-	} else {
-		allErrs = append(allErrs, validateCounterName(counterSet.Name, fldPath.Child("name"))...)
+
+	if mixins == nil {
+		return allErrs
 	}
-	if len(counterSet.Counters) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
-	} else {
-		// The size limit is enforced for across all sets by the caller.
-		allErrs = append(allErrs, validateMap(counterSet.Counters, -1, validation.DNS1123LabelMaxLength,
-			validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
-	}
+
+	allErrs = append(allErrs, validateSet(mixins.Device, -1,
+		validateDeviceMixin,
+		func(deviceMixin resource.DeviceMixin) (string, string) {
+			return deviceMixin.Name, "name"
+		}, fldPath.Child("device"))...)
+
+	allErrs = append(allErrs, validateSet(mixins.CounterSet, -1,
+		validateCounterSetMixin,
+		func(counterSetMixin resource.CounterSetMixin) (string, string) {
+			return counterSetMixin.Name, "name"
+		}, fldPath.Child("counterSet"))...)
+
+	allErrs = append(allErrs, validateSet(mixins.DeviceCounterConsumption, -1,
+		validateDeviceCounterConsumptionMixin,
+		func(deviceCounterConsumptionMixin resource.DeviceCounterConsumptionMixin) (string, string) {
+			return deviceCounterConsumptionMixin.Name, "name"
+		}, fldPath.Child("deviceCounterConsumption"))...)
 
 	return allErrs
 }
 
-func gatherSharedCounterCounterNames(sharedCounters []resource.CounterSet) map[string]sets.Set[string] {
+func validateDeviceMixin(deviceMixin resource.DeviceMixin, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDNS1123LabelName(deviceMixin.Name, fldPath.Child("name"))...)
+	allErrs = append(allErrs, validateMap(deviceMixin.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
+	allErrs = append(allErrs, validateMap(deviceMixin.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceCapacity, fldPath.Child("capacity"))...)
+	return allErrs
+}
+
+func validateCounterSetMixin(counterSetMixin resource.CounterSetMixin, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDNS1123LabelName(counterSetMixin.Name, fldPath.Child("name"))...)
+	allErrs = append(allErrs, validateCounters(counterSetMixin.Counters, fldPath.Child("counters"))...)
+	return allErrs
+}
+
+func validateDeviceCounterConsumptionMixin(deviceCounterConsumptionMixin resource.DeviceCounterConsumptionMixin, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDNS1123LabelName(deviceCounterConsumptionMixin.Name, fldPath.Child("name"))...)
+	allErrs = append(allErrs, validateCounters(deviceCounterConsumptionMixin.Counters, fldPath.Child("counters"))...)
+	return allErrs
+}
+
+func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path, counterSetMixinNames sets.Set[string]) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDNS1123LabelName(counterSet.Name, fldPath.Child("name"))...)
+	// The size limit is enforced for across all sets by the caller.
+	if len(counterSet.Counters) == 0 && len(counterSet.Includes) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "at least one of `counters` or `includes` must be specified"))
+	}
+	allErrs = append(allErrs, validateMap(counterSet.Counters, -1, validation.DNS1123LabelMaxLength,
+		validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
+	allErrs = append(allErrs, validateSlice(counterSet.Includes, resource.ResourceSliceMaxIncludes,
+		func(counterSetMixinRef string, fldPath *field.Path) field.ErrorList {
+			return validateCounterSetMixinRef(counterSetMixinRef, fldPath, counterSetMixinNames)
+		}, fldPath.Child("includes"))...)
+	return allErrs
+}
+
+func validateCounterSetMixinRef(counterSetMixinRef string, fldPath *field.Path, counterSetMixinNames sets.Set[string]) field.ErrorList {
+	var allErrs field.ErrorList
+	if !counterSetMixinNames.Has(counterSetMixinRef) {
+		allErrs = append(allErrs, field.Invalid(fldPath, counterSetMixinRef, "must reference a counter set mixin defined in the ResourceSlice"))
+	}
+	return allErrs
+}
+
+func validateCounters(counters map[string]resource.Counter, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(counters) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else {
+		allErrs = append(allErrs, validateMap(counters, -1, validation.DNS1123LabelMaxLength,
+			validateCounterName, validateDeviceCounter, fldPath)...)
+	}
+	return allErrs
+}
+
+func validateDNS1123LabelName(name string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if name == "" {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	} else {
+		allErrs = corevalidation.ValidateDNS1123Label(name, fldPath)
+	}
+	return allErrs
+}
+
+func gatherSharedCounterCounterNames(sharedCounters []resource.CounterSet, mixins *resource.ResourceSliceMixins) map[string]sets.Set[string] {
 	sharedCounterToCounterMap := make(map[string]sets.Set[string])
+	var counterSetMixins []resource.CounterSetMixin
+	if mixins != nil {
+		counterSetMixins = mixins.CounterSet
+	}
 	for _, counterSet := range sharedCounters {
 		counterNames := sets.New[string]()
 		for counterName := range counterSet.Counters {
 			counterNames.Insert(counterName)
 		}
+		// Also include the counters that gets added through mixins.
+		for _, mixinRef := range counterSet.Includes {
+			i := slices.IndexFunc(counterSetMixins, func(mixin resource.CounterSetMixin) bool {
+				return mixin.Name == mixinRef
+			})
+			// Just ignore bad references here. It will be caught by other
+			// validation rules.
+			if i < 0 {
+				continue
+			}
+			for counterName := range counterSetMixins[i].Counters {
+				counterNames.Insert(counterName)
+			}
+		}
 		sharedCounterToCounterMap[counterSet.Name] = counterNames
 	}
 	return sharedCounterToCounterMap
+}
+
+func gatherCounterSetMixinNames(mixins *resource.ResourceSliceMixins) sets.Set[string] {
+	counterSetMixinNames := sets.New[string]()
+	if mixins == nil {
+		return counterSetMixinNames
+	}
+	for _, counterSetMixin := range mixins.CounterSet {
+		counterSetMixinNames.Insert(counterSetMixin.Name)
+	}
+	return counterSetMixinNames
+}
+
+func gatherDeviceMixinNames(deviceMixins []resource.DeviceMixin) sets.Set[string] {
+	deviceMixinNames := sets.New[string]()
+	for _, deviceMixin := range deviceMixins {
+		deviceMixinNames.Insert(deviceMixin.Name)
+	}
+	return deviceMixinNames
+}
+
+func gatherDeviceCounterConsumptionMixinCounterNames(mixins *resource.ResourceSliceMixins) map[string]sets.Set[string] {
+	counterConsumptionMixinToCounterMap := make(map[string]sets.Set[string])
+	if mixins == nil {
+		return counterConsumptionMixinToCounterMap
+	}
+	for _, dcc := range mixins.DeviceCounterConsumption {
+		counterNames := sets.New[string]()
+		for counterName := range dcc.Counters {
+			counterNames.Insert(counterName)
+		}
+		counterConsumptionMixinToCounterMap[dcc.Name] = counterNames
+	}
+	return counterConsumptionMixinToCounterMap
 }
 
 func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field.ErrorList {
@@ -714,47 +879,20 @@ func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field
 	return allErrs
 }
 
-func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterToCounterNames map[string]sets.Set[string], perDeviceNodeSelection *bool) field.ErrorList {
+func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterToCounterNames, deviceCounterConsumptionMixinToCounterMap map[string]sets.Set[string], deviceMixins []resource.DeviceMixin, perDeviceNodeSelection *bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
-	// Warn about exceeding the maximum length only once. If any individual
-	// field is too large, then so is the combination.
-	attributeAndCapacityLength := len(device.Attributes) + len(device.Capacity)
-	if attributeAndCapacityLength > resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
-		allErrs = append(allErrs, field.Invalid(fldPath, attributeAndCapacityLength, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice)))
-	}
-
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
 	allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceCapacity, fldPath.Child("capacity"))...)
 	allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength, validateDeviceTaint, fldPath.Child("taints"))...)
 
 	allErrs = append(allErrs, validateSet(device.ConsumesCounters, -1,
-		validateDeviceCounterConsumption,
+		func(deviceCounterConsumption resource.DeviceCounterConsumption, fldPath *field.Path) field.ErrorList {
+			return validateDeviceCounterConsumption(deviceCounterConsumption, fldPath, deviceCounterConsumptionMixinToCounterMap, sharedCounterToCounterNames)
+		},
 		func(deviceCapacityConsumption resource.DeviceCounterConsumption) (string, string) {
 			return deviceCapacityConsumption.CounterSet, "counterSet"
 		}, fldPath.Child("consumesCounters"))...)
-
-	var countersLength int
-	for _, set := range device.ConsumesCounters {
-		countersLength += len(set.Counters)
-	}
-	if countersLength > resource.ResourceSliceMaxCountersPerDevice {
-		allErrs = append(allErrs, field.Invalid(fldPath, countersLength, fmt.Sprintf("the total number of counters must not exceed %d", resource.ResourceSliceMaxCountersPerDevice)))
-	}
-
-	for i, deviceCounterConsumption := range device.ConsumesCounters {
-		if capacityNames, exists := sharedCounterToCounterNames[deviceCounterConsumption.CounterSet]; exists {
-			for capacityName := range deviceCounterConsumption.Counters {
-				if !capacityNames.Has(string(capacityName)) {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("consumesCounters").Index(i).Child("counters"),
-						capacityName, "must reference a counter defined in the ResourceSlice sharedCounters"))
-				}
-			}
-		} else {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("consumesCounters").Index(i).Child("counterSet"),
-				deviceCounterConsumption.CounterSet, "must reference a counterSet defined in the ResourceSlice sharedCounters"))
-		}
-	}
 
 	if perDeviceNodeSelection != nil && *perDeviceNodeSelection {
 		setFields := make([]string, 0, 3)
@@ -788,21 +926,121 @@ func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterTo
 	} else if (perDeviceNodeSelection == nil || !*perDeviceNodeSelection) && (device.NodeName != nil || device.NodeSelector != nil || device.AllNodes != nil) {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "`nodeName`, `nodeSelector` and `allNodes` can only be set if `perDeviceNodeSelection` is set to true in the ResourceSlice spec"))
 	}
+	deviceMixinNames := gatherDeviceMixinNames(deviceMixins)
+	allErrs = append(allErrs, validateSlice(device.Includes, resource.ResourceSliceMaxIncludes,
+		func(deviceMixinRef string, fldPath *field.Path) field.ErrorList {
+			return validateDeviceMixinRef(deviceMixinRef, fldPath, deviceMixinNames)
+		}, fldPath.Child("includes"))...)
+
+	// Check the total number of attributes and capacities in flattened device.
+	flattenedAttributes, flattenedCapacities := flattenAttributesAndCapacities(device, deviceMixins)
+	numFlattenedAttributesAndCapacities := len(flattenedAttributes) + len(flattenedCapacities)
+	if numFlattenedAttributesAndCapacities > resource.ResourceSliceMaxAttributesAndCapacitiesPerDeviceAfterMixins {
+		allErrs = append(allErrs, field.Invalid(fldPath, numFlattenedAttributesAndCapacities, fmt.Sprintf("the total number of attributes and capacities in a device after mixins have been applied must not exceed %d", resource.ResourceSliceMaxAttributesAndCapacitiesPerDeviceAfterMixins)))
+	}
+
 	return allErrs
 }
 
-func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCounterConsumption, fldPath *field.Path) field.ErrorList {
+func flattenAttributesAndCapacities(device resource.Device, deviceMixins []resource.DeviceMixin) (map[resource.QualifiedName]resource.DeviceAttribute, map[resource.QualifiedName]resource.DeviceCapacity) {
+	if len(device.Includes) == 0 || len(deviceMixins) == 0 {
+		return device.Attributes, device.Capacity
+	}
+
+	attributes := make(map[resource.QualifiedName]resource.DeviceAttribute)
+	capacities := make(map[resource.QualifiedName]resource.DeviceCapacity)
+	for qname, attr := range device.Attributes {
+		attributes[qname] = attr
+	}
+	for qname, cap := range device.Capacity {
+		capacities[qname] = cap
+	}
+	for _, mixinRef := range device.Includes {
+		i := slices.IndexFunc(deviceMixins, func(dm resource.DeviceMixin) bool {
+			return dm.Name == mixinRef
+		})
+		if i < 0 {
+			continue
+		}
+		mixin := deviceMixins[i]
+		for qname, attr := range mixin.Attributes {
+			attributes[qname] = attr
+		}
+		for qname, cap := range mixin.Capacity {
+			capacities[qname] = cap
+		}
+	}
+	return attributes, capacities
+}
+
+func validateDeviceMixinRef(deviceMixinRef string, fldPath *field.Path, deviceMixinNames sets.Set[string]) field.ErrorList {
+	var allErrs field.ErrorList
+	if !deviceMixinNames.Has(deviceMixinRef) {
+		allErrs = append(allErrs, field.Invalid(fldPath, deviceMixinRef, "must reference a device mixin defined in the ResourceSlice"))
+	}
+	return allErrs
+}
+
+func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCounterConsumption, fldPath *field.Path, deviceCounterConsumptionMixinToCounterMap,
+	sharedCounterToCounterNames map[string]sets.Set[string]) field.ErrorList {
 	var allErrs field.ErrorList
 
+	// Make sure a valid CounterSet is referenced.
 	if len(deviceCounterConsumption.CounterSet) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counterSet"), ""))
 	}
-	if len(deviceCounterConsumption.Counters) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
+
+	if len(deviceCounterConsumption.Counters) == 0 && len(deviceCounterConsumption.Includes) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "at least one of `counters` or `includes` must be specified"))
+	}
+
+	// The size limit is enforced for the entire device.
+	allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, -1, validation.DNS1123LabelMaxLength,
+		validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
+
+	countersInCounterSet, found := sharedCounterToCounterNames[deviceCounterConsumption.CounterSet]
+	if !found {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("counterSet"),
+			deviceCounterConsumption.CounterSet, "must reference a counterSet defined in the ResourceSlice sharedCounters"))
 	} else {
-		// The size limit is enforced for the entire device.
-		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, -1, validation.DNS1123LabelMaxLength,
-			validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
+		// Check that all counters consumed actually exists on the referenced CounterSet.
+		for counterName := range deviceCounterConsumption.Counters {
+			if !countersInCounterSet.Has(string(counterName)) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("counters"),
+					counterName, "must reference a counter defined in the ResourceSlice sharedCounters"))
+			}
+		}
+		// Also check that any counters consumed through mixins also exist on the referenced
+		// CounterSet. This can only be checked if a valid counterSet is referenced, so we
+		// handle this here rather than in validateDeviceCounterConsumptionMixinRef. However,
+		// checking that the referenced mixin exists can be done regardless, so that is handled
+		// in validateDeviceCounterConsumptionMixinRef.
+		for i, mixin := range deviceCounterConsumption.Includes {
+			countersInMixin, found := deviceCounterConsumptionMixinToCounterMap[mixin]
+			if !found {
+				continue
+			}
+			// Find all counters that are defined in the mixin, but that doesn't exist in the
+			// CounterSet
+			diff := countersInMixin.Difference(countersInCounterSet)
+			// If there were any, report an error.
+			if diff.Len() > 0 {
+				missingCounters := strings.Join(sets.List(diff), ", ")
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("includes").Index(i), "", fmt.Sprintf("mixin references counters %s that do not exist in counter set %s", missingCounters, deviceCounterConsumption.CounterSet)))
+			}
+		}
+	}
+	allErrs = append(allErrs, validateSlice(deviceCounterConsumption.Includes, resource.ResourceSliceMaxIncludes,
+		func(deviceCounterConsumptionMixinRef string, fldPath *field.Path) field.ErrorList {
+			return validateDeviceCounterConsumptionMixinRef(deviceCounterConsumptionMixinRef, fldPath, deviceCounterConsumptionMixinToCounterMap)
+		}, fldPath.Child("includes"))...)
+	return allErrs
+}
+
+func validateDeviceCounterConsumptionMixinRef(deviceCounterConsumptionMixinRef string, fldPath *field.Path, deviceCounterConsumptionMixinToCounterMap map[string]sets.Set[string]) field.ErrorList {
+	var allErrs field.ErrorList
+	if _, found := deviceCounterConsumptionMixinToCounterMap[deviceCounterConsumptionMixinRef]; !found {
+		allErrs = append(allErrs, field.Invalid(fldPath, deviceCounterConsumptionMixinRef, "must reference a device counter consumption mixin defined in the ResourceSlice"))
 	}
 	return allErrs
 }
