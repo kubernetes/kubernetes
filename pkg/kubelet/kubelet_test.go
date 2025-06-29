@@ -3542,9 +3542,10 @@ func createRemoteRuntimeService(endpoint string, t *testing.T, tp oteltrace.Trac
 func TestNewMainKubeletStandAlone(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tempDir, err := os.MkdirTemp("", "logs")
-	ContainerLogsDir = tempDir
 	assert.NoError(t, err)
-	defer os.RemoveAll(ContainerLogsDir)
+	defer func() {
+		_ = os.RemoveAll(tempDir)
+	}()
 	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
 		SyncFrequency: metav1.Duration{Duration: time.Minute},
 		ConfigMapAndSecretChangeDetectionStrategy: kubeletconfiginternal.WatchChangeDetectionStrategy,
