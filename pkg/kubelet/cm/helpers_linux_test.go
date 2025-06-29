@@ -275,6 +275,25 @@ func TestResourceConfigForPod(t *testing.T) {
 			quotaPeriod:      tunedQuotaPeriod,
 			expected:         &ResourceConfig{CPUShares: &burstablePartialShares},
 		},
+		"besteffort-with-pod-level-resources-enabled": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("", ""),
+						Limits:   getResourceList("", ""),
+					},
+					Containers: []v1.Container{
+						{
+							Resources: getResourceRequirements(getResourceList("", ""), getResourceList("", "")),
+						},
+					},
+				},
+			},
+			podLevelResourcesEnabled: true,
+			enforceCPULimits:         true,
+			quotaPeriod:              defaultQuotaPeriod,
+			expected:                 &ResourceConfig{CPUShares: &minShares},
+		},
 		"burstable-with-pod-level-requests": {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -351,6 +370,25 @@ func TestResourceConfigForPod(t *testing.T) {
 			quotaPeriod:              defaultQuotaPeriod,
 			expected:                 &ResourceConfig{CPUShares: &burstableShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
 		},
+		"burstable-with-partial-pod-level-resources-limits": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("200m", "300Mi"),
+					},
+					Containers: []v1.Container{
+						{
+							Name:      "Container with guaranteed resources",
+							Resources: getResourceRequirements(getResourceList("200m", "200Mi"), getResourceList("200m", "200Mi")),
+						},
+					},
+				},
+			},
+			podLevelResourcesEnabled: true,
+			enforceCPULimits:         true,
+			quotaPeriod:              defaultQuotaPeriod,
+			expected:                 &ResourceConfig{CPUShares: &burstablePartialShares, CPUQuota: &burstableQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &burstableMemory},
+		},
 		"guaranteed-with-pod-level-resources": {
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -381,6 +419,32 @@ func TestResourceConfigForPod(t *testing.T) {
 						{
 							Name:      "Container with resources",
 							Resources: getResourceRequirements(getResourceList("10m", "50Mi"), getResourceList("50m", "100Mi")),
+						},
+					},
+				},
+			},
+			podLevelResourcesEnabled: true,
+			enforceCPULimits:         true,
+			quotaPeriod:              defaultQuotaPeriod,
+			expected:                 &ResourceConfig{CPUShares: &guaranteedShares, CPUQuota: &guaranteedQuota, CPUPeriod: &defaultQuotaPeriod, Memory: &guaranteedMemory},
+		},
+		"guaranteed-pod-level-resources-with-init-containers": {
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("100m", "100Mi"),
+						Limits:   getResourceList("100m", "100Mi"),
+					},
+					Containers: []v1.Container{
+						{
+							Name:      "Container with resources",
+							Resources: getResourceRequirements(getResourceList("10m", "50Mi"), getResourceList("50m", "50Mi")),
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name:      "Container with resources",
+							Resources: getResourceRequirements(getResourceList("10m", "50Mi"), getResourceList("50m", "50Mi")),
 						},
 					},
 				},
