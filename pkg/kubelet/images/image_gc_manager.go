@@ -403,7 +403,7 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 			// be due to an unusually large number or size of in-use container images.
 			message := fmt.Sprintf("Insufficient free disk space on the node's image filesystem (%.1f%% of %s used). "+
 				"Failed to free sufficient space by deleting unused images. "+
-				"Consider resizing the disk or deleting unused files.",
+				"Investigate disk usage, as it could be used by active images, logs, volumes, or other data.",
 				usagePercent, formatSize(capacity))
 			im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.FreeDiskSpaceFailed, "%s", message)
 			return fmt.Errorf("%s", message)

@@ -710,7 +710,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 	// Check that a warning event was sent
 	expectedEvent := "Warning FreeDiskSpaceFailed Insufficient free disk space on the node's image filesystem" +
 		" (95.0% of 10.0 GiB used). Failed to free sufficient space by deleting unused images." +
-		" Consider resizing the disk or deleting unused files."
+		" Investigate disk usage, as it could be used by active images, logs, volumes, or other data."
 	select {
 	case event := <-recorder.Events:
 		assert.Equal(t, expectedEvent, event)
