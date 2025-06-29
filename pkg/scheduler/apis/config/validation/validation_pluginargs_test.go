@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -1151,6 +1152,42 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			err := ValidateNodeResourcesFitArgs(nil, &args)
 			if diff := cmp.Diff(test.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateNodeResourcesFitArgs returned err (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateDynamicResourcesArgs(t *testing.T) {
+	cases := map[string]struct {
+		args     config.DynamicResourcesArgs
+		wantErrs field.ErrorList
+	}{
+		"valid args (default)": {
+			args: config.DynamicResourcesArgs{
+				FilterTimeout: &metav1.Duration{Duration: config.DynamicResourcesFilterTimeoutDefault},
+			},
+		},
+		"valid args (disabled)": {
+			args: config.DynamicResourcesArgs{},
+		},
+		"negative FilterTimeout": {
+			args: config.DynamicResourcesArgs{
+				FilterTimeout: &metav1.Duration{Duration: -time.Second},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "filterTimeout",
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateDynamicResourcesArgs(nil, &tc.args)
+			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Errorf("ValidateDynamicResourcesArgs returned err (-want,+got):\n%s", diff)
 			}
 		})
 	}
