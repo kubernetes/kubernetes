@@ -75,6 +75,7 @@ type KubeControllerManagerOptions struct {
 	DeploymentController                      *DeploymentControllerOptions
 	StatefulSetController                     *StatefulSetControllerOptions
 	DeprecatedFlags                           *DeprecatedControllerOptions
+	DisruptionController                      *DisruptionControllerOptions
 	EndpointController                        *EndpointControllerOptions
 	EndpointSliceController                   *EndpointSliceControllerOptions
 	EndpointSliceMirroringController          *EndpointSliceMirroringControllerOptions
@@ -150,6 +151,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		DeprecatedFlags: &DeprecatedControllerOptions{
 			&componentConfig.DeprecatedController,
+		},
+		DisruptionController: &DisruptionControllerOptions{
+			&componentConfig.DisruptionController,
 		},
 		EndpointController: &EndpointControllerOptions{
 			&componentConfig.EndpointController,
@@ -267,6 +271,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.StatefulSetController.AddFlags(fss.FlagSet(names.StatefulSetController))
 	s.DaemonSetController.AddFlags(fss.FlagSet(names.DaemonSetController))
 	s.DeprecatedFlags.AddFlags(fss.FlagSet("deprecated"))
+	s.DisruptionController.AddFlags(fss.FlagSet(names.DisruptionController))
 	s.EndpointController.AddFlags(fss.FlagSet(names.EndpointsController))
 	s.EndpointSliceController.AddFlags(fss.FlagSet(names.EndpointSliceController))
 	s.EndpointSliceMirroringController.AddFlags(fss.FlagSet(names.EndpointSliceMirroringController))
@@ -327,6 +332,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 		return err
 	}
 	if err := s.DeprecatedFlags.ApplyTo(&c.ComponentConfig.DeprecatedController); err != nil {
+		return err
+	}
+	if err := s.DisruptionController.ApplyTo(&c.ComponentConfig.DisruptionController); err != nil {
 		return err
 	}
 	if err := s.EndpointController.ApplyTo(&c.ComponentConfig.EndpointController); err != nil {
@@ -423,6 +431,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.DeploymentController.Validate()...)
 	errs = append(errs, s.StatefulSetController.Validate()...)
 	errs = append(errs, s.DeprecatedFlags.Validate()...)
+	errs = append(errs, s.DisruptionController.Validate()...)
 	errs = append(errs, s.EndpointController.Validate()...)
 	errs = append(errs, s.EndpointSliceController.Validate()...)
 	errs = append(errs, s.EndpointSliceMirroringController.Validate()...)
