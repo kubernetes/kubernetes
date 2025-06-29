@@ -68,7 +68,8 @@ type Manager interface {
 	GetActuatedResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
 
 	// AddPodAdmitHandlers adds the admit handlers to the allocation manager.
-	// TODO: See if we can remove this and just add them in the allocation manager constructor.
+	// Deprecated: This method exists for backward compatibility. New code should pass admit handlers
+	// directly to the allocation manager constructor.
 	AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers)
 
 	// AddPod checks if a pod can be admitted. If so, it admits the pod and updates the allocation.
@@ -110,13 +111,19 @@ type manager struct {
 }
 
 func NewManager(checkpointDirectory string, containerManager cm.ContainerManager, statusManager status.Manager) Manager {
+	return NewManagerWithAdmitHandlers(checkpointDirectory, containerManager, statusManager, lifecycle.PodAdmitHandlers{})
+}
+
+// NewManagerWithAdmitHandlers creates a new allocation manager with the specified admit handlers.
+// This resolves circular dependencies by allowing admit handlers to be passed at construction time.
+func NewManagerWithAdmitHandlers(checkpointDirectory string, containerManager cm.ContainerManager, statusManager status.Manager, admitHandlers lifecycle.PodAdmitHandlers) Manager {
 	return &manager{
 		allocated: newStateImpl(checkpointDirectory, allocatedPodsStateFile),
 		actuated:  newStateImpl(checkpointDirectory, actuatedPodsStateFile),
 
 		containerManager: containerManager,
 		statusManager:    statusManager,
-		admitHandlers:    lifecycle.PodAdmitHandlers{},
+		admitHandlers:    admitHandlers,
 	}
 }
 
@@ -139,13 +146,19 @@ func newStateImpl(checkpointDirectory, checkpointName string) state.State {
 // NewInMemoryManager returns an allocation manager that doesn't persist state.
 // For testing purposes only!
 func NewInMemoryManager(containerManager cm.ContainerManager, statusManager status.Manager) Manager {
+	return NewInMemoryManagerWithAdmitHandlers(containerManager, statusManager, lifecycle.PodAdmitHandlers{})
+}
+
+// NewInMemoryManagerWithAdmitHandlers returns an allocation manager that doesn't persist state
+// and uses the specified admit handlers. For testing purposes only!
+func NewInMemoryManagerWithAdmitHandlers(containerManager cm.ContainerManager, statusManager status.Manager, admitHandlers lifecycle.PodAdmitHandlers) Manager {
 	return &manager{
 		allocated: state.NewStateMemory(nil),
 		actuated:  state.NewStateMemory(nil),
 
 		containerManager: containerManager,
 		statusManager:    statusManager,
-		admitHandlers:    lifecycle.PodAdmitHandlers{},
+		admitHandlers:    admitHandlers,
 	}
 }
 
