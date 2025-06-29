@@ -1212,6 +1212,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1.ServiceAccountSubjectApplyConfiguration{}
 	case flowcontrolv1.SchemeGroupVersion.WithKind("Subject"):
 		return &applyconfigurationsflowcontrolv1.SubjectApplyConfiguration{}
+	case flowcontrolv1.SchemeGroupVersion.WithKind("UserAgentSubject"):
+		return &applyconfigurationsflowcontrolv1.UserAgentSubjectApplyConfiguration{}
 	case flowcontrolv1.SchemeGroupVersion.WithKind("UserSubject"):
 		return &applyconfigurationsflowcontrolv1.UserSubjectApplyConfiguration{}
 
@@ -1256,6 +1258,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1beta1.ServiceAccountSubjectApplyConfiguration{}
 	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("Subject"):
 		return &applyconfigurationsflowcontrolv1beta1.SubjectApplyConfiguration{}
+	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("UserAgentSubject"):
+		return &applyconfigurationsflowcontrolv1beta1.UserAgentSubjectApplyConfiguration{}
 	case flowcontrolv1beta1.SchemeGroupVersion.WithKind("UserSubject"):
 		return &applyconfigurationsflowcontrolv1beta1.UserSubjectApplyConfiguration{}
 
@@ -1300,6 +1304,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsflowcontrolv1beta2.ServiceAccountSubjectApplyConfiguration{}
 	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("Subject"):
 		return &applyconfigurationsflowcontrolv1beta2.SubjectApplyConfiguration{}
+	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("UserAgentSubject"):
+		return &applyconfigurationsflowcontrolv1beta2.UserAgentSubjectApplyConfiguration{}
 	case flowcontrolv1beta2.SchemeGroupVersion.WithKind("UserSubject"):
 		return &applyconfigurationsflowcontrolv1beta2.UserSubjectApplyConfiguration{}
 
@@ -1344,6 +1350,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &flowcontrolv1beta3.ServiceAccountSubjectApplyConfiguration{}
 	case v1beta3.SchemeGroupVersion.WithKind("Subject"):
 		return &flowcontrolv1beta3.SubjectApplyConfiguration{}
+	case v1beta3.SchemeGroupVersion.WithKind("UserAgentSubject"):
+		return &flowcontrolv1beta3.UserAgentSubjectApplyConfiguration{}
 	case v1beta3.SchemeGroupVersion.WithKind("UserSubject"):
 		return &flowcontrolv1beta3.UserSubjectApplyConfiguration{}
 
