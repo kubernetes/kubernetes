@@ -26,12 +26,12 @@ import (
 
 // PersistentVolumeClaimHasClass returns true if given claim has set StorageClassName field.
 func PersistentVolumeClaimHasClass(claim *v1.PersistentVolumeClaim) bool {
-	// Use beta annotation first
-	if _, found := claim.Annotations[v1.BetaStorageClassAnnotation]; found {
+	// Use StorageClassName field first
+	if claim.Spec.StorageClassName != nil {
 		return true
 	}
 
-	if claim.Spec.StorageClassName != nil {
+	if _, found := claim.Annotations[v1.BetaStorageClassAnnotation]; found {
 		return true
 	}
 
@@ -41,13 +41,13 @@ func PersistentVolumeClaimHasClass(claim *v1.PersistentVolumeClaim) bool {
 // GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
 // requested, it returns "".
 func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
-	// Use beta annotation first
-	if class, found := claim.Annotations[v1.BetaStorageClassAnnotation]; found {
-		return class
-	}
-
+	//Use StorageClassName field first
 	if claim.Spec.StorageClassName != nil {
 		return *claim.Spec.StorageClassName
+	}
+
+	if class, found := claim.Annotations[v1.BetaStorageClassAnnotation]; found {
+		return class
 	}
 
 	return ""
@@ -55,12 +55,16 @@ func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
 
 // GetPersistentVolumeClass returns StorageClassName.
 func GetPersistentVolumeClass(volume *v1.PersistentVolume) string {
-	// Use beta annotation first
+	// Use StorageClassName field first
+	if len(volume.Spec.StorageClassName) > 0 {
+		return volume.Spec.StorageClassName
+	}
+
 	if class, found := volume.Annotations[v1.BetaStorageClassAnnotation]; found {
 		return class
 	}
 
-	return volume.Spec.StorageClassName
+	return ""
 }
 
 // CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
