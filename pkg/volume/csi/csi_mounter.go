@@ -486,10 +486,8 @@ func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolic
 // getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
 func (c *csiMountMgr) getFSGroupPolicy() (storage.FSGroupPolicy, error) {
-	// Retrieve CSIDriver. It's not an error if that isn't
-	// possible (we don't have the lister if CSIDriverRegistry is
-	// disabled) or the driver isn't found (CSIDriver is
-	// optional)
+	// Retrieve CSIDriver. It's not an error if the driver isn't found
+	// (CSIDriver is optional)
 	var csiDriver *storage.CSIDriver
 	driver := string(c.driverName)
 	if c.plugin.csiDriverLister != nil {
@@ -515,10 +513,8 @@ func (c *csiMountMgr) getFSGroupPolicy() (storage.FSGroupPolicy, error) {
 // supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
 func (c *csiMountMgr) supportsVolumeLifecycleMode() error {
-	// Retrieve CSIDriver. It's not an error if that isn't
-	// possible (we don't have the lister if CSIDriverRegistry is
-	// disabled) or the driver isn't found (CSIDriver is
-	// optional), but then only persistent volumes are supported.
+	// Retrieve CSIDriver. It's not an error if the driver isn't found
+	// (CSIDriver is optional), but then only persistent volumes are supported.
 	var csiDriver *storage.CSIDriver
 	driver := string(c.driverName)
 	if c.plugin.csiDriverLister != nil {
