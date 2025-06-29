@@ -93,7 +93,7 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, opts L
 	if !opts.AllowInvalidLabelValueInSelector {
 		for valueIndex, value := range sr.Values {
 			for _, msg := range validation.IsValidLabelValue(value) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("values").Index(valueIndex), value, msg))
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("values").Index(valueIndex), value, msg).WithOrigin("format=label-value"))
 			}
 		}
 	}
@@ -104,7 +104,7 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, opts L
 func ValidateLabelName(labelName string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(labelName) {
-		allErrs = append(allErrs, field.Invalid(fldPath, labelName, msg).WithOrigin("labelKey"))
+		allErrs = append(allErrs, field.Invalid(fldPath, labelName, msg).WithOrigin("format=qualified-name"))
 	}
 	return allErrs
 }
@@ -115,7 +115,7 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 	for k, v := range labels {
 		allErrs = append(allErrs, ValidateLabelName(k, fldPath)...)
 		for _, msg := range validation.IsValidLabelValue(v) {
-			allErrs = append(allErrs, field.Invalid(fldPath, v, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath, v, msg).WithOrigin("format=label-value"))
 		}
 	}
 	return allErrs
@@ -216,12 +216,12 @@ func ValidateFieldManager(fieldManager string, fldPath *field.Path) field.ErrorL
 	// considered as not set and is defaulted by the rest of the process
 	// (unless apply is used, in which case it is required).
 	if len(fieldManager) > FieldManagerMaxLength {
-		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, FieldManagerMaxLength))
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, FieldManagerMaxLength).WithOrigin("field-manager"))
 	}
 	// Verify that all characters are printable.
 	for i, r := range fieldManager {
 		if !unicode.IsPrint(r) {
-			allErrs = append(allErrs, field.Invalid(fldPath, fieldManager, fmt.Sprintf("invalid character %#U (at position %d)", r, i)))
+			allErrs = append(allErrs, field.Invalid(fldPath, fieldManager, fmt.Sprintf("invalid character %#U (at position %d)", r, i)).WithOrigin("field-manager"))
 		}
 	}
 
@@ -273,15 +273,15 @@ func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *fiel
 		switch fields.Operation {
 		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
 		default:
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("operation"), fields.Operation, "must be `Apply` or `Update`"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("operation"), fields.Operation, "must be `Apply` or `Update`").WithOrigin("managed-fields"))
 		}
 		if len(fields.FieldsType) > 0 && fields.FieldsType != "FieldsV1" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`").WithOrigin("managed-fields"))
 		}
 		allErrs = append(allErrs, ValidateFieldManager(fields.Manager, fldPath.Child("manager"))...)
 
 		if len(fields.Subresource) > MaxSubresourceNameLength {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("subresource"), "" /*unused*/, MaxSubresourceNameLength))
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("subresource"), "" /*unused*/, MaxSubresourceNameLength).WithOrigin("managed-fields"))
 		}
 	}
 	return allErrs

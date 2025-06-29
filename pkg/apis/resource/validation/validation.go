@@ -559,7 +559,7 @@ func ValidateResourceClaimTemplateUpdate(template, oldTemplate *resource.Resourc
 func validateNodeName(name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	for _, msg := range corevalidation.ValidateNodeName(name, false) {
-		allErrs = append(allErrs, field.Invalid(fldPath, name, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, name, msg).WithOrigin("format=dns-subdomain"))
 	}
 	return allErrs
 }
@@ -1187,7 +1187,7 @@ func validateLabelValue(value string, fldPath *field.Path) field.ErrorList {
 
 	// There's no metav1validation.ValidateLabelValue.
 	for _, msg := range validation.IsValidLabelValue(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=label-value"))
 	}
 
 	return allErrs

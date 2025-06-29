@@ -19,26 +19,18 @@ package validation
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/dynamic-resource-allocation/api"
 )
 
 // assertFailures compares the expected against the actual errors.
 //
-// If they differ, it also logs what the formatted errors would look
-// like to a user. This can be helpful to figure out whether an error
-// is informative.
-func assertFailures(tb testing.TB, want, got field.ErrorList) bool {
+// For the wanted error details it is okay to specify only a substring.
+func assertFailures(tb testing.TB, want, got field.ErrorList) {
 	tb.Helper()
-	if diff := cmp.Diff(want, got, cmpopts.IgnoreFields(field.Error{}, "Origin"), cmp.AllowUnexported(api.UniqueString{})); diff != "" {
-		tb.Errorf("unexpected field errors (-want, +got):\n%s", diff)
-		return false
-	}
-	return true
+	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByValue().ByDetailSubstring().WithUniqueMatches()
+	matcher.Test(tb, want, got)
 }
 
 func TestTruncateIfTooLong(t *testing.T) {

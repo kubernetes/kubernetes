@@ -100,7 +100,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			slice:        testResourceSlice("", goodName, driverName, 1),
 		},
 		"bad-name": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')") /* no WithOrigin https://github.com/kubernetes/kubernetes/blob/6ed5b60f71930d51bfcf8bfa6f3506b099811318/staging/src/k8s.io/apimachinery/pkg/api/validation/objectmeta.go#L160 */},
 			slice:        testResourceSlice(badName, goodName, driverName, 1),
 		},
 		"generate-name": {
@@ -192,7 +192,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"bad-labels": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "").WithOrigin("format=label-value")},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Labels = map[string]string{
@@ -211,7 +211,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"bad-annotations": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"), badName, "").WithOrigin("format=qualified-name")},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Annotations = map[string]string{
@@ -222,18 +222,18 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-nodename": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "pool", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
-				field.Invalid(field.NewPath("spec", "nodeName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Invalid(field.NewPath("spec", "pool", "name"), badName, "").WithOrigin("format=dns-subdomain"),
+				field.Invalid(field.NewPath("spec", "nodeName"), badName, "").WithOrigin("format=dns-subdomain"),
 			},
 			slice: testResourceSlice(goodName, badName, driverName, 1),
 		},
 		"bad-multi-pool-name": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "pool", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
-				field.Invalid(field.NewPath("spec", "pool", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
-				field.Invalid(field.NewPath("spec", "nodeName"), badName+"/"+badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Invalid(field.NewPath("spec", "pool", "name"), badName, "").WithOrigin("format=dns-subdomain"),
+				field.Invalid(field.NewPath("spec", "pool", "name"), badName+"-other", "").WithOrigin("format=dns-subdomain"),
+				field.Invalid(field.NewPath("spec", "nodeName"), badName+"/"+badName+"-other", "").WithOrigin("format=dns-subdomain"),
 			},
-			slice: testResourceSlice(goodName, badName+"/"+badName, driverName, 1),
+			slice: testResourceSlice(goodName, badName+"/"+badName+"-other", driverName, 1),
 		},
 		"good-pool-name": {
 			slice: func() *resourceapi.ResourceSlice {
@@ -307,12 +307,12 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"bad-drivername": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), badName, "").WithOrigin("format=dns-subdomain")},
 			slice:        testResourceSlice(goodName, goodName, badName, 1),
 		},
 		"bad-devices": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("name"), badName, "").WithOrigin("format=dns-label"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 3)
@@ -372,7 +372,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		"bad-attribute-domain": {
 			wantFailures: field.ErrorList{
 				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
-				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), "").WithOrigin("format=dns-subdomain"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
@@ -436,7 +436,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"invalid-node-selecor-label-value": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "").WithOrigin("format=label-value")},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 3)
 				slice.Spec.NodeName = nil
@@ -456,12 +456,13 @@ func TestValidateResourceSlice(t *testing.T) {
 			wantFailures: func() field.ErrorList {
 				fldPath := field.NewPath("spec", "devices").Index(0).Child("taints")
 				return field.ErrorList{
-					field.Invalid(fldPath.Index(2).Child("key"), "", "name part must be non-empty"),
-					field.Invalid(fldPath.Index(2).Child("key"), "", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
+					// Perhaps https://github.com/kubernetes/kubernetes/blob/6ed5b60f71930d51bfcf8bfa6f3506b099811318/staging/src/k8s.io/apimachinery/pkg/util/validation/validation.go#L41 should only warn about non-empty?
+					field.Invalid(fldPath.Index(2).Child("key"), "", "must be non-empty").WithOrigin("format=qualified-name"),
+					field.Invalid(fldPath.Index(2).Child("key"), "", "consist of alphanumeric characters").WithOrigin("format=qualified-name"),
 					field.Required(fldPath.Index(2).Child("effect"), ""),
 
-					field.Invalid(fldPath.Index(3).Child("key"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
-					field.Invalid(fldPath.Index(3).Child("value"), badName, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')"),
+					field.Invalid(fldPath.Index(3).Child("key"), badName, "").WithOrigin("format=qualified-name"),
+					field.Invalid(fldPath.Index(3).Child("value"), badName, "").WithOrigin("format=label-value"),
 					field.NotSupported(fldPath.Index(3).Child("effect"), resourceapi.DeviceTaintEffect("some-other-op"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule}),
 				}
 			}(),
@@ -613,7 +614,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-name-shared-counters": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("name"), badName, "").WithOrigin("format=dns-label"),
 				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), ""),
 			},
 			slice: func() *resourceapi.ResourceSlice {
@@ -628,7 +629,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-countername-shared-counters": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters").Key(badName), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters").Key(badName), badName, "").WithOrigin("format=dns-label"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
@@ -835,7 +836,7 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			},
 		},
 		"invalid-update-to-invalid-nodeselector-label-value": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "").WithOrigin("format=label-value")},
 			oldResourceSlice: func() *resourceapi.ResourceSlice {
 				slice := validResourceSlice.DeepCopy()
 				slice.Spec.NodeName = nil
