@@ -217,10 +217,30 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod
 		}
 	}
 
-	if !hasAnyNodeConstraint {
+	singleZone := true
+	zoneKey := ""
+
+	// For each PV‐topology constraint on the pod…
+	for _, pvTopology := range podPVTopologies {
+		if _, ok := node.Labels[pvTopology.key]; !ok {
+			continue
+		}
+		if zoneKey == "" {
+			zoneKey = pvTopology.key
+		} else if zoneKey != pvTopology.key {
+			singleZone = false
+			break
+		}
+	}
+
+	if !hasAnyNodeConstraint && singleZone {
 		// The node has no zone constraints, so we're OK to schedule.
 		// This is to handle a single-zone cluster scenario where the node may not have any topology labels.
 		return nil
+	}
+	if !hasAnyNodeConstraint {
+		// Reject: multi-zone cluster but node missing zone label
+		logger.V(10).Info("Won't schedule pod onto node due to missing topology label", "pod", klog.KObj(pod), "node", klog.KObj(node))
 	}
 
 	for _, pvTopology := range podPVTopologies {
