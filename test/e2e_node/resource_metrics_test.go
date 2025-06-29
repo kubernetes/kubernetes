@@ -106,6 +106,11 @@ var _ = SIGDescribe("ResourceMetricsAPI", feature.ResourceMetrics, func() {
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): zeroSampe,
 				}),
 
+				"container_swap_limit_bytes": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(0*e2evolume.Kb, 80*e2evolume.Mb),
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(0*e2evolume.Kb, 80*e2evolume.Mb),
+				}),
+
 				"pod_cpu_usage_seconds_total": gstruct.MatchElements(podID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): boundedSample(0, 100),
 					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): boundedSample(0, 100),
