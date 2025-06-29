@@ -974,3 +974,74 @@ func TestRealFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 		}
 	}
 }
+
+func TestRealFIFO_ReplaceOrdersWhenPossible(t *testing.T) {
+	tests := []struct {
+		actions        []func(f *RealFIFO)
+		expectedSynced bool
+	}{
+		{
+			actions:        []func(f *RealFIFO){},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Add(mkFifoObj("a", 1)) },
+			},
+			expectedSynced: true,
+		},
+		{
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Replace([]interface{}{}, "0") },
+			},
+			expectedSynced: true,
+		},
+		{
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
+			},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
+				func(f *RealFIFO) { Pop(f) },
+			},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
+				func(f *RealFIFO) { Pop(f) },
+				func(f *RealFIFO) { Pop(f) },
+			},
+			expectedSynced: true,
+		},
+		{
+			// This test case won't happen in practice since a Reflector, the only producer for delta_fifo today, always passes a complete snapshot consistent in time;
+			// there cannot be duplicate keys in the list or apiserver is broken.
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("a", 2)}, "0") },
+				func(f *RealFIFO) { Pop(f) },
+				// ATTENTION: difference with delta_fifo_test, every event is delivered, so a is listed twice and must be popped twice to remove both
+				func(f *RealFIFO) { Pop(f) },
+			},
+			expectedSynced: true,
+		},
+	}
+
+	for i, test := range tests {
+		f := NewRealFIFO(
+			testFifoObjectKeyFunc,
+			emptyKnownObjects(),
+			nil,
+		)
+
+		for _, action := range test.actions {
+			action(f)
+		}
+		if e, a := test.expectedSynced, f.HasSynced(); a != e {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, e, a)
+		}
+	}
+}
