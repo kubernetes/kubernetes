@@ -844,7 +844,7 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 
 		if pod.Spec.Resources != nil {
 			w.Write(LEVEL_0, "Resources:\n")
-			describeResources(pod.Spec.Resources, w, LEVEL_1)
+			describeResources(pod.Spec.Resources, w, LEVEL_1, false)
 		}
 
 		if len(pod.Spec.InitContainers) > 0 {
@@ -1811,7 +1811,7 @@ func describeContainers(label string, containers []corev1.Container, containerSt
 		if ok {
 			describeContainerState(status, w)
 		}
-		describeResources(&container.Resources, w, LEVEL_2)
+		describeResources(&container.Resources, w, LEVEL_2, false)
 		describeContainerProbe(container, w)
 		if len(container.EnvFrom) > 0 {
 			describeContainerEnvFrom(container, resolverFn, w)
@@ -1897,7 +1897,7 @@ func describeContainerCommand(container corev1.Container, w PrefixWriter) {
 	}
 }
 
-func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, level int) {
+func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, level int, humanReadableFlag bool) {
 	if resources == nil {
 		return
 	}
@@ -1907,7 +1907,12 @@ func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, l
 	}
 	for _, name := range SortedResourceNames(resources.Limits) {
 		quantity := resources.Limits[name]
-		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
+		// todo: introduce a flag to determine if we want to display a human readable string
+		if humanReadableFlag {
+			w.Write(level+1, "%s:\t%s\n", name, quantity.HumanReadableString())
+		} else {
+			w.Write(level+1, "%s:\t%s\n", name, quantity.String())
+		}
 	}
 
 	if len(resources.Requests) > 0 {
@@ -1915,7 +1920,12 @@ func describeResources(resources *corev1.ResourceRequirements, w PrefixWriter, l
 	}
 	for _, name := range SortedResourceNames(resources.Requests) {
 		quantity := resources.Requests[name]
-		w.Write(level+1, "%s:\t%s\n", name, quantity.String())
+		// todo: introduce a flag to determine if we want to display a human readable string
+		if humanReadableFlag {
+			w.Write(level+1, "%s:\t%s\n", name, quantity.HumanReadableString())
+		} else {
+			w.Write(level+1, "%s:\t%s\n", name, quantity.String())
+		}
 	}
 }
 
