@@ -169,6 +169,27 @@ func (p *streamProtocolV2) copyStderr(wg *sync.WaitGroup) {
 	}()
 }
 
+func (p *streamProtocolV2) streams() (count int) {
+	// set up error stream
+	count = 1
+
+	// set up stdin stream
+	if p.Stdin != nil {
+		count++
+	}
+
+	// set up stdout stream
+	if p.Stdout != nil {
+		count++
+	}
+
+	// set up stderr stream
+	if p.Stderr != nil && !p.Tty {
+		count++
+	}
+
+	return
+}
 func (p *streamProtocolV2) stream(conn streamCreator) error {
 	if err := p.createStreams(conn); err != nil {
 		return err
