@@ -24,7 +24,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corehelper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -33,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -54,12 +58,16 @@ type staticPolicy struct {
 	// Note that the restartable init container memory is not included here,
 	// because it is not reusable.
 	initContainersReusableMemory reusableMemory
+	// pods for which we already logged the pod-level resource warning.
+	loggedPods map[types.UID]bool
+	// recorder for events.
+	recorder record.EventRecorder
 }
 
 var _ Policy = &staticPolicy{}
 
 // NewPolicyStatic returns new static policy instance
-func NewPolicyStatic(machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
+func NewPolicyStatic(machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store, recorder record.EventRecorder) (Policy, error) {
 	var totalSystemReserved uint64
 	for _, node := range reserved {
 		if _, ok := node[v1.ResourceMemory]; !ok {
@@ -78,6 +86,8 @@ func NewPolicyStatic(machineInfo *cadvisorapi.MachineInfo, reserved systemReserv
 		systemReserved:               reserved,
 		affinity:                     affinity,
 		initContainersReusableMemory: reusableMemory{},
+		loggedPods:                   make(map[types.UID]bool),
+		recorder:                     recorder,
 	}, nil
 }
 
@@ -99,6 +109,10 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	qos := v1qos.GetPodQOS(pod)
 	if qos != v1.PodQOSGuaranteed {
 		klog.V(5).InfoS("Exclusive memory allocation skipped, pod QoS is not guaranteed", "pod", klog.KObj(pod), "containerName", container.Name, "qos", qos)
+		return nil
+	}
+
+	if p.isPodLevelResourcesAndRecordEvent(pod) {
 		return nil
 	}
 
@@ -397,6 +411,10 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 		return nil
 	}
 
+	if p.isPodLevelResourcesAndRecordEvent(pod) {
+		return nil
+	}
+
 	reqRsrcs, err := getPodRequestedResources(pod)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get pod requested resources", "pod", klog.KObj(pod), "podUID", pod.UID)
@@ -422,6 +440,10 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 // and other resource controllers.
 func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
+		return nil
+	}
+
+	if p.isPodLevelResourcesAndRecordEvent(pod) {
 		return nil
 	}
 
@@ -1062,5 +1084,31 @@ func isAffinityViolatingNUMAAllocations(machineState state.NUMANodeMap, mask bit
 			return true
 		}
 	}
+	return false
+}
+
+func (p *staticPolicy) isPodLevelResourcesAndRecordEvent(pod *v1.Pod) bool {
+	// If pod entries to p.loggedPods other than the current pod exist, delete them.
+	for podUID := range p.loggedPods {
+		if podUID != pod.UID {
+			delete(p.loggedPods, podUID)
+		}
+	}
+
+	// The Memory manager static policy does not support pod-level resources.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		if p.loggedPods == nil {
+			p.loggedPods = make(map[types.UID]bool)
+		}
+
+		if !p.loggedPods[pod.UID] {
+			p.recorder.Eventf(pod, v1.EventTypeWarning, events.MemoryManagerPodLevelResourceAllocation, "Memory manager alignment is skipped, Pod %s has pod-level resources", pod.Name)
+			klog.V(5).InfoS("Memory manager allocation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "pod", klog.KObj(pod))
+			p.loggedPods[pod.UID] = true
+		}
+
+		return true
+	}
+
 	return false
 }

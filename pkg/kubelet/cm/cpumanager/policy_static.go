@@ -21,7 +21,10 @@ import (
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -30,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/cpuset"
 )
@@ -122,6 +126,10 @@ type staticPolicy struct {
 	// we compute this value multiple time, and it's not supposed to change
 	// at runtime - the cpumanager can't deal with runtime topology changes anyway.
 	cpuGroupSize int
+	// pods for which we already logged the pod-level resource warning.
+	loggedPods map[types.UID]bool
+	// recorder for events.
+	recorder record.EventRecorder
 }
 
 // Ensure staticPolicy implements Policy interface
@@ -130,7 +138,7 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store, cpuPolicyOptions map[string]string) (Policy, error) {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store, cpuPolicyOptions map[string]string, recorder record.EventRecorder) (Policy, error) {
 	opts, err := NewStaticPolicyOptions(cpuPolicyOptions)
 	if err != nil {
 		return nil, err
@@ -149,6 +157,8 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		cpusToReuse:  make(map[string]cpuset.CPUSet),
 		options:      opts,
 		cpuGroupSize: cpuGroupSize,
+		loggedPods:   make(map[types.UID]bool),
+		recorder:     recorder,
 	}
 
 	allCPUs := topology.CPUDetails.CPUs()
@@ -467,6 +477,28 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 		klog.V(5).InfoS("Exclusive CPU allocation skipped, pod QoS is not guaranteed", "pod", klog.KObj(pod), "containerName", container.Name, "qos", qos)
 		return 0
 	}
+
+	// If pod entries to p.loggedPods other than the current pod exist, delete them.
+	for podUID := range p.loggedPods {
+		if podUID != pod.UID {
+			delete(p.loggedPods, podUID)
+		}
+	}
+
+	// The CPU manager static policy does not support pod-level resources.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		if p.loggedPods == nil {
+			p.loggedPods = make(map[types.UID]bool)
+		}
+
+		if !p.loggedPods[pod.UID] {
+			p.recorder.Eventf(pod, v1.EventTypeWarning, events.CPUManagerPodLevelResourceAllocation, "CPU Manager alignment is skipped, Pod %s has pod-level resources", pod.Name)
+			klog.V(5).InfoS("CPU Manager allocation skipped, pod is using pod-level resources which are not supported by the static CPU manager policy", "pod", klog.KObj(pod), "containerName", container.Name)
+			p.loggedPods[pod.UID] = true
+		}
+		return 0
+	}
+
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
 	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
 	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.

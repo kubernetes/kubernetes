@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -132,7 +133,7 @@ type manager struct {
 var _ Manager = &manager{}
 
 // NewManager returns new instance of the memory manager
-func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAllocatableReservation v1.ResourceList, reservedMemory []kubeletconfig.MemoryReservation, stateFileDirectory string, affinity topologymanager.Store, recorder record.EventRecorder) (Manager, error) {
 	var policy Policy
 
 	switch policyType(policyName) {
@@ -150,7 +151,7 @@ func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAll
 			return nil, err
 		}
 
-		policy, err = NewPolicyStatic(machineInfo, systemReserved, affinity)
+		policy, err = NewPolicyStatic(machineInfo, systemReserved, affinity, recorder)
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +162,7 @@ func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAll
 			if err != nil {
 				return nil, err
 			}
-			policy, err = NewPolicyBestEffort(machineInfo, systemReserved, affinity)
+			policy, err = NewPolicyBestEffort(machineInfo, systemReserved, affinity, recorder)
 			if err != nil {
 				return nil, err
 			}
