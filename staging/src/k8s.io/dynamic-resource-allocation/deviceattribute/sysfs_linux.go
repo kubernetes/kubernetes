@@ -39,25 +39,30 @@ func (s sysfsPath) bus(path string) string {
 	return filepath.Join(string(s), "bus", path)
 }
 
-func (s sysfsPath) block(path string) string {
-	return filepath.Join(string(s), "block", path)
-}
+// Commented out for future use or if needed later
+// func (s sysfsPath) block(path string) string {
+// 	return filepath.Join(string(s), "block", path)
+// }
 
-func (s sysfsPath) class(path string) string {
-	return filepath.Join(string(s), "class", path)
-}
+// Commented out for future use or if needed later
+// func (s sysfsPath) class(path string) string {
+// 	return filepath.Join(string(s), "class", path)
+// }
 
-func (s sysfsPath) dev(path string) string {
-	return filepath.Join(string(s), "dev", path)
-}
+// Commented out for future use or if needed later
+// func (s sysfsPath) dev(path string) string {
+// 	return filepath.Join(string(s), "dev", path)
+// }
 
-func (s sysfsPath) firmware(path string) string {
-	return filepath.Join(string(s), "firmware", path)
-}
-func (s sysfsPath) kernel(path string) string {
-	return filepath.Join(string(s), "kernel", path)
-}
+// Commented out for future use or if needed later
+// func (s sysfsPath) firmware(path string) string {
+// 	return filepath.Join(string(s), "firmware", path)
+// }
+// func (s sysfsPath) kernel(path string) string {
+// 	return filepath.Join(string(s), "kernel", path)
+// }
 
-func (s sysfsPath) module(path string) string {
-	return filepath.Join(string(s), "module", path)
-}
+// Commented out for future use or if needed later
+// func (s sysfsPath) module(path string) string {
+// 	return filepath.Join(string(s), "module", path)
+// }
