@@ -264,7 +264,8 @@ func buildImpersonationRequests(headers http.Header) ([]v1.ObjectReference, erro
 func authorizeNodeImperonsation(ctx context.Context, requestor user.Info, attr *authorizer.AttributesRecord, a authorizer.Authorizer, requestURI string) (authorizer.Decision, string, error) {
 	attr.Name = strings.TrimPrefix(attr.Name, "system:node:")
 	attr.Resource = "nodes"
-	if IsScheduledNode(requestor, attr) {
+	attr.Verb = "impersonate:node"
+	if isScheduledNode(requestor, attr) {
 		attr.Verb = "impersonate:scheduled-node"
 		decision, reason, err := a.Authorize(ctx, attr)
 		if err != nil || decision != authorizer.DecisionAllow {
@@ -276,8 +277,8 @@ func authorizeNodeImperonsation(ctx context.Context, requestor user.Info, attr *
 	return a.Authorize(ctx, attr)
 }
 
-func IsScheduledNode(requestor user.Info, attr *authorizer.AttributesRecord) bool {
-	if !IsNode(attr) {
+func isScheduledNode(requestor user.Info, attr *authorizer.AttributesRecord) bool {
+	if attr.Resource != "nodes" {
 		return false
 	}
 
@@ -294,10 +295,6 @@ func IsScheduledNode(requestor user.Info, attr *authorizer.AttributesRecord) boo
 	}
 
 	return true
-}
-
-func IsNode(attr *authorizer.AttributesRecord) bool {
-	return strings.HasPrefix(attr.Name, "system:node:")
 }
 
 func authorizeConstrainedImpersonation(ctx context.Context, requestor user.Info, impersonationRequests []v1.ObjectReference, a authorizer.Authorizer, requestURI string) (authorizer.Decision, authorizer.Attributes, string) {
@@ -357,7 +354,7 @@ func authorizeConstrainedImpersonation(ctx context.Context, requestor user.Info,
 
 	attrs, err := GetAuthorizerAttributes(ctx)
 	if err != nil {
-		return authorizer.DecisionNoOpinion, attrs, ""
+		return authorizer.DecisionNoOpinion, authorizer.AttributesRecord{}, ""
 	}
 	actingAttrs := attrs.(*authorizer.AttributesRecord)
 	actingAttrs.Verb = "impersonate-on:" + actingAttrs.Verb
