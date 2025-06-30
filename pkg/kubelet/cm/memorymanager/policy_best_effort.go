@@ -18,6 +18,7 @@ package memorymanager
 
 import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"k8s.io/client-go/tools/record"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -39,8 +40,8 @@ type bestEffortPolicy struct {
 
 var _ Policy = &bestEffortPolicy{}
 
-func NewPolicyBestEffort(machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
-	p, err := NewPolicyStatic(machineInfo, reserved, affinity)
+func NewPolicyBestEffort(machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store, recorder record.EventRecorder) (Policy, error) {
+	p, err := NewPolicyStatic(machineInfo, reserved, affinity, recorder)
 
 	if err != nil {
 		return nil, err

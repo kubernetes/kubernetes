@@ -26,6 +26,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 
@@ -140,6 +141,9 @@ type manager struct {
 	// stateFileDirectory holds the directory where the state file for checkpoints is held.
 	stateFileDirectory string
 
+	// recorder for events.
+	recorder record.EventRecorder
+
 	// allCPUs is the set of online CPUs as reported by the system
 	allCPUs cpuset.CPUSet
 
@@ -156,7 +160,7 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManager creates new cpu manager based on provided policy
-func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
+func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, specificCPUs cpuset.CPUSet, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store, recorder record.EventRecorder) (Manager, error) {
 	var topo *topology.CPUTopology
 	var policy Policy
 	var err error
@@ -195,7 +199,7 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 		// exclusively allocated.
 		reservedCPUsFloat := float64(reservedCPUs.MilliValue()) / 1000
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
-		policy, err = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions)
+		policy, err = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, affinity, cpuPolicyOptions, recorder)
 		if err != nil {
 			return nil, fmt.Errorf("new static policy error: %w", err)
 		}
@@ -211,6 +215,7 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 		topology:                   topo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
 		stateFileDirectory:         stateFileDirectory,
+		recorder:                   recorder,
 		allCPUs:                    topo.CPUDetails.CPUs(),
 	}
 	manager.sourcesReady = &sourcesReadyStub{}
