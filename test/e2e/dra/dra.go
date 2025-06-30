@@ -411,6 +411,18 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			b.testPod(ctx, f, pod)
 		})
 
+		ginkgo.It("supports init containers with external claims", func(ctx context.Context) {
+			pod := b.podExternal()
+			claim := b.externalClaim()
+			pod.Spec.InitContainers = []v1.Container{pod.Spec.Containers[0]}
+			pod.Spec.InitContainers[0].Name += "-init"
+			// This must succeed for the pod to start.
+			pod.Spec.InitContainers[0].Command = []string{"sh", "-c", "env | grep user_a=b"}
+			b.create(ctx, pod, claim)
+
+			b.testPod(ctx, f, pod)
+		})
+
 		ginkgo.It("removes reservation from claim when pod is done", func(ctx context.Context) {
 			pod := b.podExternal()
 			claim := b.externalClaim()

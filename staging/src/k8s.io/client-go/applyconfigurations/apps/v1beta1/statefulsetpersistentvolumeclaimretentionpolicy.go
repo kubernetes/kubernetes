@@ -34,7 +34,6 @@ type StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration struct {
 func StatefulSetPersistentVolumeClaimRetentionPolicy() *StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration {
 	return &StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration{}
 }
-func (b StatefulSetPersistentVolumeClaimRetentionPolicyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithWhenDeleted sets the WhenDeleted field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

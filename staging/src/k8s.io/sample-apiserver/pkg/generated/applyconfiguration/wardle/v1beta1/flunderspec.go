@@ -35,7 +35,6 @@ type FlunderSpecApplyConfiguration struct {
 func FlunderSpec() *FlunderSpecApplyConfiguration {
 	return &FlunderSpecApplyConfiguration{}
 }
-func (b FlunderSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithFlunderReference sets the FlunderReference field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

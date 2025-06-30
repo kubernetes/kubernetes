@@ -511,8 +511,7 @@ done`}
 		framework.ExpectNoError(err, "failed to get latest job object")
 		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
-		// TODO (https://github.com/kubernetes/enhancements/issues/3939): Restore the assert on .status.terminating when PodReplacementPolicy goes GA.
-		// gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 		gomega.Expect(job.Status.Failed).Should(gomega.Equal(int32(0)))
 	})
 
@@ -553,8 +552,7 @@ done`}
 		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal("0"))
 		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
-		// TODO (https://github.com/kubernetes/enhancements/issues/3939): Restore the assert on .status.terminating when PodReplacementPolicy goes GA.
-		// gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
 
 	/*
@@ -594,8 +592,7 @@ done`}
 		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal("0"))
 		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
-		// TODO (https://github.com/kubernetes/enhancements/issues/3939): Restore the assert on .status.terminating when PodReplacementPolicy goes GA.
-		// gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
 
 	/*

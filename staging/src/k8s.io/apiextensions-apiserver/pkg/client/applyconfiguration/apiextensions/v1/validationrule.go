@@ -38,7 +38,6 @@ type ValidationRuleApplyConfiguration struct {
 func ValidationRule() *ValidationRuleApplyConfiguration {
 	return &ValidationRuleApplyConfiguration{}
 }
-func (b ValidationRuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRule sets the Rule field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

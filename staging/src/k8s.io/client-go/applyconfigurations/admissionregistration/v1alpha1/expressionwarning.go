@@ -30,7 +30,6 @@ type ExpressionWarningApplyConfiguration struct {
 func ExpressionWarning() *ExpressionWarningApplyConfiguration {
 	return &ExpressionWarningApplyConfiguration{}
 }
-func (b ExpressionWarningApplyConfiguration) IsApplyConfiguration() {}
 
 // WithFieldRef sets the FieldRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

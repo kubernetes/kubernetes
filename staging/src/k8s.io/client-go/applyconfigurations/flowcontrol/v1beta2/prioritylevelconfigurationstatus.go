@@ -29,7 +29,6 @@ type PriorityLevelConfigurationStatusApplyConfiguration struct {
 func PriorityLevelConfigurationStatus() *PriorityLevelConfigurationStatusApplyConfiguration {
 	return &PriorityLevelConfigurationStatusApplyConfiguration{}
 }
-func (b PriorityLevelConfigurationStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

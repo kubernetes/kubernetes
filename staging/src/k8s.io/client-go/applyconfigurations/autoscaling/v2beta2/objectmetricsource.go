@@ -31,7 +31,6 @@ type ObjectMetricSourceApplyConfiguration struct {
 func ObjectMetricSource() *ObjectMetricSourceApplyConfiguration {
 	return &ObjectMetricSourceApplyConfiguration{}
 }
-func (b ObjectMetricSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDescribedObject sets the DescribedObject field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -194,9 +194,9 @@ func (f *fakeCRPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ 
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *fakeCRPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: "foos.v1.example.com", ActionType: framework.All}},
+func (f *fakeCRPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: "foos.v1.example.com", ActionType: fwk.All}},
 	}, nil
 }
 
@@ -458,9 +458,9 @@ func TestRequeueByPermitRejection(t *testing.T) {
 		fakePermitPluginName: func(ctx context.Context, o runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 			fakePermit = &fakePermitPlugin{
 				frameworkHandler: fh,
-				schedulingHint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+				schedulingHint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 					queueingHintCalledCounter++
-					return framework.Queue, nil
+					return fwk.Queue, nil
 				},
 			}
 			return fakePermit, nil
@@ -560,7 +560,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 
 type fakePermitPlugin struct {
 	frameworkHandler framework.Handle
-	schedulingHint   framework.QueueingHintFn
+	schedulingHint   fwk.QueueingHintFn
 }
 
 const fakePermitPluginName = "fakePermitPlugin"
@@ -573,9 +573,9 @@ func (p *fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, _ *
 	return framework.NewStatus(framework.Wait), wait.ForeverTestTimeout
 }
 
-func (p *fakePermitPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeLabel}, QueueingHintFn: p.schedulingHint},
+func (p *fakePermitPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}, QueueingHintFn: p.schedulingHint},
 	}, nil
 }
 

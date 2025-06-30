@@ -41,10 +41,10 @@ if [[ -n "${direct_sets}" ]]; then
   rc=1
 fi
 
-
+export LC_ALL=C
 # ensure all generic features are added in alphabetic order
 lines=$(git grep 'genericfeatures[.].*:' -- pkg/features/kube_features.go)
-sorted_lines=$(echo "$lines" | sort -f)
+sorted_lines=$(echo "$lines" | sort)
 if [[ "$lines" != "$sorted_lines" ]]; then
   echo "Generic features in pkg/features/kube_features.go not sorted" >&2
   echo >&2

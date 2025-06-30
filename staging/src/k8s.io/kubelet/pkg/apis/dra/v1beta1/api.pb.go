@@ -326,7 +326,8 @@ func (m *NodeUnprepareResourcesRequest) GetClaims() []*Claim {
 type NodeUnprepareResourcesResponse struct {
 	// The ResourceClaims for which preparation was reverted.
 	// The same rules as for NodePrepareResourcesResponse.claims
-	// apply.
+	// apply. In particular, all claims in the request must
+	// have an entry in the response, even if that entry is nil.
 	Claims               map[string]*NodeUnprepareResourceResponse `protobuf:"bytes,1,rep,name=claims,proto3" json:"claims,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}                                  `json:"-"`
 	XXX_sizecache        int32                                     `json:"-"`

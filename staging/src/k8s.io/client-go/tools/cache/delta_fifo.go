@@ -303,6 +303,11 @@ func (f *DeltaFIFO) KeyOf(obj interface{}) (string, error) {
 	return f.keyFunc(obj)
 }
 
+// Transformer implements the TransformingStore interface.
+func (f *DeltaFIFO) Transformer() TransformFunc {
+	return f.transformer
+}
+
 // HasSynced returns true if an Add/Update/Delete/AddIfNotPresent are called first,
 // or the first batch of items inserted by Replace() has been popped.
 func (f *DeltaFIFO) HasSynced() bool {

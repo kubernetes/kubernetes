@@ -19,6 +19,7 @@ package etcd3
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"reflect"
@@ -31,6 +32,7 @@ import (
 	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.opentelemetry.io/otel/attribute"
 
+	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -88,7 +90,10 @@ type store struct {
 
 	resourcePrefix string
 	newListFunc    func() runtime.Object
+	stats          *statsCache
 }
+
+var _ storage.Interface = (*store)(nil)
 
 func (s *store) RequestWatchProgress(ctx context.Context) error {
 	// Use watchContext to match ctx metadata provided when creating the watch.
@@ -136,20 +141,7 @@ func (a *abortOnFirstError) Aggregate(key string, err error) bool {
 func (a *abortOnFirstError) Err() error { return a.err }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) storage.Interface {
-	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
-		transformer = WithCorruptObjErrorHandlingTransformer(transformer)
-		decoder = WithCorruptObjErrorHandlingDecoder(decoder)
-	}
-	var store storage.Interface
-	store = newStore(c, codec, newFunc, newListFunc, prefix, resourcePrefix, groupResource, transformer, leaseManagerConfig, decoder, versioner)
-	if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
-		store = NewStoreWithUnsafeCorruptObjectDeletion(store, groupResource)
-	}
-	return store
-}
-
-func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
+func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
 	// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
@@ -192,6 +184,11 @@ func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc fu
 		resourcePrefix: resourcePrefix,
 		newListFunc:    newListFunc,
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		stats := newStatsCache(pathPrefix, s.getKeys)
+		s.stats = stats
+		w.stats = stats
+	}
 
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
 		return s.GetCurrentResourceVersion(ctx)
@@ -205,6 +202,12 @@ func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc fu
 // Versioner implements storage.Interface.Versioner.
 func (s *store) Versioner() storage.Versioner {
 	return s.versioner
+}
+
+func (s *store) Close() {
+	if s.stats != nil {
+		s.stats.Close()
+	}
 }
 
 // Get implements storage.Interface.Get.
@@ -617,26 +620,36 @@ func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Obje
 	}
 }
 
-func (s *store) Count(ctx context.Context, key string) (int64, error) {
-	preparedKey, err := s.prepareKey(key)
-	if err != nil {
-		return 0, err
+func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
+	if s.stats != nil {
+		return s.stats.Stats(ctx)
 	}
-
-	// We need to make sure the key ended with "/" so that we only get children "directories".
-	// e.g. if we have key "/a", "/a/b", "/ab", getting keys with prefix "/a" will return all three,
-	// while with prefix "/a/" will return only "/a/b" which is the correct answer.
-	if !strings.HasSuffix(preparedKey, "/") {
-		preparedKey += "/"
-	}
-
 	startTime := time.Now()
-	count, err := s.client.Kubernetes.Count(ctx, preparedKey, kubernetes.CountOptions{})
+	count, err := s.client.Kubernetes.Count(ctx, s.pathPrefix, kubernetes.CountOptions{})
 	metrics.RecordEtcdRequest("listWithCount", s.groupResource, err, startTime)
 	if err != nil {
-		return 0, err
+		return storage.Stats{}, err
 	}
-	return count, nil
+	return storage.Stats{
+		ObjectCount: count,
+	}, nil
+}
+
+func (s *store) SetKeysFunc(keys storage.KeysFunc) {
+	if s.stats != nil {
+		s.stats.SetKeysFunc(keys)
+	}
+}
+
+func (s *store) getKeys(ctx context.Context) ([]string, error) {
+	startTime := time.Now()
+	resp, err := s.client.KV.Get(ctx, s.pathPrefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
+	metrics.RecordEtcdRequest("listOnlyKeys", s.groupResource, err, startTime)
+	keys := make([]string, 0, len(resp.Kvs))
+	for _, kv := range resp.Kvs {
+		keys = append(keys, string(kv.Key))
+	}
+	return keys, nil
 }
 
 // ReadinessCheck implements storage.Interface.
@@ -744,6 +757,14 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		})
 		metrics.RecordEtcdRequest(metricsOp, s.groupResource, err, startTime)
 		if err != nil {
+			if errors.Is(err, etcdrpc.ErrFutureRev) {
+				currentRV, getRVErr := s.GetCurrentResourceVersion(ctx)
+				if getRVErr != nil {
+					// If we can't get the current RV, use 0 as a fallback.
+					currentRV = 0
+				}
+				return storage.NewTooLargeResourceVersionError(uint64(withRev), currentRV, 0)
+			}
 			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 		}
 		numFetched += len(getResp.Kvs)
@@ -766,6 +787,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			growSlice(v, len(getResp.Kvs))
 		} else {
 			growSlice(v, 2048, len(getResp.Kvs))
+		}
+		if s.stats != nil {
+			s.stats.Update(getResp.Kvs)
 		}
 
 		// take items from the response until the bucket is full, filtering as we go

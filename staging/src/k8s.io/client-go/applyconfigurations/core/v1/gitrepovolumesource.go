@@ -31,7 +31,6 @@ type GitRepoVolumeSourceApplyConfiguration struct {
 func GitRepoVolumeSource() *GitRepoVolumeSourceApplyConfiguration {
 	return &GitRepoVolumeSourceApplyConfiguration{}
 }
-func (b GitRepoVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRepository sets the Repository field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

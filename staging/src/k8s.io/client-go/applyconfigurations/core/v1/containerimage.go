@@ -30,7 +30,6 @@ type ContainerImageApplyConfiguration struct {
 func ContainerImage() *ContainerImageApplyConfiguration {
 	return &ContainerImageApplyConfiguration{}
 }
-func (b ContainerImageApplyConfiguration) IsApplyConfiguration() {}
 
 // WithNames adds the given value to the Names field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

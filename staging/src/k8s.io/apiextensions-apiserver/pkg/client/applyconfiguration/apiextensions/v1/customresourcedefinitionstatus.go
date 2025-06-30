@@ -31,7 +31,6 @@ type CustomResourceDefinitionStatusApplyConfiguration struct {
 func CustomResourceDefinitionStatus() *CustomResourceDefinitionStatusApplyConfiguration {
 	return &CustomResourceDefinitionStatusApplyConfiguration{}
 }
-func (b CustomResourceDefinitionStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

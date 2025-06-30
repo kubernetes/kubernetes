@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/code-generator/cmd/deepcopy-gen/args"
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -53,21 +54,24 @@ func extractEnabledTypeTag(t *types.Type) *enabledTagValue {
 }
 
 func extractEnabledTag(comments []string) *enabledTagValue {
-	tagVals := gengo.ExtractCommentTags("+", comments)[tagEnabledName]
-	if tagVals == nil {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagEnabledName}, comments)
+	if err != nil {
+		klog.Fatalf("Error extracting %s tags: %v", tagEnabledName, err)
+	}
+	if tags[tagEnabledName] == nil {
 		// No match for the tag.
 		return nil
 	}
 	// If there are multiple values, abort.
-	if len(tagVals) > 1 {
-		klog.Fatalf("Found %d %s tags: %q", len(tagVals), tagEnabledName, tagVals)
+	if len(tags[tagEnabledName]) > 1 {
+		klog.Fatalf("Found %d %s tags: %q", len(tags[tagEnabledName]), tagEnabledName, tags[tagEnabledName])
 	}
 
 	// If we got here we are returning something.
 	tag := &enabledTagValue{}
 
 	// Get the primary value.
-	parts := strings.Split(tagVals[0], ",")
+	parts := strings.Split(tags[tagEnabledName][0], ",")
 	if len(parts) >= 1 {
 		tag.value = parts[0]
 	}
@@ -451,8 +455,11 @@ func (g *genDeepCopy) needsGeneration(t *types.Type) bool {
 func extractInterfacesTag(t *types.Type) []string {
 	var result []string
 	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
-	values := gengo.ExtractCommentTags("+", comments)[interfacesTagName]
-	for _, v := range values {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{interfacesTagName}, comments)
+	if err != nil {
+		klog.Fatalf("Error extracting %s tags: %v", interfacesTagName, err)
+	}
+	for _, v := range tags[interfacesTagName] {
 		if len(v) == 0 {
 			continue
 		}
@@ -469,7 +476,12 @@ func extractInterfacesTag(t *types.Type) []string {
 
 func extractNonPointerInterfaces(t *types.Type) (bool, error) {
 	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
-	values := gengo.ExtractCommentTags("+", comments)[interfacesNonPointerTagName]
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{interfacesNonPointerTagName}, comments)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse comments: %w", err)
+	}
+
+	values := tags[interfacesNonPointerTagName]
 	if len(values) == 0 {
 		return false, nil
 	}

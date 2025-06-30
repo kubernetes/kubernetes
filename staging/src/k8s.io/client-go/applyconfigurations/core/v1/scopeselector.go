@@ -29,7 +29,6 @@ type ScopeSelectorApplyConfiguration struct {
 func ScopeSelector() *ScopeSelectorApplyConfiguration {
 	return &ScopeSelectorApplyConfiguration{}
 }
-func (b ScopeSelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMatchExpressions adds the given value to the MatchExpressions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

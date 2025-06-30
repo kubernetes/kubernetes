@@ -100,8 +100,8 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 	traceservice.RegisterTraceServiceServer(srv, fakeServer)
 
 	go func() {
-		if err := srv.Serve(listener); err != nil {
-			t.Error(err)
+		if serveErr := srv.Serve(listener); serveErr != nil {
+			t.Error(serveErr)
 			return
 		}
 	}()
@@ -354,8 +354,8 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 	traceservice.RegisterTraceServiceServer(srv, fakeServer)
 
 	go func() {
-		if err = srv.Serve(listener); err != nil {
-			t.Error(err)
+		if serveErr := srv.Serve(listener); serveErr != nil {
+			t.Error(serveErr)
 		}
 	}()
 	defer srv.Stop()

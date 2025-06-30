@@ -43,6 +43,7 @@ import (
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/watchlist"
@@ -85,7 +86,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		framework.ExpectNoError(err, "Failed waiting for the secret informer in %s namespace to be synced", f.Namespace.Namespace)
 
 		ginkgo.By("Verifying if the secret informer was properly synchronised")
-		verifyStore(ctx, expectedSecrets, secretInformer.GetStore())
+		verifyStoreFor(ctx, verifyStoreForMetaObject(expectedSecrets, secretInformer.GetStore()))
 
 		ginkgo.By("Modifying a secret and checking if the update was picked up by the secret informer")
 		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(ctx, "secret-1", metav1.GetOptions{})
@@ -95,7 +96,50 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		framework.ExpectNoError(err)
 
 		expectedSecrets[0] = secret
-		verifyStore(ctx, expectedSecrets, secretInformer.GetStore())
+		verifyStoreFor(ctx, verifyStoreForMetaObject(expectedSecrets, secretInformer.GetStore()))
+	})
+	ginkgo.It("should be requested by metadatainformer when WatchListClient is enabled", func(ctx context.Context) {
+		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
+
+		metadataClient, err := metadata.NewForConfig(f.ClientConfig())
+		framework.ExpectNoError(err)
+		secretMetaInformer := metadatainformer.NewFilteredMetadataInformer(
+			metadataClient,
+			v1.SchemeGroupVersion.WithResource("secrets"),
+			f.Namespace.Name,
+			time.Duration(0),
+			nil,
+			nil,
+		)
+
+		_ = addWellKnownSecrets(ctx, f)
+		expectedSecrets, err := metadataClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Starting the secret meta informer")
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		go secretMetaInformer.Informer().Run(stopCh)
+
+		ginkgo.By("Waiting until the secret meta informer is fully synchronised")
+		err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, false, func(context.Context) (done bool, err error) {
+			return secretMetaInformer.Informer().HasSynced(), nil
+		})
+		framework.ExpectNoError(err, "Failed waiting for the secret meta informer in %s namespace to be synced", f.Namespace.Namespace)
+
+		ginkgo.By("Verifying if the secret meta informer was properly synchronised")
+		verifyStoreFor(ctx, verifyPartialObjectMetadataStore(toPointerSlice(expectedSecrets.Items), secretMetaInformer.Informer().GetStore()))
+
+		ginkgo.By("Modifying a secret and checking if the update was picked up by the secret meta informer")
+		secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(ctx, "secret-1", metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		secret.StringData = map[string]string{"foo": "bar"}
+		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(ctx, secret, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+
+		expectedSecrets, err = metadataClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		verifyStoreFor(ctx, verifyPartialObjectMetadataStore(toPointerSlice(expectedSecrets.Items), secretMetaInformer.Informer().GetStore()))
 	})
 	ginkgo.It("should NOT be requested by client-go's List method when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
@@ -112,7 +156,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 
 		ginkgo.By("Verifying retrieved secrets")
 		actualSecrets := secretList.Items
-		gomega.Expect(cmp.Equal(expectedSecrets, toSecretPointerSlice(actualSecrets))).To(gomega.BeTrueBecause("data received via list must match the added data"))
+		gomega.Expect(cmp.Equal(expectedSecrets, toPointerSlice(actualSecrets))).To(gomega.BeTrueBecause("data received via list must match the added data"))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
 		expectedRequestsMadeByKubeClient := []string{expectedListRequestMadeByClient}
@@ -134,7 +178,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 
 		ginkgo.By("verifying retrieved secrets")
 		actualSecrets := secretList.Items
-		gomega.Expect(cmp.Equal(expectedSecrets, toSecretPointerSlice(actualSecrets))).To(gomega.BeTrueBecause("data received via list must match the added data"))
+		gomega.Expect(cmp.Equal(expectedSecrets, toPointerSlice(actualSecrets))).To(gomega.BeTrueBecause("data received via list must match the added data"))
 		gomega.Expect(secretList.GetObjectKind().GroupVersionKind()).To(gomega.Equal(v1.SchemeGroupVersion.WithKind("SecretList")))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
@@ -238,7 +282,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		framework.ExpectNoError(err, "Failed waiting for the secret informer in %s namespace to be synced", f.Namespace.Namespace)
 
 		ginkgo.By("Verifying if the secret informer was properly synchronised")
-		verifyStore[unstructured.Unstructured](ctx, expectedSecrets, secretInformer.GetStore())
+		verifyStoreFor(ctx, verifyStoreForMetaObject[unstructured.Unstructured](expectedSecrets, secretInformer.GetStore()))
 	})
 })
 
@@ -270,10 +314,17 @@ func clientConfigWithRoundTripper(f *framework.Framework) (*roundTripper, *rest.
 	return rt, clientConfig
 }
 
-func verifyStore[T any](ctx context.Context, expectedSecrets []*T, store cache.Store) {
+func verifyStoreFor(ctx context.Context, verifier func() bool) {
 	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		ginkgo.By("Comparing secrets retrieved directly from the server with the ones that have been streamed to the secret informer")
 
+		return verifier(), nil
+	})
+	framework.ExpectNoError(err)
+}
+
+func verifyStoreForMetaObject[T any](expectedSecrets []*T, store cache.Store) func() bool {
+	return func() bool {
 		expectedSecretsAsMetaObject, err := toMetaObjectSlice(expectedSecrets)
 		framework.ExpectNoError(err)
 		actualSecretsAsMetaObject, err := toMetaObjectSlice(store.List())
@@ -282,9 +333,20 @@ func verifyStore[T any](ctx context.Context, expectedSecrets []*T, store cache.S
 		sort.Sort(byName(expectedSecretsAsMetaObject))
 		sort.Sort(byName(actualSecretsAsMetaObject))
 
-		return cmp.Equal(expectedSecretsAsMetaObject, actualSecretsAsMetaObject), nil
-	})
-	framework.ExpectNoError(err)
+		return cmp.Equal(expectedSecretsAsMetaObject, actualSecretsAsMetaObject)
+	}
+}
+
+func verifyPartialObjectMetadataStore(expected []*metav1.PartialObjectMetadata, store cache.Store) func() bool {
+	return func() bool {
+		actual, err := toPartialObjectMetadata(store.List())
+		framework.ExpectNoError(err)
+
+		sort.Sort(byPartialObjectMetadataName(expected))
+		sort.Sort(byPartialObjectMetadataName(actual))
+
+		return cmp.Equal(expected, actual)
+	}
 }
 
 var expectedListRequestMadeByClient = func() string {
@@ -324,6 +386,12 @@ func (a byName) Len() int           { return len(a) }
 func (a byName) Less(i, j int) bool { return a[i].GetName() < a[j].GetName() }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
+type byPartialObjectMetadataName []*metav1.PartialObjectMetadata
+
+func (s byPartialObjectMetadataName) Len() int           { return len(s) }
+func (s byPartialObjectMetadataName) Less(i, j int) bool { return s[i].Name < s[j].Name }
+func (s byPartialObjectMetadataName) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
 func newSecret(name string) *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -345,10 +413,22 @@ func toMetaObjectSlice[T any](s []T) ([]metav1.Object, error) {
 	return result, nil
 }
 
-func toSecretPointerSlice[T any](items []T) []*T {
+func toPointerSlice[T any](items []T) []*T {
 	result := make([]*T, 0, len(items))
 	for i := range items {
 		result = append(result, &items[i])
 	}
 	return result
+}
+
+func toPartialObjectMetadata(rawItems []interface{}) ([]*metav1.PartialObjectMetadata, error) {
+	var ret []*metav1.PartialObjectMetadata
+	for _, item := range rawItems {
+		meta, ok := item.(*metav1.PartialObjectMetadata)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type in: %T", item)
+		}
+		ret = append(ret, meta)
+	}
+	return ret, nil
 }

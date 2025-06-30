@@ -34,7 +34,6 @@ type AllocationResultApplyConfiguration struct {
 func AllocationResult() *AllocationResultApplyConfiguration {
 	return &AllocationResultApplyConfiguration{}
 }
-func (b AllocationResultApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDevices sets the Devices field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

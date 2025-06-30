@@ -29,7 +29,6 @@ type PodFailurePolicyApplyConfiguration struct {
 func PodFailurePolicy() *PodFailurePolicyApplyConfiguration {
 	return &PodFailurePolicyApplyConfiguration{}
 }
-func (b PodFailurePolicyApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRules adds the given value to the Rules field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

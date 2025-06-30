@@ -40,7 +40,6 @@ type ResourceSliceSpecApplyConfiguration struct {
 func ResourceSliceSpec() *ResourceSliceSpecApplyConfiguration {
 	return &ResourceSliceSpecApplyConfiguration{}
 }
-func (b ResourceSliceSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithDriver sets the Driver field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

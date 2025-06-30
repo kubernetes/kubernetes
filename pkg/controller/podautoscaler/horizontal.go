@@ -673,8 +673,9 @@ func (a *HorizontalController) computeStatusForResourceMetricGeneric(ctx context
 			return 0, nil, time.Time{}, "", condition, fmt.Errorf("failed to get %s usage: %v", resourceName, err)
 		}
 		metricNameProposal = fmt.Sprintf("%s resource", resourceName.String())
+		quantity := buildQuantity(resourceName, rawProposal)
 		status := autoscalingv2.MetricValueStatus{
-			AverageValue: resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
+			AverageValue: &quantity,
 		}
 		return replicaCountProposal, &status, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 	}
@@ -694,11 +695,26 @@ func (a *HorizontalController) computeStatusForResourceMetricGeneric(ctx context
 	if sourceType == autoscalingv2.ContainerResourceMetricSourceType {
 		metricNameProposal = fmt.Sprintf("%s container resource utilization (percentage of request)", resourceName)
 	}
+	quantity := buildQuantity(resourceName, rawProposal)
 	status := autoscalingv2.MetricValueStatus{
 		AverageUtilization: &percentageProposal,
-		AverageValue:       resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
+		AverageValue:       &quantity,
 	}
 	return replicaCountProposal, &status, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
+}
+
+// buildQuantity creates a resource.Quantity for HPA metrics based on the resource type.
+//
+// For memory, rawProposal is expected in bytes and uses BinarySI formatting (Ki/Mi/Gi).
+// For CPU or other resources, rawProposal is expected in milli-units (e.g., 500 = 0.5 cores) and uses DecimalSI formatting (m).
+func buildQuantity(resourceName v1.ResourceName, rawProposal int64) resource.Quantity {
+	format := resource.DecimalSI
+	// to match what we return in the metrics server,
+	// see https://github.com/kubernetes-sigs/metrics-server/blob/55b4961bc1eceffd0a37809dc271e9ae38de9deb/pkg/storage/types.go#L63-L64
+	if resourceName == v1.ResourceMemory {
+		format = resource.BinarySI
+	}
+	return *resource.NewMilliQuantity(rawProposal, format)
 }
 
 // computeStatusForResourceMetric computes the desired number of replicas for the specified metric of type ResourceMetricSourceType.

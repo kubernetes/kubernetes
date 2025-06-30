@@ -43,7 +43,6 @@ type CustomResourceDefinitionSpecApplyConfiguration struct {
 func CustomResourceDefinitionSpec() *CustomResourceDefinitionSpecApplyConfiguration {
 	return &CustomResourceDefinitionSpecApplyConfiguration{}
 }
-func (b CustomResourceDefinitionSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithGroup sets the Group field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

@@ -5491,3 +5491,66 @@ func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
 
 	tc.runTest(t)
 }
+
+func TestBuildQuantity(t *testing.T) {
+	tests := []struct {
+		name         string
+		resourceName v1.ResourceName
+		rawProposal  int64
+		expected     resource.Quantity
+	}{
+		{
+			name:         "Memory - 1000 bytes → 1Ki",
+			resourceName: v1.ResourceMemory,
+			rawProposal:  1000,
+			expected:     *resource.NewQuantity(1, resource.BinarySI), // 1Ki
+		},
+		{
+			name:         "Memory - 1000000 bytes → 1000Ki",
+			resourceName: v1.ResourceMemory,
+			rawProposal:  1000000,
+			expected:     *resource.NewQuantity(1000, resource.BinarySI), // 1000Ki
+		},
+		{
+			name:         "CPU - 100 milli-cores",
+			resourceName: v1.ResourceCPU,
+			rawProposal:  100,
+			expected:     *resource.NewMilliQuantity(100, resource.DecimalSI),
+		},
+		{
+			name:         "CPU - 500 milli-cores",
+			resourceName: v1.ResourceCPU,
+			rawProposal:  500,
+			expected:     *resource.NewMilliQuantity(500, resource.DecimalSI),
+		},
+		{
+			name:         "CPU - 1 milli-core",
+			resourceName: v1.ResourceCPU,
+			rawProposal:  1,
+			expected:     *resource.NewMilliQuantity(1, resource.DecimalSI),
+		},
+		{
+			name:         "CustomResource - 200 milli-units",
+			resourceName: v1.ResourceName("custom-resource"),
+			rawProposal:  200,
+			expected:     *resource.NewMilliQuantity(200, resource.DecimalSI),
+		},
+		{
+			name:         "CustomResource - 300 milli-units",
+			resourceName: v1.ResourceName("custom-resource"),
+			rawProposal:  300,
+			expected:     *resource.NewMilliQuantity(300, resource.DecimalSI),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q := buildQuantity(tt.resourceName, tt.rawProposal)
+			if !q.Equal(tt.expected) || (q.Format != tt.expected.Format) {
+				t.Errorf("expected quantity %v (Format: %v), got %v (Format: %v)",
+					tt.expected.String(), tt.expected.Format,
+					q.String(), q.Format)
+			}
+		})
+	}
+}

@@ -811,7 +811,7 @@ func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Po
 // getJobPodsByIndexer returns the set of pods that this Job should manage.
 func (jm *Controller) getJobPodsByIndexer(j *batch.Job) ([]*v1.Pod, error) {
 	podsForJob := []*v1.Pod{}
-	for _, key := range []string{string(j.UID), controller.OrphanPodIndexKey} {
+	for _, key := range []string{string(j.UID), controller.OrphanPodIndexKeyForNamespace(j.Namespace)} {
 		pods, err := jm.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
 		if err != nil {
 			return nil, err

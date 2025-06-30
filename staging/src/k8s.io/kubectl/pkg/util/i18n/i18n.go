@@ -154,7 +154,6 @@ func LoadTranslations(root string, getLanguageFn func() string) error {
 		fmt.Sprintf("%s/%s/LC_MESSAGES/k8s.mo", root, langStr),
 	}
 
-	klog.V(3).Infof("Setting language to %s", langStr)
 	// TODO: list the directory and load all files.
 	buf := new(bytes.Buffer)
 	w := zip.NewWriter(buf)
