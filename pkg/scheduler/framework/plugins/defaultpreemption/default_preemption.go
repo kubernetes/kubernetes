@@ -288,7 +288,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 				return false, err
 			}
 			victims = append(victims, pi)
-			logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(pi.GetPod()), "node", klog.KObj(nodeInfo.GetNode()))
+			logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(pi.GetPod()), "node", klog.KObj(nodeInfo.Node()))
 		}
 		return fits, nil
 	}

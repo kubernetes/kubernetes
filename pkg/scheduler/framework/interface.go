@@ -142,7 +142,7 @@ func (m *NodeToStatus) NodesForStatusCode(nodeLister NodeInfoLister, code fwk.Co
 		}
 		// Need to find all the nodes that are absent or have a matching code using the allNodes.
 		for _, node := range allNodes {
-			nodeName := node.GetNode().Name
+			nodeName := node.Node().Name
 			if status := m.Get(nodeName); status.Code() == code {
 				resultNodes = append(resultNodes, node)
 			}

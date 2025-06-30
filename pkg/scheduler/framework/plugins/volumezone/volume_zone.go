@@ -208,7 +208,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod
 		podPVTopologies = state.podPVTopologies
 	}
 
-	node := nodeInfo.GetNode()
+	node := nodeInfo.Node()
 	hasAnyNodeConstraint := false
 	for _, topologyLabel := range topologyLabels {
 		if _, ok := node.Labels[topologyLabel]; ok {

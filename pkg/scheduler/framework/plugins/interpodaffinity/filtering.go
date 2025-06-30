@@ -50,7 +50,7 @@ type preFilterState struct {
 	// A map of topology pairs to the number of existing pods that match the anti-affinity terms of the "pod".
 	antiAffinityCounts topologyToMatchedTermCount
 	// podInfo of the incoming pod.
-	podInfo *framework.PodInfo
+	podInfo fwk.PodInfo
 	// A copy of the incoming pod's namespace labels.
 	namespaceLabels labels.Set
 }
@@ -77,11 +77,11 @@ func (s *preFilterState) updateWithPod(pInfo fwk.PodInfo, node *v1.Node, multipl
 		return
 	}
 
-	s.existingAntiAffinityCounts.updateWithAntiAffinityTerms(pInfo.GetRequiredAntiAffinityTerms(), s.podInfo.Pod, s.namespaceLabels, node, multiplier)
-	s.affinityCounts.updateWithAffinityTerms(s.podInfo.RequiredAffinityTerms, pInfo.GetPod(), node, multiplier)
+	s.existingAntiAffinityCounts.updateWithAntiAffinityTerms(pInfo.GetRequiredAntiAffinityTerms(), s.podInfo.GetPod(), s.namespaceLabels, node, multiplier)
+	s.affinityCounts.updateWithAffinityTerms(s.podInfo.GetRequiredAffinityTerms(), pInfo.GetPod(), node, multiplier)
 	// The incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 	// here we don't lookup the updated pod's namespace labels, hence passing nil for nsLabels.
-	s.antiAffinityCounts.updateWithAntiAffinityTerms(s.podInfo.RequiredAntiAffinityTerms, pInfo.GetPod(), nil, node, multiplier)
+	s.antiAffinityCounts.updateWithAntiAffinityTerms(s.podInfo.GetRequiredAntiAffinityTerms(), pInfo.GetPod(), nil, node, multiplier)
 }
 
 type topologyPair struct {
@@ -206,7 +206,7 @@ func (pl *InterPodAffinity) getExistingAntiAffinityCounts(ctx context.Context, p
 	index := int32(-1)
 	processNode := func(i int) {
 		nodeInfo := nodes[i]
-		node := nodeInfo.GetNode()
+		node := nodeInfo.Node()
 
 		antiAffinityCounts := make(topologyToMatchedTermCountList, 0)
 		for _, existingPod := range nodeInfo.GetPodsWithRequiredAntiAffinity() {
@@ -243,7 +243,7 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 	index := int32(-1)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
-		node := nodeInfo.GetNode()
+		node := nodeInfo.Node()
 
 		affinity := make(topologyToMatchedTermCountList, 0)
 		antiAffinity := make(topologyToMatchedTermCountList, 0)
@@ -284,12 +284,12 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("parsing pod: %+v", err))
 	}
 
-	for i := range s.podInfo.RequiredAffinityTerms {
+	for i := range s.podInfo.GetRequiredAffinityTerms() {
 		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(s.podInfo.GetRequiredAffinityTerms()[i]); err != nil {
 			return nil, fwk.AsStatus(err)
 		}
 	}
-	for i := range s.podInfo.RequiredAntiAffinityTerms {
+	for i := range s.podInfo.GetRequiredAntiAffinityTerms() {
 		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(s.podInfo.GetRequiredAntiAffinityTerms()[i]); err != nil {
 			return nil, fwk.AsStatus(err)
 		}
@@ -300,8 +300,13 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 	s.existingAntiAffinityCounts = pl.getExistingAntiAffinityCounts(ctx, pod, s.namespaceLabels, nodesWithRequiredAntiAffinityPods)
 	s.affinityCounts, s.antiAffinityCounts = pl.getIncomingAffinityAntiAffinityCounts(ctx, s.podInfo, allNodes)
 
+<<<<<<< HEAD
 	if len(s.existingAntiAffinityCounts) == 0 && len(s.podInfo.RequiredAffinityTerms) == 0 && len(s.podInfo.RequiredAntiAffinityTerms) == 0 {
 		return nil, fwk.NewStatus(fwk.Skip)
+=======
+	if len(s.existingAntiAffinityCounts) == 0 && len(s.podInfo.GetRequiredAffinityTerms()) == 0 && len(s.podInfo.GetRequiredAntiAffinityTerms()) == 0 {
+		return nil, framework.NewStatus(framework.Skip)
+>>>>>>> 08e38975e00 (Address review comments)
 	}
 
 	cycleState.Write(preFilterStateKey, s)
@@ -319,7 +324,7 @@ func (pl *InterPodAffinity) AddPod(ctx context.Context, cycleState fwk.CycleStat
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	state.updateWithPod(podInfoToAdd, nodeInfo.GetNode(), 1)
+	state.updateWithPod(podInfoToAdd, nodeInfo.Node(), 1)
 	return nil
 }
 
@@ -329,7 +334,7 @@ func (pl *InterPodAffinity) RemovePod(ctx context.Context, cycleState fwk.CycleS
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	state.updateWithPod(podInfoToRemove, nodeInfo.GetNode(), -1)
+	state.updateWithPod(podInfoToRemove, nodeInfo.Node(), -1)
 	return nil
 }
 
@@ -353,7 +358,7 @@ func satisfyExistingPodsAntiAffinity(state *preFilterState, nodeInfo fwk.NodeInf
 	if len(state.existingAntiAffinityCounts) > 0 {
 		// Iterate over topology pairs to get any of the pods being affected by
 		// the scheduled pod anti-affinity terms
-		for topologyKey, topologyValue := range nodeInfo.GetNode().Labels {
+		for topologyKey, topologyValue := range nodeInfo.Node().Labels {
 			tp := topologyPair{key: topologyKey, value: topologyValue}
 			if state.existingAntiAffinityCounts[tp] > 0 {
 				return false
@@ -366,8 +371,8 @@ func satisfyExistingPodsAntiAffinity(state *preFilterState, nodeInfo fwk.NodeInf
 // Checks if the node satisfies the incoming pod's anti-affinity rules.
 func satisfyPodAntiAffinity(state *preFilterState, nodeInfo fwk.NodeInfo) bool {
 	if len(state.antiAffinityCounts) > 0 {
-		for _, term := range state.podInfo.RequiredAntiAffinityTerms {
-			if topologyValue, ok := nodeInfo.GetNode().Labels[term.TopologyKey]; ok {
+		for _, term := range state.podInfo.GetRequiredAntiAffinityTerms() {
+			if topologyValue, ok := nodeInfo.Node().Labels[term.TopologyKey]; ok {
 				tp := topologyPair{key: term.TopologyKey, value: topologyValue}
 				if state.antiAffinityCounts[tp] > 0 {
 					return false
@@ -381,8 +386,8 @@ func satisfyPodAntiAffinity(state *preFilterState, nodeInfo fwk.NodeInfo) bool {
 // Checks if the node satisfies the incoming pod's affinity rules.
 func satisfyPodAffinity(state *preFilterState, nodeInfo fwk.NodeInfo) bool {
 	podsExist := true
-	for _, term := range state.podInfo.RequiredAffinityTerms {
-		if topologyValue, ok := nodeInfo.GetNode().Labels[term.TopologyKey]; ok {
+	for _, term := range state.podInfo.GetRequiredAffinityTerms() {
+		if topologyValue, ok := nodeInfo.Node().Labels[term.TopologyKey]; ok {
 			tp := topologyPair{key: term.TopologyKey, value: topologyValue}
 			if state.affinityCounts[tp] <= 0 {
 				podsExist = false
@@ -399,7 +404,7 @@ func satisfyPodAffinity(state *preFilterState, nodeInfo fwk.NodeInfo) bool {
 		// in the cluster matches the namespace and selector of this pod, the pod matches
 		// its own terms, and the node has all the requested topologies, then we allow the pod
 		// to pass the affinity check.
-		if len(state.affinityCounts) == 0 && podMatchesAllAffinityTerms(state.podInfo.RequiredAffinityTerms, state.podInfo.Pod) {
+		if len(state.affinityCounts) == 0 && podMatchesAllAffinityTerms(state.podInfo.GetRequiredAffinityTerms(), state.podInfo.GetPod()) {
 			return true
 		}
 		return false

@@ -1371,5 +1371,5 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 }
 
 func podInfoKeyFunc(pInfo *framework.QueuedPodInfo) string {
-	return cache.NewObjectName(pInfo.GetPodInfo().GetPod().Namespace, pInfo.GetPodInfo().GetPod().Name).String()
+	return cache.NewObjectName(pInfo.Pod.Namespace, pInfo.Pod.Name).String()
 }

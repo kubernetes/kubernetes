@@ -1182,7 +1182,7 @@ func TestDryRunPreemption(t *testing.T) {
 				t.Fatal(err)
 			}
 			sort.Slice(nodeInfos, func(i, j int) bool {
-				return nodeInfos[i].GetNode().Name < nodeInfos[j].GetNode().Name
+				return nodeInfos[i].Node().Name < nodeInfos[j].Node().Name
 			})
 
 			if tt.args == nil {
@@ -1468,7 +1468,7 @@ func TestCustomSelection(t *testing.T) {
 	}
 	nodeNameIsEligible := func(name string) IsEligiblePodFunc {
 		return func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool {
-			return nodeInfo.GetNode().Name == name
+			return nodeInfo.Node().Name == name
 		}
 	}
 	priorityBelowThresholdCannotPreempt := func(minPreempting int32) IsEligiblePodFunc {

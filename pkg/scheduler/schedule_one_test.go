@@ -2242,7 +2242,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			got, err := findNodesThatPassExtenders(ctx, extenders, pod, tf.BuildNodeInfos(tt.nodes), tt.filteredNodesStatuses)
 			nodes := make([]*v1.Node, len(got))
 			for i := 0; i < len(got); i++ {
-				nodes[i] = got[i].GetNode()
+				nodes[i] = got[i].Node()
 			}
 			if tt.expectsErr {
 				if err == nil {

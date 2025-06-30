@@ -182,7 +182,7 @@ func (cache *cacheImpl) Dump() *Dump {
 // UpdateSnapshot takes a snapshot of cached NodeInfo map. This is called at
 // beginning of every scheduling cycle.
 // The snapshot only includes Nodes that are not deleted at the time this function is called.
-// nodeInfo.GetNode() is guaranteed to be not nil for all the nodes in the snapshot.
+// nodeInfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
 // This function tracks generation number of NodeInfo and updates only the
 // entries of an existing snapshot that have changed after the snapshot was taken.
 func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapshot) error {
@@ -214,7 +214,7 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 			// all the nodes are updated before the existing snapshot. We are done.
 			break
 		}
-		if np := node.info.GetNode(); np != nil {
+		if np := node.info.Node(); np != nil {
 			existing, ok := nodeSnapshot.nodeInfoMap[np.Name]
 			if !ok {
 				updateAllLists = true
@@ -225,10 +225,10 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 			// We track nodes that have pods with affinity, here we check if this node changed its
 			// status from having pods with affinity to NOT having pods with affinity or the other
 			// way around.
-			if (len(existing.GetPodsWithAffinity()) > 0) != (len(clone.PodsWithAffinity) > 0) {
+			if (len(existing.PodsWithAffinity) > 0) != (len(clone.PodsWithAffinity) > 0) {
 				updateNodesHavePodsWithAffinity = true
 			}
-			if (len(existing.GetPodsWithRequiredAntiAffinity()) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
+			if (len(existing.PodsWithRequiredAntiAffinity) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
 				updateNodesHavePodsWithRequiredAntiAffinity = true
 			}
 			if !updateUsedPVCSet {
@@ -245,16 +245,7 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 			}
 			// We need to preserve the original pointer of the NodeInfo struct since it
 			// is used in the NodeInfoList, which we may not update.
-			// This operation on pointers is the reason why cacheImpl operates on framework.NodeInfo (concrete implementation)
-			// and not on interface fwk.NodeInfo.
-			if existingPtr, ok := existing.(*framework.NodeInfo); ok {
-				*existingPtr = *clone
-				nodeSnapshot.nodeInfoMap[np.Name] = existingPtr
-			} else {
-				errMsg := fmt.Sprintf("nodeInfoMap does not hold *framework.NodeInfo object. Cannot update the reference. Got object %s", existing)
-				logger.Error(nil, errMsg)
-				return errors.New(errMsg)
-			}
+			*existing = *clone
 		}
 	}
 	// Update the snapshot generation with the latest NodeInfo generation.
@@ -339,7 +330,7 @@ func (cache *cacheImpl) removeDeletedNodesFromSnapshot(snapshot *Snapshot) {
 		if toDelete <= 0 {
 			break
 		}
-		if n, ok := cache.nodes[name]; !ok || n.info.GetNode() == nil {
+		if n, ok := cache.nodes[name]; !ok || n.info.Node() == nil {
 			delete(snapshot.nodeInfoMap, name)
 			toDelete--
 		}
@@ -481,7 +472,7 @@ func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod) error {
 		if err := n.info.RemovePod(logger, pod); err != nil {
 			return err
 		}
-		if len(n.info.Pods) == 0 && n.info.GetNode() == nil {
+		if len(n.info.Pods) == 0 && n.info.Node() == nil {
 			cache.removeNodeInfoFromList(logger, pod.Spec.NodeName)
 		} else {
 			cache.moveNodeInfoToHead(logger, pod.Spec.NodeName)
@@ -618,7 +609,7 @@ func (cache *cacheImpl) AddNode(logger klog.Logger, node *v1.Node) *framework.No
 		n = newNodeInfoListItem(framework.NewNodeInfo())
 		cache.nodes[node.Name] = n
 	} else {
-		cache.removeNodeImageStates(n.info.GetNode())
+		cache.removeNodeImageStates(n.info.Node())
 	}
 	cache.moveNodeInfoToHead(logger, node.Name)
 
@@ -637,7 +628,7 @@ func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node
 		cache.nodes[newNode.Name] = n
 		cache.nodeTree.addNode(logger, newNode)
 	} else {
-		cache.removeNodeImageStates(n.info.GetNode())
+		cache.removeNodeImageStates(n.info.Node())
 	}
 	cache.moveNodeInfoToHead(logger, newNode.Name)
 

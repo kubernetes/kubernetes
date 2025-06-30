@@ -1974,13 +1974,13 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: nil,
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
@@ -2007,14 +2007,14 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2027,8 +2027,8 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
-					fwk.ProtocolPort{"TCP", 8002}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8002}: struct{}{},
 				},
 			},
 		},
@@ -2047,7 +2047,7 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2060,7 +2060,7 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
@@ -2076,14 +2076,14 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2096,14 +2096,14 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2116,8 +2116,8 @@ func TestUpdateUsedPorts_PodAdd(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
-					fwk.ProtocolPort{"TCP", 8002}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8002}: struct{}{},
 				},
 			},
 		},
@@ -2145,13 +2145,13 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: nil,
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
@@ -2169,7 +2169,7 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2185,7 +2185,7 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2198,15 +2198,15 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
-					fwk.ProtocolPort{"TCP", 8002}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8002}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2219,14 +2219,14 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2239,14 +2239,14 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2262,7 +2262,7 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2275,15 +2275,15 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},
 		{
 			ports: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
-					fwk.ProtocolPort{"TCP", 8002}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8002}: struct{}{},
 				},
 			},
 			pod: st.MakePod().
@@ -2296,7 +2296,7 @@ func TestUpdateUsedPorts_PodRemove(t *testing.T) {
 				Obj(),
 			want: fwk.HostPortInfo{
 				"0.0.0.0": {
-					fwk.ProtocolPort{"TCP", 8001}: struct{}{},
+					fwk.ProtocolPort{Protocol: "TCP", Port: 8001}: struct{}{},
 				},
 			},
 		},

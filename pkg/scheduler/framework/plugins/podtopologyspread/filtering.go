@@ -161,7 +161,7 @@ func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState fwk.CycleSta
 		return fwk.AsStatus(err)
 	}
 
-	pl.updateWithPod(s, podInfoToAdd.GetPod(), podToSchedule, nodeInfo.GetNode(), 1)
+	pl.updateWithPod(s, podInfoToAdd.GetPod(), podToSchedule, nodeInfo.Node(), 1)
 	return nil
 }
 
@@ -172,7 +172,7 @@ func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState fwk.Cycle
 		return fwk.AsStatus(err)
 	}
 
-	pl.updateWithPod(s, podInfoToRemove.GetPod(), podToSchedule, nodeInfo.GetNode(), -1)
+	pl.updateWithPod(s, podInfoToRemove.GetPod(), podToSchedule, nodeInfo.Node(), -1)
 	return nil
 }
 
@@ -254,7 +254,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
 	processNode := func(n int) {
 		nodeInfo := allNodes[n]
-		node := nodeInfo.GetNode()
+		node := nodeInfo.Node()
 
 		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
 			// spreading is applied to nodes that pass those filters.

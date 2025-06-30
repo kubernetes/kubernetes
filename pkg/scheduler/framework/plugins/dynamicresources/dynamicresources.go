@@ -548,7 +548,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 	}
 
 	logger := klog.FromContext(ctx)
-	node := nodeInfo.GetNode()
+	node := nodeInfo.Node()
 
 	var unavailableClaims []int
 	for index, claim := range state.claims {

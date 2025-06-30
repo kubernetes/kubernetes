@@ -814,7 +814,7 @@ func BenchmarkVolumeZone(b *testing.B) {
 			defer cancel()
 			nodes := makeNodesWithTopologyZone(tt.NumNodes)
 			pl := newPluginWithListers(ctx, b, []*v1.Pod{tt.Pod}, nodes, makePVCsWithPV(tt.NumPVC), makePVsWithZoneLabel(tt.NumPV))
-			nodeInfos := make([]*framework.NodeInfo, len(nodes))
+			nodeInfos := make([]fwk.NodeInfo, len(nodes))
 			for i := 0; i < len(nodes); i++ {
 				nodeInfo := &framework.NodeInfo{}
 				nodeInfo.SetNode(nodes[i])

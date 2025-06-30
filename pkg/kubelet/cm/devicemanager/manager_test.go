@@ -1589,7 +1589,7 @@ func TestUpdatePluginResources(t *testing.T) {
 
 	testManager.UpdatePluginResources(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
 
-	allocatableScalarResources := nodeInfo.Allocatable.GetScalarResources()
+	allocatableScalarResources := nodeInfo.Allocatable.ScalarResources
 	// allocatable in nodeInfo is less than needed, should update
 	as.Equal(1, int(allocatableScalarResources[v1.ResourceName(resourceName1)]))
 	// allocatable in nodeInfo is more than needed, should skip updating
