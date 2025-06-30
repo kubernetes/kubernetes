@@ -86,7 +86,7 @@ func populateStatuszData(reg statuszRegistry, componentName string) (string, err
 	}
 	var apiserverLinks string
 	if componentName == "kube-apiserver" {
-		apiserverLinks = fmt.Sprintf(`Useful Endpoints: %s %s`, delim, html.EscapeString(aggregatePaths(reg.paths())))
+		apiserverLinks = fmt.Sprintf(`Useful Endpoints%s %s`, delim, html.EscapeString(aggregatePaths(reg.paths())))
 	}
 
 	status := fmt.Sprintf(`
@@ -111,14 +111,14 @@ func aggregatePaths(listedPaths []string) string {
 	paths := make(map[string]bool)
 	for _, listedPath := range listedPaths {
 		folder := "/" + strings.Split(listedPath, "/")[1]
-		if paths[folder] == false {
+		if !paths[folder] {
 			paths[folder] = true
 		}
 	}
 
 	var path string
-	for key, _ := range paths {
-		path += " " + key 
+	for p := range paths {
+		path += " " + p
 	}
 
 	return path
