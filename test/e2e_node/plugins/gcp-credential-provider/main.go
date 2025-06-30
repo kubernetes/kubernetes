@@ -116,6 +116,7 @@ func getCredentials(tokenEndpoint string, r io.Reader, w io.Writer) error {
 
 	if pluginUsingServiceAccount {
 		response.CacheKeyType = credentialproviderv1.GlobalPluginCacheKeyType
+		response.ServiceAccountTokenCacheType = credentialproviderv1.ServiceAccountServiceAccountTokenCacheType
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
