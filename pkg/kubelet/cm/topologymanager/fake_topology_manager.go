@@ -17,6 +17,8 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
@@ -29,14 +31,14 @@ type fakeManager struct {
 }
 
 // NewFakeManager returns an instance of FakeManager
-func NewFakeManager() Manager {
-	klog.Background().Info("NewFakeManager")
+func NewFakeManager(ctx context.Context) Manager {
+	klog.FromContext(ctx).Info("NewFakeManager")
 	return &fakeManager{}
 }
 
 // NewFakeManagerWithHint returns an instance of fake topology manager with specified topology hints
-func NewFakeManagerWithHint(hint *TopologyHint) Manager {
-	klog.Background().Info("NewFakeManagerWithHint")
+func NewFakeManagerWithHint(ctx context.Context, hint *TopologyHint) Manager {
+	klog.FromContext(ctx).Info("NewFakeManagerWithHint")
 	return &fakeManager{
 		hint:   hint,
 		policy: NewNonePolicy(),
@@ -44,15 +46,15 @@ func NewFakeManagerWithHint(hint *TopologyHint) Manager {
 }
 
 // NewFakeManagerWithPolicy returns an instance of fake topology manager with specified policy
-func NewFakeManagerWithPolicy(policy Policy) Manager {
-	klog.Background().Info("NewFakeManagerWithPolicy", "policy", policy.Name())
+func NewFakeManagerWithPolicy(ctx context.Context, policy Policy) Manager {
+	klog.FromContext(ctx).Info("NewFakeManagerWithPolicy", "policy", policy.Name())
 	return &fakeManager{
 		policy: policy,
 	}
 }
 
 func (m *fakeManager) GetAffinity(podUID string, containerName string) TopologyHint {
-	klog.Background().Info("GetAffinity", "podUID", podUID, "containerName", containerName)
+	klog.TODO().Info("GetAffinity", "podUID", podUID, "containerName", containerName)
 	if m.hint == nil {
 		return TopologyHint{}
 	}
@@ -65,19 +67,19 @@ func (m *fakeManager) GetPolicy() Policy {
 }
 
 func (m *fakeManager) AddHintProvider(h HintProvider) {
-	klog.Background().Info("AddHintProvider", "hintProvider", h)
+	klog.TODO().Info("AddHintProvider", "hintProvider", h)
 }
 
 func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
-	klog.Background().Info("AddContainer", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
+	klog.TODO().Info("AddContainer", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
 func (m *fakeManager) RemoveContainer(containerID string) error {
-	klog.Background().Info("RemoveContainer", "containerID", containerID)
+	klog.TODO().Info("RemoveContainer", "containerID", containerID)
 	return nil
 }
 
 func (m *fakeManager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	klog.Background().Info("Topology Admit Handler")
+	klog.TODO().Info("Topology Admit Handler")
 	return admission.GetPodAdmitResult(nil)
 }

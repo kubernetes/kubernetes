@@ -22,10 +22,13 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestNewFakeManager(t *testing.T) {
-	fm := NewFakeManager()
+	tCtx := ktesting.Init(t)
+
+	fm := NewFakeManager(tCtx)
 
 	if _, ok := fm.(Manager); !ok {
 		t.Errorf("Result is not Manager type")
