@@ -34,6 +34,12 @@ function kube::protoc::generate_proto() {
   kube::golang::setup_env
   GOPROXY=off go install k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 
+  # Install vtprotobuf generator for enhanced performance (optional)
+  # Install standard protobuf generators needed for vtproto compatibility
+  GOPROXY=off GOPROXY=direct go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6
+  GOPROXY=off GOPROXY=direct go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+  GOWORK=off GOPROXY=direct go install github.com/planetscale/vtprotobuf/cmd/protoc-gen-go-vtproto@ba97887b0a2
+
   kube::protoc::check_protoc
 
   local package=${1}
@@ -58,6 +64,9 @@ function kube::protoc::check_protoc() {
 function kube::protoc::protoc() {
   local package=${1}
   gogopath=$(dirname "$(kube::util::find-binary "protoc-gen-gogo")")
+  vtprotopath=$(dirname "$(kube::util::find-binary "protoc-gen-go-vtproto")" 2>/dev/null || echo "")
+  gopath=$(dirname "$(kube::util::find-binary "protoc-gen-go")" 2>/dev/null || echo "")
+  gogrpcpath=$(dirname "$(kube::util::find-binary "protoc-gen-go-grpc")" 2>/dev/null || echo "")
 
   (
     cd "${package}"
@@ -66,13 +75,28 @@ function kube::protoc::protoc() {
     # directory (despite gogo docs saying it would be source-relative, it
     # isn't).  The inputs to this function do not all have a common root, so
     # this works best for all inputs.
-    PATH="${gogopath}:${PATH}" protoc \
-      --proto_path="$(pwd -P)" \
-      --proto_path="${KUBE_ROOT}/vendor" \
-      --proto_path="${KUBE_ROOT}/staging/src" \
-      --proto_path="${KUBE_ROOT}/third_party/protobuf" \
-      --gogo_out=paths=source_relative,plugins=grpc:. \
-      api.proto
+    
+    # Build the protoc command with optional vtprotobuf support
+    local protoc_cmd="PATH=\"${gogopath}:${vtprotopath}:${gopath}:${gogrpcpath}:${PATH}\" protoc"
+    local proto_paths=(
+      "--proto_path=$(pwd -P)"
+      "--proto_path=${KUBE_ROOT}/vendor"
+      "--proto_path=${KUBE_ROOT}/staging/src"
+      "--proto_path=${KUBE_ROOT}/third_party/protobuf"
+    )
+
+    local go_package="$(grep 'go_package' api.proto | cut -d'"' -f2)"
+    # Use standard protoc-gen-go for compatibility with vtprotobuf
+    local generators=(
+      "--go_out=paths=source_relative:."
+      "--go-grpc_out=paths=source_relative:."
+      "--go-vtproto_out=paths=source_relative:."
+      "--go-vtproto_opt=features=marshal+unmarshal+size+equal+clone+pool"
+      "--go-vtproto_opt=ignoreUnknownFields=${go_package}.*"
+    )
+
+    # Execute the protoc command
+    eval "${protoc_cmd} ${proto_paths[*]} ${generators[*]} api.proto"
   )
 }
 

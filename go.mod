@@ -47,6 +47,7 @@ require (
 	github.com/onsi/gomega v1.35.1
 	github.com/opencontainers/cgroups v0.0.1
 	github.com/opencontainers/selinux v1.11.1
+	github.com/planetscale/vtprotobuf v0.6.1-0.20250313105119-ba97887b0a25
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.1
