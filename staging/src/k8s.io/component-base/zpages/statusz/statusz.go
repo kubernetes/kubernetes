@@ -21,7 +21,10 @@ import (
 	"html"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
+
+	"golang.org/x/exp/maps"
 
 	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/zpages/httputil"
@@ -43,8 +46,8 @@ type mux interface {
 	Handle(path string, handler http.Handler)
 }
 
-func NewRegistry(effectiveVersion compatibility.EffectiveVersion) statuszRegistry {
-	return &registry{effectiveVersion: effectiveVersion}
+func NewRegistry(effectiveVersion compatibility.EffectiveVersion, listedPaths []string) statuszRegistry {
+	return &registry{effectiveVersion: effectiveVersion, listedPaths: listedPaths}
 }
 
 func Install(m mux, componentName string, reg statuszRegistry) {
@@ -85,14 +88,7 @@ func populateStatuszData(reg statuszRegistry, componentName string) (string, err
 	}
 	var apiserverLinks string
 	if componentName == "kube-apiserver" {
-		apiserverLinks = `
-Useful Endpoints:
-----------------
-"healthz":  "/healthz",
-"livez":	"/livez",
-"readyz":	"/readyz",
-"version":  "/version",
-"metrics":	"/metrics"`
+		apiserverLinks = fmt.Sprintf(`Useful Endpoints: %s %s`, delim, html.EscapeString(aggregatePaths(reg.listedPaths())))
 	}
 
 	status := fmt.Sprintf(`
@@ -111,4 +107,16 @@ func uptime(t time.Time) string {
 	upSince := int64(time.Since(t).Seconds())
 	return fmt.Sprintf("%d hr %02d min %02d sec",
 		upSince/3600, (upSince/60)%60, upSince%60)
+}
+
+func aggregatePaths(listedPaths []string) string {
+	paths := make(map[string]bool)
+	for _, listedPath := range listedPaths {
+		folder := "/" + strings.Split(listedPath, "/")[1]
+		if paths[folder] == false {
+			paths[folder] = true
+		}
+	}
+
+	return strings.Join(maps.Keys(paths), " ")
 }

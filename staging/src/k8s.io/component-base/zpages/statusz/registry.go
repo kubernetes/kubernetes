@@ -32,11 +32,14 @@ type statuszRegistry interface {
 	goVersion() string
 	binaryVersion() *version.Version
 	emulationVersion() *version.Version
+	listedPaths() []string
 }
 
 type registry struct {
 	// componentGlobalsRegistry compatibility.ComponentGlobalsRegistry
 	effectiveVersion compatibility.EffectiveVersion
+	// ListedPaths is an alphabetically sorted list of paths to be reported at /.
+	listedpaths []string
 }
 
 func (*registry) processStartTime() time.Time {
@@ -62,6 +65,14 @@ func (r *registry) binaryVersion() *version.Version {
 func (r *registry) emulationVersion() *version.Version {
 	if r.effectiveVersion != nil {
 		return r.effectiveVersion.EmulationVersion()
+	}
+
+	return nil
+}
+
+func (r *registry) listedPaths() []string {
+	if r.listedPaths != nil {
+		return r.listedPaths
 	}
 
 	return nil
