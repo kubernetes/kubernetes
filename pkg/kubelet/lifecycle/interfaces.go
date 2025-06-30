@@ -35,6 +35,8 @@ type PodAdmitResult struct {
 	Reason string
 	// a brief message explaining why the pod could not be admitted.
 	Message string
+	// all errors for why the pod could not be admitted.
+	Errors []error
 }
 
 // PodAdmitHandler is notified during pod admission.

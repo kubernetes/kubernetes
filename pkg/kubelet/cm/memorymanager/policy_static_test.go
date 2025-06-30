@@ -2017,9 +2017,9 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			}
 
 			err = p.Allocate(tCtx, s, testCase.pod, &testCase.pod.Spec.Containers[0])
-			if !reflect.DeepEqual(err, testCase.expectedError) {
-				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
-			}
+			if (err == nil) != (testCase.expectedError == nil) || (err != nil && testCase.expectedError != nil && err.Error() != testCase.expectedError.Error()) {
+ 				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
+ 			}
 
 			if err != nil {
 				return
