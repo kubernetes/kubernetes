@@ -149,7 +149,7 @@ func ValidateDiscovery(d *kubeadm.Discovery, fldPath *field.Path) field.ErrorLis
 	allErrs := field.ErrorList{}
 
 	if d.BootstrapToken == nil && d.File == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "bootstrapToken or file must be set"))
+		allErrs = append(allErrs, field.Required(fldPath, "bootstrapToken or file must be set"))
 	}
 
 	if d.BootstrapToken != nil && d.File != nil {

@@ -52,7 +52,7 @@ func TestValidatePodSecurityConfiguration(t *testing.T) {
 				field.Invalid(exemptionsPath("runtimeClasses", 1), invalidValueChars, "..."),
 				field.Invalid(exemptionsPath("runtimeClasses", 2), invalidValueUppercase, "..."),
 				field.Duplicate(exemptionsPath("runtimeClasses", 4), validValue),
-				field.Invalid(exemptionsPath("usernames", 0), invalidValueEmpty, "..."),
+				field.Required(exemptionsPath("usernames", 0), invalidValueEmpty),
 				field.Duplicate(exemptionsPath("usernames", 2), validValue),
 			},
 			configuration: api.PodSecurityConfiguration{

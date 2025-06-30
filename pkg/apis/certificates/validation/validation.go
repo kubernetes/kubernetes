@@ -561,7 +561,7 @@ func validateTrustBundle(path *field.Path, in string) field.ErrorList {
 	}
 
 	if len(blockDedupe) == 0 {
-		allErrors = append(allErrors, field.Invalid(path, "<value omitted>", "at least one trust anchor must be provided"))
+		allErrors = append(allErrors, field.Required(path, "at least one trust anchor must be provided"))
 	}
 
 	for _, indices := range blockDedupe {

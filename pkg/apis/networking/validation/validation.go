@@ -534,7 +534,7 @@ func validateIngressBackend(backend *networking.IngressBackend, fldPath *field.P
 			allErrs = append(allErrs, field.Required(fldPath, "port name or number is required"))
 		}
 	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "resource or service backend is required"))
+		allErrs = append(allErrs, field.Required(fldPath, "resource or service backend is required"))
 	}
 	return allErrs
 }

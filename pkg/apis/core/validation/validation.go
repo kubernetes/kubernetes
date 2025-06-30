@@ -2690,7 +2690,7 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path, opts PodValida
 	}
 
 	if numSources == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`"))
+		allErrs = append(allErrs, field.Required(fldPath, "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`"))
 	} else if len(ev.Value) != 0 {
 		if numSources != 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
@@ -2789,7 +2789,7 @@ func ValidateEnvFrom(vars []core.EnvFromSource, fldPath *field.Path, opts PodVal
 		}
 
 		if numSources == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `configMapRef` or `secretRef`"))
+			allErrs = append(allErrs, field.Required(fldPath, "must specify one of: `configMapRef` or `secretRef`"))
 		} else if numSources > 1 {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not have more than one field specified at a time"))
 		}
@@ -3058,7 +3058,7 @@ func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResource
 		allErrs = append(allErrs, field.Invalid(fldPath, claim, "at most one of `resourceClaimName` or `resourceClaimTemplateName` may be specified"))
 	}
 	if claim.ResourceClaimName == nil && claim.ResourceClaimTemplateName == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, claim, "must specify one of: `resourceClaimName`, `resourceClaimTemplateName`"))
+		allErrs = append(allErrs, field.Required(fldPath, "must specify one of: `resourceClaimName`, `resourceClaimTemplateName`"))
 	}
 	if claim.ResourceClaimName != nil {
 		for _, detail := range ValidateResourceClaimName(*claim.ResourceClaimName, false) {
@@ -8434,7 +8434,7 @@ func validateUpgradeDowngradeClusterIPs(oldService, service *core.Service) field
 		// user *must* set IPFamilyPolicy == SingleStack
 		if len(service.Spec.ClusterIPs) == 1 {
 			if service.Spec.IPFamilyPolicy == nil || *(service.Spec.IPFamilyPolicy) != core.IPFamilyPolicySingleStack {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "must be set to 'SingleStack' when releasing the secondary clusterIP"))
+				allErrs = append(allErrs, field.Required(field.NewPath("spec", "ipFamilyPolicy"), "must be set to 'SingleStack' when releasing the secondary clusterIP"))
 			}
 		}
 	case len(oldService.Spec.ClusterIPs) < len(service.Spec.ClusterIPs):
@@ -8498,7 +8498,7 @@ func validateUpgradeDowngradeIPFamilies(oldService, service *core.Service) field
 		// user *must* set IPFamilyPolicy == SingleStack
 		if len(service.Spec.IPFamilies) == 1 {
 			if service.Spec.IPFamilyPolicy == nil || *(service.Spec.IPFamilyPolicy) != core.IPFamilyPolicySingleStack {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy, "must be set to 'SingleStack' when releasing the secondary ipFamily"))
+				allErrs = append(allErrs, field.Required(field.NewPath("spec", "ipFamilyPolicy"), "must be set to 'SingleStack' when releasing the secondary ipFamily"))
 			}
 		}
 	case len(oldService.Spec.IPFamilies) < len(service.Spec.IPFamilies):

@@ -1226,7 +1226,7 @@ func TestValidateClusterTrustBundle(t *testing.T) {
 				Spec: capi.ClusterTrustBundleSpec{},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
+				field.Required(field.NewPath("spec", "trustBundle"), "at least one trust anchor must be provided"),
 			},
 		}, {
 			description: "invalid, no trust anchors",
@@ -1239,7 +1239,7 @@ func TestValidateClusterTrustBundle(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
+				field.Required(field.NewPath("spec", "trustBundle"), "at least one trust anchor must be provided"),
 			},
 		}, {
 			description: "invalid, bad signer name",
@@ -1266,7 +1266,7 @@ func TestValidateClusterTrustBundle(t *testing.T) {
 				},
 			},
 			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
+				field.Required(field.NewPath("spec", "trustBundle"), "at least one trust anchor must be provided"),
 			},
 		}, {
 			description: "invalid, bad block type",
@@ -1467,7 +1467,7 @@ func TestValidateClusterTrustBundleUpdate(t *testing.T) {
 			},
 		},
 		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
+			field.Required(field.NewPath("spec", "trustBundle"), "at least one trust anchor must be provided"),
 		},
 	}, {
 		description: "emptying trustBundle (replace with non-block garbage) disallowed",
@@ -1490,7 +1490,7 @@ func TestValidateClusterTrustBundleUpdate(t *testing.T) {
 			},
 		},
 		wantErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec", "trustBundle"), "<value omitted>", "at least one trust anchor must be provided"),
+			field.Required(field.NewPath("spec", "trustBundle"), "at least one trust anchor must be provided"),
 		},
 	}}
 

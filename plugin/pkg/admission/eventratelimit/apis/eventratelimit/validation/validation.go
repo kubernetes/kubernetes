@@ -34,7 +34,7 @@ func ValidateConfiguration(config *eventratelimitapi.Configuration) field.ErrorL
 	allErrs := field.ErrorList{}
 	limitsPath := field.NewPath("limits")
 	if len(config.Limits) == 0 {
-		allErrs = append(allErrs, field.Invalid(limitsPath, config.Limits, "must not be empty"))
+		allErrs = append(allErrs, field.Required(limitsPath, ""))
 	}
 	for i, limit := range config.Limits {
 		idxPath := limitsPath.Index(i)

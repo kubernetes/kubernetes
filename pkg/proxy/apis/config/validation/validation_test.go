@@ -774,7 +774,7 @@ func TestValidateDetectLocalConfiguration(t *testing.T) {
 			config: kubeproxyconfig.DetectLocalConfiguration{
 				InterfaceNamePrefix: "",
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DetectLocal").Child("InterfacePrefix"), "", "must not be empty")},
+			expectedErrs: field.ErrorList{field.Required(newPath.Child("DetectLocal").Child("InterfacePrefix"), "")},
 		},
 		{
 			name: "bridgeInterfaceName is empty",
@@ -782,7 +782,7 @@ func TestValidateDetectLocalConfiguration(t *testing.T) {
 			config: kubeproxyconfig.DetectLocalConfiguration{
 				InterfaceNamePrefix: "eth0", // we won't care about prefix since mode is not prefix
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("DetectLocal").Child("InterfaceName"), "", "must not be empty")},
+			expectedErrs: field.ErrorList{field.Required(newPath.Child("DetectLocal").Child("InterfaceName"), "")},
 		},
 		{
 			name: "valid cluster cidr",

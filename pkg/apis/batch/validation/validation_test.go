@@ -611,7 +611,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 		},
-		`spec.podFailurePolicy.rules[0]: Invalid value: specifying one of OnExitCodes and OnPodConditions is required`: {
+		`spec.podFailurePolicy.rules[0]: Required value: specifying one of OnExitCodes and OnPodConditions is required`: {
 			job: batch.Job{
 				ObjectMeta: validJobObjectMeta,
 				Spec: batch.JobSpec{
@@ -758,7 +758,7 @@ func TestValidateJob(t *testing.T) {
 			},
 			opts: JobValidationOptions{RequirePrefixedLabels: true},
 		},
-		`spec.podFailurePolicy.rules[0].onExitCodes.values: Invalid value: []int32{}: at least one value is required`: {
+		`spec.podFailurePolicy.rules[0].onExitCodes.values: Required value: at least one value is required`: {
 			job: batch.Job{
 				ObjectMeta: validJobObjectMeta,
 				Spec: batch.JobSpec{
@@ -2384,10 +2384,10 @@ func TestValidateJobUpdateStatus(t *testing.T) {
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeDuplicate, Field: "status.uncountedTerminatedPods.succeeded[3]"},
-				{Type: field.ErrorTypeInvalid, Field: "status.uncountedTerminatedPods.succeeded[4]"},
+				{Type: field.ErrorTypeRequired, Field: "status.uncountedTerminatedPods.succeeded[4]"},
 				{Type: field.ErrorTypeDuplicate, Field: "status.uncountedTerminatedPods.failed[0]"},
 				{Type: field.ErrorTypeDuplicate, Field: "status.uncountedTerminatedPods.failed[3]"},
-				{Type: field.ErrorTypeInvalid, Field: "status.uncountedTerminatedPods.failed[4]"},
+				{Type: field.ErrorTypeRequired, Field: "status.uncountedTerminatedPods.failed[4]"},
 			},
 		},
 	}

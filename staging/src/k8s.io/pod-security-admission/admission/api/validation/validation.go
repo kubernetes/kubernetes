@@ -112,7 +112,7 @@ func validateUsernames(configuration *admissionapi.PodSecurityConfiguration) fie
 	for i, uname := range configuration.Exemptions.Usernames {
 		if uname == "" {
 			path := field.NewPath("exemptions", "usernames").Index(i)
-			errs = append(errs, field.Invalid(path, uname, "username must not be empty"))
+			errs = append(errs, field.Required(path, ""))
 			continue
 		}
 		if validSet.Has(uname) {

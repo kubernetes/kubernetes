@@ -542,7 +542,7 @@ func ValidatePriorityLevelConfigurationCondition(condition *flowcontrol.Priority
 //  4. Wildcard "*" should only do suffix glob matching. Note that wildcard also matches slashes.
 func ValidateNonResourceURLPath(path string, fldPath *field.Path) *field.Error {
 	if len(path) == 0 {
-		return field.Invalid(fldPath, path, "must not be empty")
+		return field.Required(fldPath, "")
 	}
 	if path == "/" { // root path
 		return nil
