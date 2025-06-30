@@ -3594,6 +3594,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	crOptions := &config.ContainerRuntimeOptions{}
 
 	testMainKubelet, err := NewMainKubelet(
+		tCtx,
 		kubeCfg,
 		kubeDep,
 		crOptions,
@@ -3653,6 +3654,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 }
 
 func TestSyncPodSpans(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false)
 	kubelet := testKubelet.kubelet
 
@@ -3693,6 +3695,7 @@ func TestSyncPodSpans(t *testing.T) {
 	assert.NoError(t, err)
 
 	kubelet.containerRuntime, _, err = kuberuntime.NewKubeGenericRuntimeManager(
+		tCtx,
 		kubelet.recorder,
 		kubelet.livenessManager,
 		kubelet.readinessManager,
