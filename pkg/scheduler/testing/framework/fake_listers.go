@@ -224,13 +224,13 @@ func (pvcs PersistentVolumeClaimLister) PersistentVolumeClaims(namespace string)
 	}
 }
 
-// NodeInfoLister declares a framework.NodeInfo type for testing.
+// NodeInfoLister declares a fwk.NodeInfo type for testing.
 type NodeInfoLister []fwk.NodeInfo
 
 // Get returns a fake node object in the fake nodes.
 func (nodes NodeInfoLister) Get(nodeName string) (fwk.NodeInfo, error) {
 	for _, node := range nodes {
-		if node != nil && node.GetNode().Name == nodeName {
+		if node != nil && node.Node().Name == nodeName {
 			return node, nil
 		}
 	}

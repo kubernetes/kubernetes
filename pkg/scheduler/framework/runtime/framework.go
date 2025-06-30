@@ -807,9 +807,12 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 		status = f.runPreFilterExtensionAddPod(ctx, pl, state, podToSchedule, podInfoToAdd, nodeInfo)
 		if !status.IsSuccess() {
 			err := status.AsError()
+			// The check below is needed for test
+			//  TestRunPreFilterExtensionAddPod/one_AddPod()_returned_error
+			// TODO: find out why
 			var node *v1.Node
 			if nodeInfo != nil {
-				node = nodeInfo.GetNode()
+				node = nodeInfo.Node()
 			}
 			logger.Error(err, "Plugin failed", "pod", klog.KObj(podToSchedule), "node", klog.KObj(node), "operation", "addPod", "plugin", pl.Name())
 			return framework.AsStatus(fmt.Errorf("running AddPod on PreFilter plugin %q: %w", pl.Name(), err))
@@ -858,7 +861,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 			err := status.AsError()
 			var node *v1.Node
 			if nodeInfo != nil {
-				node = nodeInfo.GetNode()
+				node = nodeInfo.Node()
 			}
 			logger.Error(err, "Plugin failed", "node", klog.KObj(node), "operation", "removePod", "plugin", pl.Name(), "pod", klog.KObj(podToSchedule))
 			return framework.AsStatus(fmt.Errorf("running RemovePod on PreFilter plugin %q: %w", pl.Name(), err))
@@ -1049,7 +1052,7 @@ func addGENominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, s
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
 	}
-	nominatedPodInfos := fh.NominatedPodsForNode(nodeInfo.GetNode().Name)
+	nominatedPodInfos := fh.NominatedPodsForNode(nodeInfo.Node().Name)
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
@@ -1151,7 +1154,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 		// Run Score method for each node in parallel.
 		f.Parallelizer().Until(ctx, len(nodes), func(index int) {
 			nodeInfo := nodes[index]
-			nodeName := nodeInfo.GetNode().Name
+			nodeName := nodeInfo.Node().Name
 			logger := logger
 			if verboseLogs {
 				logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
@@ -1201,7 +1204,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 	// and then, build allNodePluginScores.
 	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
 		nodePluginScores := framework.NodePluginScores{
-			Name:   nodes[index].GetNode().Name,
+			Name:   nodes[index].Node().Name,
 			Scores: make([]framework.PluginScore, len(plugins)),
 		}
 

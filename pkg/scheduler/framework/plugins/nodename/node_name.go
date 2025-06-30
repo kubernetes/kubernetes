@@ -79,7 +79,7 @@ func (pl *NodeName) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, n
 
 // Fits actually checks if the pod fits the node.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
-	return len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == nodeInfo.GetNode().Name
+	return len(pod.Spec.NodeName) == 0 || pod.Spec.NodeName == nodeInfo.Node().Name
 }
 
 // New initializes a new plugin and returns it.

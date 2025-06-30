@@ -262,7 +262,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 		return nil
 	}
 
-	node := nodeInfo.GetNode()
+	node := nodeInfo.Node()
 
 	logger := klog.FromContext(ctx)
 

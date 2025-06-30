@@ -33,11 +33,7 @@ import (
 )
 
 // FitPredicate is a function type which is used in fake extender.
-<<<<<<< HEAD
-type FitPredicate func(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status
-=======
-type FitPredicate func(pod *v1.Pod, node fwk.NodeInfo) *framework.Status
->>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
+type FitPredicate func(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status
 
 // PriorityFunc is a function type which is used in fake extender.
 type PriorityFunc func(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.NodeScoreList, error)
@@ -49,33 +45,18 @@ type PriorityConfig struct {
 }
 
 // ErrorPredicateExtender implements FitPredicate function to always return error status.
-<<<<<<< HEAD
-func ErrorPredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+func ErrorPredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Error, "some error")
 }
 
 // FalsePredicateExtender implements FitPredicate function to always return unschedulable status.
-func FalsePredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+func FalsePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("pod is unschedulable on the node %q", node.Node().Name))
 }
 
 // TruePredicateExtender implements FitPredicate function to always return success status.
-func TruePredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+func TruePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Success)
-=======
-func ErrorPredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Error, "some error")
-}
-
-// FalsePredicateExtender implements FitPredicate function to always return unschedulable status.
-func FalsePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("pod is unschedulable on the node %q", node.GetNode().Name))
-}
-
-// TruePredicateExtender implements FitPredicate function to always return success status.
-func TruePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Success)
->>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 }
 
 // Node1PredicateExtender implements FitPredicate function to return true
@@ -88,11 +69,15 @@ func Node1PredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 =======
 func Node1PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
-	if node.GetNode().Name == "node1" {
+	if node.Node().Name == "node1" {
 		return framework.NewStatus(framework.Success)
 	}
+<<<<<<< HEAD
 	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.GetNode().Name))
 >>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
+=======
+	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
+>>>>>>> 08e38975e00 (Address review comments)
 }
 
 // Node2PredicateExtender implements FitPredicate function to return true
@@ -105,11 +90,15 @@ func Node2PredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
 =======
 func Node2PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
-	if node.GetNode().Name == "node2" {
+	if node.Node().Name == "node2" {
 		return framework.NewStatus(framework.Success)
 	}
+<<<<<<< HEAD
 	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.GetNode().Name))
 >>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
+=======
+	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
+>>>>>>> 08e38975e00 (Address review comments)
 }
 
 // ErrorPrioritizerExtender implements PriorityFunc function to always return error.
@@ -123,10 +112,10 @@ func Node1PrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.Nod
 	result := framework.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
-		if node.GetNode().Name == "node1" {
+		if node.Node().Name == "node1" {
 			score = 10
 		}
-		result = append(result, framework.NodeScore{Name: node.GetNode().Name, Score: int64(score)})
+		result = append(result, framework.NodeScore{Name: node.Node().Name, Score: int64(score)})
 	}
 	return &result, nil
 }
@@ -137,10 +126,10 @@ func Node2PrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.Nod
 	result := framework.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
-		if node.GetNode().Name == "node2" {
+		if node.Node().Name == "node2" {
 			score = 10
 		}
-		result = append(result, framework.NodeScore{Name: node.GetNode().Name, Score: int64(score)})
+		result = append(result, framework.NodeScore{Name: node.Node().Name, Score: int64(score)})
 	}
 	return &result, nil
 }
@@ -162,7 +151,7 @@ func (pl *node2PrioritizerPlugin) Name() string {
 // Score return score 100 if the given nodeName is "node2"; otherwise return score 10.
 func (pl *node2PrioritizerPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	score := 10
-	if nodeInfo.GetNode().Name == "node2" {
+	if nodeInfo.Node().Name == "node2" {
 		score = 100
 	}
 	return int64(score), nil
@@ -273,7 +262,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 
 	// Otherwise, as a extender support preemption and have cached node info, we will assume cachedNodeNameToInfo is available
 	// and get cached node info by given node name.
-	nodeInfoCopy := f.CachedNodeNameToInfo[node.GetNode().Name].Snapshot()
+	nodeInfoCopy := f.CachedNodeNameToInfo[node.Node().Name].SnapshotConcrete()
 
 	var potentialVictims []*v1.Pod
 
@@ -367,10 +356,14 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []fwk.NodeInfo) ([]fwk.NodeInfo
 			failedAndUnresolvableMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed and unresolvable", node.Node().Name)
 =======
 		} else if status.Code() == framework.Unschedulable {
-			failedNodesMap[node.GetNode().Name] = fmt.Sprintf("FakeExtender: node %q failed", node.GetNode().Name)
+			failedNodesMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed", node.Node().Name)
 		} else if status.Code() == framework.UnschedulableAndUnresolvable {
+<<<<<<< HEAD
 			failedAndUnresolvableMap[node.GetNode().Name] = fmt.Sprintf("FakeExtender: node %q failed and unresolvable", node.GetNode().Name)
 >>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
+=======
+			failedAndUnresolvableMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed and unresolvable", node.Node().Name)
+>>>>>>> 08e38975e00 (Address review comments)
 		} else {
 			return nil, nil, nil, status.AsError()
 		}
@@ -414,7 +407,7 @@ func (f *FakeExtender) Bind(binding *v1.Binding) error {
 	}
 	if len(f.FilteredNodes) != 0 {
 		for _, node := range f.FilteredNodes {
-			if node.GetNode().Name == binding.Target.Name {
+			if node.Node().Name == binding.Target.Name {
 				f.FilteredNodes = nil
 				return nil
 			}

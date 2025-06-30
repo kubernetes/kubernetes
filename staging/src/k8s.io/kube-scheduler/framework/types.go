@@ -244,6 +244,8 @@ func (ce ClusterEvent) Label() string {
 
 // NodeInfo is node level aggregated information.
 type NodeInfo interface {
+	// GetNode returns overall information about this node.
+	Node() *v1.Node
 	// GetPods returns Pods running on the node.
 	GetPods() []PodInfo
 	// GetPodsWithAffinity returns the subset of pods with affinity.
@@ -263,12 +265,10 @@ type NodeInfo interface {
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
 	GetAllocatable() Resource
-	SetAllocatable(r Resource)
 	// GetImageStates returns the entry of an image if and only if this image is on the node. The entry can be used for
 	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
 	// state information.
 	GetImageStates() map[string]*ImageStateSummary
-	SetImageStates(map[string]*ImageStateSummary)
 	// GetPVCRefCounts returns a mapping of PVC names to the number of pods on the node using it.
 	// Keys are in the format "namespace/name".
 	GetPVCRefCounts() map[string]int
@@ -279,8 +279,6 @@ type NodeInfo interface {
 	GetName() string
 	// TODO add a doc comment here, and find out why the implementation returns ""
 	GetNamespace() string
-	// GetNode returns overall information about this node.
-	GetNode() *v1.Node
 	// Snapshot returns a copy of this node, Except that ImageStates is copied without the Nodes field.
 	Snapshot() NodeInfo
 	// String returns representation of human readable format of this NodeInfo.
@@ -289,20 +287,17 @@ type NodeInfo interface {
 	// AddPodInfo adds pod information to this NodeInfo.
 	// Consider using this instead of AddPod if a PodInfo is already computed.
 	AddPodInfo(podInfo PodInfo)
-	// AddPod is a wrapper around AddPodInfo.
-	AddPod(pod *v1.Pod)
 	// RemovePod subtracts pod information from this NodeInfo.
 	RemovePod(logger klog.Logger, pod *v1.Pod) error
 	// SetNode sets the overall node information.
 	SetNode(node *v1.Node)
-	// RemoveNode removes the node object, leaving all other tracking information.
-	RemoveNode()
 }
 
 // QueuedPodInfo is a Pod wrapper with additional information related to
 // the pod's status in the scheduling queue, such as the timestamp when
 // it's added to the queue.
 type QueuedPodInfo interface {
+	// Returns the PodInfo object wrapped by this QueuedPodInfo instance.
 	GetPodInfo() PodInfo
 	// GetTimestamp returns the time pod added to the scheduling queue.
 	GetTimestamp() time.Time
@@ -349,8 +344,6 @@ type QueuedPodInfo interface {
 	// GetGatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
 	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
 	GetGatingPluginEvents() []ClusterEvent
-
-	DeepCopy() QueuedPodInfo
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
@@ -367,11 +360,6 @@ type PodInfo interface {
 	GetPreferredAffinityTerms() []WeightedAffinityTerm
 	// GetPreferredAntiAffinityTerms returns the precomputed anti-affinity terms with weights.
 	GetPreferredAntiAffinityTerms() []WeightedAffinityTerm
-	// DeepCopy returns a deep copy of the PodInfo object.
-	DeepCopy() PodInfo
-	// Update creates a full new PodInfo by default. And only updates the pod when the PodInfo
-	// has been instantiated and the passed pod is the exact same one as the original pod.
-	Update(pod *v1.Pod) error
 	// CalculateResource is only intended to be used by NodeInfo.
 	CalculateResource() PodResource
 }

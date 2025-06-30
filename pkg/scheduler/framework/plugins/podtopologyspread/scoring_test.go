@@ -1481,7 +1481,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				var gotList framework.NodeScoreList
 				for _, nodeInfo := range nodeInfos {
-					nodeName := nodeInfo.GetNode().Name
+					nodeName := nodeInfo.Node().Name
 					score, status := p.Score(ctx, state, tt.pod, nodeInfo)
 					if !status.IsSuccess() {
 						b.Fatalf("unexpected error: %v", status)

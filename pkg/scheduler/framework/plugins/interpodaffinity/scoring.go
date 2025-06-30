@@ -37,7 +37,7 @@ type scoreMap map[string]map[string]int64
 // preScoreState computed at PreScore and used at Score.
 type preScoreState struct {
 	topologyScore scoreMap
-	podInfo       *framework.PodInfo
+	podInfo       fwk.PodInfo
 	// A copy of the incoming pod's namespace labels.
 	namespaceLabels labels.Set
 }
@@ -85,7 +85,7 @@ func (pl *InterPodAffinity) processExistingPod(
 	incomingPod *v1.Pod,
 	topoScore scoreMap,
 ) {
-	existingPodNode := existingPodNodeInfo.GetNode()
+	existingPodNode := existingPodNodeInfo.Node()
 	if len(existingPodNode.Labels) == 0 {
 		return
 	}
@@ -95,14 +95,14 @@ func (pl *InterPodAffinity) processExistingPod(
 	// value as that of <existingPods>`s node by the term`s weight.
 	// Note that the incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 	// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
-	topoScore.processTerms(state.podInfo.PreferredAffinityTerms, existingPod.GetPod(), nil, existingPodNode, 1)
+	topoScore.processTerms(state.podInfo.GetPreferredAffinityTerms(), existingPod.GetPod(), nil, existingPodNode, 1)
 
 	// For every soft pod anti-affinity term of <pod>, if <existingPod> matches the term,
 	// decrement <p.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPod>`s node by the term`s weight.
 	// Note that the incoming pod's terms have the namespaceSelector merged into the namespaces, and so
 	// here we don't lookup the existing pod's namespace labels, hence passing nil for nsLabels.
-	topoScore.processTerms(state.podInfo.PreferredAntiAffinityTerms, existingPod.GetPod(), nil, existingPodNode, -1)
+	topoScore.processTerms(state.podInfo.GetPreferredAntiAffinityTerms(), existingPod.GetPod(), nil, existingPodNode, -1)
 
 	// For every hard pod affinity term of <existingPod>, if <pod> matches the term,
 	// increment <p.counts> for every node in the cluster with the same <term.TopologyKey>
@@ -172,13 +172,13 @@ func (pl *InterPodAffinity) PreScore(
 		return fwk.AsStatus(fmt.Errorf("failed to parse pod: %w", err))
 	}
 
-	for i := range state.podInfo.PreferredAffinityTerms {
-		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(state.podInfo.PreferredAffinityTerms[i].AffinityTerm); err != nil {
+	for i := range state.podInfo.GetPreferredAffinityTerms() {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(state.podInfo.GetPreferredAffinityTerms()[i].AffinityTerm); err != nil {
 			return fwk.AsStatus(fmt.Errorf("updating PreferredAffinityTerms: %w", err))
 		}
 	}
-	for i := range state.podInfo.PreferredAntiAffinityTerms {
-		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(state.podInfo.PreferredAntiAffinityTerms[i].AffinityTerm); err != nil {
+	for i := range state.podInfo.GetPreferredAntiAffinityTerms() {
+		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(state.podInfo.GetPreferredAntiAffinityTerms()[i].AffinityTerm); err != nil {
 			return fwk.AsStatus(fmt.Errorf("updating PreferredAntiAffinityTerms: %w", err))
 		}
 	}

@@ -217,7 +217,7 @@ func (h *HTTPExtender) convertPodUIDToPod(
 		}
 	}
 	return nil, fmt.Errorf("extender: %v claims to preempt pod (UID: %v) on node: %v, but the pod is not found on that node",
-		h.extenderURL, metaPod, nodeInfo.GetNode().Name)
+		h.extenderURL, metaPod, nodeInfo.Node().Name)
 }
 
 // convertToMetaVictims converts from struct type to meta types.
@@ -259,7 +259,7 @@ func (h *HTTPExtender) Filter(
 	)
 	fromNodeName := make(map[string]fwk.NodeInfo)
 	for _, n := range nodes {
-		fromNodeName[n.GetNode().Name] = n
+		fromNodeName[n.Node().Name] = n
 	}
 
 	if h.filterVerb == "" {
@@ -269,13 +269,13 @@ func (h *HTTPExtender) Filter(
 	if h.nodeCacheCapable {
 		nodeNameSlice := make([]string, 0, len(nodes))
 		for _, node := range nodes {
-			nodeNameSlice = append(nodeNameSlice, node.GetNode().Name)
+			nodeNameSlice = append(nodeNameSlice, node.Node().Name)
 		}
 		nodeNames = &nodeNameSlice
 	} else {
 		nodeList = &v1.NodeList{}
 		for _, node := range nodes {
-			nodeList.Items = append(nodeList.Items, *node.GetNode())
+			nodeList.Items = append(nodeList.Items, *node.Node())
 		}
 	}
 
@@ -328,7 +328,7 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []fwk.NodeInfo) (*extenderv
 	if h.prioritizeVerb == "" {
 		result := extenderv1.HostPriorityList{}
 		for _, node := range nodes {
-			result = append(result, extenderv1.HostPriority{Host: node.GetNode().Name, Score: 0})
+			result = append(result, extenderv1.HostPriority{Host: node.Node().Name, Score: 0})
 		}
 		return &result, 0, nil
 	}
@@ -336,13 +336,13 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []fwk.NodeInfo) (*extenderv
 	if h.nodeCacheCapable {
 		nodeNameSlice := make([]string, 0, len(nodes))
 		for _, node := range nodes {
-			nodeNameSlice = append(nodeNameSlice, node.GetNode().Name)
+			nodeNameSlice = append(nodeNameSlice, node.Node().Name)
 		}
 		nodeNames = &nodeNameSlice
 	} else {
 		nodeList = &v1.NodeList{}
 		for _, node := range nodes {
-			nodeList.Items = append(nodeList.Items, *node.GetNode())
+			nodeList.Items = append(nodeList.Items, *node.Node())
 		}
 	}
 

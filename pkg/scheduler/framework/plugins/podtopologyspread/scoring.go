@@ -84,10 +84,10 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 	}
 	topoSize := make([]int, len(s.Constraints))
 	for _, node := range filteredNodes {
-		if requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.GetNode().Labels, s.Constraints) {
+		if requireAllTopologies && !nodeLabelsMatchSpreadConstraints(node.Node().Labels, s.Constraints) {
 			// Nodes which don't have all required topologyKeys present are ignored
 			// when scoring later.
-			s.IgnoredNodes.Insert(node.GetNode().Name)
+			s.IgnoredNodes.Insert(node.Node().Name)
 			continue
 		}
 		for i, constraint := range s.Constraints {
@@ -95,7 +95,7 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 			if constraint.TopologyKey == v1.LabelHostname {
 				continue
 			}
-			value := node.GetNode().Labels[constraint.TopologyKey]
+			value := node.Node().Labels[constraint.TopologyKey]
 			if s.TopologyValueToPodCounts[i][value] == nil {
 				s.TopologyValueToPodCounts[i][value] = new(int64)
 				topoSize[i]++
@@ -152,7 +152,7 @@ func (pl *PodTopologySpread) PreScore(
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
 	processAllNode := func(n int) {
 		nodeInfo := allNodes[n]
-		node := nodeInfo.GetNode()
+		node := nodeInfo.Node()
 
 		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
 			// `node` should satisfy incoming pod's NodeSelector/NodeAffinity

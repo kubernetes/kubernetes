@@ -195,7 +195,7 @@ func (sched *Scheduler) schedulingCycle(
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
-	assumedPodInfo := podInfo.DeepCopyConcrete()
+	assumedPodInfo := podInfo.DeepCopy()
 	assumedPod := assumedPodInfo.Pod
 	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
 	err = sched.assume(logger, assumedPod, scheduleResult.SuggestedHost)
@@ -429,7 +429,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	// When only one node after predicate, just use it.
 	if len(feasibleNodes) == 1 {
 		return ScheduleResult{
-			SuggestedHost:  feasibleNodes[0].GetNode().Name,
+			SuggestedHost:  feasibleNodes[0].Node().Name,
 			EvaluatedNodes: 1 + diagnosis.NodeToStatus.Len(),
 			FeasibleNodes:  1,
 		}, nil
@@ -632,7 +632,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 				feasibleNodes[length-1] = nodeInfo
 			}
 		} else {
-			result[i] = &nodeStatus{node: nodeInfo.GetNode().Name, status: status}
+			result[i] = &nodeStatus{node: nodeInfo.Node().Name, status: status}
 		}
 	}
 
@@ -759,7 +759,7 @@ func prioritizeNodes(
 		result := make([]framework.NodePluginScores, 0, len(nodes))
 		for i := range nodes {
 			result = append(result, framework.NodePluginScores{
-				Name:       nodes[i].GetNode().Name,
+				Name:       nodes[i].Node().Name,
 				TotalScore: 1,
 			})
 		}
@@ -841,7 +841,7 @@ func prioritizeNodes(
 		// wait for all go routines to finish
 		wg.Wait()
 		for i := range nodesScores {
-			if score, ok := allNodeExtendersScores[nodes[i].GetNode().Name]; ok {
+			if score, ok := allNodeExtendersScores[nodes[i].Node().Name]; ok {
 				nodesScores[i].Scores = append(nodesScores[i].Scores, score.Scores...)
 				nodesScores[i].TotalScore += score.TotalScore
 			}

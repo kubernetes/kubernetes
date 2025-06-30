@@ -1442,5 +1442,5 @@ func newUnschedulablePods(unschedulableRecorder, gatedRecorder metrics.MetricRec
 }
 
 func podInfoKeyFunc(pInfo *framework.QueuedPodInfo) string {
-	return cache.NewObjectName(pInfo.GetPodInfo().GetPod().Namespace, pInfo.GetPodInfo().GetPod().Name).String()
+	return cache.NewObjectName(pInfo.Pod.Namespace, pInfo.Pod.Name).String()
 }

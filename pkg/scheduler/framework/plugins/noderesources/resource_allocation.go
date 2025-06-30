@@ -51,7 +51,7 @@ func (r *resourceAllocationScorer) score(
 	nodeInfo fwk.NodeInfo,
 	podRequests []int64) (int64, *fwk.Status) {
 	logger := klog.FromContext(ctx)
-	node := nodeInfo.GetNode()
+	node := nodeInfo.Node()
 
 	// resources not set, nothing scheduled,
 	if len(r.resources) == 0 {
