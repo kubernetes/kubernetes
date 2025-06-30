@@ -2757,8 +2757,17 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path, opts PodValida
 		allErrs = append(allErrs, validateSecretKeySelector(ev.ValueFrom.SecretKeyRef, fldPath.Child("secretKeyRef"))...)
 	}
 
+	if ev.ValueFrom.FileKeyRef != nil {
+		numSources++
+		allErrs = append(allErrs, validateFileKeySelector(ev.ValueFrom.FileKeyRef, fldPath.Child("fileKeyRef"))...)
+	}
+
 	if numSources == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`"))
+		if opts.AllowEnvFilesValidation {
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef`, `secretKeyRef` or `fileKeyRef`"))
+		} else {
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`"))
+		}
 	} else if len(ev.Value) != 0 {
 		if numSources != 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
@@ -2962,6 +2971,35 @@ func validateSecretKeySelector(s *core.SecretKeySelector, fldPath *field.Path) f
 		for _, msg := range validation.IsConfigMapKey(s.Key) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, msg))
 		}
+	}
+
+	return allErrs
+}
+
+func validateFileKeySelector(s *core.FileKeySelector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// The Key field must be non-empty and must be a valid environment variable name.
+	if len(s.Key) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
+	} else {
+		for _, msg := range validation.IsRelaxedEnvVarName(s.Key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, msg))
+		}
+	}
+
+	// The VolumeName field must be non-empty and must be a valid DNS1123 label.
+	if len(s.VolumeName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
+	} else {
+		allErrs = append(allErrs, ValidateDNS1123Label(s.VolumeName, fldPath.Child("volumeName"))...)
+	}
+
+	// The Path field must be non-empty and must not contain backsteps ("..").
+	if len(s.Path) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+	} else {
+		allErrs = append(allErrs, validatePathNoBacksteps(s.Path, fldPath.Child("path"))...)
 	}
 
 	return allErrs
@@ -3750,6 +3788,45 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList 
 	return allErrs
 }
 
+// validateFileKeyRefVolumes validates that volumes referenced by FileKeyRef environment variables
+// are of type emptyDir. FileKeyRef requires emptyDir volumes to ensure proper file access.
+func validateFileKeyRefVolumes(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	volumeSources := make(map[string]*core.VolumeSource)
+	for i := range spec.Volumes {
+		volume := &spec.Volumes[i]
+		volumeSources[volume.Name] = &volume.VolumeSource
+	}
+
+	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
+		envPath := cFldPath.Child("env")
+		for j, env := range c.Env {
+			// Only care about environment variables that use FileKeyRef.
+			if env.ValueFrom == nil || env.ValueFrom.FileKeyRef == nil {
+				continue
+			}
+
+			volumeName := env.ValueFrom.FileKeyRef.VolumeName
+			fileKeyRefPath := envPath.Index(j).Child("valueFrom").Child("fileKeyRef")
+			volumeNamePath := fileKeyRefPath.Child("volumeName")
+
+			source, found := volumeSources[volumeName]
+			if !found {
+				// The referenced volume does not exist in the pod spec.
+				allErrs = append(allErrs, field.NotFound(volumeNamePath, volumeName))
+			} else if source.EmptyDir == nil {
+				// The volume exists, but it is not of type emptyDir, which is required.
+				allErrs = append(allErrs, field.Invalid(volumeNamePath, volumeName, "referenced volume must be of type emptyDir"))
+			}
+		}
+
+		return true
+	})
+
+	return allErrs
+}
+
 // validateContainers is called by pod spec and template validation to validate the list of regular containers.
 func validateContainers(containers []core.Container, os *core.PodOS, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -4189,6 +4266,8 @@ type PodValidationOptions struct {
 	OldPodViolatesMatchLabelKeysValidation bool
 	// OldPod has invalid MatchLabelKeys in TopologySpreadConstraints against legacy(<v1.34) validation
 	OldPodViolatesLegacyMatchLabelKeysValidation bool
+	// Allows containers to consume environment variables via environment variable files.
+	AllowEnvFilesValidation bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4419,6 +4498,8 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 			allErrs = append(allErrs, validateWindows(spec, fldPath)...)
 		}
 	}
+
+	allErrs = append(allErrs, validateFileKeyRefVolumes(spec, fldPath)...)
 	return allErrs
 }
 
@@ -8211,7 +8292,7 @@ var (
 	supportedPodTopologySpreadNodePolicies = sets.New(core.NodeInclusionPolicyIgnore, core.NodeInclusionPolicyHonor)
 )
 
-// validateNodeAffinityPolicy tests that the argument is a valid NodeInclusionPolicy.
+// validateNodeInclusionPolicy tests that the argument is a valid NodeInclusionPolicy.
 func validateNodeInclusionPolicy(fldPath *field.Path, policy *core.NodeInclusionPolicy) *field.Error {
 	if policy == nil {
 		return nil
