@@ -37,14 +37,14 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		smockSysfsSetup   func(t *testing.T, mockSysfs sysfsPath)
+		mockSysfsSetup    func(t *testing.T, mockSysfs sysfsPath)
 		address           string
 		expectedAttribute *DeviceAttribute
 		expectsError      bool
 		expectedErrMsg    string
 	}{
 		"valid": {
-			smockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
+			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
 				devicePath := mockSysfs.Devices(filepath.Join(pcieRoot, "0000:00:13.1", pciBusID))
 				TouchFile(t, devicePath)
 				busPath := mockSysfs.Bus(filepath.Join("pci", "devices", pciBusID))
@@ -73,7 +73,7 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 			expectedErrMsg:    "no such file or directory",
 		},
 		"invalid symlink": {
-			smockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
+			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
 				devicePath := mockSysfs.Devices(filepath.Join("invalid-pci-root", "0000:00:13.1", pciBusID))
 				TouchFile(t, devicePath)
 				busPath := mockSysfs.Bus(filepath.Join("pci", "devices", pciBusID))
@@ -89,8 +89,8 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			mockSysfsPath := t.TempDir()
 			mockSysfs := sysfsPath(mockSysfsPath)
-			if test.smockSysfsSetup != nil {
-				test.smockSysfsSetup(t, mockSysfs)
+			if test.mockSysfsSetup != nil {
+				test.mockSysfsSetup(t, mockSysfs)
 			}
 			sysfs = mockSysfs
 			t.Cleanup(func() {
