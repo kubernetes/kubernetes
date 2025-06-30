@@ -645,5 +645,11 @@ func (tc *throughputCollector) collect() []DataItem {
 		throughputSummary.Unit = "pods/s"
 	}
 
+	// tc.schedulingThroughputs can be empty if the scenario doesn't have
+	// enough number of pods and nodes to take more than throughputSampleInterval (i.e. 1 second).
+	if throughputSummary.Data == nil {
+		klog.Warningf("Failed to measure SchedulingThroughput for %s. You would need to increase the number of pods and nodes.", tc.resultLabels["Name"])
+	}
+
 	return []DataItem{throughputSummary}
 }
