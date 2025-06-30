@@ -684,7 +684,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.podManager = kubepod.NewBasicPodManager()
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
-	klet.allocationManager = allocation.NewManager(klet.getRootDir(), klet.containerManager, klet.statusManager)
+	klet.allocationManager = allocation.NewManager(klet.getRootDir(), klet.containerManager, klet.statusManager, kubeDeps.Recorder)
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
