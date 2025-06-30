@@ -416,7 +416,7 @@ func getStateData(cs fwk.CycleState) (*stateData, error) {
 // PVCs can be matched with an available and node-compatible PV.
 func (pl *VolumeBinding) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	logger := klog.FromContext(ctx)
-	node := nodeInfo.GetNode()
+	node := nodeInfo.Node()
 
 	state, err := getStateData(cs)
 	if err != nil {
@@ -469,7 +469,7 @@ func (pl *VolumeBinding) Score(ctx context.Context, cs fwk.CycleState, pod *v1.P
 	if err != nil {
 		return 0, fwk.AsStatus(err)
 	}
-	nodeName := nodeInfo.GetNode().Name
+	nodeName := nodeInfo.Node().Name
 	podVolumes, ok := state.podVolumesByNode[nodeName]
 	if !ok {
 		return 0, nil

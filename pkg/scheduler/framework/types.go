@@ -182,7 +182,7 @@ type NodeInfo struct {
 	NonZeroRequested *Resource
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
-	Allocatable fwk.Resource
+	Allocatable *Resource
 
 	// ImageStates holds the entry of an image if and only if this image is on the node. The entry can be used for
 	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
@@ -198,21 +198,46 @@ type NodeInfo struct {
 	Generation int64
 }
 
-func (n *NodeInfo) GetNode() *v1.Node                  { return n.node }
-func (n *NodeInfo) GetPods() []fwk.PodInfo             { return n.Pods }
-func (n *NodeInfo) GetPodsWithAffinity() []fwk.PodInfo { return n.PodsWithAffinity }
+func (n *NodeInfo) GetPods() []fwk.PodInfo {
+	return n.Pods
+}
+
+func (n *NodeInfo) GetPodsWithAffinity() []fwk.PodInfo {
+	return n.PodsWithAffinity
+}
+
 func (n *NodeInfo) GetPodsWithRequiredAntiAffinity() []fwk.PodInfo {
 	return n.PodsWithRequiredAntiAffinity
 }
-func (n *NodeInfo) GetUsedPorts() fwk.HostPortInfo                    { return n.UsedPorts }
-func (n *NodeInfo) GetRequested() fwk.Resource                        { return n.Requested }
-func (n *NodeInfo) GetNonZeroRequested() fwk.Resource                 { return n.NonZeroRequested }
-func (n *NodeInfo) GetAllocatable() fwk.Resource                      { return n.Allocatable }
-func (n *NodeInfo) GetImageStates() map[string]*fwk.ImageStateSummary { return n.ImageStates }
-func (n *NodeInfo) GetPVCRefCounts() map[string]int                   { return n.PVCRefCounts }
-func (n *NodeInfo) GetGeneration() int64                              { return n.Generation }
 
-func (n *NodeInfo) SetAllocatable(r fwk.Resource) { n.Allocatable = r }
+func (n *NodeInfo) GetUsedPorts() fwk.HostPortInfo {
+	return n.UsedPorts
+}
+
+func (n *NodeInfo) GetRequested() fwk.Resource {
+	return n.Requested
+}
+
+func (n *NodeInfo) GetNonZeroRequested() fwk.Resource {
+	return n.NonZeroRequested
+}
+
+func (n *NodeInfo) GetAllocatable() fwk.Resource {
+	return n.Allocatable
+}
+
+func (n *NodeInfo) GetImageStates() map[string]*fwk.ImageStateSummary {
+	return n.ImageStates
+}
+
+func (n *NodeInfo) GetPVCRefCounts() map[string]int {
+	return n.PVCRefCounts
+}
+
+func (n *NodeInfo) GetGeneration() int64 {
+	return n.Generation
+}
+
 func (n *NodeInfo) SetImageStates(iss map[string]*fwk.ImageStateSummary) {
 	n.ImageStates = iss
 }
@@ -252,7 +277,7 @@ func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 		node:             n.node,
 		Requested:        n.Requested.CloneConcreteResource(),
 		NonZeroRequested: n.NonZeroRequested.CloneConcreteResource(),
-		Allocatable:      n.Allocatable.Clone(),
+		Allocatable:      n.Allocatable.CloneConcreteResource(),
 		UsedPorts:        make(fwk.HostPortInfo),
 		ImageStates:      make(map[string]*fwk.ImageStateSummary),
 		PVCRefCounts:     make(map[string]int),
@@ -502,17 +527,49 @@ type QueuedPodInfo struct {
 	GatingPluginEvents []fwk.ClusterEvent
 }
 
-func (pqi *QueuedPodInfo) GetPodInfo() fwk.PodInfo                   { return pqi.PodInfo }
-func (pqi *QueuedPodInfo) GetTimestamp() time.Time                   { return pqi.Timestamp }
-func (pqi *QueuedPodInfo) GetAttempts() int                          { return pqi.Attempts }
-func (pqi *QueuedPodInfo) GetBackoffExpiration() time.Time           { return pqi.BackoffExpiration }
-func (pqi *QueuedPodInfo) GetUnschedulableCount() int                { return pqi.UnschedulableCount }
-func (pqi *QueuedPodInfo) GetConsecutiveErrorsCount() int            { return pqi.ConsecutiveErrorsCount }
-func (pqi *QueuedPodInfo) GetInitialAttemptTimestamp() *time.Time    { return pqi.InitialAttemptTimestamp }
-func (pqi *QueuedPodInfo) GetUnschedulablePlugins() sets.Set[string] { return pqi.UnschedulablePlugins }
-func (pqi *QueuedPodInfo) GetPendingPlugins() sets.Set[string]       { return pqi.PendingPlugins }
-func (pqi *QueuedPodInfo) GetGatingPlugin() string                   { return pqi.GatingPlugin }
-func (pqi *QueuedPodInfo) GetGatingPluginEvents() []fwk.ClusterEvent { return pqi.GatingPluginEvents }
+func (pqi *QueuedPodInfo) GetPodInfo() fwk.PodInfo {
+	return pqi.PodInfo
+}
+
+func (pqi *QueuedPodInfo) GetTimestamp() time.Time {
+	return pqi.Timestamp
+}
+
+func (pqi *QueuedPodInfo) GetAttempts() int {
+	return pqi.Attempts
+}
+
+func (pqi *QueuedPodInfo) GetBackoffExpiration() time.Time {
+	return pqi.BackoffExpiration
+}
+
+func (pqi *QueuedPodInfo) GetUnschedulableCount() int {
+	return pqi.UnschedulableCount
+}
+
+func (pqi *QueuedPodInfo) GetConsecutiveErrorsCount() int {
+	return pqi.ConsecutiveErrorsCount
+}
+
+func (pqi *QueuedPodInfo) GetInitialAttemptTimestamp() *time.Time {
+	return pqi.InitialAttemptTimestamp
+}
+
+func (pqi *QueuedPodInfo) GetUnschedulablePlugins() sets.Set[string] {
+	return pqi.UnschedulablePlugins
+}
+
+func (pqi *QueuedPodInfo) GetPendingPlugins() sets.Set[string] {
+	return pqi.PendingPlugins
+}
+
+func (pqi *QueuedPodInfo) GetGatingPlugin() string {
+	return pqi.GatingPlugin
+}
+
+func (pqi *QueuedPodInfo) GetGatingPluginEvents() []fwk.ClusterEvent {
+	return pqi.GatingPluginEvents
+}
 
 // Gated returns true if the pod is gated by any plugin.
 func (pqi *QueuedPodInfo) Gated() bool {
@@ -520,14 +577,9 @@ func (pqi *QueuedPodInfo) Gated() bool {
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
-func (pqi *QueuedPodInfo) DeepCopy() fwk.QueuedPodInfo {
-	return pqi.DeepCopyConcrete()
-}
-
-// Same as DeepCopy() but return type is *QueuedPodInfo (pointer to concrete implementation).
-func (pqi *QueuedPodInfo) DeepCopyConcrete() *QueuedPodInfo {
+func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 	return &QueuedPodInfo{
-		PodInfo:                 pqi.PodInfo.DeepCopyConcrete(),
+		PodInfo:                 pqi.PodInfo.DeepCopy(),
 		Timestamp:               pqi.Timestamp,
 		Attempts:                pqi.Attempts,
 		UnschedulableCount:      pqi.UnschedulableCount,
@@ -561,26 +613,28 @@ type PodInfo struct {
 	cachedResource *fwk.PodResource
 }
 
-func (pi *PodInfo) GetPod() *v1.Pod                              { return pi.Pod }
-func (pi *PodInfo) GetRequiredAffinityTerms() []fwk.AffinityTerm { return pi.RequiredAffinityTerms }
+func (pi *PodInfo) GetPod() *v1.Pod {
+	return pi.Pod
+}
+
+func (pi *PodInfo) GetRequiredAffinityTerms() []fwk.AffinityTerm {
+	return pi.RequiredAffinityTerms
+}
+
 func (pi *PodInfo) GetRequiredAntiAffinityTerms() []fwk.AffinityTerm {
 	return pi.RequiredAntiAffinityTerms
 }
+
 func (pi *PodInfo) GetPreferredAffinityTerms() []fwk.WeightedAffinityTerm {
 	return pi.PreferredAffinityTerms
 }
+
 func (pi *PodInfo) GetPreferredAntiAffinityTerms() []fwk.WeightedAffinityTerm {
 	return pi.PreferredAntiAffinityTerms
 }
 
-// DeepCopy returns a deep copy of the PodInfo object, same as DeepCopyConcrete, but with returned type fwk.PodInfo
-// (the purpose is to have PodInfo implement interface fwk.PodInfo).
-func (pi *PodInfo) DeepCopy() fwk.PodInfo {
-	return pi.DeepCopyConcrete()
-}
-
 // DeepCopy returns a deep copy of the PodInfo object.
-func (pi *PodInfo) DeepCopyConcrete() *PodInfo {
+func (pi *PodInfo) DeepCopy() *PodInfo {
 	return &PodInfo{
 		Pod:                        pi.Pod.DeepCopy(),
 		RequiredAffinityTerms:      pi.RequiredAffinityTerms,
@@ -889,13 +943,33 @@ type Resource struct {
 	ScalarResources map[v1.ResourceName]int64
 }
 
-func (r *Resource) GetMilliCPU() int64                             { return r.MilliCPU }
-func (r *Resource) GetMemory() int64                               { return r.Memory }
-func (r *Resource) SetMemory(v int64)                              { r.Memory = v }
-func (r *Resource) GetEphemeralStorage() int64                     { return r.EphemeralStorage }
-func (r *Resource) GetAllowedPodNumber() int                       { return r.AllowedPodNumber }
-func (r *Resource) GetScalarResources() map[v1.ResourceName]int64  { return r.ScalarResources }
-func (r *Resource) SetScalarResources(s map[v1.ResourceName]int64) { r.ScalarResources = s }
+func (r *Resource) GetMilliCPU() int64 {
+	return r.MilliCPU
+}
+
+func (r *Resource) GetMemory() int64 {
+	return r.Memory
+}
+
+func (r *Resource) SetMemory(v int64) {
+	r.Memory = v
+}
+
+func (r *Resource) GetEphemeralStorage() int64 {
+	return r.EphemeralStorage
+}
+
+func (r *Resource) GetAllowedPodNumber() int {
+	return r.AllowedPodNumber
+}
+
+func (r *Resource) GetScalarResources() map[v1.ResourceName]int64 {
+	return r.ScalarResources
+}
+
+func (r *Resource) SetScalarResources(s map[v1.ResourceName]int64) {
+	r.ScalarResources = s
+}
 
 // NewResource creates a Resource from ResourceList
 func NewResource(rl v1.ResourceList) *Resource {

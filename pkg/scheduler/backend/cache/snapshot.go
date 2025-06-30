@@ -29,7 +29,7 @@ import (
 // snapshot at the beginning of each scheduling cycle and uses it for its operations in that cycle.
 type Snapshot struct {
 	// nodeInfoMap a map of node name to a snapshot of its NodeInfo.
-	nodeInfoMap map[string]fwk.NodeInfo
+	nodeInfoMap map[string]*framework.NodeInfo
 	// nodeInfoList is the list of nodes as ordered in the cache's nodeTree.
 	nodeInfoList []fwk.NodeInfo
 	// havePodsWithAffinityNodeInfoList is the list of nodes with at least one pod declaring affinity terms.
@@ -48,7 +48,7 @@ var _ framework.SharedLister = &Snapshot{}
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
-		nodeInfoMap: make(map[string]fwk.NodeInfo),
+		nodeInfoMap: make(map[string]*framework.NodeInfo),
 		usedPVCSet:  sets.New[string](),
 	}
 }
@@ -61,10 +61,10 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	havePodsWithRequiredAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	for _, v := range nodeInfoMap {
 		nodeInfoList = append(nodeInfoList, v)
-		if len(v.GetPodsWithAffinity()) > 0 {
+		if len(v.PodsWithAffinity) > 0 {
 			havePodsWithAffinityNodeInfoList = append(havePodsWithAffinityNodeInfoList, v)
 		}
-		if len(v.GetPodsWithRequiredAntiAffinity()) > 0 {
+		if len(v.PodsWithRequiredAntiAffinity) > 0 {
 			havePodsWithRequiredAntiAffinityNodeInfoList = append(havePodsWithRequiredAntiAffinityNodeInfoList, v)
 		}
 	}
@@ -82,8 +82,8 @@ func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 // createNodeInfoMap obtains a list of pods and pivots that list into a map
 // where the keys are node names and the values are the aggregated information
 // for that node.
-func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]fwk.NodeInfo {
-	nodeNameToInfo := make(map[string]fwk.NodeInfo)
+func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.NodeInfo {
+	nodeNameToInfo := make(map[string]*framework.NodeInfo)
 	for _, pod := range pods {
 		nodeName := pod.Spec.NodeName
 		if _, ok := nodeNameToInfo[nodeName]; !ok {
@@ -188,7 +188,7 @@ func (s *Snapshot) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error
 
 // Get returns the NodeInfo of the given node name.
 func (s *Snapshot) Get(nodeName string) (fwk.NodeInfo, error) {
-	if v, ok := s.nodeInfoMap[nodeName]; ok && v.GetNode() != nil {
+	if v, ok := s.nodeInfoMap[nodeName]; ok && v.Node() != nil {
 		return v, nil
 	}
 	return nil, fmt.Errorf("nodeinfo not found for node name %q", nodeName)

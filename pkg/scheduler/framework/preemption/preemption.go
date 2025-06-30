@@ -696,7 +696,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 	var errs []error
 	checkNode := func(i int) {
 		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Snapshot()
-		logger.V(5).Info("Check the potential node for preemption", "node", nodeInfoCopy.GetNode().Name)
+		logger.V(5).Info("Check the potential node for preemption", "node", nodeInfoCopy.Node().Name)
 
 		stateCopy := state.Clone()
 		pods, numPDBViolations, status := ev.SelectVictimsOnNode(ctx, stateCopy, pod, nodeInfoCopy, pdbs)
@@ -707,7 +707,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 			}
 			c := &candidate{
 				victims: &victims,
-				name:    nodeInfoCopy.GetNode().Name,
+				name:    nodeInfoCopy.Node().Name,
 			}
 			if numPDBViolations == 0 {
 				nonViolatingCandidates.add(c)
@@ -727,7 +727,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState,
 		if status.Code() == fwk.Error {
 			errs = append(errs, status.AsError())
 		}
-		nodeStatuses.Set(nodeInfoCopy.GetNode().Name, status)
+		nodeStatuses.Set(nodeInfoCopy.Node().Name, status)
 		statusesLock.Unlock()
 	}
 	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName)

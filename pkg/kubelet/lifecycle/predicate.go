@@ -321,7 +321,7 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.No
 			filteredResources := make(v1.ResourceList)
 			for rName, rQuant := range c.Resources.Requests {
 				if v1helper.IsExtendedResourceName(rName) {
-					if _, found := nodeInfo.Allocatable.GetScalarResources()[rName]; !found {
+					if _, found := nodeInfo.Allocatable.ScalarResources[rName]; !found {
 						continue
 					}
 				}

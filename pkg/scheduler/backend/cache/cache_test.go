@@ -1235,7 +1235,7 @@ func TestNodeOperators(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			nodes := map[string]fwk.NodeInfo{}
+			nodes := map[string]*framework.NodeInfo{}
 			for nodeItem := cache.headNode; nodeItem != nil; nodeItem = nodeItem.next {
 				nodes[nodeItem.info.Node().Name] = nodeItem.info
 			}
@@ -1968,7 +1968,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 			}
 			nodeNames := make([]string, len(snapshot.nodeInfoList))
 			for i, nodeInfo := range snapshot.nodeInfoList {
-				nodeNames[i] = nodeInfo.GetNode().Name
+				nodeNames[i] = nodeInfo.Node().Name
 			}
 			if diff := cmp.Diff(test.expected, nodeNames); diff != "" {
 				t.Errorf("Unexpected nodeInfoList (-want, +got):\n%s", diff)
@@ -2038,7 +2038,7 @@ func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, po
 
 // checkImageStateSummary collect ImageStateSummary of image traverse nodes,
 // the collected ImageStateSummary should be equal
-func checkImageStateSummary(nodes map[string]fwk.NodeInfo, imageNames ...string) bool {
+func checkImageStateSummary(nodes map[string]*framework.NodeInfo, imageNames ...string) bool {
 	for _, imageName := range imageNames {
 		var imageState *fwk.ImageStateSummary
 		for _, node := range nodes {

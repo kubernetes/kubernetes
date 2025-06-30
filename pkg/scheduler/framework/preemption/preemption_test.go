@@ -257,7 +257,7 @@ func TestDryRunPreemption(t *testing.T) {
 				t.Fatal(err)
 			}
 			sort.Slice(nodeInfos, func(i, j int) bool {
-				return nodeInfos[i].GetNode().Name < nodeInfos[j].GetNode().Name
+				return nodeInfos[i].Node().Name < nodeInfos[j].Node().Name
 			})
 
 			fakePostPlugin := &FakePostFilterPlugin{numViolatingVictim: tt.numViolatingVictim}

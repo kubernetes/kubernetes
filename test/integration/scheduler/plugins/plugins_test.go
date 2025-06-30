@@ -374,7 +374,7 @@ func (sp *ScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Po
 	score := int64(1)
 	if sp.numScoreCalled == 1 {
 		// The first node is scored the highest, the rest is scored lower.
-		sp.highScoreNode = nodeInfo.GetNode().Name
+		sp.highScoreNode = nodeInfo.Node().Name
 		score = framework.MaxNodeScore
 	}
 	return score, nil

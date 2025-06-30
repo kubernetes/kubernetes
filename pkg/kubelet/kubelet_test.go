@@ -1098,7 +1098,7 @@ func TestHandlePluginResources(t *testing.T) {
 			failedResource:   resourceQuantityInvalid,
 		}
 		pod := attrs.Pod
-		newAllocatableResource := node.Allocatable.Clone()
+		newAllocatableResource := node.Allocatable.CloneConcreteResource()
 		for _, container := range pod.Spec.Containers {
 			for resource := range container.Resources.Requests {
 				newQuantity, exist := updateResourceMap[resource]
@@ -1108,7 +1108,7 @@ func TestHandlePluginResources(t *testing.T) {
 				if newQuantity.Value() < 0 {
 					return fmt.Errorf("Allocation failed")
 				}
-				newAllocatableResource.GetScalarResources()[resource] = newQuantity.Value()
+				newAllocatableResource.ScalarResources[resource] = newQuantity.Value()
 			}
 		}
 		node.Allocatable = newAllocatableResource

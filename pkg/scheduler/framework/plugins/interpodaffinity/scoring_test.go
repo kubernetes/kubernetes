@@ -803,7 +803,7 @@ func TestPreferredAffinity(t *testing.T) {
 
 			var gotList framework.NodeScoreList
 			for _, nodeInfo := range nodeInfos {
-				nodeName := nodeInfo.GetNode().Name
+				nodeName := nodeInfo.Node().Name
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error from Score: %v", status)
@@ -967,7 +967,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 
 			var gotList framework.NodeScoreList
 			for _, nodeInfo := range nodeInfos {
-				nodeName := nodeInfo.GetNode().Name
+				nodeName := nodeInfo.Node().Name
 				nodeInfo, err := p.(*InterPodAffinity).sharedLister.NodeInfos().Get(nodeName)
 				if err != nil {
 					t.Errorf("failed to get node %q from snapshot: %v", nodeName, err)
