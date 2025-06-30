@@ -45,10 +45,10 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 	}{
 		"valid": {
 			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
-				devicePath := mockSysfs.Devices(filepath.Join(pcieRoot, "0000:00:13.1", pciBusID))
-				TouchFile(t, devicePath)
-				busPath := mockSysfs.Bus(filepath.Join("pci", "devices", pciBusID))
-				CreateSymlink(t, devicePath, busPath)
+				devicePath := mockSysfs.devices(filepath.Join(pcieRoot, "0000:00:13.1", pciBusID))
+				touchFile(t, devicePath)
+				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
+				createSymlink(t, devicePath, busPath)
 			},
 			address:           pciBusID,
 			expectedAttribute: &expectedAttribute,
@@ -74,10 +74,10 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 		},
 		"invalid symlink": {
 			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
-				devicePath := mockSysfs.Devices(filepath.Join("invalid-pci-root", "0000:00:13.1", pciBusID))
-				TouchFile(t, devicePath)
-				busPath := mockSysfs.Bus(filepath.Join("pci", "devices", pciBusID))
-				CreateSymlink(t, devicePath, busPath)
+				devicePath := mockSysfs.devices(filepath.Join("invalid-pci-root", "0000:00:13.1", pciBusID))
+				touchFile(t, devicePath)
+				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
+				createSymlink(t, devicePath, busPath)
 			},
 			address:           pciBusID,
 			expectedAttribute: nil,
@@ -122,7 +122,7 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 	}
 }
 
-func TouchFile(t *testing.T, path string) {
+func touchFile(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatalf("Failed to create directory %s: %v", filepath.Dir(path), err)
@@ -132,7 +132,7 @@ func TouchFile(t *testing.T, path string) {
 	}
 }
 
-func CreateSymlink(t *testing.T, target, link string) {
+func createSymlink(t *testing.T, target, link string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(link), 0755); err != nil {
 		t.Fatalf("Failed to create directory for symlink %s: %v", filepath.Dir(link), err)

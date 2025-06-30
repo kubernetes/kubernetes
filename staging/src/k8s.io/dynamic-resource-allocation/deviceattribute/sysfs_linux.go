@@ -31,33 +31,33 @@ var (
 // and can be replaced with a mock in tests.
 type sysfsPath string
 
-func (s sysfsPath) Devices(path string) string {
+func (s sysfsPath) devices(path string) string {
 	return filepath.Join(string(s), "devices", path)
 }
 
-func (s sysfsPath) Bus(path string) string {
+func (s sysfsPath) bus(path string) string {
 	return filepath.Join(string(s), "bus", path)
 }
 
-func (s sysfsPath) Block(path string) string {
+func (s sysfsPath) block(path string) string {
 	return filepath.Join(string(s), "block", path)
 }
 
-func (s sysfsPath) Class(path string) string {
+func (s sysfsPath) class(path string) string {
 	return filepath.Join(string(s), "class", path)
 }
 
-func (s sysfsPath) Dev(path string) string {
+func (s sysfsPath) dev(path string) string {
 	return filepath.Join(string(s), "dev", path)
 }
 
-func (s sysfsPath) Firmware(path string) string {
+func (s sysfsPath) firmware(path string) string {
 	return filepath.Join(string(s), "firmware", path)
 }
-func (s sysfsPath) Kernel(path string) string {
+func (s sysfsPath) kernel(path string) string {
 	return filepath.Join(string(s), "kernel", path)
 }
 
-func (s sysfsPath) Module(path string) string {
+func (s sysfsPath) module(path string) string {
 	return filepath.Join(string(s), "module", path)
 }
