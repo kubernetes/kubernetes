@@ -17,11 +17,14 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -457,3 +460,137 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 // Currently this module has a circular dependency with config, and so it's
 // named config_test, which means even test methods need to be public. This
 // is refactoring that we can avoid by resolving the dependency.
+
+type nodeTopologyHandlerMock struct {
+	topologyLabels map[string]string
+}
+
+func (n *nodeTopologyHandlerMock) OnTopologyChange(topologyLabels map[string]string) {
+	n.topologyLabels = topologyLabels
+}
+
+// waitForInvocation waits for event handler to complete processing of the invocation.
+func waitForInvocation(invoked <-chan struct{}) error {
+	for {
+		select {
+		// unit tests will hard timeout in 5m with a stack trace, prevent that
+		// and surface a clearer reason for failure.
+		case <-time.After(wait.ForeverTestTimeout):
+			return fmt.Errorf("timed out waiting for event handler to process update")
+		case <-invoked:
+			return nil
+		}
+	}
+}
+
+func TestNewNodeTopologyConfig(t *testing.T) {
+	_, ctx := klogtesting.NewTestContext(t)
+	client := fake.NewClientset()
+	fakeWatch := watch.NewFake()
+	client.PrependWatchReactor("nodes", ktesting.DefaultWatchReactor(fakeWatch, nil))
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
+	nodeInformer := sharedInformers.Core().V1().Nodes()
+	invoked := make(chan struct{})
+	config := newNodeTopologyConfig(ctx, nodeInformer, time.Minute, func() {
+		// The callback is invoked after the event has been processed by the
+		// handlers. For this unit test, we write to the channel here and wait
+		// for it in waitForInvocation() which is called before doing assertions.
+		invoked <- struct{}{}
+	})
+
+	handler := &nodeTopologyHandlerMock{
+		topologyLabels: make(map[string]string),
+	}
+	config.RegisterEventHandler(handler)
+	sharedInformers.Start(stopCh)
+
+	testNodeName := "test-node"
+
+	// add non-topology labels, handle should receive no notification
+	fakeWatch.Add(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testNodeName,
+			Labels: map[string]string{
+				v1.LabelInstanceType: "m4.large",
+				v1.LabelOSStable:     "linux",
+			},
+		},
+	})
+	err := waitForInvocation(invoked)
+	require.NoError(t, err)
+	require.Empty(t, handler.topologyLabels)
+
+	// add topology label not relevant to kube-proxy, handle should receive no notification
+	fakeWatch.Add(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testNodeName,
+			Labels: map[string]string{
+				v1.LabelInstanceType:   "m4.large",
+				v1.LabelOSStable:       "linux",
+				v1.LabelTopologyRegion: "us-east-1",
+			},
+		},
+	})
+	err = waitForInvocation(invoked)
+	require.NoError(t, err)
+	require.Empty(t, handler.topologyLabels)
+
+	// add relevant zone topology label, handle should receive notification
+	fakeWatch.Add(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testNodeName,
+			Labels: map[string]string{
+				v1.LabelInstanceType: "c6.large",
+				v1.LabelOSStable:     "windows",
+				v1.LabelTopologyZone: "us-west-2a",
+			},
+		},
+	})
+
+	err = waitForInvocation(invoked)
+	require.NoError(t, err)
+	require.Len(t, handler.topologyLabels, 1)
+	require.Equal(t, map[string]string{
+		v1.LabelTopologyZone: "us-west-2a",
+	}, handler.topologyLabels)
+
+	// add region topology label, handle should not receive notification
+	// because kube-proxy doesn't do any region-based topology.
+	fakeWatch.Add(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testNodeName,
+			Labels: map[string]string{
+				v1.LabelInstanceType:   "m3.medium",
+				v1.LabelOSStable:       "windows",
+				v1.LabelTopologyRegion: "us-east-1",
+				v1.LabelTopologyZone:   "us-east-1b",
+			},
+		},
+	})
+	err = waitForInvocation(invoked)
+	require.NoError(t, err)
+	require.Len(t, handler.topologyLabels, 1)
+	require.Equal(t, map[string]string{
+		v1.LabelTopologyZone: "us-east-1b",
+	}, handler.topologyLabels)
+
+	// update non-topology label, handle should not receive notification
+	fakeWatch.Add(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testNodeName,
+			Labels: map[string]string{
+				v1.LabelInstanceType:   "m3.large",
+				v1.LabelOSStable:       "windows",
+				v1.LabelTopologyRegion: "us-east-1",
+				v1.LabelTopologyZone:   "us-east-1b",
+			},
+		},
+	})
+	err = waitForInvocation(invoked)
+	require.NoError(t, err)
+	require.Len(t, handler.topologyLabels, 1)
+}
