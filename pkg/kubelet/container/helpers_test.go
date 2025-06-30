@@ -1205,22 +1205,17 @@ func TestFilterEventRecorder(t *testing.T) {
 	filtered.Eventf(implicit, "Normal", "Reason", "MessageFmt")
 	filtered.AnnotatedEventf(implicit, map[string]string{"a": "b"}, "Normal", "Reason", "MessageFmt")
 
-	if len(recorder.events) != 1 || len(recorder.fEvents) != 1 || len(recorder.aEvents) != 1 {
-		assert.Len(t, recorder.events, 1, "Expected only one event of each type to be recorded, got events: %v", recorder.events)
-		assert.Len(t, recorder.fEvents, 1, "Expected only one event of each type to be recorded, got fEvents: %v", recorder.fEvents)
-		assert.Len(t, recorder.aEvents, 1, "Expected only one event of each type to be recorded, got aEvents: %v", recorder.aEvents)
-	}
+	assert.Len(t, recorder.events, 1, "Expected only one event of each type to be recorded, got events: %v", recorder.events)
+	assert.Len(t, recorder.fEvents, 1, "Expected only one event of each type to be recorded, got fEvents: %v", recorder.fEvents)
+	assert.Len(t, recorder.aEvents, 1, "Expected only one event of each type to be recorded, got aEvents: %v", recorder.aEvents)
 }
 
 func TestIsHostNetworkPod(t *testing.T) {
 	pod := &v1.Pod{Spec: v1.PodSpec{HostNetwork: true}}
-	if !IsHostNetworkPod(pod) {
-		assert.True(t, IsHostNetworkPod(pod), "expected true for HostNetwork pod")
-	}
+	assert.True(t, IsHostNetworkPod(pod), "expected true for HostNetwork pod")
+
 	pod = &v1.Pod{Spec: v1.PodSpec{HostNetwork: false}}
-	if IsHostNetworkPod(pod) {
-		assert.False(t, IsHostNetworkPod(pod), "expected false for non-HostNetwork pod")
-	}
+	assert.False(t, IsHostNetworkPod(pod), "expected false for non-HostNetwork pod")
 }
 
 func TestConvertPodStatusToRunningPod(t *testing.T) {
@@ -1255,21 +1250,17 @@ func TestConvertPodStatusToRunningPod(t *testing.T) {
 	}
 	runtimeName := "docker"
 	runningPod := ConvertPodStatusToRunningPod(runtimeName, podStatus)
-	if runningPod.ID != podStatus.ID || runningPod.Name != podStatus.Name || runningPod.Namespace != podStatus.Namespace {
-		assert.Equal(t, podStatus.ID, runningPod.ID, "ConvertPodStatusToRunningPod did not copy pod ID correctly")
-		assert.Equal(t, podStatus.Name, runningPod.Name, "ConvertPodStatusToRunningPod did not copy pod Name correctly")
-		assert.Equal(t, podStatus.Namespace, runningPod.Namespace, "ConvertPodStatusToRunningPod did not copy pod Namespace correctly")
-	}
-	assert.Len(t, runningPod.Containers, 1, "expected 1 running container, got %d", len(runningPod.Containers))
-	if len(runningPod.Containers) > 0 {
+	assert.Equal(t, podStatus.ID, runningPod.ID, "ConvertPodStatusToRunningPod did not copy pod ID correctly")
+	assert.Equal(t, podStatus.Name, runningPod.Name, "ConvertPodStatusToRunningPod did not copy pod Name correctly")
+	assert.Equal(t, podStatus.Namespace, runningPod.Namespace, "ConvertPodStatusToRunningPod did not copy pod Namespace correctly")
+
+	if assert.Len(t, runningPod.Containers, 1, "expected 1 running container, got %d", len(runningPod.Containers)) {
 		assert.Equal(t, "c1", runningPod.Containers[0].Name, "expected running container name 'c1', got %q", runningPod.Containers[0].Name)
 	}
-	assert.Len(t, runningPod.Sandboxes, 2, "expected 2 sandboxes, got %d", len(runningPod.Sandboxes))
-	if len(runningPod.Sandboxes) > 0 {
+
+	if assert.Len(t, runningPod.Sandboxes, 2, "expected 2 sandboxes, got %d", len(runningPod.Sandboxes)) {
 		assert.Equal(t, "sandbox1", runningPod.Sandboxes[0].ID.ID, "expected sandbox1 to be running")
 		assert.Equal(t, ContainerStateRunning, runningPod.Sandboxes[0].State, "expected sandbox1 to be running")
-	}
-	if len(runningPod.Sandboxes) > 1 {
 		assert.Equal(t, "sandbox2", runningPod.Sandboxes[1].ID.ID, "expected sandbox2 to be exited")
 		assert.Equal(t, ContainerStateExited, runningPod.Sandboxes[1].State, "expected sandbox2 to be exited")
 	}
