@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	scalefake "k8s.io/client-go/scale/fake"
@@ -159,6 +160,7 @@ type testCase struct {
 	testCMClient      *cmfake.FakeCustomMetricsClient
 	testEMClient      *emfake.FakeExternalMetricsClient
 	testScaleClient   *scalefake.FakeScaleClient
+	testDynamicClient *dynamicfake.FakeDynamicClient
 
 	recommendations []timestampedRecommendation
 	hpaSelectors    *selectors.BiMultimap
@@ -185,7 +187,7 @@ func init() {
 	scaleUpLimitFactor = 8
 }
 
-func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient, *scalefake.FakeScaleClient) {
+func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient, *scalefake.FakeScaleClient, *dynamicfake.FakeDynamicClient) {
 	namespace := "test-namespace"
 	hpaName := "test-hpa"
 	podNamePrefix := "test-pod"
@@ -664,7 +666,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		return true, metrics, nil
 	})
 
-	return fakeClient, fakeMetricsClient, fakeCMClient, fakeEMClient, fakeScaleClient
+	fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+
+	return fakeClient, fakeMetricsClient, fakeCMClient, fakeEMClient, fakeScaleClient, fakeDynamicClient
 }
 
 func findCpuUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization *int32) {
@@ -730,7 +734,7 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T, m *m
 }
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
-	testClient, testMetricsClient, testCMClient, testEMClient, testScaleClient := tc.prepareTestClient(t)
+	testClient, testMetricsClient, testCMClient, testEMClient, testScaleClient, testDynamicClient := tc.prepareTestClient(t)
 	if tc.testClient != nil {
 		testClient = tc.testClient
 	}
@@ -745,6 +749,9 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	}
 	if tc.testScaleClient != nil {
 		testScaleClient = tc.testScaleClient
+	}
+	if tc.testDynamicClient != nil {
+		testDynamicClient = tc.testDynamicClient
 	}
 	metricsClient := metrics.NewRESTMetricsClient(
 		testMetricsClient.MetricsV1beta1(),
@@ -793,6 +800,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		testDynamicClient,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 	if tc.recommendations != nil {
@@ -861,12 +869,17 @@ type mockMonitor struct {
 
 	metricComputationActionLabels map[autoscalingv2.MetricSourceType][]monitor.ActionLabel
 	metricComputationErrorLabels  map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel
+
+	cacheHits   map[string]int
+	cacheMisses map[string]int
 }
 
 func newMockMonitor() *mockMonitor {
 	return &mockMonitor{
 		metricComputationActionLabels: make(map[autoscalingv2.MetricSourceType][]monitor.ActionLabel),
 		metricComputationErrorLabels:  make(map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel),
+		cacheHits:                     make(map[string]int),
+		cacheMisses:                   make(map[string]int),
 	}
 }
 
@@ -897,6 +910,30 @@ func (m *mockMonitor) waitUntilRecorded(ctx context.Context, t *testing.T) {
 	}); err != nil {
 		t.Fatalf("no reconciliation is recorded in the monitor, len(monitor.reconciliationActionLabels)=%v len(monitor.reconciliationErrorLabels)=%v ", len(m.reconciliationActionLabels), len(m.reconciliationErrorLabels))
 	}
+}
+
+func (m *mockMonitor) ObserveCacheHit(resourceKind string) {
+	m.Lock()
+	defer m.Unlock()
+	m.cacheHits[resourceKind]++
+}
+
+func (m *mockMonitor) ObserveCacheMiss(resourceKind string) {
+	m.Lock()
+	defer m.Unlock()
+	m.cacheMisses[resourceKind]++
+}
+
+func (m *mockMonitor) GetCacheHit(resourceKind string) int {
+	m.RLock()
+	defer m.RUnlock()
+	return m.cacheHits[resourceKind]
+}
+
+func (m *mockMonitor) GetCacheMiss(resourceKind string) int {
+	m.RLock()
+	defer m.RUnlock()
+	return m.cacheMisses[resourceKind]
 }
 
 func TestScaleUp(t *testing.T) {
@@ -3030,7 +3067,7 @@ func TestConditionInvalidSelectorMissing(t *testing.T) {
 		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
+	_, _, _, _, testScaleClient, _ := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
 	testScaleClient.PrependReactor("get", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -3080,7 +3117,7 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
+	_, _, _, _, testScaleClient, _ := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
 	testScaleClient.PrependReactor("get", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -3197,7 +3234,7 @@ func TestConditionAmbiguousSelectorWhenPartialSelectorOverlapBetweenHPAs(t *test
 		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 
-	testClient, _, _, _, _ := tc.prepareTestClient(t)
+	testClient, _, _, _, _, _ := tc.prepareTestClient(t)
 	tc.testClient = testClient
 
 	testClient.PrependReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -3303,7 +3340,7 @@ func TestConditionFailedGetMetrics(t *testing.T) {
 				metricType: monitor.ErrorLabelInternal,
 			},
 		}
-		_, testMetricsClient, testCMClient, testEMClient, _ := tc.prepareTestClient(t)
+		_, testMetricsClient, testCMClient, testEMClient, _, _ := tc.prepareTestClient(t)
 		tc.testMetricsClient = testMetricsClient
 		tc.testCMClient = testCMClient
 		tc.testEMClient = testEMClient
@@ -3396,7 +3433,7 @@ func TestConditionFailedGetScale(t *testing.T) {
 		expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
 	}
 
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
+	_, _, _, _, testScaleClient, _ := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
 	testScaleClient.PrependReactor("get", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -3432,7 +3469,7 @@ func TestConditionFailedUpdateScale(t *testing.T) {
 		},
 	}
 
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
+	_, _, _, _, testScaleClient, _ := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
 	testScaleClient.PrependReactor("update", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -3780,7 +3817,7 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
 		},
 	}
-	testClient, _, _, _, _ := tc.prepareTestClient(t)
+	testClient, _, _, _, _, _ := tc.prepareTestClient(t)
 	tc.testClient = testClient
 	testClient.PrependReactor("list", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		tc.Lock()
@@ -5047,7 +5084,7 @@ func TestScaleUpOneMetricEmpty(t *testing.T) {
 			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelInternal,
 		},
 	}
-	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
+	_, _, _, testEMClient, _, _ := tc.prepareTestClient(t)
 	testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
 	})
@@ -5133,7 +5170,7 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelInternal,
 		},
 	}
-	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
+	_, _, _, testEMClient, _, _ := tc.prepareTestClient(t)
 	testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
 	})
@@ -5372,6 +5409,8 @@ func TestMultipleHPAs(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 
 	tCtx := ktesting.Init(t)
+	testDynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+
 	hpaController := NewHorizontalController(
 		tCtx,
 		testClient.CoreV1(),
@@ -5386,6 +5425,7 @@ func TestMultipleHPAs(t *testing.T) {
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		testDynamicClient,
 	)
 	hpaController.scaleUpEvents = scaleUpEventsMap
 	hpaController.scaleDownEvents = scaleDownEventsMap
@@ -5434,7 +5474,7 @@ func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
 		},
 	}
 
-	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
+	_, _, _, _, testScaleClient, _ := tc.prepareTestClient(t)
 	tc.testScaleClient = testScaleClient
 
 	updateCallCount := 0
