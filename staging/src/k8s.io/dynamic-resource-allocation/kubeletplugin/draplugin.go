@@ -274,7 +274,7 @@ func PluginSocket(name string) Option {
 	}
 }
 
-// PluginListener configures how to create the registrar socket.
+// PluginListener configures how to create the DRA service socket.
 // The default is to remove the file if it exists and to then
 // create a socket.
 //
@@ -430,6 +430,18 @@ func DRAService(enabled bool) Option {
 	}
 }
 
+// ErrorChannel allows the plugin to send errors to the caller. This is
+// useful to report errors that happen in goroutines. The caller is expected
+// to read from the channel and handle errors appropriately.
+// For example, this channel can be used to report errors returned by the
+// grpcserver.Serve. Plugins then can use this error to perform a graceful shutdown.
+func ErrorChannel(errorChannel chan error) Option {
+	return func(o *options) error {
+		o.errorChannel = errorChannel
+		return nil
+	}
+}
+
 type options struct {
 	logger                     klog.Logger
 	grpcVerbosity              int
@@ -449,6 +461,7 @@ type options struct {
 	nodeV1beta1                bool
 	registrationService        bool
 	draService                 bool
+	errorChannel               chan error // The channel to report unrecoverable errors.
 }
 
 // Helper combines the kubelet registration service and the DRA node plugin
@@ -588,7 +601,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 
 	if o.draService {
 		// Run the node plugin gRPC server first to ensure that it is ready.
-		pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
+		pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, o.errorChannel, func(grpcServer *grpc.Server) {
 			if o.nodeV1beta1 {
 				logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
 				drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
@@ -602,7 +615,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 
 	if o.registrationService {
 		// Now make it available to kubelet.
-		registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint)
+		registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint, o.errorChannel)
 		if err != nil {
 			return nil, fmt.Errorf("start registrar: %w", err)
 		}

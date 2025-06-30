@@ -39,7 +39,7 @@ type registerService func(s *grpc.Server)
 
 // startGRPCServer sets up the GRPC server on a Unix domain socket and spawns a goroutine
 // which handles requests for arbitrary services.
-func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, endpoint endpoint, services ...registerService) (*grpcServer, error) {
+func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, endpoint endpoint, errorChannel chan error, services ...registerService) (*grpcServer, error) {
 	ctx := klog.NewContext(context.Background(), logger)
 
 	s := &grpcServer{
@@ -78,7 +78,10 @@ func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []
 		defer s.wg.Done()
 		err := s.server.Serve(listener)
 		if err != nil {
-			logger.Error(err, "GRPC server failed")
+			logger.Error(err, "gRPC server failed to serve")
+			if errorChannel != nil {
+				errorChannel <- fmt.Errorf("gRPC server failed to serve: %w", err)
+			}
 		} else {
 			logger.V(3).Info("GRPC server terminated gracefully")
 		}
