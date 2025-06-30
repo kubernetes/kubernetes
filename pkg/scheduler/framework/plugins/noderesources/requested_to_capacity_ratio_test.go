@@ -19,10 +19,10 @@ package noderesources
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -209,12 +209,17 @@ func TestBrokenLinearFunction(t *testing.T) {
 			},
 		},
 	}
-
+	opt := cmp.Comparer(func(x, y float64) bool {
+		delta := math.Abs(x - y)
+		return delta < 0.1
+	})
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			function := helper.BuildBrokenLinearFunction(test.points)
 			for _, assertion := range test.assertions {
-				assert.InDelta(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%d", test.points, assertion.p)
+				if !cmp.Equal(float64(assertion.expected), float64(function(assertion.p)), opt) {
+					t.Fatalf("case fail at points=%v, p=%d", test.points, assertion.p)
+				}
 			}
 		})
 	}
