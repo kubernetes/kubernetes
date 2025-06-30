@@ -1437,6 +1437,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 					},
 				},
 			},
+			nil,
 			[]resourceapi.Device{
 				{
 					Name: "device-1",
@@ -1504,6 +1505,193 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		})
 	}
 
+	resourceSliceMixinsTests := func() {
+
+		f.It("must handle device mixins", func(ctx context.Context) {
+			nodes := NewNodesNow(ctx, f, 1, 1)
+			driver := NewDriverInstance(f)
+			nodename := nodes.NodeNames[0]
+			driver.Run(nodes, toDriverResourcesNow(nodename, nil,
+				&resourceapi.ResourceSliceMixins{
+					Device: []resourceapi.DeviceMixin{
+						{
+							Name: "device-mixin",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"special": {
+									BoolValue: ptr.To(true),
+								},
+							},
+						},
+					},
+				},
+				resourceapi.Device{
+					Name:     "device",
+					Includes: []string{"device-mixin"},
+				},
+			))
+			b := newBuilderNow(ctx, f, driver)
+
+			claim := b.externalClaim()
+			claim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{
+				{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: fmt.Sprintf(`device.attributes["%s"].special`, driver.Name),
+					},
+				},
+			}
+			pod := b.podExternal()
+			b.create(ctx, claim, pod)
+			b.testPod(ctx, f, pod)
+		})
+
+		f.It("must handle counter set mixins", func(ctx context.Context) {
+			nodes := NewNodesNow(ctx, f, 1, 1)
+			driver := NewDriverInstance(f)
+			nodename := nodes.NodeNames[0]
+			driver.Run(nodes, toDriverResourcesNow(nodename,
+				[]resourceapi.CounterSet{
+					{
+						Name: "counter-set",
+						Counters: map[string]resourceapi.Counter{
+							"cpu": {
+								Value: resource.MustParse("2"),
+							},
+						},
+						Includes: []string{"counter-set-mixin"},
+					},
+				},
+				&resourceapi.ResourceSliceMixins{
+					CounterSet: []resourceapi.CounterSetMixin{
+						{
+							Name: "counter-set-mixin",
+							Counters: map[string]resourceapi.Counter{
+								"memory": {
+									Value: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+				resourceapi.Device{
+					Name: "device",
+					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counter-set",
+							Counters: map[string]resourceapi.Counter{
+								"cpu": {
+									Value: resource.MustParse("2"),
+								},
+								"memory": {
+									Value: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			))
+			b := newBuilderNow(ctx, f, driver)
+
+			claim := b.externalClaim()
+			pod := b.podExternal()
+			b.create(ctx, claim, pod)
+			b.testPod(ctx, f, pod)
+		})
+
+		f.It("must handle device counter consumption mixins", func(ctx context.Context) {
+			nodes := NewNodesNow(ctx, f, 1, 1)
+			driver := NewDriverInstance(f)
+			nodename := nodes.NodeNames[0]
+			driver.Run(nodes, toDriverResourcesNow(nodename,
+				[]resourceapi.CounterSet{
+					{
+						Name: "counter-set",
+						Counters: map[string]resourceapi.Counter{
+							"cpu": {
+								Value: resource.MustParse("2"),
+							},
+							"memory": {
+								Value: resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+				&resourceapi.ResourceSliceMixins{
+					DeviceCounterConsumption: []resourceapi.DeviceCounterConsumptionMixin{
+						{
+							Name: "device-counter-consumption-mixin",
+							Counters: map[string]resourceapi.Counter{
+								"memory": {
+									Value: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+				resourceapi.Device{
+					Name: "device",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"special": {
+							BoolValue: ptr.To(true),
+						},
+					},
+					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counter-set",
+							Counters: map[string]resourceapi.Counter{
+								"cpu": {
+									Value: resource.MustParse("2"),
+								},
+							},
+							Includes: []string{"device-counter-consumption-mixin"},
+						},
+					},
+				},
+				resourceapi.Device{
+					Name: "otherdevice",
+					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counter-set",
+							Counters: map[string]resourceapi.Counter{
+								"memory": {
+									Value: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			))
+			b := newBuilderNow(ctx, f, driver)
+
+			claim := b.externalClaim()
+			claim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{
+				{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: fmt.Sprintf(`device.attributes["%s"].special`, driver.Name),
+					},
+				},
+			}
+			pod := b.podExternal()
+			pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+			b.create(ctx, claim, pod)
+			b.testPod(ctx, f, pod)
+
+			claim2 := b.externalClaim()
+			pod2 := b.podExternal()
+			pod2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+			b.create(ctx, claim2, pod2)
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				testPod, err := b.f.ClientSet.CoreV1().Pods(pod2.Namespace).Get(ctx, pod2.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("expected the test pod %s to exist: %w", pod2.Name, err)
+				}
+				if testPod.Status.Phase != v1.PodPending {
+					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod2.Name, testPod.Status.Phase, v1.PodPending)
+				}
+				return nil
+			}, 20*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
+		})
+	}
+
 	ginkgo.Context("on single node", singleNodeTests)
 
 	ginkgo.Context("on multiple nodes", multiNodeTests)
@@ -1513,6 +1701,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 	ginkgo.Context("with v1beta2 API", v1beta2Tests)
 
 	framework.Context(f.WithFeatureGate(features.DRAPartitionableDevices), partitionableDevicesTests)
+
+	framework.Context(f.WithFeatureGate(features.DRAResourceSliceMixins), f.WithFeatureGate(features.DRAPartitionableDevices), resourceSliceMixinsTests)
 
 	framework.Context(f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := NewNodes(f, 1, 1)
@@ -1629,9 +1819,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				for e := 0; e < resourceapi.ResourceSliceMaxDevices; e++ {
 					device := resourceapi.Device{
 						Name:       devicePrefix + strings.Repeat("x", validation.DNS1035LabelMaxLength-len(devicePrefix)-4) + fmt.Sprintf("%04d", e),
-						Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice),
+						Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDeviceAfterMixins),
 					}
-					for j := 0; j < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; j++ {
+					for j := 0; j < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDeviceAfterMixins; j++ {
 						name := resourceapi.QualifiedName(domain + "/" + strings.Repeat("x", resourceapi.DeviceMaxIDLength-4) + fmt.Sprintf("%04d", j))
 						device.Attributes[name] = resourceapi.DeviceAttribute{
 							StringValue: &stringValue,
@@ -2777,22 +2967,27 @@ func driverResourcesNow(nodes *Nodes, maxAllocations int, devicesPerNode ...map[
 	return driverResources
 }
 
-func toDriverResources(counters []resourceapi.CounterSet, devices ...resourceapi.Device) driverResourcesGenFunc {
+func toDriverResources(counters []resourceapi.CounterSet, mixins *resourceapi.ResourceSliceMixins, devices ...resourceapi.Device) driverResourcesGenFunc {
 	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
 		nodename := nodes.NodeNames[0]
-		return map[string]resourceslice.DriverResources{
-			nodename: {
-				Pools: map[string]resourceslice.Pool{
-					nodename: {
-						Slices: []resourceslice.Slice{
-							{
-								SharedCounters: counters,
-								Devices:        devices,
-							},
+		return toDriverResourcesNow(nodename, counters, mixins, devices...)
+	}
+}
+
+func toDriverResourcesNow(nodename string, counters []resourceapi.CounterSet, mixins *resourceapi.ResourceSliceMixins, devices ...resourceapi.Device) map[string]resourceslice.DriverResources {
+	return map[string]resourceslice.DriverResources{
+		nodename: {
+			Pools: map[string]resourceslice.Pool{
+				nodename: {
+					Slices: []resourceslice.Slice{
+						{
+							SharedCounters: counters,
+							Devices:        devices,
+							Mixins:         mixins,
 						},
 					},
 				},
 			},
-		}
+		},
 	}
 }
