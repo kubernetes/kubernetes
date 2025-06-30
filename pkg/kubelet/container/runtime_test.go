@@ -17,10 +17,11 @@ limitations under the License.
 package container
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -62,9 +63,7 @@ func TestParseContainerID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ParseContainerID(tt.input)
-			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("ParseContainerID(%q) = %v, want %v", tt.input, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "ParseContainerID(%q)", tt.input)
 		})
 	}
 }
@@ -95,9 +94,7 @@ func TestContainerIDString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.cid.String()
-			if result != tt.expected {
-				t.Errorf("ContainerID.String() = %q, want %q", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "ContainerID.String()")
 		})
 	}
 }
@@ -141,9 +138,7 @@ func TestPodStatusFindContainerStatusByName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := podStatus.FindContainerStatusByName(tt.containerName)
-			if result != tt.expectedStatus {
-				t.Errorf("FindContainerStatusByName(%q) = %v, want %v", tt.containerName, result, tt.expectedStatus)
-			}
+			assert.Equal(t, tt.expectedStatus, result, "FindContainerStatusByName(%q)", tt.containerName)
 		})
 	}
 }
@@ -164,9 +159,7 @@ func TestPodStatusGetRunningContainerStatuses(t *testing.T) {
 	}
 
 	result := podStatus.GetRunningContainerStatuses()
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("GetRunningContainerStatuses() = %v, want %v", result, expected)
-	}
+	assert.Equal(t, expected, result, "GetRunningContainerStatuses()")
 }
 
 func TestGetPodFullName(t *testing.T) {
@@ -200,9 +193,7 @@ func TestGetPodFullName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := GetPodFullName(tt.pod)
-			if result != tt.expected {
-				t.Errorf("GetPodFullName() = %q, want %q", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "GetPodFullName()")
 		})
 	}
 }
@@ -243,9 +234,7 @@ func TestBuildPodFullName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := BuildPodFullName(tt.podName, tt.namespace)
-			if result != tt.expected {
-				t.Errorf("BuildPodFullName(%q, %q) = %q, want %q", tt.podName, tt.namespace, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "BuildPodFullName(%q, %q)", tt.podName, tt.namespace)
 		})
 	}
 }
@@ -306,18 +295,13 @@ func TestParsePodFullName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			name, namespace, err := ParsePodFullName(tt.podFullName)
 
-			if tt.expectError && err == nil {
-				t.Errorf("ParsePodFullName(%q) expected error, got nil", tt.podFullName)
+			if tt.expectError {
+				require.Error(t, err, "ParsePodFullName(%q) expected error", tt.podFullName)
+			} else {
+				require.NoError(t, err, "ParsePodFullName(%q) unexpected error", tt.podFullName)
 			}
-			if !tt.expectError && err != nil {
-				t.Errorf("ParsePodFullName(%q) unexpected error: %v", tt.podFullName, err)
-			}
-			if name != tt.expectedName {
-				t.Errorf("ParsePodFullName(%q) name = %q, want %q", tt.podFullName, name, tt.expectedName)
-			}
-			if namespace != tt.expectedNamespace {
-				t.Errorf("ParsePodFullName(%q) namespace = %q, want %q", tt.podFullName, namespace, tt.expectedNamespace)
-			}
+			assert.Equal(t, tt.expectedName, name, "ParsePodFullName(%q) name", tt.podFullName)
+			assert.Equal(t, tt.expectedNamespace, namespace, "ParsePodFullName(%q) namespace", tt.podFullName)
 		})
 	}
 }
@@ -361,9 +345,7 @@ func TestPodFindContainerByName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := pod.FindContainerByName(tt.containerName)
-			if result != tt.expectedContainer {
-				t.Errorf("FindContainerByName(%q) = %v, want %v", tt.containerName, result, tt.expectedContainer)
-			}
+			assert.Equal(t, tt.expectedContainer, result, "FindContainerByName(%q)", tt.containerName)
 		})
 	}
 }
@@ -406,9 +388,7 @@ func TestPodFindContainerByID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := pod.FindContainerByID(tt.containerID)
-			if result != tt.expectedContainer {
-				t.Errorf("FindContainerByID(%v) = %v, want %v", tt.containerID, result, tt.expectedContainer)
-			}
+			assert.Equal(t, tt.expectedContainer, result, "FindContainerByID(%v)", tt.containerID)
 		})
 	}
 }
@@ -451,9 +431,7 @@ func TestPodFindSandboxByID(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := pod.FindSandboxByID(tt.sandboxID)
-			if result != tt.expectedSandbox {
-				t.Errorf("FindSandboxByID(%v) = %v, want %v", tt.sandboxID, result, tt.expectedSandbox)
-			}
+			assert.Equal(t, tt.expectedSandbox, result, "FindSandboxByID(%v)", tt.sandboxID)
 		})
 	}
 }
@@ -484,9 +462,7 @@ func TestPodToAPIPod(t *testing.T) {
 	}
 
 	result := pod.ToAPIPod()
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("ToAPIPod() = %v, want %v", result, expected)
-	}
+	assert.Equal(t, expected, result, "ToAPIPod()")
 }
 
 func TestPodIsEmpty(t *testing.T) {
@@ -528,9 +504,7 @@ func TestPodIsEmpty(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.pod.IsEmpty()
-			if result != tt.expected {
-				t.Errorf("IsEmpty() = %v, want %v", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "IsEmpty()")
 		})
 	}
 }
@@ -576,9 +550,7 @@ func TestPodsFindPod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := pods.FindPod(tt.podFullName, tt.podUID)
-			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("FindPod(%q, %q) = %v, want %v", tt.podFullName, tt.podUID, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "FindPod(%q, %q)", tt.podFullName, tt.podUID)
 		})
 	}
 }
@@ -616,9 +588,7 @@ func TestRuntimeStatusGetRuntimeCondition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := status.GetRuntimeCondition(tt.conditionType)
-			if result != tt.expected {
-				t.Errorf("GetRuntimeCondition(%q) = %v, want %v", tt.conditionType, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "GetRuntimeCondition(%q)", tt.conditionType)
 		})
 	}
 }
@@ -638,10 +608,7 @@ func TestRuntimeStatusString(t *testing.T) {
 
 	result := status.String()
 	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true"
-
-	if result != expected {
-		t.Errorf("String() = %q, want %q", result, expected)
-	}
+	assert.Equal(t, expected, result, "String()")
 }
 
 func TestRuntimeHandlerString(t *testing.T) {
@@ -673,9 +640,7 @@ func TestRuntimeHandlerString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.handler.String()
-			if result != tt.expected {
-				t.Errorf("String() = %q, want %q", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "String()")
 		})
 	}
 }
@@ -711,9 +676,7 @@ func TestRuntimeConditionString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.condition.String()
-			if result != tt.expected {
-				t.Errorf("String() = %q, want %q", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "String()")
 		})
 	}
 }
@@ -748,9 +711,7 @@ func TestRuntimeFeaturesString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.features.String()
-			if result != tt.expected {
-				t.Errorf("String() = %q, want %q", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "String()")
 		})
 	}
 }
@@ -764,23 +725,16 @@ func TestSortContainerStatusesByCreationTime(t *testing.T) {
 	}
 
 	// Test Len
-	if statuses.Len() != 3 {
-		t.Errorf("Len() = %d, want 3", statuses.Len())
-	}
+	assert.Len(t, statuses, 3, "Len()")
 
 	// Test Swap
 	original1 := statuses[1]
 	original2 := statuses[2]
 	statuses.Swap(1, 2)
-	if statuses[2] != original1 || statuses[1] != original2 {
-		t.Errorf("Swap(0, 1) did not work correctly")
-	}
+	assert.Equal(t, original1, statuses[2], "Swap(0, 1) did not work correctly (0)")
+	assert.Equal(t, original2, statuses[1], "Swap(0, 1) did not work correctly (1)")
 
 	// Test Less
-	if !statuses.Less(1, 0) {
-		t.Errorf("Less(1, 0) should be true")
-	}
-	if statuses.Less(0, 1) {
-		t.Errorf("Less(0, 1) should be false")
-	}
+	assert.True(t, statuses.Less(1, 0), "Less(1, 0) should be true")
+	assert.False(t, statuses.Less(0, 1), "Less(0, 1) should be false")
 }
