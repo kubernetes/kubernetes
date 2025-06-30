@@ -685,9 +685,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 
-	// create a placeholder allocation manager that will be replaced later once admit handlers are available
-	klet.allocationManager = allocation.NewManager(klet.getRootDir(), klet.containerManager, klet.statusManager)
-
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
@@ -747,58 +744,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return klet.kubeClient.CoreV1().ServiceAccounts(namespace).Get(ctx, name, metav1.GetOptions{})
 		}
 	}
-
-	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
-		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
-		klet.livenessManager,
-		klet.readinessManager,
-		klet.startupManager,
-		rootDirectory,
-		podLogsDirectory,
-		machineInfo,
-		klet.podWorkers,
-		kubeDeps.OSInterface,
-		klet,
-		insecureContainerLifecycleHTTPClient,
-		imageBackOff,
-		kubeCfg.SerializeImagePulls,
-		kubeCfg.MaxParallelImagePulls,
-		float32(kubeCfg.RegistryPullQPS),
-		int(kubeCfg.RegistryBurst),
-		kubeCfg.ImagePullCredentialsVerificationPolicy,
-		kubeCfg.PreloadedImagesVerificationAllowlist,
-		imageCredentialProviderConfigPath,
-		imageCredentialProviderBinDir,
-		singleProcessOOMKill,
-		kubeCfg.CPUCFSQuota,
-		kubeCfg.CPUCFSQuotaPeriod,
-		kubeDeps.RemoteRuntimeService,
-		kubeDeps.RemoteImageService,
-		kubeDeps.ContainerManager,
-		klet.containerLogManager,
-		klet.runtimeClassManager,
-		klet.allocationManager,
-		seccompDefault,
-		kubeCfg.MemorySwap.SwapBehavior,
-		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
-		*kubeCfg.MemoryThrottlingFactor,
-		kubeDeps.PodStartupLatencyTracker,
-		kubeDeps.TracerProvider,
-		tokenManager,
-		getServiceAccount,
-	)
-	if err != nil {
-		return nil, err
-	}
-	klet.containerRuntime = runtime
-	klet.streamingRuntime = runtime
-	klet.runner = runtime
-
-	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
-	if err != nil {
-		return nil, err
-	}
-	klet.runtimeCache = runtimeCache
 
 	// common provider to get host file system usage associated with a pod managed by kubelet
 	hostStatsProvider := stats.NewHostStatsProvider(kubecontainer.RealOS{}, func(podUID types.UID) string {
@@ -862,21 +807,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if _, err := klet.updatePodCIDR(ctx, kubeCfg.PodCIDR); err != nil {
 		klog.ErrorS(err, "Pod CIDR update failed")
 	}
-
-	// setup containerGC
-	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy, klet.sourcesReady)
-	if err != nil {
-		return nil, err
-	}
-	klet.containerGC = containerGC
-	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
-
-	// setup imageManager
-	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, postImageGCHooks, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
-	}
-	klet.imageManager = imageManager
 
 	if kubeDeps.TLSOptions != nil {
 		if kubeCfg.ServerTLSBootstrap && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
@@ -1012,8 +942,76 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.shutdownManager = shutdownManager
 	handlers = append(handlers, shutdownManager)
 
-	// replace the allocation manager with one that has admit handlers directly
+	// create the allocation manager with admit handlers
 	klet.allocationManager = allocation.NewManagerWithAdmitHandlers(klet.getRootDir(), klet.containerManager, klet.statusManager, handlers)
+
+	// create the container runtime with the properly configured allocation manager
+	runtime, postImageGCHooks, err := kuberuntime.NewKubeGenericRuntimeManager(
+		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
+		klet.livenessManager,
+		klet.readinessManager,
+		klet.startupManager,
+		rootDirectory,
+		podLogsDirectory,
+		machineInfo,
+		klet.podWorkers,
+		kubeDeps.OSInterface,
+		klet,
+		insecureContainerLifecycleHTTPClient,
+		imageBackOff,
+		kubeCfg.SerializeImagePulls,
+		kubeCfg.MaxParallelImagePulls,
+		float32(kubeCfg.RegistryPullQPS),
+		int(kubeCfg.RegistryBurst),
+		kubeCfg.ImagePullCredentialsVerificationPolicy,
+		kubeCfg.PreloadedImagesVerificationAllowlist,
+		imageCredentialProviderConfigPath,
+		imageCredentialProviderBinDir,
+		singleProcessOOMKill,
+		kubeCfg.CPUCFSQuota,
+		kubeCfg.CPUCFSQuotaPeriod,
+		kubeDeps.RemoteRuntimeService,
+		kubeDeps.RemoteImageService,
+		kubeDeps.ContainerManager,
+		klet.containerLogManager,
+		klet.runtimeClassManager,
+		klet.allocationManager,
+		seccompDefault,
+		kubeCfg.MemorySwap.SwapBehavior,
+		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
+		*kubeCfg.MemoryThrottlingFactor,
+		kubeDeps.PodStartupLatencyTracker,
+		kubeDeps.TracerProvider,
+		tokenManager,
+		getServiceAccount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	klet.containerRuntime = runtime
+	klet.streamingRuntime = runtime
+	klet.runner = runtime
+
+	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
+	if err != nil {
+		return nil, err
+	}
+	klet.runtimeCache = runtimeCache
+
+	// setup imageManager (moved here after container runtime creation to use postImageGCHooks)
+	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, postImageGCHooks, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
+	}
+	klet.imageManager = imageManager
+
+	// setup containerGC (moved here after container runtime creation)
+	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy, klet.sourcesReady)
+	if err != nil {
+		return nil, err
+	}
+	klet.containerGC = containerGC
+	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, kubeDeps.Recorder, klet.clock)
