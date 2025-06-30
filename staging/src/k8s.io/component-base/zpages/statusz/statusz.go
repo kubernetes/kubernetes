@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/exp/maps"
-
 	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/zpages/httputil"
 	"k8s.io/klog/v2"
@@ -88,7 +86,7 @@ func populateStatuszData(reg statuszRegistry, componentName string) (string, err
 	}
 	var apiserverLinks string
 	if componentName == "kube-apiserver" {
-		apiserverLinks = fmt.Sprintf(`Useful Endpoints: %s %s`, delim, html.EscapeString(aggregatePaths(reg.listedPaths())))
+		apiserverLinks = fmt.Sprintf(`Useful Endpoints: %s %s`, delim, html.EscapeString(aggregatePaths(reg.paths())))
 	}
 
 	status := fmt.Sprintf(`
@@ -118,5 +116,10 @@ func aggregatePaths(listedPaths []string) string {
 		}
 	}
 
-	return strings.Join(maps.Keys(paths), " ")
+	var path string
+	for key, _ := range paths {
+		path += " " + key 
+	}
+
+	return path
 }

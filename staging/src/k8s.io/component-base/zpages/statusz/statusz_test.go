@@ -226,6 +226,6 @@ func (f fakeRegistry) emulationVersion() *version.Version {
 	return f.emulationVer
 }
 
-func (f fakeRegistry) listedPaths() []string {
+func (f fakeRegistry) paths() []string {
 	return f.listedPaths
 }
