@@ -18,9 +18,12 @@ package cache
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/meta"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiltrace "k8s.io/utils/trace"
+	"sort"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -326,8 +329,10 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	}
 
 	// now that we have the deletes we need for items, we can add the newItems to the items queue
-	for _, obj := range newItems {
-		retErr := f.addToItems_locked(Replaced, false, obj)
+	sortedNewItems := createSortableItems(newItems)
+	sort.Sort(byResourceVersion(sortedNewItems))
+	for _, currSortableItem := range sortedNewItems {
+		retErr := f.addToItems_locked(Replaced, false, currSortableItem.item)
 		if retErr != nil {
 			return fmt.Errorf("couldn't enqueue object: %w", retErr)
 		}
@@ -404,4 +409,55 @@ func NewRealFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter, transformer Tran
 	}
 	f.cond.L = &f.lock
 	return f
+}
+
+func createSortableItems(items []interface{}) []sortableItem {
+	sortableItems := make([]sortableItem, len(items))
+	for i := range items {
+		sortableItems[i] = newSortableItem(items[i])
+	}
+
+	return sortableItems
+}
+
+type sortableItem struct {
+	item            interface{}
+	resourceVersion int
+}
+
+func newSortableItem(item interface{}) sortableItem {
+	return sortableItem{
+		item:            item,
+		resourceVersion: comparableResourceVersion(item),
+	}
+}
+
+type byResourceVersion []sortableItem
+
+// Len is part of sort.Interface.
+func (s byResourceVersion) Len() int {
+	return len(s)
+}
+
+// Swap is part of sort.Interface.
+func (s byResourceVersion) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+// Less is part of sort.Interface. It is implemented by calling the "by" closure in the sorter.
+func (s byResourceVersion) Less(i, j int) bool {
+	return s[i].resourceVersion < s[j].resourceVersion
+}
+
+func comparableResourceVersion(obj interface{}) int {
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return 0 // resourceversions are never zero
+	}
+	rvString := meta.GetResourceVersion()
+	resourceVersion, err := strconv.Atoi(rvString)
+	if err != nil {
+		return 0 // resourceversions are never zero
+	}
+	return resourceVersion
 }
