@@ -21,13 +21,13 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
@@ -1004,7 +1004,9 @@ func TestPlugin(t *testing.T) {
 
 			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod, nil)
 			t.Run("prefilter", func(t *testing.T) {
-				assert.Equal(t, tc.want.preFilterResult, result)
+				if !cmp.Equal(tc.want.preFilterResult, result) {
+					t.Fatalf("expected preFilterResult %v, got %v", tc.want.preFilterResult, result)
+				}
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
 			})
 			unschedulable := status.Code() != framework.Success
@@ -1095,7 +1097,9 @@ func TestPlugin(t *testing.T) {
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postfilter)
 				result, status := testCtx.p.PostFilter(testCtx.ctx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
 				t.Run("postfilter", func(t *testing.T) {
-					assert.Equal(t, tc.want.postFilterResult, result)
+					if !cmp.Equal(tc.want.postFilterResult, result) {
+						t.Fatalf("expected postFilterResult %v, got %v", tc.want.postFilterResult, result)
+					}
 					testCtx.verify(t, tc.want.postfilter, initialObjects, nil, status)
 				})
 			}
@@ -1115,13 +1119,15 @@ type testContext struct {
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
 	t.Helper()
-	if expected.status == nil {
-		assert.Nil(t, status)
-	} else if actualErr := status.AsError(); actualErr != nil {
+	if expected.status == nil && !cmp.Equal(status, nil) {
+		t.Fatal("expected no status, but got", status)
+	} else if actualErr := status.AsError(); actualErr != nil && !strings.Contains(actualErr.Error(), expected.status.AsError().Error()) {
 		// Compare only the error strings.
-		assert.ErrorContains(t, actualErr, expected.status.AsError().Error())
+		t.Fatalf("expected error to contain %q, got %q", expected.status.AsError().Error(), actualErr.Error())
 	} else {
-		assert.Equal(t, expected.status, status)
+		if !cmp.Equal(expected.status, status) {
+			t.Fatalf("expected status to be %v, got %v", expected.status, status)
+		}
 	}
 	objects := tc.listAll(t)
 	wantObjects := update(t, initialObjects, expected.changes)
@@ -1503,13 +1509,18 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				}
 
 				// Eventually the assume cache will have it, too.
-				require.EventuallyWithT(t, func(t *assert.CollectT) {
+				eventuallyHelpper(t, time.Minute, time.Second, func(t *testing.T) bool {
 					cachedClaim, err := testCtx.draManager.resourceClaimTracker.cache.Get(claimKey)
-					require.NoError(t, err, "retrieve claim")
+					if err != nil {
+						t.Errorf("failed to get cached claim: %v", err)
+						return false
+					}
 					if cachedClaim.(*resourceapi.ResourceClaim).ResourceVersion != claim.ResourceVersion {
 						t.Errorf("cached claim not updated yet")
+						return false
 					}
-				}, time.Minute, time.Second, "claim assume cache must have new or updated claim")
+					return true
+				}, "claim assume cache must have new or updated claim")
 
 				// This has the actual UID and ResourceVersion,
 				// which is relevant for
@@ -1609,5 +1620,25 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				t.Fatalf("want %#v, got %#v", tc.wantHint.String(), gotHint.String())
 			}
 		})
+	}
+}
+
+func eventuallyHelpper(t *testing.T, d time.Duration, tick time.Duration, f func(*testing.T) bool, msgAndArgs ...interface{}) {
+	t.Helper()
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	timeout := time.After(d)
+
+	for {
+		select {
+		case <-timeout:
+			t.Fatalf("case %s timed out after %v: %v", t.Name(), d, fmt.Sprint(msgAndArgs...))
+			return
+		case <-ticker.C:
+			if f(t) {
+				return
+			}
+		}
 	}
 }

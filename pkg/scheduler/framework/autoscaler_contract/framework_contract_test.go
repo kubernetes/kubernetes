@@ -24,8 +24,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
@@ -43,20 +42,24 @@ type frameworkContract interface {
 func TestFrameworkContract(t *testing.T) {
 	var f framework.Framework
 	var c frameworkContract = f
-	assert.Nil(t, c)
+	if !cmp.Equal(c, nil) {
+		t.Fatal("frameworkContract expected to be nil")
+	}
 }
 
 func TestNewFramework(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	var f interface{}
 	if f, _ = runtime.NewFramework(ctx, nil, nil); f != nil {
-		_, ok := f.(framework.Framework)
-		assert.True(t, ok)
+		if _, ok := f.(framework.Framework); !ok {
+			t.Fatalf("expected type to be framework.Framework, got %T", f)
+		}
 	}
 }
 
 func TestNewCycleState(t *testing.T) {
 	var state interface{} = framework.NewCycleState()
-	_, ok := state.(*framework.CycleState)
-	assert.True(t, ok)
+	if _, ok := state.(*framework.CycleState); !ok {
+		t.Fatalf("expected type to be framework.CycleState, got %T", state)
+	}
 }
