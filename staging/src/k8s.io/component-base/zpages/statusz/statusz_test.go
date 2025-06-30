@@ -60,10 +60,7 @@ Up: %s
 Go version: %s
 Binary version: %v
 
-
-Useful Endpoints: 
-
-"/livez" "/readyz"
+Useful Endpoints:  "/livez" "/readyz"
 `
 
 func TestStatusz(t *testing.T) {
