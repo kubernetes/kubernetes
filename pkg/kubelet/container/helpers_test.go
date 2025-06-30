@@ -1166,9 +1166,7 @@ func TestExpandContainerCommandOnlyStatic(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := ExpandContainerCommandOnlyStatic(tc.command, tc.envs)
-			if !reflect.DeepEqual(tc.expected, actual) {
-				t.Errorf("ExpandContainerCommandOnlyStatic(%v, %v) = %v, want %v", tc.command, tc.envs, actual, tc.expected)
-			}
+			assert.Equal(t, tc.expected, actual, "ExpandContainerCommandOnlyStatic(%v, %v)", tc.command, tc.envs)
 		})
 	}
 }
@@ -1208,18 +1206,20 @@ func TestFilterEventRecorder(t *testing.T) {
 	filtered.AnnotatedEventf(implicit, map[string]string{"a": "b"}, "Normal", "Reason", "MessageFmt")
 
 	if len(recorder.events) != 1 || len(recorder.fEvents) != 1 || len(recorder.aEvents) != 1 {
-		t.Errorf("Expected only one event of each type to be recorded, got events: %v, fEvents: %v, aEvents: %v", recorder.events, recorder.fEvents, recorder.aEvents)
+		assert.Len(t, recorder.events, 1, "Expected only one event of each type to be recorded, got events: %v", recorder.events)
+		assert.Len(t, recorder.fEvents, 1, "Expected only one event of each type to be recorded, got fEvents: %v", recorder.fEvents)
+		assert.Len(t, recorder.aEvents, 1, "Expected only one event of each type to be recorded, got aEvents: %v", recorder.aEvents)
 	}
 }
 
 func TestIsHostNetworkPod(t *testing.T) {
 	pod := &v1.Pod{Spec: v1.PodSpec{HostNetwork: true}}
 	if !IsHostNetworkPod(pod) {
-		t.Errorf("expected true for HostNetwork pod")
+		assert.True(t, IsHostNetworkPod(pod), "expected true for HostNetwork pod")
 	}
 	pod = &v1.Pod{Spec: v1.PodSpec{HostNetwork: false}}
 	if IsHostNetworkPod(pod) {
-		t.Errorf("expected false for non-HostNetwork pod")
+		assert.False(t, IsHostNetworkPod(pod), "expected false for non-HostNetwork pod")
 	}
 }
 
@@ -1256,22 +1256,22 @@ func TestConvertPodStatusToRunningPod(t *testing.T) {
 	runtimeName := "docker"
 	runningPod := ConvertPodStatusToRunningPod(runtimeName, podStatus)
 	if runningPod.ID != podStatus.ID || runningPod.Name != podStatus.Name || runningPod.Namespace != podStatus.Namespace {
-		t.Errorf("ConvertPodStatusToRunningPod did not copy pod metadata correctly")
+		assert.Equal(t, podStatus.ID, runningPod.ID, "ConvertPodStatusToRunningPod did not copy pod ID correctly")
+		assert.Equal(t, podStatus.Name, runningPod.Name, "ConvertPodStatusToRunningPod did not copy pod Name correctly")
+		assert.Equal(t, podStatus.Namespace, runningPod.Namespace, "ConvertPodStatusToRunningPod did not copy pod Namespace correctly")
 	}
-	if len(runningPod.Containers) != 1 {
-		t.Errorf("expected 1 running container, got %d", len(runningPod.Containers))
+	assert.Len(t, runningPod.Containers, 1, "expected 1 running container, got %d", len(runningPod.Containers))
+	if len(runningPod.Containers) > 0 {
+		assert.Equal(t, "c1", runningPod.Containers[0].Name, "expected running container name 'c1', got %q", runningPod.Containers[0].Name)
 	}
-	if runningPod.Containers[0].Name != "c1" {
-		t.Errorf("expected running container name 'c1', got %q", runningPod.Containers[0].Name)
+	assert.Len(t, runningPod.Sandboxes, 2, "expected 2 sandboxes, got %d", len(runningPod.Sandboxes))
+	if len(runningPod.Sandboxes) > 0 {
+		assert.Equal(t, "sandbox1", runningPod.Sandboxes[0].ID.ID, "expected sandbox1 to be running")
+		assert.Equal(t, ContainerStateRunning, runningPod.Sandboxes[0].State, "expected sandbox1 to be running")
 	}
-	if len(runningPod.Sandboxes) != 2 {
-		t.Errorf("expected 2 sandboxes, got %d", len(runningPod.Sandboxes))
-	}
-	if runningPod.Sandboxes[0].ID.ID != "sandbox1" || runningPod.Sandboxes[0].State != ContainerStateRunning {
-		t.Errorf("expected sandbox1 to be running")
-	}
-	if runningPod.Sandboxes[1].ID.ID != "sandbox2" || runningPod.Sandboxes[1].State != ContainerStateExited {
-		t.Errorf("expected sandbox2 to be exited")
+	if len(runningPod.Sandboxes) > 1 {
+		assert.Equal(t, "sandbox2", runningPod.Sandboxes[1].ID.ID, "expected sandbox2 to be exited")
+		assert.Equal(t, ContainerStateExited, runningPod.Sandboxes[1].State, "expected sandbox2 to be exited")
 	}
 }
 
@@ -1288,9 +1288,7 @@ func TestSandboxToContainerState(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := SandboxToContainerState(tc.input)
-			if actual != tc.expected {
-				t.Errorf("SandboxToContainerState(%v) = %v, want %v", tc.input, actual, tc.expected)
-			}
+			assert.Equal(t, tc.expected, actual, "SandboxToContainerState(%v)", tc.input)
 		})
 	}
 }
@@ -1299,6 +1297,7 @@ func TestAllContainersAreWindowsHostProcess(t *testing.T) {
 	trueVar := true
 	falseVar := false
 	containerName := "container"
+
 	testCases := []struct {
 		name           string
 		podSpec        *v1.PodSpec
@@ -1364,6 +1363,7 @@ func TestAllContainersAreWindowsHostProcess(t *testing.T) {
 			expectedResult: true, // by definition true ?
 		},
 	}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			pod := &v1.Pod{}
@@ -1520,9 +1520,7 @@ func TestHasAnyRegularContainerStarted(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := HasAnyRegularContainerStarted(tc.spec, tc.statuses)
-			if actual != tc.expectStarted {
-				t.Errorf("HasAnyRegularContainerStarted(%v, %v) = %v, want %v", tc.spec, tc.statuses, actual, tc.expectStarted)
-			}
+			assert.Equal(t, tc.expectStarted, actual, "HasAnyRegularContainerStarted(%v, %v)", tc.spec, tc.statuses)
 		})
 	}
 }
