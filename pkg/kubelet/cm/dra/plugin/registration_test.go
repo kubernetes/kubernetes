@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
-	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -151,23 +150,24 @@ func TestRegistrationHandler(t *testing.T) {
 			description:       "two-services",
 			driverName:        pluginB,
 			socketFile:        socketFileB,
-			supportedServices: []string{drapbv1alpha4.NodeService, drapb.DRAPluginService},
+			supportedServices: []string{drapb.DRAPluginService /* TODO: add v1 here once we have it */},
 			chosenService:     drapb.DRAPluginService,
 		},
+		// TODO: use v1beta1 here once we have v1
+		// {
+		// 	description:       "old-service",
+		// 	driverName:        pluginB,
+		// 	socketFile:        socketFileB,
+		// 	supportedServices: []string{drapbv1alpha4.NodeService},
+		// 	chosenService:     drapbv1alpha4.NodeService,
+		// },
 		{
-			description:       "old-service",
-			driverName:        pluginB,
-			socketFile:        socketFileB,
-			supportedServices: []string{drapbv1alpha4.NodeService},
-			chosenService:     drapbv1alpha4.NodeService,
-		},
-		{
-			// Legacy behavior.
+			// Legacy behavior of picking v1alpha4 is no longer supported.
 			description:       "version",
 			driverName:        pluginB,
 			socketFile:        socketFileB,
 			supportedServices: []string{"1.0.0"},
-			chosenService:     drapbv1alpha4.NodeService,
+			shouldError:       true,
 		},
 		{
 			description:       "replace",

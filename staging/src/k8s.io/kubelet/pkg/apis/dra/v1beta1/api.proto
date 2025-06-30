@@ -95,7 +95,8 @@ message NodeUnprepareResourcesRequest {
 message NodeUnprepareResourcesResponse {
     // The ResourceClaims for which preparation was reverted.
     // The same rules as for NodePrepareResourcesResponse.claims
-    // apply.
+    // apply. In particular, all claims in the request must
+    // have an entry in the response, even if that entry is nil.
     map<string, NodeUnprepareResourceResponse> claims = 1;
 }
 

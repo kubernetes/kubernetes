@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -75,8 +74,6 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	switch service {
 	case drapbv1beta1.DRAPluginService:
 		drapbv1beta1.RegisterDRAPluginServer(s, fakeGRPCServer)
-	case drapbv1alpha4.NodeService:
-		drapbv1alpha4.RegisterNodeServer(s, drapbv1alpha4.V1Beta1ServerWrapper{DRAPluginServer: fakeGRPCServer})
 	default:
 		return nil, fmt.Errorf("unsupported gRPC service: %s", service)
 	}
@@ -209,21 +206,9 @@ func TestGRPCMethods(t *testing.T) {
 		expectError   string
 	}{
 		{
-			description:   "v1alpha4",
-			service:       drapbv1alpha4.NodeService,
-			chosenService: drapbv1alpha4.NodeService,
-		},
-		{
 			description:   "v1beta1",
 			service:       drapbv1beta1.DRAPluginService,
 			chosenService: drapbv1beta1.DRAPluginService,
-		},
-		{
-			// In practice, such a mismatch between plugin and kubelet should not happen.
-			description:   "mismatch",
-			service:       drapbv1beta1.DRAPluginService,
-			chosenService: drapbv1alpha4.NodeService,
-			expectError:   "unknown service v1alpha3.Node",
 		},
 		{
 			// In practice, kubelet wouldn't choose an invalid service.
