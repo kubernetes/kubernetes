@@ -64,7 +64,7 @@ type PolicyOptions struct {
 }
 
 func NewPolicyOptions(ctx context.Context, policyOptions map[string]string) (PolicyOptions, error) {
-	logger := klog.FromContext()
+	logger := klog.FromContext(ctx)
 
 	opts := PolicyOptions{
 		// Set MaxAllowableNUMANodes to the default. This will be overwritten

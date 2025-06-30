@@ -17,7 +17,6 @@ limitations under the License.
 package allocation
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -78,7 +77,7 @@ type Manager interface {
 	// the pod cannot be admitted.
 	// allocatedPods should represent the pods that have already been admitted, along with their
 	// admitted (allocated) resources.
-	AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) (ok bool, reason, message string)
+	AddPod(activePods []*v1.Pod, pod *v1.Pod) (ok bool, reason, message string)
 
 	// RemovePod removes any stored state for the given pod UID.
 	RemovePod(uid types.UID)
@@ -89,7 +88,7 @@ type Manager interface {
 	// HandlePodResourcesResize returns the "allocated pod", which should be used for all resource
 	// calculations after this function is called. It also updates the cached ResizeStatus according to
 	// the allocation decision and pod status.
-	HandlePodResourcesResize(context.Context, runtime kubecontainer.Runtime, allocatedPods []*v1.Pod, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, error)
+	HandlePodResourcesResize(runtime kubecontainer.Runtime, allocatedPods []*v1.Pod, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, error)
 
 	// IsPodResizingInProgress checks whether the actuated resizable resources differ from the allocated resources
 	// for any running containers. Specifically, the following differences are ignored:
@@ -230,7 +229,7 @@ func (m *manager) AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers) {
 	}
 }
 
-func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -242,7 +241,7 @@ func (m *manager) AddPod(ctx context.Context, activePods []*v1.Pod, pod *v1.Pod)
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := m.getAllocatedPods(activePods)
-	ok, reason, message := m.canAdmitPod(ctx, allocatedPods, pod)
+	ok, reason, message := m.canAdmitPod(allocatedPods, pod)
 
 	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
@@ -286,7 +285,6 @@ func (m *manager) GetActuatedResources(podUID types.UID, containerName string) (
 }
 
 func (m *manager) HandlePodResourcesResize(
-	ctx context.Context,
 	runtime kubecontainer.Runtime,
 	allocatedPods []*v1.Pod,
 	pod *v1.Pod,
@@ -325,7 +323,7 @@ func (m *manager) HandlePodResourcesResize(
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, reason, message := m.canResizePod(ctx, allocatedPods, pod)
+	fit, reason, message := m.canResizePod(allocatedPods, pod)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(pod); err != nil {
@@ -388,16 +386,15 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 // the pod cannot be admitted.
 // allocatedPods should represent the pods that have already been admitted, along with their
 // admitted (allocated) resources.
-func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
-	logger := klog.FromContext(ctx)
+func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	// Filter out the pod being evaluated.
 	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
 	// If any handler rejects, the pod is rejected.
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods}
 	for _, podAdmitHandler := range m.admitHandlers {
-		if result := podAdmitHandler.Admit(ctx, attrs); !result.Admit {
-			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message)
+		if result := podAdmitHandler.Admit(attrs); !result.Admit {
+			klog.InfoS("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message)
 			return false, result.Reason, result.Message
 		}
 	}
@@ -409,7 +406,7 @@ func (m *manager) canAdmitPod(ctx context.Context, allocatedPods []*v1.Pod, pod 
 // pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed; returns a reason and message
 // otherwise.
-func (m *manager) canResizePod(ctx context.Context, allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	// TODO: Move this logic into a PodAdmitHandler by introducing an operation field to
 	// lifecycle.PodAdmitAttributes, and combine canResizePod with canAdmitPod.
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
@@ -446,7 +443,7 @@ func (m *manager) canResizePod(ctx context.Context, allocatedPods []*v1.Pod, pod
 
 	}
 
-	if ok, failReason, failMessage := m.canAdmitPod(ctx, allocatedPods, pod); !ok {
+	if ok, failReason, failMessage := m.canAdmitPod(allocatedPods, pod); !ok {
 		// Log reason and return. Let the next sync iteration retry the resize
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
 		return false, v1.PodReasonDeferred, failMessage
