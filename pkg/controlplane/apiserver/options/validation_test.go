@@ -395,3 +395,68 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateCoordinatedLeadershipFlags(t *testing.T) {
+	tests := []struct {
+		name           string
+		options        *Options
+		expectedErrors map[string]bool
+	}{
+		{
+			name: "no errors",
+			options: &Options{
+				CoordinatedLeadershipLeaseDuration: 10,
+				CoordinatedLeadershipRenewDeadline: 5,
+				CoordinatedLeadershipRetryPeriod:   2,
+			},
+		},
+		{
+			name: "invalid lease duration",
+			options: &Options{
+				CoordinatedLeadershipLeaseDuration: 5,
+				CoordinatedLeadershipRenewDeadline: 5,
+				CoordinatedLeadershipRetryPeriod:   2,
+			},
+			expectedErrors: map[string]bool{
+				"--coordinated-leadership-lease-duration must be greater than --coordinated-leadership-renew-deadline": true,
+			},
+		},
+		{
+			name: "invalid retry period",
+			options: &Options{
+				CoordinatedLeadershipLeaseDuration: 10,
+				CoordinatedLeadershipRenewDeadline: 5,
+				CoordinatedLeadershipRetryPeriod:   5,
+			},
+			expectedErrors: map[string]bool{
+				"--coordinated-leadership-renew-deadline must be greater than --coordinated-leadership-retry-period": true,
+			},
+		},
+		{
+			name: "all errors",
+			options: &Options{
+				CoordinatedLeadershipLeaseDuration: 5,
+				CoordinatedLeadershipRenewDeadline: 5,
+				CoordinatedLeadershipRetryPeriod:   5,
+			},
+			expectedErrors: map[string]bool{
+				"--coordinated-leadership-lease-duration must be greater than --coordinated-leadership-renew-deadline": true,
+				"--coordinated-leadership-renew-deadline must be greater than --coordinated-leadership-retry-period":   true,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errs := validateCoordinatedLeadershipFlags(test.options)
+			if len(errs) != len(test.expectedErrors) {
+				t.Errorf("Expected %d errors, but got %d", len(test.expectedErrors), len(errs))
+			}
+			for _, err := range errs {
+				if _, ok := test.expectedErrors[err.Error()]; !ok {
+					t.Errorf("Unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}

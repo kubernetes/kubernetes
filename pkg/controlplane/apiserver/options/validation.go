@@ -117,6 +117,17 @@ func validateServiceAccountTokenSigningConfig(options *Options) []error {
 	return errors
 }
 
+func validateCoordinatedLeadershipFlags(options *Options) []error {
+	var errs []error
+	if options.CoordinatedLeadershipLeaseDuration <= options.CoordinatedLeadershipRenewDeadline {
+		errs = append(errs, fmt.Errorf("--coordinated-leadership-lease-duration must be greater than --coordinated-leadership-renew-deadline"))
+	}
+	if options.CoordinatedLeadershipRenewDeadline <= options.CoordinatedLeadershipRetryPeriod {
+		errs = append(errs, fmt.Errorf("--coordinated-leadership-renew-deadline must be greater than --coordinated-leadership-retry-period"))
+	}
+	return errs
+}
+
 // Validate checks Options and return a slice of found errs.
 func (s *Options) Validate() []error {
 	var errs []error
@@ -135,6 +146,7 @@ func (s *Options) Validate() []error {
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFlags(s)...)
 	errs = append(errs, validateNodeSelectorAuthorizationFeature()...)
 	errs = append(errs, validateServiceAccountTokenSigningConfig(s)...)
+	errs = append(errs, validateCoordinatedLeadershipFlags(s)...)
 
 	return errs
 }
