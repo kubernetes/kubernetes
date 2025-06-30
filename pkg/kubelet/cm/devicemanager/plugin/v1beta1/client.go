@@ -91,7 +91,7 @@ func (c *client) Run() {
 			return
 		}
 		klog.V(2).InfoS("State pushed for device plugin", "resource", c.resource, "resourceCapacity", len(response.Devices))
-		c.handler.PluginListAndWatchReceiver(c.resource, response)
+		c.handler.PluginListAndWatchReceiver(context.TODO(), c.resource, response)
 	}
 }
 
