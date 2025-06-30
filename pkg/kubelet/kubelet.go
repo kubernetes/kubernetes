@@ -684,6 +684,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.podManager = kubepod.NewBasicPodManager()
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
+
+	// create a placeholder allocation manager that will be replaced later once admit handlers are available
 	klet.allocationManager = allocation.NewManager(klet.getRootDir(), klet.containerManager, klet.statusManager)
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
@@ -968,6 +970,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation)
 
 	klet.evictionManager = evictionManager
+
+	// build admit handlers list
 	handlers := []lifecycle.PodAdmitHandler{}
 	handlers = append(handlers, evictionAdmitHandler)
 
@@ -980,41 +984,16 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	handlers = append(handlers, sysctlsAllowlist)
 
-	// enable active deadline handler
-	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, kubeDeps.Recorder, klet.clock)
-	if err != nil {
-		return nil, err
-	}
-	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
-	klet.AddPodSyncHandler(activeDeadlineHandler)
-
 	handlers = append(handlers, klet.containerManager.GetAllocateResourcesPodAdmitHandler())
 
 	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.getAllocatedPods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
 	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources))
-	// apply functional Option's
-	for _, opt := range kubeDeps.Options {
-		opt(klet)
-	}
 
 	if goos == "linux" {
 		// AppArmor is a Linux kernel security module and it does not support other operating systems.
 		klet.appArmorValidator = apparmor.NewValidator()
 		handlers = append(handlers, lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	}
-
-	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
-	renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)
-	klet.nodeLeaseController = lease.NewController(
-		klet.clock,
-		klet.heartbeatClient,
-		string(klet.nodeName),
-		kubeCfg.NodeLeaseDurationSeconds,
-		klet.onRepeatedHeartbeatFailure,
-		renewInterval,
-		string(klet.nodeName),
-		v1.NamespaceNodeLease,
-		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName)))
 
 	// setup node shutdown manager
 	shutdownManager := nodeshutdown.NewManager(&nodeshutdown.Config{
@@ -1031,12 +1010,41 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		StateDirectory:                   rootDirectory,
 	})
 	klet.shutdownManager = shutdownManager
+	handlers = append(handlers, shutdownManager)
+
+	// replace the allocation manager with one that has admit handlers directly
+	klet.allocationManager = allocation.NewManagerWithAdmitHandlers(klet.getRootDir(), klet.containerManager, klet.statusManager, handlers)
+
+	// enable active deadline handler
+	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, kubeDeps.Recorder, klet.clock)
+	if err != nil {
+		return nil, err
+	}
+	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
+	klet.AddPodSyncHandler(activeDeadlineHandler)
+
+	// apply functional Option's
+	for _, opt := range kubeDeps.Options {
+		opt(klet)
+	}
+
+	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
+	renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)
+	klet.nodeLeaseController = lease.NewController(
+		klet.clock,
+		klet.heartbeatClient,
+		string(klet.nodeName),
+		kubeCfg.NodeLeaseDurationSeconds,
+		klet.onRepeatedHeartbeatFailure,
+		renewInterval,
+		string(klet.nodeName),
+		v1.NamespaceNodeLease,
+		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName)))
+
 	klet.usernsManager, err = userns.MakeUserNsManager(klet)
 	if err != nil {
 		return nil, fmt.Errorf("create user namespace manager: %w", err)
 	}
-	handlers = append(handlers, shutdownManager)
-	klet.allocationManager.AddPodAdmitHandlers(handlers)
 
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
