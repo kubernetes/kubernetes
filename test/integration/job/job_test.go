@@ -4021,27 +4021,68 @@ func TestSuspendJob(t *testing.T) {
 		wantReason string
 	}
 	testCases := []struct {
-		featureGate bool
-		create      step
-		update      step
+		name          string
+		featureGate   bool
+		create        step
+		update        step
+		isRestartCase bool
 	}{
 		// Exhaustively test all combinations other than trivial true->true and
 		// false->false cases.
 		{
-			create: step{flag: false, wantActive: 2},
-			update: step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
+			name:          "restart_false_to_true",
+			create:        step{flag: false, wantActive: 2},
+			update:        step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
+			isRestartCase: true,
 		},
 		{
-			create: step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
-			update: step{flag: false, wantActive: 2, wantStatus: v1.ConditionFalse, wantReason: "Resumed"},
+			name:          "restart_true_to_false",
+			create:        step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
+			update:        step{flag: false, wantActive: 2, wantStatus: v1.ConditionFalse, wantReason: "Resumed"},
+			isRestartCase: true,
+		},
+		{
+			name:          "false_to_true",
+			create:        step{flag: false, wantActive: 2},
+			update:        step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
+			isRestartCase: false,
+		},
+		{
+			name:          "true_to_false",
+			create:        step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
+			update:        step{flag: false, wantStatus: v1.ConditionFalse, wantReason: "Resumed", wantActive: 2},
+			isRestartCase: false,
 		},
 	}
 
 	closeFn, restConfig, clientSet, ns := setup(t, "suspend")
 	t.Cleanup(closeFn)
 	for _, tc := range testCases {
-		name := fmt.Sprintf("feature=%v,create=%v,update=%v", tc.featureGate, tc.create.flag, tc.update.flag)
-		t.Run(name, func(t *testing.T) {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.isRestartCase {
+				ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+				defer cancel()
+
+				job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+					Spec: batchv1.JobSpec{
+						Parallelism: ptr.To[int32](2),
+						Completions: ptr.To[int32](4),
+						Suspend:     ptr.To(true),
+					},
+				})
+				if err != nil {
+					t.Fatalf("Failed to create suspended Job: %v", err)
+				}
+
+				validateJobPodsStatus(ctx, t, clientSet, job, podsByStatus{
+					Active:      0,
+					Ready:       ptr.To[int32](0),
+					Terminating: ptr.To[int32](0),
+				})
+				return
+			}
+
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 			t.Cleanup(cancel)
 			events, err := clientSet.EventsV1().Events(ns.Name).Watch(ctx, metav1.ListOptions{})
