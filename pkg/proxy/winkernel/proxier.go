@@ -1356,7 +1356,9 @@ func (proxier *Proxier) syncProxyRules() {
 			// targetPort is zero if it is specified as a name in port.TargetPort, so the real port should be got from endpoints.
 			// Note that hnslib.AddLoadBalancer() doesn't support endpoints with different ports, so only port from first endpoint is used.
 			// TODO(feiskyer): add support of different endpoint ports after hnslib.AddLoadBalancer() add that.
-			if svcInfo.targetPort == 0 {
+			if svcInfo.targetPort == 0 || svcInfo.targetPort != int(ep.port) {
+				// Update the targetPort to the first endpoint's port if it is not specified or different from the endpoint's port.
+				klog.V(3).InfoS("Update targetPort", "oldTargetPort", svcInfo.targetPort, "newTargetPort", ep.port)
 				svcInfo.targetPort = int(ep.port)
 			}
 			// There is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address, so we need to check using endpoint ID first.
