@@ -68,7 +68,7 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *S) field.ErrorList {
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *S) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SliceField[*]")
 			})...)
 			return
@@ -80,7 +80,7 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field TypeDefSliceField[*]")
 			})...)
 			return
@@ -92,7 +92,7 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DirectComparableStruct) field.ErrorList {
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DirectComparableStruct) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SliceStructField[*]")
 			})...)
 			return
@@ -104,10 +104,10 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonDirectComparableStruct) field.ErrorList {
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonDirectComparableStruct) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SliceNonComparableStructField[*]")
 			})...)
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, Validate_NonDirectComparableStruct)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NonDirectComparableStruct)...)
 			return
 		}(fldPath.Child("sliceNonComparableStructField"), obj.SliceNonComparableStructField, safe.Field(oldObj, func(oldObj *StructSlice) []NonDirectComparableStruct { return oldObj.SliceNonComparableStructField }))...)
 

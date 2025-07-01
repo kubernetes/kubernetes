@@ -65,7 +65,12 @@ func Test_StructSlice(t *testing.T) {
 		TypeDefSliceField:             MySlice{1, 2},
 		SliceStructField:              []DirectComparableStruct{{IntField: 2}, {IntField: 1}},
 		SliceNonComparableStructField: []NonDirectComparableStruct{{IntPtrField: ptr.To(2)}, {IntPtrField: ptr.To(1)}},
-	}).ExpectValid()
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Invalid(field.NewPath("sliceField[0]"), "", ""),
+		field.Invalid(field.NewPath("typedefSliceField[0]"), "", ""),
+		field.Invalid(field.NewPath("sliceStructField[0]"), "", ""),
+		field.Invalid(field.NewPath("sliceNonComparableStructField[0]"), "", ""),
+	})
 
 	// No changes.
 	st.Value(&StructSlice{
@@ -92,5 +97,7 @@ func Test_StructSlice(t *testing.T) {
 	}).OldValue(&StructSlice{
 		SliceNonComparableStructField:   []NonDirectComparableStruct{{IntPtrField: ptr.To(1)}, {IntPtrField: ptr.To(2)}},
 		SliceNonComparableStructWithKey: []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}, {Key: "y", IntPtrField: ptr.To(2)}},
-	}).ExpectValid()
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Invalid(field.NewPath("sliceNonComparableStructField[0]"), "", ""),
+	})
 }
