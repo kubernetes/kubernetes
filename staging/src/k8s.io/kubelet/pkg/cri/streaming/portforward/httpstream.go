@@ -140,7 +140,7 @@ func (h *httpStreamHandler) getStreamPair(requestID string) (*httpStreamPair, bo
 func (h *httpStreamHandler) monitorStreamPair(p *httpStreamPair, timeout <-chan time.Time) {
 	select {
 	case <-timeout:
-		err := fmt.Errorf("(conn=%v, request=%s) timed out waiting for streams", h.conn, p.requestID)
+		err := fmt.Errorf("(conn=%p, request=%s) timed out waiting for streams", h.conn, p.requestID)
 		utilruntime.HandleError(err)
 		p.printError(err.Error())
 	case <-p.complete:
