@@ -55,10 +55,10 @@ func Test(t *testing.T) {
 		Max0TypedefField:  make([]OtherTypedefStruct, 1),
 		Max10TypedefField: make([]OtherTypedefStruct, 11),
 	}).ExpectRegexpsByPath(map[string][]string{
-		"max0Field":         []string{`Too many:.*must have at most 0 items`},
-		"max10Field":        []string{`Too many:.*must have at most 10 items`},
-		"max0TypedefField":  []string{`Too many:.*must have at most 0 items`},
-		"max10TypedefField": []string{`Too many:.*must have at most 10 items`},
+		"max0Field":         {`Too many:.*must have at most 0 items`},
+		"max10Field":        {`Too many:.*must have at most 10 items`},
+		"max0TypedefField":  {`Too many:.*must have at most 0 items`},
+		"max10TypedefField": {`Too many:.*must have at most 10 items`},
 	})
 	// Test validation ratcheting
 	st.Value(&Struct{

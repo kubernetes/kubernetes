@@ -66,14 +66,16 @@ func IsNilableType(t *types.Type) bool {
 //   - given `type X []int; *X`, returns `*[]int`
 func NativeType(t *types.Type) *types.Type {
 	ptrs := 0
-	for {
-		if t.Kind == types.Alias {
+	conditionMet := false
+	for !conditionMet {
+		switch t.Kind {
+		case types.Alias:
 			t = t.Underlying
-		} else if t.Kind == types.Pointer {
+		case types.Pointer:
 			ptrs++
 			t = t.Elem
-		} else {
-			break
+		default:
+			conditionMet = true
 		}
 	}
 	for range ptrs {

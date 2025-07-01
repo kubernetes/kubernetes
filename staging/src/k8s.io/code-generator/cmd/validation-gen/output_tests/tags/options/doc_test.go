@@ -27,27 +27,27 @@ func Test(t *testing.T) {
 		// All zero values
 	}).ExpectRegexpsByPath(map[string][]string{
 		// All ifOptionDisabled validations should trigger
-		"xDisabledField": []string{"field Struct.XDisabledField"},
-		"yDisabledField": []string{"field Struct.YDisabledField"},
-		"xyMixedField":   []string{"field Struct.XYMixedField/Y"},
+		"xDisabledField": {"field Struct.XDisabledField"},
+		"yDisabledField": {"field Struct.YDisabledField"},
+		"xyMixedField":   {"field Struct.XYMixedField/Y"},
 	})
 
 	st.Value(&Struct{
 		// All zero values
 	}).Opts([]string{"FeatureX", "FeatureY"}).ExpectRegexpsByPath(map[string][]string{
 		// All ifOptionEnabled validations should trigger
-		"xEnabledField": []string{"field Struct.XEnabledField"},
-		"yEnabledField": []string{"field Struct.YEnabledField"},
-		"xyMixedField":  []string{"field Struct.XYMixedField/X"},
+		"xEnabledField": {"field Struct.XEnabledField"},
+		"yEnabledField": {"field Struct.YEnabledField"},
+		"xyMixedField":  {"field Struct.XYMixedField/X"},
 	})
 
 	st.Value(&Struct{
 		// All zero values
 	}).Opts([]string{"FeatureX"}).ExpectRegexpsByPath(map[string][]string{
 		// All ifOptionEnabled validations should trigger
-		"xEnabledField":  []string{"field Struct.XEnabledField"},
-		"yDisabledField": []string{"field Struct.YDisabledField"},
-		"xyMixedField": []string{
+		"xEnabledField":  {"field Struct.XEnabledField"},
+		"yDisabledField": {"field Struct.YDisabledField"},
+		"xyMixedField": {
 			"field Struct.XYMixedField/X",
 			"field Struct.XYMixedField/Y"},
 	})
@@ -56,7 +56,7 @@ func Test(t *testing.T) {
 		// All zero values
 	}).Opts([]string{"FeatureY"}).ExpectRegexpsByPath(map[string][]string{
 		// All ifOptionEnabled validations should trigger
-		"xDisabledField": []string{"field Struct.XDisabledField"},
-		"yEnabledField":  []string{"field Struct.YEnabledField"},
+		"xDisabledField": {"field Struct.XDisabledField"},
+		"yEnabledField":  {"field Struct.YEnabledField"},
 	})
 }

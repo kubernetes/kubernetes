@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/util"
-	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
@@ -217,5 +216,5 @@ func isEnumType(t *types.Type) bool {
 }
 
 func hasEnumTag(t *types.Type) bool {
-	return gengo.ExtractCommentTags("+", t.CommentLines)[enumTagName] != nil
+	return codetags.Extract("+", t.CommentLines)[enumTagName] != nil
 }

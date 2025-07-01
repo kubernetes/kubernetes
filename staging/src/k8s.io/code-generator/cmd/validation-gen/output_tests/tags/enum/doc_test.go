@@ -28,9 +28,9 @@ func Test(t *testing.T) {
 	st.Value(&Struct{
 		// All zero vals
 	}).ExpectRegexpsByPath(map[string][]string{
-		"enum0Field": []string{"Unsupported value: \"\"$"},
-		"enum1Field": []string{"Unsupported value: \"\": supported values: \"e1v1\""},
-		"enum2Field": []string{"Unsupported value: \"\": supported values: \"e2v1\", \"e2v2\""},
+		"enum0Field": {"Unsupported value: \"\"$"},
+		"enum1Field": {"Unsupported value: \"\": supported values: \"e1v1\""},
+		"enum2Field": {"Unsupported value: \"\": supported values: \"e2v1\", \"e2v2\""},
 	})
 
 	st.Value(&Struct{
@@ -43,8 +43,8 @@ func Test(t *testing.T) {
 		NotEnumField:    "x",
 		NotEnumPtrField: ptr.To(NotEnum("x")),
 	}).ExpectRegexpsByPath(map[string][]string{
-		"enum0Field":    []string{"Unsupported value: \"\"$"},
-		"enum0PtrField": []string{"Unsupported value: \"\"$"},
+		"enum0Field":    {"Unsupported value: \"\"$"},
+		"enum0PtrField": {"Unsupported value: \"\"$"},
 	})
 
 	st.Value(&Struct{
@@ -57,11 +57,11 @@ func Test(t *testing.T) {
 		NotEnumField:    "x",
 		NotEnumPtrField: ptr.To(NotEnum("x")),
 	}).ExpectRegexpsByPath(map[string][]string{
-		"enum0Field":    []string{"Unsupported value: \"x\"$"},
-		"enum0PtrField": []string{"Unsupported value: \"x\"$"},
-		"enum1Field":    []string{"Unsupported value: \"x\": supported values: \"e1v1\""},
-		"enum1PtrField": []string{"Unsupported value: \"x\": supported values: \"e1v1\""},
-		"enum2Field":    []string{"Unsupported value: \"x\": supported values: \"e2v1\", \"e2v2\""},
-		"enum2PtrField": []string{"Unsupported value: \"x\": supported values: \"e2v1\", \"e2v2\""},
+		"enum0Field":    {"Unsupported value: \"x\"$"},
+		"enum0PtrField": {"Unsupported value: \"x\"$"},
+		"enum1Field":    {"Unsupported value: \"x\": supported values: \"e1v1\""},
+		"enum1PtrField": {"Unsupported value: \"x\": supported values: \"e1v1\""},
+		"enum2Field":    {"Unsupported value: \"x\": supported values: \"e2v1\", \"e2v2\""},
+		"enum2PtrField": {"Unsupported value: \"x\": supported values: \"e2v1\", \"e2v2\""},
 	})
 }
