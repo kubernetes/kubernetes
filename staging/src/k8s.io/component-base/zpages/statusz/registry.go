@@ -42,6 +42,14 @@ type registry struct {
 	listedPaths []string
 }
 
+// Option is a function to configure registry.
+type Option func(reg *registry)
+
+// WithListedPaths returns an Option to configure the ListedPaths.
+func WithListedPaths(listedPaths []string) Option {
+	return func(reg *registry) { reg.listedPaths = listedPaths }
+}
+
 func (*registry) processStartTime() time.Time {
 	start, err := compbasemetrics.GetProcessStart()
 	if err != nil {

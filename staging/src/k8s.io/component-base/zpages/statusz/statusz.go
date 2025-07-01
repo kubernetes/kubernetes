@@ -44,8 +44,15 @@ type mux interface {
 	Handle(path string, handler http.Handler)
 }
 
-func NewRegistry(effectiveVersion compatibility.EffectiveVersion, listedPaths []string) statuszRegistry {
-	return &registry{effectiveVersion: effectiveVersion, listedPaths: listedPaths}
+type ListedPathsOption []string
+
+func NewRegistry(effectiveVersion compatibility.EffectiveVersion, opts ...func(*registry)) statuszRegistry {
+	r := &registry{effectiveVersion: effectiveVersion}
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 func Install(m mux, componentName string, reg statuszRegistry) {
