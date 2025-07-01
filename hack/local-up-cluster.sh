@@ -183,6 +183,8 @@ function usage {
             echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
             echo "           KUBELET_FLAGS=\"--kube-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi --system-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi\" \\"
             echo "           hack/local-up-cluster.sh (build a local copy of the source with full-pcpus-only CPU Management policy)"
+            echo ""
+            echo "-d         dry-run: prepare for running commands, then show their command lines instead of running them"
 }
 
 # This function guesses where the existing cached binary build is for the `-O`
@@ -198,9 +200,14 @@ function guess_built_binary_path {
 
 ### Allow user to supply the source directory.
 GO_OUT=${GO_OUT:-}
-while getopts "ho:O" OPTION
+DRY_RUN=
+while getopts "dho:O" OPTION
 do
     case ${OPTION} in
+        d)
+            echo "skipping running commands"
+            DRY_RUN=1
+            ;;
         o)
             echo "skipping build"
             GO_OUT="${OPTARG}"
@@ -223,6 +230,28 @@ do
             ;;
     esac
 done
+
+# run executes the command specified by its parameters if DRY_RUN is empty,
+# otherwise it prints them.
+#
+# The first parameter must be the name of the Kubernetes components.
+# It is only used when printing the command in dry-run mode.
+# The second parameter is a log file for the command. It may be empty.
+function run {
+    local what="$1"
+    local log="$2"
+    shift
+    shift
+    if [[ -z "${DRY_RUN}" ]]; then
+        if [[ -z "${log}" ]]; then
+            "${@}"
+        else
+            "${@}" >"${log}" 2>&1
+        fi
+    else
+        echo "RUN ${what}: ${@}"
+    fi
+}
 
 if [ -z "${GO_OUT}" ]; then
     binaries_to_build="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kube-scheduler"
@@ -626,9 +655,13 @@ EOF
       AUDIT_POLICY_FILE="${TMP_DIR}/kube-audit-policy-file"
     fi
 
+    # Create admin config. Works without the apiserver, so do it early to enable debug access to the apiserver while it starts.
+    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" admin
+    ${CONTROLPLANE_SUDO} chown "${USER}" "${CERT_DIR}/client-admin.key" # make readable for kubectl
+
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
     # shellcheck disable=SC2086
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-apiserver" "${authorizer_args[@]}" "${priv_arg}" ${runtime_config} \
+    run kube-apiserver "${APISERVER_LOG}" ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-apiserver" "${authorizer_args[@]}" "${priv_arg}" ${runtime_config} \
       "${advertise_address}" \
       "${node_port_range}" \
       --v="${LOG_LEVEL}" \
@@ -668,33 +701,33 @@ EOF
       --requestheader-allowed-names=system:auth-proxy \
       --proxy-client-cert-file="${CERT_DIR}/client-auth-proxy.crt" \
       --proxy-client-key-file="${CERT_DIR}/client-auth-proxy.key" \
-      --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
+      --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" &
     APISERVER_PID=$!
 
-    # Create kubeconfigs for all components, using client certs
-    kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" admin
-    ${CONTROLPLANE_SUDO} chown "${USER}" "${CERT_DIR}/client-admin.key" # make readable for kubectl
+    if [[ -z "${DRY_RUN}" ]]; then
+        # Wait for kube-apiserver to come up before launching the rest of the components.
+        echo "Waiting for apiserver to come up"
+        kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 "${WAIT_FOR_URL_API_SERVER}" "${MAX_TIME_FOR_URL_API_SERVER}" \
+            || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
+    fi
 
-    # Wait for kube-apiserver to come up before launching the rest of the components.
-    echo "Waiting for apiserver to come up"
-    kube::util::wait_for_url "https://${API_HOST_IP}:${API_SECURE_PORT}/healthz" "apiserver: " 1 "${WAIT_FOR_URL_API_SERVER}" "${MAX_TIME_FOR_URL_API_SERVER}" \
-        || { echo "check apiserver logs: ${APISERVER_LOG}" ; exit 1 ; }
-
+    # Create kubeconfigs for all components, using client certs. This needs a running apiserver.
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" controller
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" scheduler
 
     if [[ -z "${AUTH_ARGS}" ]]; then
         AUTH_ARGS="--client-key=${CERT_DIR}/client-admin.key --client-certificate=${CERT_DIR}/client-admin.crt"
     fi
+
     # Grant apiserver permission to speak to the kubelet
-    ${KUBECTL} --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kube-apiserver-kubelet-admin --clusterrole=system:kubelet-api-admin --user=kube-apiserver
+    run kubectl "" ${KUBECTL} --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kube-apiserver-kubelet-admin --clusterrole=system:kubelet-api-admin --user=kube-apiserver
 
     # Grant kubelets permission to request client certificates
-    ${KUBECTL} --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kubelet-csr --clusterrole=system:certificates.k8s.io:certificatesigningrequests:selfnodeclient --group=system:nodes
+    run kubectl "" ${KUBECTL} --kubeconfig "${CERT_DIR}/admin.kubeconfig" create clusterrolebinding kubelet-csr --clusterrole=system:certificates.k8s.io:certificatesigningrequests:selfnodeclient --group=system:nodes
 
     ${CONTROLPLANE_SUDO} cp "${CERT_DIR}/admin.kubeconfig" "${CERT_DIR}/admin-kube-aggregator.kubeconfig"
     ${CONTROLPLANE_SUDO} chown -R "$(whoami)" "${CERT_DIR}"
-    ${KUBECTL} config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-kube-aggregator.kubeconfig" --server="https://${API_HOST_IP}:31090"
+    run kubectl "" ${KUBECTL} config set-cluster local-up-cluster --kubeconfig="${CERT_DIR}/admin-kube-aggregator.kubeconfig" --server="https://${API_HOST_IP}:31090"
     echo "use 'kubectl --kubeconfig=${CERT_DIR}/admin-kube-aggregator.kubeconfig' to use the aggregated API server"
 
 }
@@ -709,7 +742,7 @@ function start_controller_manager {
     fi
 
     CTLRMGR_LOG=${LOG_DIR}/kube-controller-manager.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-controller-manager" \
+    run kube-controller-manager "${CTLRMGR_LOG}" ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-controller-manager" \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -747,7 +780,7 @@ function start_cloud_controller_manager {
 
     CLOUD_CTLRMGR_LOG=${LOG_DIR}/cloud-controller-manager.log
     # shellcheck disable=SC2086
-    ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/cloud-controller-manager"}" \
+    run cloud-controller-manager ${CONTROLPLANE_SUDO} "${EXTERNAL_CLOUD_PROVIDER_BINARY:-"${GO_OUT}/cloud-controller-manager"}" \
       ${CLOUD_CTLRMGR_FLAGS} \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
@@ -763,6 +796,12 @@ function start_cloud_controller_manager {
 }
 
 function wait_node_ready(){
+  if [[ -n "${DRY_RUN}" ]]; then
+    return
+  fi
+
+  echo "wait kubelet ready"
+
   # check the nodes information after kubelet daemon start
   local nodes_stats="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get nodes"
   local node_name=$HOSTNAME_OVERRIDE
@@ -809,6 +848,10 @@ function refresh_docker_containerd_runc {
 }
 
 function wait_coredns_available(){
+  if [[ -n "${DRY_RUN}" ]]; then
+    return
+  fi
+
   local interval_time=2
   local coredns_wait_time=300
 
@@ -1001,12 +1044,12 @@ EOF
     } >>"${TMP_DIR}"/kubelet.yaml
 
     # shellcheck disable=SC2024
-    sudo -E "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" \
-      --config="${TMP_DIR}"/kubelet.yaml >"${KUBELET_LOG}" 2>&1 &
+    run kubelet "${KUBELET_LOG}" sudo -E "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" \
+      --config="${TMP_DIR}"/kubelet.yaml &
     KUBELET_PID=$!
 
     # Quick check that kubelet is running.
-    if [ -n "${KUBELET_PID}" ] && ps -p ${KUBELET_PID} > /dev/null; then
+    if [ -n "${DRY_RUN}" ] || ( [ -n "${KUBELET_PID}" ] && ps -p ${KUBELET_PID} > /dev/null ); then
       echo "kubelet ( ${KUBELET_PID} ) is running."
     else
       cat "${KUBELET_LOG}" ; exit 1
@@ -1018,7 +1061,6 @@ function start_kubeproxy {
 
     if [[ "${START_MODE}" != *"nokubelet"* ]]; then
       # wait for kubelet collect node information
-      echo "wait kubelet ready"
       wait_node_ready
     fi
 
@@ -1049,7 +1091,7 @@ EOF
     # Probably not necessary...
     #
     # shellcheck disable=SC2024
-    sudo "${GO_OUT}/kube-proxy" \
+    run kube-proxy "${PROXY_LOG}" sudo "${GO_OUT}/kube-proxy" \
       --v="${LOG_LEVEL}" \
       --config="${TMP_DIR}"/kube-proxy.yaml \
       --healthz-port="${PROXY_HEALTHZ_PORT}" \
@@ -1071,57 +1113,57 @@ clientConnection:
 leaderElection:
   leaderElect: ${LEADER_ELECT}
 EOF
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-scheduler" \
+    run kube-scheduler "${SCHEDULER_LOG}" ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-scheduler" \
       --v="${LOG_LEVEL}" \
       --config="${TMP_DIR}"/kube-scheduler.yaml \
       --feature-gates="${FEATURE_GATES}" \
       --emulated-version="${EMULATED_VERSION}" \
       --authentication-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
       --authorization-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
-      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
+      --secure-port="${SCHEDULER_SECURE_PORT}" \
+      --bind-address="${API_BIND_ADDR}" \
+      --master="https://${API_HOST}:${API_SECURE_PORT}" &
     SCHEDULER_PID=$!
 }
 
 function start_dns_addon {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-        cp "${KUBE_ROOT}/cluster/addons/dns/${DNS_ADDON}/${DNS_ADDON}.yaml.in" dns.yaml
-        ${SED} -i -e "s/dns_domain/${DNS_DOMAIN}/g" dns.yaml
-        ${SED} -i -e "s/dns_server/${DNS_SERVER_IP}/g" dns.yaml
-        ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" dns.yaml
+        cp "${KUBE_ROOT}/cluster/addons/dns/${DNS_ADDON}/${DNS_ADDON}.yaml.in" "${TMP_DIR}/dns.yaml"
+        ${SED} -i -e "s/dns_domain/${DNS_DOMAIN}/g" "${TMP_DIR}/dns.yaml"
+        ${SED} -i -e "s/dns_server/${DNS_SERVER_IP}/g" "${TMP_DIR}/dns.yaml"
+        ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" "${TMP_DIR}/dns.yaml"
         # TODO update to dns role once we have one.
         # use kubectl to create dns addon
-        if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system apply -f dns.yaml ; then
+        if run kubectl "" ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system apply -f "${TMP_DIR}/dns.yaml" ; then
             echo "${DNS_ADDON} addon successfully deployed."
         else
 		echo "Something is wrong with your DNS input"
-		cat dns.yaml
+		cat "${TMP_DIR}/dns.yaml"
 		exit 1
         fi
-        rm dns.yaml
     fi
 }
 
 function start_nodelocaldns {
-  cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml" nodelocaldns.yaml
+  cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/"${TMP_DIR}/nodelocaldns.yaml"" "${TMP_DIR}/nodelocaldns.yaml"
   # eventually all the __PILLAR__ stuff will be gone, but theyre still in nodelocaldns for backward compat.
-  ${SED} -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" nodelocaldns.yaml
-  ${SED} -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" nodelocaldns.yaml
-  ${SED} -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
+  ${SED} -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" "${TMP_DIR}/nodelocaldns.yaml"
+  ${SED} -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" "${TMP_DIR}/nodelocaldns.yaml"
+  ${SED} -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" "${TMP_DIR}/nodelocaldns.yaml"
 
   # use kubectl to create nodelocaldns addon
-  ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system apply -f nodelocaldns.yaml
+  run kubectl "" ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system apply -f "${TMP_DIR}/nodelocaldns.yaml"
   echo "NodeLocalDNS addon successfully deployed."
-  rm nodelocaldns.yaml
 }
 
 function start_csi_snapshotter {
     if [[ "${ENABLE_CSI_SNAPSHOTTER}" = true ]]; then
         echo "Creating Kubernetes-CSI snapshotter"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshots.yaml"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/volume-snapshot-controller/rbac-volume-snapshot-controller.yaml"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/volume-snapshot-controller/volume-snapshot-controller-deployment.yaml"
+        run kubectl "" ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshots.yaml"
+        run kubectl "" ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml"
+        run kubectl "" ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml"
+        run kubectl "" ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/volume-snapshot-controller/rbac-volume-snapshot-controller.yaml"
+        run kubectl "" ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${KUBE_ROOT}/cluster/addons/volumesnapshots/volume-snapshot-controller/volume-snapshot-controller-deployment.yaml"
 
         echo "Kubernetes-CSI snapshotter successfully deployed."
     fi
@@ -1136,13 +1178,17 @@ function create_storage_class {
 
     if [ -e "${CLASS_FILE}" ]; then
         echo "Create default storage class for ${CLOUD_PROVIDER}"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${CLASS_FILE}"
+        run kubectl "" ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${CLASS_FILE}"
     else
         echo "No storage class available for ${CLOUD_PROVIDER}."
     fi
 }
 
 function print_success {
+if [[ -n "${DRY_RUN}" ]]; then
+  return
+fi
+
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   if [[ "${ENABLE_DAEMON}" = false ]]; then
     echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
@@ -1484,13 +1530,16 @@ fi
 
 print_success
 
-if [[ "${ENABLE_DAEMON}" = false ]]; then
+if [[ -n "${DRY_RUN}" ]]; then
+  echo "Local etcd is running. Run commands. Press Ctrl-C to shut it down."
+  sleep infinity
+elif [[ "${ENABLE_DAEMON}" = false ]]; then
   while true; do sleep 1; healthcheck; done
 fi
 
 if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
-  ${KUBECTL} config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/server-ca.crt
-  ${KUBECTL} config set-credentials myself --client-key=/var/run/kubernetes/client-admin.key --client-certificate=/var/run/kubernetes/client-admin.crt
-  ${KUBECTL} config set-context local --cluster=local --user=myself
-  ${KUBECTL} config use-context local
+  run kubectl "" ${KUBECTL} config set-cluster local --server=https://localhost:6443 --certificate-authority=/var/run/kubernetes/server-ca.crt
+  run kubectl "" ${KUBECTL} config set-credentials myself --client-key=/var/run/kubernetes/client-admin.key --client-certificate=/var/run/kubernetes/client-admin.crt
+  run kubectl "" ${KUBECTL} config set-context local --cluster=local --user=myself
+  run kubectl "" ${KUBECTL} config use-context local
 fi
