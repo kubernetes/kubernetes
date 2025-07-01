@@ -277,7 +277,11 @@ func Init(tb TB, opts ...InitOption) TContext {
 			return tCtx
 		}
 	}
-	return WithCancel(InitCtx(ctx, tb))
+	tCtx := WithCancel(InitCtx(ctx, tb))
+	tCtx.Cleanup(func() {
+		tCtx.Cancel(cleanupErr(tCtx.Name()).Error())
+	})
+	return tCtx
 }
 
 func newLogger(tb TB, bufferLogs bool) klog.Logger {
