@@ -1991,16 +1991,13 @@ func (og *operationGenerator) expandVolumeDuringMount(volumeToMount VolumeToMoun
 				volumePlugin:       expandablePlugin,
 				actualStateOfWorld: actualStateOfWorld,
 			}
-			if og.checkForRecoveryFromExpansion(pvc, volumeToMount) {
-				// if recovery feature is enabled, we can use allocated size from PVC status as new size
-				rsOpts.NewSize = pvc.Status.AllocatedResources[v1.ResourceStorage]
-				resizeOp.pluginResizeOpts = rsOpts
-				nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
-				resizeFinished, _, err := nodeExpander.expandOnPlugin()
-				return resizeFinished, err
-			} else {
-				return og.legacyCallNodeExpandOnPlugin(resizeOp)
-			}
+			// if recovery feature is enabled, we can use allocated size from PVC status as new size
+			rsOpts.NewSize = pvc.Status.AllocatedResources[v1.ResourceStorage]
+			resizeOp.pluginResizeOpts = rsOpts
+			nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
+			resizeFinished, _, err := nodeExpander.expandOnPlugin()
+			return resizeFinished, err
+
 		}
 	}
 	return true, nil
@@ -2058,107 +2055,17 @@ func (og *operationGenerator) nodeExpandVolume(
 				actualStateOfWorld: actualStateOfWorld,
 			}
 
-			if og.checkForRecoveryFromExpansion(pvc, volumeToMount) {
-				// if recovery feature is enabled, we can use allocated size from PVC status as new size
-				newSize := pvc.Status.AllocatedResources[v1.ResourceStorage]
-				rsOpts.NewSize = newSize
-				resizeOp.pluginResizeOpts.NewSize = newSize
-				nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
-				resizeFinished, newSize, err := nodeExpander.expandOnPlugin()
-				return resizeFinished, newSize, err
-			} else {
-				resizeFinished, err := og.legacyCallNodeExpandOnPlugin(resizeOp)
-				return resizeFinished, rsOpts.NewSize, err
-			}
+			// if recovery feature is enabled, we can use allocated size from PVC status as new size
+			newSize := pvc.Status.AllocatedResources[v1.ResourceStorage]
+			rsOpts.NewSize = newSize
+			resizeOp.pluginResizeOpts.NewSize = newSize
+			nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
+			resizeFinished, newSize, err := nodeExpander.expandOnPlugin()
+			return resizeFinished, newSize, err
+
 		}
 	}
 	return true, rsOpts.OldSize, nil
-}
-
-func (og *operationGenerator) checkForRecoveryFromExpansion(pvc *v1.PersistentVolumeClaim, volumeToMount VolumeToMount) bool {
-	resizeStatus := pvc.Status.AllocatedResourceStatuses[v1.ResourceStorage]
-	allocatedResource := pvc.Status.AllocatedResources
-	featureGateStatus := utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure)
-
-	if !featureGateStatus {
-		// even though RecoverVolumeExpansionFailure feature-gate is disabled, we should consider it enabled
-		// if resizeStatus is not empty or allocatedresources is set
-		if resizeStatus != "" || allocatedResource != nil {
-			return true
-		}
-		return false
-	}
-
-	// Even though RecoverVolumeExpansionFailure feature gate is enabled, it appears that we are running with older version
-	// of resize controller, which will not populate allocatedResource and resizeStatus. This can happen because of version skew
-	// and hence we are going to keep expanding using older logic.
-	if resizeStatus == "" && allocatedResource == nil {
-		_, detailedMsg := volumeToMount.GenerateMsg("MountVolume.NodeExpandVolume running with", "older external resize controller")
-		klog.Warning(detailedMsg)
-		return false
-	}
-	return true
-}
-
-// legacyCallNodeExpandOnPlugin is old version of calling node expansion on plugin, which does not support
-// recovery from volume expansion failure
-// TODO: Removing this code when RecoverVolumeExpansionFailure feature goes GA.
-func (og *operationGenerator) legacyCallNodeExpandOnPlugin(resizeOp nodeResizeOperationOpts) (bool, error) {
-	pvc := resizeOp.pvc
-	volumeToMount := resizeOp.vmt
-	rsOpts := resizeOp.pluginResizeOpts
-	actualStateOfWorld := resizeOp.actualStateOfWorld
-	expandableVolumePlugin := resizeOp.volumePlugin
-
-	pvcStatusCap := pvc.Status.Capacity[v1.ResourceStorage]
-
-	nodeName := volumeToMount.Pod.Spec.NodeName
-
-	var err error
-
-	// File system resize was requested, proceed
-	klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("MountVolume.NodeExpandVolume entering", fmt.Sprintf("DevicePath %q", volumeToMount.DevicePath)), "pod", klog.KObj(volumeToMount.Pod))
-
-	rsOpts.VolumeSpec = volumeToMount.VolumeSpec
-
-	_, resizeErr := expandableVolumePlugin.NodeExpand(rsOpts)
-	if resizeErr != nil {
-		// This is a workaround for now, until RecoverFromVolumeExpansionFailure feature goes GA.
-		// If RecoverFromVolumeExpansionFailure feature is enabled, we will not ever hit this state, because
-		// we will wait for VolumeExpansionPendingOnNode before trying to expand volume in kubelet.
-		if volumetypes.IsOperationNotSupportedError(resizeErr) {
-			klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("MountVolume.NodeExpandVolume failed", "NodeExpandVolume not supported"), "pod", klog.KObj(volumeToMount.Pod))
-			return true, nil
-		}
-
-		// if driver returned FailedPrecondition error that means
-		// volume expansion should not be retried on this node but
-		// expansion operation should not block mounting
-		if volumetypes.IsFailedPreconditionError(resizeErr) {
-			actualStateOfWorld.MarkForInUseExpansionError(volumeToMount.VolumeName)
-			klog.Error(volumeToMount.GenerateErrorDetailed("MountVolume.NodeExapndVolume failed", resizeErr).Error())
-			return true, nil
-		}
-		return false, resizeErr
-	}
-
-	simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.NodeExpandVolume succeeded", nodeName)
-	og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
-	og.recorder.Eventf(pvc, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
-	klog.InfoS(detailedMsg, "pod", klog.KObj(volumeToMount.Pod))
-
-	// if PVC already has new size, there is no need to update it.
-	if pvcStatusCap.Cmp(rsOpts.NewSize) >= 0 {
-		return true, nil
-	}
-
-	// File system resize succeeded, now update the PVC's Capacity to match the PV's
-	_, err = util.MarkFSResizeFinished(pvc, rsOpts.NewSize, og.kubeClient)
-	if err != nil {
-		// On retry, NodeExpandVolume will be called again but do nothing
-		return false, fmt.Errorf("mountVolume.NodeExpandVolume update PVC status failed : %v", err)
-	}
-	return true, nil
 }
 
 func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount, plugin volume.VolumePlugin) error {

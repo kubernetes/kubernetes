@@ -86,7 +86,6 @@ type Plugin struct {
 
 	authz authorizer.Authorizer
 
-	expansionRecoveryEnabled                       bool
 	dynamicResourceAllocationEnabled               bool
 	allowInsecureKubeletCertificateSigningRequests bool
 	serviceAccountNodeAudienceRestriction          bool
@@ -101,7 +100,6 @@ var (
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
-	p.expansionRecoveryEnabled = featureGates.Enabled(features.RecoverVolumeExpansionFailure)
 	p.dynamicResourceAllocationEnabled = featureGates.Enabled(features.DynamicResourceAllocation)
 	p.allowInsecureKubeletCertificateSigningRequests = featureGates.Enabled(features.AllowInsecureKubeletCertificateSigningRequests)
 	p.serviceAccountNodeAudienceRestriction = featureGates.Enabled(features.ServiceAccountNodeAudienceRestriction)
@@ -433,13 +431,11 @@ func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 		oldPVC.Status.Conditions = nil
 		newPVC.Status.Conditions = nil
 
-		if p.expansionRecoveryEnabled {
-			oldPVC.Status.AllocatedResourceStatuses = nil
-			newPVC.Status.AllocatedResourceStatuses = nil
+		oldPVC.Status.AllocatedResourceStatuses = nil
+		newPVC.Status.AllocatedResourceStatuses = nil
 
-			oldPVC.Status.AllocatedResources = nil
-			newPVC.Status.AllocatedResources = nil
-		}
+		oldPVC.Status.AllocatedResources = nil
+		newPVC.Status.AllocatedResources = nil
 
 		// TODO(apelisse): We don't have a good mechanism to
 		// verify that only the things that should have changed
