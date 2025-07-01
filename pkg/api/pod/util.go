@@ -426,6 +426,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
+		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -470,6 +471,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowPodLifecycleSleepActionZeroValue = opts.AllowPodLifecycleSleepActionZeroValue || podLifecycleSleepActionZeroValueInUse(oldPodSpec)
 		// If oldPod has resize policy set on the restartable init container, we must allow it
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
+
+		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -744,6 +747,10 @@ func dropDisabledFields(
 			podSpec.InitContainers[i].RestartPolicy = nil
 		}
 		// For other types of containers, validateContainers will handle them.
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) && !containerRestartRulesInUse(oldPodSpec) {
+		dropContainerRestartRules(podSpec)
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !rroInUse(oldPodSpec) {
@@ -1689,4 +1696,44 @@ func ApparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
 	// we can only reach this code path if the localhostProfile name has a zero
 	// length or if the annotation has an unrecognized value
 	return nil
+}
+
+func dropContainerRestartRules(podSpec *api.PodSpec) {
+	if podSpec == nil {
+		return
+	}
+	for i, c := range podSpec.InitContainers {
+		if c.RestartPolicy != nil && *c.RestartPolicy != api.ContainerRestartPolicyAlways {
+			podSpec.InitContainers[i].RestartPolicy = nil
+		}
+		podSpec.InitContainers[i].RestartPolicyRules = nil
+	}
+	for i := range podSpec.Containers {
+		podSpec.Containers[i].RestartPolicy = nil
+		podSpec.Containers[i].RestartPolicyRules = nil
+	}
+	for i := range podSpec.EphemeralContainers {
+		podSpec.EphemeralContainers[i].RestartPolicy = nil
+		podSpec.EphemeralContainers[i].RestartPolicyRules = nil
+	}
+}
+
+func containerRestartRulesInUse(oldPodSpec *api.PodSpec) bool {
+	if oldPodSpec == nil {
+		return false
+	}
+	for _, c := range oldPodSpec.InitContainers {
+		if c.RestartPolicy != nil && *c.RestartPolicy != api.ContainerRestartPolicyAlways {
+			return true
+		}
+		if len(c.RestartPolicyRules) > 0 {
+			return true
+		}
+	}
+	for _, c := range oldPodSpec.Containers {
+		if c.RestartPolicy != nil {
+			return true
+		}
+	}
+	return false
 }
