@@ -129,7 +129,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feat
 }
 
 // PostFilter invoked at the postFilter extension point.
-func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
+func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *fwk.Status) {
 	defer func() {
 		metrics.PreemptionAttempts.Inc()
 	}()
@@ -137,17 +137,17 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleStat
 	result, status := pl.Evaluator.Preempt(ctx, state, pod, m)
 	msg := status.Message()
 	if len(msg) > 0 {
-		return result, framework.NewStatus(status.Code(), "preemption: "+msg)
+		return result, fwk.NewStatus(status.Code(), "preemption: "+msg)
 	}
 	return result, status
 }
 
-func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
 	if !pl.fts.EnableAsyncPreemption {
 		return nil
 	}
 	if pl.Evaluator.IsPodRunningPreemption(p.GetUID()) {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished")
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for the preemption for this pod to be finished")
 	}
 	return nil
 }
@@ -220,7 +220,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	state fwk.CycleState,
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
-	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *framework.Status) {
+	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	var potentialVictims []*framework.PodInfo
 	removePod := func(rpi *framework.PodInfo) error {
@@ -247,14 +247,14 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		if pl.isPreemptionAllowed(nodeInfo, pi, pod) {
 			potentialVictims = append(potentialVictims, pi)
 			if err := removePod(pi); err != nil {
-				return nil, 0, framework.AsStatus(err)
+				return nil, 0, fwk.AsStatus(err)
 			}
 		}
 	}
 
 	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
-		return nil, 0, framework.NewStatus(framework.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
+		return nil, 0, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
 	}
 
 	// If the new pod does not fit after removing all the eligible pods,
@@ -292,7 +292,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	}
 	for _, p := range violatingVictims {
 		if fits, err := reprievePod(p); err != nil {
-			return nil, 0, framework.AsStatus(err)
+			return nil, 0, fwk.AsStatus(err)
 		} else if !fits {
 			numViolatingVictim++
 		}
@@ -300,7 +300,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	// Now we try to reprieve non-violating victims.
 	for _, p := range nonViolatingVictims {
 		if _, err := reprievePod(p); err != nil {
-			return nil, 0, framework.AsStatus(err)
+			return nil, 0, fwk.AsStatus(err)
 		}
 	}
 
@@ -312,7 +312,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	for _, pi := range victims {
 		victimPods = append(victimPods, pi.Pod)
 	}
-	return victimPods, numViolatingVictim, framework.NewStatus(framework.Success)
+	return victimPods, numViolatingVictim, fwk.NewStatus(fwk.Success)
 }
 
 // PodEligibleToPreemptOthers returns one bool and one string. The bool
@@ -323,7 +323,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 //  2. The pod has already preempted other pods and the victims are in their graceful termination period.
 //     Currently we check the node that is nominated for this pod, and as long as there are
 //     terminating pods on this node, we don't attempt to preempt more pods.
-func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string) {
+func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
 	if pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
@@ -333,7 +333,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 	if len(nomNodeName) > 0 {
 		// If the pod's nominated node is considered as UnschedulableAndUnresolvable by the filters,
 		// then the pod should be considered for preempting again.
-		if nominatedNodeStatus.Code() == framework.UnschedulableAndUnresolvable {
+		if nominatedNodeStatus.Code() == fwk.UnschedulableAndUnresolvable {
 			return true, ""
 		}
 

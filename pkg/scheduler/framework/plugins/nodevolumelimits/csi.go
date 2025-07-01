@@ -234,7 +234,7 @@ func (pl *CSILimits) isSchedulableAfterCSINodeUpdated(logger klog.Logger, pod *v
 // PreFilter invoked at the prefilter extension point
 //
 // If the pod haven't those types of volumes, we'll skip the Filter phase
-func (pl *CSILimits) PreFilter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *CSILimits) PreFilter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	volumes := pod.Spec.Volumes
 	for i := range volumes {
 		vol := &volumes[i]
@@ -243,7 +243,7 @@ func (pl *CSILimits) PreFilter(ctx context.Context, _ fwk.CycleState, pod *v1.Po
 		}
 	}
 
-	return nil, framework.NewStatus(framework.Skip)
+	return nil, fwk.NewStatus(fwk.Skip)
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -252,7 +252,7 @@ func (pl *CSILimits) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	// If the new pod doesn't have any volume attached to it, the predicate will always be true
 	if len(pod.Spec.Volumes) == 0 {
 		return nil
@@ -273,9 +273,9 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 	if err := pl.filterAttachableVolumes(logger, pod, csiNode, true /* new pod */, newVolumes); err != nil {
 		if apierrors.IsNotFound(err) {
 			// PVC is not found. This Pod will never be schedulable until PVC is created.
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, err.Error())
 		}
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 
 	// If the pod doesn't have any new CSI volumes, the predicate will always be true
@@ -293,7 +293,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 	attachedVolumes := make(map[string]string)
 	for _, existingPod := range nodeInfo.Pods {
 		if err := pl.filterAttachableVolumes(logger, existingPod.Pod, csiNode, false /* existing pod */, attachedVolumes); err != nil {
-			return framework.AsStatus(err)
+			return fwk.AsStatus(err)
 		}
 	}
 
@@ -307,7 +307,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 	// Count CSI volumes from VolumeAttachments
 	volumeAttachments, err := pl.getNodeVolumeAttachmentInfo(logger, node.Name)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 
 	for volumeUniqueName, driverName := range volumeAttachments {
@@ -331,7 +331,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 				"maxLimits", maxVolumeLimit, "currentVolumeCount", currentVolumeCount, "newVolumeCount", count,
 				"pod", klog.KObj(pod))
 			if currentVolumeCount+count > int(maxVolumeLimit) {
-				return framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded)
+				return fwk.NewStatus(fwk.Unschedulable, ErrReasonMaxVolumeCountExceeded)
 			}
 		}
 	}

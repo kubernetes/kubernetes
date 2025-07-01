@@ -38,7 +38,7 @@ var _ framework.EnqueueExtensions = &ReservePlugin{}
 
 type ReservePlugin struct {
 	name               string
-	statusCode         framework.Code
+	statusCode         fwk.Code
 	numReserveCalled   int
 	numUnreserveCalled int
 }
@@ -47,16 +47,16 @@ func (rp *ReservePlugin) Name() string {
 	return rp.name
 }
 
-func (rp *ReservePlugin) Reserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+func (rp *ReservePlugin) Reserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
 	rp.numReserveCalled += 1
 
-	if rp.statusCode == framework.Error {
-		return framework.NewStatus(framework.Error, "failed to reserve")
+	if rp.statusCode == fwk.Error {
+		return fwk.NewStatus(fwk.Error, "failed to reserve")
 	}
 
-	if rp.statusCode == framework.Unschedulable {
+	if rp.statusCode == fwk.Unschedulable {
 		if rp.numReserveCalled <= 1 {
-			return framework.NewStatus(framework.Unschedulable, "reject to reserve")
+			return fwk.NewStatus(fwk.Unschedulable, "reject to reserve")
 		}
 	}
 
@@ -80,7 +80,7 @@ func (rp *ReservePlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEvent
 
 type PermitPlugin struct {
 	name            string
-	statusCode      framework.Code
+	statusCode      fwk.Code
 	numPermitCalled int
 }
 
@@ -88,16 +88,16 @@ func (pp *PermitPlugin) Name() string {
 	return pp.name
 }
 
-func (pp *PermitPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
+func (pp *PermitPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
 	pp.numPermitCalled += 1
 
-	if pp.statusCode == framework.Error {
-		return framework.NewStatus(framework.Error, "failed to permit"), 0
+	if pp.statusCode == fwk.Error {
+		return fwk.NewStatus(fwk.Error, "failed to permit"), 0
 	}
 
-	if pp.statusCode == framework.Unschedulable {
+	if pp.statusCode == fwk.Unschedulable {
 		if pp.numPermitCalled <= 1 {
-			return framework.NewStatus(framework.Unschedulable, "reject to permit"), 0
+			return fwk.NewStatus(fwk.Unschedulable, "reject to permit"), 0
 		}
 	}
 
@@ -132,7 +132,7 @@ func TestReScheduling(t *testing.T) {
 		{
 			name: "Rescheduling pod rejected by Permit Plugin",
 			plugins: []framework.Plugin{
-				&PermitPlugin{name: "permit", statusCode: framework.Unschedulable},
+				&PermitPlugin{name: "permit", statusCode: fwk.Unschedulable},
 			},
 			action: func() error {
 				_, err := testutils.CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
@@ -143,7 +143,7 @@ func TestReScheduling(t *testing.T) {
 		{
 			name: "Rescheduling pod rejected by Permit Plugin with unrelated event",
 			plugins: []framework.Plugin{
-				&PermitPlugin{name: "permit", statusCode: framework.Unschedulable},
+				&PermitPlugin{name: "permit", statusCode: fwk.Unschedulable},
 			},
 			action: func() error {
 				_, err := testutils.CreatePausePod(testContext.ClientSet,
@@ -155,7 +155,7 @@ func TestReScheduling(t *testing.T) {
 		{
 			name: "Rescheduling pod failed by Permit Plugin",
 			plugins: []framework.Plugin{
-				&PermitPlugin{name: "permit", statusCode: framework.Error},
+				&PermitPlugin{name: "permit", statusCode: fwk.Error},
 			},
 			action: func() error {
 				_, err := testutils.CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
@@ -167,7 +167,7 @@ func TestReScheduling(t *testing.T) {
 		{
 			name: "Rescheduling pod rejected by Reserve Plugin",
 			plugins: []framework.Plugin{
-				&ReservePlugin{name: "reserve", statusCode: framework.Unschedulable},
+				&ReservePlugin{name: "reserve", statusCode: fwk.Unschedulable},
 			},
 			action: func() error {
 				_, err := testutils.CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())
@@ -178,7 +178,7 @@ func TestReScheduling(t *testing.T) {
 		{
 			name: "Rescheduling pod rejected by Reserve Plugin with unrelated event",
 			plugins: []framework.Plugin{
-				&ReservePlugin{name: "reserve", statusCode: framework.Unschedulable},
+				&ReservePlugin{name: "reserve", statusCode: fwk.Unschedulable},
 			},
 			action: func() error {
 				_, err := testutils.CreatePausePod(testContext.ClientSet,
@@ -190,7 +190,7 @@ func TestReScheduling(t *testing.T) {
 		{
 			name: "Rescheduling pod failed by Reserve Plugin",
 			plugins: []framework.Plugin{
-				&ReservePlugin{name: "reserve", statusCode: framework.Error},
+				&ReservePlugin{name: "reserve", statusCode: fwk.Error},
 			},
 			action: func() error {
 				_, err := testutils.CreateNode(testContext.ClientSet, st.MakeNode().Name("fake-node").Obj())

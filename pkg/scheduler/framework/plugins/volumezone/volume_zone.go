@@ -109,27 +109,27 @@ func (pl *VolumeZone) Name() string {
 //
 // Currently, this is only supported with PersistentVolumeClaims,
 // and only looks for the bound PersistentVolume.
-func (pl *VolumeZone) PreFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *VolumeZone) PreFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	podPVTopologies, status := pl.getPVbyPod(logger, pod)
 	if !status.IsSuccess() {
 		return nil, status
 	}
 	if len(podPVTopologies) == 0 {
-		return nil, framework.NewStatus(framework.Skip)
+		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	cs.Write(preFilterStateKey, &stateData{podPVTopologies: podPVTopologies})
 	return nil, nil
 }
 
 // getPVbyPod gets PVTopology from pod
-func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology, *framework.Status) {
+func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology, *fwk.Status) {
 	podPVTopologies := make([]pvTopology, 0)
 
 	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
 	for _, pvcName := range pvcNames {
 		if pvcName == "" {
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
+			return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
 		}
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 		if s := getErrorAsStatus(err); !s.IsSuccess() {
@@ -140,7 +140,7 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 		if pvName == "" {
 			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 			if len(scName) == 0 {
-				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
+				return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
 			}
 
 			class, err := pl.scLister.Get(scName)
@@ -148,14 +148,14 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 				return nil, s
 			}
 			if class.VolumeBindingMode == nil {
-				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
+				return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
 			}
 			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
 				// Skip unbound volumes
 				continue
 			}
 
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
+			return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "PersistentVolume had no name")
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
@@ -188,7 +188,7 @@ func (pl *VolumeZone) PreFilterExtensions() framework.PreFilterExtensions {
 // determining the zone of a volume during scheduling, and that is likely to
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
-func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	logger := klog.FromContext(ctx)
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
@@ -199,7 +199,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod
 	state, err := getStateData(cs)
 	if err != nil {
 		// Fallback to calculate pv list here
-		var status *framework.Status
+		var status *fwk.Status
 		podPVTopologies, status = pl.getPVbyPod(logger, pod)
 		if !status.IsSuccess() {
 			return status
@@ -231,7 +231,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod
 		}
 		if !ok || !pvTopology.values.Has(v) {
 			logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict)
 		}
 	}
 
@@ -250,12 +250,12 @@ func getStateData(cs fwk.CycleState) (*stateData, error) {
 	return s, nil
 }
 
-func getErrorAsStatus(err error) *framework.Status {
+func getErrorAsStatus(err error) *fwk.Status {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, err.Error())
 		}
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	return nil
 }

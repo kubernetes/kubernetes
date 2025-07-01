@@ -130,7 +130,7 @@ func (pl *NodeUnschedulable) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	node := nodeInfo.Node()
 
 	if !node.Spec.Unschedulable {
@@ -143,7 +143,7 @@ func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *
 		Effect: v1.TaintEffectNoSchedule,
 	})
 	if !podToleratesUnschedulable {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonUnschedulable)
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonUnschedulable)
 	}
 
 	return nil

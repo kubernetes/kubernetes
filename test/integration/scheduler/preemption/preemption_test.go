@@ -105,33 +105,33 @@ func (fp *tokenFilter) Name() string {
 }
 
 func (fp *tokenFilter) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod,
-	nodeInfo *framework.NodeInfo) *framework.Status {
+	nodeInfo *framework.NodeInfo) *fwk.Status {
 	if fp.Tokens > 0 {
 		fp.Tokens--
 		return nil
 	}
-	status := framework.Unschedulable
+	status := fwk.Unschedulable
 	if fp.Unresolvable {
-		status = framework.UnschedulableAndUnresolvable
+		status = fwk.UnschedulableAndUnresolvable
 	}
-	return framework.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
+	return fwk.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
 }
 
-func (fp *tokenFilter) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (fp *tokenFilter) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	if !fp.EnablePreFilter || fp.Tokens > 0 {
 		return nil, nil
 	}
-	return nil, framework.NewStatus(framework.Unschedulable)
+	return nil, fwk.NewStatus(fwk.Unschedulable)
 }
 
 func (fp *tokenFilter) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod,
-	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
 	fp.Tokens--
 	return nil
 }
 
 func (fp *tokenFilter) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod,
-	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
 	fp.Tokens++
 	return nil
 }
@@ -1512,11 +1512,11 @@ func (af *alwaysFail) Name() string {
 	return alwaysFailPlugin
 }
 
-func (af *alwaysFail) PreBind(_ context.Context, _ fwk.CycleState, p *v1.Pod, _ string) *framework.Status {
+func (af *alwaysFail) PreBind(_ context.Context, _ fwk.CycleState, p *v1.Pod, _ string) *fwk.Status {
 	if strings.Contains(p.Name, doNotFailMe) {
 		return nil
 	}
-	return framework.NewStatus(framework.Unschedulable)
+	return fwk.NewStatus(fwk.Unschedulable)
 }
 
 func newAlwaysFail(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
