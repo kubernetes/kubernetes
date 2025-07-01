@@ -115,7 +115,8 @@ type AuthInfo struct {
 	// Token is the bearer token for authentication to the kubernetes cluster.
 	// +optional
 	Token string `json:"token,omitempty" datapolicy:"token"`
-	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present, Token takes precedence.
+	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present,
+	// the TokenFile will be periodically read and last successfully read value takes precedence over Token.
 	// +optional
 	TokenFile string `json:"tokenFile,omitempty"`
 	// Impersonate is the username to impersonate.  The name matches the flag.
