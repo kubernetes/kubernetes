@@ -442,7 +442,7 @@ func TestValidateConditions(t *testing.T) {
 			if !hasError(errs, needle) {
 				t.Errorf("missing %q in\n%v", needle, errorsAsString(errs))
 			}
-			needle = `status.conditions[0].lastTransitionTime: Required value: must be set`
+			needle = `status.conditions[0].lastTransitionTime: Required value`
 			if !hasError(errs, needle) {
 				t.Errorf("missing %q in\n%v", needle, errorsAsString(errs))
 			}

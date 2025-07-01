@@ -590,7 +590,7 @@ func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectRefere
 	}
 
 	if params.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "kind is required"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Kind) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), params.Kind, msg))
@@ -598,7 +598,7 @@ func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectRefere
 	}
 
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "name is required"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))

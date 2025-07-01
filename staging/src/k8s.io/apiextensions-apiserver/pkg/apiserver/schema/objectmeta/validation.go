@@ -80,10 +80,10 @@ func validateEmbeddedResource(pth *field.Path, x map[string]interface{}, s *stru
 
 	// require apiVersion and kind, but not metadata
 	if _, found := x["apiVersion"]; !found {
-		allErrs = append(allErrs, field.Required(pth.Child("apiVersion"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(pth.Child("apiVersion"), ""))
 	}
 	if _, found := x["kind"]; !found {
-		allErrs = append(allErrs, field.Required(pth.Child("kind"), "must not be empty"))
+		allErrs = append(allErrs, field.Required(pth.Child("kind"), ""))
 	}
 
 	for k, v := range x {
