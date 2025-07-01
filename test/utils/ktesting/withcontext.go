@@ -43,6 +43,13 @@ func WithCancel(tCtx TContext) TContext {
 	}
 }
 
+// WithoutCancel causes the returned context to ignore cancellation of its parent.
+func WithoutCancel(tCtx TContext) TContext {
+	tCtx.Helper()
+	ctx := context.WithoutCancel(tCtx)
+	return WithContext(tCtx, ctx)
+}
+
 // WithTimeout sets up new context with a timeout. Canceling the timeout gets
 // registered in a [TContext.Cleanup] callback. [TContext.Cancel] cancels only
 // the new context. The cause is used as reason why the context is canceled
