@@ -706,6 +706,10 @@ func dropDisabledFields(
 		// For other types of containers, validateContainers will handle them.
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) && !containerRestartRulesInUse(oldPodSpec) {
+		dropContainerRestartRules(podSpec)
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !rroInUse(oldPodSpec) {
 		for i := range podSpec.Containers {
 			for j := range podSpec.Containers[i].VolumeMounts {
@@ -1560,4 +1564,40 @@ func HasAPIObjectReference(pod *api.Pod) (bool, string, error) {
 	}
 
 	return false, "", nil
+}
+
+func dropContainerRestartRules(podSpec *api.PodSpec) {
+	if podSpec == nil {
+		return
+	}
+	for i, c := range podSpec.InitContainers {
+		if c.RestartPolicy != nil && *c.RestartPolicy != api.ContainerRestartPolicyAlways {
+			podSpec.InitContainers[i].RestartPolicy = nil
+			podSpec.InitContainers[i].RestartPolicyRules = nil
+		}
+	}
+	for i := range podSpec.Containers {
+		podSpec.Containers[i].RestartPolicy = nil
+		podSpec.Containers[i].RestartPolicyRules = nil
+	}
+}
+
+func containerRestartRulesInUse(oldPodSpec *api.PodSpec) bool {
+	if oldPodSpec == nil {
+		return false
+	}
+	for _, c := range oldPodSpec.InitContainers {
+		if c.RestartPolicy != nil && *c.RestartPolicy != api.ContainerRestartPolicyAlways {
+			return true
+		}
+		if len(c.RestartPolicyRules) > 0 {
+			return true
+		}
+	}
+	for _, c := range oldPodSpec.Containers {
+		if c.RestartPolicy != nil {
+			return true
+		}
+	}
+	return false
 }
