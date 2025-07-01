@@ -356,16 +356,12 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 	}
 
 	if in.Spec.SelectionStrategy != nil {
-		selectionStrategyEnc, err := json.Marshal(in.Spec.SelectionStrategy)
-		if err != nil {
-			return err
-		}
 		// copy before mutating
 		if !copiedAnnotations {
 			copiedAnnotations = true
 			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
 		}
-		out.Annotations[autoscaling.SelectionStrategyAnnotation] = string(selectionStrategyEnc)
+		out.Annotations[autoscaling.SelectionStrategyAnnotation] = string(*in.Spec.SelectionStrategy)
 	}
 
 	if len(in.Status.Conditions) > 0 {
@@ -457,6 +453,11 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 				}
 			}
 		}
+	}
+
+	if strategyStr, ok := out.Annotations[autoscaling.SelectionStrategyAnnotation]; ok {
+		strategy := autoscaling.SelectionStrategy(strategyStr)
+		out.Spec.SelectionStrategy = &strategy
 	}
 
 	// drop round-tripping annotations after converting to internal
