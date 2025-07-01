@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
@@ -197,7 +198,7 @@ func TestAllocate(t *testing.T) {
 
 	respOut, err := e.allocate([]string{"ADeviceId"})
 	require.NoError(t, err)
-	require.Equal(t, resp, respOut)
+	require.True(t, proto.Equal(resp, respOut), "protobuf messages should be equal")
 }
 
 func TestGetPreferredAllocation(t *testing.T) {
@@ -231,7 +232,7 @@ func TestGetPreferredAllocation(t *testing.T) {
 
 	respOut, err := e.getPreferredAllocation([]string{}, []string{}, -1)
 	require.NoError(t, err)
-	require.Equal(t, resp, respOut)
+	require.True(t, proto.Equal(resp, respOut), "protobuf messages should be equal")
 }
 
 func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*plugin.Stub, *endpointImpl) {

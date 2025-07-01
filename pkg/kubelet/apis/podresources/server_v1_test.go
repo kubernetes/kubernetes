@@ -21,8 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/protobuf/proto"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -242,8 +241,8 @@ func TestListPodResourcesV1(t *testing.T) {
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
-			if diff := cmp.Diff(tc.expectedResponse, resp, cmpopts.EquateEmpty()); diff != "" {
-				t.Fatal(diff)
+			if !proto.Equal(tc.expectedResponse, resp) {
+				t.Fatalf("expected response %v, got %v", tc.expectedResponse, resp)
 			}
 		})
 	}
@@ -437,8 +436,8 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
-			if diff := cmp.Diff(tc.expectedResponse, resp, cmpopts.EquateEmpty()); diff != "" {
-				t.Fatal(diff)
+			if !proto.Equal(tc.expectedResponse, resp) {
+				t.Fatalf("expected response %v, got %v", tc.expectedResponse, resp)
 			}
 		})
 	}
@@ -728,8 +727,8 @@ func TestAllocatableResources(t *testing.T) {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
 
-			if diff := cmp.Diff(tc.expectedAllocatableResourcesResponse, resp, cmpopts.EquateEmpty()); diff != "" {
-				t.Fatal(diff)
+			if !proto.Equal(tc.expectedAllocatableResourcesResponse, resp) {
+				t.Fatalf("expected response %v, got %v", tc.expectedAllocatableResourcesResponse, resp)
 			}
 		})
 	}
@@ -902,8 +901,8 @@ func TestGetPodResourcesV1(t *testing.T) {
 				if err != tc.err {
 					t.Errorf("want exit = %v, got %v", tc.err, err)
 				} else {
-					if diff := cmp.Diff(tc.expectedResponse, resp, cmpopts.EquateEmpty()); diff != "" {
-						t.Fatal(diff)
+					if !proto.Equal(tc.expectedResponse, resp) {
+						t.Fatalf("expected response %v, got %v", tc.expectedResponse, resp)
 					}
 				}
 			}
@@ -1094,8 +1093,8 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
-			if diff := cmp.Diff(tc.expectedResponse, resp, cmpopts.EquateEmpty()); diff != "" {
-				t.Fatal(diff)
+			if !proto.Equal(tc.expectedResponse, resp) {
+				t.Fatalf("expected response %v, got %v", tc.expectedResponse, resp)
 			}
 		})
 	}

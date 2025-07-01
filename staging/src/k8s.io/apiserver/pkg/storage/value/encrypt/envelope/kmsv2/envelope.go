@@ -27,7 +27,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/gogo/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/crypto/cryptobyte"
 
