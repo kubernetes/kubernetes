@@ -1333,60 +1333,77 @@ func TestPreemptionStarvation(t *testing.T) {
 	}
 
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
-		for _, test := range tests {
-			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+		for _, clearingNominatedNodeNameAfterBinding := range []bool{true, false} {
+			for _, test := range tests {
+				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, ClearingNominatedNodeNameAfterBinding :%v)", test.name, asyncPreemptionEnabled, clearingNominatedNodeNameAfterBinding), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClearingNominatedNodeNameAfterBinding, clearingNominatedNodeNameAfterBinding)
 
-				pendingPods := make([]*v1.Pod, test.numExpectedPending)
-				numRunningPods := test.numExistingPod - test.numExpectedPending
-				runningPods := make([]*v1.Pod, numRunningPods)
-				// Create and run existingPods.
-				for i := 0; i < numRunningPods; i++ {
-					runningPods[i], err = createPausePod(cs, mkPriorityPodWithGrace(testCtx, fmt.Sprintf("rpod-%v", i), mediumPriority, 0))
+					pendingPods := make([]*v1.Pod, test.numExpectedPending)
+					numRunningPods := test.numExistingPod - test.numExpectedPending
+					runningPods := make([]*v1.Pod, numRunningPods)
+					// Create and run existingPods.
+					for i := 0; i < numRunningPods; i++ {
+						runningPods[i], err = createPausePod(cs, mkPriorityPodWithGrace(testCtx, fmt.Sprintf("rpod-%v", i), mediumPriority, 0))
+						if err != nil {
+							t.Fatalf("Error creating pause pod: %v", err)
+						}
+					}
+					// make sure that runningPods are all scheduled.
+					for _, p := range runningPods {
+						if err := testutils.WaitForPodToSchedule(testCtx.Ctx, cs, p); err != nil {
+							t.Fatalf("Pod %v/%v didn't get scheduled: %v", p.Namespace, p.Name, err)
+						}
+					}
+					// Create pending pods.
+					for i := 0; i < test.numExpectedPending; i++ {
+						pendingPods[i], err = createPausePod(cs, mkPriorityPodWithGrace(testCtx, fmt.Sprintf("ppod-%v", i), mediumPriority, 0))
+						if err != nil {
+							t.Fatalf("Error creating pending pod: %v", err)
+						}
+					}
+					// Make sure that all pending pods are being marked unschedulable.
+					for _, p := range pendingPods {
+						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+							podUnschedulable(cs, p.Namespace, p.Name)); err != nil {
+							t.Errorf("Pod %v/%v didn't get marked unschedulable: %v", p.Namespace, p.Name, err)
+						}
+					}
+					// Create the preemptor.
+					preemptor, err := createPausePod(cs, test.preemptor)
 					if err != nil {
-						t.Fatalf("Error creating pause pod: %v", err)
+						t.Errorf("Error while creating the preempting pod: %v", err)
 					}
-				}
-				// make sure that runningPods are all scheduled.
-				for _, p := range runningPods {
-					if err := testutils.WaitForPodToSchedule(testCtx.Ctx, cs, p); err != nil {
-						t.Fatalf("Pod %v/%v didn't get scheduled: %v", p.Namespace, p.Name, err)
+
+					if !clearingNominatedNodeNameAfterBinding {
+						// Check if .status.nominatedNodeName of the preemptor pod gets set.
+						if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
+							t.Errorf(".status.nominatedNodeName was not set for pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
+						}
 					}
-				}
-				// Create pending pods.
-				for i := 0; i < test.numExpectedPending; i++ {
-					pendingPods[i], err = createPausePod(cs, mkPriorityPodWithGrace(testCtx, fmt.Sprintf("ppod-%v", i), mediumPriority, 0))
-					if err != nil {
-						t.Fatalf("Error creating pending pod: %v", err)
+					// Make sure that preemptor is scheduled after preemptions.
+					if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, cs, preemptor, 60*time.Second); err != nil {
+						t.Errorf("Preemptor pod %v didn't get scheduled: %v", preemptor.Name, err)
 					}
-				}
-				// Make sure that all pending pods are being marked unschedulable.
-				for _, p := range pendingPods {
-					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-						podUnschedulable(cs, p.Namespace, p.Name)); err != nil {
-						t.Errorf("Pod %v/%v didn't get marked unschedulable: %v", p.Namespace, p.Name, err)
+
+					if clearingNominatedNodeNameAfterBinding {
+						preemptor, err = cs.CoreV1().Pods(preemptor.Namespace).Get(testCtx.Ctx, preemptor.Name, metav1.GetOptions{})
+						if err != nil {
+							t.Fatalf("Error getting preemptor pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
+						}
+						// Check if .status.nominatedNodeName of the preemptor pod gets cleared.
+						if preemptor.Status.NominatedNodeName != "" {
+							t.Errorf(".status.nominatedNodeName was not cleared for pod %v/%v", preemptor.Namespace, preemptor.Name)
+						}
 					}
-				}
-				// Create the preemptor.
-				preemptor, err := createPausePod(cs, test.preemptor)
-				if err != nil {
-					t.Errorf("Error while creating the preempting pod: %v", err)
-				}
-				// Check if .status.nominatedNodeName of the preemptor pod gets set.
-				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
-					t.Errorf(".status.nominatedNodeName was not set for pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
-				}
-				// Make sure that preemptor is scheduled after preemptions.
-				if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, cs, preemptor, 60*time.Second); err != nil {
-					t.Errorf("Preemptor pod %v didn't get scheduled: %v", preemptor.Name, err)
-				}
-				// Cleanup
-				klog.Info("Cleaning up all pods...")
-				allPods := pendingPods
-				allPods = append(allPods, runningPods...)
-				allPods = append(allPods, preemptor)
-				testutils.CleanupPods(testCtx.Ctx, cs, t, allPods)
-			})
+					// Cleanup
+					klog.Info("Cleaning up all pods...")
+					allPods := pendingPods
+					allPods = append(allPods, runningPods...)
+					allPods = append(allPods, preemptor)
+					testutils.CleanupPods(testCtx.Ctx, cs, t, allPods)
+				})
+			}
 		}
 	}
 }
