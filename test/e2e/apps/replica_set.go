@@ -259,7 +259,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", name))
-	rs := newRS(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage, nil)
+	rs := newRS(name, 3, map[string]string{"name": name}, AgnhostImageName, AgnhostImage, nil)
 	rs, err = c.AppsV1().ReplicaSets(namespace).Create(ctx, rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
@@ -329,7 +329,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: WebserverImage,
+					Image: AgnhostImage,
 				},
 			},
 		},
@@ -337,7 +337,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 
 	ginkgo.By("When a replicaset with a matching selector is created")
 	replicas := int32(1)
-	rsSt := newRS(name, replicas, rsLabels, name, WebserverImage, nil)
+	rsSt := newRS(name, replicas, rsLabels, name, AgnhostImage, nil)
 	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: rsLabels}
 	rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(ctx, rsSt, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
@@ -406,13 +406,13 @@ func testRSScaleSubresources(ctx context.Context, f *framework.Framework) {
 	podName := "sample-pod"
 	rsPodLabels := map[string]string{
 		"name": podName,
-		"pod":  WebserverImageName,
+		"pod":  AgnhostImageName,
 	}
 
 	rsName := "test-rs"
 	replicas := int32(1)
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", rsName))
-	rs := newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil)
+	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
@@ -472,7 +472,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 	podName := "sample-pod"
 	rsPodLabels := map[string]string{
 		"name": podName,
-		"pod":  WebserverImageName,
+		"pod":  AgnhostImageName,
 	}
 
 	rsName := "test-rs"
@@ -491,7 +491,7 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 	rsList, err := f.ClientSet.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{LabelSelector: label})
 	framework.ExpectNoError(err, "failed to list rsList")
 	// Create a ReplicaSet
-	rs := newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil)
+	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	_, err = c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
@@ -571,12 +571,12 @@ func listRSDeleteCollection(ctx context.Context, f *framework.Framework) {
 	podName := "sample-pod"
 	rsPodLabels := map[string]string{
 		"name": podName,
-		"pod":  WebserverImageName,
+		"pod":  AgnhostImageName,
 		"e2e":  e2eValue,
 	}
 
 	ginkgo.By("Create a ReplicaSet")
-	rs := newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil)
+	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	_, err := rsClient.Create(ctx, rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
@@ -611,7 +611,7 @@ func testRSStatus(ctx context.Context, f *framework.Framework) {
 	podName := "sample-pod"
 	rsPodLabels := map[string]string{
 		"name": podName,
-		"pod":  WebserverImageName,
+		"pod":  AgnhostImageName,
 	}
 	labelSelector := labels.SelectorFromSet(rsPodLabels).String()
 
@@ -628,7 +628,7 @@ func testRSStatus(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err, "failed to list Replicasets")
 
 	ginkgo.By("Create a Replicaset")
-	rs := newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil)
+	rs := newRS(rsName, replicas, rsPodLabels, AgnhostImageName, AgnhostImage, nil)
 	testReplicaSet, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
