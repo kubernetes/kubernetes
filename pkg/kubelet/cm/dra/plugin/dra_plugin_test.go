@@ -35,6 +35,9 @@ import (
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
+
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 // this interface satisfies what setupGRPCServerWithFake needs
@@ -334,6 +337,116 @@ func TestGRPCMethods(t *testing.T) {
 			assertError(t, test.expectError, err)
 		})
 	}
+}
+
+func TestGRPCWithTimeoutEnforced(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	service := drapbv1.DRAPluginService
+	addr := path.Join(t.TempDir(), "dra.sock")
+
+	// we force NodePrepareResources to block, this will cause the timeout
+	// to elapse, as a consequence the client should abort.
+	// once the client aborts, we unblock NodePrepareResources
+	blocked := make(chan struct{})
+	server := &timeoutFakeGRPCServer{
+		t:              t,
+		fakeGRPCServer: &fakeGRPCServer{},
+		blocked:        blocked,
+		done:           make(chan struct{}),
+	}
+	teardown, err := setupGRPCServerWithFake(service, addr, server)
+	require.NoError(t, err, "failed to setup grpc server")
+	defer teardown()
+
+	driverName := "dummy-driver"
+	timeout := time.Second
+	manager := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
+	err = manager.add(driverName, addr, service, timeout)
+	require.NoError(t, err, "unexpected error while adding the plugin")
+
+	plugin, err := manager.GetPlugin(driverName)
+	require.NoError(t, err, "unexpected error while retrieving the plugin")
+
+	// we will invoke the method on a new gorouinte, in case there
+	// is no timeout enforced it might block forever
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(errCh)
+		req := &drapbv1.NodePrepareResourcesRequest{
+			Claims: []*drapbv1.Claim{
+				{
+					Namespace: "dummy-namespace",
+					Uid:       "dummy-uid",
+					Name:      "dummy-claim",
+				},
+			},
+		}
+		_, err := plugin.NodePrepareResources(tCtx, req)
+		errCh <- err
+	}()
+
+	// wait for the grpc caller to timeout
+	select {
+	// not using wait.ForeverTestTimeout, we will wait at most
+	// 3*timeout to account for flakes in CI
+	case <-time.After(3 * timeout):
+		t.Errorf("expected the grpc caller to return after the timeout had elapsed")
+	case err = <-errCh:
+		// the grpc call returned
+	}
+
+	// unblock the request handler on the server, and wait for it to
+	// return, this ensures that the server method was invoked.
+	// if the timeout is not enforced, we don't leak any goroutine
+	close(blocked)
+	select {
+	case <-server.done:
+	// not using wait.ForeverTestTimeout, we will wait at most
+	// 3*timeout to account for flakes in CI
+	case <-time.After(3 * timeout):
+		t.Errorf("expected the grpc method to have been invoked")
+	}
+
+	require.Error(t, err, "expected the grpc method to return an error")
+	status, ok := grpcstatus.FromError(err)
+	// if it is not a gRPC error then the operation may have failed before
+	// the gRPC method was called, otherwise we would get gRPC error.
+	require.True(t, ok, "expected an error of type: %T, but got: %T", &grpcstatus.Status{}, err)
+
+	// DeadlineExceeded means operation expired before completion. The gRPC
+	// framework will generate this error code when the deadline is exceeded.
+	// More here: https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
+	assert.Equal(t, grpccodes.DeadlineExceeded, status.Code(), "expected status code to match")
+}
+
+// it embeds a fakeGRPCServer instance and overrides the NodePrepareResources
+// method to simulate a timeout scenario.
+// NodePrepareResources will block until the test explicitly closes the blocked
+// channel to unblock it, and it will close the done channel when it completes
+// so the test can wait for it to finish.
+type timeoutFakeGRPCServer struct {
+	*fakeGRPCServer
+
+	t       *testing.T
+	blocked <-chan struct{}
+	done    chan struct{}
+}
+
+func (f *timeoutFakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error) {
+	defer close(f.done)
+	now := time.Now()
+	deadline, ok := ctx.Deadline()
+	f.t.Logf("request context has deadline: %t, after: %s", ok, deadline.Sub(now))
+	if !ok {
+		f.t.Errorf("expected the request context to have a deadline")
+	}
+	f.t.Logf("NodePrepareResources: blocking so the client times out before the server sends a reply")
+
+	<-f.blocked
+
+	f.t.Logf("NodePrepareResources: blocked for: %s", time.Since(now))
+	return &drapbv1.NodePrepareResourcesResponse{}, nil
 }
 
 func assertError(t *testing.T, expectError string, err error) {
