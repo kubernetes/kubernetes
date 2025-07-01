@@ -3131,18 +3131,22 @@ func validateProbe(probe *core.Probe, gracePeriod *int64, fldPath *field.Path, o
 	return allErrs
 }
 
-func validateInitContainerRestartPolicy(restartPolicy *core.ContainerRestartPolicy, fldPath *field.Path) field.ErrorList {
+func validateInitContainerRestartPolicy(restartPolicy *core.ContainerRestartPolicy, restartRules []core.ContainerRestartRule, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 
 	if restartPolicy == nil {
 		return allErrors
 	}
-	switch *restartPolicy {
-	case core.ContainerRestartPolicyAlways:
-		break
-	default:
-		validValues := []core.ContainerRestartPolicy{core.ContainerRestartPolicyAlways}
-		allErrors = append(allErrors, field.NotSupported(fldPath, *restartPolicy, validValues))
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+		allErrors = append(allErrors, validateContainerRestartPolicy(restartPolicy, restartRules, fldPath)...)
+	} else {
+		switch *restartPolicy {
+		case core.ContainerRestartPolicyAlways:
+			break
+		default:
+			validValues := []core.ContainerRestartPolicy{core.ContainerRestartPolicyAlways}
+			allErrors = append(allErrors, field.NotSupported(fldPath.Child("restartPolicy"), *restartPolicy, validValues))
+		}
 	}
 
 	return allErrors
@@ -3460,6 +3464,60 @@ func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *fiel
 	return allErrors
 }
 
+func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules []core.ContainerRestartRule, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	restartPolicyFld := fldPath.Child("restartPolicy")
+	if policy == nil {
+		if len(rules) == 0 {
+			return allErrs
+		} else {
+			allErrs = append(allErrs, field.Required(restartPolicyFld, "must specify restartPolicy when restart rules are used"))
+		}
+	} else {
+		switch *policy {
+		case core.ContainerRestartPolicyAlways, core.ContainerRestartPolicyOnFailure, core.ContainerRestartPolicyNever:
+		default:
+			validPolicies := []core.ContainerRestartPolicy{
+				core.ContainerRestartPolicyAlways, core.ContainerRestartPolicyNever, core.ContainerRestartPolicyOnFailure,
+			}
+			allErrs = append(allErrs, field.NotSupported(restartPolicyFld, *policy, validPolicies))
+		}
+	}
+
+	if len(rules) > 20 {
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("restartPolicyRules"), rules, 20))
+	}
+	for i, rule := range rules {
+		policyRulesFld := fldPath.Child("restartPolicyRules").Index(i)
+
+		switch rule.Action {
+		case core.ContainerRestartRuleActionRestart:
+		default:
+			validActions := []core.ContainerRestartRuleAction{core.ContainerRestartRuleActionRestart}
+			allErrs = append(allErrs, field.NotSupported(policyRulesFld.Child("action"), rule.Action, validActions))
+		}
+
+		if rule.ExitCodes != nil {
+			exitCodesFld := policyRulesFld.Child("when", "exitCodes")
+			switch rule.ExitCodes.Operator {
+			case core.ContainerRestartRuleOnExitCodesOpIn, core.ContainerRestartRuleOnExitCodesOpNotIn:
+			default:
+				validValues := []core.ContainerRestartRuleOnExitCodesOperator{
+					core.ContainerRestartRuleOnExitCodesOpIn, core.ContainerRestartRuleOnExitCodesOpNotIn,
+				}
+				allErrs = append(allErrs, field.NotSupported(exitCodesFld.Child("operator"), rule.ExitCodes.Operator, validValues))
+			}
+
+			if len(rule.ExitCodes.Values) > 255 {
+				allErrs = append(allErrs, field.TooLong(exitCodesFld.Child("values"), rule.ExitCodes.Values, 255))
+			}
+		} else {
+			allErrs = append(allErrs, field.Required(policyRulesFld.Child("when"), "must be specified"))
+		}
+	}
+	return allErrs
+}
+
 // validateEphemeralContainers is called by pod spec and template validation to validate the list of ephemeral containers.
 // Note that this is called for pod template even though ephemeral containers aren't allowed in pod templates.
 func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, containers, initContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
@@ -3561,7 +3619,7 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 		restartAlways := false
 		// Apply the validation specific to init containers
 		if ctr.RestartPolicy != nil {
-			allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, idxPath.Child("restartPolicy"))...)
+			allErrs = append(allErrs, validateInitContainerRestartPolicy(ctr.RestartPolicy, ctr.RestartPolicyRules, idxPath)...)
 			restartAlways = *ctr.RestartPolicy == core.ContainerRestartPolicyAlways
 		}
 
@@ -3717,9 +3775,12 @@ func validateContainers(containers []core.Container, os *core.PodOS, volumes map
 		allErrs = append(allErrs, validateReadinessProbe(ctr.ReadinessProbe, gracePeriod, path.Child("readinessProbe"), opts)...)
 		allErrs = append(allErrs, validateStartupProbe(ctr.StartupProbe, gracePeriod, path.Child("startupProbe"), opts)...)
 
-		// These fields are disallowed for regular containers
-		if ctr.RestartPolicy != nil {
-			allErrs = append(allErrs, field.Forbidden(path.Child("restartPolicy"), "may not be set for non-init containers"))
+		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+			allErrs = append(allErrs, validateContainerRestartPolicy(ctr.RestartPolicy, ctr.RestartPolicyRules, path)...)
+		} else {
+			if ctr.RestartPolicy != nil {
+				allErrs = append(allErrs, field.Forbidden(path.Child("restartPolicy"), "may not be set for non-init containers"))
+			}
 		}
 	}
 
