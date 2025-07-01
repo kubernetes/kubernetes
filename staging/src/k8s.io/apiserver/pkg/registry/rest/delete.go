@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes
@@ -92,10 +92,10 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 
 	// Negative values will be treated as the value `1s` on the delete path.
 	if gracePeriodSeconds := options.GracePeriodSeconds; gracePeriodSeconds != nil && *gracePeriodSeconds < 0 {
-		options.GracePeriodSeconds = utilpointer.Int64(1)
+		options.GracePeriodSeconds = ptr.To[int64](1)
 	}
 	if deletionGracePeriodSeconds := objectMeta.GetDeletionGracePeriodSeconds(); deletionGracePeriodSeconds != nil && *deletionGracePeriodSeconds < 0 {
-		objectMeta.SetDeletionGracePeriodSeconds(utilpointer.Int64(1))
+		objectMeta.SetDeletionGracePeriodSeconds(ptr.To[int64](1))
 	}
 
 	gracefulStrategy, ok := strategy.(RESTGracefulDeleteStrategy)
