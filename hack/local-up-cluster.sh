@@ -1503,8 +1503,7 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
     esac
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  if [[ "${START_MODE}" != *"nokubeproxy"* ]]; then
+if [[ "${START_MODE}" != "kubeletonly" ]] && [[ "${START_MODE}" != *"nokubeproxy"* ]]; then
     ## TODO remove this check if/when kubelet is supported on darwin
     # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
@@ -1521,7 +1520,8 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kube-proxy aborted."
         ;;
     esac
-  fi
+else
+    print_color "Skipping kube-proxy (START_MODE=${START_MODE})."
 fi
 
 if [[ "${DEFAULT_STORAGE_CLASS}" = "true" ]]; then
