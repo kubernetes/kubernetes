@@ -80,13 +80,15 @@ func TestUnion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Create mock extractors that return predefined values instead of
+			// actually extracting from the object.
 			extractors := make([]ExtractorFn[*testMember, any], len(tc.fieldValues))
 			for i, val := range tc.fieldValues {
 				val := val
 				extractors[i] = func(_ *testMember) any { return val }
 			}
 
-			got := Union(context.Background(), operation.Operation{Type: operation.Update}, nil, &testMember{}, nil, NewUnionMembership(tc.fields...), extractors...)
+			got := Union(context.Background(), operation.Operation{}, nil, &testMember{}, nil, NewUnionMembership(tc.fields...), extractors...)
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got, tc.expected)
 			}
@@ -127,15 +129,201 @@ func TestDiscriminatedUnion(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			discriminatorExtractor := func(_ *testMember) string { return tc.discriminatorValue }
 
+			// Create mock extractors that return predefined values instead of
+			// actually extracting from the object.
 			extractors := make([]ExtractorFn[*testMember, any], len(tc.fieldValues))
 			for i, val := range tc.fieldValues {
 				val := val
 				extractors[i] = func(_ *testMember) any { return val }
 			}
 
-			got := DiscriminatedUnion(context.Background(), operation.Operation{Type: operation.Update}, nil, &testMember{}, nil, NewDiscriminatedUnionMembership(tc.discriminatorField, tc.fields...), discriminatorExtractor, extractors...)
+			got := DiscriminatedUnion(context.Background(), operation.Operation{}, nil, &testMember{}, nil, NewDiscriminatedUnionMembership(tc.discriminatorField, tc.fields...), discriminatorExtractor, extractors...)
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got.ToAggregate(), tc.expected.ToAggregate())
+			}
+		})
+	}
+}
+
+type testStruct struct {
+	M1 *m1 `json:"m1"`
+	M2 *m2 `json:"m2"`
+}
+
+type m1 struct{}
+type m2 struct{}
+
+var extractors = []ExtractorFn[*testStruct, any]{
+	func(s *testStruct) any {
+		if s != nil {
+			return s.M1
+		}
+		return nil
+	},
+	func(s *testStruct) any {
+		if s != nil {
+			return s.M2
+		}
+		return nil
+	},
+}
+
+func TestUnionRatcheting(t *testing.T) {
+	testCases := []struct {
+		name      string
+		oldStruct *testStruct
+		newStruct *testStruct
+		expected  field.ErrorList
+	}{
+		{
+			name:      "both nil",
+			oldStruct: nil,
+			newStruct: nil,
+		},
+		{
+			name:      "both empty struct",
+			oldStruct: &testStruct{},
+			newStruct: &testStruct{},
+		},
+		{
+			name: "both have more than one member",
+			oldStruct: &testStruct{
+				M1: &m1{},
+				M2: &m2{},
+			},
+			newStruct: &testStruct{
+				M1: &m1{},
+				M2: &m2{},
+			},
+		},
+		{
+			name: "change to invalid",
+			oldStruct: &testStruct{
+				M1: &m1{},
+			},
+			newStruct: &testStruct{
+				M1: &m1{},
+				M2: &m2{},
+			},
+			expected: field.ErrorList{
+				field.Invalid(nil, "{m1, m2}", "must specify exactly one of: `m1`, `m2`"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Union(context.Background(), operation.Operation{Type: operation.Update}, nil, tc.newStruct, tc.oldStruct, NewUnionMembership([][2]string{{"m1", "m1"}, {"m2", "m2"}}...), extractors...)
+			if !reflect.DeepEqual(got, tc.expected) {
+				t.Errorf("got %v want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+type testDiscriminatedStruct struct {
+	D  string `json:"d"`
+	M1 *m1    `json:"m1"`
+	M2 *m2    `json:"m2"`
+}
+
+var testDiscriminatorExtractor = func(s *testDiscriminatedStruct) string {
+	if s != nil {
+		return s.D
+	}
+	return ""
+}
+var testDiscriminatedExtractors = []ExtractorFn[*testDiscriminatedStruct, any]{
+	func(s *testDiscriminatedStruct) any {
+		if s != nil {
+			return s.M1
+		}
+		return nil
+	},
+	func(s *testDiscriminatedStruct) any {
+		if s != nil {
+			return s.M2
+		}
+		return nil
+	},
+}
+
+func TestDiscriminatedUnionRatcheting(t *testing.T) {
+	testCases := []struct {
+		name      string
+		oldStruct *testDiscriminatedStruct
+		newStruct *testDiscriminatedStruct
+		expected  field.ErrorList
+	}{
+		{
+			name: "pass with both nil",
+		},
+		{
+			name:      "pass with both empty struct",
+			oldStruct: &testDiscriminatedStruct{},
+			newStruct: &testDiscriminatedStruct{},
+		},
+		{
+			name: "pass with both not set to member that is specified",
+			oldStruct: &testDiscriminatedStruct{
+				D:  "m1",
+				M2: &m2{},
+			},
+			newStruct: &testDiscriminatedStruct{
+				D:  "m1",
+				M2: &m2{},
+			},
+		},
+		{
+			name: "pass with both set to more than one member",
+			oldStruct: &testDiscriminatedStruct{
+				D:  "m1",
+				M1: &m1{},
+				M2: &m2{},
+			},
+			newStruct: &testDiscriminatedStruct{
+				D:  "m1",
+				M1: &m1{},
+				M2: &m2{},
+			},
+		},
+		{
+			name: "fail on changing to invalid with both set",
+			oldStruct: &testDiscriminatedStruct{
+				D:  "m1",
+				M1: &m1{},
+			},
+			newStruct: &testDiscriminatedStruct{
+				D:  "m1",
+				M1: &m1{},
+				M2: &m2{},
+			},
+			expected: field.ErrorList{
+				field.Invalid(field.NewPath("m2"), "", "may only be specified when `d` is \"m2\""),
+			},
+		},
+		{
+			name: "fail on changing the discriminator",
+			oldStruct: &testDiscriminatedStruct{
+				D:  "m1",
+				M1: &m1{},
+			},
+			newStruct: &testDiscriminatedStruct{
+				D:  "m2",
+				M1: &m1{},
+			},
+			expected: field.ErrorList{
+				field.Invalid(field.NewPath("m1"), "", "may only be specified when `d` is \"m1\""),
+				field.Invalid(field.NewPath("m2"), "", "must be specified when `d` is \"m2\""),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := DiscriminatedUnion(context.Background(), operation.Operation{Type: operation.Update}, nil, tc.newStruct, tc.oldStruct, NewDiscriminatedUnionMembership("d", [][2]string{{"m1", "m1"}, {"m2", "m2"}}...), testDiscriminatorExtractor, testDiscriminatedExtractors...)
+			if !reflect.DeepEqual(got, tc.expected) {
+				t.Errorf("got %v want %v", got, tc.expected)
 			}
 		})
 	}

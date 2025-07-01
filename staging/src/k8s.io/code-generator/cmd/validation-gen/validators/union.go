@@ -96,7 +96,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 				discriminatorExtractor := FunctionLiteral{
 					Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
 					Results:    []ParamResult{{Type: types.String}},
-					Body:       fmt.Sprintf("return string(obj.%s)", u.discriminatorMember.Name), // Cast to string
+					Body:       fmt.Sprintf("if obj != nil {return string(obj.%s)}; return \"\"", u.discriminatorMember.Name), // Cast to string
 				}
 				extractorArgs = append(extractorArgs, discriminatorExtractor)
 
@@ -104,7 +104,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 					extractor := FunctionLiteral{
 						Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
 						Results:    []ParamResult{{Type: types.Any}},
-						Body:       fmt.Sprintf("return obj.%s", member.Name),
+						Body:       fmt.Sprintf("if obj != nil {return obj.%s}; return nil", member.Name),
 					}
 					extractorArgs = append(extractorArgs, extractor)
 				}
@@ -122,7 +122,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 					extractor := FunctionLiteral{
 						Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
 						Results:    []ParamResult{{Type: types.Any}},
-						Body:       fmt.Sprintf("return obj.%s", member.Name),
+						Body:       fmt.Sprintf("if obj != nil {return obj.%s}; return nil", member.Name),
 					}
 					extractorArgs = append(extractorArgs, extractor)
 				}

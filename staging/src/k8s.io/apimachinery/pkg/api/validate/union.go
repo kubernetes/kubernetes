@@ -27,6 +27,7 @@ import (
 )
 
 // ExtractorFn extracts a member field from a parent object.
+// Note: obj is not guaranteed to be non-nil, need to handle nil obj in the extractor.
 type ExtractorFn[T, V any] func(obj T) V
 
 // Union verifies that exactly one member of a union is specified.
@@ -35,9 +36,9 @@ type ExtractorFn[T, V any] func(obj T) V
 //
 // For example:
 //
-//	var abcUnionMembership := schema.NewUnionMembership("a", "b", "c")
+//	var UnionMembershipForABC := validate.NewUnionMembership([2]string{"a", "A"}, [2]string{"b", "B"}, [2]string{"c", "C"})
 //	func ValidateABC(ctx context.Context, op operation.Operation, fldPath *field.Path, in *ABC) (errs fields.ErrorList) {
-//		errs = append(errs, Union(ctx, op, fldPath, in, oldIn, abcUnionMembership,
+//		errs = append(errs, Union(ctx, op, fldPath, in, oldIn, UnionMembershipForABC,
 //			func(in *ABC) any { return in.A },
 //			func(in *ABC) any { return in.B },
 //			func(in *ABC) any { return in.C },
@@ -53,12 +54,23 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 		}
 	}
 	var specifiedFields []string
+	var changed bool
 	for i, extractor := range extractorFns {
 		fieldValue := extractor(obj)
+		if op.Type == operation.Update && !changed {
+			oldFieldValue := extractor(oldObj)
+			// TODO: consider passing an equiv function to DirectEqual instead of SemanticDeepEqual
+			// if value can be compared directly, to improve performance.
+			changed = !SemanticDeepEqual(fieldValue, oldFieldValue)
+		}
 		rv := reflect.ValueOf(fieldValue)
 		if rv.IsValid() && !rv.IsZero() {
 			specifiedFields = append(specifiedFields, union.members[i].fieldName)
 		}
+	}
+	// If all union members are unchanged, we don't need to validate the union.
+	if op.Type == operation.Update && !changed {
+		return nil
 	}
 	if len(specifiedFields) > 1 {
 		return field.ErrorList{
@@ -80,10 +92,10 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 //
 // For example:
 //
-//	var abcUnionMembership := schema.NewDiscriminatedUnionMembership("type", "a", "b", "c")
+//	var UnionMembershipForABC := validate.NewDiscriminatedUnionMembership("type", [2]string{"a", "A"}, [2]string{"b" "B"}, [2]string{"c", "C"})
 //	func ValidateABC(ctx context.Context, op operation.Operation, fldPath, *field.Path, in *ABC) (errs fields.ErrorList) {
-//		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, oldIn, abcUnionMembership,
-//			func(in *ABC) string { return in.Type },
+//		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, oldIn, UnionMembershipForABC,
+//			func(in *ABC) string { return string(in.Type) },
 //			func(in *ABC) any { return in.A },
 //			func(in *ABC) any { return in.B },
 //			func(in *ABC) any { return in.C },
@@ -101,13 +113,21 @@ func DiscriminatedUnion[T any, D ~string](_ context.Context, op operation.Operat
 					len(extractorFns), len(union.members))),
 		}
 	}
-
+	var changed bool
 	discriminatorValue := discriminatorExtractor(obj)
+	if op.Type == operation.Update {
+		oldDiscriminatorValue := discriminatorExtractor(oldObj)
+		changed = discriminatorValue != oldDiscriminatorValue
+	}
 
 	for i, extractor := range extractorFns {
 		member := union.members[i]
 		isDiscriminatedMember := string(discriminatorValue) == member.discriminatorValue
 		fieldValue := extractor(obj)
+		if op.Type == operation.Update && !changed {
+			oldFieldValue := extractor(oldObj)
+			changed = !SemanticDeepEqual(fieldValue, oldFieldValue)
+		}
 		rv := reflect.ValueOf(fieldValue)
 		isSpecified := rv.IsValid() && !rv.IsZero()
 		if isSpecified && !isDiscriminatedMember {
@@ -117,6 +137,11 @@ func DiscriminatedUnion[T any, D ~string](_ context.Context, op operation.Operat
 			errs = append(errs, field.Invalid(fldPath.Child(member.fieldName), "",
 				fmt.Sprintf("must be specified when `%s` is %q", union.discriminatorName, discriminatorValue)))
 		}
+	}
+	// If all union discriminator and union members are unchanged,
+	// We can ignore this union validation.
+	if op.Type == operation.Update && !changed {
+		return nil
 	}
 	return errs
 }

@@ -50,4 +50,16 @@ func Test(t *testing.T) {
 		field.Invalid(nil, "{u1m1, u1m2}", "must specify exactly one of: `u1m1`, `u1m2`"),
 		field.Invalid(nil, "{u2m1, u2m2}", "must specify exactly one of: `u2m1`, `u2m2`"),
 	)
+
+	// Test validation ratcheting
+	st.Value(&Struct{}).OldValue(&Struct{}).ExpectValid()
+	st.Value(&Struct{U1M1: &M1{}, U1M2: &M2{}}).OldValue(&Struct{U1M1: &M1{}, U1M2: &M2{}}).ExpectValid()
+	st.Value(&Struct{U2M1: &M1{}, U2M2: &M2{}}).OldValue(&Struct{U2M1: &M1{}, U2M2: &M2{}}).ExpectValid()
+	st.Value(&Struct{
+		U1M1: &M1{}, U1M2: &M2{},
+		U2M1: &M1{}, U2M2: &M2{},
+	}).OldValue(&Struct{
+		U1M1: &M1{}, U1M2: &M2{},
+		U2M1: &M1{}, U2M2: &M2{},
+	}).ExpectValid()
 }
