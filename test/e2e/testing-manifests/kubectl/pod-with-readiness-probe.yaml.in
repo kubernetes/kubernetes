@@ -1,13 +1,15 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: httpd
+  name: agnhost
   labels:
-    name: httpd
+    name: agnhost
 spec:
   containers:
-  - name: httpd
-    image: {{.HttpdImage}}
+  - name: agnhost
+    image: {{.AgnhostImage}}
+    command: ["/bin/sh", "-c"]
+    args: ["/agnhost netexec --http-port 80"]
     ports:
     - containerPort: 80
     readinessProbe:

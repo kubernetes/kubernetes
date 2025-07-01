@@ -91,25 +91,25 @@ import (
 )
 
 const (
-	updateDemoSelector        = "name=update-demo"
-	guestbookStartupTimeout   = 10 * time.Minute
-	guestbookResponseTimeout  = 3 * time.Minute
-	simplePodSelector         = "name=httpd"
-	simplePodName             = "httpd"
-	simplePodResourceName     = "pod/httpd"
-	httpdDefaultOutput        = "It works!"
-	simplePodPort             = 80
-	pausePodSelector          = "name=pause"
-	pausePodName              = "pause"
-	busyboxPodSelector        = "app=busybox1"
-	busyboxPodName            = "busybox1"
-	kubeCtlManifestPath       = "test/e2e/testing-manifests/kubectl"
-	agnhostControllerFilename = "agnhost-primary-controller.json.in"
-	agnhostServiceFilename    = "agnhost-primary-service.json"
-	httpdDeployment1Filename  = "httpd-deployment1.yaml.in"
-	httpdDeployment2Filename  = "httpd-deployment2.yaml.in"
-	httpdDeployment3Filename  = "httpd-deployment3.yaml.in"
-	metaPattern               = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
+	updateDemoSelector         = "name=update-demo"
+	guestbookStartupTimeout    = 10 * time.Minute
+	guestbookResponseTimeout   = 3 * time.Minute
+	simplePodSelector          = "name=agnhost"
+	simplePodName              = "agnhost"
+	simplePodResourceName      = "pod/agnhost"
+	agnhostDefaultOutput       = "itworks"
+	simplePodPort              = 80
+	pausePodSelector           = "name=pause"
+	pausePodName               = "pause"
+	busyboxPodSelector         = "app=busybox1"
+	busyboxPodName             = "busybox1"
+	kubeCtlManifestPath        = "test/e2e/testing-manifests/kubectl"
+	agnhostControllerFilename  = "agnhost-primary-controller.json.in"
+	agnhostServiceFilename     = "agnhost-primary-service.json"
+	agnhostDeployment1Filename = "agnhost-deployment1.yaml.in"
+	agnhostDeployment2Filename = "agnhost-deployment2.yaml.in"
+	agnhostDeployment3Filename = "agnhost-deployment3.yaml.in"
+	metaPattern                = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
 func unknownFieldMetadataJSON(gvk schema.GroupVersionKind, name string) string {
@@ -586,14 +586,14 @@ var _ = SIGDescribe("Kubectl client", func() {
 				defer cmd.Stop()
 
 				ginkgo.By("curling local port output")
-				localAddr := fmt.Sprintf("http://localhost:%d", cmd.port)
+				localAddr := fmt.Sprintf("http://localhost:%d/echo?msg=%s", cmd.port, agnhostDefaultOutput)
 				body, err := curl(localAddr)
 				framework.Logf("got: %s", body)
 				if err != nil {
 					framework.Failf("Failed http.Get of forwarded port (%s): %v", localAddr, err)
 				}
-				if !strings.Contains(body, httpdDefaultOutput) {
-					framework.Failf("Container port output missing expected value. Wanted:'%s', got: %s", httpdDefaultOutput, body)
+				if !strings.Contains(body, agnhostDefaultOutput) {
+					framework.Failf("Container port output missing expected value. Wanted:'%s', got: %s", agnhostDefaultOutput, body)
 				}
 			})
 
@@ -680,7 +680,7 @@ metadata:
 
 				ginkgo.By("getting pods with in-cluster configs")
 				execOutput := e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --v=6 2>&1")
-				gomega.Expect(execOutput).To(gomega.MatchRegexp("httpd +1/1 +Running"))
+				gomega.Expect(execOutput).To(gomega.MatchRegexp("agnhost +1/1 +Running"))
 				gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
 
@@ -1030,9 +1030,9 @@ metadata:
 		})
 
 		ginkgo.It("apply set/view last-applied", func(ctx context.Context) {
-			deployment1Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment1Filename)))
-			deployment2Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment2Filename)))
-			deployment3Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment3Filename)))
+			deployment1Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostDeployment1Filename)))
+			deployment2Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostDeployment2Filename)))
+			deployment3Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostDeployment3Filename)))
 
 			ginkgo.By("deployment replicas number is 2")
 			e2ekubectl.RunKubectlOrDieInput(ns, deployment1Yaml, "apply", "-f", "-")
@@ -1055,16 +1055,16 @@ metadata:
 			}
 
 			ginkgo.By("scale set replicas to 3")
-			httpdDeploy := "httpd-deployment"
+			agnhostDeploy := "agnhost-deployment"
 			debugDiscovery()
-			e2ekubectl.RunKubectlOrDie(ns, "scale", "deployment", httpdDeploy, "--replicas=3")
+			e2ekubectl.RunKubectlOrDie(ns, "scale", "deployment", agnhostDeploy, "--replicas=3")
 
 			ginkgo.By("apply file doesn't have replicas but image changed")
 			e2ekubectl.RunKubectlOrDieInput(ns, deployment3Yaml, "apply", "-f", "-")
 
 			ginkgo.By("verify replicas still is 3 and image has been updated")
 			output = e2ekubectl.RunKubectlOrDieInput(ns, deployment3Yaml, "get", "-f", "-", "-o", "json")
-			requiredItems := []string{"\"replicas\": 3", imageutils.GetE2EImage(imageutils.Httpd)}
+			requiredItems := []string{"\"replicas\": 3", imageutils.GetE2EImage(imageutils.AgnhostPrev)}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
 					framework.Failf("Missing %s in kubectl apply", item)
@@ -1077,23 +1077,23 @@ metadata:
 		/*
 			Release: v1.19
 			Testname: Kubectl, diff Deployment
-			Description: Create a Deployment with httpd image. Declare the same Deployment with a different image, busybox. Diff of live Deployment with declared Deployment MUST include the difference between live and declared image.
+			Description: Create a Deployment with agnhost image. Declare the same Deployment with a different image, busybox. Diff of live Deployment with declared Deployment MUST include the difference between live and declared image.
 		*/
 		framework.ConformanceIt("should check if kubectl diff finds a difference for Deployments", func(ctx context.Context) {
-			ginkgo.By("create deployment with httpd image")
-			deployment := commonutils.SubstituteImageName(string(readTestFileOrDie(httpdDeployment3Filename)))
+			ginkgo.By("create deployment with agnhost image")
+			deployment := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostDeployment3Filename)))
 			e2ekubectl.RunKubectlOrDieInput(ns, deployment, "create", "-f", "-")
 
 			ginkgo.By("verify diff finds difference between live and declared image")
-			deployment = strings.Replace(deployment, imageutils.GetE2EImage(imageutils.Httpd), imageutils.GetE2EImage(imageutils.BusyBox), 1)
+			deployment = strings.Replace(deployment, imageutils.GetE2EImage(imageutils.AgnhostPrev), imageutils.GetE2EImage(imageutils.BusyBox), 1)
 			if !strings.Contains(deployment, imageutils.GetE2EImage(imageutils.BusyBox)) {
-				framework.Failf("Failed replacing image from %s to %s in:\n%s\n", imageutils.GetE2EImage(imageutils.Httpd), imageutils.GetE2EImage(imageutils.BusyBox), deployment)
+				framework.Failf("Failed replacing image from %s to %s in:\n%s\n", imageutils.GetE2EImage(imageutils.AgnhostPrev), imageutils.GetE2EImage(imageutils.BusyBox), deployment)
 			}
 			output, err := e2ekubectl.RunKubectlInput(ns, deployment, "diff", "-f", "-")
 			if err, ok := err.(*exec.ExitError); ok && err.ExitCode() == 1 {
 				framework.Failf("Expected kubectl diff exit code of 1, but got %d: %v\n", err.ExitCode(), err)
 			}
-			requiredItems := []string{imageutils.GetE2EImage(imageutils.Httpd), imageutils.GetE2EImage(imageutils.BusyBox)}
+			requiredItems := []string{imageutils.GetE2EImage(imageutils.AgnhostPrev), imageutils.GetE2EImage(imageutils.BusyBox)}
 			for _, item := range requiredItems {
 				if !strings.Contains(output, item) {
 					framework.Failf("Missing %s in kubectl diff output:\n%s\n%v\n", item, output, err)
@@ -1111,23 +1111,23 @@ metadata:
 			Description: The command 'kubectl run' must create a pod with the specified image name. After, the command 'kubectl patch pod -p {...} --dry-run=server' should update the Pod with the new image name and server-side dry-run enabled. The image name must not change.
 		*/
 		framework.ConformanceIt("should check if kubectl can dry-run update Pods", func(ctx context.Context) {
-			httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
-			ginkgo.By("running the image " + httpdImage)
-			podName := "e2e-test-httpd-pod"
-			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
+			agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
+			ginkgo.By("running the image " + agnhostImage)
+			podName := "e2e-test-agnhost-pod"
+			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, podRunningTimeoutArg, "--labels=run="+podName)
 
 			ginkgo.By("replace the image in the pod with server-side dry-run")
 			specImage := fmt.Sprintf(`{"spec":{"containers":[{"name": "%s","image": "%s"}]}}`, podName, imageutils.GetE2EImage(imageutils.BusyBox))
 			e2ekubectl.RunKubectlOrDie(ns, "patch", "pod", podName, "-p", specImage, "--dry-run=server")
 
-			ginkgo.By("verifying the pod " + podName + " has the right image " + httpdImage)
+			ginkgo.By("verifying the pod " + podName + " has the right image " + agnhostImage)
 			pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting pod %s: %v", podName, err)
 			}
 			containers := pod.Spec.Containers
-			if checkContainersImage(containers, httpdImage) {
-				framework.Failf("Failed creating pod with expected image %s", httpdImage)
+			if checkContainersImage(containers, agnhostImage) {
+				framework.Failf("Failed creating pod with expected image %s", agnhostImage)
 			}
 
 			e2ekubectl.RunKubectlOrDie(ns, "delete", "pods", podName)
@@ -1776,7 +1776,7 @@ metadata:
 		var podName string
 
 		ginkgo.BeforeEach(func() {
-			podName = "e2e-test-httpd-pod"
+			podName = "e2e-test-agnhost-pod"
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1789,17 +1789,17 @@ metadata:
 			Description: Command 'kubectl run' MUST create a pod, when a image name is specified in the run command. After the run command there SHOULD be a pod that should exist with one container running the specified image.
 		*/
 		framework.ConformanceIt("should create a pod from an image when restart is Never", func(ctx context.Context) {
-			httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
-			ginkgo.By("running the image " + httpdImage)
-			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--restart=Never", podRunningTimeoutArg, "--image="+httpdImage)
+			agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
+			ginkgo.By("running the image " + agnhostImage)
+			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--restart=Never", podRunningTimeoutArg, "--image="+agnhostImage)
 			ginkgo.By("verifying the pod " + podName + " was created")
 			pod, err := c.CoreV1().Pods(ns).Get(ctx, podName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting pod %s: %v", podName, err)
 			}
 			containers := pod.Spec.Containers
-			if checkContainersImage(containers, httpdImage) {
-				framework.Failf("Failed creating pod %s with expected image %s", podName, httpdImage)
+			if checkContainersImage(containers, agnhostImage) {
+				framework.Failf("Failed creating pod %s with expected image %s", podName, agnhostImage)
 			}
 			if pod.Spec.RestartPolicy != v1.RestartPolicyNever {
 				framework.Failf("Failed creating a pod with correct restart policy for --restart=Never")
@@ -1811,7 +1811,7 @@ metadata:
 		var podName string
 
 		ginkgo.BeforeEach(func() {
-			podName = "e2e-test-httpd-pod"
+			podName = "e2e-test-agnhost-pod"
 		})
 
 		ginkgo.AfterEach(func() {
@@ -1824,9 +1824,9 @@ metadata:
 			Description: Command 'kubectl replace' on a existing Pod with a new spec MUST update the image of the container running in the Pod. A -f option to 'kubectl replace' SHOULD force to re-create the resource. The new Pod SHOULD have the container with new change to the image.
 		*/
 		framework.ConformanceIt("should update a single-container pod's image", func(ctx context.Context) {
-			httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
-			ginkgo.By("running the image " + httpdImage)
-			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
+			agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
+			ginkgo.By("running the image " + agnhostImage)
+			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, podRunningTimeoutArg, "--labels=run="+podName)
 
 			ginkgo.By("verifying the pod " + podName + " is running")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": podName}))
@@ -1843,7 +1843,7 @@ metadata:
 
 			ginkgo.By("replace the image in the pod")
 			busyboxImage := imageutils.GetE2EImage(imageutils.BusyBox)
-			podJSON = strings.Replace(podJSON, httpdImage, busyboxImage, 1)
+			podJSON = strings.Replace(podJSON, agnhostImage, busyboxImage, 1)
 			e2ekubectl.RunKubectlOrDieInput(ns, podJSON, "replace", "-f", "-")
 
 			ginkgo.By("verifying the pod " + podName + " has the right image " + busyboxImage)
@@ -2025,10 +2025,10 @@ metadata:
 
 	ginkgo.Describe("Kubectl events", func() {
 		ginkgo.It("should show event when pod is created", func(ctx context.Context) {
-			podName := "e2e-test-httpd-pod"
-			httpdImage := imageutils.GetE2EImage(imageutils.Httpd)
-			ginkgo.By("running the image " + httpdImage)
-			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+httpdImage, podRunningTimeoutArg, "--labels=run="+podName)
+			podName := "e2e-test-agnhost-pod"
+			agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
+			ginkgo.By("running the image " + agnhostImage)
+			e2ekubectl.RunKubectlOrDie(ns, "run", podName, "--image="+agnhostImage, podRunningTimeoutArg, "--labels=run="+podName)
 
 			ginkgo.By("verifying the pod " + podName + " is running")
 			label := labels.SelectorFromSet(map[string]string{"run": podName})
