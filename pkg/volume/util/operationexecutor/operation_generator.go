@@ -1997,7 +1997,6 @@ func (og *operationGenerator) expandVolumeDuringMount(volumeToMount VolumeToMoun
 			nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
 			resizeFinished, _, err := nodeExpander.expandOnPlugin()
 			return resizeFinished, err
-
 		}
 	}
 	return true, nil
@@ -2062,7 +2061,6 @@ func (og *operationGenerator) nodeExpandVolume(
 			nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
 			resizeFinished, newSize, err := nodeExpander.expandOnPlugin()
 			return resizeFinished, newSize, err
-
 		}
 	}
 	return true, rsOpts.OldSize, nil

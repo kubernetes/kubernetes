@@ -1281,22 +1281,12 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			newPVSize:       resource.MustParse("15G"),
 			oldPVSize:       resource.MustParse("13G"),
 		},
-		{
-			name:            "expand-fs-volume with unsupported error",
-			volumeMode:      &fsMode,
-			expansionFailed: false,
-			pvName:          volumetesting.FailWithUnSupportedVolumeName,
-			pvcSize:         resource.MustParse("10G"),
-			pvcStatusSize:   resource.MustParse("10G"),
-			newPVSize:       resource.MustParse("15G"),
-			oldPVSize:       resource.MustParse("13G"),
-		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			pv := getTestPV(tc.pvName, tc.volumeMode, tc.oldPVSize)
-			pvc := getTestPVC("pv", tc.volumeMode, tc.pvcSize, tc.pvcStatusSize)
+			pvc := getTestPVC("pv", tc.volumeMode, tc.pvcSize, tc.pvcStatusSize, tc.newPVSize)
 			pod := getTestPod(pvc.Name)
 
 			// deep copy before reconciler runs to avoid data race.
@@ -1403,7 +1393,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 	}
 }
 
-func getTestPVC(pvName string, volumeMode *v1.PersistentVolumeMode, specSize, statusSize resource.Quantity) *v1.PersistentVolumeClaim {
+func getTestPVC(pvName string, volumeMode *v1.PersistentVolumeMode, specSize, statusSize, allocatedSize resource.Quantity) *v1.PersistentVolumeClaim {
 	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pvc",
@@ -1421,6 +1411,12 @@ func getTestPVC(pvName string, volumeMode *v1.PersistentVolumeMode, specSize, st
 		Status: v1.PersistentVolumeClaimStatus{
 			Capacity: v1.ResourceList{
 				v1.ResourceStorage: statusSize,
+			},
+			AllocatedResources: v1.ResourceList{
+				v1.ResourceStorage: allocatedSize,
+			},
+			AllocatedResourceStatuses: map[v1.ResourceName]v1.ClaimResourceStatus{
+				v1.ResourceStorage: v1.PersistentVolumeClaimNodeResizePending,
 			},
 		},
 	}
@@ -1746,6 +1742,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 						v1.ResourceStorage: tc.pvSize,
 					}
 				}
+				nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
 				pvc := &v1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "pvc",
@@ -1760,6 +1757,12 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 					pvc.Status = v1.PersistentVolumeClaimStatus{
 						Capacity: v1.ResourceList{
 							v1.ResourceStorage: tc.pvcStatusSize,
+						},
+						AllocatedResources: v1.ResourceList{
+							v1.ResourceStorage: tc.pvcStatusSize,
+						},
+						AllocatedResourceStatuses: map[v1.ResourceName]v1.ClaimResourceStatus{
+							v1.ResourceStorage: nodeResizePending,
 						},
 					}
 				}
