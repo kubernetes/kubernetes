@@ -13,7 +13,7 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f
 	github.com/fatih/camelcase v1.0.0
 	github.com/go-openapi/jsonreference v0.20.2
-	github.com/google/gnostic-models v0.6.9
+	github.com/google/gnostic-models v0.7.0
 	github.com/google/go-cmp v0.7.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
