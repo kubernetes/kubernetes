@@ -291,6 +291,14 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta1_HorizontalPodAutosca
 	annotations, copiedAnnotations := autoscaling.DropRoundTripHorizontalPodAutoscalerAnnotations(out.Annotations)
 	out.Annotations = annotations
 
+	if in.Spec.SelectionStrategy != nil {
+		if !copiedAnnotations {
+			copiedAnnotations = true
+			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
+		}
+		out.Annotations[autoscaling.SelectionStrategyAnnotation] = string(*in.Spec.SelectionStrategy)
+	}
+
 	if in.Spec.Behavior != nil {
 		// TODO: this is marshaling an internal type. Fix this without breaking backwards compatibility with n-1 API servers.
 		behaviorEnc, err := json.Marshal(in.Spec.Behavior)
@@ -321,6 +329,11 @@ func Convert_v2beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutosca
 			// only move well-formed data from annotations to fields
 			out.Spec.Behavior = &behavior
 		}
+	}
+
+	if strategyStr, ok := out.Annotations[autoscaling.SelectionStrategyAnnotation]; ok {
+		strategy := autoscaling.SelectionStrategy(strategyStr)
+		out.Spec.SelectionStrategy = &strategy
 	}
 
 	// drop round-tripping annotations after converting to internal
