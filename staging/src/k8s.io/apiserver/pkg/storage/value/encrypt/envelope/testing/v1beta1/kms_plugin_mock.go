@@ -49,6 +49,7 @@ const (
 // Base64Plugin gRPC sever for a mock KMS provider.
 // Uses base64 to simulate encrypt and decrypt.
 type Base64Plugin struct {
+	kmsapi.UnimplementedKeyManagementServiceServer
 	grpcServer         *grpc.Server
 	listener           net.Listener
 	mu                 *sync.Mutex

@@ -26,6 +26,7 @@ import (
 
 // registrationServer implements the kubelet plugin registration gRPC interface.
 type registrationServer struct {
+	registerapi.UnimplementedRegistrationServer
 	driverName        string
 	draEndpointPath   string
 	supportedVersions []string

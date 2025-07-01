@@ -662,7 +662,7 @@ func (b *containerAllocateResponseBuilder) Build() *pluginapi.ContainerAllocateR
 		}
 		cdiDevices = append(cdiDevices, &cdiDevice)
 	}
-	resp.CDIDevices = cdiDevices
+	resp.CdiDevices = cdiDevices
 
 	return resp
 }

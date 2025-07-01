@@ -48,6 +48,7 @@ type Server interface {
 }
 
 type server struct {
+	api.UnimplementedRegistrationServer
 	socketName string
 	socketDir  string
 	mutex      sync.Mutex

@@ -28,6 +28,7 @@ import (
 
 // GRPCService is a grpc server that runs the kms v2 alpha1 API.
 type GRPCService struct {
+	kmsapi.UnimplementedKeyManagementServiceServer
 	addr    string
 	timeout time.Duration
 	server  *grpc.Server

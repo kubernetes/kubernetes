@@ -36,6 +36,7 @@ import (
 
 // examplePlugin is a sample plugin to work with plugin watcher
 type examplePlugin struct {
+	registerapi.UnimplementedRegistrationServer
 	grpcServer         *grpc.Server
 	wg                 sync.WaitGroup
 	registrationStatus chan registerapi.RegistrationStatus // for testing
@@ -46,6 +47,7 @@ type examplePlugin struct {
 }
 
 type pluginServiceV1Beta1 struct {
+	v1beta1.UnimplementedExampleServer
 	server *examplePlugin
 }
 
@@ -59,6 +61,7 @@ func (s *pluginServiceV1Beta1) RegisterService() {
 }
 
 type pluginServiceV1Beta2 struct {
+	v1beta2.UnimplementedExampleServer
 	server *examplePlugin
 }
 

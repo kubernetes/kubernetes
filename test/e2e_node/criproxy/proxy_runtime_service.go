@@ -87,6 +87,8 @@ func (p *RemoteRuntime) runInjectors(apiName string) error {
 
 // RemoteRuntime represents a proxy for remote container runtime.
 type RemoteRuntime struct {
+	runtimeapi.UnimplementedRuntimeServiceServer
+	runtimeapi.UnimplementedImageServiceServer
 	server         *grpc.Server
 	injectors      []func(string) error
 	runtimeService internalapi.RuntimeService

@@ -749,6 +749,7 @@ func (d *Helper) serializeGRPCIfEnabled() (func(), error) {
 // nodePluginImplementation is a thin wrapper around the helper instance.
 // It prevents polluting the public API with these implementation details.
 type nodePluginImplementation struct {
+	drapb.UnimplementedDRAPluginServer
 	*Helper
 }
 
@@ -779,7 +780,7 @@ func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req
 				RequestNames: stripSubrequestNames(result.Requests),
 				PoolName:     result.PoolName,
 				DeviceName:   result.DeviceName,
-				CDIDeviceIDs: result.CDIDeviceIDs,
+				CdiDeviceIds: result.CDIDeviceIDs,
 			}
 			devices = append(devices, device)
 		}
@@ -816,7 +817,7 @@ func (d *nodePluginImplementation) getResourceClaims(ctx context.Context, claims
 		if claim.Status.Allocation == nil {
 			return resourceClaims, fmt.Errorf("claim %s/%s not allocated", claimReq.Namespace, claimReq.Name)
 		}
-		if claim.UID != types.UID(claimReq.UID) {
+		if claim.UID != types.UID(claimReq.Uid) {
 			return resourceClaims, fmt.Errorf("claim %s/%s got replaced", claimReq.Namespace, claimReq.Name)
 		}
 		resourceClaims = append(resourceClaims, claim)
@@ -834,7 +835,7 @@ func (d *nodePluginImplementation) NodeUnprepareResources(ctx context.Context, r
 
 	claims := make([]NamespacedObject, 0, len(req.Claims))
 	for _, claim := range req.Claims {
-		claims = append(claims, NamespacedObject{UID: types.UID(claim.UID), NamespacedName: types.NamespacedName{Name: claim.Name, Namespace: claim.Namespace}})
+		claims = append(claims, NamespacedObject{UID: types.UID(claim.Uid), NamespacedName: types.NamespacedName{Name: claim.Name, Namespace: claim.Namespace}})
 	}
 	result, err := d.plugin.UnprepareResourceClaims(ctx, claims)
 	if err != nil {

@@ -20,6 +20,7 @@ import (
 	"maps"
 	"sync"
 
+	"github.com/gogo/protobuf/proto"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -211,7 +212,7 @@ func (pdev *podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 					continue
 				}
 
-				allocResp, err := devices.allocResp.Marshal()
+				allocResp, err := proto.Marshal(devices.allocResp)
 				if err != nil {
 					klog.ErrorS(err, "Can't marshal allocResp", "podUID", podUID, "containerName", conName, "resourceName", resource)
 					continue
@@ -235,7 +236,7 @@ func (pdev *podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 			"podUID", entry.PodUID, "containerName", entry.ContainerName,
 			"resourceName", entry.ResourceName, "deviceIDs", entry.DeviceIDs, "allocated", entry.AllocResp)
 		allocResp := &pluginapi.ContainerAllocateResponse{}
-		err := allocResp.Unmarshal(entry.AllocResp)
+		err := proto.Unmarshal(entry.AllocResp, allocResp)
 		if err != nil {
 			klog.ErrorS(err, "Can't unmarshal allocResp", "podUID", entry.PodUID, "containerName", entry.ContainerName, "resourceName", entry.ResourceName)
 			continue
@@ -357,7 +358,7 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 // getCDIDeviceInfo returns CDI devices from an allocate response
 func getCDIDeviceInfo(resp *pluginapi.ContainerAllocateResponse, knownCDIDevices sets.Set[string]) []kubecontainer.CDIDevice {
 	var cdiDevices []kubecontainer.CDIDevice
-	for _, cdiDevice := range resp.CDIDevices {
+	for _, cdiDevice := range resp.CdiDevices {
 		if knownCDIDevices.Has(cdiDevice.Name) {
 			klog.V(4).InfoS("Skip existing CDI Device", "name", cdiDevice.Name)
 			continue

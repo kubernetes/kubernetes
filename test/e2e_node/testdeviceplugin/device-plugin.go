@@ -32,6 +32,7 @@ import (
 )
 
 type DevicePlugin struct {
+	kubeletdevicepluginv1beta1.UnimplementedDevicePluginServer
 	server     *grpc.Server
 	uniqueName string
 
@@ -123,7 +124,7 @@ func (dp *DevicePlugin) Allocate(ctx context.Context, request *kubeletdeviceplug
 
 	for _, r := range request.ContainerRequests {
 		response := &kubeletdevicepluginv1beta1.ContainerAllocateResponse{}
-		for _, id := range r.DevicesIDs {
+		for _, id := range r.DevicesIds {
 			fpath, err := os.CreateTemp("/tmp", fmt.Sprintf("%s-%s", dp.uniqueName, id))
 			gomega.Expect(err).To(gomega.Succeed())
 

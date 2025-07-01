@@ -983,7 +983,7 @@ func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.C
 					cdiDevices = append(cdiDevices, &podresourcesapi.CDIDevice{Name: cdiDeviceID})
 				}
 				resources := &podresourcesapi.ClaimResource{
-					CDIDevices: cdiDevices,
+					CdiDevices: cdiDevices,
 					DriverName: driverName,
 					PoolName:   device.PoolName,
 					DeviceName: device.DeviceName,
@@ -1015,7 +1015,7 @@ func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresources
 	for _, b := range blocks {
 		containerMemory := podresourcesapi.ContainerMemory{
 			MemoryType: string(b.Type),
-			Size_:      b.Size,
+			Size:       b.Size,
 			Topology: &podresourcesapi.TopologyInfo{
 				Nodes: []*podresourcesapi.NUMANode{},
 			},

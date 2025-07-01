@@ -552,8 +552,7 @@ func TestEncodeDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("envelopeTransformer: error while decoding data: %s", err)
 	}
-	// reset internal field modified by marshaling obj
-	obj.XXX_sizecache = 0
+	// internal fields are handled automatically by vtproto
 	if !reflect.DeepEqual(got, obj) {
 		t.Fatalf("envelopeTransformer: decoded data does not match original data. Got: %v, want %v", got, obj)
 	}

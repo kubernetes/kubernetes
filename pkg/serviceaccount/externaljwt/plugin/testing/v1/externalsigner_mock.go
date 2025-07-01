@@ -40,6 +40,7 @@ import (
 )
 
 type MockSigner struct {
+	v1.UnimplementedExternalJWTSignerServer
 	socketPath string
 	server     *grpc.Server
 	listener   net.Listener

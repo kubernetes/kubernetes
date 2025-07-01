@@ -42,7 +42,7 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Devic
 	var responses pluginapi.AllocateResponse
 	for _, req := range r.ContainerRequests {
 		response := &pluginapi.ContainerAllocateResponse{}
-		for _, requestID := range req.DevicesIDs {
+		for _, requestID := range req.DevicesIds {
 			dev, ok := devs[requestID]
 			if !ok {
 				return nil, fmt.Errorf("invalid allocation request with non-existing device %s", requestID)
@@ -77,7 +77,7 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Devic
 				cdiDevice := &pluginapi.CDIDevice{
 					Name: fmt.Sprintf("%s=%s", resourceName, cdiPrefix+dev.ID),
 				}
-				response.CDIDevices = append(response.CDIDevices, cdiDevice)
+				response.CdiDevices = append(response.CdiDevices, cdiDevice)
 			}
 		}
 		responses.ContainerResponses = append(responses.ContainerResponses, response)

@@ -36,6 +36,8 @@ import (
 
 // Stub implementation for DevicePlugin.
 type Stub struct {
+	pluginapi.UnimplementedDevicePluginServer
+	watcherapi.UnimplementedRegistrationServer
 	devs                       []*pluginapi.Device
 	socket                     string
 	resourceName               string

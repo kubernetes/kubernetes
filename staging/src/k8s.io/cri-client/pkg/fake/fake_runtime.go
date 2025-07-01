@@ -30,6 +30,8 @@ import (
 
 // RemoteRuntime represents a fake remote container runtime.
 type RemoteRuntime struct {
+	kubeapi.UnimplementedRuntimeServiceServer
+	kubeapi.UnimplementedImageServiceServer
 	server *grpc.Server
 	// Fake runtime service.
 	RuntimeService *apitest.FakeRuntimeService

@@ -56,12 +56,12 @@ func TestListPodResourcesV1(t *testing.T) {
 	memory := []*podresourcesapi.ContainerMemory{
 		{
 			MemoryType: "memory",
-			Size_:      1073741824,
+			Size:       1073741824,
 			Topology:   &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
 		},
 		{
 			MemoryType: "hugepages-1Gi",
-			Size_:      1073741824,
+			Size:       1073741824,
 			Topology:   &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
 		},
 	}
@@ -92,7 +92,7 @@ func TestListPodResourcesV1(t *testing.T) {
 		{
 			ClaimName:      "claim-name",
 			ClaimNamespace: "default",
-			ClaimResources: []*podresourcesapi.ClaimResource{{CDIDevices: pluginCDIDevices, DriverName: draDriverName, PoolName: poolName, DeviceName: deviceName}},
+			ClaimResources: []*podresourcesapi.ClaimResource{{CdiDevices: pluginCDIDevices, DriverName: draDriverName, PoolName: poolName, DeviceName: deviceName}},
 		},
 	}
 
@@ -273,12 +273,12 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 	memory := []*podresourcesapi.ContainerMemory{
 		{
 			MemoryType: "memory",
-			Size_:      1073741824,
+			Size:       1073741824,
 			Topology:   &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
 		},
 		{
 			MemoryType: "hugepages-1Gi",
-			Size_:      1073741824,
+			Size:       1073741824,
 			Topology:   &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
 		},
 	}
@@ -504,7 +504,7 @@ func TestAllocatableResources(t *testing.T) {
 	allMemory := []*podresourcesapi.ContainerMemory{
 		{
 			MemoryType: "memory",
-			Size_:      5368709120,
+			Size:       5368709120,
 			Topology: &podresourcesapi.TopologyInfo{
 				Nodes: []*podresourcesapi.NUMANode{
 					{
@@ -515,7 +515,7 @@ func TestAllocatableResources(t *testing.T) {
 		},
 		{
 			MemoryType: "hugepages-2Mi",
-			Size_:      1073741824,
+			Size:       1073741824,
 			Topology: &podresourcesapi.TopologyInfo{
 				Nodes: []*podresourcesapi.NUMANode{
 					{
@@ -526,7 +526,7 @@ func TestAllocatableResources(t *testing.T) {
 		},
 		{
 			MemoryType: "memory",
-			Size_:      5368709120,
+			Size:       5368709120,
 			Topology: &podresourcesapi.TopologyInfo{
 				Nodes: []*podresourcesapi.NUMANode{
 					{
@@ -537,7 +537,7 @@ func TestAllocatableResources(t *testing.T) {
 		},
 		{
 			MemoryType: "hugepages-2Mi",
-			Size_:      1073741824,
+			Size:       1073741824,
 			Topology: &podresourcesapi.TopologyInfo{
 				Nodes: []*podresourcesapi.NUMANode{
 					{
@@ -758,12 +758,12 @@ func TestGetPodResourcesV1(t *testing.T) {
 	memory := []*podresourcesapi.ContainerMemory{
 		{
 			MemoryType: "memory",
-			Size_:      1073741824,
+			Size:       1073741824,
 			Topology:   &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
 		},
 		{
 			MemoryType: "hugepages-1Gi",
-			Size_:      1073741824,
+			Size:       1073741824,
 			Topology:   &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
 		},
 	}
@@ -790,7 +790,7 @@ func TestGetPodResourcesV1(t *testing.T) {
 		{
 			ClaimName:      "claim-name",
 			ClaimNamespace: "default",
-			ClaimResources: []*podresourcesapi.ClaimResource{{CDIDevices: pluginCDIDevices}},
+			ClaimResources: []*podresourcesapi.ClaimResource{{CdiDevices: pluginCDIDevices}},
 		},
 	}
 
@@ -937,12 +937,12 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 	memory := []*podresourcesapi.ContainerMemory{
 		{
 			MemoryType: "memory",
-			Size_:      1073741824,
+			Size:       1073741824,
 			Topology:   &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
 		},
 		{
 			MemoryType: "hugepages-1Gi",
-			Size_:      1073741824,
+			Size:       1073741824,
 			Topology:   &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: numaID}}},
 		},
 	}
