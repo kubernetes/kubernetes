@@ -151,7 +151,8 @@ func v1EnvVarsToMap(envs []v1.EnvVar) map[string]string {
 }
 
 // ExpandContainerCommandOnlyStatic substitutes only static environment variable values from the
-// container environment definitions. This does *not* include valueFrom substitutions.
+// container environment definitions. This does *not* include valueFrom substitutions. Note any unbound
+// variables will not be expanded or empty substituted, i.e. "echo $(MISSING) => echo $(MISSING)".
 // TODO: callers should use ExpandContainerCommandAndArgs with a fully resolved list of environment.
 func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVar) (command []string) {
 	mapping := expansion.MappingFuncFor(v1EnvVarsToMap(envs))
