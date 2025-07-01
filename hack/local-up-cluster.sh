@@ -26,6 +26,11 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 # CA in /var/run/kubernetes.
 # Usage: `hack/local-up-cluster.sh`.
 
+# Dump config at KUBE_VERBOSE >= 2.
+if (( KUBE_VERBOSE >= 2 )); then
+  set -x
+fi
+
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 export DOCKER=(docker "${DOCKER_OPTS[@]}")
 DOCKER_ROOT=${DOCKER_ROOT:-""}
@@ -155,6 +160,11 @@ AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
 # dmesg command PID for cleanup
 DMESG_PID=${DMESG_PID:-""}
 
+# Stop logging commands again at KUBE_VERBOSE <= 4.
+if (( KUBE_VERBOSE <= 4 )); then
+  set +x
+fi
+
 # Stop right away if the build fails
 set -e
 
@@ -230,6 +240,10 @@ fi
 # Shut down anyway if there's an error.
 set +e
 
+if (( KUBE_VERBOSE >= 2 )); then
+  set -x
+fi
+
 API_PORT=${API_PORT:-0}
 API_SECURE_PORT=${API_SECURE_PORT:-6443}
 
@@ -275,6 +289,10 @@ REUSE_CERTS=${REUSE_CERTS:-false}
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
 mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
 CONTROLPLANE_SUDO=$(test -w "${CERT_DIR}" || echo "sudo -E")
+
+if (( KUBE_VERBOSE <= 4 )); then
+  set +x
+fi
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
