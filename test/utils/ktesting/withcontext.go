@@ -29,9 +29,6 @@ import (
 // context.
 func WithCancel(tCtx TContext) TContext {
 	ctx, cancel := context.WithCancelCause(tCtx)
-	tCtx.Cleanup(func() {
-		cancel(cleanupErr(tCtx.Name()))
-	})
 
 	return withContext{
 		TContext: tCtx,
