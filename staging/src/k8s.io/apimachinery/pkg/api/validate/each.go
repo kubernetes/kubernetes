@@ -25,8 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// CompareFunc is a function that compares two values of the same type.
-type CompareFunc[T any] func(T, T) bool
+// MatchFunc is a function that compares two values of the same type,
+// according to some criteria, and returns true if they match.
+type MatchFunc[T any] func(T, T) bool
 
 // EachSliceVal performs validation on each element of newSlice using the provided validation function.
 //
@@ -41,7 +42,7 @@ type CompareFunc[T any] func(T, T) bool
 //
 // Note: The slice element type must be non-nilable.
 func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []T,
-	match, equiv CompareFunc[T], validator ValidateFunc[*T]) field.ErrorList {
+	match, equiv MatchFunc[T], validator ValidateFunc[*T]) field.ErrorList {
 	var errs field.ErrorList
 	for i, val := range newSlice {
 		var old *T
@@ -64,9 +65,9 @@ func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *f
 
 // lookup returns a pointer to the first element in the list that matches the
 // target, according to the provided comparison function, or else nil.
-func lookup[T any](list []T, target T, cmp func(T, T) bool) *T {
+func lookup[T any](list []T, target T, match MatchFunc[T]) *T {
 	for i := range list {
-		if cmp(list[i], target) {
+		if match(list[i], target) {
 			return &list[i]
 		}
 	}
@@ -80,7 +81,7 @@ func lookup[T any](list []T, target T, cmp func(T, T) bool) *T {
 // The value-type of the map is assumed to not be nilable.
 // If equiv is nil, value-based ratcheting is disabled and all values will be validated.
 func EachMapVal[K ~string, V any](ctx context.Context, op operation.Operation, fldPath *field.Path, newMap, oldMap map[K]V,
-	equiv CompareFunc[V], validator ValidateFunc[*V]) field.ErrorList {
+	equiv MatchFunc[V], validator ValidateFunc[*V]) field.ErrorList {
 	var errs field.ErrorList
 	for key, val := range newMap {
 		var old *V
@@ -118,34 +119,17 @@ func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, f
 	return errs
 }
 
-// UniqueByCompare verifies that each element of newSlice is unique.  This
-// function can only be used on types that are directly comparable. For
-// non-comparable types, use UniqueByReflect.
-//
-// Caution: structs with pointer fields satisfy comparable, but this function
-// will only compare pointer values.  It does not compare the pointed-to
-// values.
-func UniqueByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
-	return unique(fldPath, newSlice, DirectEqual)
-}
-
-// UniqueByReflect verifies that each element of newSlice is unique. Unlike
-// UniqueByCompare, this function can be used with types that are not directly
-// comparable, at the cost of performance.
-func UniqueByReflect[T any](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
-	return unique(fldPath, newSlice, SemanticDeepEqual)
-}
-
-// unique compares every element of the slice with every other element and
-// returns errors for non-unique items.
-func unique[T any](fldPath *field.Path, slice []T, cmp func(T, T) bool) field.ErrorList {
+// Unique verifies that each element of newSlice is unique, according to the
+// match function. It compares every element of the slice with every other
+// element and returns errors for non-unique items.
+func Unique[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []T, match MatchFunc[T]) field.ErrorList {
 	var dups []int
-	for i, val := range slice {
-		for j := i + 1; j < len(slice); j++ {
-			other := slice[j]
-			if cmp(val, other) {
+	for i, val := range newSlice {
+		for j := i + 1; j < len(newSlice); j++ {
+			other := newSlice[j]
+			if match(val, other) {
 				if dups == nil {
-					dups = make([]int, 0, len(slice))
+					dups = make([]int, 0, len(newSlice))
 				}
 				if lookup(dups, j, func(a, b int) bool { return a == b }) == nil {
 					dups = append(dups, j)
@@ -157,24 +141,31 @@ func unique[T any](fldPath *field.Path, slice []T, cmp func(T, T) bool) field.Er
 	var errs field.ErrorList
 	sort.Ints(dups)
 	for _, i := range dups {
-		errs = append(errs, field.Duplicate(fldPath.Index(i), slice[i]))
+		var val any = newSlice[i]
+		// TODO: we don't want the whole item to be logged in the error, just
+		// the key(s). Unfortunately, the way errors are rendered, it comes out
+		// as something like "map[string]any{...}" which is not very nice. Once
+		// that is fixed, we can consider adding a way for this function to
+		// specify that just the keys should be renderted in the error.
+		errs = append(errs, field.Duplicate(fldPath.Index(i), val))
 	}
 	return errs
 }
 
-// SemanticDeepEqual is a CompareFunc that uses equality.Semantic.DeepEqual to
+// SemanticDeepEqual is a MatchFunc that uses equality.Semantic.DeepEqual to
 // compare two values.
-// This wrapper is needed because CompareFunc requires a function that takes two
-// arguments of specific type T, while equality.Semantic.DeepEqual takes arguments
-// of type interface{}/any. The wrapper satisfies the type constraints of CompareFunc
-// while leveraging the underlying semantic equality logic.
-// It can be used by any other function that needs to call DeepEqual.
+// This wrapper is needed because MatchFunc requires a function that takes two
+// arguments of specific type T, while equality.Semantic.DeepEqual takes
+// arguments of type interface{}/any. The wrapper satisfies the type
+// constraints of MatchFunc while leveraging the underlying semantic equality
+// logic. It can be used by any other function that needs to call DeepEqual.
 func SemanticDeepEqual[T any](a, b T) bool {
 	return equality.Semantic.DeepEqual(a, b)
 }
 
-// DirectEqual is a CompareFunc that uses the == operator to compare two values.
-// It can be used by any other function that needs to compare two values directly.
+// DirectEqual is a MatchFunc that uses the == operator to compare two values.
+// It can be used by any other function that needs to compare two values
+// directly.
 func DirectEqual[T comparable](a, b T) bool {
 	return a == b
 }

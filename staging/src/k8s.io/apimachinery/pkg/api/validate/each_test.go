@@ -122,8 +122,8 @@ func testEachSliceValUpdate[T any](t *testing.T, name string, input []T) {
 		old := make([]T, len(input))
 		copy(old, input)
 		slices.Reverse(old)
-		cmp := func(a, b T) bool { return reflect.DeepEqual(a, b) }
-		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, cmp, cmp, vfn)
+		match := func(a, b T) bool { return reflect.DeepEqual(a, b) }
+		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, match, match, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}
@@ -158,7 +158,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		[]TestStructWithKey{
 			{Key: "a", I: 11, D: "a"}, {Key: "c", I: 13, D: "c"}, {Key: "b", I: 12, D: "b"},
 		},
-		CompareFunc[TestStructWithKey](func(a, b TestStructWithKey) bool {
+		MatchFunc[TestStructWithKey](func(a, b TestStructWithKey) bool {
 			return a.Key == b.Key
 		}),
 		DirectEqual,
@@ -170,7 +170,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		[]TestStructWithKey{
 			{Key: "a", I: 11, D: "a"}, {Key: "c", I: 13, D: "c"},
 		},
-		CompareFunc[TestStructWithKey](func(a, b TestStructWithKey) bool {
+		MatchFunc[TestStructWithKey](func(a, b TestStructWithKey) bool {
 			return a.Key == b.Key
 		}),
 		DirectEqual,
@@ -192,7 +192,7 @@ func TestEachSliceValRatcheting(t *testing.T) {
 		[]NonComparableStructWithKey{
 			{Key: "a", I: 11, S: []string{"a"}}, {Key: "b", I: 12, S: []string{"b"}}, {Key: "c", I: 13, S: []string{"c"}},
 		},
-		CompareFunc[NonComparableStructWithKey](func(a, b NonComparableStructWithKey) bool {
+		MatchFunc[NonComparableStructWithKey](func(a, b NonComparableStructWithKey) bool {
 			return a.Key == b.Key
 		}),
 		SemanticDeepEqual,
@@ -200,14 +200,14 @@ func TestEachSliceValRatcheting(t *testing.T) {
 
 }
 
-func testEachSliceValRatcheting[T any](t *testing.T, name string, old, new []T, cmp, equiv CompareFunc[T]) {
+func testEachSliceValRatcheting[T any](t *testing.T, name string, old, new []T, match, equiv MatchFunc[T]) {
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
 			return field.ErrorList{field.Invalid(fldPath, *newVal, "expected no calls")}
 		}
-		errs := EachSliceVal(context.Background(), operation.Operation{Type: operation.Update}, field.NewPath("test"), new, old, cmp, equiv, vfn)
+		errs := EachSliceVal(context.Background(), operation.Operation{Type: operation.Update}, field.NewPath("test"), new, old, match, equiv, vfn)
 		if len(errs) > 0 {
 			t.Errorf("expected no errors, got %d: %s", len(errs), fmtErrs(errs))
 		}
@@ -349,7 +349,7 @@ func TestEachMapValRatcheting(t *testing.T) {
 	)
 }
 
-func testEachMapValRatcheting[K ~string, V any](t *testing.T, name string, old, new map[K]V, equiv CompareFunc[V], wantCalls int) {
+func testEachMapValRatcheting[K ~string, V any](t *testing.T, name string, old, new map[K]V, equiv MatchFunc[V], wantCalls int) {
 	t.Helper()
 	var zero V
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
@@ -425,40 +425,45 @@ func testEachMapKeyRatcheting[K ~string, V any](t *testing.T, name string, old, 
 	})
 }
 
-func TestUniqueByCompare(t *testing.T) {
-	testUniqueByCompare(t, "int_nil", []int(nil), 0)
-	testUniqueByCompare(t, "int_empty", []int{}, 0)
-	testUniqueByCompare(t, "int_uniq", []int{1, 2, 3}, 0)
-	testUniqueByCompare(t, "int_dup", []int{1, 2, 3, 2, 1}, 2)
+func TestUniqueComparableValues(t *testing.T) {
+	testUnique(t, "int_nil", []int(nil), 0)
+	testUnique(t, "int_empty", []int{}, 0)
+	testUnique(t, "int_uniq", []int{1, 2, 3}, 0)
+	testUnique(t, "int_dup", []int{1, 2, 3, 2, 1}, 2)
 
-	testUniqueByCompare(t, "string_nil", []string(nil), 0)
-	testUniqueByCompare(t, "string_empty", []string{}, 0)
-	testUniqueByCompare(t, "string_uniq", []string{"a", "b", "c"}, 0)
-	testUniqueByCompare(t, "string_dup", []string{"a", "a", "c", "b", "a"}, 2)
+	testUnique(t, "string_nil", []string(nil), 0)
+	testUnique(t, "string_empty", []string{}, 0)
+	testUnique(t, "string_uniq", []string{"a", "b", "c"}, 0)
+	testUnique(t, "string_dup", []string{"a", "a", "c", "b", "a"}, 2)
 
 	type isComparable struct {
 		I int
 		S string
 	}
 
-	testUniqueByCompare(t, "struct_nil", []isComparable(nil), 0)
-	testUniqueByCompare(t, "struct_empty", []isComparable{}, 0)
-	testUniqueByCompare(t, "struct_uniq", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}}, 0)
-	testUniqueByCompare(t, "struct_dup", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}, {2, "b"}, {1, "a"}}, 2)
+	testUnique(t, "struct_nil", []isComparable(nil), 0)
+	testUnique(t, "struct_empty", []isComparable{}, 0)
+	testUnique(t, "struct_uniq", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}}, 0)
+	testUnique(t, "struct_dup", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}, {2, "b"}, {1, "a"}}, 2)
 }
 
-func testUniqueByCompare[T comparable](t *testing.T, name string, input []T, wantErrs int) {
+func testUnique[T comparable](t *testing.T, name string, input []T, wantErrs int) {
 	t.Helper()
-	var zero T
-	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
-		errs := UniqueByCompare(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil)
+	t.Run(fmt.Sprintf("%s(direct)", name), func(t *testing.T) {
+		errs := Unique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, DirectEqual)
+		if len(errs) != wantErrs {
+			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
+		}
+	})
+	t.Run(fmt.Sprintf("%s(reflect)", name), func(t *testing.T) {
+		errs := Unique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, SemanticDeepEqual)
 		if len(errs) != wantErrs {
 			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
 		}
 	})
 }
 
-func TestUniqueByReflect(t *testing.T) {
+func TestUniqueNonComparableValues(t *testing.T) {
 	type nonComparable struct {
 		I int
 		S []string
@@ -479,7 +484,7 @@ func testUniqueByReflect[T any](t *testing.T, name string, input []T, wantErrs i
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
-		errs := UniqueByReflect(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil)
+		errs := Unique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, SemanticDeepEqual)
 		if len(errs) != wantErrs {
 			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
 		}
