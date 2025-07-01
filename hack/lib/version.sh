@@ -158,6 +158,7 @@ kube::version::ldflags() {
     ldflags+=(
       "-X 'k8s.io/client-go/pkg/version.${key}=${val}'"
       "-X 'k8s.io/component-base/version.${key}=${val}'"
+      "-X google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=ignore"
     )
   }
 
