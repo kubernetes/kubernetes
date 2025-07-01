@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dra
+package utils
 
 import (
 	"bytes"
@@ -63,6 +63,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
+	"k8s.io/kubernetes/test/e2e/dra/test-driver/deploy/example"
 	testdrivergomega "k8s.io/kubernetes/test/e2e/dra/test-driver/gomega"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -84,9 +85,6 @@ type Nodes struct {
 	NodeNames []string
 	tempDir   string
 }
-
-//go:embed test-driver/deploy/example/plugin-permissions.yaml
-var pluginPermissions string
 
 // NewNodes selects nodes to run the test on.
 //
@@ -240,7 +238,7 @@ func (d *Driver) NewGetSlices() framework.GetFunc[*resourceapi.ResourceSliceList
 }
 
 type MethodInstance struct {
-	Nodename   string
+	NodeName   string
 	FullMethod string
 }
 
@@ -368,7 +366,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 
 	// Create service account and corresponding RBAC rules.
 	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + d.InstanceSuffix + "-service-account"
-	content := pluginPermissions
+	content := example.PluginPermissions
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin-namespace", d.f.Namespace.Name)
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name+d.InstanceSuffix)
 	d.createFromYAML(ctx, []byte(content), d.f.Namespace.Name)
@@ -459,7 +457,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 		// https://github.com/kubernetes/kubernetes/pull/124711).
 		//
 		// Here we merely use impersonation, which is faster.
-		driverClient := d.impersonateKubeletPlugin(&pod)
+		driverClient := d.ImpersonateKubeletPlugin(&pod)
 
 		logger := klog.LoggerWithValues(klog.LoggerWithName(logger, "kubelet-plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		loggerCtx := klog.NewContext(ctx, logger)
@@ -577,7 +575,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
 }
 
-func (d *Driver) impersonateKubeletPlugin(pod *v1.Pod) kubernetes.Interface {
+func (d *Driver) ImpersonateKubeletPlugin(pod *v1.Pod) kubernetes.Interface {
 	ginkgo.GinkgoHelper()
 	driverUserInfo := (&serviceaccount.ServiceAccountInfo{
 		Name:      d.serviceAccountName,
