@@ -21,6 +21,15 @@ jobs:
         hack/update-codegen.sh validation
         git diff --exit-code
 
+    - name: Run gofmt and check for diffs
+      run: |
+        hack/verify-gofmt.sh
+        git diff --exit-code
+
+    - name: Run golangci-lint CI Test
+      run: |
+        hack/verify-golangci-lint.sh
+
     - name: Run validation-gen go tests and also check for diffs with generated test fixture code
       env: 
         UPDATE_VALIDATION_GEN_FIXTURE_DATA: "true"
