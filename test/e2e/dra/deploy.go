@@ -25,6 +25,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"os"
 	"path"
 	"sort"
 	"strings"
@@ -275,6 +276,11 @@ type Driver struct {
 	// In addition, there is one entry for a fictional node.
 	Nodes map[string]KubeletPlugin
 
+	// IsLocal can be set to true when using local-up-cluster.sh *and* ensuring
+	// that /var/lib/kubelet/plugins, /var/lib/kubelet/plugins_registry and
+	// /var/run/cdi are writable by the current user.
+	IsLocal bool
+
 	NodeV1alpha4 bool
 	NodeV1beta1  bool
 
@@ -401,10 +407,19 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 					},
 				},
 			}
-			item.Spec.Template.Spec.Volumes[0].HostPath.Path = pluginDataDirectoryPath
-			item.Spec.Template.Spec.Volumes[1].HostPath.Path = registrarDirectoryPath
-			item.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath = pluginDataDirectoryPath
-			item.Spec.Template.Spec.Containers[0].VolumeMounts[1].MountPath = registrarDirectoryPath
+			if d.IsLocal {
+				// Drop mounting of directories. All operations run locally.
+				item.Spec.Template.Spec.Volumes = nil
+				item.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+				// No privileges required either.
+				item.Spec.Template.Spec.SecurityContext = nil
+				item.Spec.Template.Spec.Containers[0].SecurityContext = nil
+			} else {
+				item.Spec.Template.Spec.Volumes[0].HostPath.Path = pluginDataDirectoryPath
+				item.Spec.Template.Spec.Volumes[1].HostPath.Path = registrarDirectoryPath
+				item.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath = pluginDataDirectoryPath
+				item.Spec.Template.Spec.Containers[0].VolumeMounts[1].MountPath = registrarDirectoryPath
+			}
 		}
 		return nil
 	}, manifests...)
@@ -451,10 +466,27 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 		fileOps := app.FileOperations{
 			Create: func(name string, content []byte) error {
 				klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
+				if d.IsLocal {
+					// Name starts with /cdi, which is how it is mapped in the container.
+					// Here we need it under /var/run.
+					// Try to create /var/run/cdi, it might not exist yet.
+					name = path.Join("/var/run", name)
+					if err := os.MkdirAll(path.Dir(name), 0700); err != nil {
+						return fmt.Errorf("create CDI directory: %w", err)
+					}
+					if err := os.WriteFile(name, content, 0644); err != nil {
+						return fmt.Errorf("write CDI file: %w", err)
+					}
+					return nil
+				}
 				return d.createFile(&pod, name, content)
 			},
 			Remove: func(name string) error {
 				klog.Background().Info("deleting CDI file", "node", nodename, "filename", name)
+				if d.IsLocal {
+					name = path.Join("/var/run", name)
+					return os.Remove(name)
+				}
 				return d.removeFile(&pod, name)
 			},
 			ErrorHandler: func(ctx context.Context, err error, msg string) {
@@ -488,6 +520,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 			// serialize when we explicitly want to test a rolling update.
 			serialize = false
 		}
+
 		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename, fileOps,
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
@@ -649,11 +682,21 @@ var errListenerDone = errors.New("listener is shutting down")
 // listen returns the function which the kubeletplugin helper needs to open a listening socket.
 // For that it spins up hostpathplugin in the pod for the desired node
 // and connects to hostpathplugin via port forwarding.
-func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path string) (net.Listener, error) {
-	return func(ctx context.Context, path string) (l net.Listener, e error) {
+func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, endpoint string) (net.Listener, error) {
+	return func(ctx context.Context, endpoint string) (l net.Listener, e error) {
 		// No need create sockets, the kubelet is not expected to use them.
 		if !d.WithKubelet {
 			return newNullListener(), nil
+		}
+
+		// Try opening the socket directly on the local host. Falls back to pod if that fails.
+		// Closing the listener will unlink the socket.
+		if d.IsLocal {
+			dir := path.Dir(endpoint)
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return nil, err
+			}
+			return net.ListenUnix("unix", &net.UnixAddr{Name: endpoint, Net: "unix"})
 		}
 
 		// "Allocate" a new port by by bumping the per-pod counter by one.
@@ -661,7 +704,7 @@ func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path
 
 		logger := klog.FromContext(ctx)
 		logger = klog.LoggerWithName(logger, "socket-listener")
-		logger = klog.LoggerWithValues(logger, "endpoint", path, "port", port)
+		logger = klog.LoggerWithValues(logger, "endpoint", endpoint, "port", port)
 		ctx = klog.NewContext(ctx, logger)
 
 		// Start hostpathplugin in proxy mode and keep it running until the listener gets closed.
@@ -675,7 +718,7 @@ func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path
 				Command: []string{
 					"/hostpathplugin",
 					"--v=5",
-					"--endpoint=" + path,
+					"--endpoint=" + endpoint,
 					fmt.Sprintf("--proxy-endpoint=tcp://:%d", port),
 				},
 				Stdout: true,
@@ -722,7 +765,7 @@ func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path
 					Command: []string{
 						"rm",
 						"-f",
-						path,
+						endpoint,
 					},
 					Stdout: true,
 					Stderr: true,
