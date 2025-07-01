@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/protobuf/proto"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -2074,7 +2075,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 				`encryptKeyIDHash="", stateKeyIDHash="sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35", expirationTimestamp=` + now.Format(time.RFC3339),
 		},
 	}
-	for i, tt := range tests {
+	for i := range tests {
+		tt := &tests[i]
 		t.Run(tt.name, func(t *testing.T) {
 			kmsName := fmt.Sprintf("panda-%d", i)
 			defer SetKDFForTests(kmsName, tt.useSeed)()
@@ -2099,17 +2101,19 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 				t.Errorf("log mismatch (-want +got):\n%s", diff)
 			}
 
-			ignoredFields := sets.NewString("Transformer", "EncryptedObject.EncryptedDEKSource", "UID", "CacheKey")
+			ignoredFields := sets.NewString("Transformer", "EncryptedObject.EncryptedDEKSource", "UID", "CacheKey", "EncryptedObject.state", "EncryptedObject.unknownFields", "EncryptedObject.sizeCache")
 
 			gotState := *h.state.Load()
 
-			if diff := cmp.Diff(tt.wantState, gotState,
+			if diff := cmp.Diff(&tt.wantState, &gotState,
 				cmp.FilterPath(func(path cmp.Path) bool { return ignoredFields.Has(path.String()) }, cmp.Ignore()),
 			); len(diff) > 0 {
 				t.Errorf("state mismatch (-want +got):\n%s", diff)
 			}
 
-			if len(cmp.Diff(tt.wantState, gotState)) > 0 { // we only need to run this check when the state changes
+			if len(cmp.Diff(&tt.wantState, &gotState,
+				cmp.FilterPath(func(path cmp.Path) bool { return ignoredFields.Has(path.String()) }, cmp.Ignore()),
+			)) > 0 { // we only need to run this check when the state changes
 				validCiphertext := len(gotState.EncryptedObject.EncryptedDEKSource) > 0
 				if tt.useSeed {
 					validCiphertext = validCiphertext && gotState.EncryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
@@ -2169,9 +2173,11 @@ func validState(t *testing.T, keyID string, exp time.Time, useSeed bool) envelop
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Create a proper copy of the EncryptedObject to avoid copying mutex from protobuf state
+	encObjectCopy := proto.Clone(encObject).(*kmstypes.EncryptedObject)
 	return envelopekmsv2.State{
-		Transformer:         transformer,
-		EncryptedObject:     *encObject,
+		Transformer:     transformer,
+		EncryptedObject: *encObjectCopy, //nolint:copylocks // copying protobuf struct for test state
 		ExpirationTimestamp: exp,
 		CacheKey:            cacheKey,
 	}

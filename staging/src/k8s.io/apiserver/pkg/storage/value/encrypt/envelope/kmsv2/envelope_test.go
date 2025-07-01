@@ -35,7 +35,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
@@ -553,7 +553,7 @@ func TestEncodeDecode(t *testing.T) {
 		t.Fatalf("envelopeTransformer: error while decoding data: %s", err)
 	}
 	// internal fields are handled automatically by vtproto
-	if !reflect.DeepEqual(got, obj) {
+	if !proto.Equal(got, obj) {
 		t.Fatalf("envelopeTransformer: decoded data does not match original data. Got: %v, want %v", got, obj)
 	}
 }
