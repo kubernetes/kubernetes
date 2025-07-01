@@ -37,6 +37,13 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
+// this interface satisfies what setupGRPCServerWithFake needs
+type fakeGRPCServerInterface interface {
+	drapbv1.DRAPluginServer
+	drahealthv1alpha1.DRAResourceHealthServer
+	drapbv1.UnsafeDRAPluginServer
+}
+
 type fakeGRPCServer struct {
 	drapbv1beta1.UnimplementedDRAPluginServer
 	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
@@ -44,6 +51,7 @@ type fakeGRPCServer struct {
 }
 
 var _ drapbv1.DRAPluginServer = &fakeGRPCServer{}
+var _ fakeGRPCServerInterface = &fakeGRPCServer{}
 
 func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error) {
 	return &drapbv1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1.NodePrepareResourceResponse{"claim-uid": {
@@ -82,7 +90,7 @@ func (f *fakeGRPCServer) NodeWatchResources(in *drahealthv1alpha1.NodeWatchResou
 // tearDown is an idempotent cleanup function.
 type tearDown func()
 
-func setupFakeGRPCServer(service, addr string) (tearDown, error) {
+func setupGRPCServerWithFake(service, addr string, fakeGRPCServer fakeGRPCServerInterface) (tearDown, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	teardown := func() {
 		cancel()
@@ -95,7 +103,6 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	}
 
 	s := grpc.NewServer()
-	fakeGRPCServer := &fakeGRPCServer{}
 
 	switch service {
 	case drapbv1.DRAPluginService:
@@ -125,6 +132,10 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	}()
 
 	return teardown, nil
+}
+
+func setupFakeGRPCServer(service, addr string) (tearDown, error) {
+	return setupGRPCServerWithFake(service, addr, &fakeGRPCServer{})
 }
 
 func TestGRPCConnIsReused(t *testing.T) {
