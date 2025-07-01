@@ -248,7 +248,6 @@
         "github.com/go-task/slim-sprig/v3",
         "github.com/google/cadvisor",
         "github.com/google/cel-go",
-        "github.com/google/gnostic-models",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "github.com/grpc-ecosystem/go-grpc-middleware/v2",
         "github.com/grpc-ecosystem/grpc-gateway/v2",
