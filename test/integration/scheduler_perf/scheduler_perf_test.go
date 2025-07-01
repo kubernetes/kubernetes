@@ -19,10 +19,12 @@ package benchmark
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -241,6 +243,67 @@ func TestRunOp(t *testing.T) {
 						t.Fatalf("Verification function %d failed for test %q: %v", i, tt.name, err)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestWaitUntilPodScheduledInNamespace(t *testing.T) {
+	const (
+		targetNamespace = "test-namespace"
+		targetPodName   = "test-pod"
+	)
+
+	tests := []struct {
+		name    string
+		pod     *v1.Pod
+		timeout time.Duration
+		wantErr error
+	}{
+		{
+			name: "scheduled pod returns nil",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: targetNamespace,
+					Name:      targetPodName,
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-1",
+				},
+			},
+		},
+		{
+			name: "unscheduled pod times out",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: targetNamespace,
+					Name:      targetPodName,
+				},
+			},
+			wantErr: context.DeadlineExceeded,
+		},
+		{
+			name:    "not found pod is treated as success",
+			wantErr: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var client *fake.Clientset
+			if tt.pod != nil {
+				client = fake.NewSimpleClientset(tt.pod)
+			} else {
+				client = fake.NewSimpleClientset()
+			}
+
+			err := waitUntilPodScheduledInNamespace(context.Background(), client, targetNamespace, targetPodName, time.Millisecond, 30*time.Millisecond)
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Fatalf("expected nil error, got %v", err)
+				}
+			} else if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected error %v, got %v", tt.wantErr, err)
 			}
 		})
 	}
