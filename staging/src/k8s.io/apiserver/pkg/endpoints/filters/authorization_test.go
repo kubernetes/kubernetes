@@ -27,11 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	"github.com/stretchr/testify/assert"
+
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -47,10 +45,9 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 	}
 
 	testcases := map[string]struct {
-		Verb                        string
-		Path                        string
-		ExpectedAttributes          *authorizer.AttributesRecord
-		EnableAuthorizationSelector bool
+		Verb               string
+		Path               string
+		ExpectedAttributes *authorizer.AttributesRecord
 	}{
 		"non-resource root": {
 			Verb: http.MethodPost,
@@ -143,7 +140,6 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 					fields.OneTermEqualSelector("foo", "bar").Requirements()[0],
 				},
 			},
-			EnableAuthorizationSelector: true,
 		},
 		"enabled, bad field selector": {
 			Verb: http.MethodGet,
@@ -158,7 +154,6 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 				Resource:                "jobs",
 				FieldSelectorParsingErr: errors.New("invalid selector: '*bar'; can't understand '*bar'"),
 			},
-			EnableAuthorizationSelector: true,
 		},
 		"disabled, ignore good label selector": {
 			Verb: http.MethodGet,
@@ -188,7 +183,6 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 					*basicLabelRequirement,
 				},
 			},
-			EnableAuthorizationSelector: true,
 		},
 		"enabled, bad label selector": {
 			Verb: http.MethodGet,
@@ -203,16 +197,12 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 				Resource:                "jobs",
 				LabelSelectorParsingErr: errors.New("unable to parse requirement: <nil>: Invalid value: \"*bar\": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
 			},
-			EnableAuthorizationSelector: true,
 		},
 	}
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
 			ctx := t.Context()
-			if tc.EnableAuthorizationSelector {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
-			}
 
 			req, _ := http.NewRequestWithContext(ctx, tc.Verb, tc.Path, nil)
 			req.RemoteAddr = "127.0.0.1"
