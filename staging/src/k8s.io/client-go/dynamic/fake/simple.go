@@ -279,19 +279,19 @@ func (c *dynamicResourceClient) Delete(ctx context.Context, name string, opts me
 	switch {
 	case len(c.namespace) == 0 && len(subresources) == 0:
 		_, err = c.client.Fake.
-			Invokes(testing.NewRootDeleteAction(c.resource, name), &metav1.Status{Status: "dynamic delete fail"})
+			Invokes(testing.NewRootDeleteActionWithOptions(c.resource, name, opts), &metav1.Status{Status: "dynamic delete fail"})
 
 	case len(c.namespace) == 0 && len(subresources) > 0:
 		_, err = c.client.Fake.
-			Invokes(testing.NewRootDeleteSubresourceAction(c.resource, strings.Join(subresources, "/"), name), &metav1.Status{Status: "dynamic delete fail"})
+			Invokes(testing.NewRootDeleteSubresourceActionWithOptions(c.resource, strings.Join(subresources, "/"), name, opts), &metav1.Status{Status: "dynamic delete fail"})
 
 	case len(c.namespace) > 0 && len(subresources) == 0:
 		_, err = c.client.Fake.
-			Invokes(testing.NewDeleteAction(c.resource, c.namespace, name), &metav1.Status{Status: "dynamic delete fail"})
+			Invokes(testing.NewDeleteActionWithOptions(c.resource, c.namespace, name, opts), &metav1.Status{Status: "dynamic delete fail"})
 
 	case len(c.namespace) > 0 && len(subresources) > 0:
 		_, err = c.client.Fake.
-			Invokes(testing.NewDeleteSubresourceAction(c.resource, strings.Join(subresources, "/"), c.namespace, name), &metav1.Status{Status: "dynamic delete fail"})
+			Invokes(testing.NewDeleteSubresourceActionWithOptions(c.resource, strings.Join(subresources, "/"), c.namespace, name, opts), &metav1.Status{Status: "dynamic delete fail"})
 	}
 
 	return err
