@@ -1118,7 +1118,7 @@ func FilterPodsByOwner(podIndexer cache.Indexer, owner *metav1.ObjectMeta) ([]*v
 	result := []*v1.Pod{}
 	// Iterate over two keys:
 	// - the UID of the owner, which identifies Pods that are controlled by the owner
-	// - the OrphanPodIndexKey, which identifies orphaned Pods in the owner's namespace
+	// - the OrphanPodIndexKey, which identifies orphaned Pods in the owner's namespace and might be adopted by the owner later
 	for _, key := range []string{string(owner.UID), OrphanPodIndexKeyForNamespace(owner.Namespace)} {
 		pods, err := podIndexer.ByIndex(PodControllerUIDIndex, key)
 		if err != nil {
