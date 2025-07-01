@@ -337,6 +337,15 @@ func (e *WorkloadExecutor) runChurnOp(tCtx ktesting.TContext, opIndex int, op *c
 
 		churnFns = append(churnFns, func(name string) string {
 			if name != "" {
+				// Wait for pod to be scheduled before deleting
+				if op.WaitForPodsScheduledBeforeDeletion && gvk.GroupKind().String() == "Pod" {
+					if err := waitUntilPodScheduledInNamespace(tCtx, namespace, name, 100*time.Millisecond, 2*time.Minute); err != nil {
+						if !errors.Is(err, context.Canceled) {
+							tCtx.Fatalf("op %d: error waiting for pod %v to be scheduled: %v", opIndex, name, err)
+						}
+					}
+				}
+
 				if err := dynRes.Delete(tCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
 					tCtx.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
 				}
@@ -848,6 +857,32 @@ func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer corei
 		err = fmt.Errorf("at least pod %s is not scheduled: %w", klog.KObj(pendingPod), err)
 	}
 	return err
+}
+
+// waitUntilPodScheduledInNamespace waits until the specified pod is scheduled.
+func waitUntilPodScheduledInNamespace(tCtx ktesting.TContext, namespace, name string, interval, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(tCtx, interval, timeout, true, func(ctx context.Context) (bool, error) {
+		select {
+		case <-ctx.Done():
+			return true, ctx.Err()
+		default:
+		}
+
+		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				// Pod already deleted, no need to wait.
+				return true, nil
+			}
+			return false, err
+		}
+
+		scheduled := len(pod.Spec.NodeName) > 0
+		if !scheduled {
+			klog.V(4).Infof("Waiting for pod %s/%s to be scheduled", namespace, name)
+		}
+		return scheduled, nil
+	})
 }
 
 func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) {

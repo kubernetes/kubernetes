@@ -494,6 +494,9 @@ type churnOp struct {
 	Number int
 	// Intervals of churning. Defaults to 500 millisecond.
 	IntervalMilliseconds int64
+	// WaitForPodsScheduledBeforeDeletion ensures each pod is scheduled before
+	// it is deleted in Recreate mode.
+	WaitForPodsScheduledBeforeDeletion bool
 	// Namespace the churning objects should be created in. Defaults to a unique
 	// namespace of the format "namespace-<number>".
 	// Optional
