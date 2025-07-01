@@ -992,14 +992,10 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 	results := make([]resourceapi.DeviceRequestAllocationResult, len(driverNames))
 	config := make([]resourceapi.DeviceAllocationConfiguration, len(driverNames))
 
-	allocPoolName := "some-pool"
-	if len(poolName) > 0 {
-		allocPoolName = poolName[0]
-	}
 	for i, driverName := range driverNames {
 		results[i] = resourceapi.DeviceRequestAllocationResult{
 			Driver:      driverName,
-			Pool:        allocPoolName,
+			Pool:        "some-pool",
 			Device:      "some-device",
 			Request:     claim.Spec.Devices.Requests[0].Name,
 			AdminAccess: ptr.To(false),
