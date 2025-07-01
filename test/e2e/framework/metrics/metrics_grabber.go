@@ -55,6 +55,21 @@ const (
 // the check.
 var MetricsGrabbingDisabledError = errors.New("metrics grabbing disabled")
 
+// ProxyTimeoutErrorType is returned if there's an issue in connecting to the node
+// via the proxy. Tests should treat this as a connectivity issue and may
+// choose to use another node.
+type ProxyTimeoutErrorType struct {
+	NodeName string
+}
+
+func (e *ProxyTimeoutErrorType) Error() string {
+	return fmt.Sprintf("Timed out when waiting for proxy to gather metrics from %v", e.NodeName)
+}
+
+func NewProxyTimeoutError(nodeName string) *ProxyTimeoutErrorType {
+	return &ProxyTimeoutErrorType{NodeName: nodeName}
+}
+
 // Collection is metrics collection of components
 type Collection struct {
 	APIServerMetrics          APIServerMetrics
@@ -228,7 +243,7 @@ func (g *Grabber) getMetricsFromNode(ctx context.Context, nodeName string, kubel
 	}()
 	select {
 	case <-time.After(proxyTimeout):
-		return "", fmt.Errorf("Timed out when waiting for proxy to gather metrics from %v", nodeName)
+		return "", NewProxyTimeoutError(nodeName)
 	case <-finished:
 		if err != nil {
 			return "", err
