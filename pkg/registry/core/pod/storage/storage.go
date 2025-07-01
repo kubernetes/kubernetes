@@ -256,6 +256,11 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 			Type:   api.PodScheduled,
 			Status: api.ConditionTrue,
 		})
+		// Clear nomination hint to prevent stale information affecting external components.
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NominatedNodeNameForExpectation) {
+			pod.Status.NominatedNodeName = ""
+		}
+
 		finalPod = pod
 		return pod, nil
 	}), dryRun, nil)
