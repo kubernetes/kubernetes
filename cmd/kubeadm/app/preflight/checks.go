@@ -1128,7 +1128,7 @@ func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.Set[st
 		}
 	}
 	if errsBuffer.Len() > 0 {
-		return handleError(&errsBuffer, errsBuffer.String())
+		return handleError(ww, errsBuffer.String())
 	}
 	return nil
 }
