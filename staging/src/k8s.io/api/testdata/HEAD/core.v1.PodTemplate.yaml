@@ -339,6 +339,12 @@ template:
         requests:
           requestsKey: "0"
       restartPolicy: restartPolicyValue
+      restartPolicyRules:
+      - action: actionValue
+        exitCodes:
+          operator: operatorValue
+          values:
+          - 2
       securityContext:
         allowPrivilegeEscalation: true
         appArmorProfile:
@@ -561,6 +567,12 @@ template:
         requests:
           requestsKey: "0"
       restartPolicy: restartPolicyValue
+      restartPolicyRules:
+      - action: actionValue
+        exitCodes:
+          operator: operatorValue
+          values:
+          - 2
       securityContext:
         allowPrivilegeEscalation: true
         appArmorProfile:
@@ -786,6 +798,12 @@ template:
         requests:
           requestsKey: "0"
       restartPolicy: restartPolicyValue
+      restartPolicyRules:
+      - action: actionValue
+        exitCodes:
+          operator: operatorValue
+          values:
+          - 2
       securityContext:
         allowPrivilegeEscalation: true
         appArmorProfile:

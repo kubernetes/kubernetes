@@ -360,7 +360,8 @@ var map_Container = map[string]string{
 	"env":                      "List of environment variables to set in the container. Cannot be updated.",
 	"resources":                "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
 	"resizePolicy":             "Resources resize policy for the container.",
-	"restartPolicy":            "RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is \"Always\". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
+	"restartPolicy":            "RestartPolicy defines the restart behavior of individual containers in a pod. This overrides the pod-level restart policy. When this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Additionally, setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
+	"restartPolicyRules":       "Represents a list of rules to be checked to determine if the container should be restarted on exit. The rules are evaluated in order. Once a rule matches a container exit condition, the remaining rules are ignored. If no rule matches the container exit condition, the Container-level restart policy determines the whether the container is restarted or not. Constraints on the rules: - At most 20 rules are allowed. - Rules can have the same action. - Identical rules are not forbidden in validations. When rules are specified, container MUST set RestartPolicy explicitly even it if matches the Pod's RestartPolicy.",
 	"volumeMounts":             "Pod volumes to mount into the container's filesystem. Cannot be updated.",
 	"volumeDevices":            "volumeDevices is the list of block devices to be used by the container.",
 	"livenessProbe":            "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
@@ -411,6 +412,26 @@ var map_ContainerResizePolicy = map[string]string{
 
 func (ContainerResizePolicy) SwaggerDoc() map[string]string {
 	return map_ContainerResizePolicy
+}
+
+var map_ContainerRestartRule = map[string]string{
+	"":          "ContainerRestartRule describes how a container exit is handled.",
+	"action":    "Specifies the action taken on a container exit if the requirements are satisfied. The only possible value is \"Restart\" to restart the container.",
+	"exitCodes": "Represents the exit codes to check on container exits.",
+}
+
+func (ContainerRestartRule) SwaggerDoc() map[string]string {
+	return map_ContainerRestartRule
+}
+
+var map_ContainerRestartRuleOnExitCodes = map[string]string{
+	"":         "ContainerRestartRuleOnExitCodes describes the condition for handling an exited container based on its exit codes.",
+	"operator": "Represents the relationship between the container exit code(s) and the specified values. Possible values are: - In: the requirement is satisfied if the container exit code is in the\n  set of specified values.\n- NotIn: the requirement is satisfied if the container exit code is\n  not in the set of specified values.",
+	"values":   "Specifies the set of values to check for container exit codes. At most 255 elements are allowed.",
+}
+
+func (ContainerRestartRuleOnExitCodes) SwaggerDoc() map[string]string {
+	return map_ContainerRestartRuleOnExitCodes
 }
 
 var map_ContainerState = map[string]string{
@@ -651,7 +672,8 @@ var map_EphemeralContainerCommon = map[string]string{
 	"env":                      "List of environment variables to set in the container. Cannot be updated.",
 	"resources":                "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod.",
 	"resizePolicy":             "Resources resize policy for the container.",
-	"restartPolicy":            "Restart policy for the container to manage the restart behavior of each container within a pod. This may only be set for init containers. You cannot set this field on ephemeral containers.",
+	"restartPolicy":            "Restart policy for the container to manage the restart behavior of each container within a pod. You cannot set this field on ephemeral containers.",
+	"restartPolicyRules":       "Represents a list of rules to be checked to determine if the container should be restarted on exit. You cannot set this field on ephemeral containers.",
 	"volumeMounts":             "Pod volumes to mount into the container's filesystem. Subpath mounts are not allowed for ephemeral containers. Cannot be updated.",
 	"volumeDevices":            "volumeDevices is the list of block devices to be used by the container.",
 	"livenessProbe":            "Probes are not allowed for ephemeral containers.",
