@@ -74,6 +74,14 @@ func TestRunOp(t *testing.T) {
 			},
 		},
 		{
+			name: "Create Zero Node",
+			op: &createNodesOp{
+				Opcode: createNodesOpcode,
+				Count:  0,
+			},
+			expectedFailure: true,
+		},
+		{
 			name: "Create Multiple Nodes",
 			op: &createNodesOp{
 				Opcode: createNodesOpcode,
@@ -220,6 +228,14 @@ func TestRunOp(t *testing.T) {
 				tCtx:                         tCtx,
 				numPodsScheduledPerNamespace: make(map[string]int),
 				nextNodeIndex:                0,
+			}
+
+			// Validate the operation first
+			if err := tt.op.isValid(false); err != nil {
+				if tt.expectedFailure {
+					return
+				}
+				t.Fatalf("Validation failed: %v", err)
 			}
 
 			err := exec.runOp(tt.op, 0)

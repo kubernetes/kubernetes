@@ -561,7 +561,7 @@ func isValidParameterizable(val string) bool {
 func isValidCount(allowParameterization bool, count int, countParam string) bool {
 	if !allowParameterization || countParam == "" {
 		// Ignore parameter. The value itself must be okay.
-		return count >= 0
+		return count > 0
 	}
 	return isValidParameterizable(countParam)
 }
