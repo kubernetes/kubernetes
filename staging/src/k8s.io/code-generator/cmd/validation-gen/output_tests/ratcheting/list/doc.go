@@ -86,3 +86,13 @@ type DirectComparableStructWithKey struct {
 	Key      string `json:"key"`
 	IntField int    `json:"intField"`
 }
+
+type DirectComparableStruct struct {
+	A int `json:"a"`
+	B int `json:"b"`
+}
+
+type NonDirectComparableStruct struct {
+	A *int `json:"a"`
+	B *int `json:"b"`
+}
