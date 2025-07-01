@@ -1123,7 +1123,6 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 	ginkgo.DeferCleanup(f.ClientSet.ResourceV1beta1().DeviceClasses().Delete, ctx, className, metav1.DeleteOptions{})
 
 	ginkgo.By(fmt.Sprintf("Creating ResourceClaim %q", claimName))
-	podClaimName := "resource-claim"
 	claim := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: claimName,
@@ -1137,11 +1136,12 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 			},
 		},
 	}
-	createdClaim, err := f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+
+	_, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create ResourceClaim "+claimName)
 	ginkgo.DeferCleanup(f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Delete, ctx, claimName, metav1.DeleteOptions{})
 
-	ginkgo.By(fmt.Sprintf("Creating long-running Pod %q", podName))
+	ginkgo.By(fmt.Sprintf("Creating long-running Pod %q (without claim allocation yet)", podName))
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -1151,10 +1151,7 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 			NodeName:      getNodeName(ctx, f),
 			RestartPolicy: v1.RestartPolicyNever,
 			ResourceClaims: []v1.PodResourceClaim{
-				{
-					Name:              podClaimName,
-					ResourceClaimName: &claimName,
-				},
+				{Name: claimName, ResourceClaimName: &claimName},
 			},
 			Containers: []v1.Container{
 				{
@@ -1162,20 +1159,28 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 					Image:   e2epod.GetDefaultTestImage(),
 					Command: []string{"/bin/sh", "-c", "sleep 600"},
 					Resources: v1.ResourceRequirements{
-						Claims: []v1.ResourceClaim{{Name: podClaimName}},
+						Claims: []v1.ResourceClaim{{Name: claimName}},
 					},
 				},
 			},
 		},
 	}
+	// Create the pod on the API server to assign the real UID.
 	createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create Pod "+podName)
-	ginkgo.DeferCleanup(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete, ctx, podName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(func() {
+		e2epod.DeletePodOrFail(ctx, f.ClientSet, createdPod.Namespace, createdPod.Name)
+	})
 
-	ginkgo.By(fmt.Sprintf("Allocating claim %q to pod %q", claimName, podName))
-	createdClaim.Status = resourceapi.ResourceClaimStatus{
+	ginkgo.By(fmt.Sprintf("Allocating claim %q to pod %q with its real UID", claimName, podName))
+	// Get the created claim to ensure the latest version before updating.
+	claimToUpdate, err := f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Get(ctx, claimName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "failed to get latest version of ResourceClaim "+claimName)
+
+	// Update the claims status to reserve it for the *real* pod UID.
+	claimToUpdate.Status = resourceapi.ResourceClaimStatus{
 		ReservedFor: []resourceapi.ResourceClaimConsumerReference{
-			{Resource: "pods", Name: podName, UID: createdPod.UID},
+			{Resource: "pods", Name: createdPod.Name, UID: createdPod.UID},
 		},
 		Allocation: &resourceapi.AllocationResult{
 			Devices: resourceapi.DeviceAllocationResult{
@@ -1190,7 +1195,7 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 			},
 		},
 	}
-	_, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
+	_, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claimToUpdate, metav1.UpdateOptions{})
 	framework.ExpectNoError(err, "failed to update ResourceClaim status for test")
 
 	return createdPod

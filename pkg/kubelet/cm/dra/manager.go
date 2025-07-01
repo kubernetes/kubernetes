@@ -720,7 +720,7 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 					// Create a new entry and add it to the map and the slice
 					newStatus := v1.ResourceStatus{
 						Name:      resourceName,
-						Resources: []v1.ResourceHealth{}, // Initialize the slice
+						Resources: []v1.ResourceHealth{},
 					}
 					status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, newStatus)
 					// Get pointer to the newly added element *after* appending
