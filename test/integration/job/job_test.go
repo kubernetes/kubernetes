@@ -4091,6 +4091,29 @@ func TestSuspendJob(t *testing.T) {
 	}
 }
 
+// TestSuspendJobWithZeroCompletions verifies the suspended Job with
+// completions=0 is marked as Complete.
+func TestSuspendJobWithZeroCompletions(t *testing.T) {
+	closeFn, restConfig, clientSet, ns := setup(t, "suspended-with-zero-completions")
+	t.Cleanup(closeFn)
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+	t.Cleanup(func() {
+		cancel()
+	})
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Completions: ptr.To[int32](0),
+			Suspend:     ptr.To(true),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+	for _, condition := range []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete} {
+		validateJobCondition(ctx, t, clientSet, jobObj, condition)
+	}
+}
+
 func TestSuspendJobControllerRestart(t *testing.T) {
 	closeFn, restConfig, clientSet, ns := setup(t, "suspend")
 	t.Cleanup(closeFn)
