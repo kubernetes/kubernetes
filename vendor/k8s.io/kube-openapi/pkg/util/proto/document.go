@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
+	yaml "go.yaml.in/yaml/v2"
 )
 
 func newSchemaError(path *Path, format string, a ...interface{}) error {
