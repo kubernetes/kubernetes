@@ -396,26 +396,24 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		directComparable := util.IsDirectComparable(util.NonPointer(util.NativeType(t.Elem)))
 		switch {
 		case listMetadata != nil && listMetadata.declaredAsMap:
-			// Emit the comparison by keys when listType=map
+			// For listType=map, we use key to lookup the correlated element in the old list.
+			// And use equivFunc to compare the correlated elements in the old and new lists.
 			matchArg = listMetadata.makeListMapMatchFunc(t.Elem)
 			if directComparable {
 				equivArg = Identifier(validateDirectEqual)
 			} else {
 				equivArg = Identifier(validateSemanticDeepEqual)
 			}
-		case directComparable:
-			// Emit the matchArg as a simple comparison when possible.
-			// Slices and maps are not comparable, and structs might hold
-			// pointer fields, which are directly comparable but not what we need.
-			//
-			// Note: This compares the pointee, not the pointer itself.
-			matchArg = Identifier(validateDirectEqual)
-
+		case listMetadata != nil && listMetadata.declaredAsSet:
+			// For listType=set, matchArg is the equivalence check, so equivArg is nil.
+			if directComparable {
+				matchArg = Identifier(validateDirectEqual)
+			} else {
+				matchArg = Identifier(validateSemanticDeepEqual)
+			}
 		default:
-			// Emit semantic comparison by default when the element cannot be
-			// directly compared.
-			matchArg = Identifier(validateSemanticDeepEqual)
-
+			// For non-map and non-set list, we don't lookup the correlated element in the old list.
+			// The matchArg and equivArg are both nil.
 		}
 		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{vfn, t.Elem})
 		result.Functions = append(result.Functions, f)
