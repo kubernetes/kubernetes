@@ -244,24 +244,32 @@ if (( KUBE_VERBOSE >= 2 )); then
   set -x
 fi
 
+# Ports opened by the different components.
+# They must be available on the API_BIND_ADDR (same for all components for the sake of simplicity).
+# Sorted by default port number!
 API_PORT=${API_PORT:-0}
 API_SECURE_PORT=${API_SECURE_PORT:-6443}
-
-# WARNING: For DNS to work on most setups you should export API_HOST as the docker0 ip address,
-API_HOST=${API_HOST:-localhost}
-API_HOST_IP=${API_HOST_IP:-"127.0.0.1"}
-ADVERTISE_ADDRESS=${ADVERTISE_ADDRESS:-""}
-NODE_PORT_RANGE=${NODE_PORT_RANGE:-""}
-API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"}
-EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
-
-KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
-KUBELET_RESOLV_CONF=${KUBELET_RESOLV_CONF:-"/etc/resolv.conf"}
-# By default only allow CORS for requests on localhost
-API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-//127.0.0.1(:[0-9]+)?$,//localhost(:[0-9]+)?$}
+KUBELET_HEALTHZ_PORT=${KUBELET_HEALTHZ_PORT:-10248}
+PROXY_METRICS_PORT=${PROXY_METRICS_PORT:-10249}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 # By default we use 0(close it) for it's insecure
 KUBELET_READ_ONLY_PORT=${KUBELET_READ_ONLY_PORT:-0}
+PROXY_HEALTHZ_PORT=${PROXY_HEALTHZ_PORT:-10256}
+KCM_SECURE_PORT=${KCM_SECURE_PORT:-10257}
+SCHEDULER_SECURE_PORT=${SCHEDULER_SECURE_PORT:-10259}
+
+# WARNING: For DNS to work on most setups you should export API_HOST as the docker0 ip address,
+API_HOST=${API_HOST:-localhost}
+API_HOST_IP=${API_HOST_IP:-"127.0.0.1"} # Used for all components, except kubelet.
+KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"} # Also the bind address.
+ADVERTISE_ADDRESS=${ADVERTISE_ADDRESS:-""}
+NODE_PORT_RANGE=${NODE_PORT_RANGE:-""}
+API_BIND_ADDR=${API_BIND_ADDR:-"0.0.0.0"} # Used for all components, except kubelet.
+EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
+
+KUBELET_RESOLV_CONF=${KUBELET_RESOLV_CONF:-"/etc/resolv.conf"}
+# By default only allow CORS for requests on localhost
+API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-//127.0.0.1(:[0-9]+)?$,//localhost(:[0-9]+)?$}
 LOG_LEVEL=${LOG_LEVEL:-3}
 # Use to increase verbosity on particular files, e.g. LOG_SPEC=token_controller*=5,other_controller*=4
 LOG_SPEC=${LOG_SPEC:-""}
@@ -632,6 +640,8 @@ EOF
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
       --kubelet-client-key="${CERT_DIR}/client-kube-apiserver.key" \
+      --kubelet-port="${KUBELET_PORT}" \
+      --kubelet-read-only-port="${KUBELET_READ_ONLY_PORT}" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --service-account-issuer="https://kubernetes.default.svc" \
@@ -719,7 +729,9 @@ function start_controller_manager {
       --controllers="${KUBE_CONTROLLERS}" \
       --leader-elect="${LEADER_ELECT}" \
       --cert-dir="${CERT_DIR}" \
-      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
+      --secure-port="${KCM_SECURE_PORT}" \
+      --bind-address="${API_BIND_ADDR}" \
+      --master="https://${API_HOST}:${API_SECURE_PORT}" &
     CTLRMGR_PID=$!
 }
 
@@ -891,6 +903,8 @@ evictionPressureTransitionPeriod: "${EVICTION_PRESSURE_TRANSITION_PERIOD}"
 failSwapOn: ${FAIL_SWAP_ON}
 port: ${KUBELET_PORT}
 readOnlyPort: ${KUBELET_READ_ONLY_PORT}
+healthzPort: ${KUBELET_HEALTHZ_PORT}
+healthzBindAddress: ${KUBELET_HOST}
 rotateCertificates: true
 runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
@@ -1031,11 +1045,18 @@ EOF
         generate_kubeproxy_certs
     fi
 
+    # Including the port in the bind addresses mirrors the defaults.
+    # Probably not necessary...
+    #
     # shellcheck disable=SC2024
     sudo "${GO_OUT}/kube-proxy" \
       --v="${LOG_LEVEL}" \
       --config="${TMP_DIR}"/kube-proxy.yaml \
-      --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
+      --healthz-port="${PROXY_HEALTHZ_PORT}" \
+      --healthz-bind-address="${API_BIND_ADDR}:${PROXY_HEALTHZ_PORT}" \
+      --metrics-port="${PROXY_METRICS_PORT}" \
+      --metrics-bind-address="${API_BIND_ADDR}:${PROXY_METRICS_PORT}" \
+      --master="https://${API_HOST}:${API_SECURE_PORT}" &
     PROXY_PID=$!
 }
 
