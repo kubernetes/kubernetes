@@ -137,5 +137,32 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 			return
 		}(fldPath.Child("sliceNonComparableStructWithKey"), obj.SliceNonComparableStructWithKey, safe.Field(oldObj, func(oldObj *StructSlice) []NonComparableStructWithKey { return oldObj.SliceNonComparableStructWithKey }))...)
 
+	// field StructSlice.SliceSetStructField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []DirectComparableStruct) (errs field.ErrorList) {
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil // no changes
+			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DirectComparableStruct) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SliceSetStructField[*]")
+			})...)
+			return
+		}(fldPath.Child("sliceSetStructField"), obj.SliceSetStructField, safe.Field(oldObj, func(oldObj *StructSlice) []DirectComparableStruct { return oldObj.SliceSetStructField }))...)
+
+	// field StructSlice.SliceSetNonComparableStructField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []NonDirectComparableStruct) (errs field.ErrorList) {
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil // no changes
+			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonDirectComparableStruct) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SliceSetNonComparableStructField[*]")
+			})...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, Validate_NonDirectComparableStruct)...)
+			return
+		}(fldPath.Child("sliceSetNonComparableStructField"), obj.SliceSetNonComparableStructField, safe.Field(oldObj, func(oldObj *StructSlice) []NonDirectComparableStruct { return oldObj.SliceSetNonComparableStructField }))...)
+
 	return errs
 }

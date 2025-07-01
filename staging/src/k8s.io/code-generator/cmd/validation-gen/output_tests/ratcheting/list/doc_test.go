@@ -100,4 +100,11 @@ func Test_StructSlice(t *testing.T) {
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Invalid(field.NewPath("sliceNonComparableStructField[0]"), "", ""),
 	})
+
+	// same data of listType=set, different order.
+	st.Value(&StructSlice{
+		SliceSetStructField: []DirectComparableStruct{{IntField: 1}, {IntField: 2}},
+	}).OldValue(&StructSlice{
+		SliceSetStructField: []DirectComparableStruct{{IntField: 2}, {IntField: 1}},
+	}).ExpectValid()
 }

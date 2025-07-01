@@ -48,6 +48,14 @@ type StructSlice struct {
 	// +k8s:listMapKey=key
 	// +k8s:eachVal=+k8s:validateFalse="field SliceNonComparableStructWithKey[*]"
 	SliceNonComparableStructWithKey []NonComparableStructWithKey `json:"sliceNonComparableStructWithKey"`
+
+	// +k8s:listType=set
+	// +k8s:eachVal=+k8s:validateFalse="field SliceSetStructField[*]"
+	SliceSetStructField []DirectComparableStruct `json:"sliceSetStructField"`
+
+	// +k8s:listType=set
+	// +k8s:eachVal=+k8s:validateFalse="field SliceSetNonComparableStructField[*]"
+	SliceSetNonComparableStructField []NonDirectComparableStruct `json:"sliceSetNonComparableStructField"`
 }
 
 type S string
