@@ -127,25 +127,29 @@ func (s *fakeDRADriverGRPCServer) WatchResources(req *drahealthv1alpha1.WatchRes
 		return s.watchResourcesError
 	}
 
-	// Use the stream argument to send messages
-	for {
-		select {
-		case <-stream.Context().Done():
-			logger.Info("Fake Server: WatchResources stream context canceled")
-			return stream.Context().Err()
-		case resp, ok := <-s.watchResourcesResponses:
-			if !ok {
-				logger.Info("Fake Server: WatchResources response channel closed")
-				return nil
-			}
-			logger.V(5).Info("Fake Server: Sending health response", "response", resp)
-			// Use the stream argument to send
-			if err := stream.Send(resp); err != nil {
-				logger.Error(err, "Fake Server: Error sending response on stream")
-				return err
+	go func() {
+		for {
+			select {
+			case <-stream.Context().Done():
+				logger.Info("Fake Server: WatchResources stream context canceled")
+				return
+			case resp, ok := <-s.watchResourcesResponses:
+				if !ok {
+					logger.Info("Fake Server: WatchResources response channel closed")
+					return
+				}
+				logger.V(5).Info("Fake Server: Sending health response", "response", resp)
+				// Use the stream argument to send
+				if err := stream.Send(resp); err != nil {
+					logger.Error(err, "Fake Server: Error sending response on stream")
+					return
+				}
 			}
 		}
-	}
+	}()
+
+	logger.V(4).Info("Fake Server: WatchResources RPC call returning control to client.")
+	return nil
 }
 
 type mockWatchResourcesClient struct {
@@ -642,18 +646,22 @@ func TestPrepareResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
+			backgroundCtx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			logger := klog.NewKlogr()
+			backgroundCtx = klog.NewContext(backgroundCtx, logger)
 
 			manager, err := NewManager(fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
-			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
+			manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			if test.claim != nil {
-				if _, err := fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{}); err != nil {
+				if _, err := fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Create(backgroundCtx, test.claim, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("failed to create ResourceClaim %s: %+v", test.claim.Name, err)
 				}
 				defer func() {
-					require.NoError(t, fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Delete(tCtx, test.claim.Name, metav1.DeleteOptions{}))
+					_ = fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Delete(context.Background(), test.claim.Name, metav1.DeleteOptions{})
 				}()
 			}
 
@@ -663,7 +671,7 @@ func TestPrepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil, nil)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(backgroundCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -677,7 +685,7 @@ func TestPrepareResources(t *testing.T) {
 				manager.cache.add(test.claimInfo)
 			}
 
-			err = manager.PrepareResources(tCtx, test.pod)
+			err = manager.PrepareResources(backgroundCtx, test.pod)
 
 			assert.Equal(t, test.expectedPrepareCalls, draServerInfo.server.prepareResourceCalls.Load())
 
@@ -802,7 +810,11 @@ func TestUnprepareResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
+			backgroundCtx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			logger := klog.NewKlogr()
+			backgroundCtx = klog.NewContext(backgroundCtx, logger)
 
 			var pluginClientTimeout *time.Duration
 			if test.wantTimeout {
@@ -810,7 +822,7 @@ func TestUnprepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(backgroundCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -818,7 +830,7 @@ func TestUnprepareResources(t *testing.T) {
 
 			manager, err := NewManager(fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
-			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
+			manager.initDRAPluginManager(backgroundCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			plg := manager.GetWatcherHandler()
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
@@ -829,7 +841,7 @@ func TestUnprepareResources(t *testing.T) {
 				manager.cache.add(test.claimInfo)
 			}
 
-			err = manager.UnprepareResources(tCtx, test.pod)
+			err = manager.UnprepareResources(backgroundCtx, test.pod)
 
 			assert.Equal(t, test.expectedUnprepareCalls, draServerInfo.server.unprepareResourceCalls.Load())
 

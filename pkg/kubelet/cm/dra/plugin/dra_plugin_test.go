@@ -18,14 +18,13 @@ package plugin
 
 import (
 	"context"
+	"io"
 	"net"
 	"path"
 	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"k8s.io/klog/v2"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,6 +54,22 @@ func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1be
 func (f *fakeGRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1beta1.NodeUnprepareResourcesRequest) (*drapbv1beta1.NodeUnprepareResourcesResponse, error) {
 
 	return &drapbv1beta1.NodeUnprepareResourcesResponse{}, nil
+}
+
+func (f *fakeGRPCServer) WatchResources(in *drahealthv1alpha1.WatchResourcesRequest, srv drahealthv1alpha1.NodeHealth_WatchResourcesServer) error {
+	resp := &drahealthv1alpha1.WatchResourcesResponse{
+		Devices: []*drahealthv1alpha1.DeviceHealth{
+			{
+				PoolName:   "pool1",
+				DeviceName: "dev1",
+				Health:     "Healthy",
+			},
+		},
+	}
+	if err := srv.Send(resp); err != nil {
+		return err
+	}
+	return nil
 }
 
 // tearDown is an idempotent cleanup function.
@@ -106,7 +121,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	driverName := "dummy-driver"
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get plugin")
@@ -176,7 +191,7 @@ func TestGetDRAPlugin(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 			if test.setup != nil {
 				require.NoError(t, test.setup(draPlugins), "setup plugin")
 			}
@@ -222,7 +237,7 @@ func TestGRPCMethods(t *testing.T) {
 			defer teardown()
 
 			driverName := "dummy-driver"
-			draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 			tCtx.ExpectNoError(draPlugins.add(driverName, addr, test.chosenService, defaultClientCallTimeout))
 
 			plugin, err := draPlugins.GetPlugin(driverName)
@@ -253,7 +268,9 @@ func assertError(t *testing.T, expectError string, err error) {
 
 func TestPlugin_WatchResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	ctx := klog.NewContext(tCtx, klog.NewKlogr())
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+
 	driverName := "test-driver"
 	addr := path.Join(t.TempDir(), "dra.sock")
 
@@ -261,7 +278,7 @@ func TestPlugin_WatchResources(t *testing.T) {
 	require.NoError(t, err)
 	defer teardown()
 
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 	err = draPlugins.add(driverName, addr, drapbv1beta1.DRAPluginService, 5*time.Second)
 	require.NoError(t, err)
 	defer draPlugins.remove(driverName, addr)
@@ -270,12 +287,19 @@ func TestPlugin_WatchResources(t *testing.T) {
 	require.NoError(t, err)
 
 	stream, err := p.WatchResources(ctx)
-	assert.NoError(t, err)
-	assert.NotNil(t, stream)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
 
+	// 1. Receive the first message that our fake server sends.
 	resp, err := stream.Recv()
-	assert.NoError(t, err)
-	assert.Len(t, resp.Devices, 1)
+	require.NoError(t, err, "The first Recv() should succeed with the message from the server")
+	require.NotNil(t, resp)
+	require.Len(t, resp.Devices, 1)
 	assert.Equal(t, "pool1", resp.Devices[0].PoolName)
 	assert.Equal(t, "Healthy", resp.Devices[0].Health)
+
+	// 2. The second receive should fail with io.EOF because the server
+	//    closed the stream by returning nil. This confirms the stream ended cleanly.
+	_, err = stream.Recv()
+	require.ErrorIs(t, err, io.EOF, "The second Recv() should return an io.EOF error to signal a clean stream closure")
 }

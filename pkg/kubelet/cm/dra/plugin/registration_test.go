@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -151,7 +150,7 @@ func TestRegistrationHandler(t *testing.T) {
 			description:       "two-services",
 			driverName:        pluginB,
 			socketFile:        socketFileB,
-			supportedServices: []string{drapb.DRAPluginService, drahealthv1alpha1.NodeHealth /* TODO: add v1 here once we have it */},
+			supportedServices: []string{drapb.DRAPluginService, "v1alpha1.NodeHealth" /* TODO: add v1 here once we have it */},
 			chosenService:     drapb.DRAPluginService,
 		},
 		// TODO: use v1beta1 here once we have v1
@@ -309,7 +308,7 @@ func TestConnectionHandling(t *testing.T) {
 			tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
 
 			// The handler wipes all slices at startup.
-			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, nil, test.delay)
+			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, test.delay)
 			tCtx.Cleanup(draPlugins.Stop)
 			requireNoSlices(tCtx)
 

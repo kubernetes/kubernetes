@@ -809,78 +809,79 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 	}()
 
 	for {
-		select {
-		case <-ctx.Done():
-			logger.Info("Stopping health monitoring due to context cancellation", "pluginName", pluginName, "reason", ctx.Err())
-			return ctx.Err()
-		default:
-			resp, err := stream.Recv()
-			if err != nil {
-				logger.Error(err, "Error receiving from WatchResources stream", "pluginName", pluginName)
-				if errors.Is(err, io.EOF) {
-					logger.Info("Stream ended with EOF", "pluginName", pluginName)
-					return nil
-				}
+		resp, err := stream.Recv()
+		if err != nil {
+			// Context canceled, normal shutdown.
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				logger.Info("Stopping health monitoring due to context cancellation", "pluginName", pluginName, "reason", err)
 				return err
 			}
-			// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
-			devices := make([]state.DeviceHealth, len(resp.GetDevices()))
-			for i, d := range resp.GetDevices() {
-				devices[i] = state.DeviceHealth{
-					PoolName:    d.PoolName,
-					DeviceName:  d.DeviceName,
-					Health:      state.DeviceHealthString(d.Health),
-					LastUpdated: time.Unix(d.LastUpdated, 0),
-				}
+			// Stream closed cleanly by the server, get normal EOF.
+			if errors.Is(err, io.EOF) {
+				logger.Info("Stream ended with EOF", "pluginName", pluginName)
+				return nil
 			}
+			// Other errors are unexpected, log & return.
+			logger.Error(err, "Error receiving from WatchResources stream", "pluginName", pluginName)
+			return err
+		}
 
-			changedDevices, changed, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
-			if updateErr != nil {
-				logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
+		// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
+		devices := make([]state.DeviceHealth, len(resp.GetDevices()))
+		for i, d := range resp.GetDevices() {
+			devices[i] = state.DeviceHealth{
+				PoolName:    d.PoolName,
+				DeviceName:  d.DeviceName,
+				Health:      state.DeviceHealthString(d.Health),
+				LastUpdated: time.Unix(d.LastUpdated, 0),
 			}
-			if changed && len(changedDevices) > 0 {
-				// DEBUG: Change verbosity to 1 for log checks.
-				logger.Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
+		}
 
-				podsToUpdate := sets.New[string]()
+		changedDevices, changed, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
+		if updateErr != nil {
+			logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
+		}
+		if changed && len(changedDevices) > 0 {
+			// DEBUG: Change verbosity to 1 for log checks.
+			logger.Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
 
-				m.cache.RLock()
-				for _, dev := range changedDevices {
-					for _, cInfo := range m.cache.claimInfo {
-						if driverState, ok := cInfo.DriverState[pluginName]; ok {
-							for _, allocatedDevice := range driverState.Devices {
-								if allocatedDevice.PoolName == dev.PoolName && allocatedDevice.DeviceName == dev.DeviceName {
-									podsToUpdate.Insert(cInfo.PodUIDs.UnsortedList()...)
-									break
-								}
+			podsToUpdate := sets.New[string]()
+
+			m.cache.RLock()
+			for _, dev := range changedDevices {
+				for _, cInfo := range m.cache.claimInfo {
+					if driverState, ok := cInfo.DriverState[pluginName]; ok {
+						for _, allocatedDevice := range driverState.Devices {
+							if allocatedDevice.PoolName == dev.PoolName && allocatedDevice.DeviceName == dev.DeviceName {
+								podsToUpdate.Insert(cInfo.PodUIDs.UnsortedList()...)
+								break
 							}
 						}
 					}
 				}
-				m.cache.RUnlock()
-
-				if podsToUpdate.Len() > 0 {
-					podUIDs := podsToUpdate.UnsortedList()
-					// DEBUG: Change verbosity to 1 for log checks.
-					logger.Info("[KEP-4680 DEBUG] 1. DRA Manager: Sending update for pods: %v", podUIDs)
-					logger.Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
-					select {
-					case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
-					default:
-						logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pluginName", pluginName, "pods", podUIDs)
-					}
-				} else {
-					// DEBUG: Change verbosity to 1 for log checks.
-					logger.Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
-				}
-			} else if changed {
-				// DEBUG: Change verbosity to 1 for log checks.
-				logger.Info("Health info updated, but no specific device changes detected", "pluginName", pluginName)
 			}
+			m.cache.RUnlock()
 
+			if podsToUpdate.Len() > 0 {
+				podUIDs := podsToUpdate.UnsortedList()
+				// DEBUG: Change verbosity to 1 for log checks.
+				logger.Info("[KEP-4680 DEBUG] 1. DRA Manager: Sending update for pods", "podUIDs", podUIDs)
+				logger.Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
+				select {
+				case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
+				default:
+					logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pluginName", pluginName, "pods", podUIDs)
+				}
+			} else {
+				// DEBUG: Change verbosity to 1 for log checks.
+				logger.Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
+			}
+		} else if changed {
+			// DEBUG: Change verbosity to 1 for log checks.
+			logger.Info("Health info updated, but no specific device changes detected", "pluginName", pluginName)
 		}
-	}
 
+	}
 }
 
 // Updates returns the channel that provides resource updates.

@@ -367,17 +367,28 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 	}
 	p.conn = conn
 
-	streamCtx, streamAttemptCancel := context.WithCancel(p.backgroundCtx)
-	stream, err := p.WatchResources(streamCtx)
-	if err != nil {
-		streamAttemptCancel()
-		logger.Error(err, "Failed to start WatchResources stream")
-		p.SetHealthStream(nil, nil)
-	} else {
-		logger.Info("Successfully started WatchResources health stream")
-		p.SetHealthStream(streamCtx, streamAttemptCancel)
-		go pm.streamHandler.HandleWatchResourcesStream(streamCtx, stream, driverName)
-	}
+	pm.wg.Add(1)
+	go func() {
+		defer pm.wg.Done()
+
+		streamCtx, streamCancel := context.WithCancel(p.backgroundCtx)
+		p.SetHealthStream(streamCtx, streamCancel)
+
+		wait.UntilWithContext(streamCtx, func(ctx context.Context) {
+			logger.V(4).Info("Attempting to start WatchResources health stream")
+			stream, err := p.WatchResources(ctx)
+			if err != nil {
+				logger.V(3).Error(err, "Failed to establish WatchResources stream, will retry")
+				return
+			}
+
+			logger.V(2).Info("Successfully started WatchResources health stream")
+
+			err = pm.streamHandler.HandleWatchResourcesStream(ctx, stream, driverName)
+			logger.V(2).Info("WatchResources health stream has ended", "error", err)
+
+		}, 5*time.Second)
+	}()
 
 	// Ensure that gRPC tries to connect even if we don't call any gRPC method.
 	// This is necessary to detect early whether a plugin is really available.

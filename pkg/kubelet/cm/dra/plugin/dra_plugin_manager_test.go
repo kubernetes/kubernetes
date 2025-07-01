@@ -63,7 +63,7 @@ func TestDelete(t *testing.T) {
 	socketFile := "dra.sock"
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 	tCtx.ExpectNoError(draPlugins.add(driverName, "dra.sock", "", defaultClientCallTimeout), "add plugin")
 
 	draPlugins.remove(driverName, socketFile)
