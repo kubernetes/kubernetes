@@ -138,6 +138,12 @@ type FunctionSpec struct {
 
 type ExecSpec struct {
 	Path string `json:"path,omitempty" yaml:"path,omitempty"`
+
+	// Args is a slice of args that will be passed as arguments to script
+	Args []string `json:"args,omitempty" yaml:"args,omitempty"`
+
+	// Env is a slice of env string that will be exposed to container
+	Env []string `json:"envs,omitempty" yaml:"envs,omitempty"`
 }
 
 // ContainerSpec defines a spec for running a function as a container
