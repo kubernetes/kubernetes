@@ -1890,8 +1890,21 @@
             "description": "Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
           },
           "restartPolicy": {
-            "description": "RestartPolicy defines the restart behavior of individual containers in a pod. This field may only be set for init containers, and the only allowed value is \"Always\". For non-init containers or when this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
+            "description": "RestartPolicy defines the restart behavior of individual containers in a pod. This overrides the pod-level restart policy. When this field is not specified, the restart behavior is defined by the Pod's restart policy and the container type. Additionally, setting the RestartPolicy as \"Always\" for the init container will have the following effect: this init container will be continually restarted on exit until all regular containers have terminated. Once all regular containers have completed, all init containers with restartPolicy \"Always\" will be shut down. This lifecycle differs from normal init containers and is often referred to as a \"sidecar\" container. Although this init container still starts in the init container sequence, it does not wait for the container to complete before proceeding to the next init container. Instead, the next init container starts immediately after this init container is started, or after any startupProbe has successfully completed.",
             "type": "string"
+          },
+          "restartPolicyRules": {
+            "description": "Represents a list of rules to be checked to determine if the container should be restarted on exit. The rules are evaluated in order. Once a rule matches a container exit condition, the remaining rules are ignored. If no rule matches the container exit condition, the Pod-level restart policy determines the whether the container is restarted or not. Constraints on the rules: - At most 20 rules are allowed. - Rules can have the same action. - Identical rules are not forbidden in validations.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.ContainerRestartRule"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "securityContext": {
             "allOf": [
@@ -2025,6 +2038,50 @@
         "required": [
           "resourceName",
           "restartPolicy"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.ContainerRestartRule": {
+        "description": "ContainerRestartRule describes how a container exit is handled.",
+        "properties": {
+          "action": {
+            "description": "Specifies the action taken on a container exit if the requirements are satisfied. The only possible value is \"Restart\" to restart the container.",
+            "type": "string"
+          },
+          "exitCodes": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ContainerRestartRuleOnExitCodes"
+              }
+            ],
+            "description": "Represents the exit codes to check on container exits."
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.ContainerRestartRuleOnExitCodes": {
+        "description": "ContainerRestartRuleOnExitCodes describes the condition for handling an exited container based on its exit codes.",
+        "properties": {
+          "operator": {
+            "description": "Represents the relationship between the container exit code(s) and the specified values. Possible values are: - In: the requirement is satisfied if the container exit code is in the\n  set of specified values.\n- NotIn: the requirement is satisfied if the container exit code is\n  not in the set of specified values.",
+            "type": "string"
+          },
+          "values": {
+            "description": "Specifies the set of values to check for container exit codes. At most 255 elements are allowed.",
+            "items": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "set"
+          }
+        },
+        "required": [
+          "operator"
         ],
         "type": "object"
       },
@@ -2345,8 +2402,21 @@
             "description": "Resources are not allowed for ephemeral containers. Ephemeral containers use spare resources already allocated to the pod."
           },
           "restartPolicy": {
-            "description": "Restart policy for the container to manage the restart behavior of each container within a pod. This may only be set for init containers. You cannot set this field on ephemeral containers.",
+            "description": "Restart policy for the container to manage the restart behavior of each container within a pod. You cannot set this field on ephemeral containers.",
             "type": "string"
+          },
+          "restartPolicyRules": {
+            "description": "Represents a list of rules to be checked to determine if the container should be restarted on exit. You cannot set this field on ephemeral containers.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.ContainerRestartRule"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "securityContext": {
             "allOf": [

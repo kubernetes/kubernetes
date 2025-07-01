@@ -147,6 +147,19 @@ func (b *EphemeralContainerApplyConfiguration) WithRestartPolicy(value corev1.Co
 	return b
 }
 
+// WithRestartPolicyRules adds the given value to the RestartPolicyRules field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the RestartPolicyRules field.
+func (b *EphemeralContainerApplyConfiguration) WithRestartPolicyRules(values ...*ContainerRestartRuleApplyConfiguration) *EphemeralContainerApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithRestartPolicyRules")
+		}
+		b.EphemeralContainerCommonApplyConfiguration.RestartPolicyRules = append(b.EphemeralContainerCommonApplyConfiguration.RestartPolicyRules, *values[i])
+	}
+	return b
+}
+
 // WithVolumeMounts adds the given value to the VolumeMounts field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the VolumeMounts field.

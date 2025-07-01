@@ -580,6 +580,17 @@
               }
             ],
             "restartPolicy": "restartPolicyValue",
+            "restartPolicyRules": [
+              {
+                "action": "actionValue",
+                "exitCodes": {
+                  "operator": "operatorValue",
+                  "values": [
+                    2
+                  ]
+                }
+              }
+            ],
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -877,6 +888,17 @@
               }
             ],
             "restartPolicy": "restartPolicyValue",
+            "restartPolicyRules": [
+              {
+                "action": "actionValue",
+                "exitCodes": {
+                  "operator": "operatorValue",
+                  "values": [
+                    2
+                  ]
+                }
+              }
+            ],
             "volumeMounts": [
               {
                 "name": "nameValue",
@@ -1174,6 +1196,17 @@
               }
             ],
             "restartPolicy": "restartPolicyValue",
+            "restartPolicyRules": [
+              {
+                "action": "actionValue",
+                "exitCodes": {
+                  "operator": "operatorValue",
+                  "values": [
+                    2
+                  ]
+                }
+              }
+            ],
             "volumeMounts": [
               {
                 "name": "nameValue",
