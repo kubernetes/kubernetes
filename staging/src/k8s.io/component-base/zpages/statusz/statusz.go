@@ -91,9 +91,9 @@ func populateStatuszData(reg statuszRegistry, componentName string) (string, err
 	if reg.emulationVersion() != nil {
 		emulationVersion = fmt.Sprintf(`Emulation version%s %s`, delim, html.EscapeString(reg.emulationVersion().String()))
 	}
-	var apiserverLinks string
-	if componentName == "kube-apiserver" {
-		apiserverLinks = fmt.Sprintf(`Useful Endpoints%s %s`, delim, html.EscapeString(aggregatePaths(reg.paths())))
+	usefulLinks := aggregatePaths(reg.paths())
+	if usefulLinks != "" {
+		usefulLinks = fmt.Sprintf(`Useful Endpoints%s %s`, delim, html.EscapeString(usefulLinks))
 	}
 
 	status := fmt.Sprintf(`
@@ -103,7 +103,7 @@ Go version%[1]s %[4]s
 Binary version%[1]s %[5]s
 %[6]s
 %[7]s
-`, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion, apiserverLinks)
+`, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion, usefulLinks)
 
 	return status, nil
 }
