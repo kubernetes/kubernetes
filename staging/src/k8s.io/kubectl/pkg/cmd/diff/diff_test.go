@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,16 +19,23 @@ package diff
 import (
 	"bytes"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/rest/fake"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/utils/exec"
 )
 
@@ -58,6 +65,105 @@ func (f *FakeObject) Live() runtime.Object {
 		return nil
 	}
 	return &unstructured.Unstructured{Object: f.live}
+}
+
+func TestDiffValidateOptions(t *testing.T) {
+	testCases := []struct {
+		name        string
+		options     *DiffOptions
+		expectedErr string
+	}{
+		{
+			name: "valid: prune with --all",
+			options: &DiffOptions{
+				Prune: true,
+				All:   true,
+			},
+			expectedErr: "",
+		},
+		{
+			name: "valid: prune with --selector",
+			options: &DiffOptions{
+				Prune:    true,
+				Selector: "app=test",
+			},
+			expectedErr: "",
+		},
+		{
+			name: "valid: prune with --applyset",
+			options: &DiffOptions{
+				Prune:       true,
+				ApplySetRef: "secret/my-applyset",
+			},
+			expectedErr: "",
+		},
+		{
+			name: "valid: no prune flags",
+			options: &DiffOptions{
+				Prune: false,
+			},
+			expectedErr: "",
+		},
+		{
+			name: "invalid: --applyset without --prune",
+			options: &DiffOptions{
+				Prune:       false,
+				ApplySetRef: "secret/my-applyset",
+			},
+			expectedErr: "--applyset requires --prune",
+		},
+		{
+			name: "invalid: --prune with --applyset and --all",
+			options: &DiffOptions{
+				Prune:       true,
+				ApplySetRef: "secret/my-applyset",
+				All:         true,
+			},
+			expectedErr: "--all is incompatible with --applyset",
+		},
+		{
+			name: "invalid: --prune with --applyset and --selector",
+			options: &DiffOptions{
+				Prune:       true,
+				ApplySetRef: "secret/my-applyset",
+				Selector:    "app=test",
+			},
+			expectedErr: "--selector is incompatible with --applyset",
+		},
+		{
+			name: "invalid: --prune with --applyset and --prune-allowlist",
+			options: &DiffOptions{
+				Prune:          true,
+				ApplySetRef:    "secret/my-applyset",
+				PruneAllowlist: []string{"v1/pods"},
+			},
+			expectedErr: "--prune-allowlist is incompatible with --applyset",
+		},
+		{
+			name: "invalid: --prune without --all or --selector",
+			options: &DiffOptions{
+				Prune: true,
+			},
+			expectedErr: "all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.options.Validate()
+			if tc.expectedErr == "" {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("expected error %q, but got none", tc.expectedErr)
+				} else if err.Error() != tc.expectedErr {
+					t.Errorf("expected error %q, but got %q", tc.expectedErr, err.Error())
+				}
+			}
+		})
+	}
 }
 
 func TestDiffProgram(t *testing.T) {
@@ -632,4 +738,138 @@ func TestMasker(t *testing.T) {
 			}
 		})
 	}
+}
+
+func fatalNoExit(t *testing.T, ioStreams genericiooptions.IOStreams) func(msg string, code int) {
+	return func(msg string, code int) {
+		if len(msg) > 0 {
+			// add newline if needed
+			if !strings.HasSuffix(msg, "\n") {
+				msg += "\n"
+			}
+			fmt.Fprint(ioStreams.ErrOut, msg)
+		}
+	}
+}
+
+func TestDiffWithPruneV2(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("default")
+	defer tf.Cleanup()
+
+	liveNamespace := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Namespace",
+			"metadata": map[string]interface{}{
+				"name": "test-prune-simple-namespace",
+				"uid":  "ns-uid-12345",
+			},
+		},
+	}
+	liveSecret := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Secret",
+			"metadata": map[string]interface{}{
+				"name":      "test-prune-simple-secret-1",
+				"namespace": "default",
+				"uid":       "secret-uid-67890",
+				"labels": map[string]interface{}{
+					"applyset.kubernetes.io/part-of": "simple", // Crucial label
+				},
+			},
+		},
+	}
+
+	secretList := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "SecretList",
+		},
+		Items: []unstructured.Unstructured{*liveSecret},
+	}
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			codec := scheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
+			switch p, m := req.URL.Path, req.Method; {
+
+			case p == "/namespaces/foo" && m == http.MethodGet:
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     cmdtesting.DefaultHeader(),
+					Body: cmdtesting.ObjBody(codec, &unstructured.Unstructured{
+						Object: map[string]interface{}{
+							"apiVersion": "v1",
+							"kind":       "Namespace",
+							"metadata": map[string]interface{}{
+								"name": "foo",
+								"uid":  "some-fake-uid", // Add a UID for realism
+							},
+						},
+					}),
+				}, nil
+
+			case p == "/namespaces/foo" && m == http.MethodPatch:
+				if req.URL.Query().Get("dryRun") == "All" {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     cmdtesting.DefaultHeader(),
+						Body: cmdtesting.ObjBody(codec, &unstructured.Unstructured{
+							Object: map[string]interface{}{
+								"apiVersion": "v1",
+								"kind":       "Namespace",
+								"metadata": map[string]interface{}{
+									"name":        "foo",
+									"annotations": map[string]interface{}{"diff": "was-here"},
+								},
+							},
+						}),
+					}, nil
+				}
+
+			case p == "/namespaces/test-prune-simple-namespace" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, liveNamespace)}, nil
+
+			case p == "/api/v1/namespaces/default/secrets" && m == http.MethodGet:
+				if req.URL.Query().Get("labelSelector") == "applyset.kubernetes.io/part-of=simple" {
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, secretList)}, nil
+				}
+
+			case m == http.MethodGet && req.URL.Query().Has("labelSelector"):
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &unstructured.UnstructuredList{})}, nil
+			}
+
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.Path)
+			return nil, nil
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+		testdir := "testdata/prune/"
+		ioStreams, _, outBuf, _ := genericiooptions.NewTestIOStreams()
+		cmdutil.BehaviorOnFatal(fatalNoExit(t, ioStreams))
+		defer cmdutil.DefaultBehaviorOnFatal()
+
+		cmd := NewCmdDiff(tf, ioStreams)
+		cmd.Flags().Set("filename", filepath.Join(testdir, "sample_manifest.yaml"))
+		cmd.Flags().Set("applyset", "simple")
+		cmd.Flags().Set("prune", "true")
+
+		cmd.Run(cmd, []string{})
+
+		got := outBuf.String()
+
+		expectedPattern := `(?m)metadata:\n\+\s+annotations:\n\+\s+diff: was-here\n\s+name: foo\n-\s+uid: some-fake-uid`
+
+		re := regexp.MustCompile(expectedPattern)
+
+		if !re.MatchString(got) {
+			t.Errorf("Diff output did not contain the expected changes.\nExpected pattern:\n%s\n\nActual output:\n%s", expectedPattern, got)
+		}
+	})
 }

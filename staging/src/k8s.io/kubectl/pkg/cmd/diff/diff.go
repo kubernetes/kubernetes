@@ -689,18 +689,15 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 			}
 
 			tooling := apply.ApplySetTooling{Name: "kubectl", Version: apply.ApplySetToolVersion}
-			restClient, err := f.UnstructuredClientForMapping(parent.RESTMapping)
-			if err != nil {
+			if restClient, err := f.UnstructuredClientForMapping(parent.RESTMapping); err != nil {
 				return fmt.Errorf("failed to initialize RESTClient for ApplySet: %w", err)
-			}
-			if restClient == nil {
+			} else if restClient == nil {
 				return fmt.Errorf("could not build RESTClient for ApplySet")
-			}
-
-			o.applySet = apply.NewApplySet(parent, tooling, mapper, restClient)
-
-			if err := o.applySet.Validate(cmd.Context(), o.DynamicClient); err != nil {
-				return err
+			} else {
+				o.applySet = apply.NewApplySet(parent, tooling, mapper, restClient)
+				if err := o.applySet.Validate(cmd.Context(), o.DynamicClient); err != nil {
+					return err
+				}
 			}
 
 		} else {
