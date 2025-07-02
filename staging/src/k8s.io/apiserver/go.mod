@@ -10,7 +10,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/coreos/go-oidc v2.3.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
-	github.com/emicklei/go-restful/v3 v3.11.0
+	github.com/emicklei/go-restful/v3 v3.12.2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-logr/logr v1.4.2
 	github.com/gogo/protobuf v1.3.2
