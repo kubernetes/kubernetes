@@ -807,7 +807,7 @@ func TestDiffWithPruneV2(t *testing.T) {
 							"kind":       "Namespace",
 							"metadata": map[string]interface{}{
 								"name": "foo",
-								"uid":  "some-fake-uid", // Add a UID for realism
+								"uid":  "some-fake-uid",
 							},
 						},
 					}),
