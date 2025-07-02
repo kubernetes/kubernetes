@@ -1,4 +1,4 @@
-# SortedFeatures Linter
+# Sorted Linter
 
 This linter checks if feature gates in Kubernetes code are sorted alphabetically in const and var blocks, as well as
 in maps.
@@ -59,8 +59,8 @@ const FeatureB featuregate.Feature = "FeatureB"
 1. Build the plugin:
 
 ```bash
-cd hack/tools/golangci-lint/sortedfeatures
-go build -buildmode=plugin -o sortedfeatures.so ./plugin/
+cd hack/tools/golangci-lint/sorted
+go build -buildmode=plugin -o sorted.so ./plugin/
 ```
 
 2. Add the plugin to your `.golangci.yml` configuration:
@@ -69,10 +69,10 @@ go build -buildmode=plugin -o sortedfeatures.so ./plugin/
 linters:
   settings:
     custom:
-      sortedfeatures:
-        path: /path/to/sortedfeatures.so
+      sorted:
+        path: /path/to/sorted.so
         description: Checks if feature gates are sorted alphabetically
-        original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sortedfeatures
+        original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sorted
         settings:
           debug: false
           files:
@@ -82,7 +82,7 @@ linters:
 ### As a standalone tool
 
 ```bash
-cd hack/tools/golangci-lint/sortedfeatures
+cd hack/tools/golangci-lint/sorted
 go run main.go path/to/file.go
 ```
 
@@ -100,7 +100,7 @@ go run main.go path/to/file.go
 linters:
   settings:
     custom:
-      sortedfeatures:
+      sorted:
         settings:
           debug: true
 
@@ -108,7 +108,7 @@ linters:
 linters:
   settings:
     custom:
-      sortedfeatures:
+      sorted:
         settings:
           files:
             - pkg/features/kube_features.go
@@ -133,14 +133,14 @@ When no `files` configuration is provided, the linter checks these Kubernetes fi
 ### With golangci-lint
 
 ```bash
-# Run all linters including sortedfeatures
+# Run all linters including sorted
 golangci-lint run
 
-# Run only sortedfeatures
-golangci-lint run --enable=sortedfeatures --disable-all
+# Run only sorted
+golangci-lint run --enable=sorted --disable-all
 
 # Enable if disabled by default
-golangci-lint run -Esortedfeatures
+golangci-lint run -Esorted
 ```
 
 ### Enabling the linter
@@ -148,8 +148,8 @@ golangci-lint run -Esortedfeatures
 Custom linters follow standard golangci-lint rules:
 
 - Enabled by default unless `linters.disable-all: true` is set
-- Can be explicitly enabled with `linters.enable: [sortedfeatures]`
-- Can be enabled via command line: `golangci-lint run -Esortedfeatures`
+- Can be explicitly enabled with `linters.enable: [sorted]`
+- Can be enabled via command line: `golangci-lint run -Esorted`
 
 ## Examples
 
