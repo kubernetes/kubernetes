@@ -299,7 +299,7 @@ func reportSortingIssue(pass *analysis.Pass, decl *ast.GenDecl, current, sorted 
 	}
 
 	// Report the issue with the diff
-	pass.Reportf(decl.Pos(), "not sorted alphabetically:\n%s\n", stripHeader(diffText, 3))
+	pass.Reportf(decl.Pos(), "not sorted alphabetically (-got, +want):\n%s\n", stripHeader(diffText, 3))
 }
 
 func stripHeader(input string, n int) string {
@@ -341,7 +341,7 @@ func reportMapSortingIssue(pass *analysis.Pass, decl *ast.GenDecl, mapName strin
 	}
 
 	// Report the issue with the diff
-	pass.Reportf(decl.Pos(), "map '%s' keys not sorted alphabetically:\n%s\n", mapName, stripHeader(diffText, 3))
+	pass.Reportf(decl.Pos(), "map '%s' keys not sorted alphabetically (-got, +want):\n%s\n", mapName, stripHeader(diffText, 3))
 }
 
 // generateMapSourceCode recreates the source code for map keys
