@@ -334,7 +334,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-multi-alloc-devices-too-long": {
 			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("name"), "", resourceapi.SharedDeviceNameMaxLength),
+				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("name"), "", 56), // SharedDeviceNameMaxLength
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 3)
