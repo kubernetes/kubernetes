@@ -66,10 +66,16 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 		groupsSpecified := len(req.Header[authenticationv1.ImpersonateGroupHeader]) > 0
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ConstrainedImpersonation) {
-			decision, actingAsAttributes, reason := authorizeConstrainedImpersonation(ctx, requestor, impersonationRequests, a, req.RequestURI)
-			if decision != authorizer.DecisionAllow {
-				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
-				return
+			constrainedDecision, contrainedActingAsAttributes, constrainedReason := authorizeConstrainedImpersonation(ctx, requestor, impersonationRequests, a, req.RequestURI)
+			// fallback to legacy impersonate. Note request will be forbidden if the requestor has both Impersonate-User and
+			// Impersonate-Group header, but has the permissions of "impersonate:user-info" on users resource and "impersonate"
+			// on group resources.
+			if constrainedDecision != authorizer.DecisionAllow {
+				decision, _, _ := authorizeImpersonation(ctx, requestor, impersonationRequests, a, req.RequestURI)
+				if decision != authorizer.DecisionAllow {
+					responsewriters.Forbidden(ctx, contrainedActingAsAttributes, w, req, constrainedReason, s)
+					return
+				}
 			}
 		} else {
 			decision, actingAsAttributes, reason := authorizeImpersonation(ctx, requestor, impersonationRequests, a, req.RequestURI)
@@ -261,32 +267,46 @@ func buildImpersonationRequests(headers http.Header) ([]v1.ObjectReference, erro
 	return impersonationRequests, nil
 }
 
-func authorizeNodeImperonsation(ctx context.Context, requestor user.Info, attr *authorizer.AttributesRecord, a authorizer.Authorizer, requestURI string) (authorizer.Decision, string, error) {
+// authorizeNodeImperonsation authorizes the request impersonating node.
+func authorizeNodeImperonsation(ctx context.Context, requestor user.Info, attr *authorizer.AttributesRecord, a authorizer.Authorizer, requestURI string) (authorizer.Decision, authorizer.Attributes, string) {
 	attr.Name = strings.TrimPrefix(attr.Name, "system:node:")
 	attr.Resource = "nodes"
 	attr.Verb = "impersonate:node"
+
+	// if the requestor is using a service account to impersonate the node it is running on,
+	// 1. check the permission with verb impersonate:scheduled-node.
+	// 2. If fails, fallback to check the permission with verb impersonate:node.
 	if isScheduledNode(requestor, attr) {
 		attr.Verb = "impersonate:scheduled-node"
 		decision, reason, err := a.Authorize(ctx, attr)
 		if err != nil || decision != authorizer.DecisionAllow {
 			klog.V(4).InfoS("Forbidden", "URI", requestURI, "reason", reason, "err", err)
 		} else {
-			return decision, reason, nil
+			return decision, attr, reason
 		}
 	}
-	return a.Authorize(ctx, attr)
+
+	decision, reason, err := a.Authorize(ctx, attr)
+	if err != nil || decision != authorizer.DecisionAllow {
+		klog.V(4).InfoS("Forbidden", "URI", requestURI, "reason", reason, "err", err)
+	}
+	return decision, attr, reason
 }
 
+// isScheduledNode checks if the requestor is from the scheduled node:
+// 1. the requestor is impersonating a node.
+// 2. the requestor must be using a service account.
+// 3. the requestor must run on the same node it is impersonating.
 func isScheduledNode(requestor user.Info, attr *authorizer.AttributesRecord) bool {
 	if attr.Resource != "nodes" {
 		return false
 	}
 
-	if len(requestor.GetExtra()) == 0 {
+	if _, _, err := serviceaccount.SplitUsername(requestor.GetName()); err != nil {
 		return false
 	}
 
-	if _, _, err := serviceaccount.SplitUsername(requestor.GetName()); err != nil {
+	if len(requestor.GetExtra()) == 0 {
 		return false
 	}
 
@@ -297,6 +317,9 @@ func isScheduledNode(requestor user.Info, attr *authorizer.AttributesRecord) boo
 	return true
 }
 
+// authorizeConstrainedImpersonation checks two permissions:
+// 1. the permission of verb with the prefix of "impersonate:" to impersonate a user/node/serviceaccount.
+// 2. the permission of verb with the prefix of "impersonate-on:" to impersonate a specific request.
 func authorizeConstrainedImpersonation(ctx context.Context, requestor user.Info, impersonationRequests []v1.ObjectReference, a authorizer.Authorizer, requestURI string) (authorizer.Decision, authorizer.Attributes, string) {
 	for _, impersonationRequest := range impersonationRequests {
 		gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
@@ -315,11 +338,12 @@ func authorizeConstrainedImpersonation(ctx context.Context, requestor user.Info,
 			actingAsAttributes.Verb = "impersonate:serviceaccount"
 
 		case v1.SchemeGroupVersion.WithKind("User").GroupKind():
+			// If the user has the prefix of "system:node", impersonate:node or impersonate:scheduled-node is checked
+			// instead of impersonate:user-info
 			if strings.HasPrefix(actingAsAttributes.Name, "system:node:") {
-				decision, reason, err := authorizeNodeImperonsation(ctx, requestor, actingAsAttributes, a, requestURI)
-				if err != nil || decision != authorizer.DecisionAllow {
-					klog.V(4).InfoS("Forbidden", "URI", requestURI, "reason", reason, "err", err)
-					return authorizeImpersonation(ctx, requestor, impersonationRequests, a, requestURI)
+				decision, attr, reason := authorizeNodeImperonsation(ctx, requestor, actingAsAttributes, a, requestURI)
+				if decision != authorizer.DecisionAllow {
+					return decision, attr, reason
 				}
 			} else {
 				actingAsAttributes.Resource = "users"
@@ -348,25 +372,30 @@ func authorizeConstrainedImpersonation(ctx context.Context, requestor user.Info,
 		decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 		if err != nil || decision != authorizer.DecisionAllow {
 			klog.V(4).InfoS("Forbidden", "URI", requestURI, "reason", reason, "err", err)
-			return authorizeImpersonation(ctx, requestor, impersonationRequests, a, requestURI)
+			return decision, actingAsAttributes, reason
 		}
 	}
 
+	// Get requestInfo from the context.
 	attrs, err := GetAuthorizerAttributes(ctx)
 	if err != nil {
 		return authorizer.DecisionNoOpinion, authorizer.AttributesRecord{}, ""
 	}
 	actingAttrs := attrs.(*authorizer.AttributesRecord)
+
+	// Prepend the impersonate-on prefix to the actual verb.
 	actingAttrs.Verb = "impersonate-on:" + actingAttrs.Verb
 	decision, reason, err := a.Authorize(ctx, attrs)
 	if err != nil || decision != authorizer.DecisionAllow {
 		klog.V(4).InfoS("Forbidden", "URI", requestURI, "reason", reason, "err", err)
-		return authorizeImpersonation(ctx, requestor, impersonationRequests, a, requestURI)
+		return decision, actingAttrs, reason
 	}
 
 	return authorizer.DecisionAllow, nil, ""
 }
 
+// authorizeImpersonation is the permission check on impersonate verb. It is used when ConstrainedImpersonation
+// feature gate is disabled, or the constrained permission check fails for backward compatible.
 func authorizeImpersonation(ctx context.Context, requestor user.Info, impersonationRequests []v1.ObjectReference, a authorizer.Authorizer, requestURI string) (authorizer.Decision, authorizer.Attributes, string) {
 	for _, impersonationRequest := range impersonationRequests {
 		gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
