@@ -179,6 +179,59 @@
   help: The count of disabled metrics.
   type: Counter
   stabilityLevel: BETA
+- name: grpc_operations_duration_seconds
+  subsystem: dra
+  help: Duration in seconds of the DRA gRPC operations
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - driver_name
+  - grpc_status_code
+  - method_name
+  buckets:
+  - 0.1
+  - 0.1534127404634391
+  - 0.23535468936502524
+  - 0.36106407876409946
+  - 0.5539182980610752
+  - 0.849781240983936
+  - 1.303672689737678
+  - 1.9999999999999993
+  - 3.0682548092687805
+  - 4.7070937873005025
+  - 7.221281575281985
+  - 11.078365961221499
+  - 16.995624819678714
+  - 26.07345379475354
+  - 39.99999999999997
+- name: operations_duration_seconds
+  subsystem: dra
+  help: Latency histogram in seconds for the duration of handling all ResourceClaims
+    referenced by a pod when the pod starts or stops. Identified by the name of the
+    operation (PrepareResources or UnprepareResources) and separated by the success
+    of the operation. The number of failed operations is provided through the histogram's
+    overall count.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - is_error
+  - operation_name
+  buckets:
+  - 0.1
+  - 0.1534127404634391
+  - 0.23535468936502524
+  - 0.36106407876409946
+  - 0.5539182980610752
+  - 0.849781240983936
+  - 1.303672689737678
+  - 1.9999999999999993
+  - 3.0682548092687805
+  - 4.7070937873005025
+  - 7.221281575281985
+  - 11.078365961221499
+  - 16.995624819678714
+  - 26.07345379475354
+  - 39.99999999999997
 - name: hidden_metrics_total
   help: The count of hidden metrics.
   type: Counter
@@ -212,6 +265,26 @@
   labels:
   - deprecated_version
   - stability_level
+- name: allocated_resource_claims
+  subsystem: resourceclaim_controller
+  help: Number of allocated ResourceClaims
+  type: Gauge
+  stabilityLevel: BETA
+- name: create_attempts_total
+  subsystem: resourceclaim_controller
+  help: Number of ResourceClaims creation requests
+  type: Counter
+  stabilityLevel: BETA
+- name: create_failures_total
+  subsystem: resourceclaim_controller
+  help: Number of ResourceClaims creation request failures
+  type: Counter
+  stabilityLevel: BETA
+- name: resource_claims
+  subsystem: resourceclaim_controller
+  help: Number of ResourceClaims
+  type: Gauge
+  stabilityLevel: BETA
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling

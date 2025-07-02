@@ -1011,7 +1011,7 @@ var (
 			Name:           DRAOperationsDurationKey,
 			Help:           "Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.",
 			Buckets:        DRADurationBuckets,
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"operation_name", "is_error"},
 	)
@@ -1023,7 +1023,7 @@ var (
 			Name:           DRAGRPCOperationsDurationKey,
 			Help:           "Duration in seconds of the DRA gRPC operations",
 			Buckets:        DRADurationBuckets,
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"driver_name", "method_name", "grpc_status_code"},
 	)
