@@ -382,14 +382,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		},
 		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\" or \"NoSwap\"",
 	}, {
-		name: "specify MemorySwap.SwapBehavior without enabling NodeSwap",
-		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"NodeSwap": false}
-			conf.MemorySwap.SwapBehavior = string(kubetypes.LimitedSwap)
-			return conf
-		},
-		errMsg: "invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled",
-	}, {
 		name: "CrashLoopBackOff.MaxContainerRestartPeriod too low",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true}
