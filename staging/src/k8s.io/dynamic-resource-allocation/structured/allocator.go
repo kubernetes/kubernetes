@@ -71,7 +71,7 @@ type Allocator struct {
 	// function is called for the allocator. This is a measurement of the
 	// amount of work the allocator had to do to allocate devices
 	// for the claims.
-	numAllocateOneInvocations int64
+	numAllocateOneInvocations atomic.Int64
 }
 
 type Features struct {
@@ -402,7 +402,7 @@ type Stats struct {
 
 func (a *Allocator) GetStats() Stats {
 	s := Stats{
-		NumAllocateOneInvocations: atomic.LoadInt64(&a.numAllocateOneInvocations),
+		NumAllocateOneInvocations: a.numAllocateOneInvocations.Load(),
 	}
 	return s
 }
@@ -731,7 +731,7 @@ func lookupAttribute(device *draapi.BasicDevice, deviceID DeviceID, attributeNam
 // This allows the logic for subrequests to call allocateOne with the same
 // device index without causing infinite recursion.
 func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (bool, error) {
-	atomic.AddInt64(&alloc.numAllocateOneInvocations, 1)
+	alloc.numAllocateOneInvocations.Add(1)
 	if r.claimIndex >= len(alloc.claimsToAllocate) {
 		// Done! If we were doing scoring, we would compare the current allocation result
 		// against the previous one, keep the best, and continue. Without scoring, we stop
@@ -939,14 +939,15 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 					deviceIndex:     r.deviceIndex + 1,
 				}
 				done, err := alloc.allocateOne(deviceKey, allocateSubRequest)
-				// If we hit the allocation size limit, don't attempt
-				// to find a different device, as it will not change the
-				// number of allocated devices.
-				if errors.Is(err, errAllocationResultMaxSizeExceeded) {
-					deallocate()
-					return false, err
-				}
 				if err != nil {
+					// If we hit the allocation size limit, don't attempt
+					// to find a different device, as it will not change the
+					// number of allocated devices. Just backtrack, but unlike
+					// what we do for other errors, we need to deallocate since
+					// we will continue searching for a solution.
+					if errors.Is(err, errAllocationResultMaxSizeExceeded) {
+						deallocate()
+					}
 					return false, err
 				}
 
