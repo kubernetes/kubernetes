@@ -764,11 +764,24 @@ func dropDisabledFields(
 		}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HostnameOverride) && !setHostnameOverrideInUse(oldPodSpec) {
+		// Set HostnameOverride to nil only if feature is disabled and it is not used
+		podSpec.HostnameOverride = nil
+	}
+
 	dropFileKeyRefInUse(podSpec, oldPodSpec)
 	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
 	dropContainerStopSignals(podSpec, oldPodSpec)
+}
+
+// setHostnameOverrideInUse returns true if any pod's spec defines HostnameOverride field.
+func setHostnameOverrideInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil || podSpec.HostnameOverride == nil {
+		return false
+	}
+	return true
 }
 
 func dropFileKeyRefInUse(podSpec, oldPodSpec *api.PodSpec) {

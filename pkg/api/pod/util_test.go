@@ -5199,6 +5199,90 @@ func TestHasAPIReferences(t *testing.T) {
 	}
 }
 
+func TestDropHostnameOverride(t *testing.T) {
+	podWithoutHostnameOverride := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{},
+		}
+	}
+
+	podWithHostnameOverride := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				HostnameOverride: ptr.To("custom-hostname"),
+			},
+		}
+	}
+
+	oldPodInfo := []struct {
+		description         string
+		hasHostnameOverride bool
+		pod                 func() *api.Pod
+	}{
+		{
+			description:         "with HostnameOverride=true",
+			hasHostnameOverride: true,
+			pod:                 podWithHostnameOverride,
+		},
+		{
+			description:         "with HostnameOverride=nil",
+			hasHostnameOverride: false,
+			pod:                 podWithoutHostnameOverride,
+		},
+	}
+
+	newPodInfo := []struct {
+		description         string
+		hasHostnameOverride bool
+		pod                 func() *api.Pod
+	}{
+		{
+			description:         "with HostnameOverride=true",
+			hasHostnameOverride: true,
+			pod:                 podWithHostnameOverride,
+		},
+		{
+			description:         "with HostnameOverride=nil",
+			hasHostnameOverride: false,
+			pod:                 podWithoutHostnameOverride,
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range oldPodInfo {
+			for _, newPodInfo := range newPodInfo {
+				oldPodHasHostnameOverride, oldPod := oldPodInfo.hasHostnameOverride, oldPodInfo.pod()
+				newPodHasHostnameOverride, newPod := newPodInfo.hasHostnameOverride, newPodInfo.pod()
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HostnameOverride, enabled)
+
+					DropDisabledPodFields(newPod, oldPod)
+
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasHostnameOverride:
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasHostnameOverride:
+						if exp := podWithoutHostnameOverride(); !reflect.DeepEqual(newPod, exp) {
+							t.Errorf("new pod had HostnameOverride: %v", cmp.Diff(newPod, exp))
+						}
+					default:
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestDropFileKeyRefInUse(t *testing.T) {
 	testCases := []struct {
 		name           string
