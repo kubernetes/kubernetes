@@ -102,6 +102,7 @@ type Device struct {
 	Driver     string
 	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
 	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+	Mixins     []resourceapi.DeviceMixin
 }
 
 type compiler struct {
@@ -225,30 +226,46 @@ func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
 
 var boolType = reflect.TypeOf(true)
 
+func convertAndAddAttributes(attrs map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, driver string, celAttrs map[string]any) error {
+	for name, attr := range attrs {
+		value, err := getAttributeValue(attr)
+		if err != nil {
+			return fmt.Errorf("attribute %s: %w", name, err)
+		}
+		domain, id := parseQualifiedName(name, driver)
+		if celAttrs[domain] == nil {
+			celAttrs[domain] = make(map[string]any)
+		}
+		celAttrs[domain].(map[string]any)[id] = value
+	}
+	return nil
+}
+
+func convertAndAddCapacity(caps map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, driver string, celCaps map[string]any) {
+	for name, cap := range caps {
+		domain, id := parseQualifiedName(name, driver)
+		if celCaps[domain] == nil {
+			celCaps[domain] = make(map[string]apiservercel.Quantity)
+		}
+		celCaps[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
+	}
+}
+
 func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
 	// TODO (future): avoid building these maps and instead use a proxy
 	// which wraps the underlying maps and directly looks up values.
 	attributes := make(map[string]any)
-	for name, attr := range input.Attributes {
-		value, err := getAttributeValue(attr)
-		if err != nil {
-			return false, nil, fmt.Errorf("attribute %s: %w", name, err)
-		}
-		domain, id := parseQualifiedName(name, input.Driver)
-		if attributes[domain] == nil {
-			attributes[domain] = make(map[string]any)
-		}
-		attributes[domain].(map[string]any)[id] = value
-	}
-
 	capacity := make(map[string]any)
-	for name, cap := range input.Capacity {
-		domain, id := parseQualifiedName(name, input.Driver)
-		if capacity[domain] == nil {
-			capacity[domain] = make(map[string]apiservercel.Quantity)
+	for _, mixin := range input.Mixins {
+		if err := convertAndAddAttributes(mixin.Attributes, input.Driver, attributes); err != nil {
+			return false, nil, err
 		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
+		convertAndAddCapacity(mixin.Capacity, input.Driver, capacity)
 	}
+	if err := convertAndAddAttributes(input.Attributes, input.Driver, attributes); err != nil {
+		return false, nil, err
+	}
+	convertAndAddCapacity(input.Capacity, input.Driver, capacity)
 
 	variables := map[string]any{
 		deviceVar: map[string]any{
