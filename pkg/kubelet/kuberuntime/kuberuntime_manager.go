@@ -1133,6 +1133,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 //  8. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	// Step 1: Compute sandbox and container changes.
+	if isAllowed, msg := allocation.IsPodLevelResourcesAllowed(pod); pod.Spec.Resources != nil && !isAllowed {
+		result.Fail(fmt.Errorf("unable to set pod-level resources for pod %q: %s", pod.Name, msg))
+		return
+	}
 	podContainerChanges := m.computePodActions(ctx, pod, podStatus)
 	klog.V(3).InfoS("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
 	if podContainerChanges.CreateSandbox {
