@@ -614,7 +614,7 @@ func ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx context.Context, f 
 	framework.ExpectNoError(err, "failed to update pod %q and remove finalizer in namespace %q", podName, nsName)
 
 	ginkgo.By("Waiting for the pod to not be present in the namespace")
-	framework.ExpectNoError(e2epod.WaitForPodNoLongerRunningInNamespace(ctx, f.ClientSet, podName, nsName))
+	framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podName, nsName, f.Timeouts.PodDelete)))
 
 	ginkgo.By("Waiting for the namespace to be removed.")
 	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 1*time.Second, framework.DefaultNamespaceDeletionTimeout, true,
