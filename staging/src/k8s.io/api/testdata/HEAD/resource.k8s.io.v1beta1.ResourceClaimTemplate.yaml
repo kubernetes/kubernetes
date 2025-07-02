@@ -80,16 +80,23 @@ spec:
         requests:
         - requestsValue
       constraints:
-      - matchAttribute: matchAttributeValue
+      - distinctAttribute: distinctAttributeValue
+        matchAttribute: matchAttributeValue
         requests:
         - requestsValue
       requests:
       - adminAccess: true
         allocationMode: allocationModeValue
+        capacityRequests:
+          minimum:
+            minimumKey: "0"
         count: 5
         deviceClassName: deviceClassNameValue
         firstAvailable:
         - allocationMode: allocationModeValue
+          capacityRequests:
+            minimum:
+              minimumKey: "0"
           count: 5
           deviceClassName: deviceClassNameValue
           name: nameValue
