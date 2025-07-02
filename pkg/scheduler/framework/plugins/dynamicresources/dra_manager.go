@@ -24,7 +24,6 @@ import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -201,10 +200,12 @@ func (c *claimTracker) List() ([]*resourceapi.ResourceClaim, error) {
 	return result, nil
 }
 
-func (c *claimTracker) ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error) {
+func (c *claimTracker) GatherAllocatedState() (*structured.AllocatedState, error) {
 	// Start with a fresh set that matches the current known state of the
 	// world according to the informers.
 	allocated := c.allocatedDevices.Get()
+	allocatedSharedDeviceIDs := make(structured.SharedDeviceIDList)
+	aggregatedCapacity := c.allocatedDevices.GetConsumedCapacityCollection()
 
 	// Whatever is in flight also has to be checked.
 	c.inFlightAllocations.Range(func(key, value any) bool {
@@ -212,11 +213,22 @@ func (c *claimTracker) ListAllAllocatedDevices() (sets.Set[structured.DeviceID],
 		foreachAllocatedDevice(claim, func(deviceID structured.DeviceID) {
 			c.logger.V(6).Info("Device is in flight for allocation", "device", deviceID, "claim", klog.KObj(claim))
 			allocated.Insert(deviceID)
+		}, func(sharedDeviceID structured.SharedDeviceID) {
+			c.logger.V(6).Info("Device is in flight for allocation", "shared device", sharedDeviceID, "claim", klog.KObj(claim))
+			allocatedSharedDeviceIDs[sharedDeviceID] = struct{}{}
+		}, func(capacity structured.DeviceConsumedCapacity) {
+			c.logger.V(6).Info("Device is in flight for allocation", "consumed capacity", capacity, "claim", klog.KObj(claim))
+			aggregatedCapacity.Insert(capacity)
 		})
 		return true
 	})
+
 	// There's no reason to return an error in this implementation, but the error might be helpful for other implementations.
-	return allocated, nil
+	return &structured.AllocatedState{
+		AllocatedDevices:         allocated,
+		AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
+		AggregatedCapacity:       aggregatedCapacity,
+	}, nil
 }
 
 func (c *claimTracker) AssumeClaimAfterAPICall(claim *resourceapi.ResourceClaim) error {
