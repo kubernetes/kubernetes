@@ -17,17 +17,20 @@ limitations under the License.
 package disk
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"io"
+	"maps"
 	"net/http"
-	"net/url"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/bartventer/httpcache/store/acceptance"
+	"github.com/bartventer/httpcache/store/driver"
 	"github.com/peterbourgon/diskv"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // copied from k8s.io/client-go/transport/round_trippers_test.go
@@ -44,9 +47,7 @@ func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 func BenchmarkDiskCache(b *testing.B) {
 	cacheDir, err := os.MkdirTemp("", "cache-rt")
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(b, err)
 	defer os.RemoveAll(cacheDir)
 
 	d := diskv.New(diskv.Options{
@@ -58,264 +59,188 @@ func BenchmarkDiskCache(b *testing.B) {
 
 	k := "localhost:8080/apis/batch/v1.json"
 	v, err := os.ReadFile("../../testdata/apis/batch/v1.json")
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(b, err)
 
 	c := sumDiskCache{disk: d}
 
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		c.Set(k, v)
 		c.Get(k)
 		c.Delete(k)
 	}
 }
 
-func TestCacheRoundTripper(t *testing.T) {
-	rt := &testRoundTripper{}
-	cacheDir, err := os.MkdirTemp("", "cache-rt")
-	defer os.RemoveAll(cacheDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cache := newCacheRoundTripper(cacheDir, rt)
-
-	// First call, caches the response
-	req := &http.Request{
-		Method: http.MethodGet,
-		URL:    &url.URL{Host: "localhost"},
-	}
-	rt.Response = &http.Response{
-		Header:     http.Header{"ETag": []string{`"123456"`}},
-		Body:       io.NopCloser(bytes.NewReader([]byte("Content"))),
-		StatusCode: http.StatusOK,
-	}
-	resp, err := cache.RoundTrip(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(content) != "Content" {
-		t.Errorf(`Expected Body to be "Content", got %q`, string(content))
-	}
-
-	// Second call, returns cached response
-	req = &http.Request{
-		Method: http.MethodGet,
-		URL:    &url.URL{Host: "localhost"},
-	}
-	rt.Response = &http.Response{
-		StatusCode: http.StatusNotModified,
-		Body:       io.NopCloser(bytes.NewReader([]byte("Other Content"))),
-	}
-
-	resp, err = cache.RoundTrip(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Read body and make sure we have the initial content
-	content, err = io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(content) != "Content" {
-		t.Errorf("Invalid content read from cache %q", string(content))
-	}
+func setupSumDiskCache(t *testing.T) (conn *sumDiskCache, cleanup func()) {
+	t.Helper()
+	cacheDir := t.TempDir()
+	d, err := openSumDiskCache(cacheDir)
+	require.NoError(t, err, "Failed to create sumDiskCache")
+	cleanup = func() {} //noop; t.TempDir() handles cleanup
+	return d, cleanup
 }
 
-func TestCacheRoundTripperPathPerm(t *testing.T) {
-	assert := assert.New(t)
+func TestCacheRoundTripper(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		etag := r.Header.Get("X-Test-ETag-Hint")
+		w.Header().Set("ETag", etag)
+		w.Header().Set("Vary", "Accept-Encoding")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.WriteHeader(http.StatusOK)
+		switch etag {
+		case "W/1":
+			w.Write([]byte("Content"))
+		case "W/2":
+			w.Header().Set("Content-Encoding", "gzip")
+			w.Write([]byte("Content with gzip"))
+		}
+	}))
+	defer server.Close()
 
-	rt := &testRoundTripper{}
 	cacheDir, err := os.MkdirTemp("", "cache-rt")
+	require.NoError(t, err, "Failed to create cache directory")
 	os.RemoveAll(cacheDir)
 	defer os.RemoveAll(cacheDir)
+	cache := newCacheRoundTripper(cacheDir, http.DefaultTransport)
 
-	if err != nil {
-		t.Fatal(err)
-	}
-	cache := newCacheRoundTripper(cacheDir, rt)
-
-	// First call, caches the response
-	req := &http.Request{
-		Method: http.MethodGet,
-		URL:    &url.URL{Host: "localhost"},
-	}
-	rt.Response = &http.Response{
-		Header:     http.Header{"ETag": []string{`"123456"`}},
-		Body:       io.NopCloser(bytes.NewReader([]byte("Content"))),
-		StatusCode: http.StatusOK,
-	}
-	resp, err := cache.RoundTrip(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(content) != "Content" {
-		t.Errorf(`Expected Body to be "Content", got %q`, string(content))
+	type args struct {
+		reqHeader http.Header
 	}
 
-	err = filepath.Walk(cacheDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			assert.Equal(os.FileMode(0750), info.Mode().Perm())
-		} else {
-			assert.Equal(os.FileMode(0660), info.Mode().Perm())
-		}
-		return nil
+	tests := []struct {
+		name                             string
+		args                             args
+		wantStatusCode                   int
+		wantXCacheStatus, wantXFromCache string
+		wantBody                         string
+	}{
+		{
+			name: "Cache Miss",
+			args: args{
+				reqHeader: http.Header{
+					"X-Test-ETag-Hint": []string{"W/1"},
+				},
+			},
+			wantStatusCode:   http.StatusOK,
+			wantXCacheStatus: "MISS",
+			wantXFromCache:   "",
+			wantBody:         "Content",
+		},
+		{
+			name: "Cache Miss Different Vary Header",
+			args: args{
+				reqHeader: http.Header{
+					"X-Test-ETag-Hint": []string{"W/2"},
+					"Accept-Encoding":  []string{"gzip"},
+				},
+			},
+			wantStatusCode:   http.StatusOK,
+			wantXCacheStatus: "MISS",
+			wantXFromCache:   "",
+			wantBody:         "Content with gzip",
+		},
+		{
+			name: "Cache Hit",
+			args: args{
+				reqHeader: http.Header{
+					"If-None-Match": []string{"W/1"},
+				},
+			},
+			wantStatusCode:   http.StatusOK,
+			wantXCacheStatus: "HIT",
+			wantXFromCache:   "1",
+			wantBody:         "Content",
+		},
+
+		{
+			name: "Cache Hit Different Vary Header",
+			args: args{
+				reqHeader: http.Header{
+					"If-None-Match":   []string{"W/2"},
+					"Accept-Encoding": []string{"gzip"},
+				},
+			},
+			wantStatusCode:   http.StatusOK,
+			wantXCacheStatus: "HIT",
+			wantXFromCache:   "1",
+			wantBody:         "Content with gzip",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodGet, server.URL, nil)
+			maps.Copy(req.Header, tt.args.reqHeader)
+
+			resp, err := cache.RoundTrip(req)
+			require.NoError(t, err, "RoundTrip failed")
+			defer resp.Body.Close()
+
+			content, err := io.ReadAll(resp.Body)
+			require.NoError(t, err, "Failed to read response body")
+
+			assert.Equal(t, tt.wantStatusCode, resp.StatusCode)
+			assert.Equal(t, tt.wantXCacheStatus, resp.Header.Get("X-Httpcache-Status"))
+			assert.Equal(t, tt.wantXFromCache, resp.Header.Get("X-From-Cache"))
+			assert.Equal(t, tt.wantBody, string(content))
+		})
+	}
+
+	t.Run("Cache Directory Permissions", func(t *testing.T) {
+		err := filepath.Walk(cacheDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				assert.Equal(t, os.FileMode(0750), info.Mode().Perm())
+			} else {
+				assert.Equal(t, os.FileMode(0660), info.Mode().Perm())
+			}
+			return nil
+		})
+		assert.NoError(t, err)
 	})
-	assert.NoError(err)
 }
 
 func TestSumDiskCache(t *testing.T) {
-	assert := assert.New(t)
-
-	// Ensure that we'll return a cache miss if the backing file doesn't exist.
-	t.Run("NoSuchKey", func(t *testing.T) {
-		cacheDir, err := os.MkdirTemp("", "cache-test")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(cacheDir)
-		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
-		c := &sumDiskCache{disk: d}
-
-		key := "testing"
-
-		got, ok := c.Get(key)
-		assert.False(ok)
-		assert.Equal([]byte{}, got)
+	t.Run("Acceptance", func(t *testing.T) {
+		acceptance.Run(t, acceptance.FactoryFunc(func() (driver.Conn, func()) {
+			return setupSumDiskCache(t)
+		}))
 	})
 
-	// Ensure that we'll return a cache miss if the backing file is empty.
+	// Below are edge cases specific to sumDiskCache that are not covered by
+	// the acceptance tests.
 	t.Run("EmptyFile", func(t *testing.T) {
-		cacheDir, err := os.MkdirTemp("", "cache-test")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(cacheDir)
-		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
-		c := &sumDiskCache{disk: d}
+		c, cleanup := setupSumDiskCache(t)
+		t.Cleanup(cleanup)
 
 		key := "testing"
-
-		f, err := os.Create(filepath.Join(cacheDir, sanitize(key)))
-		if err != nil {
-			t.Fatal(err)
-		}
+		f, err := os.Create(filepath.Join(c.disk.BasePath, sanitize(key)))
+		require.NoError(t, err, "Failed to create cache file")
 		f.Close()
 
-		got, ok := c.Get(key)
-		assert.False(ok)
-		assert.Equal([]byte{}, got)
+		got, err := c.Get(key)
+		assert.ErrorIs(t, err, errInvalidCacheFile)
+		assert.Equal(t, []byte{}, got)
 	})
 
-	// Ensure that we'll return a cache miss if the backing has an invalid
-	// checksum.
 	t.Run("InvalidChecksum", func(t *testing.T) {
-		cacheDir, err := os.MkdirTemp("", "cache-test")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(cacheDir)
-		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
-		c := &sumDiskCache{disk: d}
+		c, cleanup := setupSumDiskCache(t)
+		t.Cleanup(cleanup)
 
 		key := "testing"
 		value := []byte("testing")
 		mismatchedValue := []byte("testink")
 		sum := sha256.Sum256(value)
 
-		// Create a file with the sum of 'value' followed by the bytes of
-		// 'mismatchedValue'.
-		f, err := os.Create(filepath.Join(cacheDir, sanitize(key)))
-		if err != nil {
-			t.Fatal(err)
-		}
+		f, err := os.Create(filepath.Join(c.disk.BasePath, sanitize(key)))
+		require.NoError(t, err, "Failed to create cache file")
 		f.Write(sum[:])
 		f.Write(mismatchedValue)
 		f.Close()
 
 		// The mismatched checksum should result in a cache miss.
-		got, ok := c.Get(key)
-		assert.False(ok)
-		assert.Equal([]byte{}, got)
-	})
-
-	// Ensure that our disk cache will happily cache over the top of an existing
-	// value. We depend on this behaviour to recover from corrupted cache
-	// entries. When Get detects a bad checksum it will return a cache miss.
-	// This should cause httpcache to fall back to its underlying transport and
-	// to subsequently cache the new value, overwriting the corrupt one.
-	t.Run("OverwriteExistingKey", func(t *testing.T) {
-		cacheDir, err := os.MkdirTemp("", "cache-test")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(cacheDir)
-		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
-		c := &sumDiskCache{disk: d}
-
-		key := "testing"
-		value := []byte("cool value!")
-
-		// Write a value.
-		c.Set(key, value)
-		got, ok := c.Get(key)
-
-		// Ensure we can read back what we wrote.
-		assert.True(ok)
-		assert.Equal(value, got)
-
-		differentValue := []byte("I'm different!")
-
-		// Write a different value.
-		c.Set(key, differentValue)
-		got, ok = c.Get(key)
-
-		// Ensure we can read back the different value.
-		assert.True(ok)
-		assert.Equal(differentValue, got)
-	})
-
-	// Ensure that deleting a key does in fact delete it.
-	t.Run("DeleteKey", func(t *testing.T) {
-		cacheDir, err := os.MkdirTemp("", "cache-test")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(cacheDir)
-		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
-		c := &sumDiskCache{disk: d}
-
-		key := "testing"
-		value := []byte("coolValue")
-
-		c.Set(key, value)
-
-		// Ensure we successfully set the value.
-		got, ok := c.Get(key)
-		assert.True(ok)
-		assert.Equal(value, got)
-
-		c.Delete(key)
-
-		// Ensure the value is gone.
-		got, ok = c.Get(key)
-		assert.False(ok)
-		assert.Equal([]byte{}, got)
-
-		// Ensure that deleting a non-existent value is a no-op.
-		c.Delete(key)
+		got, err := c.Get(key)
+		assert.ErrorIs(t, err, errChecksumMismatch)
+		assert.Equal(t, []byte{}, got)
 	})
 }
