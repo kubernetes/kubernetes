@@ -67,7 +67,6 @@ import (
 const (
 	zookeeperManifestPath   = "test/e2e/testing-manifests/statefulset/zookeeper"
 	mysqlGaleraManifestPath = "test/e2e/testing-manifests/statefulset/mysql-galera"
-	redisManifestPath       = "test/e2e/testing-manifests/statefulset/redis"
 	cockroachDBManifestPath = "test/e2e/testing-manifests/statefulset/cockroachdb"
 	// We don't restart MySQL cluster regardless of restartCluster, since MySQL doesn't handle restart well
 	restartCluster = true
@@ -1198,14 +1197,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working redis cluster", func(ctx context.Context) {
-			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
-			appTester.statefulPod = &redisTester{client: c}
-			appTester.run(ctx)
-		})
-
-		// Do not mark this as Conformance.
-		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working mysql cluster", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 			appTester.statefulPod = &mysqlGaleraTester{client: c}
@@ -2086,37 +2077,6 @@ func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
 func (m *mysqlGaleraTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	return lastLine(m.mysqlExec(fmt.Sprintf("use statefulset; select v from foo where k=\"%v\";", key), m.ss.Namespace, name))
-}
-
-type redisTester struct {
-	ss     *appsv1.StatefulSet
-	client clientset.Interface
-}
-
-func (m *redisTester) name() string {
-	return "redis: master/slave"
-}
-
-func (m *redisTester) redisExec(cmd, ns, podName string) string {
-	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
-	return e2ekubectl.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
-}
-
-func (m *redisTester) deploy(ctx context.Context, ns string) *appsv1.StatefulSet {
-	m.ss = e2estatefulset.CreateStatefulSet(ctx, m.client, redisManifestPath, ns)
-	return m.ss
-}
-
-func (m *redisTester) write(statefulPodIndex int, kv map[string]string) {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	for k, v := range kv {
-		framework.Logf("%s", m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
-	}
-}
-
-func (m *redisTester) read(statefulPodIndex int, key string) string {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	return lastLine(m.redisExec(fmt.Sprintf("GET %v", key), m.ss.Namespace, name))
 }
 
 type cockroachDBTester struct {

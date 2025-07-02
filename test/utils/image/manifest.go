@@ -202,8 +202,6 @@ const (
 	Pause
 	// Perl image
 	Perl
-	// Redis image
-	Redis
 	// RegressionIssue74839 image
 	RegressionIssue74839
 	// ResourceConsumer image
@@ -243,7 +241,6 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
 	configs[Pause] = Config{list.GcRegistry, "pause", "3.10"}
 	configs[Perl] = Config{list.PromoterE2eRegistry, "perl", "5.26"}
-	configs[Redis] = Config{list.PromoterE2eRegistry, "redis", "5.0.5-3"}
 	configs[RegressionIssue74839] = Config{list.PromoterE2eRegistry, "regression-issue-74839", "1.2"}
 	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.13"}
 	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.4"}
