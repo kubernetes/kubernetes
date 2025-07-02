@@ -695,36 +695,6 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 	return nil
 }
 
-// getRSPods returns the Pods that a given RS should manage.
-func (rsc *ReplicaSetController) getRSPods(rs *apps.ReplicaSet, orphanedPods bool) ([]*v1.Pod, error) {
-	// Iterate over two keys:
-	//  The UID of the RS, which identifies Pods that are controlled by the RS.
-	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
-	//   but may be adopted later on if they have matching labels with the ReplicaSet.
-	podsForRS := []*v1.Pod{}
-
-	uidKeys := []string{string(rs.UID)}
-	if orphanedPods {
-		uidKeys = append(uidKeys, controller.OrphanPodIndexKeyForNamespace(rs.Namespace))
-	}
-
-	for _, key := range uidKeys {
-		podObjs, err := rsc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
-		if err != nil {
-			return nil, err
-		}
-		for _, obj := range podObjs {
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
-				continue
-			}
-			podsForRS = append(podsForRS, pod)
-		}
-	}
-	return podsForRS, nil
-}
-
 // syncReplicaSet will sync the ReplicaSet with the given key if it has had its expectations fulfilled,
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
@@ -757,7 +727,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	// List all pods indexed to RS UID and Orphan pods
-	allRSPods, err := rsc.getRSPods(rs, true)
+	allRSPods, err := controller.FilterPodsByOwner(rsc.podIndexer, &rs.ObjectMeta)
 	if err != nil {
 		return err
 	}

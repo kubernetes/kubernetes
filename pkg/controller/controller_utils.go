@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1110,6 +1111,29 @@ func AddPodControllerUIDIndexer(podInformer cache.SharedIndexInformer) error {
 			return []string{OrphanPodIndexKeyForNamespace(pod.Namespace)}, nil
 		},
 	})
+}
+
+// FilterPodsByOwner gets the Pods managed by an owner or orphan Pods in the owner's namespace
+func FilterPodsByOwner(podIndexer cache.Indexer, owner *metav1.ObjectMeta) ([]*v1.Pod, error) {
+	result := []*v1.Pod{}
+	// Iterate over two keys:
+	// - the UID of the owner, which identifies Pods that are controlled by the owner
+	// - the OrphanPodIndexKey, which identifies orphaned Pods in the owner's namespace and might be adopted by the owner later
+	for _, key := range []string{string(owner.UID), OrphanPodIndexKeyForNamespace(owner.Namespace)} {
+		pods, err := podIndexer.ByIndex(PodControllerUIDIndex, key)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range pods {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+				continue
+			}
+			result = append(result, pod)
+		}
+	}
+	return result, nil
 }
 
 // PodKey returns a key unique to the given pod within a cluster.
