@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"net/http"
@@ -279,6 +280,8 @@ func authorizeNodeImperonsation(ctx context.Context, requestor user.Info, attr *
 	if isScheduledNode(requestor, attr) {
 		attr.Verb = "impersonate:scheduled-node"
 		decision, reason, err := a.Authorize(ctx, attr)
+
+		// if impersonate:scheduled-node check fails, fallback to check impersonate:node.
 		if err != nil || decision != authorizer.DecisionAllow {
 			klog.V(4).InfoS("Forbidden", "URI", requestURI, "reason", reason, "err", err)
 		} else {
@@ -323,18 +326,19 @@ func isScheduledNode(requestor user.Info, attr *authorizer.AttributesRecord) boo
 func authorizeConstrainedImpersonation(ctx context.Context, requestor user.Info, impersonationRequests []v1.ObjectReference, a authorizer.Authorizer, requestURI string) (authorizer.Decision, authorizer.Attributes, string) {
 	for _, impersonationRequest := range impersonationRequests {
 		gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
-		actingAsAttributes := &authorizer.AttributesRecord{
-			User:            requestor,
-			APIGroup:        authenticationv1.SchemeGroupVersion.Group,
-			APIVersion:      authenticationv1.SchemeGroupVersion.Version,
-			Namespace:       impersonationRequest.Namespace,
-			Name:            impersonationRequest.Name,
-			ResourceRequest: true,
+
+		actingAsAttributes, err := buildActingAttributes(requestor, gvk, impersonationRequest)
+		if err != nil {
+			klog.V(4).InfoS("unknown impersonation request type", "request", impersonationRequest)
+			return authorizer.DecisionNoOpinion, actingAsAttributes, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest)
 		}
+
+		// group and version should always be authentication.k8s.io and v1
+		actingAsAttributes.APIGroup = authenticationv1.SchemeGroupVersion.Group
+		actingAsAttributes.APIVersion = authenticationv1.SchemeGroupVersion.Version
 
 		switch gvk.GroupKind() {
 		case v1.SchemeGroupVersion.WithKind("ServiceAccount").GroupKind():
-			actingAsAttributes.Resource = "serviceaccounts"
 			actingAsAttributes.Verb = "impersonate:serviceaccount"
 
 		case v1.SchemeGroupVersion.WithKind("User").GroupKind():
@@ -345,28 +349,15 @@ func authorizeConstrainedImpersonation(ctx context.Context, requestor user.Info,
 				if decision != authorizer.DecisionAllow {
 					return decision, attr, reason
 				}
+				continue
 			} else {
-				actingAsAttributes.Resource = "users"
 				actingAsAttributes.Verb = "impersonate:user-info"
 			}
 
-		case v1.SchemeGroupVersion.WithKind("Group").GroupKind():
-			actingAsAttributes.Resource = "groups"
+		case v1.SchemeGroupVersion.WithKind("Group").GroupKind(),
+			authenticationv1.SchemeGroupVersion.WithKind("UserExtra").GroupKind(),
+			authenticationv1.SchemeGroupVersion.WithKind("UID").GroupKind():
 			actingAsAttributes.Verb = "impersonate:user-info"
-
-		case authenticationv1.SchemeGroupVersion.WithKind("UserExtra").GroupKind():
-			extraKey := impersonationRequest.FieldPath
-			actingAsAttributes.Resource = "userextras"
-			actingAsAttributes.Subresource = extraKey
-			actingAsAttributes.Verb = "impersonate:user-info"
-
-		case authenticationv1.SchemeGroupVersion.WithKind("UID").GroupKind():
-			actingAsAttributes.Resource = "uids"
-			actingAsAttributes.Verb = "impersonate:user-info"
-
-		default:
-			klog.V(4).InfoS("unknown impersonation request type", "request", impersonationRequest)
-			return authorizer.DecisionNoOpinion, actingAsAttributes, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest)
 		}
 
 		decision, reason, err := a.Authorize(ctx, actingAsAttributes)
@@ -394,43 +385,52 @@ func authorizeConstrainedImpersonation(ctx context.Context, requestor user.Info,
 	return authorizer.DecisionAllow, nil, ""
 }
 
+func buildActingAttributes(requestor user.Info, gvk schema.GroupVersionKind, impersonationRequest v1.ObjectReference) (*authorizer.AttributesRecord, error) {
+	actingAsAttributes := &authorizer.AttributesRecord{
+		User:            requestor,
+		APIGroup:        gvk.Group,
+		APIVersion:      gvk.Version,
+		Namespace:       impersonationRequest.Namespace,
+		Name:            impersonationRequest.Name,
+		ResourceRequest: true,
+	}
+
+	switch gvk.GroupKind() {
+	case v1.SchemeGroupVersion.WithKind("ServiceAccount").GroupKind():
+		actingAsAttributes.Resource = "serviceaccounts"
+
+	case v1.SchemeGroupVersion.WithKind("User").GroupKind():
+		actingAsAttributes.Resource = "users"
+
+	case v1.SchemeGroupVersion.WithKind("Group").GroupKind():
+		actingAsAttributes.Resource = "groups"
+
+	case authenticationv1.SchemeGroupVersion.WithKind("UserExtra").GroupKind():
+		extraKey := impersonationRequest.FieldPath
+		actingAsAttributes.Resource = "userextras"
+		actingAsAttributes.Subresource = extraKey
+
+	case authenticationv1.SchemeGroupVersion.WithKind("UID").GroupKind():
+		actingAsAttributes.Resource = "uids"
+
+	default:
+		return actingAsAttributes, fmt.Errorf("unknown impersonation request type: %v", gvk)
+	}
+
+	return actingAsAttributes, nil
+}
+
 // authorizeImpersonation is the permission check on impersonate verb. It is used when ConstrainedImpersonation
 // feature gate is disabled, or the constrained permission check fails for backward compatible.
 func authorizeImpersonation(ctx context.Context, requestor user.Info, impersonationRequests []v1.ObjectReference, a authorizer.Authorizer, requestURI string) (authorizer.Decision, authorizer.Attributes, string) {
 	for _, impersonationRequest := range impersonationRequests {
 		gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
-		actingAsAttributes := &authorizer.AttributesRecord{
-			User:            requestor,
-			Verb:            "impersonate",
-			APIGroup:        gvk.Group,
-			APIVersion:      gvk.Version,
-			Namespace:       impersonationRequest.Namespace,
-			Name:            impersonationRequest.Name,
-			ResourceRequest: true,
-		}
-
-		switch gvk.GroupKind() {
-		case v1.SchemeGroupVersion.WithKind("ServiceAccount").GroupKind():
-			actingAsAttributes.Resource = "serviceaccounts"
-
-		case v1.SchemeGroupVersion.WithKind("User").GroupKind():
-			actingAsAttributes.Resource = "users"
-
-		case v1.SchemeGroupVersion.WithKind("Group").GroupKind():
-			actingAsAttributes.Resource = "groups"
-
-		case authenticationv1.SchemeGroupVersion.WithKind("UserExtra").GroupKind():
-			extraKey := impersonationRequest.FieldPath
-			actingAsAttributes.Resource = "userextras"
-			actingAsAttributes.Subresource = extraKey
-
-		case authenticationv1.SchemeGroupVersion.WithKind("UID").GroupKind():
-			actingAsAttributes.Resource = "uids"
-
-		default:
+		actingAsAttributes, err := buildActingAttributes(requestor, gvk, impersonationRequest)
+		if err != nil {
 			klog.V(4).InfoS("unknown impersonation request type", "request", impersonationRequest)
 			return authorizer.DecisionNoOpinion, actingAsAttributes, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest)
 		}
+		actingAsAttributes.Verb = "impersonate"
 
 		decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 		if err != nil || decision != authorizer.DecisionAllow {
