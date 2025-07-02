@@ -151,6 +151,8 @@ const (
 	None ImageID = iota
 	// Agnhost image
 	Agnhost
+	// AgnhostNew image
+	AgnhostNew
 	// AgnhostPrivate image
 	AgnhostPrivate
 	// APIServer image
@@ -216,7 +218,8 @@ const (
 
 func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config) {
 	configs := map[ImageID]Config{}
-	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.56"}
+	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.55"}
+	configs[AgnhostNew] = Config{list.PromoterE2eRegistry, "agnhost", "2.56"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}

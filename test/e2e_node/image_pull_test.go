@@ -304,8 +304,8 @@ func checkPodPullingOverlap(podStartTime map[string]metav1.Time, podEndTime map[
 
 func prepareAndCleanup(ctx context.Context, f *framework.Framework) (testpods []*v1.Pod) {
 	// cuda images are > 2Gi and it will reduce the flaky rate
-	image1 := imageutils.GetE2EImage(imageutils.Httpd)
-	image2 := imageutils.GetE2EImage(imageutils.HttpdNew)
+	image1 := imageutils.GetE2EImage(imageutils.Agnhost)
+	image2 := imageutils.GetE2EImage(imageutils.AgnhostNew)
 	node := getNodeName(ctx, f)
 
 	testpod := &v1.Pod{
