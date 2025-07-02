@@ -170,6 +170,11 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		HealthControlChan: make(chan DeviceHealthUpdate, 10),
 	}
 
+	ex.healthMutex.Lock()
+	ex.deviceHealth["pool-a/dev-0"] = "Healthy"
+	ex.deviceHealth["pool-b/dev-1"] = "Healthy"
+	ex.healthMutex.Unlock()
+
 	opts = append(opts,
 		kubeletplugin.DriverName(driverName),
 		kubeletplugin.NodeName(nodeName),
@@ -605,14 +610,13 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.NodeHealth_Watch
 	logger.Info("[KEP-4680-E2E-DEBUG] Test driver: sendHealthUpdate called.")
 	healthUpdates := []*drahealthv1alpha1.DeviceHealth{}
 	ex.healthMutex.Lock()
-	// Assume two devices for the test
+	defer ex.healthMutex.Unlock() // Use defer for safety
+
 	devices := []struct{ Pool, Name string }{{"pool-a", "dev-0"}, {"pool-b", "dev-1"}}
 	for _, device := range devices {
 		key := device.Pool + "/" + device.Name
-		health, ok := ex.deviceHealth[key]
-		if !ok {
-			health = "Healthy"
-		}
+		health := ex.deviceHealth[key]
+
 		healthUpdates = append(healthUpdates, &drahealthv1alpha1.DeviceHealth{
 			PoolName:    device.Pool,
 			DeviceName:  device.Name,
@@ -620,8 +624,8 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.NodeHealth_Watch
 			LastUpdated: time.Now().Unix(),
 		})
 	}
-	ex.healthMutex.Unlock()
 
 	resp := &drahealthv1alpha1.WatchResourcesResponse{Devices: healthUpdates}
+	logger.Info("Test driver sending health update", "response", resp)
 	return srv.Send(resp)
 }
