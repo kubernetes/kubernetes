@@ -815,7 +815,7 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 				node = nodeInfo.Node()
 			}
 			logger.Error(err, "Plugin failed", "pod", klog.KObj(podToSchedule), "node", klog.KObj(node), "operation", "addPod", "plugin", pl.Name())
-			return framework.AsStatus(fmt.Errorf("running AddPod on PreFilter plugin %q: %w", pl.Name(), err))
+			return fwk.AsStatus(fmt.Errorf("running AddPod on PreFilter plugin %q: %w", pl.Name(), err))
 		}
 	}
 
@@ -864,7 +864,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 				node = nodeInfo.Node()
 			}
 			logger.Error(err, "Plugin failed", "node", klog.KObj(node), "operation", "removePod", "plugin", pl.Name(), "pod", klog.KObj(podToSchedule))
-			return framework.AsStatus(fmt.Errorf("running RemovePod on PreFilter plugin %q: %w", pl.Name(), err))
+			return fwk.AsStatus(fmt.Errorf("running RemovePod on PreFilter plugin %q: %w", pl.Name(), err))
 		}
 	}
 
