@@ -248,6 +248,7 @@ var (
 		lifecycle.OutOfMemory,
 		lifecycle.OutOfEphemeralStorage,
 		lifecycle.OutOfPods,
+		lifecycle.PodLevelResourcesNotAdmittedReason,
 		tainttoleration.ErrReasonNotMatch,
 		eviction.Reason,
 		sysctl.ForbiddenReason,
@@ -1010,6 +1011,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.appArmorValidator = apparmor.NewValidator()
 		handlers = append(handlers, lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	}
+
+	handlers = append(handlers, lifecycle.NewPodFeaturesAdmitHandler())
 
 	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
 	renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)
