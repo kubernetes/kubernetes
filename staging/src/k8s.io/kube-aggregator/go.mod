@@ -7,7 +7,7 @@ go 1.24.0
 godebug default=go1.24
 
 require (
-	github.com/emicklei/go-restful/v3 v3.11.0
+	github.com/emicklei/go-restful/v3 v3.12.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/go-cmp v0.7.0
 	github.com/spf13/cobra v1.9.1

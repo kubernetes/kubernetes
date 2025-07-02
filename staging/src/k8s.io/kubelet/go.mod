@@ -7,7 +7,7 @@ go 1.24.0
 godebug default=go1.24
 
 require (
-	github.com/emicklei/go-restful/v3 v3.11.0
+	github.com/emicklei/go-restful/v3 v3.12.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/goleak v1.3.0
