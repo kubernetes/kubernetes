@@ -731,6 +731,41 @@
                 "update",
                 "watch"
               ]
+            },
+            {
+              "resource": "podcertificaterequests",
+              "responseKind": {
+                "group": "",
+                "kind": "PodCertificateRequest",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "podcertificaterequest",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "PodCertificateRequest",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
             }
           ],
           "version": "v1alpha1"
@@ -1403,73 +1438,6 @@
             }
           ],
           "version": "v1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "categories": [
-                "api-extensions"
-              ],
-              "resource": "validatingadmissionpolicies",
-              "responseKind": {
-                "group": "",
-                "kind": "ValidatingAdmissionPolicy",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicy",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "ValidatingAdmissionPolicy",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "categories": [
-                "api-extensions"
-              ],
-              "resource": "validatingadmissionpolicybindings",
-              "responseKind": {
-                "group": "",
-                "kind": "ValidatingAdmissionPolicyBinding",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicybinding",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1beta1"
         },
         {
           "freshness": "Current",
