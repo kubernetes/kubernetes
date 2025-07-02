@@ -117,6 +117,78 @@ var sliceWithPartitionableDevices = &resource.ResourceSlice{
 	},
 }
 
+var sliceWithMixins = &resource.ResourceSlice{
+	ObjectMeta: metav1.ObjectMeta{
+		Name: "valid-resource-slice",
+	},
+	Spec: resource.ResourceSliceSpec{
+		NodeName: ptr.To("valid-node-name"),
+		Driver:   "testdriver.example.com",
+		Pool: resource.ResourcePool{
+			Name:               "valid-pool-name",
+			ResourceSliceCount: 1,
+		},
+		SharedCounters: []resource.CounterSet{
+			{
+				Name: "counter-set",
+				Counters: map[string]resource.Counter{
+					"memory": {
+						Value: k8sresource.MustParse("16Gi"),
+					},
+				},
+				Includes: []string{"counter-set-mixin"},
+			},
+		},
+		Mixins: &resource.ResourceSliceMixins{
+			Device: []resource.DeviceMixin{
+				{
+					Name: "device-mixin",
+					Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+						resource.QualifiedName("vendor"): {
+							StringValue: ptr.To("test-vendor"),
+						},
+					},
+				},
+			},
+			CounterSet: []resource.CounterSetMixin{
+				{
+					Name: "counter-set-mixin",
+					Counters: map[string]resource.Counter{
+						"memory": {
+							Value: k8sresource.MustParse("16Gi"),
+						},
+					},
+				},
+			},
+			DeviceCounterConsumption: []resource.DeviceCounterConsumptionMixin{
+				{
+					Name: "device-counter-consumption-mixin",
+					Counters: map[string]resource.Counter{
+						"memory": {
+							Value: k8sresource.MustParse("16Gi"),
+						},
+					},
+				},
+			},
+		},
+		Devices: []resource.Device{{
+			Name:     "device-0",
+			Includes: []string{"device-mixin"},
+			ConsumesCounters: []resource.DeviceCounterConsumption{
+				{
+					CounterSet: "counter-set",
+					Counters: map[string]resource.Counter{
+						"memory": {
+							Value: k8sresource.MustParse("16Gi"),
+						},
+					},
+					Includes: []string{"device-counter-consumption-mixin"},
+				},
+			},
+		}},
+	},
+}
+
 func TestResourceSliceStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ResourceSlice must not be namespace scoped")
@@ -132,6 +204,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		obj                     *resource.ResourceSlice
 		deviceTaints            bool
 		partitionableDevices    bool
+		resourceSliceMixins     bool
 		expectedValidationError bool
 		expectObj               *resource.ResourceSlice
 	}{
@@ -210,12 +283,37 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"drop-fields-resourceslice-mixins": {
+			obj:                  sliceWithMixins,
+			resourceSliceMixins:  false,
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithMixins.DeepCopy()
+				obj.Spec.Mixins = nil
+				obj.Spec.SharedCounters[0].Includes = nil
+				obj.Spec.Devices[0].Includes = nil
+				obj.Spec.Devices[0].ConsumesCounters[0].Includes = nil
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-resourceslice-mixins": {
+			obj:                  sliceWithMixins,
+			resourceSliceMixins:  true,
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithMixins.DeepCopy()
+				obj.Generation = 1
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, tc.deviceTaints)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevices, tc.partitionableDevices)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceSliceMixins, tc.resourceSliceMixins)
 
 			obj := tc.obj.DeepCopy()
 
@@ -243,6 +341,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 		newObj                *resource.ResourceSlice
 		deviceTaints          bool
 		partitionableDevices  bool
+		resourceSliceMixins   bool
 		expectValidationError bool
 		expectObj             *resource.ResourceSlice
 	}{
@@ -410,12 +509,79 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				return obj
 			}(),
 		},
+		"drop-fields-resourceslice-mixins": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithMixins.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			resourceSliceMixins:  false,
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithMixins.DeepCopy()
+				obj.Spec.Mixins = nil
+				obj.Spec.SharedCounters[0].Includes = nil
+				obj.Spec.Devices[0].Includes = nil
+				obj.Spec.Devices[0].ConsumesCounters[0].Includes = nil
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-fields-resourceslice-mixins": {
+			oldObj: slice,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithMixins.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			resourceSliceMixins:  true,
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithMixins.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+		},
+		"keep-existing-fields-resourceslice-mixins": {
+			oldObj: sliceWithMixins,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithMixins.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			resourceSliceMixins:  true,
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithMixins.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
+		"keep-existing-fields-resourceslice-mixins-disabled-feature": {
+			oldObj: sliceWithMixins,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithMixins.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+			resourceSliceMixins:  false,
+			partitionableDevices: true,
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithMixins.DeepCopy()
+				obj.ResourceVersion = "4"
+				return obj
+			}(),
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, tc.deviceTaints)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPartitionableDevices, tc.partitionableDevices)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceSliceMixins, tc.resourceSliceMixins)
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
