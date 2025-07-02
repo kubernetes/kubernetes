@@ -28,31 +28,6 @@ func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{
-		IntField:              0,
-		IntPtrField:           ptr.To(-1),
-		IntTypedefField:       42,
-		ValidatedTypedefField: 100,
-	}).ExpectInvalid(
-		field.Invalid(field.NewPath("intField"), 0, content.NEQError(0)),
-		field.Invalid(field.NewPath("intPtrField"), -1, content.NEQError(-1)),
-		field.Invalid(field.NewPath("intTypedefField"), IntType(42), content.NEQError(IntType(42))),
-		field.Invalid(field.NewPath("validatedTypedefField"), ValidatedIntType(100), content.NEQError(ValidatedIntType(100))),
-	)
-
-	// Test validation ratcheting
-	st.Value(&Struct{
-		IntField:              0,
-		IntPtrField:           ptr.To(-1),
-		IntTypedefField:       42,
-		ValidatedTypedefField: 100,
-	}).OldValue(&Struct{
-		IntField:              0,
-		IntPtrField:           ptr.To(-1),
-		IntTypedefField:       42,
-		ValidatedTypedefField: 100,
-	}).ExpectValid()
-
-	st.Value(&Struct{
 		IntField:              1,
 		IntPtrField:           ptr.To(0),
 		IntTypedefField:       41,
@@ -65,4 +40,21 @@ func Test(t *testing.T) {
 		IntTypedefField:       41,
 		ValidatedTypedefField: 99,
 	}).ExpectValid()
+
+	invalid := &Struct{
+		IntField:              0,
+		IntPtrField:           ptr.To(-1),
+		IntTypedefField:       42,
+		ValidatedTypedefField: 100,
+	}
+
+	st.Value(invalid).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("intField"), 0, content.NEQError(0)).WithOrigin("neq"),
+		field.Invalid(field.NewPath("intPtrField"), -1, content.NEQError(-1)).WithOrigin("neq"),
+		field.Invalid(field.NewPath("intTypedefField"), IntType(42), content.NEQError(IntType(42))).WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedTypedefField"), ValidatedIntType(100), content.NEQError(ValidatedIntType(100))).WithOrigin("neq"),
+	})
+
+	// Test validation ratcheting.
+	st.Value(invalid).OldValue(invalid).ExpectValid()
 }

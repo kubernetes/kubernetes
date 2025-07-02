@@ -50,7 +50,7 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.Enabled
+	// field Struct.NeqTrueField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *bool) (errs field.ErrorList) {
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
@@ -58,9 +58,9 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			}
 			errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, true)...)
 			return
-		}(fldPath.Child("enabled"), &obj.Enabled, safe.Field(oldObj, func(oldObj *Struct) *bool { return &oldObj.Enabled }))...)
+		}(fldPath.Child("neqTrueField"), &obj.NeqTrueField, safe.Field(oldObj, func(oldObj *Struct) *bool { return &oldObj.NeqTrueField }))...)
 
-	// field Struct.DisabledPtr
+	// field Struct.NeqFalsePtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *bool) (errs field.ErrorList) {
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
@@ -68,7 +68,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			}
 			errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, false)...)
 			return
-		}(fldPath.Child("disabledPtr"), obj.DisabledPtr, safe.Field(oldObj, func(oldObj *Struct) *bool { return oldObj.DisabledPtr }))...)
+		}(fldPath.Child("neqFalsePtrField"), obj.NeqFalsePtrField, safe.Field(oldObj, func(oldObj *Struct) *bool { return oldObj.NeqFalsePtrField }))...)
 
 	// field Struct.ValidatedTypedefField
 	errs = append(errs,

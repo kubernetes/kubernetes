@@ -28,10 +28,10 @@ type Struct struct {
 	TypeMeta int
 
 	// +k8s:neq=true
-	Enabled bool `json:"enabled"`
+	NeqTrueField bool `json:"neqTrueField"`
 
 	// +k8s:neq=false
-	DisabledPtr *bool `json:"disabledPtr"`
+	NeqFalsePtrField *bool `json:"neqFalsePtrField"`
 
 	ValidatedTypedefField ValidatedBoolType `json:"validatedTypedefField"`
 }
