@@ -252,11 +252,7 @@ func (pl *CSILimits) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 // Filter invoked at the filter extension point.
-<<<<<<< HEAD
-func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
-=======
-func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *framework.Status {
->>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
+func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	// If the new pod doesn't have any volume attached to it, the predicate will always be true
 	if len(pod.Spec.Volumes) == 0 {
 		return nil
@@ -295,15 +291,9 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 
 	// Count CSI volumes from existing pods
 	attachedVolumes := make(map[string]string)
-<<<<<<< HEAD
-	for _, existingPod := range nodeInfo.Pods {
-		if err := pl.filterAttachableVolumes(logger, existingPod.Pod, csiNode, false /* existing pod */, attachedVolumes); err != nil {
-			return fwk.AsStatus(err)
-=======
 	for _, existingPod := range nodeInfo.GetPods() {
 		if err := pl.filterAttachableVolumes(logger, existingPod.GetPod(), csiNode, false /* existing pod */, attachedVolumes); err != nil {
-			return framework.AsStatus(err)
->>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
+			return fwk.AsStatus(err)
 		}
 	}
 

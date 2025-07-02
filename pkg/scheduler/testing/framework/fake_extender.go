@@ -61,44 +61,20 @@ func TruePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 
 // Node1PredicateExtender implements FitPredicate function to return true
 // when the given node's name is "node1"; otherwise return false.
-<<<<<<< HEAD
-func Node1PredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+func Node1PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 	if node.Node().Name == "node1" {
 		return fwk.NewStatus(fwk.Success)
 	}
 	return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
-=======
-func Node1PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
-	if node.Node().Name == "node1" {
-		return framework.NewStatus(framework.Success)
-	}
-<<<<<<< HEAD
-	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.GetNode().Name))
->>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
-=======
-	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
->>>>>>> 08e38975e00 (Address review comments)
 }
 
 // Node2PredicateExtender implements FitPredicate function to return true
 // when the given node's name is "node2"; otherwise return false.
-<<<<<<< HEAD
-func Node2PredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+func Node2PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 	if node.Node().Name == "node2" {
 		return fwk.NewStatus(fwk.Success)
 	}
 	return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
-=======
-func Node2PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
-	if node.Node().Name == "node2" {
-		return framework.NewStatus(framework.Success)
-	}
-<<<<<<< HEAD
-	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.GetNode().Name))
->>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
-=======
-	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
->>>>>>> 08e38975e00 (Address review comments)
 }
 
 // ErrorPrioritizerExtender implements PriorityFunc function to always return error.
@@ -326,11 +302,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 
 // runPredicate run predicates of extender one by one for given pod and node.
 // Returns: fits or not.
-<<<<<<< HEAD
-func (f *FakeExtender) runPredicate(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
-=======
-func (f *FakeExtender) runPredicate(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
->>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
+func (f *FakeExtender) runPredicate(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 	for _, predicate := range f.Predicates {
 		status := predicate(pod, node)
 		if !status.IsSuccess() {
@@ -349,21 +321,10 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []fwk.NodeInfo) ([]fwk.NodeInfo
 		status := f.runPredicate(pod, node)
 		if status.IsSuccess() {
 			filtered = append(filtered, node)
-<<<<<<< HEAD
 		} else if status.Code() == fwk.Unschedulable {
 			failedNodesMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed", node.Node().Name)
 		} else if status.Code() == fwk.UnschedulableAndUnresolvable {
 			failedAndUnresolvableMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed and unresolvable", node.Node().Name)
-=======
-		} else if status.Code() == framework.Unschedulable {
-			failedNodesMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed", node.Node().Name)
-		} else if status.Code() == framework.UnschedulableAndUnresolvable {
-<<<<<<< HEAD
-			failedAndUnresolvableMap[node.GetNode().Name] = fmt.Sprintf("FakeExtender: node %q failed and unresolvable", node.GetNode().Name)
->>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
-=======
-			failedAndUnresolvableMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed and unresolvable", node.Node().Name)
->>>>>>> 08e38975e00 (Address review comments)
 		} else {
 			return nil, nil, nil, status.AsError()
 		}

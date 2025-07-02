@@ -300,13 +300,8 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleS
 	s.existingAntiAffinityCounts = pl.getExistingAntiAffinityCounts(ctx, pod, s.namespaceLabels, nodesWithRequiredAntiAffinityPods)
 	s.affinityCounts, s.antiAffinityCounts = pl.getIncomingAffinityAntiAffinityCounts(ctx, s.podInfo, allNodes)
 
-<<<<<<< HEAD
-	if len(s.existingAntiAffinityCounts) == 0 && len(s.podInfo.RequiredAffinityTerms) == 0 && len(s.podInfo.RequiredAntiAffinityTerms) == 0 {
-		return nil, fwk.NewStatus(fwk.Skip)
-=======
 	if len(s.existingAntiAffinityCounts) == 0 && len(s.podInfo.GetRequiredAffinityTerms()) == 0 && len(s.podInfo.GetRequiredAntiAffinityTerms()) == 0 {
-		return nil, framework.NewStatus(framework.Skip)
->>>>>>> 08e38975e00 (Address review comments)
+		return nil, fwk.NewStatus(fwk.Skip)
 	}
 
 	cycleState.Write(preFilterStateKey, s)

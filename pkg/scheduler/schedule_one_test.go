@@ -289,7 +289,7 @@ func (pl *noPodsFilterPlugin) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	if len(nodeInfo.Pods) == 0 {
+	if len(nodeInfo.GetPods()) == 0 {
 		return nil
 	}
 	return fwk.NewStatus(fwk.Unschedulable, tf.ErrReasonFake)
