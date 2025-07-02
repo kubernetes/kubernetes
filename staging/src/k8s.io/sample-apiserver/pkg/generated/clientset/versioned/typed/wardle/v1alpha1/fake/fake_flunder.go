@@ -19,8 +19,8 @@ limitations under the License.
 package fake
 
 import (
-	gentype "k8s.io/client-go/gentype"
-	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	"k8s.io/client-go/gentype"
+	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1alpha1"
 	typedwardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1alpha1"
 )

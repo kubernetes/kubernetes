@@ -19,8 +19,8 @@ limitations under the License.
 package api
 
 import (
-	v1 "k8s.io/code-generator/examples/single/informers/externalversions/api/v1"
-	internalinterfaces "k8s.io/code-generator/examples/single/informers/externalversions/internalinterfaces"
+	"k8s.io/code-generator/examples/single/informers/externalversions/api/v1"
+	"k8s.io/code-generator/examples/single/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

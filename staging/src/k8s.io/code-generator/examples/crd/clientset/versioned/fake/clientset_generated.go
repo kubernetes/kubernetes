@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
-	applyconfiguration "k8s.io/code-generator/examples/crd/applyconfiguration"
+	"k8s.io/code-generator/examples/crd/applyconfiguration"
 	clientset "k8s.io/code-generator/examples/crd/clientset/versioned"
 	conflictingexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/conflicting/v1"
 	fakeconflictingexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/conflicting/v1/fake"

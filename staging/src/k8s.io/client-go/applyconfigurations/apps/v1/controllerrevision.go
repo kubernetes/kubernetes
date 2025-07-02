@@ -21,10 +21,10 @@ package v1
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
-	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	internal "k8s.io/client-go/applyconfigurations/internal"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/client-go/applyconfigurations/internal"
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 

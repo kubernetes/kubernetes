@@ -20,8 +20,8 @@ package fake
 
 import (
 	v1alpha2 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/testing"
 )
 
 type FakeCoordinationV1alpha2 struct {

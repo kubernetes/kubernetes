@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1 "k8s.io/api/rbac/v1"
+	"k8s.io/api/rbac/v1"
 	rbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedrbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 )
 

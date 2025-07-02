@@ -23,7 +23,7 @@ package v2
 
 import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.

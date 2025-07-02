@@ -19,17 +19,17 @@ limitations under the License.
 package v1beta3
 
 import (
-	context "context"
-	time "time"
+	"context"
+	"time"
 
 	apiflowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	watch "k8s.io/apimachinery/pkg/watch"
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
-	kubernetes "k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/kubernetes"
 	flowcontrolv1beta3 "k8s.io/client-go/listers/flowcontrol/v1beta3"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache"
 )
 
 // PriorityLevelConfigurationInformer provides access to a shared informer and lister for

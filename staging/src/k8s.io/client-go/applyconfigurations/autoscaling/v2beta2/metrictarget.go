@@ -20,7 +20,7 @@ package v2beta2
 
 import (
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
-	resource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // MetricTargetApplyConfiguration represents a declarative configuration of the MetricTarget type for use

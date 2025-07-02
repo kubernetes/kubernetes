@@ -19,8 +19,8 @@ limitations under the License.
 package v1beta2
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // AllocatedDeviceStatusApplyConfiguration represents a declarative configuration of the AllocatedDeviceStatus type for use

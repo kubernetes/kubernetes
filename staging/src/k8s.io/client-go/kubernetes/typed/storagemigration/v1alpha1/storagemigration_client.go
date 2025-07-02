@@ -19,11 +19,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	http "net/http"
+	"net/http"
 
 	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type StoragemigrationV1alpha1Interface interface {

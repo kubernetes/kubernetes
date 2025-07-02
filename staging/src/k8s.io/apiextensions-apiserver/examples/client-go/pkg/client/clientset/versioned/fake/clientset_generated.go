@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	applyconfiguration "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/applyconfiguration"
+	"k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/applyconfiguration"
 	clientset "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned"
 	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1"
 	fakecrv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1/fake"

@@ -22,9 +22,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	config "k8s.io/cloud-provider/controllers/service/config"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cloud-provider/controllers/service/config"
 )
 
 func init() {

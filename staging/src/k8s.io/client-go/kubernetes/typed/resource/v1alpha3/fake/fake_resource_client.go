@@ -20,8 +20,8 @@ package fake
 
 import (
 	v1alpha3 "k8s.io/client-go/kubernetes/typed/resource/v1alpha3"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/testing"
 )
 
 type FakeResourceV1alpha3 struct {

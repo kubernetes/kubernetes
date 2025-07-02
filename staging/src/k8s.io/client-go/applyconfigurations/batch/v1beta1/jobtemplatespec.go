@@ -20,9 +20,9 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	batchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // JobTemplateSpecApplyConfiguration represents a declarative configuration of the JobTemplateSpec type for use

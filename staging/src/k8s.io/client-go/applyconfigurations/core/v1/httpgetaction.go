@@ -20,7 +20,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // HTTPGetActionApplyConfiguration represents a declarative configuration of the HTTPGetAction type for use

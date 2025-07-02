@@ -22,13 +22,13 @@ limitations under the License.
 package v1
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	configv1 "k8s.io/kubelet/config/v1"
-	config "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 func init() {

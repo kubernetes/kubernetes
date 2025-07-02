@@ -19,7 +19,7 @@ limitations under the License.
 package v2
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // MetricIdentifierApplyConfiguration represents a declarative configuration of the MetricIdentifier type for use

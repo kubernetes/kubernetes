@@ -20,7 +20,7 @@ package v1
 
 import (
 	policyv1 "k8s.io/api/policy/v1"
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 

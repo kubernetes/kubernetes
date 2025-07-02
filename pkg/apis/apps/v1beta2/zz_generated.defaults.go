@@ -23,8 +23,8 @@ package v1beta2
 
 import (
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
-	v1 "k8s.io/api/core/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 

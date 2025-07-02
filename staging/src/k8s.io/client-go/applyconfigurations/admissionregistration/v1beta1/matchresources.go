@@ -20,7 +20,7 @@ package v1beta1
 
 import (
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // MatchResourcesApplyConfiguration represents a declarative configuration of the MatchResources type for use

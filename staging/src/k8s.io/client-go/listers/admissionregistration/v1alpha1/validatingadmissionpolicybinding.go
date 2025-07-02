@@ -20,9 +20,9 @@ package v1alpha1
 
 import (
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // ValidatingAdmissionPolicyBindingLister helps list ValidatingAdmissionPolicyBindings.

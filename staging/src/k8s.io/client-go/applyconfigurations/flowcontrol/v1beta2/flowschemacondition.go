@@ -20,7 +20,7 @@ package v1beta2
 
 import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // FlowSchemaConditionApplyConfiguration represents a declarative configuration of the FlowSchemaCondition type for use

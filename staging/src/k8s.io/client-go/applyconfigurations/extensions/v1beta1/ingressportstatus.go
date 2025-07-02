@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 )
 
 // IngressPortStatusApplyConfiguration represents a declarative configuration of the IngressPortStatus type for use

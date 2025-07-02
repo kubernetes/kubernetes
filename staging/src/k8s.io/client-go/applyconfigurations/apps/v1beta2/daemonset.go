@@ -21,10 +21,10 @@ package v1beta2
 import (
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/client-go/applyconfigurations/internal"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // DaemonSetApplyConfiguration represents a declarative configuration of the DaemonSet type for use

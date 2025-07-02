@@ -19,8 +19,8 @@ limitations under the License.
 package fake
 
 import (
-	gentype "k8s.io/client-go/gentype"
-	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/client-go/gentype"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 )
 

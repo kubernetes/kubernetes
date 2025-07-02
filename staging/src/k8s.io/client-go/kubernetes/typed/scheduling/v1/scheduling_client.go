@@ -19,11 +19,11 @@ limitations under the License.
 package v1
 
 import (
-	http "net/http"
+	"net/http"
 
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type SchedulingV1Interface interface {

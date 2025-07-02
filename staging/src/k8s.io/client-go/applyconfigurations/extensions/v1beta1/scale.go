@@ -21,8 +21,8 @@ package v1beta1
 import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ScaleApplyConfiguration represents a declarative configuration of the Scale type for use

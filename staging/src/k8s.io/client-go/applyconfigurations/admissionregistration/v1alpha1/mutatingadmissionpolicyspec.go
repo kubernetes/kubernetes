@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 )
 

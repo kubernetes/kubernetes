@@ -19,9 +19,9 @@ limitations under the License.
 package policy
 
 import (
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
-	v1 "k8s.io/client-go/informers/policy/v1"
-	v1beta1 "k8s.io/client-go/informers/policy/v1beta1"
+	"k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/informers/policy/v1"
+	"k8s.io/client-go/informers/policy/v1beta1"
 )
 
 // Interface provides access to each of this group's versions.

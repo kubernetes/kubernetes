@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	"k8s.io/api/flowcontrol/v1beta3"
 	flowcontrolv1beta3 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedflowcontrolv1beta3 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
 )
 

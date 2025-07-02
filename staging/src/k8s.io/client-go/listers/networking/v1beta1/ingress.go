@@ -20,9 +20,9 @@ package v1beta1
 
 import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // IngressLister helps list Ingresses.

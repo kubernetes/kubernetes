@@ -19,12 +19,12 @@ limitations under the License.
 package v1
 
 import (
-	context "context"
+	"context"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // SelfSubjectReviewsGetter has a method to return a SelfSubjectReviewInterface.

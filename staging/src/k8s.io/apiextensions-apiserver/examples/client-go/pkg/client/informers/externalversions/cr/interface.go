@@ -19,8 +19,8 @@ limitations under the License.
 package cr
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/informers/externalversions/cr/v1"
-	internalinterfaces "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/informers/externalversions/internalinterfaces"
+	"k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/informers/externalversions/cr/v1"
+	"k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

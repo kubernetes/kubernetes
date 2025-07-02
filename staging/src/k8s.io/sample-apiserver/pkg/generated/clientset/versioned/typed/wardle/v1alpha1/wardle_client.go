@@ -19,11 +19,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	http "net/http"
+	"net/http"
 
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
-	scheme "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
+	"k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
 )
 
 type WardleV1alpha1Interface interface {

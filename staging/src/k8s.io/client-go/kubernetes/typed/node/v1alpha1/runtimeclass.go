@@ -19,15 +19,15 @@ limitations under the License.
 package v1alpha1
 
 import (
-	context "context"
+	"context"
 
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsnodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // RuntimeClassesGetter has a method to return a RuntimeClassInterface.

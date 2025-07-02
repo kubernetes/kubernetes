@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // TCPSocketActionApplyConfiguration represents a declarative configuration of the TCPSocketAction type for use

@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	context "context"
-	time "time"
+	"context"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	watch "k8s.io/apimachinery/pkg/watch"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	singleapiv1 "k8s.io/code-generator/examples/single/api/v1"
-	versioned "k8s.io/code-generator/examples/single/clientset/versioned"
-	internalinterfaces "k8s.io/code-generator/examples/single/informers/externalversions/internalinterfaces"
+	"k8s.io/code-generator/examples/single/clientset/versioned"
+	"k8s.io/code-generator/examples/single/informers/externalversions/internalinterfaces"
 	apiv1 "k8s.io/code-generator/examples/single/listers/api/v1"
 )
 

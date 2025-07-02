@@ -20,9 +20,9 @@ package v1alpha1
 
 import (
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // RoleLister helps list Roles.

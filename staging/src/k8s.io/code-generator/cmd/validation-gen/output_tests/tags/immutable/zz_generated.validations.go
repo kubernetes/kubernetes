@@ -22,15 +22,15 @@ limitations under the License.
 package immutable
 
 import (
-	context "context"
-	fmt "fmt"
+	"context"
+	"fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
-	operation "k8s.io/apimachinery/pkg/api/operation"
-	safe "k8s.io/apimachinery/pkg/api/safe"
-	validate "k8s.io/apimachinery/pkg/api/validate"
-	field "k8s.io/apimachinery/pkg/util/validation/field"
-	testscheme "k8s.io/code-generator/cmd/validation-gen/testscheme"
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/safe"
+	"k8s.io/apimachinery/pkg/api/validate"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/code-generator/cmd/validation-gen/testscheme"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }

@@ -19,8 +19,8 @@ limitations under the License.
 package storagemigration
 
 import (
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
-	v1alpha1 "k8s.io/client-go/informers/storagemigration/v1alpha1"
+	"k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/informers/storagemigration/v1alpha1"
 )
 
 // Interface provides access to each of this group's versions.

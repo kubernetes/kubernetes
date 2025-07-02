@@ -22,7 +22,7 @@ limitations under the License.
 package trivial
 
 import (
-	testscheme "k8s.io/code-generator/cmd/validation-gen/testscheme"
+	"k8s.io/code-generator/cmd/validation-gen/testscheme"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }

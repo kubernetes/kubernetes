@@ -22,10 +22,10 @@ limitations under the License.
 package v1
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	example3io "k8s.io/code-generator/examples/apiserver/apis/example3.io"
 )
 

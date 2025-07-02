@@ -20,9 +20,9 @@ package v1alpha3
 
 import (
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // DeviceTaintRuleLister helps list DeviceTaintRules.

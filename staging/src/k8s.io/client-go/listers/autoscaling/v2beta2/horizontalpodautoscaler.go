@@ -20,9 +20,9 @@ package v2beta2
 
 import (
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // HorizontalPodAutoscalerLister helps list HorizontalPodAutoscalers.

@@ -20,8 +20,8 @@ package fake
 
 import (
 	v1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/testing"
 )
 
 type FakeRbacV1alpha1 struct {

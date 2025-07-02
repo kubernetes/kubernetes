@@ -21,10 +21,10 @@ package v1alpha2
 import (
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/client-go/applyconfigurations/internal"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // LeaseCandidateApplyConfiguration represents a declarative configuration of the LeaseCandidate type for use

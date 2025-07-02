@@ -19,11 +19,11 @@ limitations under the License.
 package v1
 
 import (
-	http "net/http"
+	"net/http"
 
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest"
 	apiv1 "k8s.io/code-generator/examples/single/api/v1"
-	scheme "k8s.io/code-generator/examples/single/clientset/versioned/scheme"
+	"k8s.io/code-generator/examples/single/clientset/versioned/scheme"
 )
 
 type ExampleV1Interface interface {

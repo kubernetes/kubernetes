@@ -19,15 +19,15 @@ limitations under the License.
 package v1
 
 import (
-	context "context"
+	"context"
 
 	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 	applyconfigurationcrv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/applyconfiguration/cr/v1"
-	scheme "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme"
+	"k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/gentype"
 )
 
 // ExamplesGetter has a method to return a ExampleInterface.

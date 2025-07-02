@@ -20,7 +20,7 @@ package v1alpha1
 
 import (
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // StorageVersionConditionApplyConfiguration represents a declarative configuration of the StorageVersionCondition type for use

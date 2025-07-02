@@ -22,15 +22,15 @@ limitations under the License.
 package typeargs
 
 import (
-	context "context"
-	fmt "fmt"
+	"context"
+	"fmt"
 
-	operation "k8s.io/apimachinery/pkg/api/operation"
-	safe "k8s.io/apimachinery/pkg/api/safe"
-	validate "k8s.io/apimachinery/pkg/api/validate"
-	field "k8s.io/apimachinery/pkg/util/validation/field"
-	primitives "k8s.io/code-generator/cmd/validation-gen/output_tests/primitives"
-	testscheme "k8s.io/code-generator/cmd/validation-gen/testscheme"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/safe"
+	"k8s.io/apimachinery/pkg/api/validate"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/code-generator/cmd/validation-gen/output_tests/primitives"
+	"k8s.io/code-generator/cmd/validation-gen/testscheme"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }

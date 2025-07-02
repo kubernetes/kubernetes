@@ -20,8 +20,8 @@ package fake
 
 import (
 	v1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/testing"
 )
 
 type FakeAuthenticationV1 struct {

@@ -19,12 +19,12 @@ limitations under the License.
 package v1beta1
 
 import (
-	context "context"
+	"context"
 
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // SubjectAccessReviewsGetter has a method to return a SubjectAccessReviewInterface.

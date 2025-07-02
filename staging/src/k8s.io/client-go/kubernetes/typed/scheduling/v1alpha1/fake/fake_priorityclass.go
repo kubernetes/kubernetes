@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "k8s.io/api/scheduling/v1alpha1"
+	"k8s.io/api/scheduling/v1alpha1"
 	schedulingv1alpha1 "k8s.io/client-go/applyconfigurations/scheduling/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedschedulingv1alpha1 "k8s.io/client-go/kubernetes/typed/scheduling/v1alpha1"
 )
 

@@ -19,9 +19,9 @@ limitations under the License.
 package v1beta1
 
 import (
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 )
 

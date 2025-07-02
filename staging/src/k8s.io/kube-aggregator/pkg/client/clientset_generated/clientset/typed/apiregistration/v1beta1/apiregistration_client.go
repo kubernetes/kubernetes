@@ -19,11 +19,11 @@ limitations under the License.
 package v1beta1
 
 import (
-	http "net/http"
+	"net/http"
 
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
-	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
+	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type ApiregistrationV1beta1Interface interface {

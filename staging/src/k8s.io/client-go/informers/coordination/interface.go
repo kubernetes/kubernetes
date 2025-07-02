@@ -19,10 +19,10 @@ limitations under the License.
 package coordination
 
 import (
-	v1 "k8s.io/client-go/informers/coordination/v1"
-	v1alpha2 "k8s.io/client-go/informers/coordination/v1alpha2"
-	v1beta1 "k8s.io/client-go/informers/coordination/v1beta1"
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/informers/coordination/v1"
+	"k8s.io/client-go/informers/coordination/v1alpha2"
+	"k8s.io/client-go/informers/coordination/v1beta1"
+	"k8s.io/client-go/informers/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

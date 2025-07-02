@@ -20,7 +20,7 @@ package v1alpha2
 
 import (
 	coordinationv1 "k8s.io/api/coordination/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // LeaseCandidateSpecApplyConfiguration represents a declarative configuration of the LeaseCandidateSpec type for use

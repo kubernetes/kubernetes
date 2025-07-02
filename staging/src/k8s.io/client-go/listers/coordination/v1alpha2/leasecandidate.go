@@ -20,9 +20,9 @@ package v1alpha2
 
 import (
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // LeaseCandidateLister helps list LeaseCandidates.

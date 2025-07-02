@@ -23,10 +23,10 @@ package v1alpha1
 
 import (
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	authentication "k8s.io/kubernetes/pkg/apis/authentication"
-	v1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/authentication"
+	"k8s.io/kubernetes/pkg/apis/authentication/v1"
 )
 
 func init() {

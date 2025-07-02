@@ -19,9 +19,9 @@ limitations under the License.
 package discovery
 
 import (
-	v1 "k8s.io/client-go/informers/discovery/v1"
-	v1beta1 "k8s.io/client-go/informers/discovery/v1beta1"
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/informers/discovery/v1"
+	"k8s.io/client-go/informers/discovery/v1beta1"
+	"k8s.io/client-go/informers/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

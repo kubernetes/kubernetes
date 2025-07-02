@@ -20,9 +20,9 @@ package v1alpha1
 
 import (
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // ImageReviewLister helps list ImageReviews.

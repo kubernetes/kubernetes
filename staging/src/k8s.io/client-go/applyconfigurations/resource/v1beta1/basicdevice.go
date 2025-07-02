@@ -20,7 +20,7 @@ package v1beta1
 
 import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // BasicDeviceApplyConfiguration represents a declarative configuration of the BasicDevice type for use

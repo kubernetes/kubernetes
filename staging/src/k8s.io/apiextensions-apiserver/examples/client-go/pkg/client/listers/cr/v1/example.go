@@ -20,9 +20,9 @@ package v1
 
 import (
 	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // ExampleLister helps list Examples.

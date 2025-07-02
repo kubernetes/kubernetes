@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
-	resource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // DeviceCapacityApplyConfiguration represents a declarative configuration of the DeviceCapacity type for use

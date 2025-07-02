@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
-	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // ResourceClaimConsumerReferenceApplyConfiguration represents a declarative configuration of the ResourceClaimConsumerReference type for use

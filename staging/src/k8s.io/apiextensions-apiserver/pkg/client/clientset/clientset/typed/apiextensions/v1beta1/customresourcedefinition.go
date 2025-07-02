@@ -19,15 +19,15 @@ limitations under the License.
 package v1beta1
 
 import (
-	context "context"
+	"context"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	applyconfigurationapiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1beta1"
-	scheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/gentype"
 )
 
 // CustomResourceDefinitionsGetter has a method to return a CustomResourceDefinitionInterface.

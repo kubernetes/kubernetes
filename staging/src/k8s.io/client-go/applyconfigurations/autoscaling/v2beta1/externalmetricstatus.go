@@ -19,8 +19,8 @@ limitations under the License.
 package v2beta1
 
 import (
-	resource "k8s.io/apimachinery/pkg/api/resource"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ExternalMetricStatusApplyConfiguration represents a declarative configuration of the ExternalMetricStatus type for use

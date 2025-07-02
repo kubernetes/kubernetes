@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	v1alpha2 "k8s.io/code-generator/examples/crd/apis/gateway-api/v1alpha2"
+	"k8s.io/code-generator/examples/crd/apis/gateway-api/v1alpha2"
 )
 
 // TestTypeStatusApplyConfiguration represents a declarative configuration of the TestTypeStatus type for use

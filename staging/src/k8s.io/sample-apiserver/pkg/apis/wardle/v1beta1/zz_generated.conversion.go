@@ -22,11 +22,11 @@ limitations under the License.
 package v1beta1
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	wardle "k8s.io/sample-apiserver/pkg/apis/wardle"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/sample-apiserver/pkg/apis/wardle"
 )
 
 func init() {

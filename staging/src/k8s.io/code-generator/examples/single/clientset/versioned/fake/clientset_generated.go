@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
-	applyconfiguration "k8s.io/code-generator/examples/single/applyconfiguration"
+	"k8s.io/code-generator/examples/single/applyconfiguration"
 	clientset "k8s.io/code-generator/examples/single/clientset/versioned"
 	examplev1 "k8s.io/code-generator/examples/single/clientset/versioned/typed/api/v1"
 	fakeexamplev1 "k8s.io/code-generator/examples/single/clientset/versioned/typed/api/v1/fake"

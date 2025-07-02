@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ValidationApplyConfiguration represents a declarative configuration of the Validation type for use

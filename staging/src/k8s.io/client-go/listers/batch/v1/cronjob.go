@@ -20,9 +20,9 @@ package v1
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // CronJobLister helps list CronJobs.

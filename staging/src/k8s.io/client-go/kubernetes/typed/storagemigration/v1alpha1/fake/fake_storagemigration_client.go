@@ -20,8 +20,8 @@ package fake
 
 import (
 	v1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/testing"
 )
 
 type FakeStoragemigrationV1alpha1 struct {

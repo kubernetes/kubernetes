@@ -19,8 +19,8 @@ limitations under the License.
 package v2beta1
 
 import (
-	v1 "k8s.io/api/core/v1"
-	resource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // ResourceMetricStatusApplyConfiguration represents a declarative configuration of the ResourceMetricStatus type for use

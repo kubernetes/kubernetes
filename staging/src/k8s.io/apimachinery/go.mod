@@ -53,3 +53,5 @@ require (
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace k8s.io/gengo/v2 => github.com/brandond/gengo/v2 v2.0.0-20250701181758-a2d61268f2ac

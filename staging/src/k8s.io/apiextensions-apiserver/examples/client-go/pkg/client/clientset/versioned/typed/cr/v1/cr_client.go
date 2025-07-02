@@ -19,11 +19,11 @@ limitations under the License.
 package v1
 
 import (
-	http "net/http"
+	"net/http"
 
 	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
-	scheme "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type CrV1Interface interface {

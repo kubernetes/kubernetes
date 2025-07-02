@@ -23,8 +23,8 @@ package v1beta1
 
 import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	v1 "k8s.io/api/core/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )

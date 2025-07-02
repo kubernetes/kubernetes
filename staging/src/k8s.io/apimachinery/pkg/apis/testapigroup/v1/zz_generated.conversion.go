@@ -22,12 +22,12 @@ limitations under the License.
 package v1
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	testapigroup "k8s.io/apimachinery/pkg/apis/testapigroup"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/apis/testapigroup"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func init() {

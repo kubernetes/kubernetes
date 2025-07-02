@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1beta1 "k8s.io/api/policy/v1beta1"
+	"k8s.io/api/policy/v1beta1"
 	policyv1beta1 "k8s.io/client-go/applyconfigurations/policy/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedpolicyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 )
 

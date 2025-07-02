@@ -19,14 +19,14 @@ limitations under the License.
 package fake
 
 import (
-	context "context"
+	"context"
 
-	v1 "k8s.io/api/certificates/v1"
+	"k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	certificatesv1 "k8s.io/client-go/applyconfigurations/certificates/v1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedcertificatesv1 "k8s.io/client-go/kubernetes/typed/certificates/v1"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/testing"
 )
 
 // fakeCertificateSigningRequests implements CertificateSigningRequestInterface

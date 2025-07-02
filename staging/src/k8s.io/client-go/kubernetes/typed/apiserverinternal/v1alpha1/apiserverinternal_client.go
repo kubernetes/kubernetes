@@ -19,11 +19,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	http "net/http"
+	"net/http"
 
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type InternalV1alpha1Interface interface {
