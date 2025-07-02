@@ -475,9 +475,9 @@ func renderList(list []string) string {
 }
 
 func (v *ValidationTester) expectInvalid(matcher matcher, errs ...*field.Error) *ValidationTester {
-	v.T.Helper()
+	v.Helper()
 
-	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
+	v.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
 
 		want := sets.New[string]()
@@ -501,10 +501,6 @@ func (v *ValidationTester) expectInvalid(matcher matcher, errs ...*field.Error) 
 }
 
 type matcher func(err *field.Error) string
-
-func byDetail(err *field.Error) string {
-	return err.Detail
-}
 
 func byFullError(err *field.Error) string {
 	return err.Error()
