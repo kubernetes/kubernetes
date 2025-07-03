@@ -68,6 +68,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	resourcev1 "k8s.io/api/resource/v1"
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
@@ -138,6 +139,7 @@ var groups = []runtime.SchemeBuilder{
 	resourcev1alpha3.SchemeBuilder,
 	resourcev1beta1.SchemeBuilder,
 	resourcev1beta2.SchemeBuilder,
+	resourcev1.SchemeBuilder,
 	schedulingv1alpha1.SchemeBuilder,
 	schedulingv1beta1.SchemeBuilder,
 	schedulingv1.SchemeBuilder,
