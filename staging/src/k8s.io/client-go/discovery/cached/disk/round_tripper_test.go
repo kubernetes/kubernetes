@@ -33,18 +33,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// copied from k8s.io/client-go/transport/round_trippers_test.go
-type testRoundTripper struct {
-	Request  *http.Request
-	Response *http.Response
-	Err      error
-}
-
-func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	rt.Request = req
-	return rt.Response, rt.Err
-}
-
 func BenchmarkDiskCache(b *testing.B) {
 	cacheDir, err := os.MkdirTemp("", "cache-rt")
 	require.NoError(b, err)
