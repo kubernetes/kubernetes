@@ -408,8 +408,6 @@ type Resource interface {
 
 	// Add adds ResourceList into Resource.
 	Add(rl v1.ResourceList)
-	// Clone returns a copy of this resource.
-	Clone() Resource
 	// AddScalar adds a resource by a scalar value of this resource.
 	AddScalar(name v1.ResourceName, quantity int64)
 	// SetScalar sets a resource by a scalar value of this resource.

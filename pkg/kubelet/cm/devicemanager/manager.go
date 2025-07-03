@@ -1053,7 +1053,7 @@ func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulerframework.NodeInfo)
 		// Needs to update nodeInfo.AllocatableResource to make sure
 		// NodeInfo.allocatableResource at least equal to the capacity already allocated.
 		if newAllocatableResource == nil {
-			newAllocatableResource = allocatableResource.CloneConcreteResource()
+			newAllocatableResource = allocatableResource.Clone()
 		}
 		newAllocatableResource.ScalarResources[v1.ResourceName(resource)] = int64(needed)
 	}
