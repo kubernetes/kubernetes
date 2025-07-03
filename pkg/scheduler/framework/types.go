@@ -275,9 +275,9 @@ func (n *NodeInfo) Snapshot() fwk.NodeInfo {
 func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	clone := &NodeInfo{
 		node:             n.node,
-		Requested:        n.Requested.CloneConcreteResource(),
-		NonZeroRequested: n.NonZeroRequested.CloneConcreteResource(),
-		Allocatable:      n.Allocatable.CloneConcreteResource(),
+		Requested:        n.Requested.Clone(),
+		NonZeroRequested: n.NonZeroRequested.Clone(),
+		Allocatable:      n.Allocatable.Clone(),
 		UsedPorts:        make(fwk.HostPortInfo),
 		ImageStates:      make(map[string]*fwk.ImageStateSummary),
 		PVCRefCounts:     make(map[string]int),
@@ -1003,12 +1003,7 @@ func (r *Resource) Add(rl v1.ResourceList) {
 }
 
 // Clone returns a copy of this resource.
-func (r *Resource) Clone() fwk.Resource {
-	return r.CloneConcreteResource()
-}
-
-// Clone returns a copy of this resource with the concrete type *Resource.
-func (r *Resource) CloneConcreteResource() *Resource {
+func (r *Resource) Clone() *Resource {
 	res := &Resource{
 		MilliCPU:         r.MilliCPU,
 		Memory:           r.Memory,
