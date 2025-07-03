@@ -227,21 +227,17 @@ func TestDRA(t *testing.T) {
 			apis:     map[schema.GroupVersion]bool{},
 			features: map[featuregate.Feature]bool{},
 			f: func(tCtx ktesting.TContext) {
-				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, false) })
+				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				tCtx.Run("FilterTimeout", testFilterTimeout)
 			},
 		},
 		"GA": {
 			apis: map[schema.GroupVersion]bool{},
 			features: map[featuregate.Feature]bool{
-				features.DynamicResourceAllocation: true,
-				// TODO: replace specific list with AllBeta once DRA is not beta.
-
-				features.DRAResourceClaimDeviceStatus: false,
-				// featuregate.Feature("AllBeta"):     false,
+				featuregate.Feature("AllBeta"): false,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
-				tCtx.Run("FilterTimeout", testFilterTimeout)
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
@@ -284,11 +280,10 @@ func TestDRA(t *testing.T) {
 				// Additional DRA feature gates go here,
 				// in alphabetical order,
 				// as needed by tests for them.
-				features.DRAAdminAccess:            true,
-				features.DRADeviceTaints:           true,
-				features.DRAPartitionableDevices:   true,
-				features.DRAPrioritizedList:        true,
-				features.DynamicResourceAllocation: true,
+				features.DRAAdminAccess:          true,
+				features.DRADeviceTaints:         true,
+				features.DRAPartitionableDevices: true,
+				features.DRAPrioritizedList:      true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })

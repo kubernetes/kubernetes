@@ -72,7 +72,7 @@ const (
 // on DRA support in the kubelet.
 //
 // Sub-tests starting with "kubelet" depend on DRA and plugin support in the kubelet.
-var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.WithFeatureGate(features.DynamicResourceAllocation), func() {
+var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	f := framework.NewDefaultFramework("dra")
 
 	// The driver containers have to run with sufficient privileges to

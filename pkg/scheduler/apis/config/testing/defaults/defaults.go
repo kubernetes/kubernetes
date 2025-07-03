@@ -17,6 +17,9 @@ limitations under the License.
 package defaults
 
 import (
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -163,6 +166,12 @@ var PluginConfigsV1 = []config.PluginConfig{
 		Args: &config.DefaultPreemptionArgs{
 			MinCandidateNodesPercentage: 10,
 			MinCandidateNodesAbsolute:   100,
+		},
+	},
+	{
+		Name: "DynamicResources",
+		Args: &config.DynamicResourcesArgs{
+			FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
 		},
 	},
 	{

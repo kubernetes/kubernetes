@@ -407,6 +407,22 @@ items:
       rbac.authorization.kubernetes.io/autoupdate: "true"
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:resource-claim-controller
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:controller:resource-claim-controller
+  subjects:
+  - kind: ServiceAccount
+    name: resource-claim-controller
+    namespace: kube-system
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:resourcequota-controller
   roleRef:
     apiGroup: rbac.authorization.k8s.io
