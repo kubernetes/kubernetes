@@ -939,25 +939,23 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 					deviceIndex:     r.deviceIndex + 1,
 				}
 				done, err := alloc.allocateOne(deviceKey, allocateSubRequest)
-				if err != nil {
-					// If we hit the allocation size limit, don't attempt
-					// to find a different device, as it will not change the
-					// number of allocated devices. Just backtrack, but unlike
-					// what we do for other errors, we need to deallocate since
-					// we will continue searching for a solution.
-					if errors.Is(err, errAllocationResultMaxSizeExceeded) {
-						deallocate()
-					}
-					return false, err
-				}
 
-				// If we found a solution, then we can stop.
-				if done {
+				// If we found a solution, we can stop.
+				if err == nil && done {
 					return done, nil
 				}
 
-				// Otherwise try some other device after rolling back.
+				// Otherwise we didn't find a solution, and we need to deallocate
+				// so the temporary allocation is correct for trying other devices.
 				deallocate()
+
+				if err != nil {
+					// If we hit an error, we return. This might be that we reached
+					// the allocation size limit, and if so, it will be caught further
+					// up the stack and other subrequests will be attempted if there
+					// are any.
+					return false, err
+				}
 			}
 		}
 	}
