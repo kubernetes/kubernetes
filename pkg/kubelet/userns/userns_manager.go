@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
 Copyright 2022 The Kubernetes Authors.
 
@@ -42,14 +45,6 @@ const userNsLength = (1 << 16)
 // Create a new map when we removed enough pods to avoid memory leaks
 // since Go maps never free memory.
 const mapReInitializeThreshold = 1000
-
-type userNsPodsManager interface {
-	HandlerSupportsUserNamespaces(runtimeHandler string) (bool, error)
-	GetPodDir(podUID types.UID) string
-	ListPodsFromDisk() ([]types.UID, error)
-	GetKubeletMappings() (uint32, uint32, error)
-	GetMaxPods() int
-}
 
 type UsernsManager struct {
 	used    *allocator.AllocationBitmap
@@ -132,7 +127,7 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("kubelet mappings: %w", err)
 	}
 
 	if kubeletMappingID%userNsLength != 0 {
@@ -411,10 +406,15 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHan
 	// From here onwards, hostUsers=false and the feature gate is enabled.
 
 	// if the pod requested a user namespace and the runtime doesn't support user namespaces then return an error.
-	if handlerSupportsUserns, err := m.kl.HandlerSupportsUserNamespaces(runtimeHandler); err != nil {
-		return nil, err
-	} else if !handlerSupportsUserns {
-		return nil, fmt.Errorf("RuntimeClass handler %q does not support user namespaces", runtimeHandler)
+	if handlerSupportsUserns, err := m.kl.HandlerSupportsUserNamespaces(runtimeHandler); err != nil || !handlerSupportsUserns {
+		msg := "can't set `spec.hostUsers: false`, runtime does not support user namespaces"
+		if runtimeHandler != "" {
+			msg = fmt.Sprintf("can't set `spec.hostUsers: false`, RuntimeClass handler %q does not support user namespaces", runtimeHandler)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%v: %w", msg, err)
+		}
+		return nil, fmt.Errorf("%v", msg)
 	}
 
 	m.lock.Lock()
@@ -429,12 +429,12 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHan
 	if string(content) != "" {
 		userNs, err = m.parseUserNsFileAndRecord(pod.UID, content)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("user namespace: %w", err)
 		}
 	} else {
 		userNs, err = m.createUserNs(pod)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("create user namespace: %w", err)
 		}
 	}
 
@@ -485,7 +485,7 @@ func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runn
 	allFound := sets.New[string]()
 	found, err := m.kl.ListPodsFromDisk()
 	if err != nil {
-		return err
+		return fmt.Errorf("user namespace: read pods from disk: %w", err)
 	}
 
 	for _, podUID := range found {
