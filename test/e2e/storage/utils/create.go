@@ -274,8 +274,11 @@ var factories = map[What]ItemFactory{
 
 // PatchName makes the name of some item unique by appending the
 // generated unique name.
-func PatchName(f *framework.Framework, item *string) {
-	if *item != "" {
+func PatchName(f *framework.Framework, driverNamespace *v1.Namespace, item *string) {
+	if *item != "" && driverNamespace != nil {
+		*item = *item + "-" + driverNamespace.GetName()
+	}
+	if *item != "" && f.Namespace != nil {
 		*item = *item + "-" + f.UniqueName
 	}
 }
@@ -304,28 +307,28 @@ func patchItemRecursively(f *framework.Framework, driverNamespace *v1.Namespace,
 		// All those names are exempt from renaming. That list could be populated by querying
 		// and get extended by tests.
 		if item.Name != "e2e-test-privileged-psp" {
-			PatchName(f, &item.Name)
+			PatchName(f, driverNamespace, &item.Name)
 		}
 	case *rbacv1.ClusterRole:
-		PatchName(f, &item.Name)
+		PatchName(f, driverNamespace, &item.Name)
 	case *rbacv1.Role:
 		PatchNamespace(f, driverNamespace, &item.Namespace)
 		// Roles are namespaced, but because for RoleRef above we don't
 		// know whether the referenced role is a ClusterRole or Role
 		// and therefore always renames, we have to do the same here.
-		PatchName(f, &item.Name)
+		PatchName(f, driverNamespace, &item.Name)
 	case *storagev1.StorageClass:
-		PatchName(f, &item.Name)
+		PatchName(f, driverNamespace, &item.Name)
 	case *storagev1beta1.VolumeAttributesClass:
-		PatchName(f, &item.Name)
+		PatchName(f, driverNamespace, &item.Name)
 	case *storagev1.CSIDriver:
-		PatchName(f, &item.Name)
+		PatchName(f, driverNamespace, &item.Name)
 	case *v1.ServiceAccount:
 		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 	case *v1.Secret:
 		PatchNamespace(f, driverNamespace, &item.ObjectMeta.Namespace)
 	case *rbacv1.ClusterRoleBinding:
-		PatchName(f, &item.Name)
+		PatchName(f, driverNamespace, &item.Name)
 		for i := range item.Subjects {
 			if err := patchItemRecursively(f, driverNamespace, &item.Subjects[i]); err != nil {
 				return fmt.Errorf("%T: %w", f, err)
