@@ -1124,7 +1124,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			driver.WithKubelet = withKubelet
 			b := newBuilder(f, driver)
 
-			f.It("supports sharing a claim sequentially", f.WithSlow(), func(ctx context.Context) {
+			// This test needs the entire test cluster for itself, therefore it is marked as serial.
+			// Running it in parallel happened to cause resource issues.
+			f.It("supports sharing a claim sequentially", f.WithSlow(), f.WithSerial(), func(ctx context.Context) {
 				var objects []klog.KMetadata
 				objects = append(objects, b.externalClaim())
 
