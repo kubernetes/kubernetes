@@ -29,6 +29,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -532,102 +533,114 @@ func (m *Manager) unprepareResourcesForPod(ctx context.Context, pod *v1.Pod) err
 func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, namespace string, claimNames []string) error {
 	logger := klog.FromContext(ctx)
 	batches := make(map[string][]*drapb.Claim)
-	claimNamesMap := make(map[types.UID]string)
+	claimsToUnprepare := make(map[string]*ClaimInfo)
+
+	// Phase 1: Update pod reference counts and identify which claims are ready for unpreparing.
+	// This is done under a single lock to ensure atomicity.
+	m.cache.Lock()
 	for _, claimName := range claimNames {
-		// Atomically perform some operations on the claimInfo cache.
-		err := m.cache.withLock(func() error {
-			// Get the claim info from the cache
-			claimInfo, exists := m.cache.get(claimName, namespace)
+		// Get the claim info from the cache directly from the map, as we hold the lock.
+		key := namespace + "/" + claimName
+		claimInfo, exists := m.cache.claimInfo[key]
 
-			// Skip calling NodeUnprepareResource if claim info is not cached
-			if !exists {
-				return nil
-			}
+		// Skip calling NodeUnprepareResource if claim info is not cached
+		if !exists {
+			continue
+		}
 
-			// Skip calling NodeUnprepareResource if other pods are still referencing it
-			if len(claimInfo.PodUIDs) > 1 {
-				// We delay checkpointing of this change until
-				// UnprepareResources returns successfully. It is OK to do
-				// this because we will only return successfully from this call
-				// if the checkpoint has succeeded. That means if the kubelet
-				// is ever restarted before this checkpoint succeeds, we will
-				// simply call into this (idempotent) function again.
-				claimInfo.deletePodReference(podUID)
-				return nil
-			}
+		// This pod is no longer using the claim. Remove its reference.
+		claimInfo.deletePodReference(podUID)
 
-			// This claimInfo name will be used to update ClaimInfo cache
-			// after NodeUnprepareResources GRPC succeeds
-			claimNamesMap[claimInfo.ClaimUID] = claimInfo.ClaimName
+		// If this was the last pod using the claim, the claim is now a
+		// candidate for being fully unprepared. We add it to a list
+		// to be processed after we have updated all reference counts.
+		if claimInfo.PodUIDs.Len() == 0 {
+			// This was the last pod. The claim is now ready to be unprepared.
+			claimsToUnprepare[claimName] = claimInfo
+		}
+	}
 
-			// Loop through all drivers and prepare for calling NodeUnprepareResources.
-			claim := &drapb.Claim{
-				Namespace: claimInfo.Namespace,
-				UID:       string(claimInfo.ClaimUID),
-				Name:      claimInfo.ClaimName,
-			}
-			for driverName := range claimInfo.DriverState {
-				batches[driverName] = append(batches[driverName], claim)
-			}
+	// Checkpoint the updated reference counts before making any RPC calls.
+	if err := m.cache.syncToCheckpoint(); err != nil {
+		m.cache.Unlock()
+		return fmt.Errorf("checkpointing pod reference removal: %w", err)
+	}
+	m.cache.Unlock()
 
-			return nil
-		})
-		if err != nil {
-			// No wrapping, this is the error above.
-			return err
+	// If no claims are ready to be unprepared, we are done.
+	if len(claimsToUnprepare) == 0 {
+		return nil
+	}
+
+	// Build batches for gRPC calls.
+	for _, claimInfo := range claimsToUnprepare {
+		// Only unprepare resources that were actually prepared.
+		if !claimInfo.isPrepared() {
+			continue
+		}
+		claim := &drapb.Claim{
+			Namespace: claimInfo.Namespace,
+			UID:       string(claimInfo.ClaimUID),
+			Name:      claimInfo.ClaimName,
+		}
+		for driverName := range claimInfo.DriverState {
+			batches[driverName] = append(batches[driverName], claim)
 		}
 	}
 
 	// Call NodeUnprepareResources for all claims in each batch.
 	// If there is any error, processing gets aborted.
-	// We could try to continue, but that would make the code more complex.
+	var allErrors []error
 	for driverName, claims := range batches {
 		// Call NodeUnprepareResources RPC for all resource handles.
 		plugin, err := m.draPlugins.GetPlugin(driverName)
-		if plugin == nil {
-			// No wrapping, error includes driver name already.
-			return err
+		if err != nil {
+			allErrors = append(allErrors, fmt.Errorf("getting plugin for driver %s: %w", driverName, err))
+			continue
 		}
 		response, err := plugin.NodeUnprepareResources(ctx, &drapb.NodeUnprepareResourcesRequest{Claims: claims})
 		if err != nil {
 			// General error unrelated to any particular claim.
-			return fmt.Errorf("NodeUnprepareResources: %w", err)
+			allErrors = append(allErrors, fmt.Errorf("NodeUnprepareResources: %w", err))
+			continue
 		}
 
 		for claimUID, result := range response.Claims {
 			reqClaim := lookupClaimRequest(claims, claimUID)
 			if reqClaim == nil {
-				return fmt.Errorf("NodeUnprepareResources returned result for unknown claim UID %s", claimUID)
+				allErrors = append(allErrors, fmt.Errorf("NodeUnprepareResources returned result for unknown claim UID %s", claimUID))
+				continue
 			}
 			if result.GetError() != "" {
-				return fmt.Errorf("NodeUnprepareResources failed for ResourceClaim %s: %s", reqClaim.Name, result.Error)
+				allErrors = append(allErrors, fmt.Errorf("NodeUnprepareResources failed for ResourceClaim %s: %s", reqClaim.Name, result.Error))
 			}
 		}
 
 		unfinished := len(claims) - len(response.Claims)
 		if unfinished != 0 {
-			return fmt.Errorf("NodeUnprepareResources skipped %d ResourceClaims", unfinished)
+			allErrors = append(allErrors, fmt.Errorf("NodeUnprepareResources skipped %d ResourceClaims", unfinished))
 		}
 	}
 
+	if len(allErrors) > 0 {
+		return utilerrors.NewAggregate(allErrors)
+	}
+
 	// Atomically perform some operations on the claimInfo cache.
-	err := m.cache.withLock(func() error {
-		// Delete all claimInfos from the cache that have just been unprepared.
-		for _, claimName := range claimNamesMap {
-			claimInfo, _ := m.cache.get(claimName, namespace)
+	m.cache.Lock()
+	defer m.cache.Unlock()
+
+	for claimName, claimInfo := range claimsToUnprepare {
+		// If the resource was prepared, it has now been successfully unprepared,
+		// so we can delete its info from the cache.
+		if claimInfo.isPrepared() {
 			m.cache.delete(claimName, namespace)
 			logger.V(6).Info("Deleted claim info cache entry", "claim", klog.KRef(namespace, claimName), "claimInfoEntry", claimInfo)
 		}
-
-		// Atomically sync the cache back to the checkpoint.
-		if err := m.cache.syncToCheckpoint(); err != nil {
-			return fmt.Errorf("checkpoint ResourceClaim state: %w", err)
-		}
-		return nil
-	})
-	if err != nil {
-		// No wrapping, this is the error above.
-		return err
+	}
+	// Atomically sync the cache back to the checkpoint.
+	if err := m.cache.syncToCheckpoint(); err != nil {
+		return fmt.Errorf("checkpoint ResourceClaim state: %w", err)
 	}
 
 	return nil

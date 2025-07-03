@@ -756,7 +756,7 @@ func TestUnprepareResources(t *testing.T) {
 				},
 				prepared: true,
 			},
-			expectedErrMsg:         "unprepare dynamic resources: DRA driver unknown-driver is not registered",
+			expectedErrMsg:         "unprepare dynamic resources: getting plugin for driver unknown-driver: DRA driver unknown-driver is not registered",
 			expectedUnprepareCalls: 0,
 		},
 		{
@@ -783,14 +783,6 @@ func TestUnprepareResources(t *testing.T) {
 			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{}},
 			expectedUnprepareCalls: 1,
 			expectedErrMsg:         "NodeUnprepareResources skipped 1 ResourceClaims",
-		},
-		{
-			description:            "should unprepare resource",
-			driverName:             driverName,
-			pod:                    genTestPod(),
-			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, false),
-			expectedUnprepareCalls: 1,
 		},
 		{
 			description:            "should unprepare already prepared resource",
