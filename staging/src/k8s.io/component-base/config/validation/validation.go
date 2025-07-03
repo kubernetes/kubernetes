@@ -46,7 +46,7 @@ func ValidateLeaderElectionConfiguration(cc *config.LeaderElectionConfiguration,
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("retryPeriod"), cc.RetryPeriod, "must be greater than zero"))
 	}
 	if cc.LeaseDuration.Duration <= cc.RenewDeadline.Duration {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("leaseDuration"), cc.RenewDeadline, "must be greater than RenewDeadline"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("leaseDuration"), cc.RenewDeadline, "must be greater than `RenewDeadline`"))
 	}
 	if len(cc.ResourceLock) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceLock"), cc.ResourceLock, "is required"))
