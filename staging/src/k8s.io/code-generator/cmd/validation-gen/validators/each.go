@@ -73,9 +73,7 @@ func (lm *listMetadata) makeListMapMatchFunc(t *types.Type) FunctionLiteral {
 	if !lm.declaredAsMap {
 		panic("makeListMapMatchFunc called on a non-map list")
 	}
-	if len(lm.keyFields) == 0 {
-		panic("makeListMapMatchFunc called on a list-map with no key fields")
-	}
+	// If no keys are defined, we will throw a good error later.
 
 	matchFn := FunctionLiteral{
 		Parameters: []ParamResult{{"a", t}, {"b", t}},
@@ -117,7 +115,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := util.NativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
-		return Validations{}, fmt.Errorf("can only be used on list types")
+		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
 
 	switch tag.Value {
@@ -201,7 +199,7 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := util.NativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
-		return Validations{}, fmt.Errorf("can only be used on list types")
+		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
 	// NOTE: lists of pointers are not supported, so we should never see a pointer here.
 	if util.NativeType(t.Elem).Kind != types.Struct {
@@ -330,7 +328,7 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	switch t.Kind {
 	case types.Slice, types.Array, types.Map:
 	default:
-		return Validations{}, fmt.Errorf("can only be used on list or map types")
+		return Validations{}, fmt.Errorf("can only be used on list or map types (%s)", t.Kind)
 	}
 
 	elemContext := Context{
@@ -478,7 +476,7 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := util.NativeType(context.Type)
 	if t.Kind != types.Map {
-		return Validations{}, fmt.Errorf("can only be used on map types")
+		return Validations{}, fmt.Errorf("can only be used on map types (%s)", t.Kind)
 	}
 
 	elemContext := Context{
