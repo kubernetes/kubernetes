@@ -151,10 +151,7 @@ func (c *sumDiskCache) Get(key string) ([]byte, error) {
 // followed by said response bytes.
 func (c *sumDiskCache) Set(key string, response []byte) error {
 	s := sha256.Sum256(response)
-	data := make([]byte, sha256.Size+len(response))
-	copy(data, s[:])
-	copy(data[sha256.Size:], response)
-	return c.disk.Write(sanitize(key), data)
+	return c.disk.Write(sanitize(key), append(s[:], response...))
 }
 
 func (c *sumDiskCache) Delete(key string) error {
