@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -967,11 +968,24 @@ func Test_UnionedGVKs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			pluginConfig := defaults.PluginConfigsV1
+
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tt.enableInPlacePodVerticalScaling)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tt.enableDynamicResourceAllocation)
 			if !tt.enableSchedulerQueueingHints {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+				// The test uses defaults.PluginConfigsV1, which contains the filter timeout.
+				// With emulation of 1.33, the DRASchedulerFilterTimeout feature gets disabled
+				// and also cannot be enabled ("pre-alpha"), which makes the config invalid.
+				// To avoid this, we have to patch the config.
+				pluginConfig = slices.Clone(pluginConfig)
+				for i := range pluginConfig {
+					if pluginConfig[i].Name == "DynamicResources" {
+						pluginConfig[i].Args = &schedulerapi.DynamicResourcesArgs{}
+						break
+					}
+				}
 			}
 
 			_, ctx := ktesting.NewTestContext(t)
@@ -990,7 +1004,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				}
 			}
 
-			profile := schedulerapi.KubeSchedulerProfile{Plugins: cfgPls, PluginConfig: defaults.PluginConfigsV1}
+			profile := schedulerapi.KubeSchedulerProfile{Plugins: cfgPls, PluginConfig: pluginConfig}
 			fwk, err := newFramework(ctx, registry, profile)
 			if err != nil {
 				t.Fatal(err)
