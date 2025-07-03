@@ -232,11 +232,11 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 				updateNodesHavePodsWithRequiredAntiAffinity = true
 			}
 			if !updateUsedPVCSet {
-				if len(existing.GetPVCRefCounts()) != len(clone.PVCRefCounts) {
+				if len(existing.PVCRefCounts) != len(clone.PVCRefCounts) {
 					updateUsedPVCSet = true
 				} else {
 					for pvcKey := range clone.PVCRefCounts {
-						if _, found := existing.GetPVCRefCounts()[pvcKey]; !found {
+						if _, found := existing.PVCRefCounts[pvcKey]; !found {
 							updateUsedPVCSet = true
 							break
 						}
@@ -295,13 +295,13 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot 
 		for _, nodeName := range nodesList {
 			if nodeInfo := snapshot.nodeInfoMap[nodeName]; nodeInfo != nil {
 				snapshot.nodeInfoList = append(snapshot.nodeInfoList, nodeInfo)
-				if len(nodeInfo.GetPodsWithAffinity()) > 0 {
+				if len(nodeInfo.PodsWithAffinity) > 0 {
 					snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, nodeInfo)
 				}
-				if len(nodeInfo.GetPodsWithRequiredAntiAffinity()) > 0 {
+				if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
 					snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 				}
-				for key := range nodeInfo.GetPVCRefCounts() {
+				for key := range nodeInfo.PVCRefCounts {
 					snapshot.usedPVCSet.Insert(key)
 				}
 			} else {
