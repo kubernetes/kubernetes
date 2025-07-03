@@ -23,7 +23,7 @@ import (
 )
 
 func init() {
-	fixtureData_1_34 := fixtureGenerator{
+	fixtureDataV1Dot34 := fixtureGenerator{
 		expectErrorSubstring: "hostProbeOrHostLifecycle",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			return []*corev1.Pod{
@@ -88,6 +88,6 @@ func init() {
 
 	registerFixtureGenerator(
 		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 34), check: "hostProbesAndHostLifecycle"},
-		fixtureData_1_34,
+		fixtureDataV1Dot34,
 	)
 }

@@ -239,7 +239,7 @@ func TestHostProbesAndHostLifecycle(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := hostProbesAndHostLifecycle_1_34(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := hostProbesAndHostLifecycleV1Dot34(&tc.pod.ObjectMeta, &tc.pod.Spec)
 			if tc.expectReason == "" {
 				if !result.Allowed {
 					t.Fatalf("expected allowed, but got disallowed: %s", result.ForbiddenDetail)
