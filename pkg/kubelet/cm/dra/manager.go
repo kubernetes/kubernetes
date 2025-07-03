@@ -711,7 +711,23 @@ func (m *Manager) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStat
 
 			// Loop through each claim associated with the container
 			for _, claimInfo := range claimInfos {
-				resourceName := v1.ResourceName(claimInfo.ClaimName)
+				var resourceName v1.ResourceName
+				foundClaimInSpec := false
+				for _, cClaim := range container.Resources.Claims {
+					if cClaim.Name == claimInfo.ClaimName {
+						if cClaim.Request == "" {
+							resourceName = v1.ResourceName(fmt.Sprintf("claim:%s", cClaim.Name))
+						} else {
+							resourceName = v1.ResourceName(fmt.Sprintf("claim:%s/%s", cClaim.Name, cClaim.Request))
+						}
+						foundClaimInSpec = true
+						break
+					}
+				}
+				if !foundClaimInSpec {
+					logger.V(4).Info("Could not find matching resource claim in container spec", "pod", klog.KObj(pod), "container", container.Name, "claimName", claimInfo.ClaimName)
+					continue
+				}
 
 				// Get or create the ResourceStatus entry for this claim
 				resStatus, ok := resourceStatusMap[resourceName]

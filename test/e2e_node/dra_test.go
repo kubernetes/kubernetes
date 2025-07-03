@@ -737,7 +737,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 			ginkgo.By("Verifying device health is now Healthy in the pod status")
 			gomega.Eventually(func() (string, error) {
-				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, poolNameForTest, deviceNameForTest)
+				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
 			}).WithTimeout(2*time.Minute).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"), "Device health should be Healthy after explicit update")
 
 			ginkgo.By("Setting device health to Unhealthy via control channel")
@@ -750,7 +750,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			ginkgo.By("Verifying device health is now Unhealthy")
 			// Verify the status has been updated to Unhealthy.
 			gomega.Eventually(func() (string, error) {
-				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, poolNameForTest, deviceNameForTest)
+				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
 			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal("Unhealthy"), "Device health should update to Unhealthy")
 		})
 	})
@@ -1082,20 +1082,29 @@ func matchResourcesByNodeName(nodeName string) types.GomegaMatcher {
 }
 
 // This helper function queries the main API server for the pod's status.
-func getDeviceHealthFromAPIServer(f *framework.Framework, namespace, podName, driverName, poolName, deviceName string) (string, error) {
+func getDeviceHealthFromAPIServer(f *framework.Framework, namespace, podName, driverName, claimName, poolName, deviceName string) (string, error) {
 	// Get the Pod object from the API server
 	pod, err := f.ClientSet.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return "NotFound", nil
+		}
 		return "", fmt.Errorf("failed to get pod %s/%s: %w", namespace, podName, err)
 	}
 
 	// This is the unique ID for the device based on how Kubelet manager code constructs it.
 	expectedResourceID := v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, poolName, deviceName))
 
+	expectedResourceStatusNameSimple := v1.ResourceName(fmt.Sprintf("claim:%s", claimName))
+	expectedResourceStatusNameWithRequest := v1.ResourceName(fmt.Sprintf("claim:%s/%s", claimName, "my-request"))
+
 	// Loop through container statuses.
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		if containerStatus.AllocatedResourcesStatus != nil {
 			for _, resourceStatus := range containerStatus.AllocatedResourcesStatus {
+				if resourceStatus.Name != expectedResourceStatusNameSimple && resourceStatus.Name != expectedResourceStatusNameWithRequest {
+					continue
+				}
 				for _, resourceHealth := range resourceStatus.Resources {
 					if resourceHealth.ResourceID == expectedResourceID || strings.HasPrefix(string(resourceHealth.ResourceID), driverName) {
 						return string(resourceHealth.Health), nil
@@ -1159,7 +1168,7 @@ func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, dr
 					Image:   e2epod.GetDefaultTestImage(),
 					Command: []string{"/bin/sh", "-c", "sleep 600"},
 					Resources: v1.ResourceRequirements{
-						Claims: []v1.ResourceClaim{{Name: claimName}},
+						Claims: []v1.ResourceClaim{{Name: claimName, Request: "my-request"}},
 					},
 				},
 			},

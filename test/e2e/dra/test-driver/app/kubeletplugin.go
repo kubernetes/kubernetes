@@ -610,7 +610,7 @@ func (ex *ExamplePlugin) sendHealthUpdate(srv drahealthv1alpha1.NodeHealth_Watch
 	logger.Info("[KEP-4680-E2E-DEBUG] Test driver: sendHealthUpdate called.")
 	healthUpdates := []*drahealthv1alpha1.DeviceHealth{}
 	ex.healthMutex.Lock()
-	defer ex.healthMutex.Unlock() // Use defer for safety
+	defer ex.healthMutex.Unlock()
 
 	devices := []struct{ Pool, Name string }{{"pool-a", "dev-0"}, {"pool-b", "dev-1"}}
 	for _, device := range devices {

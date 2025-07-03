@@ -1395,7 +1395,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	require.Len(t, contStatus.AllocatedResourcesStatus, 1, "Should have status for one resource claim")
 
 	resourceStatus := contStatus.AllocatedResourcesStatus[0]
-	assert.Equal(t, v1.ResourceName(claimName), resourceStatus.Name, "ResourceStatus Name mismatch")
+	assert.Equal(t, v1.ResourceName("claim:"+claimName), resourceStatus.Name, "ResourceStatus Name mismatch")
 	// Check the Resources slice
 	require.Len(t, resourceStatus.Resources, 1, "Should have health info for one device")
 	resourceHealth := resourceStatus.Resources[0]
