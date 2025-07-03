@@ -36,7 +36,7 @@ const (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.33
+// +k8s:prerelease-lifecycle-gen:introduced=1.34
 
 // ResourceSlice represents one or more resources in a pool of similar resources,
 // managed by a common driver. A pool may span more than one ResourceSlice, and exactly how many
@@ -500,7 +500,7 @@ const (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.33
+// +k8s:prerelease-lifecycle-gen:introduced=1.34
 
 // ResourceSliceList is a collection of ResourceSlices.
 type ResourceSliceList struct {
@@ -515,7 +515,7 @@ type ResourceSliceList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.33
+// +k8s:prerelease-lifecycle-gen:introduced=1.34
 
 // ResourceClaim describes a request for access to resources in the cluster,
 // for use by workloads. For example, if a workload needs an accelerator device
@@ -1314,7 +1314,7 @@ const (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.33
+// +k8s:prerelease-lifecycle-gen:introduced=1.34
 
 // ResourceClaimList is a collection of claims.
 type ResourceClaimList struct {
@@ -1330,7 +1330,7 @@ type ResourceClaimList struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.33
+// +k8s:prerelease-lifecycle-gen:introduced=1.34
 
 // DeviceClass is a vendor- or admin-provided resource that contains
 // device configuration and selectors. It can be referenced in
@@ -1387,7 +1387,7 @@ type DeviceClassConfiguration struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.33
+// +k8s:prerelease-lifecycle-gen:introduced=1.34
 
 // DeviceClassList is a collection of classes.
 type DeviceClassList struct {
@@ -1402,7 +1402,7 @@ type DeviceClassList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.33
+// +k8s:prerelease-lifecycle-gen:introduced=1.34
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
 //
@@ -1437,7 +1437,7 @@ type ResourceClaimTemplateSpec struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.33
+// +k8s:prerelease-lifecycle-gen:introduced=1.34
 
 // ResourceClaimTemplateList is a collection of claim templates.
 type ResourceClaimTemplateList struct {
