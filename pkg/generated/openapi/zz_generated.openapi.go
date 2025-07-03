@@ -65531,6 +65531,14 @@ func schema_k8sio_kubelet_config_v1_ServiceAccountTokenAttributes(ref common.Ref
 							Format:      "",
 						},
 					},
+					"cacheType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cacheType indicates the type of cache key use for caching the credentials returned by the plugin when the service account token is used.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"requireServiceAccount": {
 						SchemaProps: spec.SchemaProps{
 							Description: "requireServiceAccount indicates whether the plugin requires the pod to have a service account. If set to true, kubelet will only invoke the plugin if the pod has a service account. If set to false, kubelet will invoke the plugin even if the pod does not have a service account and will not include a token in the CredentialProviderRequest in that scenario. This is useful for plugins that are used to pull images for pods without service accounts (e.g., static pods).",
@@ -65579,7 +65587,7 @@ func schema_k8sio_kubelet_config_v1_ServiceAccountTokenAttributes(ref common.Ref
 						},
 					},
 				},
-				Required: []string{"serviceAccountTokenAudience", "requireServiceAccount"},
+				Required: []string{"serviceAccountTokenAudience", "cacheType", "requireServiceAccount"},
 			},
 		},
 	}
