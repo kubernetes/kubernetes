@@ -397,21 +397,12 @@ type WeightedAffinityTerm struct {
 type Resource interface {
 	GetMilliCPU() int64
 	GetMemory() int64
-	SetMemory(int64)
 	GetEphemeralStorage() int64
 	// We return AllowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
 	// explicitly as int, to avoid conversions and improve performance.
 	GetAllowedPodNumber() int
 	// ScalarResources returns a map for resource names to their scalar values
 	GetScalarResources() map[v1.ResourceName]int64
-	SetScalarResources(map[v1.ResourceName]int64)
-
-	// Add adds ResourceList into Resource.
-	Add(rl v1.ResourceList)
-	// AddScalar adds a resource by a scalar value of this resource.
-	AddScalar(name v1.ResourceName, quantity int64)
-	// SetScalar sets a resource by a scalar value of this resource.
-	SetScalar(name v1.ResourceName, quantity int64)
 	// SetMaxResource compares with ResourceList and takes max value for each Resource.
 	SetMaxResource(rl v1.ResourceList)
 }

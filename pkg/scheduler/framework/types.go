@@ -933,6 +933,8 @@ func getNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffini
 }
 
 // Resource is a collection of compute resource.
+// Implementation is separate from interface fwk.Resource, because implementation of functions Add and SetMaxResource
+// depends on internal scheduler util functions.
 type Resource struct {
 	MilliCPU         int64
 	Memory           int64
@@ -952,10 +954,6 @@ func (r *Resource) GetMemory() int64 {
 	return r.Memory
 }
 
-func (r *Resource) SetMemory(v int64) {
-	r.Memory = v
-}
-
 func (r *Resource) GetEphemeralStorage() int64 {
 	return r.EphemeralStorage
 }
@@ -966,10 +964,6 @@ func (r *Resource) GetAllowedPodNumber() int {
 
 func (r *Resource) GetScalarResources() map[v1.ResourceName]int64 {
 	return r.ScalarResources
-}
-
-func (r *Resource) SetScalarResources(s map[v1.ResourceName]int64) {
-	r.ScalarResources = s
 }
 
 // NewResource creates a Resource from ResourceList
