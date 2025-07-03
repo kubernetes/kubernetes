@@ -1941,7 +1941,8 @@ func TestRunPreFilterExtensionAddPod(t *testing.T) {
 
 			state := framework.NewCycleState()
 			state.SetSkipFilterPlugins(tt.skippedPluginNames)
-			status := f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, nil)
+			ni := framework.NewNodeInfo()
+			status := f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, ni)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("wrong status code. got: %v, want: %v", status, tt.wantStatusCode)
 			}

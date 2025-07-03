@@ -99,7 +99,7 @@ func createNodeInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*framework.N
 		}
 		nodeInfo := nodeNameToInfo[node.Name]
 		nodeInfo.SetNode(node)
-		nodeInfo.SetImageStates(getNodeImageStates(node, imageExistenceMap))
+		nodeInfo.ImageStates = getNodeImageStates(node, imageExistenceMap)
 	}
 	return nodeNameToInfo
 }
