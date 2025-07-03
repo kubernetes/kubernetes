@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/naming"
@@ -912,12 +913,12 @@ loop:
 					continue
 				}
 			}
-			meta, err := meta.Accessor(event.Object)
+			objMeta, err := meta.Accessor(event.Object)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Unable to understand watch event", "reflector", name, "event", event)
 				continue
 			}
-			resourceVersion := meta.GetResourceVersion()
+			resourceVersion := objMeta.GetResourceVersion()
 			switch event.Type {
 			case watch.Added:
 				err := store.Add(event.Object)
@@ -938,8 +939,18 @@ loop:
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to delete watch event object from store", "reflector", name, "object", event.Object)
 				}
 			case watch.Bookmark:
-				// A `Bookmark` means watch has synced here, just update the resourceVersion
-				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+				// In general, a `Bookmark` means watch has synced here,
+				// and we should just update the resourceVersion
+				//
+				// For watchlist additionally we need to check for special annotation
+				// that denotes the end of the initial events stream.
+				hasAnnotation, err := hasInitialEventsAnnotationInBookmarkObj(exitOnWatchListBookmarkReceived, event.Object, objMeta)
+				if err != nil {
+					// for watchlist fall back to
+					// a standard list call on error
+					return false, err
+				}
+				if hasAnnotation {
 					watchListBookmarkReceived = true
 				}
 			default:
@@ -1025,6 +1036,88 @@ func (r *Reflector) setIsLastSyncResourceVersionUnavailable(isUnavailable bool) 
 	r.lastSyncResourceVersionMutex.Lock()
 	defer r.lastSyncResourceVersionMutex.Unlock()
 	r.isLastSyncResourceVersionUnavailable = isUnavailable
+}
+
+func hasInitialEventsAnnotationInBookmarkObj(shouldCheckInitialEventsAnnotation bool, rawObject runtime.Object, rawObjMeta metav1.Object) (bool, error) {
+	if !shouldCheckInitialEventsAnnotation {
+		return false, nil
+	}
+	// use already constructed metadata
+	// to check if we have the annotation
+	if rawObjMeta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+		return true, nil
+	}
+
+	table, err := decodeIntoTable(rawObject)
+	if table == nil || err != nil {
+		return false, err
+	}
+	if len(table.Rows) == 0 {
+		return false, nil
+	}
+	if len(table.Rows) != 1 {
+		return false, fmt.Errorf("expected 1 row in the Table, got %d", len(table.Rows))
+	}
+
+	internalObjMeta, err := extractMetadataFromTableRowObject(table.Rows[0])
+	if internalObjMeta == nil || err != nil {
+		return false, err
+	}
+	return internalObjMeta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true", nil
+}
+
+var (
+	supportedTableVersions = map[schema.GroupVersionKind]bool{
+		metav1beta1.SchemeGroupVersion.WithKind("Table"): true,
+		metav1.SchemeGroupVersion.WithKind("Table"):      true,
+	}
+
+	_ metav1.Table      = metav1beta1.Table{}
+	_ metav1beta1.Table = metav1.Table{}
+)
+
+// decodeIntoTable tries to convert a runtime.Object into a *metav1.Table.
+// It returns (nil, nil) if rawObject is not an Unstructured Table
+// An error is returned only if conversion fails or GVK is unsupported.
+func decodeIntoTable(rawObject runtime.Object) (*metav1.Table, error) {
+	unstructuredObj, ok := rawObject.(*unstructured.Unstructured)
+	if !ok {
+		return nil, nil
+	}
+	if unstructuredObj.GetKind() != "Table" {
+		return nil, nil
+	}
+	if !supportedTableVersions[rawObject.GetObjectKind().GroupVersionKind()] {
+		return nil, fmt.Errorf("unsupported Table GVK: %v", rawObject.GetObjectKind().GroupVersionKind())
+	}
+
+	var table metav1.Table
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, &table); err != nil {
+		return nil, err
+	}
+	return &table, nil
+}
+
+// extractMetadataFromTableRowObject retrieves the metav1.Object
+// from a single TableRow. It handles two scenarios:
+//  1. If row.Object.Object is already populated, it simply returns its metadata.
+//  2. Otherwise, it decodes row.Object.Raw into a runtime.Object and then returns its metadata.
+//
+// If both row.Object.Object and row.Object.Raw are nil
+// e.g. when IncludeObject=None, it returns (nil, nil).
+func extractMetadataFromTableRowObject(row metav1.TableRow) (metav1.Object, error) {
+	if row.Object.Raw == nil && row.Object.Object == nil {
+		return nil, nil
+	}
+	if row.Object.Object != nil {
+		return meta.Accessor(row.Object.Object)
+	}
+
+	internalObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, row.Object.Raw)
+	if err != nil {
+		return nil, err
+	}
+	return meta.Accessor(internalObj)
 }
 
 func isExpiredError(err error) bool {
