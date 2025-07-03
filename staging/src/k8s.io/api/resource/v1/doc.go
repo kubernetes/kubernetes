@@ -20,5 +20,5 @@ limitations under the License.
 // +k8s:prerelease-lifecycle-gen=true
 // +groupName=resource.k8s.io
 
-// Package v1beta2 is the v1beta2 version of the resource API.
-package v1beta2
+// Package v1 is the v1 version of the resource API.
+package v1
