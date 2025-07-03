@@ -24,7 +24,6 @@ import (
 	"k8s.io/apiserver/pkg/cel/openapi/resolver"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/validatingadmissionpolicystatus"
 	"k8s.io/kubernetes/pkg/generated/openapi"
@@ -33,12 +32,12 @@ import (
 func newValidatingAdmissionPolicyStatusControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                 names.ValidatingAdmissionPolicyStatusController,
-		initFunc:             startValidatingAdmissionPolicyStatusController,
+		initFunc:             initWithStartFunc(startValidatingAdmissionPolicyStatusController),
 		requiredFeatureGates: []featuregate.Feature{},
 	}
 }
 
-func startValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+func startValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext, controllerName string) error {
 	// KCM won't start the controller without the feature gate set.
 
 	schemaResolver := resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, k8sscheme.Scheme, apiextensionsscheme.Scheme).
@@ -54,6 +53,6 @@ func startValidatingAdmissionPolicyStatusController(ctx context.Context, control
 		typeChecker,
 	)
 
-	go c.Run(ctx, int(controllerContext.ComponentConfig.ValidatingAdmissionPolicyStatusController.ConcurrentPolicySyncs))
-	return nil, true, err
+	c.Run(ctx, int(controllerContext.ComponentConfig.ValidatingAdmissionPolicyStatusController.ConcurrentPolicySyncs))
+	return err
 }

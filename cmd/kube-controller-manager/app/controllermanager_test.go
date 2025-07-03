@@ -26,11 +26,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	controllermanagercontroller "k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/features"
@@ -205,19 +205,21 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 			initFuncCalled := false
 
 			taintEvictionControllerDescriptor := NewControllerDescriptors()[names.TaintEvictionController]
-			taintEvictionControllerDescriptor.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller controllermanagercontroller.Interface, enabled bool, err error) {
+			taintEvictionControllerDescriptor.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Runnable, error) {
 				initFuncCalled = true
-				return nil, true, nil
+				return runnableFunc(func(ctx context.Context) error {
+					return nil
+				}), nil
 			}
 
-			healthCheck, err := StartController(ctx, controllerCtx, taintEvictionControllerDescriptor, nil)
-			if err != nil {
+			var healthChecks mockHealthCheckAdder
+			if err := StartController(ctx, controllerCtx, taintEvictionControllerDescriptor, &healthChecks, nil); err != nil {
 				t.Errorf("starting a TaintEvictionController controller should not return an error")
 			}
 			if test.expectInitFuncCall != initFuncCalled {
 				t.Errorf("TaintEvictionController init call check failed: expected=%v, got=%v", test.expectInitFuncCall, initFuncCalled)
 			}
-			hasHealthCheck := healthCheck != nil
+			hasHealthCheck := len(healthChecks.Checks) > 0
 			expectHealthCheck := test.expectInitFuncCall
 			if expectHealthCheck != hasHealthCheck {
 				t.Errorf("TaintEvictionController healthCheck check failed: expected=%v, got=%v", expectHealthCheck, hasHealthCheck)
@@ -238,13 +240,28 @@ func TestNoCloudProviderControllerStarted(t *testing.T) {
 			continue
 		}
 
+		var started bool
+		controller.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Runnable, error) {
+			return runnableFunc(func(ctx context.Context) error {
+				started = true
+				return nil
+			}), nil
+		}
+
 		controllerName := controller.Name()
-		checker, err := StartController(ctx, controllerCtx, controller, nil)
-		if err != nil {
+		if err := StartController(ctx, controllerCtx, controller, nil, nil); err != nil {
 			t.Errorf("Error starting controller %q: %v", controllerName, err)
 		}
-		if checker != nil {
+		if started {
 			t.Errorf("Controller %q should not be started", controllerName)
 		}
 	}
+}
+
+type mockHealthCheckAdder struct {
+	Checks []healthz.HealthChecker
+}
+
+func (m *mockHealthCheckAdder) AddHealthChecker(checks ...healthz.HealthChecker) {
+	m.Checks = append(m.Checks, checks...)
 }

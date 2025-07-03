@@ -19,7 +19,6 @@ package app
 import (
 	"context"
 
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
@@ -28,14 +27,14 @@ func newClusterRoleAggregrationControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.ClusterRoleAggregationController,
 		aliases:  []string{"clusterrole-aggregation"},
-		initFunc: startClusterRoleAggregationController,
+		initFunc: initWithStartFunc(startClusterRoleAggregationController),
 	}
 }
 
-func startClusterRoleAggregationController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	go clusterroleaggregation.NewClusterRoleAggregation(
+func startClusterRoleAggregationController(ctx context.Context, controllerContext ControllerContext, controllerName string) error {
+	clusterroleaggregation.NewClusterRoleAggregation(
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
 		controllerContext.ClientBuilder.ClientOrDie("clusterrole-aggregation-controller").RbacV1(),
 	).Run(ctx, 5)
-	return nil, true, nil
+	return nil
 }
