@@ -395,7 +395,7 @@ func ValidateIfMandatoryPriorityLevelConfigurationObject(pl *flowcontrol.Priorit
 func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, requestGV schema.GroupVersion, name string, fldPath *field.Path, opts PriorityLevelValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	if (name == flowcontrol.PriorityLevelConfigurationNameExempt) != (spec.Type == flowcontrol.PriorityLevelEnablementExempt) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), spec.Type, "type must be 'Exempt' if and only if name is 'exempt'"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), spec.Type, "must be 'Exempt' if and only if `name` is 'exempt'"))
 	}
 	switch spec.Type {
 	case flowcontrol.PriorityLevelEnablementExempt:
