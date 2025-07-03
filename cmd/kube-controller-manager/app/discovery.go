@@ -21,8 +21,8 @@ package app
 
 import (
 	"context"
+	"fmt"
 
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
 	endpointslicemirroringcontroller "k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
@@ -32,41 +32,57 @@ func newEndpointSliceControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.EndpointSliceController,
 		aliases:  []string{"endpointslice"},
-		initFunc: startEndpointSliceController,
+		initFunc: newEndpointSliceController,
 	}
 }
 
-func startEndpointSliceController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	go endpointslicecontroller.NewController(
+func newEndpointSliceController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.ClientBuilder.Client("endpointslice-controller")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a client: %w", err)
+	}
+
+	esc := endpointslicecontroller.NewController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().Services(),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.InformerFactory.Discovery().V1().EndpointSlices(),
 		controllerContext.ComponentConfig.EndpointSliceController.MaxEndpointsPerSlice,
-		controllerContext.ClientBuilder.ClientOrDie("endpointslice-controller"),
+		client,
 		controllerContext.ComponentConfig.EndpointSliceController.EndpointUpdatesBatchPeriod.Duration,
-	).Run(ctx, int(controllerContext.ComponentConfig.EndpointSliceController.ConcurrentServiceEndpointSyncs))
-	return nil, true, nil
+	)
+	return newNamedRunnableFunc(func(ctx context.Context) error {
+		esc.Run(ctx, int(controllerContext.ComponentConfig.EndpointSliceController.ConcurrentServiceEndpointSyncs))
+		return nil
+	}, controllerName), nil
 }
 
 func newEndpointSliceMirroringControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.EndpointSliceMirroringController,
 		aliases:  []string{"endpointslicemirroring"},
-		initFunc: startEndpointSliceMirroringController,
+		initFunc: newEndpointSliceMirroringController,
 	}
 }
 
-func startEndpointSliceMirroringController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	go endpointslicemirroringcontroller.NewController(
+func newEndpointSliceMirroringController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.ClientBuilder.Client("endpointslicemirroring-controller")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a client: %w", err)
+	}
+
+	esmc := endpointslicemirroringcontroller.NewController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Endpoints(),
 		controllerContext.InformerFactory.Discovery().V1().EndpointSlices(),
 		controllerContext.InformerFactory.Core().V1().Services(),
 		controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringMaxEndpointsPerSubset,
-		controllerContext.ClientBuilder.ClientOrDie("endpointslicemirroring-controller"),
+		client,
 		controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringEndpointUpdatesBatchPeriod.Duration,
-	).Run(ctx, int(controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringConcurrentServiceEndpointSyncs))
-	return nil, true, nil
+	)
+	return newNamedRunnableFunc(func(ctx context.Context) error {
+		esmc.Run(ctx, int(controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringConcurrentServiceEndpointSyncs))
+		return nil
+	}, controllerName), nil
 }

@@ -21,14 +21,14 @@ package app
 
 import (
 	"context"
+	"fmt"
 
+	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
 	"k8s.io/metrics/pkg/client/external_metrics"
@@ -38,49 +38,52 @@ func newHorizontalPodAutoscalerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.HorizontalPodAutoscalerController,
 		aliases:  []string{"horizontalpodautoscaling"},
-		initFunc: startHorizontalPodAutoscalerControllerWithRESTClient,
+		initFunc: newHorizontalPodAutoscalerController,
 	}
 }
 
-func startHorizontalPodAutoscalerControllerWithRESTClient(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	clientConfig, err := controllerContext.ClientBuilder.Config("horizontal-pod-autoscaler")
+	if err != nil {
+		return nil, fmt.Errorf("failed to init client config for %s: %w", controllerName, err)
+	}
 
-	clientConfig := controllerContext.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
-	hpaClient := controllerContext.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
-
-	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(hpaClient.Discovery())
-	// invalidate the discovery information roughly once per resync interval our API
-	// information is *at most* two resync intervals old.
-	go custom_metrics.PeriodicallyInvalidate(
-		apiVersionsGetter,
-		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
-		ctx.Done())
-
-	metricsClient := metrics.NewRESTMetricsClient(
-		resourceclient.NewForConfigOrDie(clientConfig),
-		custom_metrics.NewForConfig(clientConfig, controllerContext.RESTMapper, apiVersionsGetter),
-		external_metrics.NewForConfigOrDie(clientConfig),
-	)
-	return startHPAControllerWithMetricsClient(ctx, controllerContext, metricsClient)
-}
-
-func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext ControllerContext, metricsClient metrics.MetricsClient) (controller.Interface, bool, error) {
-
-	hpaClient := controllerContext.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
-	hpaClientConfig := controllerContext.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
+	client, err := controllerContext.ClientBuilder.Client("horizontal-pod-autoscaler")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a client: %w", err)
+	}
 
 	// we don't use cached discovery because DiscoveryScaleKindResolver does its own caching,
 	// so we want to re-fetch every time when we actually ask for it
-	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(hpaClient.Discovery())
-	scaleClient, err := scale.NewForConfig(hpaClientConfig, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
+	scaleClient, err := scale.NewForConfig(clientConfig, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
-		return nil, false, err
+		return nil, fmt.Errorf("failed to init HPA scale client: %w", err)
 	}
 
-	go podautoscaler.NewHorizontalController(
+	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(client.Discovery())
+
+	resourceClient, err := resourceclient.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init the resource client for %s: %w", controllerName, err)
+	}
+
+	externalMetricsClient, err := external_metrics.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init the external metrics client for %s: %w", controllerName, err)
+	}
+
+	metricsClient := metrics.NewRESTMetricsClient(
+		resourceClient,
+		custom_metrics.NewForConfig(clientConfig, controllerContext.RESTMapper, apiVersionsGetter),
+		externalMetricsClient,
+	)
+
+	pas := podautoscaler.NewHorizontalController(
 		ctx,
-		hpaClient.CoreV1(),
+		client.CoreV1(),
 		scaleClient,
-		hpaClient.AutoscalingV2(),
+		client.AutoscalingV2(),
 		controllerContext.RESTMapper,
 		metricsClient,
 		controllerContext.InformerFactory.Autoscaling().V2().HorizontalPodAutoscalers(),
@@ -90,6 +93,21 @@ func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext 
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
-	).Run(ctx, int(controllerContext.ComponentConfig.HPAController.ConcurrentHorizontalPodAutoscalerSyncs))
-	return nil, true, nil
+	)
+	return newNamedRunnableFunc(func(ctx context.Context) error {
+		eg, ctx := errgroup.WithContext(ctx)
+		eg.Go(func() error {
+			custom_metrics.PeriodicallyInvalidate(
+				apiVersionsGetter,
+				controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
+				ctx.Done())
+			return nil
+		})
+
+		eg.Go(func() error {
+			pas.Run(ctx, int(controllerContext.ComponentConfig.HPAController.ConcurrentHorizontalPodAutoscalerSyncs))
+			return nil
+		})
+		return eg.Wait()
+	}, controllerName), nil
 }

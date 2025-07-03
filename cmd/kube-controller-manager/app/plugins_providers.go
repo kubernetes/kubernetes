@@ -32,6 +32,7 @@ func appendPluginBasedOnFeatureFlags(logger klog.Logger, plugins []volume.Volume
 
 	_, err := csimigration.CheckMigrationFeatureFlags(featureGate, pluginInfo.pluginMigrationFeature, pluginInfo.pluginUnregisterFeature)
 	if err != nil {
+		// XXX: Can we remove os.Exit?
 		logger.Error(err, "Unexpected CSI Migration Feature Flags combination detected. CSI Migration may not take effect")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		// TODO: fail and return here once alpha only tests can set the feature flags for a plugin correctly

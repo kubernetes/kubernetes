@@ -18,8 +18,8 @@ package app
 
 import (
 	"context"
+	"fmt"
 
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
@@ -28,14 +28,22 @@ func newClusterRoleAggregrationControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.ClusterRoleAggregationController,
 		aliases:  []string{"clusterrole-aggregation"},
-		initFunc: startClusterRoleAggregationController,
+		initFunc: newClusterRoleAggregationController,
 	}
 }
 
-func startClusterRoleAggregationController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	go clusterroleaggregation.NewClusterRoleAggregation(
+func newClusterRoleAggregationController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.ClientBuilder.Client("clusterrole-aggregation-controller")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a client: %w", err)
+	}
+
+	crac := clusterroleaggregation.NewClusterRoleAggregation(
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
-		controllerContext.ClientBuilder.ClientOrDie("clusterrole-aggregation-controller").RbacV1(),
-	).Run(ctx, 5)
-	return nil, true, nil
+		client.RbacV1(),
+	)
+	return newNamedRunnableFunc(func(ctx context.Context) error {
+		crac.Run(ctx, 5)
+		return nil
+	}, controllerName), nil
 }

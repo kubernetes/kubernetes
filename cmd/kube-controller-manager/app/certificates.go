@@ -23,15 +23,14 @@ import (
 	"context"
 	"fmt"
 
+	"golang.org/x/sync/errgroup"
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
@@ -47,66 +46,85 @@ func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescri
 	return &ControllerDescriptor{
 		name:     names.CertificateSigningRequestSigningController,
 		aliases:  []string{"csrsigning"},
-		initFunc: startCertificateSigningRequestSigningController,
+		initFunc: newCertificateSigningRequestSigningController,
 	}
 }
 
-func startCertificateSigningRequestSigningController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+func newCertificateSigningRequestSigningController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 	logger := klog.FromContext(ctx)
 	missingSingleSigningFile := controllerContext.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || controllerContext.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == ""
 	if missingSingleSigningFile && !anySpecificFilesSet(controllerContext.ComponentConfig.CSRSigningController) {
 		logger.Info("Skipping CSR signer controller because no csr cert/key was specified")
-		return nil, false, nil
+		return nil, nil
 	}
 	if !missingSingleSigningFile && anySpecificFilesSet(controllerContext.ComponentConfig.CSRSigningController) {
-		return nil, false, fmt.Errorf("cannot specify default and per controller certs at the same time")
+		return nil, fmt.Errorf("cannot specify default and per controller certs at the same time")
 	}
 
-	c := controllerContext.ClientBuilder.ClientOrDie("certificate-controller")
+	c, err := controllerContext.ClientBuilder.Client("certificate-controller")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a client: %w", err)
+	}
+
 	csrInformer := controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests()
 	certTTL := controllerContext.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration
 
-	if kubeletServingSignerCertFile, kubeletServingSignerKeyFile := getKubeletServingSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeletServingSignerCertFile) > 0 || len(kubeletServingSignerKeyFile) > 0 {
-		kubeletServingSigner, err := signer.NewKubeletServingCSRSigningController(ctx, c, csrInformer, kubeletServingSignerCertFile, kubeletServingSignerKeyFile, certTTL)
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to start kubernetes.io/kubelet-serving certificate controller: %v", err)
+	return newNamedRunnableFunc(func(ctx context.Context) error {
+		eg, ctx := errgroup.WithContext(ctx)
+		if kubeletServingSignerCertFile, kubeletServingSignerKeyFile := getKubeletServingSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeletServingSignerCertFile) > 0 || len(kubeletServingSignerKeyFile) > 0 {
+			eg.Go(func() error {
+				kubeletServingSigner, err := signer.NewKubeletServingCSRSigningController(ctx, c, csrInformer, kubeletServingSignerCertFile, kubeletServingSignerKeyFile, certTTL)
+				if err != nil {
+					return fmt.Errorf("failed to start kubernetes.io/kubelet-serving certificate controller: %w", err)
+				}
+				kubeletServingSigner.Run(ctx, 5)
+				return nil
+			})
+		} else {
+			logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/kubelet-serving")
 		}
-		go kubeletServingSigner.Run(ctx, 5)
-	} else {
-		logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/kubelet-serving")
-	}
 
-	if kubeletClientSignerCertFile, kubeletClientSignerKeyFile := getKubeletClientSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeletClientSignerCertFile) > 0 || len(kubeletClientSignerKeyFile) > 0 {
-		kubeletClientSigner, err := signer.NewKubeletClientCSRSigningController(ctx, c, csrInformer, kubeletClientSignerCertFile, kubeletClientSignerKeyFile, certTTL)
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client-kubelet certificate controller: %v", err)
+		if kubeletClientSignerCertFile, kubeletClientSignerKeyFile := getKubeletClientSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeletClientSignerCertFile) > 0 || len(kubeletClientSignerKeyFile) > 0 {
+			eg.Go(func() error {
+				kubeletClientSigner, err := signer.NewKubeletClientCSRSigningController(ctx, c, csrInformer, kubeletClientSignerCertFile, kubeletClientSignerKeyFile, certTTL)
+				if err != nil {
+					return fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client-kubelet certificate controller: %w", err)
+				}
+				kubeletClientSigner.Run(ctx, 5)
+				return nil
+			})
+		} else {
+			logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/kube-apiserver-client-kubelet")
 		}
-		go kubeletClientSigner.Run(ctx, 5)
-	} else {
-		logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/kube-apiserver-client-kubelet")
-	}
 
-	if kubeAPIServerSignerCertFile, kubeAPIServerSignerKeyFile := getKubeAPIServerClientSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeAPIServerSignerCertFile) > 0 || len(kubeAPIServerSignerKeyFile) > 0 {
-		kubeAPIServerClientSigner, err := signer.NewKubeAPIServerClientCSRSigningController(ctx, c, csrInformer, kubeAPIServerSignerCertFile, kubeAPIServerSignerKeyFile, certTTL)
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client certificate controller: %v", err)
+		if kubeAPIServerSignerCertFile, kubeAPIServerSignerKeyFile := getKubeAPIServerClientSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(kubeAPIServerSignerCertFile) > 0 || len(kubeAPIServerSignerKeyFile) > 0 {
+			eg.Go(func() error {
+				kubeAPIServerClientSigner, err := signer.NewKubeAPIServerClientCSRSigningController(ctx, c, csrInformer, kubeAPIServerSignerCertFile, kubeAPIServerSignerKeyFile, certTTL)
+				if err != nil {
+					return fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client certificate controller: %w", err)
+				}
+				kubeAPIServerClientSigner.Run(ctx, 5)
+				return nil
+			})
+		} else {
+			logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/kube-apiserver-client")
 		}
-		go kubeAPIServerClientSigner.Run(ctx, 5)
-	} else {
-		logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/kube-apiserver-client")
-	}
 
-	if legacyUnknownSignerCertFile, legacyUnknownSignerKeyFile := getLegacyUnknownSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(legacyUnknownSignerCertFile) > 0 || len(legacyUnknownSignerKeyFile) > 0 {
-		legacyUnknownSigner, err := signer.NewLegacyUnknownCSRSigningController(ctx, c, csrInformer, legacyUnknownSignerCertFile, legacyUnknownSignerKeyFile, certTTL)
-		if err != nil {
-			return nil, false, fmt.Errorf("failed to start kubernetes.io/legacy-unknown certificate controller: %v", err)
+		if legacyUnknownSignerCertFile, legacyUnknownSignerKeyFile := getLegacyUnknownSignerFiles(controllerContext.ComponentConfig.CSRSigningController); len(legacyUnknownSignerCertFile) > 0 || len(legacyUnknownSignerKeyFile) > 0 {
+			eg.Go(func() error {
+				legacyUnknownSigner, err := signer.NewLegacyUnknownCSRSigningController(ctx, c, csrInformer, legacyUnknownSignerCertFile, legacyUnknownSignerKeyFile, certTTL)
+				if err != nil {
+					return fmt.Errorf("failed to start kubernetes.io/legacy-unknown certificate controller: %w", err)
+				}
+				legacyUnknownSigner.Run(ctx, 5)
+				return nil
+			})
+		} else {
+			logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/legacy-unknown")
 		}
-		go legacyUnknownSigner.Run(ctx, 5)
-	} else {
-		logger.Info("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controller", "kubernetes.io/legacy-unknown")
-	}
 
-	return nil, true, nil
+		return eg.Wait()
+	}, controllerName), nil
 }
 
 func areKubeletServingSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
@@ -171,61 +189,82 @@ func newCertificateSigningRequestApprovingControllerDescriptor() *ControllerDesc
 	return &ControllerDescriptor{
 		name:     names.CertificateSigningRequestApprovingController,
 		aliases:  []string{"csrapproving"},
-		initFunc: startCertificateSigningRequestApprovingController,
+		initFunc: newCertificateSigningRequestApprovingController,
 	}
 }
-func startCertificateSigningRequestApprovingController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	approver := approver.NewCSRApprovingController(
+func newCertificateSigningRequestApprovingController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.ClientBuilder.Client("certificate-controller")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a client: %w", err)
+	}
+
+	ac := approver.NewCSRApprovingController(
 		ctx,
-		controllerContext.ClientBuilder.ClientOrDie("certificate-controller"),
+		client,
 		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
-	go approver.Run(ctx, 5)
-
-	return nil, true, nil
+	return newNamedRunnableFunc(func(ctx context.Context) error {
+		ac.Run(ctx, 5)
+		return nil
+	}, controllerName), nil
 }
 
 func newCertificateSigningRequestCleanerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.CertificateSigningRequestCleanerController,
 		aliases:  []string{"csrcleaner"},
-		initFunc: startCertificateSigningRequestCleanerController,
+		initFunc: newCertificateSigningRequestCleanerController,
 	}
 }
-func startCertificateSigningRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	cleaner := cleaner.NewCSRCleanerController(
-		controllerContext.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
+func newCertificateSigningRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.ClientBuilder.Client("certificate-controller")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a client: %w", err)
+	}
+
+	cc := cleaner.NewCSRCleanerController(
+		client.CertificatesV1().CertificateSigningRequests(),
 		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
-	go cleaner.Run(ctx, 1)
-	return nil, true, nil
+	return newNamedRunnableFunc(func(ctx context.Context) error {
+		cc.Run(ctx, 1)
+		return nil
+	}, controllerName), nil
 }
 
 func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.RootCACertificatePublisherController,
 		aliases:  []string{"root-ca-cert-publisher"},
-		initFunc: startRootCACertificatePublisherController,
+		initFunc: newRootCACertificatePublisherController,
 	}
 }
 
-func startRootCACertificatePublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+func newRootCACertificatePublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
 	if err != nil {
-		return nil, true, err
+		return nil, err
+	}
+
+	client, err := controllerContext.ClientBuilder.Client("root-ca-cert-publisher")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a client: %w", err)
 	}
 
 	sac, err := rootcacertpublisher.NewPublisher(
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
-		controllerContext.ClientBuilder.ClientOrDie("root-ca-cert-publisher"),
+		client,
 		rootCA,
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
+		return nil, fmt.Errorf("error creating root CA certificate publisher: %w", err)
 	}
-	go sac.Run(ctx, 1)
-	return nil, true, nil
+
+	return newNamedRunnableFunc(func(ctx context.Context) error {
+		sac.Run(ctx, 1)
+		return nil
+	}, controllerName), nil
 }
 
 func newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor() *ControllerDescriptor {
@@ -238,19 +277,20 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor() *ControllerD
 
 type controllerConstructor func(string, dynamiccertificates.CAContentProvider, kubernetes.Interface) (ctbpublisher.PublisherRunner, error)
 
-func newKubeAPIServerSignerClusterTrustBundledPublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+func newKubeAPIServerSignerClusterTrustBundledPublisherController(
+	ctx context.Context, controllerContext ControllerContext, controllerName string,
+) (Controller, error) {
 	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-
-	if len(rootCA) == 0 || !utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
-		return nil, false, nil
+	if len(rootCA) == 0 {
+		return nil, nil
 	}
 
 	servingSigners, err := dynamiccertificates.NewStaticCAContent("kube-apiserver-serving", rootCA)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to create a static CA content provider for the kube-apiserver-serving signer: %w", err)
+		return nil, fmt.Errorf("failed to create a static CA content provider for the kube-apiserver-serving signer: %w", err)
 	}
 
 	schemaControllerMapping := map[schema.GroupVersion]controllerConstructor{
@@ -258,12 +298,16 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(ctx context.Co
 		certificatesv1beta1.SchemeGroupVersion:  ctbpublisher.NewBetaClusterTrustBundlePublisher,
 	}
 
-	apiserverSignerClient := controllerContext.ClientBuilder.ClientOrDie("kube-apiserver-serving-clustertrustbundle-publisher")
+	apiserverSignerClient, err := controllerContext.ClientBuilder.Client("kube-apiserver-serving-clustertrustbundle-publisher")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a client: %w", err)
+	}
+
 	var runner ctbpublisher.PublisherRunner
 	for _, gv := range []schema.GroupVersion{certificatesv1beta1.SchemeGroupVersion, certificatesv1alpha1.SchemeGroupVersion} {
 		ctbAvailable, err := clusterTrustBundlesAvailable(apiserverSignerClient, gv)
 		if err != nil {
-			return nil, false, fmt.Errorf("discovery failed for ClusterTrustBundle: %w", err)
+			return nil, fmt.Errorf("discovery failed for ClusterTrustBundle: %w", err)
 		}
 
 		if !ctbAvailable {
@@ -276,18 +320,20 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(ctx context.Co
 			apiserverSignerClient,
 		)
 		if err != nil {
-			return nil, false, fmt.Errorf("error creating kube-apiserver-serving signer certificates publisher: %w", err)
+			return nil, fmt.Errorf("error creating kube-apiserver-serving signer certificates publisher: %w", err)
 		}
 		break
 	}
 
 	if runner == nil {
 		klog.Info("no known scheme version was found for clustertrustbundles, cannot start kube-apiserver-serving-clustertrustbundle-publisher-controller")
-		return nil, false, nil
+		return nil, nil
 	}
 
-	go runner.Run(ctx)
-	return nil, true, nil
+	return newNamedRunnableFunc(func(ctx context.Context) error {
+		runner.Run(ctx)
+		return nil
+	}, controllerName), nil
 }
 
 func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion schema.GroupVersion) (bool, error) {
@@ -310,7 +356,11 @@ func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion sch
 
 func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte, error) {
 	if controllerContext.ComponentConfig.SAController.RootCAFile == "" {
-		return controllerContext.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData, nil
+		config, err := controllerContext.ClientBuilder.Config("root-ca-cert-publisher")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create a client config: %w", err)
+		}
+		return config.CAData, nil
 	}
 
 	rootCA, err := readCA(controllerContext.ComponentConfig.SAController.RootCAFile)

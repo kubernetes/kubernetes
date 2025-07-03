@@ -21,9 +21,9 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/component-base/featuregate"
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/features"
@@ -32,19 +32,28 @@ import (
 func newServiceCIDRsControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.ServiceCIDRController,
-		initFunc: startServiceCIDRsController,
+		initFunc: newServiceCIDRsController,
 		requiredFeatureGates: []featuregate.Feature{
 			features.MultiCIDRServiceAllocator,
-		}}
+		},
+	}
 }
-func startServiceCIDRsController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	go servicecidrs.NewController(
+
+func newServiceCIDRsController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+	client, err := controllerContext.ClientBuilder.Client("service-cidrs-controller")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a client: %w", err)
+	}
+
+	// TODO use component config
+	scc := servicecidrs.NewController(
 		ctx,
 		controllerContext.InformerFactory.Networking().V1().ServiceCIDRs(),
 		controllerContext.InformerFactory.Networking().V1().IPAddresses(),
-		controllerContext.ClientBuilder.ClientOrDie("service-cidrs-controller"),
-	).Run(ctx, 5)
-	// TODO use component config
-	return nil, true, nil
-
+		client,
+	)
+	return newNamedRunnableFunc(func(ctx context.Context) error {
+		scc.Run(ctx, 5)
+		return nil
+	}, controllerName), nil
 }
