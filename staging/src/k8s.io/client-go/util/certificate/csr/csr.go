@@ -39,7 +39,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // RequestCertificate will either use an existing (if this process has run
@@ -102,7 +102,7 @@ func RequestCertificateWithContext(ctx context.Context, client clientset.Interfa
 }
 
 func DurationToExpirationSeconds(duration time.Duration) *int32 {
-	return pointer.Int32(int32(duration / time.Second))
+	return ptr.To(int32(duration / time.Second))
 }
 
 func ExpirationSecondsToDuration(expirationSeconds int32) time.Duration {
