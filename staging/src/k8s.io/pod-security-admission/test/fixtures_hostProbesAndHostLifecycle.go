@@ -63,6 +63,8 @@ func init() {
 					}
 				}),
 				tweak(p, func(p *corev1.Pod) {
+					restartPolicy := corev1.ContainerRestartPolicyAlways
+					p.Spec.InitContainers[0].RestartPolicy = &restartPolicy
 					p.Spec.InitContainers[0].ReadinessProbe = &corev1.Probe{
 						ProbeHandler: corev1.ProbeHandler{
 							TCPSocket: &corev1.TCPSocketAction{
