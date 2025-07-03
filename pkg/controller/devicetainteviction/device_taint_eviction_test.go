@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	gomegatypes "github.com/onsi/gomega/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/watch"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -1190,7 +1192,38 @@ func applyEventPair(tContext *testContext, event any) {
 	}
 }
 
-func startTestController(tCtx ktesting.TContext, informerFactory informers.SharedInformerFactory) *Controller {
+func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Controller {
+	// fake.Clientset suffers from a race condition related to informers:
+	// it does not implement resource version support in its Watch
+	// implementation and instead assumes that watches are set up
+	// before further changes are made.
+	//
+	// If a test waits for caches to be synced and then immediately
+	// adds an object, that new object will never be seen by event handlers
+	// if the race goes wrong and the Watch call hadn't completed yet
+	// (can be triggered by adding a sleep before https://github.com/kubernetes/kubernetes/blob/b53b9fb5573323484af9a19cf3f5bfe80760abba/staging/src/k8s.io/client-go/tools/cache/reflector.go#L431).
+	//
+	// To work around this, we count all watches and only proceed when
+	// all of them are in place. This replaces the normal watch reactor
+	// (https://github.com/kubernetes/kubernetes/blob/b53b9fb5573323484af9a19cf3f5bfe80760abba/staging/src/k8s.io/client-go/kubernetes/fake/clientset_generated.go#L161-L173).
+	var numWatches atomic.Int32
+	clientSet.PrependWatchReactor("*", func(action core.Action) (handled bool, ret watch.Interface, err error) {
+		var opts metav1.ListOptions
+		if watchActcion, ok := action.(core.WatchActionImpl); ok {
+			opts = watchActcion.ListOptions
+		}
+		gvr := action.GetResource()
+		ns := action.GetNamespace()
+		watch, err := clientSet.Tracker().Watch(gvr, ns, opts)
+		if err != nil {
+			return false, nil, err
+		}
+		numWatches.Add(1)
+		return true, watch, nil
+	})
+
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+
 	controller := New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1beta1().ResourceClaims(),
@@ -1203,7 +1236,14 @@ func startTestController(tCtx ktesting.TContext, informerFactory informers.Share
 	// Always log, not matter what the -v value is.
 	logger := klog.FromContext(tCtx)
 	controller.eventLogger = &logger
+
 	informerFactory.Start(tCtx.Done())
+	tCtx.Cleanup(informerFactory.Shutdown)
+
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int32 {
+		return numWatches.Load()
+	}).WithTimeout(5*time.Second).Should(gomega.Equal(int32(5)), "All watches should be registered.")
+
 	return controller
 }
 
@@ -1248,6 +1288,12 @@ func TestEviction(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tCtx.Parallel()
 
+	do := func(tCtx ktesting.TContext, what string, action func(tCtx ktesting.TContext) error) {
+		tCtx.Log(what)
+		err := action(tCtx)
+		require.NoError(tCtx, err, what)
+	}
+
 	pod := podWithClaimName.DeepCopy()
 	for name, tt := range map[string]struct {
 		initialObjects []runtime.Object
@@ -1262,13 +1308,18 @@ func TestEviction(t *testing.T) {
 		},
 		"add": {
 			afterSync: func(tCtx ktesting.TContext) {
-				var err error
-				_, err = tCtx.Client().CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create pod")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, sliceTainted, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create slice")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create claim")
+				do(tCtx, "create pod", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
+					return err
+				})
+				do(tCtx, "create slice", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, sliceTainted, metav1.CreateOptions{})
+					return err
+				})
+				do(tCtx, "create claim", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
+					return err
+				})
 			},
 		},
 		"update": {
@@ -1282,13 +1333,18 @@ func TestEviction(t *testing.T) {
 				}(),
 			},
 			afterSync: func(tCtx ktesting.TContext) {
-				var err error
-				_, err = tCtx.Client().CoreV1().Pods(pod.Namespace).Update(tCtx, pod, metav1.UpdateOptions{})
-				require.NoError(tCtx, err, "update pod")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceSlices().Update(tCtx, sliceTainted, metav1.UpdateOptions{})
-				require.NoError(tCtx, err, "update slice")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).UpdateStatus(tCtx, inUseClaim, metav1.UpdateOptions{})
-				require.NoError(tCtx, err, "update claim")
+				do(tCtx, "update pod", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().CoreV1().Pods(pod.Namespace).Update(tCtx, pod, metav1.UpdateOptions{})
+					return err
+				})
+				do(tCtx, "update slice", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Update(tCtx, sliceTainted, metav1.UpdateOptions{})
+					return err
+				})
+				do(tCtx, "update claim", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).UpdateStatus(tCtx, inUseClaim, metav1.UpdateOptions{})
+					return err
+				})
 			},
 		},
 		"delete": {
@@ -1305,16 +1361,18 @@ func TestEviction(t *testing.T) {
 				pod,
 			},
 			afterSync: func(tCtx ktesting.TContext) {
-				var err error
-
-				err = tCtx.Client().ResourceV1beta1().ResourceSlices().Delete(tCtx, slice.Name+"-other", metav1.DeleteOptions{})
-				require.NoError(tCtx, err, "delete slice")
-				err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Delete(tCtx, inUseClaim.Name, metav1.DeleteOptions{})
-				require.NoError(tCtx, err, "delete claim")
+				do(tCtx, "delete slice", func(tCtx ktesting.TContext) error {
+					return tCtx.Client().ResourceV1beta1().ResourceSlices().Delete(tCtx, slice.Name+"-other", metav1.DeleteOptions{})
+				})
+				do(tCtx, "delete claim", func(tCtx ktesting.TContext) error {
+					return tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Delete(tCtx, inUseClaim.Name, metav1.DeleteOptions{})
+				})
 
 				// Re-create after deletion to enabled the normal flow.
-				_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create claim")
+				do(tCtx, "create claim", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
+					return err
+				})
 			},
 		},
 	} {
@@ -1347,9 +1405,7 @@ func TestEviction(t *testing.T) {
 				updatedPod = obj.(*v1.Pod)
 				return false, nil, nil
 			})
-			informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-			controller := startTestController(tCtx, informerFactory)
-			defer informerFactory.Shutdown()
+			controller := newTestController(tCtx, fakeClientset)
 
 			var wg sync.WaitGroup
 			defer func() {
@@ -1445,9 +1501,7 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	require.NoError(tCtx, err, "get pod before eviction")
 	assert.Equal(tCtx, podWithClaimName, pod, "test pod")
 
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var mutex sync.Mutex
 	podEvicting := false
@@ -1499,6 +1553,10 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}).WithTimeout(30 * time.Second).Should(gomega.BeFalseBecause("pod no longer pending eviction"))
 
 	// Whether we get an event depends on whether the pod still exists.
+	// If we expect an event, we need to wait for it.
+	if !deletePod {
+		ktesting.Eventually(tCtx, listEvents).WithTimeout(30 * time.Second).Should(matchCancellationEvent())
+	}
 	ktesting.Consistently(tCtx, func(tCtx ktesting.TContext) error {
 		matchEvents := matchCancellationEvent()
 		if deletePod {
@@ -1554,9 +1612,7 @@ func TestParallelPodDeletion(t *testing.T) {
 		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
 		return false, nil, nil
 	})
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var wg sync.WaitGroup
 	defer func() {
@@ -1633,9 +1689,7 @@ func TestRetry(t *testing.T) {
 		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
 		return false, nil, nil
 	})
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var wg sync.WaitGroup
 	defer func() {
@@ -1706,9 +1760,7 @@ func TestEvictionFailure(t *testing.T) {
 		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
 		return true, nil, apierrors.NewInternalError(errors.New("fake error"))
 	})
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var wg sync.WaitGroup
 	defer func() {
