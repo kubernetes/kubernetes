@@ -75,7 +75,7 @@ func setupSumDiskCache(t *testing.T) (conn *sumDiskCache, cleanup func()) {
 	cacheDir := t.TempDir()
 	d, err := openSumDiskCache(cacheDir)
 	require.NoError(t, err, "Failed to create sumDiskCache")
-	cleanup = func() {} //noop; t.TempDir() handles cleanup
+	cleanup = func() {} // noop; t.TempDir() handles cleanup
 	return d, cleanup
 }
 
@@ -88,10 +88,10 @@ func TestCacheRoundTripper(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		switch etag {
 		case "W/1":
-			w.Write([]byte("Content"))
+			_, _ = w.Write([]byte("Content"))
 		case "W/2":
 			w.Header().Set("Content-Encoding", "gzip")
-			w.Write([]byte("Content with gzip"))
+			_, _ = w.Write([]byte("Content with gzip"))
 		}
 	}))
 	defer server.Close()
@@ -172,7 +172,7 @@ func TestCacheRoundTripper(t *testing.T) {
 
 			resp, err := cache.RoundTrip(req)
 			require.NoError(t, err, "RoundTrip failed")
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			content, err := io.ReadAll(resp.Body)
 			require.NoError(t, err, "Failed to read response body")
@@ -219,8 +219,8 @@ func TestSumDiskCache(t *testing.T) {
 		f.Close()
 
 		got, err := c.Get(key)
-		assert.ErrorIs(t, err, errInvalidCacheFile)
-		assert.Equal(t, []byte{}, got)
+		require.ErrorIs(t, err, errInvalidCacheFile)
+		assert.Nil(t, got)
 	})
 
 	t.Run("InvalidChecksum", func(t *testing.T) {
@@ -240,7 +240,7 @@ func TestSumDiskCache(t *testing.T) {
 
 		// The mismatched checksum should result in a cache miss.
 		got, err := c.Get(key)
-		assert.ErrorIs(t, err, errChecksumMismatch)
-		assert.Equal(t, []byte{}, got)
+		require.ErrorIs(t, err, errChecksumMismatch)
+		assert.Nil(t, got)
 	})
 }
