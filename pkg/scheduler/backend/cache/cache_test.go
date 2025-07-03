@@ -1274,7 +1274,7 @@ func TestNodeOperators(t *testing.T) {
 			if !found || len(cachedNodes.nodeInfoMap) != len(tc.nodes) {
 				t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes.nodeInfoMap, tc.nodes)
 			}
-			expected.Generation = newNode.GetGeneration()
+			expected.Generation = newNode.Generation
 			if diff := cmp.Diff(expected.Snapshot(), newNode, nodeInfoCmpOpts...); diff != "" {
 				t.Errorf("Failed to clone node (-want,+got):\n%s", diff)
 			}
@@ -1285,7 +1285,7 @@ func TestNodeOperators(t *testing.T) {
 
 			// Step 3: update node attribute successfully.
 			node.Status.Allocatable[v1.ResourceMemory] = mem50m
-			expected.Allocatable.SetMemory(mem50m.Value())
+			expected.Allocatable.Memory = mem50m.Value()
 
 			cache.UpdateNode(logger, nil, node)
 			got, found = cache.nodes[node.Name]
@@ -1774,10 +1774,8 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 		if want.Node() == nil {
 			want = nil
 		}
-		if want != nil || snapshot.nodeInfoMap[name] != nil {
-			if diff := cmp.Diff(want, snapshot.nodeInfoMap[name], nodeInfoCmpOpts...); diff != "" {
-				return fmt.Errorf("Unexpected node info for node (-want, +got):\n%s", diff)
-			}
+		if diff := cmp.Diff(want, snapshot.nodeInfoMap[name], nodeInfoCmpOpts...); diff != "" {
+			return fmt.Errorf("Unexpected node info for node (-want, +got):\n%s", diff)
 		}
 	}
 	// Compare the lists.
@@ -1795,10 +1793,10 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 	for _, nodeName := range nodesList {
 		if n := snapshot.nodeInfoMap[nodeName]; n != nil {
 			expectedNodeInfoList = append(expectedNodeInfoList, n)
-			if len(n.GetPodsWithAffinity()) > 0 {
+			if len(n.PodsWithAffinity) > 0 {
 				expectedHavePodsWithAffinityNodeInfoList = append(expectedHavePodsWithAffinityNodeInfoList, n)
 			}
-			for key := range n.GetPVCRefCounts() {
+			for key := range n.PVCRefCounts {
 				expectedUsedPVCSet.Insert(key)
 			}
 		} else {
@@ -2042,7 +2040,7 @@ func checkImageStateSummary(nodes map[string]*framework.NodeInfo, imageNames ...
 	for _, imageName := range imageNames {
 		var imageState *fwk.ImageStateSummary
 		for _, node := range nodes {
-			state, ok := node.GetImageStates()[imageName]
+			state, ok := node.ImageStates[imageName]
 			if !ok {
 				continue
 			}

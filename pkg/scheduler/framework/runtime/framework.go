@@ -807,14 +807,7 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 		status = f.runPreFilterExtensionAddPod(ctx, pl, state, podToSchedule, podInfoToAdd, nodeInfo)
 		if !status.IsSuccess() {
 			err := status.AsError()
-			// The check below is needed for test
-			//  TestRunPreFilterExtensionAddPod/one_AddPod()_returned_error
-			// TODO: find out why
-			var node *v1.Node
-			if nodeInfo != nil {
-				node = nodeInfo.Node()
-			}
-			logger.Error(err, "Plugin failed", "pod", klog.KObj(podToSchedule), "node", klog.KObj(node), "operation", "addPod", "plugin", pl.Name())
+			logger.Error(err, "Plugin failed", "pod", klog.KObj(podToSchedule), "node", klog.KObj(nodeInfo.Node()), "operation", "addPod", "plugin", pl.Name())
 			return fwk.AsStatus(fmt.Errorf("running AddPod on PreFilter plugin %q: %w", pl.Name(), err))
 		}
 	}

@@ -227,7 +227,7 @@ func (aq *activeQueue) update(newPod *v1.Pod, oldPodInfo *framework.QueuedPodInf
 	defer aq.lock.Unlock()
 
 	if pInfo, exists := aq.queue.Get(oldPodInfo); exists {
-		_ = pInfo.PodInfo.Update(newPod)
+		_ = pInfo.Update(newPod)
 		aq.queue.AddOrUpdate(pInfo)
 		return pInfo
 	}
@@ -317,7 +317,7 @@ func (aq *activeQueue) list() []*v1.Pod {
 	defer aq.lock.RUnlock()
 	var result []*v1.Pod
 	for _, pInfo := range aq.queue.List() {
-		result = append(result, pInfo.GetPodInfo().GetPod())
+		result = append(result, pInfo.GetPod())
 	}
 	return result
 }

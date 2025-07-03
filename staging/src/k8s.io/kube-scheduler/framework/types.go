@@ -244,7 +244,7 @@ func (ce ClusterEvent) Label() string {
 
 // NodeInfo is node level aggregated information.
 type NodeInfo interface {
-	// GetNode returns overall information about this node.
+	// Node returns overall information about this node.
 	Node() *v1.Node
 	// GetPods returns Pods running on the node.
 	GetPods() []PodInfo
@@ -297,7 +297,7 @@ type NodeInfo interface {
 // the pod's status in the scheduling queue, such as the timestamp when
 // it's added to the queue.
 type QueuedPodInfo interface {
-	// Returns the PodInfo object wrapped by this QueuedPodInfo instance.
+	// GetPodInfo returns the PodInfo object wrapped by this QueuedPodInfo instance.
 	GetPodInfo() PodInfo
 	// GetTimestamp returns the time pod added to the scheduling queue.
 	GetTimestamp() time.Time
