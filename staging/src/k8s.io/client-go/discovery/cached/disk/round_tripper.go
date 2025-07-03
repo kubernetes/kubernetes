@@ -132,16 +132,16 @@ func (c *sumDiskCache) Get(key string) ([]byte, error) {
 		if errors.Is(err, os.ErrNotExist) {
 			err = errors.Join(err, driver.ErrNotExist)
 		}
-		return []byte{}, err
+		return nil, err
 	case len(b) < sha256.Size:
-		return []byte{}, fmt.Errorf("%w: got %d bytes", errInvalidCacheFile, len(b))
+		return nil, fmt.Errorf("%w: got %d bytes", errInvalidCacheFile, len(b))
 	}
 
 	response := b[sha256.Size:]
 	want := b[:sha256.Size] // The first 32 bytes of the file should be the SHA256 sum.
 	got := sha256.Sum256(response)
 	if !bytes.Equal(want, got[:]) {
-		return []byte{}, fmt.Errorf("%w: got %x, want %x", errChecksumMismatch, got, want)
+		return nil, fmt.Errorf("%w: got %x, want %x", errChecksumMismatch, got, want)
 	}
 	return response, nil
 }
