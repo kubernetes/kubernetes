@@ -19,32 +19,30 @@ limitations under the License.
 package fake
 
 import (
-	v1beta2 "k8s.io/api/resource/v1beta2"
-	resourcev1beta2 "k8s.io/client-go/applyconfigurations/resource/v1beta2"
+	v1 "k8s.io/api/resource/v1"
+	resourcev1 "k8s.io/client-go/applyconfigurations/resource/v1"
 	gentype "k8s.io/client-go/gentype"
-	typedresourcev1beta2 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	typedresourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1"
 )
 
 // fakeResourceClaims implements ResourceClaimInterface
 type fakeResourceClaims struct {
-	*gentype.FakeClientWithListAndApply[*v1beta2.ResourceClaim, *v1beta2.ResourceClaimList, *resourcev1beta2.ResourceClaimApplyConfiguration]
-	Fake *FakeResourceV1beta2
+	*gentype.FakeClientWithListAndApply[*v1.ResourceClaim, *v1.ResourceClaimList, *resourcev1.ResourceClaimApplyConfiguration]
+	Fake *FakeResourceV1
 }
 
-func newFakeResourceClaims(fake *FakeResourceV1beta2, namespace string) typedresourcev1beta2.ResourceClaimInterface {
+func newFakeResourceClaims(fake *FakeResourceV1, namespace string) typedresourcev1.ResourceClaimInterface {
 	return &fakeResourceClaims{
-		gentype.NewFakeClientWithListAndApply[*v1beta2.ResourceClaim, *v1beta2.ResourceClaimList, *resourcev1beta2.ResourceClaimApplyConfiguration](
+		gentype.NewFakeClientWithListAndApply[*v1.ResourceClaim, *v1.ResourceClaimList, *resourcev1.ResourceClaimApplyConfiguration](
 			fake.Fake,
 			namespace,
-			v1beta2.SchemeGroupVersion.WithResource("resourceclaims"),
-			v1beta2.SchemeGroupVersion.WithKind("ResourceClaim"),
-			func() *v1beta2.ResourceClaim { return &v1beta2.ResourceClaim{} },
-			func() *v1beta2.ResourceClaimList { return &v1beta2.ResourceClaimList{} },
-			func(dst, src *v1beta2.ResourceClaimList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta2.ResourceClaimList) []*v1beta2.ResourceClaim {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta2.ResourceClaimList, items []*v1beta2.ResourceClaim) {
+			v1.SchemeGroupVersion.WithResource("resourceclaims"),
+			v1.SchemeGroupVersion.WithKind("ResourceClaim"),
+			func() *v1.ResourceClaim { return &v1.ResourceClaim{} },
+			func() *v1.ResourceClaimList { return &v1.ResourceClaimList{} },
+			func(dst, src *v1.ResourceClaimList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.ResourceClaimList) []*v1.ResourceClaim { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.ResourceClaimList, items []*v1.ResourceClaim) {
 				list.Items = gentype.FromPointerSlice(items)
 			},
 		),

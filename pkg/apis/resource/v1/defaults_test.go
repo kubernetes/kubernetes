@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta2_test
+package v1_test
 
 import (
 	"reflect"
@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	v1beta2 "k8s.io/api/resource/v1beta2"
+	v1 "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
@@ -34,12 +34,12 @@ import (
 )
 
 func TestSetDefaultAllocationMode(t *testing.T) {
-	claim := &v1beta2.ResourceClaim{
-		Spec: v1beta2.ResourceClaimSpec{
-			Devices: v1beta2.DeviceClaim{
-				Requests: []v1beta2.DeviceRequest{
+	claim := &v1.ResourceClaim{
+		Spec: v1.ResourceClaimSpec{
+			Devices: v1.DeviceClaim{
+				Requests: []v1.DeviceRequest{
 					{
-						Exactly: &v1beta2.ExactDeviceRequest{},
+						Exactly: &v1.ExactDeviceRequest{},
 					},
 				},
 			},
@@ -47,20 +47,20 @@ func TestSetDefaultAllocationMode(t *testing.T) {
 	}
 
 	// fields should be defaulted
-	defaultMode := v1beta2.DeviceAllocationModeExactCount
+	defaultMode := v1.DeviceAllocationModeExactCount
 	defaultCount := int64(1)
-	output := roundTrip(t, runtime.Object(claim)).(*v1beta2.ResourceClaim)
+	output := roundTrip(t, runtime.Object(claim)).(*v1.ResourceClaim)
 	assert.Equal(t, defaultMode, output.Spec.Devices.Requests[0].Exactly.AllocationMode)
 	assert.Equal(t, defaultCount, output.Spec.Devices.Requests[0].Exactly.Count)
 
 	// field should not change
-	nonDefaultMode := v1beta2.DeviceAllocationModeExactCount
+	nonDefaultMode := v1.DeviceAllocationModeExactCount
 	nonDefaultCount := int64(10)
-	claim = &v1beta2.ResourceClaim{
-		Spec: v1beta2.ResourceClaimSpec{
-			Devices: v1beta2.DeviceClaim{
-				Requests: []v1beta2.DeviceRequest{{
-					Exactly: &v1beta2.ExactDeviceRequest{
+	claim = &v1.ResourceClaim{
+		Spec: v1.ResourceClaimSpec{
+			Devices: v1.DeviceClaim{
+				Requests: []v1.DeviceRequest{{
+					Exactly: &v1.ExactDeviceRequest{
 						AllocationMode: nonDefaultMode,
 						Count:          nonDefaultCount,
 					},
@@ -68,19 +68,19 @@ func TestSetDefaultAllocationMode(t *testing.T) {
 			},
 		},
 	}
-	output = roundTrip(t, runtime.Object(claim)).(*v1beta2.ResourceClaim)
+	output = roundTrip(t, runtime.Object(claim)).(*v1.ResourceClaim)
 	assert.Equal(t, nonDefaultMode, output.Spec.Devices.Requests[0].Exactly.AllocationMode)
 	assert.Equal(t, nonDefaultCount, output.Spec.Devices.Requests[0].Exactly.Count)
 }
 
 func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
-	claim := &v1beta2.ResourceClaim{
-		Spec: v1beta2.ResourceClaimSpec{
-			Devices: v1beta2.DeviceClaim{
-				Requests: []v1beta2.DeviceRequest{
+	claim := &v1.ResourceClaim{
+		Spec: v1.ResourceClaimSpec{
+			Devices: v1.DeviceClaim{
+				Requests: []v1.DeviceRequest{
 					{
 						Name: "req-1",
-						FirstAvailable: []v1beta2.DeviceSubRequest{
+						FirstAvailable: []v1.DeviceSubRequest{
 							{
 								Name: "subReq-1",
 							},
@@ -94,9 +94,9 @@ func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
 		},
 	}
 
-	defaultMode := v1beta2.DeviceAllocationModeExactCount
+	defaultMode := v1.DeviceAllocationModeExactCount
 	defaultCount := int64(1)
-	output := roundTrip(t, runtime.Object(claim)).(*v1beta2.ResourceClaim)
+	output := roundTrip(t, runtime.Object(claim)).(*v1.ResourceClaim)
 	// the exactly field is not set.
 	assert.Nil(t, output.Spec.Devices.Requests[0].Exactly)
 	// fields on the subRequests should be defaulted.
@@ -106,14 +106,14 @@ func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
 	assert.Equal(t, defaultCount, output.Spec.Devices.Requests[0].FirstAvailable[1].Count)
 
 	// field should not change
-	nonDefaultMode := v1beta2.DeviceAllocationModeExactCount
+	nonDefaultMode := v1.DeviceAllocationModeExactCount
 	nonDefaultCount := int64(10)
-	claim = &v1beta2.ResourceClaim{
-		Spec: v1beta2.ResourceClaimSpec{
-			Devices: v1beta2.DeviceClaim{
-				Requests: []v1beta2.DeviceRequest{{
+	claim = &v1.ResourceClaim{
+		Spec: v1.ResourceClaimSpec{
+			Devices: v1.DeviceClaim{
+				Requests: []v1.DeviceRequest{{
 					Name: "req-1",
-					FirstAvailable: []v1beta2.DeviceSubRequest{
+					FirstAvailable: []v1.DeviceSubRequest{
 						{
 							Name:           "subReq-1",
 							AllocationMode: nonDefaultMode,
@@ -129,7 +129,7 @@ func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
 			},
 		},
 	}
-	output = roundTrip(t, runtime.Object(claim)).(*v1beta2.ResourceClaim)
+	output = roundTrip(t, runtime.Object(claim)).(*v1.ResourceClaim)
 	assert.Equal(t, nonDefaultMode, output.Spec.Devices.Requests[0].FirstAvailable[0].AllocationMode)
 	assert.Equal(t, nonDefaultCount, output.Spec.Devices.Requests[0].FirstAvailable[0].Count)
 	assert.Equal(t, nonDefaultMode, output.Spec.Devices.Requests[0].FirstAvailable[1].AllocationMode)
@@ -137,28 +137,28 @@ func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
 }
 
 func TestSetDefaultDeviceTaint(t *testing.T) {
-	slice := &v1beta2.ResourceSlice{
-		Spec: v1beta2.ResourceSliceSpec{
-			Devices: []v1beta2.Device{{
+	slice := &v1.ResourceSlice{
+		Spec: v1.ResourceSliceSpec{
+			Devices: []v1.Device{{
 				Name:   "device-0",
-				Taints: []v1beta2.DeviceTaint{{}},
+				Taints: []v1.DeviceTaint{{}},
 			}},
 		},
 	}
 
 	// fields should be defaulted
-	output := roundTrip(t, slice).(*v1beta2.ResourceSlice)
+	output := roundTrip(t, slice).(*v1.ResourceSlice)
 	assert.WithinDuration(t, time.Now(), ptr.Deref(output.Spec.Devices[0].Taints[0].TimeAdded, metav1.Time{}).Time, time.Minute /* allow for some processing delay */, "time added default")
 
 	// field should not change
 	timeAdded, _ := time.ParseInLocation(time.RFC3339, "2006-01-02T15:04:05Z", time.UTC)
 	slice.Spec.Devices[0].Taints[0].TimeAdded = &metav1.Time{Time: timeAdded}
-	output = roundTrip(t, slice).(*v1beta2.ResourceSlice)
+	output = roundTrip(t, slice).(*v1.ResourceSlice)
 	assert.WithinDuration(t, timeAdded, ptr.Deref(output.Spec.Devices[0].Taints[0].TimeAdded, metav1.Time{}).Time, 0 /* semantically the same, different time zone allowed */, "time added fixed")
 }
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	codec := legacyscheme.Codecs.LegacyCodec(v1beta2.SchemeGroupVersion)
+	codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 	data, err := runtime.Encode(codec, obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)

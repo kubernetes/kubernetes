@@ -19,32 +19,30 @@ limitations under the License.
 package fake
 
 import (
-	v1beta2 "k8s.io/api/resource/v1beta2"
-	resourcev1beta2 "k8s.io/client-go/applyconfigurations/resource/v1beta2"
+	v1 "k8s.io/api/resource/v1"
+	resourcev1 "k8s.io/client-go/applyconfigurations/resource/v1"
 	gentype "k8s.io/client-go/gentype"
-	typedresourcev1beta2 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	typedresourcev1 "k8s.io/client-go/kubernetes/typed/resource/v1"
 )
 
 // fakeResourceSlices implements ResourceSliceInterface
 type fakeResourceSlices struct {
-	*gentype.FakeClientWithListAndApply[*v1beta2.ResourceSlice, *v1beta2.ResourceSliceList, *resourcev1beta2.ResourceSliceApplyConfiguration]
-	Fake *FakeResourceV1beta2
+	*gentype.FakeClientWithListAndApply[*v1.ResourceSlice, *v1.ResourceSliceList, *resourcev1.ResourceSliceApplyConfiguration]
+	Fake *FakeResourceV1
 }
 
-func newFakeResourceSlices(fake *FakeResourceV1beta2) typedresourcev1beta2.ResourceSliceInterface {
+func newFakeResourceSlices(fake *FakeResourceV1) typedresourcev1.ResourceSliceInterface {
 	return &fakeResourceSlices{
-		gentype.NewFakeClientWithListAndApply[*v1beta2.ResourceSlice, *v1beta2.ResourceSliceList, *resourcev1beta2.ResourceSliceApplyConfiguration](
+		gentype.NewFakeClientWithListAndApply[*v1.ResourceSlice, *v1.ResourceSliceList, *resourcev1.ResourceSliceApplyConfiguration](
 			fake.Fake,
 			"",
-			v1beta2.SchemeGroupVersion.WithResource("resourceslices"),
-			v1beta2.SchemeGroupVersion.WithKind("ResourceSlice"),
-			func() *v1beta2.ResourceSlice { return &v1beta2.ResourceSlice{} },
-			func() *v1beta2.ResourceSliceList { return &v1beta2.ResourceSliceList{} },
-			func(dst, src *v1beta2.ResourceSliceList) { dst.ListMeta = src.ListMeta },
-			func(list *v1beta2.ResourceSliceList) []*v1beta2.ResourceSlice {
-				return gentype.ToPointerSlice(list.Items)
-			},
-			func(list *v1beta2.ResourceSliceList, items []*v1beta2.ResourceSlice) {
+			v1.SchemeGroupVersion.WithResource("resourceslices"),
+			v1.SchemeGroupVersion.WithKind("ResourceSlice"),
+			func() *v1.ResourceSlice { return &v1.ResourceSlice{} },
+			func() *v1.ResourceSliceList { return &v1.ResourceSliceList{} },
+			func(dst, src *v1.ResourceSliceList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.ResourceSliceList) []*v1.ResourceSlice { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.ResourceSliceList, items []*v1.ResourceSlice) {
 				list.Items = gentype.FromPointerSlice(items)
 			},
 		),

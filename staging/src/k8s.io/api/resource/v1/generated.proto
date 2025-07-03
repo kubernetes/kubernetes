@@ -19,7 +19,7 @@ limitations under the License.
 
 syntax = "proto2";
 
-package k8s.io.api.resource.v1beta2;
+package k8s.io.api.resource.v1;
 
 import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "k8s.io/api/resource/v1beta2";
+option go_package = "k8s.io/api/resource/v1";
 
 // AllocatedDeviceStatus contains the status of an allocated device, if the
 // driver chooses to report it. This may include driver-specific information.
