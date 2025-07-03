@@ -1033,6 +1033,12 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "impersonation")
 
+	if c.FeatureGate.Enabled(genericfeatures.ConstrainedImpersonation) {
+		handler = filterlatency.TrackCompleted(handler)
+		handler = genericapifilters.WithContrainedImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
+		handler = filterlatency.TrackStarted(handler, c.TracerProvider, "constrainedimpersonation")
+	}
+
 	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator, c.LongRunningFunc)
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "audit")
