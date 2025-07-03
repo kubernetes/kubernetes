@@ -33,6 +33,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
+	gtypes "github.com/onsi/gomega/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -213,7 +214,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, features.DRADeviceTaints, features.DRAPartitionableDevices)
+					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices)
 				})
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
 			},
@@ -229,7 +230,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, features.DRADeviceTaints, features.DRAPartitionableDevices)
+					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices)
 				})
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 			},
@@ -241,7 +242,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, features.DRADeviceTaints, features.DRAPartitionableDevices)
+					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRAPartitionableDevices)
 				})
 			},
 		},
@@ -252,7 +253,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, features.DRADeviceTaints, features.DRAPartitionableDevices)
+					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices)
 				})
 			},
 		},
@@ -276,7 +277,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				tCtx.Run("Convert", testConvert)
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
-				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx) })
+				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
 			},
@@ -573,12 +574,14 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 	}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
 }
 
-func testPublishResourceSlices(tCtx ktesting.TContext, disabledFeatures ...featuregate.Feature) {
+func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disabledFeatures ...featuregate.Feature) {
 	tCtx.Parallel()
 
-	tCtx = ktesting.WithTimeout(tCtx, 30*time.Second, "test timed out")
 	namespace := createTestNamespace(tCtx, nil)
 	driverName := namespace + ".example.com"
+	listDriverSlices := metav1.ListOptions{
+		FieldSelector: resourcev1beta2.ResourceSliceSelectorDriver + "=" + driverName,
+	}
 	poolName := "global"
 	resources := &resourceslice.DriverResources{
 		Pools: map[string]resourceslice.Pool{
@@ -614,7 +617,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, disabledFeatures ...featu
 									Key:       "dra.example.com/taint",
 									Value:     "taint-value",
 									Effect:    resourcev1beta2.DeviceTaintEffectNoExecute,
-									TimeAdded: ptr.To(metav1.Now()),
+									TimeAdded: ptr.To(metav1.Time{Time: time.Now().Truncate(time.Second)}),
 								}},
 							},
 							{
@@ -632,68 +635,254 @@ func testPublishResourceSlices(tCtx ktesting.TContext, disabledFeatures ...featu
 			},
 		},
 	}
+
+	// Manually turn into the expected slices, considering that some fields get dropped.
+	expectedResources := resources.DeepCopy()
+	var expectedSliceSpecs []resourcev1beta2.ResourceSliceSpec
+	for _, sl := range expectedResources.Pools[poolName].Slices {
+		expectedSliceSpecs = append(expectedSliceSpecs, resourcev1beta2.ResourceSliceSpec{
+			Driver: driverName,
+			Pool: resourcev1beta2.ResourcePool{
+				Name:               poolName,
+				ResourceSliceCount: int64(len(expectedResources.Pools[poolName].Slices)),
+			},
+			AllNodes:       ptr.To(true),
+			SharedCounters: sl.SharedCounters,
+			Devices:        sl.Devices,
+		})
+	}
+	for _, disabled := range disabledFeatures {
+		switch disabled {
+		case features.DRADeviceTaints:
+			for i := range expectedSliceSpecs {
+				for e := range expectedSliceSpecs[i].Devices {
+					expectedSliceSpecs[i].Devices[e].Taints = nil
+				}
+			}
+		case features.DRAPartitionableDevices:
+			for i := range expectedSliceSpecs {
+				expectedSliceSpecs[i].SharedCounters = nil
+				for e := range expectedSliceSpecs[i].Devices {
+					expectedSliceSpecs[i].Devices[e].ConsumesCounters = nil
+				}
+			}
+		default:
+			tCtx.Fatalf("faulty test, case for %s missing", disabled)
+		}
+	}
+	var expectedSlices []any
+	for _, spec := range expectedSliceSpecs {
+		// The matcher is precise and matches all fields, except for those few which are known to
+		// be not exactly as sent by the client. New fields have to be added when extending the API.
+		expectedSlices = append(expectedSlices, gomega.HaveField("Spec", gstruct.MatchAllFields(gstruct.Fields{
+			"Driver": gomega.Equal(driverName),
+			"Pool": gstruct.MatchAllFields(gstruct.Fields{
+				"Name":               gomega.Equal(poolName),
+				"Generation":         gomega.BeNumerically(">=", int64(1)),
+				"ResourceSliceCount": gomega.Equal(int64(len(expectedResources.Pools[poolName].Slices))),
+			}),
+			"NodeName":     matchPointer(spec.NodeName),
+			"NodeSelector": matchPointer(spec.NodeSelector),
+			"AllNodes":     gstruct.PointTo(gomega.BeTrue()),
+			"Devices": gomega.HaveExactElements(func() []any {
+				var expected []any
+				for _, device := range spec.Devices {
+					expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
+						"Name":             gomega.Equal(device.Name),
+						"Attributes":       gomega.Equal(device.Attributes),
+						"Capacity":         gomega.Equal(device.Capacity),
+						"ConsumesCounters": gomega.Equal(device.ConsumesCounters),
+						"NodeName":         matchPointer(device.NodeName),
+						"NodeSelector":     matchPointer(device.NodeSelector),
+						"AllNodes":         matchPointer(device.AllNodes),
+						"Taints": gomega.HaveExactElements(func() []any {
+							var expected []any
+							for _, taint := range device.Taints {
+								if taint.TimeAdded != nil {
+									// Can do exact match.
+									expected = append(expected, gomega.Equal(taint))
+								} else {
+									// Ignore TimeAdded value.
+									expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
+										"Key":       gomega.Equal(taint.Key),
+										"Value":     gomega.Equal(taint.Value),
+										"Effect":    gomega.Equal(taint.Effect),
+										"TimeAdded": gomega.Not(gomega.BeNil()),
+									}))
+								}
+							}
+							return expected
+						}()...),
+					}))
+				}
+				return expected
+			}()...),
+			"PerDeviceNodeSelection": matchPointer(spec.PerDeviceNodeSelection),
+			"SharedCounters":         gomega.Equal(spec.SharedCounters),
+		})))
+	}
+
+	expectSlices := func(tCtx ktesting.TContext) {
+		tCtx.Helper()
+
+		if !haveLatestAPI {
+			return
+		}
+		slices, err := tCtx.Client().ResourceV1beta2().ResourceSlices().List(tCtx, listDriverSlices)
+		tCtx.ExpectNoError(err, "list slices")
+		gomega.NewGomegaWithT(tCtx).Expect(slices.Items).Should(gomega.ConsistOf(expectedSlices...))
+	}
+
+	deleteSlices := func(tCtx ktesting.TContext) {
+		tCtx.Helper()
+
+		// At least one of the APIs must be enabled...
+		var err error
+		err = tCtx.Client().ResourceV1beta1().ResourceSlices().DeleteCollection(tCtx, metav1.DeleteOptions{}, listDriverSlices)
+		if err == nil {
+			return
+		}
+		err = tCtx.Client().ResourceV1beta2().ResourceSlices().DeleteCollection(tCtx, metav1.DeleteOptions{}, listDriverSlices)
+		if err == nil {
+			return
+		}
+		tCtx.ExpectNoError(err, "delete slices")
+	}
+
+	// Speed up testing a bit...
+	factor := time.Duration(10)
+	mutationCacheTTL := resourceslice.DefaultMutationCacheTTL / factor
+	syncDelay := resourceslice.DefaultSyncDelay / factor
+	quiesencePeriod := syncDelay
+	if mutationCacheTTL > quiesencePeriod {
+		quiesencePeriod = mutationCacheTTL
+	}
+	quiesencePeriod += 10 * time.Second
+
 	var gotDroppedFieldError atomic.Bool
 	var gotValidationError atomic.Bool
 	var validationErrorsOkay atomic.Bool
-	opts := resourceslice.Options{
-		DriverName: driverName,
-		KubeClient: tCtx.Client(),
-		SyncDelay:  ptr.To(0 * time.Second),
-		Resources:  resources,
-		ErrorHandler: func(ctx context.Context, err error, msg string) {
-			klog.FromContext(ctx).Info("ErrorHandler called", "err", err, "msg", msg)
-			if !validationErrorsOkay.Load() && len(disabledFeatures) == 0 {
-				assert.NoError(tCtx, err, msg)
-				return
-			}
 
-			var droppedFields *resourceslice.DroppedFieldsError
-			if errors.As(err, &droppedFields) {
-				var disabled []string
-				for _, feature := range disabledFeatures {
-					disabled = append(disabled, string(feature))
+	setup := func(tCtx ktesting.TContext) (*resourceslice.Controller, func(tCtx ktesting.TContext) resourceslice.Stats, resourceslice.Stats) {
+		tCtx.Helper()
+
+		tCtx.CleanupCtx(deleteSlices)
+
+		gotDroppedFieldError.Store(false)
+		gotValidationError.Store(false)
+		validationErrorsOkay.Store(false)
+
+		opts := resourceslice.Options{
+			DriverName:       driverName,
+			KubeClient:       tCtx.Client(),
+			Resources:        resources,
+			MutationCacheTTL: &mutationCacheTTL,
+			SyncDelay:        &syncDelay,
+			ErrorHandler: func(ctx context.Context, err error, msg string) {
+				klog.FromContext(ctx).Info("ErrorHandler called", "err", err, "msg", msg)
+				if !validationErrorsOkay.Load() && len(disabledFeatures) == 0 {
+					assert.NoError(tCtx, err, msg)
+					return
 				}
-				assert.ErrorContains(tCtx, err, fmt.Sprintf("pool %q, slice #1: some fields were dropped by the apiserver, probably because these features are disabled: %s", poolName, strings.Join(disabled, " ")))
-				gotDroppedFieldError.Store(true)
-			} else if validationErrorsOkay.Load() && apierrors.IsInvalid(err) {
-				gotValidationError.Store(true)
-			} else {
-				tCtx.Errorf("unexpected error: %v", err)
+
+				var droppedFields *resourceslice.DroppedFieldsError
+				if errors.As(err, &droppedFields) {
+					var disabled []string
+					for _, feature := range disabledFeatures {
+						disabled = append(disabled, string(feature))
+					}
+					assert.ErrorContains(tCtx, err, fmt.Sprintf("pool %q, slice #1: some fields were dropped by the apiserver, probably because these features are disabled: %s", poolName, strings.Join(disabled, " ")))
+					gotDroppedFieldError.Store(true)
+				} else if validationErrorsOkay.Load() && apierrors.IsInvalid(err) {
+					gotValidationError.Store(true)
+				} else {
+					tCtx.Errorf("unexpected error: %v", err)
+				}
+			},
+		}
+
+		controller, err := resourceslice.StartController(tCtx, opts)
+		tCtx.ExpectNoError(err, "start controller")
+		tCtx.Cleanup(controller.Stop)
+
+		expectedStats := resourceslice.Stats{
+			NumCreates: int64(len(expectedSlices)),
+		}
+		getStats := func(tCtx ktesting.TContext) resourceslice.Stats {
+			return controller.GetStats()
+		}
+		ktesting.Eventually(tCtx, getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+		expectSlices(tCtx)
+
+		return controller, getStats, expectedStats
+	}
+
+	// Each sub-test starts with no slices and must clean up after itself.
+
+	tCtx.Run("create", func(tCtx ktesting.TContext) {
+		controller, getStats, expectedStats := setup(tCtx)
+
+		// No further changes necessary.
+		ktesting.Consistently(tCtx, getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
+
+		if len(disabledFeatures) > 0 && !gotDroppedFieldError.Load() {
+			tCtx.Error("expected dropped fields error, got none")
+		}
+
+		// Now switch to one invalid slice.
+		resources := resources.DeepCopy()
+		pool := resources.Pools[poolName]
+		pool.Slices = pool.Slices[:1]
+		pool.Slices[0].Devices[0].Attributes = map[resourcev1beta2.QualifiedName]resourcev1beta2.DeviceAttribute{"empty": {}}
+		resources.Pools[poolName] = pool
+		validationErrorsOkay.Store(true)
+		controller.Update(resources)
+		ktesting.Eventually(tCtx, getStats).WithTimeout(10*time.Second).Should(gomega.HaveField("NumDeletes", gomega.BeNumerically(">=", int64(1))), "Slice should have been removed.")
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
+			return gotValidationError.Load()
+		}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("Should have gotten another error because the slice is invalid."))
+	})
+
+	if !haveLatestAPI {
+		return
+	}
+
+	tCtx.Run("recreate-after-delete", func(tCtx ktesting.TContext) {
+		_, getStats, expectedStats := setup(tCtx)
+		ktesting.Consistently(tCtx, getStats).WithTimeout(quiesencePeriod).Should(gomega.Equal(expectedStats))
+
+		// Stress the controller by repeatedly deleting the slices.
+		// One delete occurs after the sync period is over (because of the Consistently),
+		// the second before (because it's done as quickly as possible).
+		for i := 0; i < 2; i++ {
+			tCtx.Log("deleting ResourceSlices")
+			tCtx.ExpectNoError(tCtx.Client().ResourceV1beta2().ResourceSlices().DeleteCollection(tCtx, metav1.DeleteOptions{}, listDriverSlices), "delete driver slices")
+			expectedStats.NumCreates += int64(len(expectedSlices))
+			ktesting.Eventually(tCtx, getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+			expectSlices(tCtx)
+		}
+	})
+
+	tCtx.Run("fix-after-update", func(tCtx ktesting.TContext) {
+		_, getStats, expectedStats := setup(tCtx)
+
+		// Stress the controller by repeatedly updatings the slices.
+		for i := 0; i < 2; i++ {
+			slices, err := tCtx.Client().ResourceV1beta2().ResourceSlices().List(tCtx, listDriverSlices)
+			tCtx.ExpectNoError(err, "list slices")
+			for _, slice := range slices.Items {
+				if slice.Spec.Devices[0].Attributes == nil {
+					slice.Spec.Devices[0].Attributes = make(map[resourcev1beta2.QualifiedName]resourcev1beta2.DeviceAttribute)
+				}
+				slice.Spec.Devices[0].Attributes["someUnwantedAttribute"] = resourcev1beta2.DeviceAttribute{BoolValue: ptr.To(true)}
+				_, err := tCtx.Client().ResourceV1beta2().ResourceSlices().Update(tCtx, &slice, metav1.UpdateOptions{})
+				tCtx.ExpectNoError(err, "update slice")
 			}
-		},
-	}
-	controller, err := resourceslice.StartController(tCtx, opts)
-	tCtx.ExpectNoError(err, "start controller")
-	defer controller.Stop()
-
-	// Two create calls should be all that are needed.
-	expectedStats := resourceslice.Stats{
-		NumCreates: 2,
-	}
-	getStats := func(tCtx ktesting.TContext) resourceslice.Stats {
-		return controller.GetStats()
-	}
-	ktesting.Eventually(tCtx, getStats).WithTimeout(10 * time.Second).Should(gomega.Equal(expectedStats))
-
-	// No further changes necessary.
-	ktesting.Consistently(tCtx, getStats).WithTimeout(10 * time.Second).Should(gomega.Equal(expectedStats))
-
-	if len(disabledFeatures) > 0 && !gotDroppedFieldError.Load() {
-		tCtx.Error("expected dropped fields error, got none")
-	}
-
-	// Now switch to one invalid slice.
-	pool := resources.Pools[poolName]
-	pool.Slices = pool.Slices[:1]
-	pool.Slices[0].Devices[0].Attributes = map[resourcev1beta2.QualifiedName]resourcev1beta2.DeviceAttribute{"empty": {}}
-	resources.Pools[poolName] = pool
-	validationErrorsOkay.Store(true)
-	controller.Update(resources)
-	ktesting.Eventually(tCtx, getStats).WithTimeout(10*time.Second).Should(gomega.HaveField("NumDeletes", gomega.BeNumerically(">=", int64(1))), "Slice should have been removed.")
-	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
-		return gotValidationError.Load()
-	}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("Should have gotten another error because the slice is invalid."))
-
+			expectedStats.NumUpdates += int64(len(expectedSlices))
+			ktesting.Eventually(tCtx, getStats).WithTimeout(syncDelay + 5*time.Second).Should(gomega.Equal(expectedStats))
+			expectSlices(tCtx)
+		}
+	})
 }
 
 // testResourceClaimDeviceStatus creates a ResourceClaim with an invalid device (not allocated device)
@@ -889,4 +1078,11 @@ func testMaxResourceSlice(tCtx ktesting.TContext) {
 	if diff := cmp.Diff(slice.Spec, createdSlice.Spec); diff != "" {
 		tCtx.Errorf("ResourceSliceSpec got modified during Create (- want, + got):\n%s", diff)
 	}
+}
+
+func matchPointer[T any](p *T) gtypes.GomegaMatcher {
+	if p == nil {
+		return gomega.BeNil()
+	}
+	return gstruct.PointTo(gomega.Equal(*p))
 }

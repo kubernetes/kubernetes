@@ -59,14 +59,14 @@ const (
 	// Then the obsolete slice remains in the mutation cache.
 	//
 	// To mitigate this, we use a TTL and check a pool again once added slices expire.
-	defaultMutationCacheTTL = time.Minute
+	DefaultMutationCacheTTL = time.Minute
 
-	// defaultSyncDelay defines how long to wait between receiving the most recent
+	// DefaultSyncDelay defines how long to wait between receiving the most recent
 	// informer event and syncing again. This is long enough that the informer cache
-	// should be up-to-date (matter mostly for deletes because an out-dated cache
+	// should be up-to-date (matters mostly for deletes because an out-dated cache
 	// causes redundant delete API calls) and not too long that a human mistake
 	// doesn't get fixed while that human is waiting for it.
-	defaultSyncDelay = 30 * time.Second
+	DefaultSyncDelay = 30 * time.Second
 )
 
 // Controller synchronizes information about resources of one driver with
@@ -86,6 +86,21 @@ type Controller struct {
 	mutationCacheTTL time.Duration
 	syncDelay        time.Duration
 	errorHandler     func(ctx context.Context, err error, msg string)
+
+	// Last time that a ResourceSlice of a pool was created.
+	// At that time + cache mutation TTL do we have to sync again
+	// because the locally cached slice might have stayed in the
+	// cache erronously (not removed on delete by someone else)
+	// and we have to check again once it has been removed from
+	// the cache.
+	//
+	// It's not sufficient to schedule a delayed sync because
+	// another sync scheduled by an event overwrites the older
+	// one, so we would sync too soon and then not again.
+	//
+	// The key is the pool name. This makes each time entry
+	// unique for syncPool calls for the pool.
+	lastAddByPool map[string]time.Time
 
 	// Must use atomic access...
 	numCreates int64
@@ -368,9 +383,10 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 		driverName:       options.DriverName,
 		owner:            options.Owner.DeepCopy(),
 		queue:            options.Queue,
-		mutationCacheTTL: ptr.Deref(options.MutationCacheTTL, defaultMutationCacheTTL),
-		syncDelay:        ptr.Deref(options.SyncDelay, defaultSyncDelay),
+		mutationCacheTTL: ptr.Deref(options.MutationCacheTTL, DefaultMutationCacheTTL),
+		syncDelay:        ptr.Deref(options.SyncDelay, DefaultSyncDelay),
 		errorHandler:     options.ErrorHandler,
+		lastAddByPool:    make(map[string]time.Time),
 	}
 	if c.queue == nil {
 		c.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -444,6 +460,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			}
 			logger.V(5).Info("ResourceSlice add", "slice", klog.KObj(slice))
 			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
+			logger.V(5).Info("Scheduled sync", "poolName", slice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
 		},
 		UpdateFunc: func(old, new any) {
 			oldSlice, ok := old.(*resourceapi.ResourceSlice)
@@ -460,7 +477,11 @@ func (c *Controller) initInformer(ctx context.Context) error {
 				logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
 			}
 			c.queue.AddAfter(oldSlice.Spec.Pool.Name, c.syncDelay)
-			c.queue.AddAfter(newSlice.Spec.Pool.Name, c.syncDelay)
+			logger.V(5).Info("Scheduled sync", "pool", oldSlice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
+			if oldSlice.Spec.Pool.Name != newSlice.Spec.Pool.Name {
+				c.queue.AddAfter(newSlice.Spec.Pool.Name, c.syncDelay)
+				logger.V(5).Info("Scheduled sync", "poolName", newSlice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
+			}
 		},
 		DeleteFunc: func(obj any) {
 			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
@@ -472,6 +493,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			}
 			logger.V(5).Info("ResourceSlice delete", "slice", klog.KObj(slice))
 			c.queue.AddAfter(slice.Spec.Pool.Name, c.syncDelay)
+			logger.V(5).Info("Scheduled sync", "poolName", slice.Spec.Pool.Name, "at", time.Now().Add(c.syncDelay))
 		},
 	})
 	if err != nil {
@@ -530,6 +552,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 // be updated at any time by the user of the controller.
 func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	logger := klog.FromContext(ctx)
+	start := time.Now()
 
 	// Gather information about the actual and desired state.
 	var slices []*resourceapi.ResourceSlice
@@ -724,11 +747,11 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		// Preserve TimeAdded from existing device, if there is a matching device and taint.
 		slice.Spec.Devices = copyTaintTimeAdded(slice.Spec.Devices, pool.Slices[i].Devices)
 
-		logger.V(5).Info("Updating existing resource slice", "slice", klog.KObj(slice))
 		actualSlice, err := c.resourceClient.ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("update resource slice: %w", err)
 		}
+		logger.V(5).Info("Updated existing resource slice", "slice", klog.KObj(slice))
 		atomic.AddInt64(&c.numUpdates, 1)
 		c.sliceStored(ctx, "update ResourceSlice", poolName, pool, i, slice, actualSlice)
 	}
@@ -782,19 +805,39 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		//
 		// Using a https://pkg.go.dev/k8s.io/client-go/tools/cache#MutationCache
 		// avoids that.
-		logger.V(5).Info("Creating new resource slice")
 		actualSlice, err := c.resourceClient.ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("create resource slice: %w", err)
 		}
+		logger.V(5).Info("Created new resource slice", "slice", klog.KObj(actualSlice))
 		atomic.AddInt64(&c.numCreates, 1)
 		added = true
 		c.sliceStored(ctx, "create ResourceSlice", poolName, pool, i, slice, actualSlice)
 	}
+
+	now := time.Now()
 	if added {
-		// Check that the recently added slice(s) really exist even
-		// after they expired from the mutation cache.
-		c.queue.AddAfter(poolName, c.mutationCacheTTL)
+		c.lastAddByPool[poolName] = now
+		logger.V(5).Info("Added slices")
+	} else if lastAdd, ok := c.lastAddByPool[poolName]; ok && start.After(lastAdd.Add(c.mutationCacheTTL)) {
+		// This sync started after the last add expired from the cache,
+		// so we are done and don't need to check again.
+		delete(c.lastAddByPool, poolName)
+		logger.V(5).Info("Done with re-syncing")
+	}
+	if lastAdd, ok := c.lastAddByPool[poolName]; ok {
+		// Need to check again.
+		//
+		// Scheduling the resync races with scheduling them in informer events, but that's okay:
+		// what matters is that we sync at all at some point.
+		//
+		// lastAdd was taked by time.Now() above and thus is slightly higher or equal
+		// to the time taken by the mutation cache when the slice was added, so we
+		// can be sure that any sync running at this time will not see the added
+		// slice because it will be expired.
+		when := lastAdd.Add(c.mutationCacheTTL)
+		c.queue.AddAfter(poolName, when.Sub(now))
+		logger.V(5).Info("Scheduled re-sync", "at", when)
 	}
 
 	return nil
@@ -818,10 +861,10 @@ func (c *Controller) removeSlices(ctx context.Context, slices []*resourceapi.Res
 		// If this happens, we get a "not found error" and nothing
 		// changes on the server. The only downside is the extra API
 		// call. This isn't as bad as extra creates.
-		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice), "deleteOptions", options)
 		err := c.resourceClient.ResourceSlices().Delete(ctx, slice.Name, options)
 		switch {
 		case err == nil:
+			logger.V(5).Info("Deleted obsolete resource slice", "slice", klog.KObj(slice), "deleteOptions", options)
 			atomic.AddInt64(&c.numDeletes, 1)
 		case apierrors.IsNotFound(err):
 			logger.V(5).Info("Resource slice was already deleted earlier", "slice", klog.KObj(slice))
