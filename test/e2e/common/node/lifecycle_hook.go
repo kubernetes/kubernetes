@@ -96,7 +96,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				targetURL = fmt.Sprintf("[%s]", targetIP)
 			}
 		})
-		testPodWithHook := func(ctx context.Context, podWithHook *v1.Pod) {
+		testPodWithHook := func(ctx context.Context, podWithHook *v1.Pod, podHandleHookRequest *v1.Pod) {
 			ginkgo.By("create the pod with lifecycle hook")
 			podClient.CreateSync(ctx, podWithHook)
 			const (
@@ -104,6 +104,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				httpsHandler
 			)
 			handlerContainer := defaultHandler
+
 			if podWithHook.Spec.Containers[0].Lifecycle.PostStart != nil {
 				ginkgo.By("check poststart hook")
 				if podWithHook.Spec.Containers[0].Lifecycle.PostStart.HTTPGet != nil {
@@ -111,13 +112,21 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 						handlerContainer = httpsHandler
 					}
 				}
+				// Select target pod and container based on handler type
+				var targetPod *v1.Pod
+				var targetContainer string
+				if podHandleHookRequest == nil {
+					targetPod = podWithHook
+					targetContainer = podWithHook.Spec.Containers[0].Name
+				} else {
+					targetPod = podHandleHookRequest
+					targetContainer = podHandleHookRequest.Spec.Containers[handlerContainer].Name
+				}
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					return podClient.MatchContainerOutput(ctx, targetPod.Name, targetContainer,
 						`GET /echo\?msg=poststart`)
 				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
-			ginkgo.By("delete the pod with lifecycle hook")
-			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), f.Timeouts.PodDelete)
 			if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 				ginkgo.By("check prestop hook")
 				if podWithHook.Spec.Containers[0].Lifecycle.PreStop.HTTPGet != nil {
@@ -125,10 +134,34 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 						handlerContainer = httpsHandler
 					}
 				}
+				// Select target pod and container based on handler type
+				var targetPod *v1.Pod
+				var targetContainer string
+				if podHandleHookRequest == nil {
+					targetPod = podWithHook
+					targetContainer = podWithHook.Spec.Containers[0].Name
+				} else {
+					targetPod = podHandleHookRequest
+					targetContainer = podHandleHookRequest.Spec.Containers[handlerContainer].Name
+				}
+				var deletionStarted bool
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					if !deletionStarted {
+						ginkgo.By("delete the pod with lifecycle hook")
+						framework.ExpectNoError(podClient.Delete(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15)))
+						deletionStarted = true
+					}
+					return podClient.MatchContainerOutput(ctx, targetPod.Name, targetContainer,
 						`GET /echo\?msg=prestop`)
 				}, preStopWaitTimeout, podCheckInterval).Should(gomega.BeNil())
+				// Wait for pod to be fully deleted
+				gomega.Eventually(ctx, func(ctx context.Context) bool {
+					_, err := podClient.Get(ctx, podWithHook.Name, metav1.GetOptions{})
+					return err != nil
+				}, f.Timeouts.PodDelete, podCheckInterval).Should(gomega.BeTrueBecause("pod should be deleted after prestop hook completes"))
+			} else {
+				ginkgo.By("delete the pod with lifecycle hook")
+				podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), f.Timeouts.PodDelete)
 			}
 		}
 		/*
@@ -146,7 +179,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			}
 			podWithHook := getPodWithHook("pod-with-poststart-exec-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
 
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, podHandleHookRequest)
 		})
 		/*
 			Release: v1.9
@@ -162,7 +195,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-prestop-exec-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, podHandleHookRequest)
 		})
 		/*
 			Release: v1.9
@@ -174,17 +207,19 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=poststart",
-						Host: targetIP,
 						Port: intstr.FromInt32(8080),
 					},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-poststart-http-hook", imageutils.GetPauseImageName(), lifecycle)
+			podWithHook := getPodWithHook("pod-with-poststart-http-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+			// Start netexec in the background, wait for it to be ready, then sleep.
+			// This ensures the server is listening when the postStart hook fires.
+			podWithHook.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "/agnhost netexec --http-port=8080 & while ! nc -z localhost 8080; do sleep 0.1; done; sleep 600"}
 			// make sure we spawn the test pod on the same node as the webserver.
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
 			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, nil)
 		})
 		/*
 			Release : v1.23
@@ -197,17 +232,19 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=poststart",
-						Host:   targetIP,
 						Port:   intstr.FromInt32(9090),
 					},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-poststart-https-hook", imageutils.GetPauseImageName(), lifecycle)
+			podWithHook := getPodWithHook("pod-with-poststart-https-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+			// Start netexec HTTPS server in the background, wait for it to be ready, then sleep.
+			// This ensures the server is listening when the postStart hook fires.
+			podWithHook.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "/agnhost netexec --http-port=9090 --udp-port=9091 --tls-cert-file=/localhost.crt --tls-private-key-file=/localhost.key & while ! nc -z localhost 9090; do sleep 0.1; done; sleep 600"}
 			// make sure we spawn the test pod on the same node as the webserver.
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
 			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, nil)
 		})
 		/*
 			Release : v1.9
@@ -219,17 +256,20 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=prestop",
-						Host: targetIP,
 						Port: intstr.FromInt32(8080),
 					},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-prestop-http-hook", imageutils.GetPauseImageName(), lifecycle)
+			// Use agnhost with netexec to serve HTTP requests on port 8080
+			podWithHook := getPodWithHook("pod-with-prestop-http-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+			// Start netexec in the background, wait for it to be ready, then sleep.
+			// This ensures the server is listening when the preStop hook fires.
+			podWithHook.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "/agnhost netexec --http-port=8080 & while ! nc -z localhost 8080; do sleep 0.1; done; sleep 600"}
 			// make sure we spawn the test pod on the same node as the webserver.
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
 			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, nil)
 		})
 		/*
 			Release : v1.23
@@ -242,17 +282,19 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=prestop",
-						Host:   targetIP,
 						Port:   intstr.FromInt32(9090),
 					},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-prestop-https-hook", imageutils.GetPauseImageName(), lifecycle)
+			podWithHook := getPodWithHook("pod-with-prestop-https-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+			// Start netexec HTTPS server in the background, then sleep.
+			// This ensures the server is running when the preStop hook fires.
+			podWithHook.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "/agnhost netexec --http-port=9090 --udp-port=9091 --tls-cert-file=/localhost.crt --tls-private-key-file=/localhost.key & sleep 600"}
 			// make sure we spawn the test pod on the same node as the webserver.
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
 			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, nil)
 		})
 	})
 })
@@ -314,7 +356,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 				targetURL = fmt.Sprintf("[%s]", targetIP)
 			}
 		})
-		testPodWithHook := func(ctx context.Context, podWithHook *v1.Pod) {
+		testPodWithHook := func(ctx context.Context, podWithHook *v1.Pod, podHandleHookRequest *v1.Pod) {
 			ginkgo.By("create the pod with lifecycle hook")
 			podClient.CreateSync(ctx, podWithHook)
 			const (
@@ -322,6 +364,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 				httpsHandler
 			)
 			handlerContainer := defaultHandler
+
 			if podWithHook.Spec.InitContainers[0].Lifecycle.PostStart != nil {
 				ginkgo.By("check poststart hook")
 				if podWithHook.Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet != nil {
@@ -329,13 +372,21 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 						handlerContainer = httpsHandler
 					}
 				}
+				// Select target pod and container based on handler type
+				var targetPod *v1.Pod
+				var targetContainer string
+				if podHandleHookRequest == nil {
+					targetPod = podWithHook
+					targetContainer = podWithHook.Spec.InitContainers[0].Name
+				} else {
+					targetPod = podHandleHookRequest
+					targetContainer = podHandleHookRequest.Spec.Containers[handlerContainer].Name
+				}
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					return podClient.MatchContainerOutput(ctx, targetPod.Name, targetContainer,
 						`GET /echo\?msg=poststart`)
 				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
-			ginkgo.By("delete the pod with lifecycle hook")
-			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), f.Timeouts.PodDelete)
 			if podWithHook.Spec.InitContainers[0].Lifecycle.PreStop != nil {
 				ginkgo.By("check prestop hook")
 				if podWithHook.Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet != nil {
@@ -343,10 +394,34 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 						handlerContainer = httpsHandler
 					}
 				}
+				// Select target pod and container based on handler type
+				var targetPod *v1.Pod
+				var targetContainer string
+				if podHandleHookRequest == nil {
+					targetPod = podWithHook
+					targetContainer = podWithHook.Spec.InitContainers[0].Name
+				} else {
+					targetPod = podHandleHookRequest
+					targetContainer = podHandleHookRequest.Spec.Containers[handlerContainer].Name
+				}
+				var deletionStarted bool
 				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return podClient.MatchContainerOutput(ctx, podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[handlerContainer].Name,
+					if !deletionStarted {
+						ginkgo.By("delete the pod with lifecycle hook")
+						framework.ExpectNoError(podClient.Delete(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15)))
+						deletionStarted = true
+					}
+					return podClient.MatchContainerOutput(ctx, targetPod.Name, targetContainer,
 						`GET /echo\?msg=prestop`)
 				}, preStopWaitTimeout, podCheckInterval).Should(gomega.BeNil())
+				// Wait for pod to be fully deleted
+				gomega.Eventually(ctx, func(ctx context.Context) bool {
+					_, err := podClient.Get(ctx, podWithHook.Name, metav1.GetOptions{})
+					return err != nil
+				}, f.Timeouts.PodDelete, podCheckInterval).Should(gomega.BeTrueBecause("pod should be deleted after prestop hook completes"))
+			} else {
+				ginkgo.By("delete the pod with lifecycle hook")
+				podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), f.Timeouts.PodDelete)
 			}
 		}
 		/*
@@ -369,7 +444,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 			}
 			podWithHook := getSidecarPodWithHook("pod-with-poststart-exec-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
 
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, podHandleHookRequest)
 		})
 		/*
 			Release: v1.28
@@ -390,7 +465,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 				},
 			}
 			podWithHook := getSidecarPodWithHook("pod-with-prestop-exec-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, podHandleHookRequest)
 		})
 		/*
 			Release: v1.28
@@ -407,17 +482,19 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=poststart",
-						Host: targetIP,
 						Port: intstr.FromInt32(8080),
 					},
 				},
 			}
-			podWithHook := getSidecarPodWithHook("pod-with-poststart-http-hook", imageutils.GetPauseImageName(), lifecycle)
+			podWithHook := getSidecarPodWithHook("pod-with-init-container-poststart-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+			// Start netexec in the background, wait for it to be ready, then sleep.
+			// This ensures the server is listening when the postStart hook fires.
+			podWithHook.Spec.InitContainers[0].Command = []string{"/bin/sh", "-c", "/agnhost netexec --http-port=8080 & while ! nc -z localhost 8080; do sleep 0.1; done; sleep 600"}
 			// make sure we spawn the test pod on the same node as the webserver.
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
 			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, nil)
 		})
 		/*
 			Release : v1.28
@@ -435,17 +512,19 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=poststart",
-						Host:   targetIP,
 						Port:   intstr.FromInt32(9090),
 					},
 				},
 			}
-			podWithHook := getSidecarPodWithHook("pod-with-poststart-https-hook", imageutils.GetPauseImageName(), lifecycle)
+			podWithHook := getSidecarPodWithHook("pod-with-poststart-https-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+			// Start netexec HTTPS server in the background, wait for it to be ready, then sleep.
+			// This ensures the server is listening when the postStart hook fires.
+			podWithHook.Spec.InitContainers[0].Command = []string{"/bin/sh", "-c", "/agnhost netexec --http-port=9090 --udp-port=9091 --tls-cert-file=/localhost.crt --tls-private-key-file=/localhost.key & while ! nc -z localhost 9090; do sleep 0.1; done; sleep 600"}
 			// make sure we spawn the test pod on the same node as the webserver.
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
 			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, nil)
 		})
 		/*
 			Release : v1.28
@@ -462,17 +541,20 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=prestop",
-						Host: targetIP,
 						Port: intstr.FromInt32(8080),
 					},
 				},
 			}
-			podWithHook := getSidecarPodWithHook("pod-with-prestop-http-hook", imageutils.GetPauseImageName(), lifecycle)
+			// Use agnhost with netexec to serve HTTP requests on port 8080
+			podWithHook := getSidecarPodWithHook("pod-with-prestop-http-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+			// Start netexec in the background, wait for it to be ready, then sleep.
+			// This ensures the server is listening when the preStop hook fires.
+			podWithHook.Spec.InitContainers[0].Command = []string{"/bin/sh", "-c", "/agnhost netexec --http-port=8080 & while ! nc -z localhost 8080; do sleep 0.1; done; sleep 600"}
 			// make sure we spawn the test pod on the same node as the webserver.
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
 			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, nil)
 		})
 		/*
 			Release : v1.28
@@ -490,17 +572,19 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=prestop",
-						Host:   targetIP,
 						Port:   intstr.FromInt32(9090),
 					},
 				},
 			}
-			podWithHook := getSidecarPodWithHook("pod-with-prestop-https-hook", imageutils.GetPauseImageName(), lifecycle)
+			podWithHook := getSidecarPodWithHook("pod-with-prestop-https-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+			// Start netexec HTTPS server in the background, then sleep.
+			// This ensures the server is running when the preStop hook fires.
+			podWithHook.Spec.InitContainers[0].Command = []string{"/bin/sh", "-c", "/agnhost netexec --http-port=9090 --udp-port=9091 --tls-cert-file=/localhost.crt --tls-private-key-file=/localhost.key & sleep 600"}
 			// make sure we spawn the test pod on the same node as the webserver.
 			nodeSelection := e2epod.NodeSelection{}
 			e2epod.SetAffinity(&nodeSelection, targetNode)
 			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
-			testPodWithHook(ctx, podWithHook)
+			testPodWithHook(ctx, podWithHook, nil)
 		})
 	})
 })
