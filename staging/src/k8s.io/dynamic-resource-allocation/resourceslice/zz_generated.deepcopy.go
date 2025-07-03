@@ -115,6 +115,11 @@ func (in *Slice) DeepCopyInto(out *Slice) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.Mixins != nil {
+		in, out := &in.Mixins, &out.Mixins
+		*out = new(v1beta2.ResourceSliceMixins)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
