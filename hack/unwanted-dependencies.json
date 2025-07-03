@@ -43,7 +43,6 @@
       "github.com/gorilla/mux": "unmaintained, archive mode",
       "github.com/gorilla/rpc": "unmaintained, archive mode",
       "github.com/gorilla/schema": "unmaintained, archive mode",
-      "github.com/gregjones/httpcache": "unmaintained, archive mode",
       "github.com/grpc-ecosystem/go-grpc-prometheus": "unmaintained, archive mode",
       "github.com/grpc-ecosystem/grpc-gateway": "use github.com/grpc-ecosystem/grpc-gateway/v2",
       "github.com/hashicorp/consul": "MPL license not in CNCF allowlist",
@@ -183,9 +182,6 @@
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
       ],
-      "github.com/gregjones/httpcache": [
-        "k8s.io/client-go"
-      ],
       "github.com/grpc-ecosystem/go-grpc-prometheus": [
         "k8s.io/apiserver"
       ],
@@ -289,7 +285,6 @@
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
       "github.com/google/shlex",
-      "github.com/gregjones/httpcache",
       "github.com/grpc-ecosystem/go-grpc-prometheus",
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
