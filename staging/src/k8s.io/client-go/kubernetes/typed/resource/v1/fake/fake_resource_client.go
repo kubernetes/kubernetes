@@ -19,34 +19,34 @@ limitations under the License.
 package fake
 
 import (
-	v1beta2 "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	v1 "k8s.io/client-go/kubernetes/typed/resource/v1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeResourceV1beta2 struct {
+type FakeResourceV1 struct {
 	*testing.Fake
 }
 
-func (c *FakeResourceV1beta2) DeviceClasses() v1beta2.DeviceClassInterface {
+func (c *FakeResourceV1) DeviceClasses() v1.DeviceClassInterface {
 	return newFakeDeviceClasses(c)
 }
 
-func (c *FakeResourceV1beta2) ResourceClaims(namespace string) v1beta2.ResourceClaimInterface {
+func (c *FakeResourceV1) ResourceClaims(namespace string) v1.ResourceClaimInterface {
 	return newFakeResourceClaims(c, namespace)
 }
 
-func (c *FakeResourceV1beta2) ResourceClaimTemplates(namespace string) v1beta2.ResourceClaimTemplateInterface {
+func (c *FakeResourceV1) ResourceClaimTemplates(namespace string) v1.ResourceClaimTemplateInterface {
 	return newFakeResourceClaimTemplates(c, namespace)
 }
 
-func (c *FakeResourceV1beta2) ResourceSlices() v1beta2.ResourceSliceInterface {
+func (c *FakeResourceV1) ResourceSlices() v1.ResourceSliceInterface {
 	return newFakeResourceSlices(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeResourceV1beta2) RESTClient() rest.Interface {
+func (c *FakeResourceV1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }
