@@ -34,10 +34,10 @@ func ValidateSubjectAccessReviewSpec(spec authorizationapi.SubjectAccessReviewSp
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceAttributes"), spec.NonResourceAttributes, `cannot be specified in combination with resourceAttributes`))
 	}
 	if spec.ResourceAttributes == nil && spec.NonResourceAttributes == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceAttributes"), spec.NonResourceAttributes, `exactly one of nonResourceAttributes or resourceAttributes must be specified`))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceAttributes"), `exactly one of nonResourceAttributes or resourceAttributes must be specified`))
 	}
 	if len(spec.User) == 0 && len(spec.Groups) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("user"), spec.User, `at least one of user or group must be specified`))
+		allErrs = append(allErrs, field.Required(fldPath.Child("user"), `at least one of user or group must be specified`))
 	}
 	allErrs = append(allErrs, validateResourceAttributes(spec.ResourceAttributes, field.NewPath("spec.resourceAttributes"))...)
 
@@ -52,7 +52,7 @@ func ValidateSelfSubjectAccessReviewSpec(spec authorizationapi.SelfSubjectAccess
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceAttributes"), spec.NonResourceAttributes, `cannot be specified in combination with resourceAttributes`))
 	}
 	if spec.ResourceAttributes == nil && spec.NonResourceAttributes == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceAttributes"), spec.NonResourceAttributes, `exactly one of nonResourceAttributes or resourceAttributes must be specified`))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceAttributes"), `exactly one of nonResourceAttributes or resourceAttributes must be specified`))
 	}
 	allErrs = append(allErrs, validateResourceAttributes(spec.ResourceAttributes, field.NewPath("spec.resourceAttributes"))...)
 

@@ -763,7 +763,7 @@ func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterTo
 				setFields = append(setFields, "`nodeName`")
 				allErrs = append(allErrs, validateNodeName(*device.NodeName, fldPath.Child("nodeName"))...)
 			} else {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *device.NodeName, "must not be empty"))
+				allErrs = append(allErrs, field.Required(fldPath.Child("nodeName"), ""))
 			}
 
 		}

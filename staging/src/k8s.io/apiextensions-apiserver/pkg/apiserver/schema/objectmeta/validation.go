@@ -92,7 +92,7 @@ func validateEmbeddedResource(pth *field.Path, x map[string]interface{}, s *stru
 			if apiVersion, ok := v.(string); !ok {
 				allErrs = append(allErrs, field.Invalid(pth.Child("apiVersion"), v, "must be a string"))
 			} else if len(apiVersion) == 0 {
-				allErrs = append(allErrs, field.Invalid(pth.Child("apiVersion"), apiVersion, "must not be empty"))
+				allErrs = append(allErrs, field.Required(pth.Child("apiVersion"), ""))
 			} else if _, err := schema.ParseGroupVersion(apiVersion); err != nil {
 				allErrs = append(allErrs, field.Invalid(pth.Child("apiVersion"), apiVersion, err.Error()))
 			}
@@ -100,7 +100,7 @@ func validateEmbeddedResource(pth *field.Path, x map[string]interface{}, s *stru
 			if kind, ok := v.(string); !ok {
 				allErrs = append(allErrs, field.Invalid(pth.Child("kind"), v, "must be a string"))
 			} else if len(kind) == 0 {
-				allErrs = append(allErrs, field.Invalid(pth.Child("kind"), kind, "must not be empty"))
+				allErrs = append(allErrs, field.Required(pth.Child("kind"), ""))
 			} else if errs := utilvalidation.IsDNS1035Label(strings.ToLower(kind)); len(errs) > 0 {
 				allErrs = append(allErrs, field.Invalid(pth.Child("kind"), kind, "may have mixed case, but should otherwise match: "+strings.Join(errs, ",")))
 			}

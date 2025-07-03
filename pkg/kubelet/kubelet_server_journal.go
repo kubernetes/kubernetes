@@ -136,7 +136,7 @@ func newNodeLogQuery(query url.Values) (*nodeLogQuery, field.ErrorList) {
 	// Prevent specifying  an empty or blank space query.
 	// Example: kubectl get --raw /api/v1/nodes/$node/proxy/logs?query="   "
 	if ok && (len(nlq.Files) == 0 && len(nlq.Services) == 0) {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("query"), queries, "query cannot be empty"))
+		allErrs = append(allErrs, field.Required(field.NewPath("query"), ""))
 	}
 
 	var sinceTime time.Time

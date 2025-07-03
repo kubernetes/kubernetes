@@ -851,7 +851,7 @@ func validateParamKind(gvk admissionregistration.ParamKind, fldPath *field.Path)
 		}
 		// this matches the APIService version field validation
 		if len(gv.Version) == 0 {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("apiVersion"), gvk.APIVersion, "version must be specified"))
+			allErrors = append(allErrors, field.Required(fldPath.Child("apiVersion"), ""))
 		} else {
 			if errs := utilvalidation.IsDNS1035Label(gv.Version); len(errs) > 0 {
 				allErrors = append(allErrors, field.Invalid(fldPath.Child("apiVersion"), gv.Version, strings.Join(errs, ",")))
