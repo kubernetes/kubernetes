@@ -1009,7 +1009,7 @@ func validateVariable(compiler plugincel.Compiler, v *admissionregistration.Vari
 		allErrors = append(allErrors, field.Required(fldPath.Child("name"), "name is not specified"))
 	} else {
 		if !isCELIdentifier(v.Name) {
-			allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), v.Name, "is not a valid CEL identifier"))
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), v.Name, "must be a valid CEL identifier"))
 		}
 	}
 	if len(v.Expression) == 0 || strings.TrimSpace(v.Expression) == "" {

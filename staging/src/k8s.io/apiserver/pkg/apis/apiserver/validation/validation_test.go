@@ -990,7 +990,7 @@ func TestValidateClaimValidationRules(t *testing.T) {
 				{Claim: "claim", Message: "message"},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimValidationRules[0].message: Invalid value: "message": can't be set when claim is set`,
+			want:                          `issuer.claimValidationRules[0].message: Invalid value: "message": may not be specified when claim is set`,
 		},
 		{
 			name: "requiredValue set when expression is set",
@@ -998,7 +998,7 @@ func TestValidateClaimValidationRules(t *testing.T) {
 				{Expression: "claims.foo == 'bar'", RequiredValue: "value"},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimValidationRules[0].requiredValue: Invalid value: "value": can't be set when expression is set`,
+			want:                          `issuer.claimValidationRules[0].requiredValue: Invalid value: "value": may not be specified when expression is set`,
 		},
 		{
 			name: "duplicate claim",
@@ -1024,7 +1024,7 @@ func TestValidateClaimValidationRules(t *testing.T) {
 				{Expression: "claims.foo == 'bar'"},
 			},
 			structuredAuthnFeatureEnabled: false,
-			want:                          `issuer.claimValidationRules[0].expression: Invalid value: "claims.foo == 'bar'": is not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
+			want:                          `issuer.claimValidationRules[0].expression: Invalid value: "claims.foo == 'bar'": not supported when StructuredAuthenticationConfiguration feature gate is disabled`,
 		},
 		{
 			name: "CEL expression compilation error",
@@ -1141,7 +1141,7 @@ func TestValidateClaimMappings(t *testing.T) {
 				},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimMappings.username.prefix: Invalid value: "prefix": can't be set when expression is set`,
+			want:                          `issuer.claimMappings.username.prefix: Invalid value: "prefix": may not be specified when expression is set`,
 		},
 		{
 			name: "username prefix is nil when claim is set",
@@ -1193,7 +1193,7 @@ func TestValidateClaimMappings(t *testing.T) {
 				},
 			},
 			structuredAuthnFeatureEnabled: true,
-			want:                          `issuer.claimMappings.groups.prefix: Invalid value: "prefix": can't be set when expression is set`,
+			want:                          `issuer.claimMappings.groups.prefix: Invalid value: "prefix": may not be specified when expression is set`,
 		},
 		{
 			name: "groups prefix is nil when claim is set",
@@ -1308,7 +1308,7 @@ func TestValidateClaimMappings(t *testing.T) {
 				},
 			},
 			structuredAuthnFeatureEnabled: false,
-			want: `[issuer.claimMappings.username.expression: Invalid value: "foo.bar": is not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.username.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `[issuer.claimMappings.username.expression: Invalid value: "foo.bar": not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.username.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
  | foo.bar
  | ^]`,
 		},
@@ -1324,7 +1324,7 @@ func TestValidateClaimMappings(t *testing.T) {
 				},
 			},
 			structuredAuthnFeatureEnabled: false,
-			want: `[issuer.claimMappings.groups.expression: Invalid value: "foo.bar": is not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.groups.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
+			want: `[issuer.claimMappings.groups.expression: Invalid value: "foo.bar": not supported when StructuredAuthenticationConfiguration feature gate is disabled, issuer.claimMappings.groups.expression: Invalid value: "foo.bar": compilation failed: ERROR: <input>:1:1: undeclared reference to 'foo' (in container '')
  | foo.bar
  | ^]`,
 		},

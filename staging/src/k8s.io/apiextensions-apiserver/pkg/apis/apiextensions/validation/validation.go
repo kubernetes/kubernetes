@@ -304,7 +304,7 @@ func validateCustomResourceDefinitionVersion(ctx context.Context, version *apiex
 
 	if len(version.SelectableFields) > 0 {
 		if version.Schema == nil || version.Schema.OpenAPIV3Schema == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectableFields"), "", "may only be set when version.schema.openAPIV3Schema is not included"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectableFields"), "", "may only be set when `version.schema.openAPIV3Schema` is not included"))
 		} else {
 			schema, err := structuralschema.NewStructural(version.Schema.OpenAPIV3Schema)
 			if err != nil {
