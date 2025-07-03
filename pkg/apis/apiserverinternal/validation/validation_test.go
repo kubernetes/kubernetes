@@ -280,7 +280,7 @@ func TestValidateCommonVersion(t *testing.T) {
 			}},
 			CommonEncodingVersion: nil,
 		},
-		expectedErr: "Invalid value: \"null\": the common encoding version is v1alpha1",
+		expectedErr: "Invalid value: null: the common encoding version is v1alpha1",
 	}, {
 		status: apiserverinternal.StorageVersionStatus{
 			StorageVersions: []apiserverinternal.ServerStorageVersion{{

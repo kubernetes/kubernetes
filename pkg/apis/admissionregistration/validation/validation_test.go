@@ -107,7 +107,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			AdmissionReviewVersions: []string{"invalidVersion"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalidVersion"}`,
+		expectedError: `Invalid value: ["invalidVersion"]`,
 	}, {
 		name: "should fail on duplicate AdmissionReviewVersion",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -313,7 +313,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			}},
 		},
 		}, true),
-		expectedError: `webhooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `webhooks[0].rules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -892,7 +892,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 			AdmissionReviewVersions: []string{"v1beta1", "invalid-v1"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "should fail on invalid AdmissionReviewVersion with missing previous versions",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -908,7 +908,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 			SideEffects:  &unknownSideEffect,
 		},
 		}, false),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "Webhooks must have unique names when old config has unique names",
 		config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{{
@@ -1084,7 +1084,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			AdmissionReviewVersions: []string{"invalidVersion"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalidVersion"}`,
+		expectedError: `Invalid value: ["invalidVersion"]`,
 	}, {
 		name: "should fail on duplicate AdmissionReviewVersion",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -1290,7 +1290,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			}},
 		},
 		}, true),
-		expectedError: `webhooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `webhooks[0].rules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -1885,7 +1885,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 			AdmissionReviewVersions: []string{"v1beta1", "invalid-v1"},
 		},
 		}, true),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "should fail on invalid AdmissionReviewVersion with missing previous versions",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -1901,7 +1901,7 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 			SideEffects:  &unknownSideEffect,
 		},
 		}, false),
-		expectedError: `Invalid value: []string{"invalid-v1"}`,
+		expectedError: `Invalid value: ["invalid-v1"]`,
 	}, {
 		name: "Webhooks can have duplicate names when old config has duplicate names",
 		config: newMutatingWebhookConfiguration([]admissionregistration.MutatingWebhook{{
@@ -2592,7 +2592,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "invalid expression",
 		config: &admissionregistration.ValidatingAdmissionPolicy{
@@ -3900,7 +3900,7 @@ func TestValidateValidatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "validationActions must be unique",
 		config: &admissionregistration.ValidatingAdmissionPolicyBinding{
@@ -5055,7 +5055,7 @@ func TestValidateMutatingAdmissionPolicy(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchConstraints.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "patchType required",
 		config: &admissionregistration.MutatingAdmissionPolicy{
@@ -5946,7 +5946,7 @@ func TestValidateMutatingAdmissionPolicyBinding(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+		expectedError: `spec.matchResources.resourceRules[0].resources: Invalid value: ["*/*","a"]: if '*/*' is present, must not specify other resources`,
 	}, {
 		name: "paramRef selector must not be set when name is set",
 		config: &admissionregistration.MutatingAdmissionPolicyBinding{
