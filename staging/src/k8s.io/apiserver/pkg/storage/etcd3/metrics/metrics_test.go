@@ -268,6 +268,42 @@ apiserver_storage_objects{resource="bar.foo"} -1
 	}
 }
 
+func TestDeleteObjectCount(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	registry.MustRegister(objectCounts)
+	testedMetrics := "apiserver_storage_objects"
+
+	UpdateObjectCount(schema.GroupResource{Group: "foo1", Resource: "bar1"}, int64(10))
+	UpdateObjectCount(schema.GroupResource{Group: "foo2", Resource: "bar2"}, int64(20))
+
+	expectedMetrics := `# HELP apiserver_storage_objects [STABLE] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+# TYPE apiserver_storage_objects gauge
+apiserver_storage_objects{resource="bar1.foo1"} 10
+apiserver_storage_objects{resource="bar2.foo2"} 20
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), testedMetrics); err != nil {
+		t.Fatal(err)
+	}
+
+	DeleteObjectCount(schema.GroupResource{Group: "foo1", Resource: "bar1"})
+
+	expectedMetrics = `# HELP apiserver_storage_objects [STABLE] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+# TYPE apiserver_storage_objects gauge
+apiserver_storage_objects{resource="bar2.foo2"} 20
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), testedMetrics); err != nil {
+		t.Fatal(err)
+	}
+
+	DeleteObjectCount(schema.GroupResource{Group: "foo2", Resource: "bar2"})
+	expectedMetrics = `# HELP apiserver_storage_objects [STABLE] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+# TYPE apiserver_storage_objects gauge
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), testedMetrics); err != nil {
+		t.Fatal(err)
+	}
+}
+
 type fakeEtcdMonitor struct {
 	storageSize int64
 }
