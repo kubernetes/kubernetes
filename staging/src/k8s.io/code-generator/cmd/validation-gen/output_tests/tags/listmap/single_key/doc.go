@@ -37,6 +37,9 @@ type Struct struct {
 	// +k8s:eachVal=+k8s:immutable
 	ListTypedefField []OtherTypedefStruct `json:"listTypedefField"`
 
+	// +k8s:eachVal=+k8s:immutable
+	TypedefField ListType `json:"typedefField"`
+
 	// +k8s:listType=map
 	// +k8s:listMapKey=keyField
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListComparableField[*]"
@@ -59,3 +62,7 @@ type NonComparableStruct struct {
 	KeyField       string  `json:"keyField"`
 	StringPtrField *string `json:"stringPtrField"`
 }
+
+// +k8s:listType=map
+// +k8s:listMapKey=keyField
+type ListType []OtherStruct

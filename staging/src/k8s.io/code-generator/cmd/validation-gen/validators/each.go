@@ -46,7 +46,9 @@ func init() {
 	shared := map[string]*listMetadata{} // keyed by the fieldpath
 	RegisterTagValidator(listTypeTagValidator{byFieldPath: shared})
 	RegisterTagValidator(listMapKeyTagValidator{byFieldPath: shared})
-	RegisterFieldValidator(listFieldValidator{byFieldPath: shared})
+
+	RegisterFieldValidator(listValidator{byFieldPath: shared})
+	RegisterTypeValidator(listValidator{byFieldPath: shared})
 
 	globalEachVal = &eachValTagValidator{byFieldPath: shared, validator: nil}
 	RegisterTagValidator(globalEachVal)
@@ -156,7 +158,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		}
 		lm := lttv.byFieldPath[context.Path.String()]
 		lm.declaredAsMap = true
-		// NOTE: we validate uniqueness of the keys in the listFieldValidator.
+		// NOTE: we validate uniqueness of the keys in the listValidator.
 	default:
 		return Validations{}, fmt.Errorf("unknown list type %q", tag.Value)
 	}
@@ -242,18 +244,18 @@ func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 	return doc
 }
 
-type listFieldValidator struct {
+type listValidator struct {
 	byFieldPath map[string]*listMetadata
 }
 
-func (listFieldValidator) Init(_ Config) {}
+func (listValidator) Init(_ Config) {}
 
-func (listFieldValidator) Name() string {
-	return "listFieldValidator"
+func (listValidator) Name() string {
+	return "listValidator"
 }
 
-func (lfv listFieldValidator) GetValidations(context Context) (Validations, error) {
-	lm := lfv.byFieldPath[context.Path.String()]
+func (lv listValidator) GetValidations(context Context) (Validations, error) {
+	lm := lv.byFieldPath[context.Path.String()]
 	if lm == nil {
 		// TODO(thockin): enable this once the whole codebase is converted or
 		// if we only run against fields which are opted-in.
@@ -287,7 +289,7 @@ func (lfv listFieldValidator) GetValidations(context Context) (Validations, erro
 		// is also not able to handle these well.
 		t := util.NativeType(context.Type)
 		matchArg := lm.makeListMapMatchFunc(t.Elem)
-		f := Function("listFieldValidator", DefaultFlags, validateUnique, matchArg)
+		f := Function("listValidator", DefaultFlags, validateUnique, matchArg)
 		result.Functions = append(result.Functions, f)
 	}
 
