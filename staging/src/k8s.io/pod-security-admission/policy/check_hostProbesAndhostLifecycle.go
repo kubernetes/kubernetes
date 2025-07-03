@@ -74,13 +74,13 @@ func CheckHostProbesAndHostLifecycle() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 34),
-				CheckPod:       hostProbesAndHostLifecycle_1_34,
+				CheckPod:       hostProbesAndHostLifecycleV1Dot34,
 			},
 		},
 	}
 }
 
-func hostProbesAndHostLifecycle_1_34(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func hostProbesAndHostLifecycleV1Dot34(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	var badContainers []string
 	forbidden := sets.New[string]()
 	allowed := sets.New[string](allowedLocalHostIPv4, allowedLocalHostIPv6)
