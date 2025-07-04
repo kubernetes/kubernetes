@@ -26,6 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/util/diff"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -460,7 +461,7 @@ func TestAddFlags(t *testing.T) {
 	sort.Sort(sortedGCIgnoredResources(expected.GarbageCollectorController.GCIgnoredResources))
 
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff.ObjectGoPrintSideBySide(expected, s))
 	}
 }
 
@@ -735,6 +736,67 @@ func TestApplyTo(t *testing.T) {
 
 	if !reflect.DeepEqual(expected.ComponentConfig, c.ComponentConfig) {
 		t.Errorf("Got different configuration than expected.\nDifference detected on:\n%s", cmp.Diff(expected.ComponentConfig, c.ComponentConfig))
+	}
+}
+
+func TestSetControllerListFormatter(t *testing.T) {
+	testCases := []struct {
+		name                         string
+		allControllers               []string
+		disabledByDefaultControllers []string
+		format                       func([]string) string
+		expectedUsage                string
+	}{
+		{
+			name:                         "default",
+			allControllers:               []string{"red-controller", "green-controller", "blue-controller"},
+			disabledByDefaultControllers: nil,
+			format:                       nil,
+			expectedUsage: `A list of controllers to enable. '*' enables all on-by-default controllers, 'foo' enables the controller named 'foo', '-foo' disables the controller named 'foo'.
+
+All controllers: red-controller, green-controller, blue-controller
+Disabled-by-default controllers: `,
+		},
+		{
+			name:                         "custom",
+			allControllers:               []string{"red-controller", "green-controller", "blue-controller"},
+			disabledByDefaultControllers: []string{"pink-controller"},
+			format: func(controllers []string) string {
+				if len(controllers) == 0 {
+					return ""
+				}
+				return "\n- " + strings.Join(controllers, "\n- ") + "\n"
+			},
+			expectedUsage: `A list of controllers to enable. '*' enables all on-by-default controllers, 'foo' enables the controller named 'foo', '-foo' disables the controller named 'foo'.
+
+All controllers: 
+- red-controller
+- green-controller
+- blue-controller
+
+Disabled-by-default controllers: 
+- pink-controller
+`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			options, err := NewKubeControllerManagerOptions()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if tc.format != nil {
+				options.Generic.ControllerListFormatter = tc.format
+			}
+
+			flags := options.Flags(tc.allControllers, tc.disabledByDefaultControllers, nil)
+			got := flags.FlagSet("generic").Lookup("controllers").Usage
+			if got != tc.expectedUsage {
+				t.Error("unexpected usage string:\n", cmp.Diff(tc.expectedUsage, got))
+			}
+		})
 	}
 }
 
