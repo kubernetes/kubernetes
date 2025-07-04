@@ -31,13 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
-
-func strPtr(in string) *string {
-	return &in
-}
 
 func TestValidateAPIApproval(t *testing.T) {
 	okFn := func(t *testing.T, errors field.ErrorList) {
@@ -79,14 +74,14 @@ func TestValidateAPIApproval(t *testing.T) {
 			name:               "invalid annotation update",
 			group:              "sigs.k8s.io",
 			annotationValue:    "invalid",
-			oldAnnotationValue: strPtr("invalid"),
+			oldAnnotationValue: ptr.To("invalid"),
 			validateError:      okFn,
 		},
 		{
 			name:               "invalid annotation to missing",
 			group:              "sigs.k8s.io",
 			annotationValue:    "",
-			oldAnnotationValue: strPtr("invalid"),
+			oldAnnotationValue: ptr.To("invalid"),
 			validateError: func(t *testing.T, errors field.ErrorList) {
 				t.Helper()
 				if len(errors) == 0 {
@@ -101,7 +96,7 @@ func TestValidateAPIApproval(t *testing.T) {
 			name:               "missing to invalid annotation",
 			group:              "sigs.k8s.io",
 			annotationValue:    "invalid",
-			oldAnnotationValue: strPtr(""),
+			oldAnnotationValue: ptr.To(""),
 			validateError: func(t *testing.T, errors field.ErrorList) {
 				t.Helper()
 				if len(errors) == 0 {
@@ -130,7 +125,7 @@ func TestValidateAPIApproval(t *testing.T) {
 			name:               "missing annotation update",
 			group:              "sigs.k8s.io",
 			annotationValue:    "",
-			oldAnnotationValue: strPtr(""),
+			oldAnnotationValue: ptr.To(""),
 			validateError:      okFn,
 		},
 		{
@@ -158,7 +153,7 @@ func TestValidateAPIApproval(t *testing.T) {
 					Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "v1", Storage: true, Served: true}},
 					Names:    apiextensions.CustomResourceDefinitionNames{Plural: "foos", Singular: "foo", Kind: "Foo", ListKind: "FooList"},
 					Validation: &apiextensions.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object", XPreserveUnknownFields: pointer.BoolPtr(true)},
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object", XPreserveUnknownFields: ptr.To(true)},
 					},
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
@@ -176,7 +171,7 @@ func TestValidateAPIApproval(t *testing.T) {
 						Versions: []apiextensions.CustomResourceDefinitionVersion{{Name: "v1", Storage: true, Served: true}},
 						Names:    apiextensions.CustomResourceDefinitionNames{Plural: "foos", Singular: "foo", Kind: "Foo", ListKind: "FooList"},
 						Validation: &apiextensions.CustomResourceValidation{
-							OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object", XPreserveUnknownFields: pointer.BoolPtr(true)},
+							OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object", XPreserveUnknownFields: ptr.To(true)},
 						},
 					},
 					Status: apiextensions.CustomResourceDefinitionStatus{
