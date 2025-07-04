@@ -116,7 +116,7 @@ func TestUntilMultipleConditionsFail(t *testing.T) {
 	defer cancel()
 
 	lastEvent, err := UntilWithoutRetry(ctx, fw, conditions...)
-	if err != wait.ErrWaitTimeout {
+	if !wait.Interrupted(err) {
 		t.Fatalf("expected ErrWaitTimeout error, got %#v", err)
 	}
 	if lastEvent == nil {
@@ -209,7 +209,7 @@ func TestUntilWithSync(t *testing.T) {
 			conditionFunc: func(e watch.Event) (bool, error) {
 				return true, nil
 			},
-			expectedErr:   wait.ErrWaitTimeout,
+			expectedErr:   wait.ErrorInterrupted(nil),
 			expectedEvent: nil,
 		},
 		{
