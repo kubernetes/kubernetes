@@ -726,14 +726,6 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		}
 		return result, err
 	})
-
-	// In case of a timeout error, the goroutine handling the request is still running.
-	// https://github.com/kubernetes/kubernetes/blob/d2c12afa4593e50a187075157d38748292b02733/staging/src/k8s.io/apiserver/pkg/endpoints/handlers/finisher/finisher.go#L127-L146
-	// We cannot reliably read the variable (data race!) and have to assume that
-	// the object was not created.
-	if errors.IsTimeout(err) {
-		return result, false, err
-	}
 	return result, wasCreated, err
 }
 
