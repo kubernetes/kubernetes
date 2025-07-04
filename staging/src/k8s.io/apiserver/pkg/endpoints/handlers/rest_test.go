@@ -606,6 +606,13 @@ func (tc *patchTestCase) Run(t *testing.T) {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
 				continue
 			}
+		} else if tc.isTimeout {
+			// strings.Contains check is used as a fallback to handle errors that aren't wrapped with %w,
+			// making the timeout detection more robust in practice.
+			if !apierrors.IsTimeout(err) && !strings.Contains(err.Error(), "context deadline exceeded") {
+				t.Errorf("%s: expected timeout error (context.DeadlineExceeded), but got: %v", tc.name, err)
+				continue
+			}
 		} else {
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
@@ -711,13 +718,12 @@ func TestPatchResourceNumberConversion(t *testing.T) {
 
 func TestPatchResourceTimeout(t *testing.T) {
 	tc := &patchTestCase{
-		name:          "TestPatchResourceTimeout",
-		startingPod:   &example.Pod{},
-		changedPod:    &example.Pod{},
-		updatePod:     &example.Pod{},
-		expectedPod:   nil,
-		isTimeout:     true,
-		expectedError: "Timeout: request did not complete within requested timeout - context deadline exceeded",
+		name:        "TestPatchResourceTimeout",
+		startingPod: &example.Pod{},
+		changedPod:  &example.Pod{},
+		updatePod:   &example.Pod{},
+		expectedPod: nil,
+		isTimeout:   true,
 	}
 
 	tc.Run(t)
