@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -188,7 +188,7 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 						},
 					},
 				}
-				_, err := c.ResourceV1beta2().ResourceClaims("default").Create(context.TODO(), obj, metav1.CreateOptions{})
+				_, err := c.ResourceV1().ResourceClaims("default").Create(context.TODO(), obj, metav1.CreateOptions{})
 				return err
 			},
 			// authorizer is not available to resource APIs
