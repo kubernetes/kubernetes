@@ -19,10 +19,11 @@ package app
 import (
 	"context"
 	"fmt"
-	"sort"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 )
@@ -48,13 +49,16 @@ type Controller interface {
 type ControllerConstructor func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error)
 
 type ControllerDescriptor struct {
-	name                      string
-	constructor               ControllerConstructor
-	requiredFeatureGates      []featuregate.Feature
-	aliases                   []string
-	isDisabledByDefault       bool
-	isCloudProviderController bool
-	requiresSpecialHandling   bool
+	name        string
+	constructor ControllerConstructor
+	// requiredFeatureGates and requiredClientFeatureGates are semantically the same.
+	// They are only split for type safety.
+	requiredFeatureGates       []featuregate.Feature
+	requiredClientFeatureGates []clientgofeaturegate.Feature
+	aliases                    []string
+	isDisabledByDefault        bool
+	isCloudProviderController  bool
+	requiresSpecialHandling    bool
 }
 
 func (r *ControllerDescriptor) Name() string {
@@ -67,6 +71,23 @@ func (r *ControllerDescriptor) GetControllerConstructor() ControllerConstructor 
 
 func (r *ControllerDescriptor) GetRequiredFeatureGates() []featuregate.Feature {
 	return append([]featuregate.Feature(nil), r.requiredFeatureGates...)
+}
+
+func (r *ControllerDescriptor) GetRequiredClientFeatureGates() []clientgofeaturegate.Feature {
+	return append([]clientgofeaturegate.Feature(nil), r.requiredClientFeatureGates...)
+}
+
+// GetAllRequiredFeatureGateStrings returns a string slice made by merging the required feature and client feature gates.
+func (c *ControllerDescriptor) GetAllRequiredFeatureGateStrings() []string {
+	var gates []string
+	for _, gate := range c.GetRequiredFeatureGates() {
+		gates = append(gates, string(gate))
+	}
+	for _, gate := range c.GetRequiredClientFeatureGates() {
+		gates = append(gates, string(gate))
+	}
+	slices.Sort(gates)
+	return gates
 }
 
 // GetAliases returns aliases to ensure backwards compatibility and should never be removed!
@@ -94,11 +115,21 @@ func (r *ControllerDescriptor) BuildController(ctx context.Context, controllerCt
 	logger := klog.FromContext(ctx)
 	controllerName := r.Name()
 
+	// The following feature gate check loops are duplicated, because there are multiple descriptor fields holding
+	// feature gates for the given controller since the flags are split by type for type safety.
 	for _, featureGate := range r.GetRequiredFeatureGates() {
 		if !utilfeature.DefaultFeatureGate.Enabled(featureGate) {
 			logger.Info("Controller is disabled by a feature gate",
 				"controller", controllerName,
-				"requiredFeatureGates", r.GetRequiredFeatureGates())
+				"requiredFeatureGates", r.GetAllRequiredFeatureGateStrings())
+			return nil, nil
+		}
+	}
+	for _, featureGate := range r.GetRequiredClientFeatureGates() {
+		if !clientgofeaturegate.FeatureGates().Enabled(featureGate) {
+			logger.Info("Controller is disabled by a feature gate",
+				"controller", controllerName,
+				"requiredFeatureGates", r.GetAllRequiredFeatureGateStrings())
 			return nil, nil
 		}
 	}
@@ -137,8 +168,7 @@ func ControllersDisabledByDefault() []string {
 		}
 	}
 
-	sort.Strings(controllersDisabledByDefault)
-
+	slices.Sort(controllersDisabledByDefault)
 	return controllersDisabledByDefault
 }
 
