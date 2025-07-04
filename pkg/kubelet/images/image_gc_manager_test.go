@@ -129,11 +129,11 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 		makeImage(2, 2048),
-	}
+	})
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
@@ -177,11 +177,11 @@ func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImageWithRuntimeHandler(0, 1024, testRuntimeHandler),
 		makeImageWithRuntimeHandler(1, 2048, testRuntimeHandler),
 		makeImageWithRuntimeHandler(2, 2048, ""),
-	}
+	})
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
@@ -232,10 +232,10 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 
 	// Just one image initially.
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
-	}
+	})
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
@@ -250,11 +250,11 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 	assert.Equal(2, manager.imageRecordsLen())
 
 	// Add a new image.
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 1024),
 		makeImage(2, 1024),
-	}
+	})
 
 	detectedTime := zero.Add(time.Second)
 	startTime := time.Now().Add(-time.Millisecond)
@@ -283,13 +283,13 @@ func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		{
 			ID:     sandboxImage,
 			Size:   1024,
 			Pinned: true,
 		},
-	}
+	})
 
 	err := manager.DeleteUnusedImages(ctx)
 	assert := assert.New(t)
@@ -302,17 +302,17 @@ func TestDeletePinnedImage(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		{
 			ID:     sandboxImage,
 			Size:   1024,
 			Pinned: true,
 		},
 		{
-			ID:   sandboxImage,
+			ID:   sandboxImage + "2",
 			Size: 1024,
 		},
-	}
+	})
 
 	err := manager.DeleteUnusedImages(ctx)
 	assert := assert.New(t)
@@ -325,7 +325,7 @@ func TestDoNotDeletePinnedImage(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		{
 			ID:     "1",
 			Size:   1024,
@@ -335,7 +335,7 @@ func TestDoNotDeletePinnedImage(t *testing.T) {
 			ID:   "2",
 			Size: 1024,
 		},
-	}
+	})
 
 	assert := assert.New(t)
 	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 4096, 1024, 1, time.Now())
@@ -346,7 +346,7 @@ func TestDeleteUnPinnedImage(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		{
 			ID:     "1",
 			Size:   1024,
@@ -356,7 +356,7 @@ func TestDeleteUnPinnedImage(t *testing.T) {
 			ID:   "2",
 			Size: 1024,
 		},
-	}
+	})
 
 	assert := assert.New(t)
 	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 2048, 2048, 0, time.Now())
@@ -367,7 +367,7 @@ func TestAllPinnedImages(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		{
 			ID:     "1",
 			Size:   1024,
@@ -378,7 +378,7 @@ func TestAllPinnedImages(t *testing.T) {
 			Size:   1024,
 			Pinned: true,
 		},
-	}
+	})
 
 	assert := assert.New(t)
 	getImagesAndFreeSpace(ctx, t, assert, manager, fakeRuntime, 2048, 0, 2, time.Now())
@@ -389,10 +389,10 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
-	}
+	})
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
@@ -428,10 +428,10 @@ func TestDetectImagesWithRemovedImages(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
-	}
+	})
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
@@ -446,7 +446,7 @@ func TestDetectImagesWithRemovedImages(t *testing.T) {
 	assert.Equal(2, manager.imageRecordsLen())
 
 	// Simulate both images being removed.
-	fakeRuntime.ImageList = []container.Image{}
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{})
 	_, err = manager.detectImages(ctx, time.Now())
 	require.NoError(t, err)
 	assert.Equal(0, manager.imageRecordsLen())
@@ -457,10 +457,10 @@ func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
-	}
+	})
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
@@ -478,11 +478,11 @@ func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 		makeImage(2, 2048),
-	}
+	})
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
@@ -504,11 +504,11 @@ func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{
 		MinAge: time.Second * 3, // set minAge to 3 seconds,
 	}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
 		makeImage(2, 2048),
-	}
+	})
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
@@ -535,10 +535,10 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
-	}
+	})
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
@@ -587,9 +587,9 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
-	}
+	})
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
@@ -601,10 +601,10 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 	// Make 1 more recently detected but used at the same time as 0.
 	_, err := manager.detectImages(ctx, zero)
 	require.NoError(t, err)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
-	}
+	})
 	_, err = manager.detectImages(ctx, time.Now())
 	require.NoError(t, err)
 	fakeRuntime.AllPodList = []*containertest.FakePod{}
@@ -664,9 +664,9 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 		CapacityBytes:  ptr.To(uint64(1000)),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 450),
-	}
+	})
 
 	assert.NoError(t, manager.GarbageCollect(ctx, time.Now()))
 }
@@ -686,9 +686,9 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		CapacityBytes:  ptr.To(uint64(1000)),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 50),
-	}
+	})
 
 	assert.Error(t, manager.GarbageCollect(ctx, time.Now()))
 }
@@ -710,10 +710,10 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 		recorder:      &record.FakeRecorder{},
 	}
 
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
-	}
+	})
 	// 1 image is in use, and another one is not old enough
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
@@ -764,10 +764,10 @@ func TestGarbageCollectImageTooOld(t *testing.T) {
 		recorder:      &record.FakeRecorder{},
 	}
 
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
-	}
+	})
 	// 1 image is in use, and another one is not old enough
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
@@ -820,10 +820,10 @@ func TestGarbageCollectImageMaxAgeDisabled(t *testing.T) {
 	}
 
 	assert := assert.New(t)
-	fakeRuntime.ImageList = []container.Image{
+	fakeRuntime.ImageList = containertest.ImageListToMap([]container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
-	}
+	})
 	assert.Len(fakeRuntime.ImageList, 2)
 	// 1 image is in use, and another one is not old enough
 	fakeRuntime.AllPodList = []*containertest.FakePod{
@@ -838,7 +838,7 @@ func TestGarbageCollectImageMaxAgeDisabled(t *testing.T) {
 	t.Log(fakeClock.Now())
 	images, err := manager.imagesInEvictionOrder(ctx, fakeClock.Now())
 	require.NoError(t, err)
-	require.Len(t, images, 1)
+	require.Len(t, images, 1, "%#v", images)
 	assert.Len(fakeRuntime.ImageList, 2)
 
 	oldStartTime := fakeClock.Now()

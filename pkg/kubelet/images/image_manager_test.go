@@ -566,7 +566,7 @@ func pullerTestEnv(
 	fakeRuntime = &ctest.FakeRuntime{T: t}
 	fakeRecorder = testutil.NewFakeRecorder()
 
-	fakeRuntime.ImageList = []kubecontainer.Image{{ID: "present_image:latest"}}
+	fakeRuntime.ImageList = ctest.ImageListToMap([]kubecontainer.Image{{ID: "present_image:latest"}})
 	fakeRuntime.Err = c.pullerErr
 	fakeRuntime.InspectErr = c.inspectErr
 
@@ -703,7 +703,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		ctx := context.Background()
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
-		fakeRuntime.ImageList = []kubecontainer.Image{}
+		fakeRuntime.ImageList = map[string]kubecontainer.Image{}
 		fakeClock.Step(time.Second)
 
 		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, nil, "", container.ImagePullPolicy)
@@ -760,7 +760,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 		ctx := context.Background()
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
-		fakeRuntime.ImageList = []kubecontainer.Image{}
+		fakeRuntime.ImageList = map[string]kubecontainer.Image{}
 		fakeClock.Step(time.Second)
 
 		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, nil, runtimeHandler, container.ImagePullPolicy)
