@@ -67,6 +67,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 )
 
+// TEST
+
 // Short term fix to refresh the policy source cache faster for tests
 // until we reduce the polling interval by default.
 const policyRefreshInterval = 10 * time.Millisecond
