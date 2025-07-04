@@ -391,10 +391,10 @@ func TestCategorizeEndpoints(t *testing.T) {
 		localEndpoints:   sets.New[string]("10.0.0.1:80"),
 		allEndpoints:     sets.New[string]("10.0.0.1:80"),
 	}, {
-		name:             "empty cluster endpoints when no service endpoints exist",
+		name:             "empty endpoints when no service endpoints exist",
 		serviceInfo:      &BaseServicePortInfo{},
 		endpoints:        nil,
-		clusterEndpoints: sets.New[string](),
+		clusterEndpoints: nil,
 		localEndpoints:   nil,
 		allEndpoints:     nil,
 	}}
@@ -405,7 +405,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 
 			clusterEndpoints, localEndpoints, allEndpoints, hasAnyEndpoints := CategorizeEndpoints(tc.endpoints, tc.serviceInfo, tc.nodeName, tc.nodeLabels)
 
-			if tc.clusterEndpoints == nil && clusterEndpoints != nil {
+			if len(tc.clusterEndpoints) == 0 && len(clusterEndpoints) != 0 {
 				t.Errorf("expected no cluster endpoints but got %v", clusterEndpoints)
 			} else {
 				err := checkExpectedEndpoints(tc.clusterEndpoints, clusterEndpoints)
@@ -414,7 +414,7 @@ func TestCategorizeEndpoints(t *testing.T) {
 				}
 			}
 
-			if tc.localEndpoints == nil && localEndpoints != nil {
+			if len(tc.localEndpoints) == 0 && len(localEndpoints) != 0 {
 				t.Errorf("expected no local endpoints but got %v", localEndpoints)
 			} else {
 				err := checkExpectedEndpoints(tc.localEndpoints, localEndpoints)
@@ -424,9 +424,9 @@ func TestCategorizeEndpoints(t *testing.T) {
 			}
 
 			var expectedAllEndpoints sets.Set[string]
-			if tc.clusterEndpoints != nil && tc.localEndpoints == nil {
+			if len(tc.clusterEndpoints) != 0 && len(tc.localEndpoints) == 0 {
 				expectedAllEndpoints = tc.clusterEndpoints
-			} else if tc.localEndpoints != nil && tc.clusterEndpoints == nil {
+			} else if len(tc.localEndpoints) != 0 && len(tc.clusterEndpoints) == 0 {
 				expectedAllEndpoints = tc.localEndpoints
 			} else {
 				expectedAllEndpoints = tc.allEndpoints

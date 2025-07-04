@@ -42,6 +42,11 @@ import (
 // Serving-Terminating endpoints (independently for Cluster and Local) if no Ready
 // endpoints are available.
 func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeName string, nodeLabels map[string]string) (clusterEndpoints, localEndpoints, allReachableEndpoints []Endpoint, hasAnyEndpoints bool) {
+	if len(endpoints) == 0 {
+		// If there are no endpoints, we have nothing to categorize
+		return
+	}
+
 	var topologyMode string
 	var useServingTerminatingEndpoints bool
 
