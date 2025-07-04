@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"

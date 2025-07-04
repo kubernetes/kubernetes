@@ -17,7 +17,7 @@ limitations under the License.
 // k8s:conversion-gen specifies the latest API version in k8s.io/api/resource.
 //
 // +k8s:conversion-gen=k8s.io/api/resource/v1beta1
-// +k8s:conversion-gen-external-types=k8s.io/api/resource/v1beta2
+// +k8s:conversion-gen-external-types=k8s.io/api/resource/v1
 
 // Package v1beta1 provides conversion code between the v1beta1 version of the resource API
 // and the latest API version.

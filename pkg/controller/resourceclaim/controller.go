@@ -25,7 +25,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,12 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	v1informers "k8s.io/client-go/informers/core/v1"
-	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
+	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -671,7 +671,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 		}
 		metrics.ResourceClaimCreateAttempts.Inc()
 		claimName := claim.Name
-		claim, err = ec.kubeClient.ResourceV1beta1().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
+		claim, err = ec.kubeClient.ResourceV1().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 		if err != nil {
 			metrics.ResourceClaimCreateFailures.Inc()
 			return fmt.Errorf("create ResourceClaim %s: %v", claimName, err)
@@ -691,7 +691,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 
 func needsAdminAccess(claimTemplate *resourceapi.ResourceClaimTemplate) bool {
 	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
-		if ptr.Deref(request.AdminAccess, false) {
+		if request.Exactly != nil && ptr.Deref(request.Exactly.AdminAccess, false) {
 			return true
 		}
 	}
@@ -749,7 +749,7 @@ func (ec *Controller) reserveForPod(ctx context.Context, pod *v1.Pod, claim *res
 			Name:     pod.Name,
 			UID:      pod.UID,
 		})
-	if _, err := ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+	if _, err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
 		return fmt.Errorf("reserve claim %s for pod: %w", klog.KObj(claim), err)
 	}
 	return nil
@@ -862,7 +862,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 			}
 		}
 
-		claim, err := ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		claim, err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -872,7 +872,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		builtinControllerFinalizer := slices.Index(claim.Finalizers, resourceapi.Finalizer)
 		if builtinControllerFinalizer >= 0 && claim.Status.Allocation == nil {
 			claim.Finalizers = slices.Delete(claim.Finalizers, builtinControllerFinalizer, builtinControllerFinalizer+1)
-			if _, err := ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{}); err != nil {
+			if _, err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{}); err != nil {
 				return err
 			}
 		}
@@ -884,14 +884,14 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 			// deleted. As above we then need to clear the allocation.
 			claim.Status.Allocation = nil
 			var err error
-			claim, err = ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+			claim, err = ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
 		}
 		// Whether it was allocated or not, remove the finalizer to unblock removal.
 		claim.Finalizers = slices.Delete(claim.Finalizers, builtinControllerFinalizer, builtinControllerFinalizer+1)
-		_, err := ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+		_, err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -912,7 +912,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 					// We are certain that the owning pod is not going to need
 					// the claim and therefore remove the claim.
 					logger.V(5).Info("deleting unused generated claim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
-					err := ec.kubeClient.ResourceV1beta1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+					err := ec.kubeClient.ResourceV1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 					if err != nil {
 						return fmt.Errorf("delete claim %s: %w", klog.KObj(claim), err)
 					}
