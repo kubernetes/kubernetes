@@ -379,6 +379,7 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 		isUncountedTerminatedPodsChanged := !apiequality.Semantic.DeepEqual(oldJob.Status.UncountedTerminatedPods, newJob.Status.UncountedTerminatedPods)
 		isReadyChanged := !ptr.Equal(oldJob.Status.Ready, newJob.Status.Ready)
 		isTerminatingChanged := !ptr.Equal(oldJob.Status.Terminating, newJob.Status.Terminating)
+		isSuspendedWithZeroCompletions := ptr.Equal(newJob.Spec.Suspend, ptr.To(true)) && ptr.Equal(newJob.Spec.Completions, ptr.To[int32](0))
 
 		return batchvalidation.JobStatusValidationOptions{
 			// We allow to decrease the counter for succeeded pods for jobs which
@@ -394,7 +395,7 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectFailedJobWithoutFailureTarget:          isJobFailedChanged || isFailedIndexesChanged,
 			RejectCompleteJobWithoutSuccessCriteriaMet:   isJobCompleteChanged || isJobSuccessCriteriaMetChanged,
 			RejectFinishedJobWithActivePods:              isJobFinishedChanged || isActiveChanged,
-			RejectFinishedJobWithoutStartTime:            isJobFinishedChanged || isStartTimeChanged,
+			RejectFinishedJobWithoutStartTime:            (isJobFinishedChanged || isStartTimeChanged) && !isSuspendedWithZeroCompletions,
 			RejectFinishedJobWithUncountedTerminatedPods: isJobFinishedChanged || isUncountedTerminatedPodsChanged,
 			RejectStartTimeUpdateForUnsuspendedJob:       isStartTimeChanged,
 			RejectCompletionTimeBeforeStartTime:          isStartTimeChanged || isCompletionTimeChanged,
