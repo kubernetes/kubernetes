@@ -218,6 +218,12 @@ func (r *transport) handleUnrecognizedMethod(
 			return nil, err
 		}
 		internal.CacheStatusBypass.ApplyTo(resp.Header)
+		r.logger.LogCacheBypass(
+			"Bypass; unrecognized (safe) method, served from upstream.",
+			req,
+			urlKey,
+			nil,
+		)
 		return resp, nil
 	}
 	resp, err := r.upstream.RoundTrip(req)
@@ -229,7 +235,12 @@ func (r *transport) handleUnrecognizedMethod(
 		r.ci.InvalidateCache(req.URL, resp.Header, refs, urlKey)
 	}
 	internal.CacheStatusBypass.ApplyTo(resp.Header)
-	r.logger.LogCacheBypass("Bypass; unrecognized method, served from upstream.", req, urlKey, nil)
+	r.logger.LogCacheBypass(
+		"Bypass; unrecognized (unsafe) method, served from upstream.",
+		req,
+		urlKey,
+		nil,
+	)
 	return resp, nil
 }
 
@@ -241,6 +252,17 @@ func (r *transport) handleCacheMiss(
 ) (*http.Response, error) {
 	ccReq := internal.ParseCCRequestDirectives(req.Header)
 	if ccReq.OnlyIfCached() {
+		r.logger.LogCacheMiss(
+			req,
+			urlKey,
+			internal.MiscFunc(func() internal.Misc {
+				return internal.Misc{
+					CCReq:    ccReq,
+					Refs:     refs,
+					RefIndex: refIndex,
+				}
+			}),
+		)
 		return make504Response(req)
 	}
 	resp, start, end, err := r.roundTripTimed(req)

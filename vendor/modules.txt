@@ -43,7 +43,7 @@ github.com/armon/circbuf
 # github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 ## explicit
 github.com/armon/go-socks5
-# github.com/bartventer/httpcache v0.10.1
+# github.com/bartventer/httpcache v0.10.2
 ## explicit; go 1.24
 github.com/bartventer/httpcache
 github.com/bartventer/httpcache/internal

@@ -42,7 +42,6 @@ func TraceIDFromContext(ctx context.Context) (string, bool) {
 
 type (
 	LogEntry struct {
-		CacheStatus  string
 		URLKey       string
 		MiscProvider MiscProvider
 		Error        error
@@ -74,6 +73,9 @@ func (m Misc) LogValue() slog.Value {
 	}
 	if m.RefIndex >= 0 && m.RefIndex < len(m.Refs) {
 		attrs = append(attrs, slog.Any("ref", m.Refs[m.RefIndex]))
+	}
+	if cap(attrs) > len(attrs) {
+		attrs = slices.Clip(attrs)
 	}
 	return slog.GroupValue(attrs...)
 }
@@ -143,7 +145,6 @@ func (l *Logger) LogCacheHit(req *http.Request, urlKey string, mp MiscProvider) 
 		"Hit; served from cache.",
 		LogFunc(func() (CacheStatus, *http.Request, LogEntry) {
 			return CacheStatusHit, req, LogEntry{
-				CacheStatus:  CacheStatusHit.Value,
 				URLKey:       urlKey,
 				MiscProvider: mp,
 				Error:        nil,
@@ -159,7 +160,6 @@ func (l *Logger) LogCacheMiss(req *http.Request, urlKey string, mp MiscProvider)
 		"Miss; served from origin.",
 		LogFunc(func() (CacheStatus, *http.Request, LogEntry) {
 			return CacheStatusMiss, req, LogEntry{
-				CacheStatus:  CacheStatusMiss.Value,
 				URLKey:       urlKey,
 				MiscProvider: mp,
 				Error:        nil,
@@ -175,7 +175,6 @@ func (l *Logger) LogCacheStale(req *http.Request, urlKey string, mp MiscProvider
 		"Stale; served from cache.",
 		LogFunc(func() (CacheStatus, *http.Request, LogEntry) {
 			return CacheStatusStale, req, LogEntry{
-				CacheStatus:  CacheStatusStale.Value,
 				URLKey:       urlKey,
 				MiscProvider: mp,
 				Error:        nil,
@@ -191,7 +190,6 @@ func (l *Logger) LogCacheStaleIfError(req *http.Request, urlKey string, mp MiscP
 		"Stale; served from cache; stale-if-error policy applied.",
 		LogFunc(func() (CacheStatus, *http.Request, LogEntry) {
 			return CacheStatusStale, req, LogEntry{
-				CacheStatus:  CacheStatusStale.Value,
 				URLKey:       urlKey,
 				MiscProvider: mp,
 				Error:        nil,
@@ -207,7 +205,6 @@ func (l *Logger) LogCacheStaleRevalidate(req *http.Request, urlKey string, mp Mi
 		"Stale; served from cache; revalidating.",
 		LogFunc(func() (CacheStatus, *http.Request, LogEntry) {
 			return CacheStatusStale, req, LogEntry{
-				CacheStatus:  CacheStatusStale.Value,
 				URLKey:       urlKey,
 				MiscProvider: mp,
 				Error:        nil,
@@ -223,7 +220,6 @@ func (l *Logger) LogCacheRevalidated(req *http.Request, urlKey string, mp MiscPr
 		"Revalidated; served cached response.",
 		LogFunc(func() (CacheStatus, *http.Request, LogEntry) {
 			return CacheStatusRevalidated, req, LogEntry{
-				CacheStatus:  CacheStatusRevalidated.Value,
 				URLKey:       urlKey,
 				MiscProvider: mp,
 				Error:        nil,
@@ -239,7 +235,6 @@ func (l *Logger) LogCacheBypass(msg string, req *http.Request, urlKey string, mp
 		msg,
 		LogFunc(func() (CacheStatus, *http.Request, LogEntry) {
 			return CacheStatusBypass, req, LogEntry{
-				CacheStatus:  CacheStatusBypass.Value,
 				URLKey:       urlKey,
 				MiscProvider: mp,
 				Error:        nil,
@@ -261,7 +256,6 @@ func (l *Logger) LogCacheError(
 		msg,
 		LogFunc(func() (CacheStatus, *http.Request, LogEntry) {
 			return CacheStatus{Value: "error"}, req, LogEntry{
-				CacheStatus:  "error",
 				URLKey:       urlKey,
 				MiscProvider: mp,
 				Error:        err,
@@ -293,7 +287,7 @@ func (l *Logger) logCache(ctx context.Context, level slog.Level, msg string, lp 
 			slog.String("host", req.Host),
 		),
 		groupAttrs("cache",
-			slog.String("status", cl.CacheStatus),
+			slog.Any("status", event),
 			slog.String("url_key", cl.URLKey),
 		),
 	)

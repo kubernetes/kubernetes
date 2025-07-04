@@ -7,7 +7,7 @@ go 1.24.0
 godebug default=go1.24
 
 require (
-	github.com/bartventer/httpcache v0.10.1
+	github.com/bartventer/httpcache v0.10.2
 	github.com/go-logr/logr v1.4.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/gnostic-models v0.6.9

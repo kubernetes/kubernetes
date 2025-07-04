@@ -192,6 +192,9 @@ outer:
 			}
 			slices.Sort(params)
 		}
+		if cap(params) > len(params) {
+			params = slices.Clip(params)
+		}
 		qualityParts = append(qualityParts, qualityValue{
 			main:   main,
 			q:      q,
