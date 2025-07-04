@@ -689,30 +689,6 @@ func (dsc *DaemonSetsController) updateNode(logger klog.Logger, old, cur interfa
 	dsc.nodeUpdateQueue.Add(curNode.Name)
 }
 
-// getPodsFromCache returns the Pods that a given DS should manage.
-func (dsc *DaemonSetsController) getDaemonPodsFromCache(ds *apps.DaemonSet) ([]*v1.Pod, error) {
-	// Iterate over two keys:
-	//  The UID of the Daemonset, which identifies Pods that are controlled by the Daemonset.
-	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
-	//   but may be adopted later on if they have matching labels with the Daemonset.
-	podsForDS := []*v1.Pod{}
-	for _, key := range []string{string(ds.UID), controller.OrphanPodIndexKeyForNamespace(ds.Namespace)} {
-		podObjs, err := dsc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
-		if err != nil {
-			return nil, err
-		}
-		for _, obj := range podObjs {
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
-				continue
-			}
-			podsForDS = append(podsForDS, pod)
-		}
-	}
-	return podsForDS, nil
-}
-
 // getDaemonPods returns daemon pods owned by the given ds.
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned Pods are pointers to objects in the cache.
@@ -723,7 +699,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ctx context.Context, ds *apps.Dae
 		return nil, err
 	}
 	// List all pods indexed to DS UID and Orphan pods
-	pods, err := dsc.getDaemonPodsFromCache(ds)
+	pods, err := controller.FilterPodsByOwner(dsc.podIndexer, &ds.ObjectMeta)
 	if err != nil {
 		return nil, err
 	}

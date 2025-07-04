@@ -238,7 +238,8 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
 			l.resource.Pvc = npvc
 
-			err = VerifyAllocatedResources(l.resource.Pvc, v1.PersistentVolumeClaimNodeResizePending, pvcSize)
+			ginkgo.By("Verifying allocatedResources on PVC")
+			err = verifyOfflineAllocatedResources(l.resource.Pvc, pvcSize)
 			framework.ExpectNoError(err, "While verifying allocatedResources on PVC")
 
 			ginkgo.By("Creating a new pod with same volume")
@@ -564,10 +565,10 @@ func WaitForFSResize(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clien
 	return updatedPVC, nil
 }
 
-func VerifyAllocatedResources(pvc *v1.PersistentVolumeClaim, resizeStatus v1.ClaimResourceStatus, allocatedSize resource.Quantity) error {
+func verifyOfflineAllocatedResources(pvc *v1.PersistentVolumeClaim, allocatedSize resource.Quantity) error {
 	actualResizeStatus := pvc.Status.AllocatedResourceStatuses[v1.ResourceStorage]
-	if actualResizeStatus != resizeStatus {
-		return fmt.Errorf("pvc %q had %s resize status, expected %s", pvc.Name, actualResizeStatus, resizeStatus)
+	if !checkControllerExpansionCompleted(pvc) {
+		return fmt.Errorf("pvc %q had %s resize status, expected %s", pvc.Name, actualResizeStatus, v1.PersistentVolumeClaimNodeResizePending)
 	}
 
 	actualAllocatedSize := pvc.Status.AllocatedResources.Storage()
@@ -575,6 +576,12 @@ func VerifyAllocatedResources(pvc *v1.PersistentVolumeClaim, resizeStatus v1.Cla
 		return fmt.Errorf("pvc %q had %s allocated size, expected %s", pvc.Name, actualAllocatedSize.String(), allocatedSize.String())
 	}
 	return nil
+}
+
+func checkControllerExpansionCompleted(pvc *v1.PersistentVolumeClaim) bool {
+	resizeStatus := pvc.Status.AllocatedResourceStatuses[v1.ResourceStorage]
+	// if resizeStatus is empty that means no node expansion is required but still controller expansion is completed
+	return (resizeStatus == "" || resizeStatus == v1.PersistentVolumeClaimNodeResizePending)
 }
 
 func VerifyRecoveryRelatedFields(pvc *v1.PersistentVolumeClaim) error {
