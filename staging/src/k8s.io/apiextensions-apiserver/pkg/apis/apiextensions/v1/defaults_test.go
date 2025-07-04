@@ -23,7 +23,7 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestDefaults(t *testing.T) {
@@ -65,7 +65,7 @@ func TestDefaults(t *testing.T) {
 						Strategy: WebhookConverter,
 						Webhook: &WebhookConversion{
 							ClientConfig: &WebhookClientConfig{
-								Service: &ServiceReference{Port: utilpointer.Int32Ptr(443)},
+								Service: &ServiceReference{Port: ptr.To[int32](443)},
 							},
 						},
 					},
