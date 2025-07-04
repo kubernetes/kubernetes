@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/util/apihelpers"
 	"k8s.io/klog/v2"
 )
@@ -381,14 +382,20 @@ func asTable(ctx context.Context, result runtime.Object, opts *metav1.TableOptio
 
 	for i := range table.Rows {
 		item := &table.Rows[i]
-		switch opts.IncludeObject {
-		case metav1.IncludeObject:
+
+		hasInitialEventsEndAnnotation, err := storage.HasInitialEventsEndBookmarkAnnotation(item.Object.Object)
+		if err != nil {
+			return nil, errors.NewInternalError(fmt.Errorf("unable to determine if the obj has the required annotation, err: %w", err))
+		}
+
+		switch {
+		case opts.IncludeObject == metav1.IncludeObject:
 			item.Object.Object, err = scope.Convertor.ConvertToVersion(item.Object.Object, scope.Kind.GroupVersion())
 			if err != nil {
 				return nil, err
 			}
 		// TODO: rely on defaulting for the value here?
-		case metav1.IncludeMetadata, "":
+		case opts.IncludeObject == metav1.IncludeMetadata, hasInitialEventsEndAnnotation, opts.IncludeObject == "":
 			m, err := meta.Accessor(item.Object.Object)
 			if err != nil {
 				return nil, err
@@ -397,7 +404,7 @@ func asTable(ctx context.Context, result runtime.Object, opts *metav1.TableOptio
 			partial := meta.AsPartialObjectMetadata(m)
 			partial.GetObjectKind().SetGroupVersionKind(groupVersion.WithKind("PartialObjectMetadata"))
 			item.Object.Object = partial
-		case metav1.IncludeNone:
+		case opts.IncludeObject == metav1.IncludeNone:
 			item.Object.Object = nil
 		default:
 			err = errors.NewBadRequest(fmt.Sprintf("unrecognized includeObject value: %q", opts.IncludeObject))
