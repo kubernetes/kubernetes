@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta2
 
 import (
 	"reflect"
@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -36,23 +36,25 @@ func TestConversion(t *testing.T) {
 		expectErr string
 	}{
 		{
-			name: "v1beta1 to latest without alternatives",
-			in: &resourcev1beta1.ResourceClaim{
-				Spec: resourcev1beta1.ResourceClaimSpec{
-					Devices: resourcev1beta1.DeviceClaim{
-						Requests: []resourcev1beta1.DeviceRequest{
+			name: "v1beta2 to latest without alternatives",
+			in: &resourcev1beta2.ResourceClaim{
+				Spec: resourcev1beta2.ResourceClaimSpec{
+					Devices: resourcev1beta2.DeviceClaim{
+						Requests: []resourcev1beta2.DeviceRequest{
 							{
-								Name:            "foo",
-								DeviceClassName: "class-a",
-								Selectors: []resourcev1beta1.DeviceSelector{
-									{
-										CEL: &resourcev1beta1.CELDeviceSelector{
-											Expression: `device.attributes["driver-a"].exists`,
+								Name: "foo",
+								Exactly: &resourcev1beta2.ExactDeviceRequest{
+									DeviceClassName: "class-a",
+									Selectors: []resourcev1beta2.DeviceSelector{
+										{
+											CEL: &resourcev1beta2.CELDeviceSelector{
+												Expression: `device.attributes["driver-a"].exists`,
+											},
 										},
 									},
+									AllocationMode: resourcev1beta2.DeviceAllocationModeExactCount,
+									Count:          2,
 								},
-								AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
-								Count:          2,
 							},
 						},
 					},
@@ -84,7 +86,7 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "latest to v1beta1 without alternatives",
+			name: "latest to v1beta2 without alternatives",
 			in: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
 					Devices: resourceapi.DeviceClaim{
@@ -108,23 +110,25 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			out: &resourcev1beta1.ResourceClaim{},
-			expectOut: &resourcev1beta1.ResourceClaim{
-				Spec: resourcev1beta1.ResourceClaimSpec{
-					Devices: resourcev1beta1.DeviceClaim{
-						Requests: []resourcev1beta1.DeviceRequest{
+			out: &resourcev1beta2.ResourceClaim{},
+			expectOut: &resourcev1beta2.ResourceClaim{
+				Spec: resourcev1beta2.ResourceClaimSpec{
+					Devices: resourcev1beta2.DeviceClaim{
+						Requests: []resourcev1beta2.DeviceRequest{
 							{
-								Name:            "foo",
-								DeviceClassName: "class-a",
-								Selectors: []resourcev1beta1.DeviceSelector{
-									{
-										CEL: &resourcev1beta1.CELDeviceSelector{
-											Expression: `device.attributes["driver-a"].exists`,
+								Name: "foo",
+								Exactly: &resourcev1beta2.ExactDeviceRequest{
+									DeviceClassName: "class-a",
+									Selectors: []resourcev1beta2.DeviceSelector{
+										{
+											CEL: &resourcev1beta2.CELDeviceSelector{
+												Expression: `device.attributes["driver-a"].exists`,
+											},
 										},
 									},
+									AllocationMode: resourcev1beta2.DeviceAllocationModeExactCount,
+									Count:          2,
 								},
-								AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
-								Count:          2,
 							},
 						},
 					},
@@ -133,38 +137,38 @@ func TestConversion(t *testing.T) {
 		},
 
 		{
-			name: "v1beta1 to latest with alternatives",
-			in: &resourcev1beta1.ResourceClaim{
-				Spec: resourcev1beta1.ResourceClaimSpec{
-					Devices: resourcev1beta1.DeviceClaim{
-						Requests: []resourcev1beta1.DeviceRequest{
+			name: "v1beta2 to latest with alternatives",
+			in: &resourcev1beta2.ResourceClaim{
+				Spec: resourcev1beta2.ResourceClaimSpec{
+					Devices: resourcev1beta2.DeviceClaim{
+						Requests: []resourcev1beta2.DeviceRequest{
 							{
 								Name: "foo",
-								FirstAvailable: []resourcev1beta1.DeviceSubRequest{
+								FirstAvailable: []resourcev1beta2.DeviceSubRequest{
 									{
 										Name:            "sub-1",
 										DeviceClassName: "class-a",
-										Selectors: []resourcev1beta1.DeviceSelector{
+										Selectors: []resourcev1beta2.DeviceSelector{
 											{
-												CEL: &resourcev1beta1.CELDeviceSelector{
+												CEL: &resourcev1beta2.CELDeviceSelector{
 													Expression: `device.attributes["driver-a"].exists`,
 												},
 											},
 										},
-										AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
+										AllocationMode: resourcev1beta2.DeviceAllocationModeExactCount,
 										Count:          2,
 									},
 									{
 										Name:            "sub-2",
 										DeviceClassName: "class-a",
-										Selectors: []resourcev1beta1.DeviceSelector{
+										Selectors: []resourcev1beta2.DeviceSelector{
 											{
-												CEL: &resourcev1beta1.CELDeviceSelector{
+												CEL: &resourcev1beta2.CELDeviceSelector{
 													Expression: `device.attributes["driver-a"].exists`,
 												},
 											},
 										},
-										AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
+										AllocationMode: resourcev1beta2.DeviceAllocationModeExactCount,
 										Count:          1,
 									},
 								},
@@ -215,7 +219,7 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "latest to v1beta1 with alternatives",
+			name: "latest to v1beta2 with alternatives",
 			in: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
 					Devices: resourceapi.DeviceClaim{
@@ -255,38 +259,38 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			out: &resourcev1beta1.ResourceClaim{},
-			expectOut: &resourcev1beta1.ResourceClaim{
-				Spec: resourcev1beta1.ResourceClaimSpec{
-					Devices: resourcev1beta1.DeviceClaim{
-						Requests: []resourcev1beta1.DeviceRequest{
+			out: &resourcev1beta2.ResourceClaim{},
+			expectOut: &resourcev1beta2.ResourceClaim{
+				Spec: resourcev1beta2.ResourceClaimSpec{
+					Devices: resourcev1beta2.DeviceClaim{
+						Requests: []resourcev1beta2.DeviceRequest{
 							{
 								Name: "foo",
-								FirstAvailable: []resourcev1beta1.DeviceSubRequest{
+								FirstAvailable: []resourcev1beta2.DeviceSubRequest{
 									{
 										Name:            "sub-1",
 										DeviceClassName: "class-a",
-										Selectors: []resourcev1beta1.DeviceSelector{
+										Selectors: []resourcev1beta2.DeviceSelector{
 											{
-												CEL: &resourcev1beta1.CELDeviceSelector{
+												CEL: &resourcev1beta2.CELDeviceSelector{
 													Expression: `device.attributes["driver-a"].exists`,
 												},
 											},
 										},
-										AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
+										AllocationMode: resourcev1beta2.DeviceAllocationModeExactCount,
 										Count:          2,
 									},
 									{
 										Name:            "sub-2",
 										DeviceClassName: "class-a",
-										Selectors: []resourcev1beta1.DeviceSelector{
+										Selectors: []resourcev1beta2.DeviceSelector{
 											{
-												CEL: &resourcev1beta1.CELDeviceSelector{
+												CEL: &resourcev1beta2.CELDeviceSelector{
 													Expression: `device.attributes["driver-a"].exists`,
 												},
 											},
 										},
-										AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
+										AllocationMode: resourcev1beta2.DeviceAllocationModeExactCount,
 										Count:          1,
 									},
 								},

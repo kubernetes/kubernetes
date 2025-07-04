@@ -29,7 +29,7 @@ import (
 	grpcstats "google.golang.org/grpc/stats"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -228,7 +228,7 @@ func (pm *DRAPluginManager) wipeResourceSlices(ctx context.Context, driver strin
 			fieldSelector[resourceapi.ResourceSliceSelectorDriver] = driver
 		}
 
-		err = pm.kubeClient.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
+		err = pm.kubeClient.ResourceV1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
 		switch {
 		case err == nil:
 			logger.V(3).Info("Deleted ResourceSlices", "fieldSelector", fieldSelector)

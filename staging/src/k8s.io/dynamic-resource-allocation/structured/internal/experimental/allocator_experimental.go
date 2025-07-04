@@ -27,7 +27,7 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
@@ -184,7 +184,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				// subrequest gets chosen.
 				for i, subReq := range request.FirstAvailable {
 					reqData, err := alloc.validateDeviceRequest(&deviceSubRequestAccessor{subRequest: &subReq},
-						&deviceRequestAccessor{request: request}, requestKey, pools)
+						&exactDeviceRequestAccessor{request: request}, requestKey, pools)
 					if err != nil {
 						return nil, err
 					}
@@ -196,7 +196,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				}
 				minDevicesPerClaim += minDevicesPerRequest
 			} else {
-				reqData, err := alloc.validateDeviceRequest(&deviceRequestAccessor{request: request}, nil, requestKey, pools)
+				reqData, err := alloc.validateDeviceRequest(&exactDeviceRequestAccessor{request: request}, nil, requestKey, pools)
 				if err != nil {
 					return nil, err
 				}
@@ -436,9 +436,9 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 					}
 					if selectable {
 						device := deviceWithID{
-							id:    DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name},
-							basic: slice.Spec.Devices[deviceIndex].Basic,
-							slice: slice,
+							id:     DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name},
+							Device: &slice.Spec.Devices[deviceIndex],
+							slice:  slice,
 						}
 						requestData.allDevices = append(requestData.allDevices, device)
 					}
@@ -536,8 +536,8 @@ type requestData struct {
 }
 
 type deviceWithID struct {
+	*draapi.Device
 	id    DeviceID
-	basic *draapi.BasicDevice
 	slice *draapi.ResourceSlice
 }
 
@@ -546,10 +546,10 @@ type internalAllocationResult struct {
 }
 
 type internalDeviceResult struct {
+	*draapi.Device
 	request       string // name of the request (if no subrequests) or the subrequest
 	parentRequest string // name of the request which contains the subrequest, empty otherwise
 	id            DeviceID
-	basic         *draapi.BasicDevice
 	slice         *draapi.ResourceSlice
 	adminAccess   *bool
 }
@@ -565,11 +565,11 @@ type constraint interface {
 	// add is called whenever a device is about to be allocated. It must
 	// check whether the device matches the constraint and if yes,
 	// track that it is allocated.
-	add(requestName, subRequestName string, device *draapi.BasicDevice, deviceID DeviceID) bool
+	add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool
 
 	// For every successful add there is exactly one matching removed call
 	// with the exact same parameters.
-	remove(requestName, subRequestName string, device *draapi.BasicDevice, deviceID DeviceID)
+	remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID)
 }
 
 // matchAttributeConstraint compares an attribute value across devices.
@@ -588,7 +588,7 @@ type matchAttributeConstraint struct {
 	numDevices int
 }
 
-func (m *matchAttributeConstraint) add(requestName, subRequestName string, device *draapi.BasicDevice, deviceID DeviceID) bool {
+func (m *matchAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool {
 	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
 		// Device not affected by constraint.
 		m.logger.V(7).Info("Constraint does not apply to request", "request", requestName)
@@ -645,7 +645,7 @@ func (m *matchAttributeConstraint) add(requestName, subRequestName string, devic
 	return true
 }
 
-func (m *matchAttributeConstraint) remove(requestName, subRequestName string, device *draapi.BasicDevice, deviceID DeviceID) {
+func (m *matchAttributeConstraint) remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) {
 	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
 		// Device not affected by constraint.
 		return
@@ -664,7 +664,7 @@ func (m *matchAttributeConstraint) matches(requestName, subRequestName string) b
 	}
 }
 
-func lookupAttribute(device *draapi.BasicDevice, deviceID DeviceID, attributeName draapi.FullyQualifiedName) *draapi.DeviceAttribute {
+func lookupAttribute(device *draapi.Device, deviceID DeviceID, attributeName draapi.FullyQualifiedName) *draapi.DeviceAttribute {
 	// Fully-qualified match?
 	if attr, ok := device.Attributes[draapi.QualifiedName(attributeName)]; ok {
 		return &attr
@@ -883,9 +883,9 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 
 				// Finally treat as allocated and move on to the next device.
 				device := deviceWithID{
-					id:    deviceID,
-					basic: slice.Spec.Devices[deviceIndex].Basic,
-					slice: slice,
+					id:     deviceID,
+					Device: &slice.Spec.Devices[deviceIndex],
+					slice:  slice,
 				}
 				allocated, deallocate, err := alloc.allocateDevice(r, device, false)
 				if err != nil {
@@ -929,13 +929,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 
 // isSelectable checks whether a device satisfies the request and class selectors.
 func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, slice *draapi.ResourceSlice, deviceIndex int) (bool, error) {
-	// This is the only supported device type at the moment.
-	device := slice.Spec.Devices[deviceIndex].Basic
-	if device == nil {
-		// Must be some future, unknown device type. We cannot select it.
-		return false, nil
-	}
-
+	device := &slice.Spec.Devices[deviceIndex]
 	deviceID := DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name}
 	matchKey := matchKey{DeviceID: deviceID, requestIndices: r}
 	if matches, ok := alloc.deviceMatchesRequest[matchKey]; ok {
@@ -965,15 +959,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
-		var nodeName string
-		var allNodes bool
-		if device.NodeName != nil {
-			nodeName = *device.NodeName
-		}
-		if device.AllNodes != nil {
-			allNodes = *device.AllNodes
-		}
-		matches, err := nodeMatches(alloc.node, nodeName, allNodes, device.NodeSelector)
+		matches, err := nodeMatches(alloc.node, ptr.Deref(device.NodeName, ""), ptr.Deref(device.AllNodes, false), device.NodeSelector)
 		if err != nil {
 			return false, err
 		}
@@ -988,7 +974,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 
 }
 
-func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.BasicDevice, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
+func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
 	for i, selector := range selectors {
 		expr := alloc.celCache.GetOrCompile(selector.CEL.Expression)
 		if expr.Error != nil {
@@ -1005,9 +991,9 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.BasicDev
 
 		// If this conversion turns out to be expensive, the CEL package could be converted
 		// to use unique strings.
-		var d resourceapi.BasicDevice
-		if err := draapi.Convert_api_BasicDevice_To_v1beta1_BasicDevice(device, &d, nil); err != nil {
-			return false, fmt.Errorf("convert BasicDevice: %w", err)
+		var d resourceapi.Device
+		if err := draapi.Convert_api_Device_To_v1_Device(device, &d, nil); err != nil {
+			return false, fmt.Errorf("convert Device: %w", err)
 		}
 		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), Attributes: d.Attributes, Capacity: d.Capacity})
 		if class != nil {
@@ -1058,13 +1044,13 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 	// Devices that consume counters can not be allocated if the PartitionableDevices feature
 	// is not enabled.
-	if !alloc.features.PartitionableDevices && len(device.basic.ConsumesCounters) > 0 {
+	if !alloc.features.PartitionableDevices && len(device.ConsumesCounters) > 0 {
 		alloc.logger.V(7).Info("Device consumes counters, but the partitionable devices feature is not enabled", "device", device.id)
 		return false, nil, nil
 	}
 
 	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
-	if len(device.basic.ConsumesCounters) > 0 {
+	if len(device.ConsumesCounters) > 0 {
 		// If a device consumes counters from a counter set, verify that
 		// there is sufficient counters available.
 		ok, err := alloc.checkAvailableCounters(device)
@@ -1090,13 +1076,13 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 	// Might be tainted, in which case the taint has to be tolerated.
 	// The check is skipped if the feature is disabled.
-	if alloc.features.DeviceTaints && !allTaintsTolerated(device.basic, request) {
+	if alloc.features.DeviceTaints && !allTaintsTolerated(device.Device, request) {
 		return false, nil, nil
 	}
 
 	// It's available. Now check constraints.
 	for i, constraint := range alloc.constraints[r.claimIndex] {
-		added := constraint.add(baseRequestName, subRequestName, device.basic, device.id)
+		added := constraint.add(baseRequestName, subRequestName, device.Device, device.id)
 		if !added {
 			if must {
 				// It does not make sense to declare a claim where a constraint prevents getting
@@ -1106,7 +1092,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 			// Roll back for all previous constraints before we return.
 			for e := 0; e < i; e++ {
-				alloc.constraints[r.claimIndex][e].remove(baseRequestName, subRequestName, device.basic, device.id)
+				alloc.constraints[r.claimIndex][e].remove(baseRequestName, subRequestName, device.Device, device.id)
 			}
 			return false, nil, nil
 		}
@@ -1125,7 +1111,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		request:       request.name(),
 		parentRequest: parentRequestName,
 		id:            device.id,
-		basic:         device.basic,
+		Device:        device.Device,
 		slice:         device.slice,
 	}
 	if request.adminAccess() {
@@ -1136,10 +1122,10 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 	return true, func() {
 		for _, constraint := range alloc.constraints[r.claimIndex] {
-			constraint.remove(baseRequestName, subRequestName, device.basic, device.id)
+			constraint.remove(baseRequestName, subRequestName, device.Device, device.id)
 		}
 		alloc.allocatingDevices[device.id].Delete(r.claimIndex)
-		if alloc.features.PartitionableDevices && len(device.basic.ConsumesCounters) > 0 {
+		if alloc.features.PartitionableDevices && len(device.ConsumesCounters) > 0 {
 			alloc.deallocateCountersForDevice(device)
 		}
 		// Truncate, but keep the underlying slice.
@@ -1148,7 +1134,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	}, nil
 }
 
-func allTaintsTolerated(device *draapi.BasicDevice, request requestAccessor) bool {
+func allTaintsTolerated(device *draapi.Device, request requestAccessor) bool {
 	for _, taint := range device.Taints {
 		if !taintTolerated(taint, request) {
 			return false
@@ -1209,7 +1195,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 			if !alloc.allocatedDevices.Has(deviceID) {
 				continue
 			}
-			for _, deviceCounterConsumption := range device.Basic.ConsumesCounters {
+			for _, deviceCounterConsumption := range device.ConsumesCounters {
 				availableCountersForCounterSet := availableCountersForSlice[deviceCounterConsumption.CounterSet]
 				for name, c := range deviceCounterConsumption.Counters {
 					existingCounter, ok := availableCountersForCounterSet[name]
@@ -1244,7 +1230,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		consumedCountersForSlice = make(counterSets)
 		alloc.consumedCounters[sliceName] = consumedCountersForSlice
 	}
-	for _, deviceCounterConsumption := range device.basic.ConsumesCounters {
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		consumedCountersForCounterSet, found := consumedCountersForSlice[deviceCounterConsumption.CounterSet]
 		if !found {
 			consumedCountersForCounterSet = make(map[string]draapi.Counter)
@@ -1297,7 +1283,7 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 	sliceName := slice.Name
 
 	consumedCountersForSlice := alloc.consumedCounters[sliceName]
-	for _, deviceCounterConsumption := range device.basic.ConsumesCounters {
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
 		counterSetName := deviceCounterConsumption.CounterSet
 		consumedCounterSet := consumedCountersForSlice[counterSetName]
 		for name, c := range deviceCounterConsumption.Counters {
@@ -1319,18 +1305,16 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 
 	for i := range result {
 		slice := result[i].slice
-		var nodeName draapi.UniqueString
+		var nodeName *string
 		var nodeSelector *v1.NodeSelector
 		if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
-			if result[i].basic.NodeName != nil {
-				nodeName = draapi.MakeUniqueString(*result[i].basic.NodeName)
-			}
-			nodeSelector = result[i].basic.NodeSelector
+			nodeName = result[i].NodeName
+			nodeSelector = result[i].NodeSelector
 		} else {
 			nodeName = slice.Spec.NodeName
 			nodeSelector = slice.Spec.NodeSelector
 		}
-		if nodeName != draapi.NullUniqueString {
+		if nodeName != nil {
 			// At least one device is local to one node. This
 			// restricts the allocation to that node.
 			return &v1.NodeSelector{
@@ -1338,7 +1322,7 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 					MatchFields: []v1.NodeSelectorRequirement{{
 						Key:      "metadata.name",
 						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{nodeName.String()},
+						Values:   []string{*nodeName},
 					}},
 				}},
 			}, nil
@@ -1382,42 +1366,42 @@ type requestAccessor interface {
 	tolerations() []resourceapi.DeviceToleration
 }
 
-// deviceRequestAccessor is an implementation of the
-// requestAccessor interface for DeviceRequests.
-type deviceRequestAccessor struct {
+// exactDeviceRequestAccessor is an implementation of the
+// requestAccessor interface for ExactDeviceRequests.
+type exactDeviceRequestAccessor struct {
 	request *resourceapi.DeviceRequest
 }
 
-func (d *deviceRequestAccessor) name() string {
+func (d *exactDeviceRequestAccessor) name() string {
 	return d.request.Name
 }
 
-func (d *deviceRequestAccessor) deviceClassName() string {
-	return d.request.DeviceClassName
+func (d *exactDeviceRequestAccessor) deviceClassName() string {
+	return d.request.Exactly.DeviceClassName
 }
 
-func (d *deviceRequestAccessor) allocationMode() resourceapi.DeviceAllocationMode {
-	return d.request.AllocationMode
+func (d *exactDeviceRequestAccessor) allocationMode() resourceapi.DeviceAllocationMode {
+	return d.request.Exactly.AllocationMode
 }
 
-func (d *deviceRequestAccessor) count() int64 {
-	return d.request.Count
+func (d *exactDeviceRequestAccessor) count() int64 {
+	return d.request.Exactly.Count
 }
 
-func (d *deviceRequestAccessor) adminAccess() bool {
-	return ptr.Deref(d.request.AdminAccess, false)
+func (d *exactDeviceRequestAccessor) adminAccess() bool {
+	return ptr.Deref(d.request.Exactly.AdminAccess, false)
 }
 
-func (d *deviceRequestAccessor) hasAdminAccess() bool {
-	return d.request.AdminAccess != nil
+func (d *exactDeviceRequestAccessor) hasAdminAccess() bool {
+	return d.request.Exactly.AdminAccess != nil
 }
 
-func (d *deviceRequestAccessor) selectors() []resourceapi.DeviceSelector {
-	return d.request.Selectors
+func (d *exactDeviceRequestAccessor) selectors() []resourceapi.DeviceSelector {
+	return d.request.Exactly.Selectors
 }
 
-func (d *deviceRequestAccessor) tolerations() []resourceapi.DeviceToleration {
-	return d.request.Tolerations
+func (d *exactDeviceRequestAccessor) tolerations() []resourceapi.DeviceToleration {
+	return d.request.Exactly.Tolerations
 }
 
 // deviceSubRequestAccessor is an implementation of the

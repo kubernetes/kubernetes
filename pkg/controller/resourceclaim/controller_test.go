@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
+	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
@@ -420,8 +420,8 @@ func TestSyncHandler(t *testing.T) {
 			}
 			informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 			podInformer := informerFactory.Core().V1().Pods()
-			claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
-			templateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
+			claimInformer := informerFactory.Resource().V1().ResourceClaims()
+			templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 			setupMetrics()
 
 			features := Features{
@@ -465,7 +465,7 @@ func TestSyncHandler(t *testing.T) {
 				t.Fatalf("expected error, got none")
 			}
 
-			claims, err := fakeKubeClient.ResourceV1beta1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
+			claims, err := fakeKubeClient.ResourceV1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error while listing claims: %v", err)
 			}
@@ -499,10 +499,10 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	fakeKubeClient := createTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
-	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
-	templateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
+	claimInformer := informerFactory.Resource().V1().ResourceClaims()
+	templateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	setupMetrics()
-	claimClient := fakeKubeClient.ResourceV1beta1().ResourceClaims(testNamespace)
+	claimClient := fakeKubeClient.ResourceV1().ResourceClaims(testNamespace)
 
 	ec, err := NewController(tCtx.Logger(), Features{}, fakeKubeClient, podInformer, claimInformer, templateInformer)
 	tCtx.ExpectNoError(err, "creating ephemeral controller")
@@ -711,7 +711,9 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 					Devices: resourceapi.DeviceClaim{
 						Requests: []resourceapi.DeviceRequest{
 							{
-								AdminAccess: ptr.To(false),
+								Exactly: &resourceapi.ExactDeviceRequest{
+									AdminAccess: ptr.To(false),
+								},
 							},
 						},
 					},
@@ -726,7 +728,9 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 					Devices: resourceapi.DeviceClaim{
 						Requests: []resourceapi.DeviceRequest{
 							{
-								AdminAccess: ptr.To(true),
+								Exactly: &resourceapi.ExactDeviceRequest{
+									AdminAccess: ptr.To(true),
+								},
 							},
 						},
 					},
@@ -735,16 +739,35 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 			want: "true",
 		},
 		{
+			name: "prioritized list",
+			claim: &resourceapi.ResourceClaim{
+				Spec: resourceapi.ResourceClaimSpec{
+					Devices: resourceapi.DeviceClaim{
+						Requests: []resourceapi.DeviceRequest{
+							{
+								FirstAvailable: []resourceapi.DeviceSubRequest{{}},
+							},
+						},
+					},
+				},
+			},
+			want: "false",
+		},
+		{
 			name: "multiple requests, one with admin access true",
 			claim: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
 					Devices: resourceapi.DeviceClaim{
 						Requests: []resourceapi.DeviceRequest{
 							{
-								AdminAccess: ptr.To(false),
+								Exactly: &resourceapi.ExactDeviceRequest{
+									AdminAccess: ptr.To(false),
+								},
 							},
 							{
-								AdminAccess: ptr.To(true),
+								Exactly: &resourceapi.ExactDeviceRequest{
+									AdminAccess: ptr.To(true),
+								},
 							},
 						},
 					},
@@ -759,10 +782,14 @@ func TestGetAdminAccessMetricLabel(t *testing.T) {
 					Devices: resourceapi.DeviceClaim{
 						Requests: []resourceapi.DeviceRequest{
 							{
-								AdminAccess: nil,
+								Exactly: &resourceapi.ExactDeviceRequest{
+									AdminAccess: nil,
+								},
 							},
 							{
-								AdminAccess: ptr.To(false),
+								Exactly: &resourceapi.ExactDeviceRequest{
+									AdminAccess: ptr.To(false),
+								},
 							},
 						},
 					},
@@ -810,9 +837,11 @@ func makeGeneratedClaim(podClaimName, generateName, namespace, classname string,
 			Devices: resourceapi.DeviceClaim{
 				Requests: []resourceapi.DeviceRequest{
 					{
-						Name:            "req-0",
-						DeviceClassName: "class",
-						AdminAccess:     adminAccess,
+						Name: "req-0",
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: "class",
+							AdminAccess:     adminAccess,
+						},
 					},
 				},
 			},
@@ -876,9 +905,11 @@ func makeTemplate(name, namespace, classname string, adminAccess *bool) *resourc
 				Devices: resourceapi.DeviceClaim{
 					Requests: []resourceapi.DeviceRequest{
 						{
-							Name:            "req-0",
-							DeviceClassName: "class",
-							AdminAccess:     adminAccess,
+							Name: "req-0",
+							Exactly: &resourceapi.ExactDeviceRequest{
+								DeviceClassName: "class",
+								AdminAccess:     adminAccess,
+							},
 						},
 					},
 				},

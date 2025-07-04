@@ -41,7 +41,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,6 +57,7 @@ import (
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
@@ -298,6 +299,11 @@ func NewDriverInstance(f *framework.Framework) *Driver {
 	return d
 }
 
+// ClientV1 returns a wrapper for client-go which provides the V1 API on top of whatever is enabled in the cluster.
+func (d *Driver) ClientV1() cgoresource.ResourceV1Interface {
+	return draclient.New(d.f.ClientSet)
+}
+
 func (d *Driver) Run(nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
 	d.SetUp(nodes, driverResources)
 	ginkgo.DeferCleanup(d.TearDown)
@@ -306,7 +312,7 @@ func (d *Driver) Run(nodes *Nodes, driverResources map[string]resourceslice.Driv
 // NewGetSlices generates a function for gomega.Eventually/Consistently which
 // returns the ResourceSliceList.
 func (d *Driver) NewGetSlices() framework.GetFunc[*resourceapi.ResourceSliceList] {
-	return framework.ListObjects(d.f.ClientSet.ResourceV1beta2().ResourceSlices().List, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
+	return framework.ListObjects(d.ClientV1().ResourceSlices().List, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 }
 
 type MethodInstance struct {
@@ -398,7 +404,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 		// We have to remove ResourceSlices ourselves.
 		// Otherwise the kubelet does it after unregistering the driver.
 		ginkgo.DeferCleanup(func(ctx context.Context) {
-			err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
+			err := d.f.ClientSet.ResourceV1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 			framework.ExpectNoError(err, "delete ResourceSlices of the driver")
 		})
 	}
@@ -424,7 +430,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 						Devices:      slice.Devices,
 					},
 				}
-				_, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().Create(ctx, resourceSlice, metav1.CreateOptions{})
+				_, err := d.f.ClientSet.ResourceV1().ResourceSlices().Create(ctx, resourceSlice, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 			}
 		}

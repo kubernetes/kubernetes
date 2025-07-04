@@ -29,7 +29,7 @@ import (
 
 	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1553,7 +1553,7 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			slice := &resourceapi.ResourceSlice{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec: resourceapi.ResourceSliceSpec{
-					NodeName: nodeName,
+					NodeName: &nodeName,
 				},
 			}
 			slices = append(slices, slice)

@@ -18,7 +18,7 @@ package api
 
 import (
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -32,7 +32,7 @@ type ResourceSlice struct {
 type ResourceSliceSpec struct {
 	Driver                 UniqueString
 	Pool                   ResourcePool
-	NodeName               UniqueString
+	NodeName               *string
 	NodeSelector           *v1.NodeSelector
 	AllNodes               bool
 	Devices                []Device
@@ -51,11 +51,7 @@ type ResourcePool struct {
 	ResourceSliceCount int64
 }
 type Device struct {
-	Name  UniqueString
-	Basic *BasicDevice
-}
-
-type BasicDevice struct {
+	Name             UniqueString
 	Attributes       map[QualifiedName]DeviceAttribute
 	Capacity         map[QualifiedName]DeviceCapacity
 	ConsumesCounters []DeviceCounterConsumption
