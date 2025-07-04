@@ -391,6 +391,7 @@ func Images(nodeStatusMaxImages int32,
 			node.Status.Images = imagesOnNode
 			return fmt.Errorf("error getting image list: %v", err)
 		}
+
 		// we expect imageListFunc to return a sorted list, so we just need to truncate
 		if int(nodeStatusMaxImages) > -1 &&
 			int(nodeStatusMaxImages) < len(containerImages) {
