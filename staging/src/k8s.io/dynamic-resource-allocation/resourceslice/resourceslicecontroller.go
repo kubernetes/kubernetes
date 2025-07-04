@@ -27,7 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +41,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	cgocore "k8s.io/client-go/kubernetes/typed/core/v1"
-	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	draclient "k8s.io/dynamic-resource-allocation/client"
@@ -77,7 +77,7 @@ type Controller struct {
 	cancel         func(cause error)
 	driverName     string
 	owner          *Owner
-	resourceClient cgoresource.ResourceV1beta2Interface
+	resourceClient cgoresource.ResourceV1Interface
 	coreClient     cgocore.CoreV1Interface
 	wg             sync.WaitGroup
 	// The queue is keyed with the pool name that needs work.

@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"sync"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
-	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
+	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
@@ -56,7 +56,7 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 			logger:              logger,
 		},
 		resourceSliceLister: &resourceSliceLister{tracker: resourceSliceTracker},
-		deviceClassLister:   &deviceClassLister{classLister: informerFactory.Resource().V1beta1().DeviceClasses().Lister()},
+		deviceClassLister:   &deviceClassLister{classLister: informerFactory.Resource().V1().DeviceClasses().Lister()},
 	}
 
 	// Reacting to events is more efficient than iterating over the list

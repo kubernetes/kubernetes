@@ -21,17 +21,18 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	draapi "k8s.io/dynamic-resource-allocation/api"
+	"k8s.io/utils/ptr"
 )
 
-func nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
+func nodeMatches(node *v1.Node, nodeNameToMatch *string, allNodesMatch *bool, nodeSelector *v1.NodeSelector) (bool, error) {
 	switch {
-	case nodeNameToMatch != "":
-		return node != nil && node.Name == nodeNameToMatch, nil
-	case allNodesMatch:
+	case nodeNameToMatch != nil:
+		return node != nil && node.Name == *nodeNameToMatch, nil
+	case ptr.Deref(allNodesMatch, false):
 		return true, nil
 	case nodeSelector != nil:
 		selector, err := nodeaffinity.NewNodeSelector(nodeSelector)
@@ -59,7 +60,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		}
 
 		switch {
-		case slice.Spec.NodeName != "" || slice.Spec.AllNodes || slice.Spec.NodeSelector != nil:
+		case slice.Spec.NodeName != nil || slice.Spec.AllNodes != nil || slice.Spec.NodeSelector != nil:
 			match, err := nodeMatches(node, slice.Spec.NodeName, slice.Spec.AllNodes, slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
@@ -71,18 +72,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 			}
 		case slice.Spec.PerDeviceNodeSelection != nil && *slice.Spec.PerDeviceNodeSelection:
 			for _, device := range slice.Spec.Devices {
-				if device.Basic == nil {
-					continue
-				}
-				var nodeName string
-				var allNodes bool
-				if device.Basic.NodeName != nil {
-					nodeName = *device.Basic.NodeName
-				}
-				if device.Basic.AllNodes != nil {
-					allNodes = *device.Basic.AllNodes
-				}
-				match, err := nodeMatches(node, nodeName, allNodes, device.Basic.NodeSelector)
+				match, err := nodeMatches(node, device.NodeName, device.AllNodes, device.NodeSelector)
 				if err != nil {
 					return nil, fmt.Errorf("failed to perform node selection for device %s in slice %s: %w",
 						device.String(), slice.Name, err)
@@ -120,7 +110,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 
 func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) error {
 	var slice draapi.ResourceSlice
-	if err := draapi.Convert_v1beta1_ResourceSlice_To_api_ResourceSlice(s, &slice, nil); err != nil {
+	if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(s, &slice, nil); err != nil {
 		return fmt.Errorf("convert ResourceSlice: %w", err)
 	}
 
