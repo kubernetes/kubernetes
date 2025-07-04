@@ -46,20 +46,14 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(obj.Names.ListKind) == 0 && len(obj.Names.Kind) > 0 {
 				obj.Names.ListKind = obj.Names.Kind + "List"
 			}
-			if len(obj.Versions) == 0 && len(obj.Version) == 0 {
-				// internal object must have a version to roundtrip all fields
-				obj.Version = "v1"
-			}
-			if len(obj.Versions) == 0 && len(obj.Version) != 0 {
+			if len(obj.Versions) == 0 {
 				obj.Versions = []apiextensions.CustomResourceDefinitionVersion{
 					{
-						Name:    obj.Version,
+						Name:    "v1",
 						Served:  true,
 						Storage: true,
 					},
 				}
-			} else if len(obj.Versions) != 0 {
-				obj.Version = obj.Versions[0].Name
 			}
 			if len(obj.AdditionalPrinterColumns) == 0 {
 				obj.AdditionalPrinterColumns = []apiextensions.CustomResourceColumnDefinition{
