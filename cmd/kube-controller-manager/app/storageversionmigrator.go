@@ -20,11 +20,12 @@ import (
 	"context"
 	"fmt"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/metadata"
+	"k8s.io/component-base/featuregate"
+
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	svm "k8s.io/kubernetes/pkg/controller/storageversionmigrator"
 	"k8s.io/kubernetes/pkg/features"
@@ -35,15 +36,16 @@ func newStorageVersionMigratorControllerDescriptor() *ControllerDescriptor {
 		name:        names.StorageVersionMigratorController,
 		aliases:     []string{"svm"},
 		constructor: newSVMController,
+		requiredFeatureGates: []featuregate.Feature{
+			features.StorageVersionMigrator,
+		},
+		requiredClientFeatureGates: []clientgofeaturegate.Feature{
+			clientgofeaturegate.InformerResourceVersion,
+		},
 	}
 }
 
 func newSVMController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionMigrator) ||
-		!clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerResourceVersion) {
-		return nil, nil
-	}
-
 	if !controllerContext.ComponentConfig.GarbageCollectorController.EnableGarbageCollector {
 		return nil, fmt.Errorf("storage version migrator requires garbage collector")
 	}
