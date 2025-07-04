@@ -338,7 +338,7 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 }
 
 func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj interface{}) {
-	deleted := newObj != nil
+	deleted := newObj == nil
 	if d, ok := oldObj.(cache.DeletedFinalStateUnknown); ok {
 		oldObj = d.Obj
 	}

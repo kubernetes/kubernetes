@@ -312,24 +312,9 @@ func (ssc *StatefulSetController) deletePod(logger klog.Logger, obj interface{})
 // NOTE: Returned Pods are pointers to objects from the cache.
 // If you need to modify one, you need to copy it first.
 func (ssc *StatefulSetController) getPodsForStatefulSet(ctx context.Context, set *apps.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
-	// Iterate over two keys:
-	//  The UID of the StatefulSet, which identifies Pods that are controlled by the StatefulSet.
-	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
-	//   but may be adopted later on if they have matching labels with the StatefulSet.
-	podsForSts := []*v1.Pod{}
-	for _, key := range []string{string(set.UID), controller.OrphanPodIndexKeyForNamespace(set.Namespace)} {
-		podObjs, err := ssc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
-		if err != nil {
-			return nil, err
-		}
-		for _, obj := range podObjs {
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
-				continue
-			}
-			podsForSts = append(podsForSts, pod)
-		}
+	podsForSts, err := controller.FilterPodsByOwner(ssc.podIndexer, &set.ObjectMeta)
+	if err != nil {
+		return nil, err
 	}
 
 	filter := func(pod *v1.Pod) bool {

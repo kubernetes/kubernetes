@@ -37,7 +37,8 @@ import (
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
+	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
+	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
@@ -356,6 +357,18 @@ func NodeV1beta1(enabled bool) Option {
 	}
 }
 
+// NodeV1 explicitly chooses whether the DRA gRPC API v1
+// gets enabled. True by default.
+//
+// This is used in Kubernetes for end-to-end testing. The default should
+// be fine for DRA drivers.
+func NodeV1(enabled bool) Option {
+	return func(o *options) error {
+		o.nodeV1 = enabled
+		return nil
+	}
+}
+
 // KubeClient grants the plugin access to the API server. This is needed
 // for syncing ResourceSlice objects. It's the responsibility of the DRA driver
 // developer to ensure that this client has permission to read, write,
@@ -448,6 +461,7 @@ type options struct {
 	serialize                  bool
 	flockDirectoryPath         string
 	nodeV1beta1                bool
+	nodeV1                     bool
 	registrationService        bool
 	draService                 bool
 }
@@ -497,6 +511,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		grpcVerbosity: 6, // Logs requests and responses, which can be large.
 		serialize:     true,
 		nodeV1beta1:   true,
+		nodeV1:        true,
 		pluginRegistrationEndpoint: endpoint{
 			dir: KubeletRegistryDir,
 		},
@@ -574,9 +589,11 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	}()
 
 	var supportedServices []string
+	if o.nodeV1 {
+		supportedServices = append(supportedServices, drapbv1.DRAPluginService)
+	}
 	if o.nodeV1beta1 {
-		logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
-		supportedServices = append(supportedServices, drapb.DRAPluginService)
+		supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
 	}
 	if len(supportedServices) == 0 {
 		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
@@ -590,9 +607,13 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	if o.draService {
 		// Run the node plugin gRPC server first to ensure that it is ready.
 		pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
+			if o.nodeV1 {
+				logger.V(5).Info("registering v1.DRAPlugin gRPC service")
+				drapbv1.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
+			}
 			if o.nodeV1beta1 {
 				logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
-				drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
+				drapbv1beta1.RegisterDRAPluginServer(grpcServer, drapbv1beta1.V1ServerWrapper{DRAPluginServer: &nodePluginImplementation{Helper: d}})
 			}
 		})
 		if err != nil {
@@ -752,8 +773,8 @@ type nodePluginImplementation struct {
 	*Helper
 }
 
-// NodePrepareResources implements [drapb.NodePrepareResources].
-func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
+// NodePrepareResources implements [drapbv1.NodePrepareResources].
+func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error) {
 	// Do slow API calls before serializing.
 	claims, err := d.getResourceClaims(ctx, req.Claims)
 	if err != nil {
@@ -771,11 +792,11 @@ func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req
 		return nil, fmt.Errorf("prepare resource claims: %w", err)
 	}
 
-	resp := &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{}}
+	resp := &drapbv1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1.NodePrepareResourceResponse{}}
 	for uid, claimResult := range result {
-		var devices []*drapb.Device
+		var devices []*drapbv1.Device
 		for _, result := range claimResult.Devices {
-			device := &drapb.Device{
+			device := &drapbv1.Device{
 				RequestNames: stripSubrequestNames(result.Requests),
 				PoolName:     result.PoolName,
 				DeviceName:   result.DeviceName,
@@ -783,7 +804,7 @@ func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req
 			}
 			devices = append(devices, device)
 		}
-		resp.Claims[string(uid)] = &drapb.NodePrepareResourceResponse{
+		resp.Claims[string(uid)] = &drapbv1.NodePrepareResourceResponse{
 			Error:   errorString(claimResult.Err),
 			Devices: devices,
 		}
@@ -806,7 +827,7 @@ func stripSubrequestNames(names []string) []string {
 	return stripped
 }
 
-func (d *nodePluginImplementation) getResourceClaims(ctx context.Context, claims []*drapb.Claim) ([]*resourceapi.ResourceClaim, error) {
+func (d *nodePluginImplementation) getResourceClaims(ctx context.Context, claims []*drapbv1.Claim) ([]*resourceapi.ResourceClaim, error) {
 	var resourceClaims []*resourceapi.ResourceClaim
 	for _, claimReq := range claims {
 		claim, err := d.resourceClient.ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
@@ -825,7 +846,7 @@ func (d *nodePluginImplementation) getResourceClaims(ctx context.Context, claims
 }
 
 // NodeUnprepareResources implements [draapi.NodeUnprepareResources].
-func (d *nodePluginImplementation) NodeUnprepareResources(ctx context.Context, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
+func (d *nodePluginImplementation) NodeUnprepareResources(ctx context.Context, req *drapbv1.NodeUnprepareResourcesRequest) (*drapbv1.NodeUnprepareResourcesResponse, error) {
 	unlock, err := d.serializeGRPCIfEnabled()
 	if err != nil {
 		return nil, fmt.Errorf("serialize gRPC: %w", err)
@@ -841,9 +862,9 @@ func (d *nodePluginImplementation) NodeUnprepareResources(ctx context.Context, r
 		return nil, fmt.Errorf("unprepare resource claims: %w", err)
 	}
 
-	resp := &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{}}
+	resp := &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{}}
 	for uid, err := range result {
-		resp.Claims[string(uid)] = &drapb.NodeUnprepareResourceResponse{
+		resp.Claims[string(uid)] = &drapbv1.NodeUnprepareResourceResponse{
 			Error: errorString(err),
 		}
 	}
