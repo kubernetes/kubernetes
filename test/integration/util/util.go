@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -126,8 +126,8 @@ func StartScheduler(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedul
 
 func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
 	podInformer := informerFactory.Core().V1().Pods()
-	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
-	claimTemplateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
+	claimInformer := informerFactory.Resource().V1().ResourceClaims()
+	claimTemplateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
 	features := resourceclaim.Features{
 		AdminAccess:     true,
 		PrioritizedList: true,

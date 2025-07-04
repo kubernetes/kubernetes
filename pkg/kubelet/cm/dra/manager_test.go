@@ -32,7 +32,7 @@ import (
 	"google.golang.org/grpc"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -255,8 +255,10 @@ func genTestClaim(name, driver, device, podUID string) *resourceapi.ResourceClai
 			Devices: resourceapi.DeviceClaim{
 				Requests: []resourceapi.DeviceRequest{
 					{
-						Name:            requestName,
-						DeviceClassName: className,
+						Name: requestName,
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: className,
+						},
 					},
 				},
 			},
@@ -565,11 +567,11 @@ func TestPrepareResources(t *testing.T) {
 			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			if test.claim != nil {
-				if _, err := fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{}); err != nil {
+				if _, err := fakeKubeClient.ResourceV1().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("failed to create ResourceClaim %s: %+v", test.claim.Name, err)
 				}
 				defer func() {
-					require.NoError(t, fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Delete(tCtx, test.claim.Name, metav1.DeleteOptions{}))
+					require.NoError(t, fakeKubeClient.ResourceV1().ResourceClaims(test.pod.Namespace).Delete(tCtx, test.claim.Name, metav1.DeleteOptions{}))
 				}()
 			}
 
@@ -928,7 +930,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 			}
 			claim := genTestClaim(claimName, driverName, deviceName, string(podUID))
 
-			if _, err = fakeKubeClient.ResourceV1beta1().ResourceClaims(pod.Namespace).Create(tCtx, claim, metav1.CreateOptions{}); err != nil {
+			if _, err = fakeKubeClient.ResourceV1().ResourceClaims(pod.Namespace).Create(tCtx, claim, metav1.CreateOptions{}); err != nil {
 				t.Errorf("failed to create ResourceClaim %s: %+v", claim.Name, err)
 				return
 			}

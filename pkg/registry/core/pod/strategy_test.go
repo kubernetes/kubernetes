@@ -3803,6 +3803,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			description: "drop disabled status fields/InPlacePodVerticalScaling=false",
 			features: map[featuregate.Feature]bool{
 				features.InPlacePodVerticalScaling: false,
+				features.DynamicResourceAllocation: false,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
@@ -3830,6 +3831,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			description: "drop disabled status fields/InPlacePodVerticalScaling=true",
 			features: map[featuregate.Feature]bool{
 				features.InPlacePodVerticalScaling: true,
+				features.DynamicResourceAllocation: false,
 			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},

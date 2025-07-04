@@ -28,8 +28,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	resourceapi "k8s.io/api/resource/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -572,16 +572,16 @@ func TestAddAllEventHandlers(t *testing.T) {
 			var resourceClaimCache *assumecache.AssumeCache
 			var resourceSliceTracker *resourceslicetracker.Tracker
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
+				resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 				var err error
 				opts := resourceslicetracker.Options{
 					EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-					SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+					SliceInformer:      informerFactory.Resource().V1().ResourceSlices(),
 				}
 				if opts.EnableDeviceTaints {
 					opts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
-					opts.ClassInformer = informerFactory.Resource().V1beta1().DeviceClasses()
+					opts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 
 				}
 				resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, opts)
