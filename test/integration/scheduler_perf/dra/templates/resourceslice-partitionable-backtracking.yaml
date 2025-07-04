@@ -1,5 +1,5 @@
 kind: ResourceSlice
-apiVersion: resource.k8s.io/v1beta2
+apiVersion: resource.k8s.io/v1
 metadata:
   name: resourceslice-{{.Index}}
 spec:
