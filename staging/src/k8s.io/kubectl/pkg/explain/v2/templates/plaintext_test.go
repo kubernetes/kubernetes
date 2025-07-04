@@ -762,6 +762,65 @@ func TestPlaintext(t *testing.T) {
 				checkEquals("ENUM:\n    Block\n    File\n    \"\""),
 			},
 		},
+		{
+			// show that extractExample can skip empty example field
+			Name:        "extractEmptyExample",
+			Subtemplate: "extractExample",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "string",
+					"description": "a description that should not be printed",
+				},
+			},
+			Checks: []check{
+				checkEquals(""),
+			},
+		},
+		{
+			// show that extractExample can extract example value
+			Name:        "extractExample",
+			Subtemplate: "extractExample",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "string",
+					"description": "a description that should not be printed",
+					"example":     "main",
+				},
+			},
+			Checks: []check{
+				checkEquals("EXAMPLE:\n    main"),
+			},
+		},
+		{
+			// show that extractExample can extract example value with empty string
+			Name:        "extractExampleEmptyString",
+			Subtemplate: "extractExample",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "string",
+					"description": "a description that should not be printed",
+					"example":     "",
+				},
+			},
+			Checks: []check{
+				checkEquals("EXAMPLE:\n    \"\""),
+			},
+		},
+		{
+			// show that extractExample can extract example value with numeric value
+			Name:        "extractExampleNumeric",
+			Subtemplate: "extractExample",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "integer",
+					"description": "a description that should not be printed",
+					"example":     42,
+				},
+			},
+			Checks: []check{
+				checkEquals("EXAMPLE:\n    42"),
+			},
+		},
 	}
 
 	tmpl, err := v2.WithBuiltinTemplateFuncs(template.New("")).Parse(plaintextSource)

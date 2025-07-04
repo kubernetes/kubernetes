@@ -236,5 +236,9 @@ func WithBuiltinTemplateFuncs(tmpl *template.Template) *template.Template {
 			}
 			return cur
 		},
+		"hasKey": func(dict map[string]any, key string) bool {
+			_, ok := dict[key]
+			return ok
+		},
 	})
 }
