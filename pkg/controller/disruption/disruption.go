@@ -448,7 +448,7 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 	return false, nil
 }
 
-func (dc *DisruptionController) Run(ctx context.Context) {
+func (dc *DisruptionController) Run(ctx context.Context, pdbWorkers int, stalePodWorkers int) {
 	defer utilruntime.HandleCrash()
 
 	logger := klog.FromContext(ctx)
@@ -472,9 +472,15 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, dc.worker, time.Second)
+	for i := 0; i < pdbWorkers; i++ {
+		go wait.UntilWithContext(ctx, dc.worker, time.Second)
+	}
+
 	go wait.Until(dc.recheckWorker, time.Second, ctx.Done())
-	go wait.UntilWithContext(ctx, dc.stalePodDisruptionWorker, time.Second)
+
+	for i := 0; i < stalePodWorkers; i++ {
+		go wait.UntilWithContext(ctx, dc.stalePodDisruptionWorker, time.Second)
+	}
 
 	<-ctx.Done()
 }
