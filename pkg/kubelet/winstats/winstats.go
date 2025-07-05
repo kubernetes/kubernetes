@@ -165,15 +165,17 @@ func (c *StatsClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 	var freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes int64
 	var err error
 
-	ret, _, err := syscall.Syscall6(
+	utf16Ptr, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return cadvisorapiv2.FsInfo{}, err
+	}
+
+	ret, _, err := syscall.SyscallN(
 		procGetDiskFreeSpaceEx.Addr(),
-		4,
-		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(path))),
+		uintptr(unsafe.Pointer(utf16Ptr)),
 		uintptr(unsafe.Pointer(&freeBytesAvailable)),
 		uintptr(unsafe.Pointer(&totalNumberOfBytes)),
 		uintptr(unsafe.Pointer(&totalNumberOfFreeBytes)),
-		0,
-		0,
 	)
 	if ret == 0 {
 		return cadvisorapiv2.FsInfo{}, err
