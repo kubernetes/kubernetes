@@ -136,7 +136,15 @@
               "effect": "effectValue",
               "timeAdded": "2004-01-01T01:01:01Z"
             }
-          ]
+          ],
+          "usageRestrictedToNode": true,
+          "bindingConditions": [
+            "bindingConditionsValue"
+          ],
+          "bindingFailureConditions": [
+            "bindingFailureConditionsValue"
+          ],
+          "bindingTimeoutSeconds": 11
         }
       }
     ],
