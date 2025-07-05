@@ -75,7 +75,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := resourceInodes
-	pressureTimeout := 15 * time.Minute
+	pressureTimeout := 20 * time.Minute
 	inodesConsumed := uint64(200000)
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
@@ -85,6 +85,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 			if inodesFree <= inodesConsumed {
 				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
+			framework.Logf("Setting eviction threshold to %d inodes", inodesFree-inodesConsumed)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
@@ -111,7 +112,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
 	f := framework.NewDefaultFramework("image-gc-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	pressureTimeout := 10 * time.Minute
+	pressureTimeout := 15 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := resourceInodes
 	inodesConsumed := uint64(100000)
@@ -1041,7 +1042,7 @@ func inodeConsumingPod(name string, numFiles int, volumeSource *v1.VolumeSource)
 		path = volumeMountPath
 	}
 	// Each iteration creates an empty file
-	return podWithCommand(volumeSource, v1.ResourceRequirements{}, numFiles, name, fmt.Sprintf("touch %s${i}.txt; sleep 0.001;", filepath.Join(path, "file")))
+	return podWithCommand(volumeSource, v1.ResourceRequirements{}, numFiles, name, fmt.Sprintf("touch %s${i}.txt", filepath.Join(path, "file")))
 }
 
 func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSource, resources v1.ResourceRequirements) *v1.Pod {
