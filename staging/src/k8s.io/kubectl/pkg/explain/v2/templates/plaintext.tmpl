@@ -111,6 +111,7 @@ Takes dictionary as argument with keys:
             {{- /* TODO: The original explain would say RESOURCE instead of FIELD here under some circumstances */ -}}
             FIELD: {{first $.FieldPath}} <{{ template "typeGuess" (dict "schema" $subschema "Document" $.Document) }}>{{"\n"}}
             {{- template "extractEnum" (dict "schema" $subschema "Document" $.Document "isLongView" true "limit" -1) -}}{{"\n"}}
+            {{- template "extractExample" (dict "schema" $subschema "Document" $.Document) -}}{{"\n"}}
             {{- "\n" -}}
         {{- end -}}
 
@@ -336,6 +337,31 @@ Takes dictionary as argument with keys:
                     {{- $element -}}
                 {{- end -}}
         {{- end -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* Check if there is an example value and return it in this format:
+
+    EXAMPLE: main
+
+Takes dictionary as argument with keys:
+    schema: openapiv3 JSON schema
+    Document: openapi document
+*/ -}}
+{{- define "extractExample" -}}
+    {{- with $.schema -}}
+        {{- if hasKey . "example" -}}
+            {{- "EXAMPLE:" -}}
+            {{- "\n" -}}{{- "" | indent 4 -}}
+            {{- /* Use to reflect "" when we see empty string */ -}}
+            {{- $elementType := printf "%T" .example -}}
+            {{- /* Convert empty string to `""` for more clarification */ -}}
+            {{- if and (eq "string" $elementType) (eq .example "") -}}
+                {{- `""` -}}
+            {{- else -}}
+                {{- .example -}}
+            {{- end -}}
         {{- end -}}
     {{- end -}}
 {{- end -}}
