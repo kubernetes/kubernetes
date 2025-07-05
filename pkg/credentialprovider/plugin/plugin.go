@@ -361,7 +361,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 	var serviceAccountToken string
 	var saAnnotations map[string]string
 	var err error
-	var serviceAccountCacheKey string
+	var serviceAccountCacheKey, podCacheKey string
 
 	if p.serviceAccountProvider != nil {
 		if len(serviceAccountName) == 0 && p.serviceAccountProvider.requireServiceAccount {
@@ -397,11 +397,17 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 				klog.Errorf("Error generating service account cache key: %v", err)
 				return credentialprovider.DockerConfig{}
 			}
+
+			podCacheKey, err = generatePodCacheKey(podNamespace, podName, string(podUID))
+			if err != nil {
+				klog.Errorf("Error generating pod cache key with service account: %v", err)
+				return credentialprovider.DockerConfig{}
+			}
 		}
 	}
 
 	// Check if the credentials are cached and return them if found.
-	cachedConfig, found, errCache := p.getCachedCredentials(image, serviceAccountCacheKey)
+	cachedConfig, found, errCache := p.getCachedCredentials(image, serviceAccountCacheKey, podCacheKey)
 	if errCache != nil {
 		klog.Errorf("Failed to get cached docker config: %v", err)
 		return credentialprovider.DockerConfig{}
@@ -447,6 +453,22 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 		return credentialprovider.DockerConfig{}
 	}
 
+	if len(serviceAccountToken) == 0 && len(response.ServiceAccountTokenCacheType) > 0 {
+		klog.Errorf("credential provider plugin not allowed to return serviceAccountTokenCacheType when serviceAccountToken is not provided")
+		return credentialprovider.DockerConfig{}
+	}
+	if len(serviceAccountToken) > 0 {
+		if len(response.ServiceAccountTokenCacheType) == 0 {
+			klog.Errorf("credential provider plugin did not return serviceAccountTokenCacheType when serviceAccountToken was provided")
+			return credentialprovider.DockerConfig{}
+		}
+		if response.ServiceAccountTokenCacheType != credentialproviderapi.ServiceAccountServiceAccountTokenCacheType &&
+			response.ServiceAccountTokenCacheType != credentialproviderapi.PodServiceAccountTokenCacheType {
+			klog.Errorf("credential provider plugin returned invalid serviceAccountTokenCacheType: %q", response.ServiceAccountTokenCacheType)
+			return credentialprovider.DockerConfig{}
+		}
+	}
+
 	var cacheKey string
 	switch cacheKeyType := response.CacheKeyType; cacheKeyType {
 	case credentialproviderapi.ImagePluginCacheKeyType:
@@ -485,10 +507,21 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 		expiresAt = p.clock.Now().Add(response.CacheDuration.Duration)
 	}
 
-	cacheKey, err = generateCacheKey(cacheKey, serviceAccountCacheKey)
-	if err != nil {
-		klog.Errorf("Error generating cache key: %v", err)
-		return credentialprovider.DockerConfig{}
+	if len(serviceAccountToken) > 0 {
+		switch response.ServiceAccountTokenCacheType {
+		case credentialproviderapi.ServiceAccountServiceAccountTokenCacheType:
+			cacheKey, err = generateCacheKeyWithServiceAccountCacheKey(cacheKey, serviceAccountCacheKey)
+			if err != nil {
+				klog.Errorf("Error generating cache key with service account: %v", err)
+				return credentialprovider.DockerConfig{}
+			}
+		case credentialproviderapi.PodServiceAccountTokenCacheType:
+			cacheKey, err = generateCacheKeyWithServiceAccountAndPodCacheKey(cacheKey, serviceAccountCacheKey, podCacheKey)
+			if err != nil {
+				klog.Errorf("Error generating cache key with pod cache key: %v", err)
+				return credentialprovider.DockerConfig{}
+			}
+		}
 	}
 
 	cachedEntry := &cacheEntry{
@@ -521,7 +554,16 @@ func (p *pluginProvider) isImageAllowed(image string) bool {
 }
 
 // getCachedCredentials returns a credentialprovider.DockerConfig if cached from the plugin.
-func (p *pluginProvider) getCachedCredentials(image, serviceAccountCacheKey string) (credentialprovider.DockerConfig, bool, error) {
+// Order of cache lookup
+// 1. image
+// 2. registry
+// 3. global
+//
+// Within each of these lookups, this is the order of cache key lookups:
+// if podCacheKey and serviceAccountCacheKey are both empty, only lookup with the base key (image, registry, or global).
+// else, first lookup with base key + serviceAccountCacheKey + podCacheKey and then with base key + serviceAccountCacheKey.
+// serviceAccountCacheKey and podCacheKey will be non-empty only if the plugin is operating in the service account token mode.
+func (p *pluginProvider) getCachedCredentials(image, serviceAccountCacheKey, podCacheKey string) (credentialprovider.DockerConfig, bool, error) {
 	p.Lock()
 	if p.clock.Now().After(p.lastCachePurge.Add(cachePurgeInterval)) {
 		// NewExpirationCache purges expired entries when List() is called
@@ -532,42 +574,59 @@ func (p *pluginProvider) getCachedCredentials(image, serviceAccountCacheKey stri
 	}
 	p.Unlock()
 
-	cacheKey, err := generateCacheKey(image, serviceAccountCacheKey)
-	if err != nil {
-		return nil, false, fmt.Errorf("error generating cache key: %w", err)
+	tryLookupWithKeys := func(baseKey string) (credentialprovider.DockerConfig, bool, error) {
+		// If no service account keys, only lookup with base key directly
+		if len(podCacheKey) == 0 && len(serviceAccountCacheKey) == 0 {
+			return p.cacheLookup(baseKey)
+		}
+
+		baseKeyWithServiceAccountAndPodCacheKey, err := generateCacheKeyWithServiceAccountAndPodCacheKey(baseKey, serviceAccountCacheKey, podCacheKey)
+		if err != nil {
+			return nil, false, fmt.Errorf("error generating cache key with service account and pod cache key: %w", err)
+		}
+
+		baseKeyWithServiceAccountCacheKey, err := generateCacheKeyWithServiceAccountCacheKey(baseKey, serviceAccountCacheKey)
+		if err != nil {
+			return nil, false, fmt.Errorf("error generating cache key with service account cache key: %w", err)
+		}
+
+		for _, cacheKey := range []string{baseKeyWithServiceAccountAndPodCacheKey, baseKeyWithServiceAccountCacheKey} {
+			if config, found, err := p.cacheLookup(cacheKey); err != nil {
+				return nil, false, err
+			} else if found {
+				return config, true, nil
+			}
+		}
+		return nil, false, nil
 	}
 
-	obj, found, err := p.cache.GetByKey(cacheKey)
-	if err != nil {
+	// 1. Try image-based lookup
+	if config, found, err := tryLookupWithKeys(image); err != nil {
 		return nil, false, err
+	} else if found {
+		return config, true, nil
 	}
 
-	if found {
-		return obj.(*cacheEntry).credentials, true, nil
-	}
-
+	// 2. Try registry-based lookup
 	registry := parseRegistry(image)
-
-	cacheKey, err = generateCacheKey(registry, serviceAccountCacheKey)
-	if err != nil {
-		return nil, false, fmt.Errorf("error generating cache key: %w", err)
-	}
-
-	obj, found, err = p.cache.GetByKey(cacheKey)
-	if err != nil {
+	if config, found, err := tryLookupWithKeys(registry); err != nil {
 		return nil, false, err
+	} else if found {
+		return config, true, nil
 	}
 
-	if found {
-		return obj.(*cacheEntry).credentials, true, nil
+	// 3. Try global lookup
+	if config, found, err := tryLookupWithKeys(globalCacheKey); err != nil {
+		return nil, false, err
+	} else if found {
+		return config, true, nil
 	}
 
-	cacheKey, err = generateCacheKey(globalCacheKey, serviceAccountCacheKey)
-	if err != nil {
-		return nil, false, fmt.Errorf("error generating cache key: %w", err)
-	}
+	return nil, false, nil
+}
 
-	obj, found, err = p.cache.GetByKey(cacheKey)
+func (p *pluginProvider) cacheLookup(cacheKey string) (credentialprovider.DockerConfig, bool, error) {
+	obj, found, err := p.cache.GetByKey(cacheKey)
 	if err != nil {
 		return nil, false, err
 	}
@@ -764,14 +823,65 @@ func generateServiceAccountCacheKey(serviceAccountNamespace, serviceAccountName 
 	return string(keyBytes), nil
 }
 
-func generateCacheKey(baseKey, serviceAccountCacheKey string) (string, error) {
+// generatePodCacheKey generates a cache key for the pod based on its namespace, name, and UID.
+// This key is used to uniquely identify the pod in the cache and is used in conjunction with the service account cache key
+// to create a unique cache key for the pod-service account pair.
+func generatePodCacheKey(podNamespace, podName, podUID string) (string, error) {
 	b := cryptobyte.NewBuilder(nil)
 	b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-		b.AddBytes([]byte(baseKey))
+		b.AddBytes([]byte(podNamespace))
 	})
 	b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-		b.AddBytes([]byte(serviceAccountCacheKey))
+		b.AddBytes([]byte(podName))
 	})
+	b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+		b.AddBytes([]byte(podUID))
+	})
+
+	keyBytes, err := b.Bytes()
+	if err != nil {
+		return "", err
+	}
+
+	return string(keyBytes), nil
+}
+
+// generateCacheKeyWithServiceAccountAndPodCacheKey generates a cache key that combines the base cache key
+// with the service account cache key and pod cache key.
+func generateCacheKeyWithServiceAccountAndPodCacheKey(cacheKey, serviceAccountCacheKey, podCacheKey string) (string, error) {
+	if len(cacheKey) == 0 {
+		return "", fmt.Errorf("cacheKey must be non-empty to generate cache key with service account and pod cache key")
+	}
+	if len(serviceAccountCacheKey) == 0 || len(podCacheKey) == 0 {
+		return "", fmt.Errorf("serviceAccountCacheKey and podCacheKey must be non-empty to generate cache key with service account and pod cache key")
+	}
+
+	return generateCacheKey(cacheKey, serviceAccountCacheKey, podCacheKey)
+}
+
+// generateCacheKeyWithServiceAccountCacheKey generates a cache key that combines the base cache key
+// with the service account cache key.
+func generateCacheKeyWithServiceAccountCacheKey(cacheKey, serviceAccountCacheKey string) (string, error) {
+	if len(cacheKey) == 0 {
+		return "", fmt.Errorf("cacheKey must be non-empty to generate cache key with service account cache key")
+	}
+	if len(serviceAccountCacheKey) == 0 {
+		return "", fmt.Errorf("serviceAccountCacheKey must be non-empty to generate cache key with service account cache key")
+	}
+
+	return generateCacheKey(cacheKey, serviceAccountCacheKey)
+}
+
+func generateCacheKey(keys ...string) (string, error) {
+	b := cryptobyte.NewBuilder(nil)
+	if len(keys) == 0 {
+		return "", fmt.Errorf("no keys provided to generate cache key")
+	}
+	for _, key := range keys {
+		b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+			b.AddBytes([]byte(key))
+		})
+	}
 
 	keyBytes, err := b.Bytes()
 	if err != nil {

@@ -61,6 +61,25 @@ const (
 	GlobalPluginCacheKeyType PluginCacheKeyType = "Global"
 )
 
+type ServiceAccountTokenCacheType string
+
+const (
+	// ServiceAccountServiceAccountTokenCacheType means the kubelet will cache credentials
+	// on a per-service account basis when a serviceAccountToken is provided. The cache key will
+	// include the service account UID. This should be used when the plugin's credential
+	// retrieval logic depends only on the service account and not on pod-specific claims.
+	// Use this when the returned credential is valid for all pods using the same service account.
+	ServiceAccountServiceAccountTokenCacheType ServiceAccountTokenCacheType = "ServiceAccount"
+	// PodServiceAccountTokenCacheType means the kubelet will cache credentials
+	// on a per-pod basis when a serviceAccountToken is provided. The cache key will
+	// include the pod UID. This should be used when the plugin's credential
+	// retrieval logic depends on pod-specific claims in the service account token.
+	// If the input token is returned as-is, or the returned credential is only valid as long as
+	// the input token is valid, this must be set to "Pod", since the validity of the returned
+	// credential is limited to the input token's pod's lifetime.
+	PodServiceAccountTokenCacheType ServiceAccountTokenCacheType = "Pod"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CredentialProviderResponse holds credentials that the kubelet should use for the specified
@@ -80,6 +99,14 @@ type CredentialProviderResponse struct {
 	// CredentialProviderConfig. If set to 0, the kubelet will not cache the provided AuthConfig.
 	// +optional
 	CacheDuration *metav1.Duration
+
+	// serviceAccountTokenCacheType indicates how the kubelet should cache credentials when
+	// the plugin is provided with a serviceAccountToken in the request. This field is required
+	// when a serviceAccountToken is provided in the CredentialProviderRequest. If this field
+	// is not set and a serviceAccountToken is provided, the response will NOT be used by the kubelet.
+	// Valid values are "ServiceAccount" and "Pod".
+	// +optional
+	ServiceAccountTokenCacheType ServiceAccountTokenCacheType
 
 	// auth is a map containing authentication information passed into the kubelet.
 	// Each key is a match image string (more on this below). The corresponding authConfig value
