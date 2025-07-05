@@ -3105,92 +3105,6 @@ func TestHighPriorityFlushUnschedulablePodsLeftover(t *testing.T) {
 	}
 }
 
-func TestPriorityQueue_initPodMaxInUnschedulablePodsDuration(t *testing.T) {
-	pod1 := st.MakePod().Name("test-pod-1").Namespace("ns1").UID("tp-1").NominatedNodeName("node1").Obj()
-	pod2 := st.MakePod().Name("test-pod-2").Namespace("ns2").UID("tp-2").NominatedNodeName("node2").Obj()
-
-	var timestamp = time.Now()
-	pInfo1 := &framework.QueuedPodInfo{
-		PodInfo:   mustNewTestPodInfo(t, pod1),
-		Timestamp: timestamp.Add(-time.Second),
-	}
-	pInfo2 := &framework.QueuedPodInfo{
-		PodInfo:   mustNewTestPodInfo(t, pod2),
-		Timestamp: timestamp.Add(-2 * time.Second),
-	}
-
-	tests := []struct {
-		name                              string
-		podMaxInUnschedulablePodsDuration time.Duration
-		operations                        []operation
-		operands                          []*framework.QueuedPodInfo
-		expected                          []*framework.QueuedPodInfo
-	}{
-		{
-			name: "New priority queue by the default value of podMaxInUnschedulablePodsDuration",
-			operations: []operation{
-				addPodUnschedulablePods,
-				addPodUnschedulablePods,
-				flushUnscheduledQ,
-			},
-			operands: []*framework.QueuedPodInfo{pInfo1, pInfo2, nil},
-			expected: []*framework.QueuedPodInfo{pInfo2, pInfo1},
-		},
-		{
-			name:                              "New priority queue by user-defined value of podMaxInUnschedulablePodsDuration",
-			podMaxInUnschedulablePodsDuration: 30 * time.Second,
-			operations: []operation{
-				addPodUnschedulablePods,
-				addPodUnschedulablePods,
-				flushUnscheduledQ,
-			},
-			operands: []*framework.QueuedPodInfo{pInfo1, pInfo2, nil},
-			expected: []*framework.QueuedPodInfo{pInfo2, pInfo1},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			var queue *PriorityQueue
-			if test.podMaxInUnschedulablePodsDuration > 0 {
-				queue = NewTestQueue(ctx, newDefaultQueueSort(),
-					WithClock(testingclock.NewFakeClock(timestamp)),
-					WithPodMaxInUnschedulablePodsDuration(test.podMaxInUnschedulablePodsDuration))
-			} else {
-				queue = NewTestQueue(ctx, newDefaultQueueSort(),
-					WithClock(testingclock.NewFakeClock(timestamp)))
-			}
-
-			var podInfoList []*framework.QueuedPodInfo
-
-			for i, op := range test.operations {
-				op(t, logger, queue, test.operands[i])
-			}
-
-			expectedLen := len(test.expected)
-			if queue.activeQ.len() != expectedLen {
-				t.Fatalf("Expected %v items to be in activeQ, but got: %v", expectedLen, queue.activeQ.len())
-			}
-
-			for i := 0; i < expectedLen; i++ {
-				if pInfo, err := queue.activeQ.pop(logger); err != nil {
-					t.Errorf("Error while popping the head of the queue: %v", err)
-				} else {
-					podInfoList = append(podInfoList, pInfo)
-					// Cleanup attempts counter incremented in activeQ.pop()
-					pInfo.Attempts = 0
-				}
-			}
-
-			if diff := cmp.Diff(test.expected, podInfoList, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
-				t.Errorf("Unexpected QueuedPodInfo list (-want, +got):\n%s", diff)
-			}
-		})
-	}
-}
 
 type operation func(t *testing.T, logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo)
 
@@ -3277,7 +3191,7 @@ var (
 		queue.clock.(*testingclock.FakeClock).Step(3 * time.Second)
 	}
 	flushUnscheduledQ = func(t *testing.T, logger klog.Logger, queue *PriorityQueue, _ *framework.QueuedPodInfo) {
-		queue.clock.(*testingclock.FakeClock).Step(queue.podMaxInUnschedulablePodsDuration)
+		queue.clock.(*testingclock.FakeClock).Step(DefaultPodMaxInUnschedulablePodsDuration)
 		queue.flushUnschedulablePodsLeftover(logger)
 	}
 )
