@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -36,11 +37,11 @@ import (
 type fakeGRPCServer struct {
 }
 
-var _ drapbv1beta1.DRAPluginServer = &fakeGRPCServer{}
+var _ drapbv1.DRAPluginServer = &fakeGRPCServer{}
 
-func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1beta1.NodePrepareResourcesRequest) (*drapbv1beta1.NodePrepareResourcesResponse, error) {
-	return &drapbv1beta1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1beta1.NodePrepareResourceResponse{"claim-uid": {
-		Devices: []*drapbv1beta1.Device{
+func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error) {
+	return &drapbv1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1.NodePrepareResourceResponse{"claim-uid": {
+		Devices: []*drapbv1.Device{
 			{
 				RequestNames: []string{"test-request"},
 				CDIDeviceIDs: []string{"test-cdi-id"},
@@ -49,9 +50,9 @@ func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1be
 	}}}, nil
 }
 
-func (f *fakeGRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1beta1.NodeUnprepareResourcesRequest) (*drapbv1beta1.NodeUnprepareResourcesResponse, error) {
+func (f *fakeGRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1.NodeUnprepareResourcesRequest) (*drapbv1.NodeUnprepareResourcesResponse, error) {
 
-	return &drapbv1beta1.NodeUnprepareResourcesResponse{}, nil
+	return &drapbv1.NodeUnprepareResourcesResponse{}, nil
 }
 
 // tearDown is an idempotent cleanup function.
@@ -72,8 +73,10 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	s := grpc.NewServer()
 	fakeGRPCServer := &fakeGRPCServer{}
 	switch service {
+	case drapbv1.DRAPluginService:
+		drapbv1.RegisterDRAPluginServer(s, fakeGRPCServer)
 	case drapbv1beta1.DRAPluginService:
-		drapbv1beta1.RegisterDRAPluginServer(s, fakeGRPCServer)
+		drapbv1beta1.RegisterDRAPluginServer(s, drapbv1beta1.V1ServerWrapper{DRAPluginServer: fakeGRPCServer})
 	default:
 		return nil, fmt.Errorf("unsupported gRPC service: %s", service)
 	}
@@ -93,7 +96,7 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 
 func TestGRPCConnIsReused(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	service := drapbv1beta1.DRAPluginService
+	service := drapbv1.DRAPluginService
 	addr := path.Join(t.TempDir(), "dra.sock")
 	teardown, err := setupFakeGRPCServer(service, addr)
 	if err != nil {
@@ -125,8 +128,8 @@ func TestGRPCConnIsReused(t *testing.T) {
 				return
 			}
 
-			req := &drapbv1beta1.NodePrepareResourcesRequest{
-				Claims: []*drapbv1beta1.Claim{
+			req := &drapbv1.NodePrepareResourcesRequest{
+				Claims: []*drapbv1.Claim{
 					{
 						Namespace: "dummy-namespace",
 						UID:       "dummy-uid",
@@ -211,9 +214,21 @@ func TestGRPCMethods(t *testing.T) {
 			chosenService: drapbv1beta1.DRAPluginService,
 		},
 		{
+			description:   "v1",
+			service:       drapbv1.DRAPluginService,
+			chosenService: drapbv1.DRAPluginService,
+		},
+		{
+			// In practice, such a mismatch between plugin and kubelet should not happen.
+			description:   "mismatch",
+			service:       drapbv1.DRAPluginService,
+			chosenService: drapbv1beta1.DRAPluginService,
+			expectError:   "unknown service k8s.io.kubelet.pkg.apis.dra.v1beta1.DRAPlugin",
+		},
+		{
 			// In practice, kubelet wouldn't choose an invalid service.
 			description:   "internal-error",
-			service:       drapbv1beta1.DRAPluginService,
+			service:       drapbv1.DRAPluginService,
 			chosenService: "some-other-service",
 			expectError:   "unsupported chosen service",
 		},
@@ -235,10 +250,10 @@ func TestGRPCMethods(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, err = plugin.NodePrepareResources(tCtx, &drapbv1beta1.NodePrepareResourcesRequest{})
+			_, err = plugin.NodePrepareResources(tCtx, &drapbv1.NodePrepareResourcesRequest{})
 			assertError(t, test.expectError, err)
 
-			_, err = plugin.NodeUnprepareResources(tCtx, &drapbv1beta1.NodeUnprepareResourcesRequest{})
+			_, err = plugin.NodeUnprepareResources(tCtx, &drapbv1.NodeUnprepareResourcesRequest{})
 			assertError(t, test.expectError, err)
 		})
 	}
