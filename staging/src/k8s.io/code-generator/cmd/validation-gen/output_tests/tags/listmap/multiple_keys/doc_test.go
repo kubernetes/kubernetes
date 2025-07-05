@@ -81,4 +81,55 @@ func Test(t *testing.T) {
 		field.Forbidden(field.NewPath("listTypedefField").Index(1), "field is immutable"),
 		field.Forbidden(field.NewPath("listTypedefField").Index(2), "field is immutable"),
 	)
+
+	// Test validation ratcheting.
+	structC := Struct{
+		ListComparableField: []OtherStruct{
+			{"key1", 1, "one"},
+			{"key2", 2, "two"},
+		},
+		ListNonComparableField: []NonComparableStruct{
+			{"key1", 1, []string{"one"}},
+			{"key2", 2, []string{"two"}},
+		},
+	}
+
+	// Same data, different order.
+	structC2 := Struct{
+		ListComparableField: []OtherStruct{
+			{"key2", 2, "two"},
+			{"key1", 1, "one"},
+		},
+		ListNonComparableField: []NonComparableStruct{
+			{"key2", 2, []string{"two"}},
+			{"key1", 1, []string{"one"}},
+		},
+	}
+
+	st.Value(&structC2).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Invalid(field.NewPath("listComparableField").Index(0), "", ""),
+		field.Invalid(field.NewPath("listComparableField").Index(1), "", ""),
+		field.Invalid(field.NewPath("listNonComparableField").Index(0), "", ""),
+		field.Invalid(field.NewPath("listNonComparableField").Index(1), "", ""),
+	})
+	st.Value(&structC).OldValue(&structC2).ExpectValid()
+}
+
+func TestUniqueKey(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	structA := Struct{
+		ListField: []OtherStruct{
+			{"key1", 1, "one"},
+			{"key1", 1, "two"},
+		},
+		ListTypedefField: []OtherTypedefStruct{
+			{"key1", 1, "one"},
+			{"key1", 1, "two"},
+		},
+	}
+	st.Value(&structA).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+		field.Duplicate(field.NewPath("listField[1]"), nil),
+		field.Duplicate(field.NewPath("listTypedefField[1]"), nil),
+	})
 }

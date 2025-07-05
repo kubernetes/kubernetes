@@ -1,0 +1,37 @@
+name: validation-gen CI Tests
+
+on:
+  pull_request:
+    branches:
+      - "main"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+
+    - name: Run code generation and check for diffs
+      run: |
+        hack/update-codegen.sh validation
+        git diff --exit-code
+
+    - name: Run validation-gen go tests and also check for diffs with generated test fixture code
+      env: 
+        UPDATE_VALIDATION_GEN_FIXTURE_DATA: "true"
+      run: |
+        go test ./staging/src/k8s.io/code-generator/cmd/validation-gen/...
+        go test ./staging/src/k8s.io/apimachinery/pkg/api/...
+        go test ./staging/src/k8s.io/apimachinery/pkg/util/...
+        go test ./pkg/api/testing/...
+        go test ./pkg/apis/autoscaling/validation/...
+        go test ./pkg/registry/core/replicationcontroller/...
+        go test ./pkg/registry/certificates/certificates/...
+        go test ./pkg/apis/autoscaling/validation/...
+        git diff --exit-code
+

@@ -31,7 +31,6 @@ type JSON struct {
 	Omit      bool
 	Inline    bool
 	Omitempty bool
-	OmitZero  bool
 }
 
 func (t JSON) String() string {
@@ -41,9 +40,6 @@ func (t JSON) String() string {
 	}
 	if t.Omitempty {
 		tag += ",omitempty"
-	}
-	if t.OmitZero {
-		tag += ",omitzero"
 	}
 	// "inline" isn't (yet) a standard json tag, but it is used by
 	// gengo to indicate that the field should be inlined.
@@ -63,7 +59,6 @@ func LookupJSON(m types.Member) (JSON, bool) {
 	// gengo to indicate that the field should be inlined.
 	inline := (m.Embedded && name == "") || opts.Contains("inline")
 	omitempty := opts.Contains("omitempty")
-	omitzero := opts.Contains("omitzero")
 	if !inline && name == "" {
 		name = m.Name
 	}
@@ -72,7 +67,6 @@ func LookupJSON(m types.Member) (JSON, bool) {
 		Omit:      false,
 		Inline:    inline,
 		Omitempty: omitempty,
-		OmitZero:  omitzero,
 	}, true
 }
 

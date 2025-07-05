@@ -407,11 +407,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		} else if validations.Empty() {
 			klog.V(6).InfoS("no type-attached validations", "type", t)
 		} else {
-			// TODO: This check is placed here to allow map-of-slices fields to exist in the type
-			// system, while preventing validation on them since that functionality is not yet
-			// implemented. Once validation support for map-of-slices is added, this check should
-			// be removed.
-			if util.NativeType(t).Kind == types.Map && util.NativeType(t).Elem.Kind == types.Slice {
+			if util.NonPointer(util.NativeType(t)).Kind == types.Map && util.NonPointer(util.NativeType(t)).Elem.Kind == types.Slice {
 				return nil, fmt.Errorf("field %s: validation for map of slices is not supported", fldPath)
 			}
 			klog.V(5).InfoS("found type-attached validations", "n", validations.Len(), "type", t)
@@ -586,11 +582,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			klog.V(6).InfoS("no field-attached validations", "field", childPath)
 		} else {
 			klog.V(5).InfoS("found field-attached validations", "n", validations.Len(), "field", childPath)
-			// TODO: This check is placed here to allow map-of-slices fields to exist in the type
-			// system, while preventing validation on them since that functionality is not yet
-			// implemented. Once validation support for map-of-slices is added, this check should
-			// be removed.
-			if util.NativeType(childType).Kind == types.Map && util.NativeType(childType).Elem.Kind == types.Slice {
+			if util.NonPointer(util.NativeType(childType)).Kind == types.Map && util.NonPointer(util.NativeType(childType)).Elem.Kind == types.Slice {
 				return fmt.Errorf("field %s: validation for map of slices is not supported", childPath)
 			}
 			child.fieldValidations.Add(validations)
@@ -600,7 +592,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		}
 
 		// Handle non-included types.
-		switch nonPtrType(childType).Kind {
+		switch util.NonPointer(childType).Kind {
 		case types.Struct, types.Alias:
 			if child.node == nil { // a non-included type
 				if !child.fieldValidations.OpaqueType {
@@ -723,14 +715,6 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 
 	thisNode.fields = fields
 	return nil
-}
-
-// nonPtrType removes any pointerness from the type.
-func nonPtrType(t *types.Type) *types.Type {
-	for t.Kind == types.Pointer {
-		t = t.Elem
-	}
-	return t
 }
 
 // getValidationFunctionName looks up the name of the specified type's
@@ -1006,8 +990,6 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			bufsw := sw.Dup(buf)
 
 			validations := fld.fieldValidations
-
-			// fldRatchetingChecked is used to avoid emitting the ratcheting check multiple times.
 			fldRatchetingChecked := false
 			if !validations.Empty() {
 				emitComments(validations.Comments, bufsw)
@@ -1143,9 +1125,15 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 	}
 	// If the type is a builtin, we can use a simpler equality check when they are not nil.
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(t))) {
-		_, exprPfx, _ := getLeafTypeAndPrefixes(t)
-		targs["exprPfx"] = exprPfx
-		sw.Do("if op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && $.exprPfx$obj == $.exprPfx$oldObj)) {\n", targs)
+		// We should never get anything but pointers here, since every other
+		// nilable type is not Comparable.
+		//
+		// This condition looks overly complex, but each case is needed:
+		// - obj == oldObj : handle pointers which are nil in old and new
+		// - obj != nil : handle optional fields which are updated to nil
+		// - oldObj != nil : handle optional fields which are updated from nil
+		// - *obj == *oldObj : compare values
+		sw.Do("if op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {\n", targs)
 	} else {
 		targs["equality"] = mkSymbolArgs(c, equalityPkgSymbols)
 		sw.Do("if op.Type == $.operation.Update|raw$ && $.equality.Semantic|raw$.DeepEqual(obj, oldObj) {\n", targs)
@@ -1337,6 +1325,8 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 	case *types.Type:
 		sw.Do("$.|raw$", v)
 	case types.Member:
+		sw.Do("obj."+v.Name, nil)
+	case *types.Member:
 		sw.Do("obj."+v.Name, nil)
 	case validators.Identifier:
 		sw.Do("$.|raw$", c.Universe.Type(types.Name(v)))

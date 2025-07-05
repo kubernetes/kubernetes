@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -66,7 +66,8 @@ func IsNilableType(t *types.Type) bool {
 //   - given `type X []int; *X`, returns `*[]int`
 func NativeType(t *types.Type) *types.Type {
 	ptrs := 0
-	for {
+	conditionMet := false
+	for !conditionMet {
 		switch t.Kind {
 		case types.Alias:
 			t = t.Underlying
@@ -74,10 +75,9 @@ func NativeType(t *types.Type) *types.Type {
 			ptrs++
 			t = t.Elem
 		default:
-			goto done
+			conditionMet = true
 		}
 	}
-done:
 	for range ptrs {
 		t = types.PointerTo(t)
 	}

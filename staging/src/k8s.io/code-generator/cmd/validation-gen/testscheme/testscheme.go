@@ -418,9 +418,9 @@ func (v *ValidationTester) ExpectRegexpsByPath(regexpStringsByPath map[string][]
 }
 
 func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected field.ErrorList) *ValidationTester {
-	v.Helper()
+	v.T.Helper()
 
-	v.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
+	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
 		actual := v.validate()
 		matcher.Test(t, expected, actual)
@@ -475,9 +475,9 @@ func renderList(list []string) string {
 }
 
 func (v *ValidationTester) expectInvalid(matcher matcher, errs ...*field.Error) *ValidationTester {
-	v.T.Helper()
+	v.Helper()
 
-	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
+	v.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
 
 		want := sets.New[string]()

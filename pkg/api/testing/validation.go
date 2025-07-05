@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -38,28 +37,10 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old k8sruntime.Obje
 	accumulate := func(t *testing.T, gv string, errs field.ErrorList) {
 		all[gv] = errs
 	}
-	// Convert versioned object to internal format before validation.
-	// runtimetest.RunValidationForEachVersion requires unversioned (internal) objects as input.
-	internalObj, err := convertToInternal(t, legacyscheme.Scheme, obj)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if internalObj == nil {
-		return
-	}
 	if old == nil {
-		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, accumulate, subresources...)
+		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, obj, accumulate)
 	} else {
-		// Convert old versioned object to internal format before validation.
-		// runtimetest.RunUpdateValidationForEachVersion requires unversioned (internal) objects as input.
-		internalOld, err := convertToInternal(t, legacyscheme.Scheme, old)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if internalOld == nil {
-			return
-		}
-		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, internalObj, internalOld, accumulate, subresources...)
+		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, obj, old, accumulate)
 	}
 
 	// Make a copy so we can modify it.
@@ -122,26 +103,4 @@ func fmtErrs(errs field.ErrorList) string {
 	}
 
 	return buf.String()
-}
-
-func convertToInternal(t *testing.T, scheme *k8sruntime.Scheme, obj k8sruntime.Object) (k8sruntime.Object, error) {
-	t.Helper()
-
-	gvks, _, err := scheme.ObjectKinds(obj)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(gvks) == 0 {
-		t.Fatal("no GVKs found for object")
-	}
-	gvk := gvks[0]
-	if gvk.Version == k8sruntime.APIVersionInternal {
-		return obj, nil
-	}
-	gvk.Version = k8sruntime.APIVersionInternal
-	if !scheme.Recognizes(gvk) {
-		t.Logf("no internal object found for GroupKind %s", gvk.GroupKind().String())
-		return nil, nil
-	}
-	return scheme.ConvertToVersion(obj, schema.GroupVersion{Group: gvk.Group, Version: k8sruntime.APIVersionInternal})
 }

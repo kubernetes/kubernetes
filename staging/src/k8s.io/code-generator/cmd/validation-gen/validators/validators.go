@@ -26,7 +26,19 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
-// TagValidator describes a single validation tag and how to use it.
+// TagValidator describes a single validation tag and how to use it. To be
+// findable by validation-gen, a TagValidator must be registered - see
+// RegisterTagValidator.
+//
+// TagValidators are always evaluated before TypeValidators and
+// FieldValidators. In general, TagValidators should not depend on other
+// TagValidators having been run already because users might specify tags in
+// the any order. The one exception to this rule is that some TagValidators may
+// be designated as "late" validators (see LateTagValidator), which means they
+// will be run after all non-late TagValidators. No other guarantees are made
+// about the order of execution of TagValidators or LateTagValidators. Instead
+// of relying on tag ordering , TagValidators can accumulate information
+// internally and use a TypeValidator and/or FieldValidator to finish the work.
 type TagValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)
@@ -53,7 +65,44 @@ type LateTagValidator interface {
 }
 
 // TypeValidator describes a validator which runs on every type definition.
+// To be findable by validation-gen, a TypeValidator must be registered - see
+// RegisterTypeValidator.
+//
+// TypeValidators are always processed after TagValidators, which means that
+// they can "finish" work with data that was collected by TagValidators.
+// TypeValidators are evaluated after all TagValidators and after the type has
+// been fully processed (including all child fields). TypeValidators MUST NOT
+// depend on other TypeValidators having been run already.
 type TypeValidator interface {
+	// Init initializes the implementation.  This will be called exactly once.
+	Init(cfg Config)
+
+	// Name returns a unique name for this validator.  This is used for sorting
+	// and logging.
+	Name() string
+
+	// GetValidations returns any validations imposed by this validator for the
+	// given context.
+	//
+	// The way gengo handles type definitions varies between structs and other
+	// types.  For struct definitions (e.g. `type Foo struct {}`), the realType
+	// is the struct itself (the Kind field will be `types.Struct`) and the
+	// parentType will be nil.  For other types (e.g. `type Bar string`), the
+	// realType will be the underlying type and the parentType will be the
+	// newly defined type (the Kind field will be `types.Alias`).
+	GetValidations(context Context) (Validations, error)
+}
+
+// FieldValidator describes a validator which runs on every field definition.
+// To be findable by validation-gen, a FieldValidator must be registered - see
+// RegisterFieldValidator.
+//
+// FieldValidators are always processed after TagValidators, which means that
+// they can "finish" work with data that was collected by TagValidators.
+// FieldValidators are evaluated after all TagValidators and after the field has
+// been fully processed (including all child fields). FieldValidators MUST NOT
+// depend on other FieldValidators having been run already.
+type FieldValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)
 
@@ -82,8 +131,8 @@ type Config struct {
 	// Validator provides a way to compose validations.
 	//
 	// For example, it is possible to define a validation such as
-	// "+myValidator=+format=IP" by using the registry to extract the
-	// validation for the embedded "+format=IP" and use those to
+	// "+myValidator=+format=k8s-something" by using the registry to extract
+	// the validation for the embedded "+format=k8s-something" and use those to
 	// create the final Validations returned by the "+myValidator" tag.
 	//
 	// This field MUST NOT be used during init, since other validators may not
@@ -483,7 +532,7 @@ func typeCheck(tag codetags.Tag, doc TagDoc) error {
 		if doc.PayloadsRequired {
 			return fmt.Errorf("missing required tag value of type %s", doc.PayloadsType)
 		}
-	} else if tag.ValueType != doc.PayloadsType {
+	} else if doc.PayloadsType != codetags.ValueTypeRaw && tag.ValueType != doc.PayloadsType {
 		return fmt.Errorf("tag value has wrong type: got %s, want %s", tag.ValueType, doc.PayloadsType)
 	}
 	return nil
