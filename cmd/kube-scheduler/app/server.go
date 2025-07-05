@@ -378,6 +378,8 @@ func newEndpointsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
+		paths := pathRecorderMux.ListedPaths()
+		klog.Infof("scheduler paths: %v", paths)
 		statusz.Install(pathRecorderMux, kubeScheduler, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
 	}
 
