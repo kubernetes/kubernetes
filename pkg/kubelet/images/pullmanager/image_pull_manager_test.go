@@ -763,7 +763,7 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 
 func TestFileBasedImagePullManager_initialize(t *testing.T) {
 	imageService := &ctesting.FakeRuntime{
-		ImageList: []container.Image{
+		ImageList: ctesting.ImageListToMap([]container.Image{
 			{
 				ID:       "testimageref1",
 				RepoTags: []string{"repo.repo/test/test:docker", "docker.io/testing/test:something"},
@@ -786,7 +786,7 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 				ID:          "testimageref4",
 				RepoDigests: []string{"repo.repo/test/test@dgst4", "repo.repo/test/notatest@dgst44"},
 			},
-		},
+		}),
 	}
 
 	tests := []struct {

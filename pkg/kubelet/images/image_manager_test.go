@@ -21,15 +21,19 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
@@ -40,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	. "k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -566,7 +570,7 @@ func pullerTestEnv(
 	fakeRuntime = &ctest.FakeRuntime{T: t}
 	fakeRecorder = testutil.NewFakeRecorder()
 
-	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
+	fakeRuntime.ImageList = ctest.ImageListToMap([]kubecontainer.Image{{ID: "present_image:latest"}})
 	fakeRuntime.Err = c.pullerErr
 	fakeRuntime.InspectErr = c.inspectErr
 
@@ -703,7 +707,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		ctx := context.Background()
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
-		fakeRuntime.ImageList = []Image{}
+		fakeRuntime.ImageList = map[string]kubecontainer.Image{}
 		fakeClock.Step(time.Second)
 
 		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, nil, "", container.ImagePullPolicy)
@@ -719,7 +723,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		assert.Equal(t, "missing_image:latest", image.ID, "Image ID")
 		assert.Equal(t, "", image.Spec.RuntimeHandler, "image.Spec.RuntimeHandler not empty", "ImageID", image.ID)
 
-		expectedAnnotations := []Annotation{
+		expectedAnnotations := []kubecontainer.Annotation{
 			{
 				Name:  "kubernetes.io/runtimehandler",
 				Value: "handler_name",
@@ -760,7 +764,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 		ctx := context.Background()
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
-		fakeRuntime.ImageList = []Image{}
+		fakeRuntime.ImageList = map[string]kubecontainer.Image{}
 		fakeClock.Step(time.Second)
 
 		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, nil, runtimeHandler, container.ImagePullPolicy)
@@ -779,7 +783,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 		// handler information for every image in the ListImages() response
 		assert.Equal(t, runtimeHandler, image.Spec.RuntimeHandler, "runtime handler returned not as expected", "Image ID", image)
 
-		expectedAnnotations := []Annotation{
+		expectedAnnotations := []kubecontainer.Annotation{
 			{
 				Name:  "kubernetes.io/runtimehandler",
 				Value: "handler_name",
@@ -950,6 +954,170 @@ func TestImagePullPrecheck(t *testing.T) {
 			}
 		})
 	}
+}
+
+type pullManagerBenchmark struct {
+	createImagePullManager func(context.Context, *testing.B, kubecontainer.ImageService) pullmanager.ImagePullManager
+	enableFeatures         []featuregate.Feature
+
+	dimensions pullManagerBenchmarkDimensions
+}
+
+type pullManagerBenchmarkDimensions struct {
+	cacheHitPercent        []int32
+	imagesPresentAndCached []int32
+}
+
+func (pb *pullManagerBenchmark) populate(fakeRuntime *ctest.FakeRuntime, imagePullManager pullmanager.ImagePullManager, recordsNum, requestsNum, cacheHitPercent int32) []string {
+	var imgIDs []string
+	for range recordsNum {
+		imgID := uuid.New().String()
+		imgName := "image-" + imgID
+		imgIDs = append(imgIDs, imgID)
+		fakeRuntime.ImageList[imgID] = kubecontainer.Image{ID: imgID, RepoTags: []string{imgName + ":tag"}, Spec: kubecontainer.ImageSpec{Image: imgID}}
+		imagePullManager.RecordImagePulled(imgName, imgID, &kubeletconfiginternal.ImagePullCredentials{NodePodsAccessible: true})
+	}
+
+	imgNameToRefMapping := make(map[string]string, recordsNum)
+	imageRequests := make([]string, requestsNum)
+	for i := range requestsNum {
+		// use imgRef even for cache misses. This way a cache miss won't cause a new
+		// record, meaning if we had an LRU cache that's authoritative based on number
+		// of records, we're able to reliably test the authoritative->non-authoritative
+		// impact by defining higher number of records in the benchmark
+		imgRef := imgIDs[rand.IntnRange(0, int(recordsNum-1))]
+
+		if rand.IntnRange(1, 100) > int(cacheHitPercent) {
+			imageName := uuid.New().String() + ":missing"
+			imageRequests[i] = imageName
+			imgNameToRefMapping[imageName] = imgRef
+		} else {
+			imgRef := imgIDs[rand.IntnRange(0, int(recordsNum-1))]
+			imageRequests = append(imageRequests, fakeRuntime.ImageList[imgRef].RepoTags[0])
+		}
+	}
+
+	fakeRuntime.ImageSpecToImageMapping = func(image kubecontainer.ImageSpec) kubecontainer.Image {
+		return kubecontainer.Image{
+			ID:   imgNameToRefMapping[image.Image],
+			Spec: image,
+		}
+	}
+
+	return imageRequests
+}
+
+func BenchmarkImagePullManager_CompareEnsureSecretPulledImages(b *testing.B) {
+	testDimensions := pullManagerBenchmarkDimensions{
+		imagesPresentAndCached: []int32{100},
+		cacheHitPercent:        []int32{100},
+	}
+
+	b.Run("ImageRecordsAccess=Disabled", func(b *testing.B) {
+		benchmarkImagePullManagers(b,
+			&pullManagerBenchmark{
+				createImagePullManager: func(ctx context.Context, b *testing.B, is kubecontainer.ImageService) pullmanager.ImagePullManager {
+					return &pullmanager.NoopImagePullManager{}
+				},
+				dimensions: testDimensions,
+			},
+		)
+	})
+
+	b.Run("ImageRecordsAccess=DirectFS", func(b *testing.B) {
+		benchmarkImagePullManagers(b,
+			&pullManagerBenchmark{
+				createImagePullManager: prepareFSImagePullManager,
+				enableFeatures:         []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
+				dimensions:             testDimensions,
+			},
+		)
+	})
+}
+
+func BenchmarkImagePullManageWithEnsureSecretPulledImages(b *testing.B) {
+	b.Run("ImageRecordsAccess=DirectFS", func(b *testing.B) {
+		benchmarkImagePullManagers(b,
+			&pullManagerBenchmark{
+				createImagePullManager: prepareFSImagePullManager,
+				enableFeatures:         []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
+
+				dimensions: pullManagerBenchmarkDimensions{
+					imagesPresentAndCached: []int32{10, 50, 100, 500},
+					cacheHitPercent:        []int32{10, 20, 50, 75, 100},
+				},
+			},
+		)
+	})
+}
+
+func benchmarkImagePullManagers(b *testing.B, tc *pullManagerBenchmark) {
+	for _, fg := range tc.enableFeatures {
+		featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, fg, true)
+	}
+	const (
+		qps   = 0.0
+		burst = 0
+	)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test_pod",
+			Namespace:       "test-ns",
+			UID:             "bar",
+			ResourceVersion: "42",
+		}}
+
+	for _, recordsNum := range tc.dimensions.imagesPresentAndCached {
+		for _, cacheHitRate := range tc.dimensions.cacheHitPercent {
+			b.Run(fmt.Sprintf("Records=%d/CacheHitRate=%d", recordsNum, cacheHitRate), func(b *testing.B) {
+				testCtx := ktesting.InitCtx(context.Background(), b)
+
+				fakeRuntime := &ctest.FakeRuntime{T: b}
+				imagePullManager := tc.createImagePullManager(testCtx, b, fakeRuntime)
+
+				fakeRecorder := testutil.NewFakeRecorder()
+				fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{}
+				puller := NewImageManager(fakeRecorder, &credentialprovider.BasicDockerKeyring{}, fakeRuntime, imagePullManager, flowcontrol.NewBackOff(time.Second, 300*time.Second), false, ptr.To[int32](0), qps, burst, fakePodPullingTimeRecorder)
+
+				const preGenRequestNum int32 = 10000
+				imageRequests := tc.populate(fakeRuntime, imagePullManager, recordsNum, preGenRequestNum, cacheHitRate)
+
+				i := atomic.Int32{}
+				b.ReportAllocs()
+				for b.Loop() {
+					if _, _, err := puller.EnsureImageExists(testCtx, &v1.ObjectReference{}, pod, imageRequests[i.Load()%preGenRequestNum], []v1.Secret{}, nil, "", v1.PullIfNotPresent); err != nil {
+						b.Fatalf("EnsureImageExists failed: %v", err)
+					}
+					i.Add(1)
+				}
+
+				var numPulls int32
+				for _, fname := range fakeRuntime.CalledFunctions {
+					if fname == "PullImage" {
+						numPulls++
+					}
+				}
+				require.InDelta(b, 100-cacheHitRate, numPulls*100/i.Load(), 5)
+			})
+		}
+	}
+
+}
+
+func prepareFSImagePullManager(ctx context.Context, b *testing.B, imageService kubecontainer.ImageService) pullmanager.ImagePullManager {
+	tmpDir := b.TempDir()
+
+	fsAccessor, err := pullmanager.NewFSPullRecordsAccessor(tmpDir)
+	if err != nil {
+		b.Fatalf("failed to set up FS-cache accessor: %v", err)
+	}
+
+	pullManager, err := pullmanager.NewImagePullManager(ctx, fsAccessor, pullmanager.AlwaysVerifyImagePullPolicy(), imageService, 10)
+	if err != nil {
+		b.Fatalf("failed to set up image pull manager: %v", err)
+	}
+	return pullManager
 }
 
 func makeDockercfgSecretForRepo(sMeta metav1.ObjectMeta, repo string) v1.Secret {

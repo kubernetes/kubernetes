@@ -18,9 +18,13 @@ package testing
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/url"
 	"reflect"
+	"slices"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,12 +35,15 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 type TB interface {
 	Errorf(format string, args ...any)
 }
+
+type ImageSpecToImageMappingFunc func(image kubecontainer.ImageSpec) kubecontainer.Image
 
 type FakePod struct {
 	Pod       *kubecontainer.Pod
@@ -46,26 +53,27 @@ type FakePod struct {
 // FakeRuntime is a fake container runtime for testing.
 type FakeRuntime struct {
 	sync.Mutex
-	CalledFunctions   []string
-	PodList           []*FakePod
-	AllPodList        []*FakePod
-	ImageList         []kubecontainer.Image
-	ImageFsStats      []*runtimeapi.FilesystemUsage
-	ContainerFsStats  []*runtimeapi.FilesystemUsage
-	APIPodStatus      v1.PodStatus
-	PodStatus         kubecontainer.PodStatus
-	StartedPods       []string
-	KilledPods        []string
-	StartedContainers []string
-	KilledContainers  []string
-	RuntimeStatus     *kubecontainer.RuntimeStatus
-	VersionInfo       string
-	APIVersionInfo    string
-	RuntimeType       string
-	SyncResults       *kubecontainer.PodSyncResult
-	Err               error
-	InspectErr        error
-	StatusErr         error
+	CalledFunctions         []string
+	PodList                 []*FakePod
+	AllPodList              []*FakePod
+	ImageList               map[string]kubecontainer.Image
+	ImageSpecToImageMapping ImageSpecToImageMappingFunc
+	ImageFsStats            []*runtimeapi.FilesystemUsage
+	ContainerFsStats        []*runtimeapi.FilesystemUsage
+	APIPodStatus            v1.PodStatus
+	PodStatus               kubecontainer.PodStatus
+	StartedPods             []string
+	KilledPods              []string
+	StartedContainers       []string
+	KilledContainers        []string
+	RuntimeStatus           *kubecontainer.RuntimeStatus
+	VersionInfo             string
+	APIVersionInfo          string
+	RuntimeType             string
+	SyncResults             *kubecontainer.PodSyncResult
+	Err                     error
+	InspectErr              error
+	StatusErr               error
 	// If BlockImagePulls is true, then all PullImage() calls will be blocked until
 	// UnblockImagePulls() is called. This is used to simulate image pull latency
 	// from container runtime.
@@ -315,15 +323,21 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, creds []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
+func (f *FakeRuntime) PullImage(ctx context.Context, imageSpec kubecontainer.ImageSpec, creds []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
 	f.Lock()
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
+	specMapping := f.ImageSpecToImageMapping
+	if specMapping == nil {
+		specMapping = defaultImageSpecToImageMapping
+	}
+	image := specMapping(imageSpec)
 	if f.Err == nil {
-		i := kubecontainer.Image{
-			ID:   image.Image,
-			Spec: image,
+		cachedImg, exists := f.ImageList[image.ID]
+		if exists {
+			image.RepoDigests = append(cachedImg.RepoDigests, image.RepoDigests...)
+			image.RepoTags = append(cachedImg.RepoTags, image.RepoTags...)
 		}
-		f.ImageList = append(f.ImageList, i)
+		f.ImageList[image.ID] = image
 	}
 
 	// if credentials were supplied for the pull at least return the first in the list
@@ -334,7 +348,7 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 
 	if !f.BlockImagePulls {
 		f.Unlock()
-		return image.Image, retCreds, f.Err
+		return image.ID, retCreds, f.Err
 	}
 
 	retErr := f.Err
@@ -348,7 +362,7 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 	case <-f.imagePullTokenBucket:
 	}
 
-	return image.Image, retCreds, retErr
+	return image.ID, retCreds, retErr
 }
 
 // UnblockImagePulls unblocks a certain number of image pulls, if BlockImagePulls is true.
@@ -368,8 +382,18 @@ func (f *FakeRuntime) GetImageRef(_ context.Context, image kubecontainer.ImageSp
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetImageRef")
+	imageMapping := f.ImageSpecToImageMapping
+	if imageMapping == nil {
+		imageMapping = defaultImageSpecToImageMapping
+	}
+
+	if img, ok := f.ImageList[imageMapping(image).ID]; ok {
+		return img.ID, nil
+	}
+
 	for _, i := range f.ImageList {
-		if i.ID == image.Image {
+		if slices.Index(i.RepoDigests, image.Image) > -1 ||
+			slices.Index(i.RepoTags, image.Image) > -1 {
 			return i.ID, nil
 		}
 	}
@@ -392,9 +416,13 @@ func (f *FakeRuntime) ListImages(_ context.Context) ([]kubecontainer.Image, erro
 	return snapshot(f.ImageList), f.Err
 }
 
-func snapshot(imageList []kubecontainer.Image) []kubecontainer.Image {
-	result := make([]kubecontainer.Image, len(imageList))
-	copy(result, imageList)
+func snapshot(imageList map[string]kubecontainer.Image) []kubecontainer.Image {
+	result := make([]kubecontainer.Image, 0, len(imageList))
+	for _, v := range imageList {
+		result = append(result, v)
+	}
+	// nodestatus.Images expected the images to be sorted by image size
+	sort.Sort(sliceutils.ByImageSize(result))
 	return result
 }
 
@@ -403,15 +431,12 @@ func (f *FakeRuntime) RemoveImage(_ context.Context, image kubecontainer.ImageSp
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "RemoveImage")
-	index := 0
-	for i := range f.ImageList {
-		if f.ImageList[i].ID == image.Image {
-			index = i
-			break
-		}
+	specMapping := f.ImageSpecToImageMapping
+	if specMapping == nil {
+		specMapping = defaultImageSpecToImageMapping
 	}
-	f.ImageList = append(f.ImageList[:index], f.ImageList[index+1:]...)
 
+	delete(f.ImageList, specMapping(image).ID)
 	return f.Err
 }
 
@@ -544,4 +569,26 @@ func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Contai
 		return f.SwapBehavior[container.Name]
 	}
 	return kubetypes.NoSwap
+}
+
+func defaultImageSpecToImageMapping(image kubecontainer.ImageSpec) kubecontainer.Image {
+	return kubecontainer.Image{
+		ID:   image.Image,
+		Spec: image,
+	}
+}
+
+func ImageListToMap(images []kubecontainer.Image) map[string]kubecontainer.Image {
+	ret := make(map[string]kubecontainer.Image)
+	for _, image := range images {
+		if _, ok := ret[image.ID]; ok {
+			panic(fmt.Sprintf("supplied records contain duplicate images with ID %q: %v", image.ID, image))
+		}
+		ret[image.ID] = image
+	}
+	return ret
+}
+
+func imageCmp(a, b kubecontainer.Image) int {
+	return strings.Compare(a.ID, b.ID)
 }

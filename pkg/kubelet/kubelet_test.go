@@ -205,7 +205,7 @@ func newTestKubeletWithImageList(
 	logger, _ := ktesting.NewTestContext(t)
 
 	fakeRuntime := &containertest.FakeRuntime{
-		ImageList: imageList,
+		ImageList: containertest.ImageListToMap(imageList),
 		// Set ready conditions by default.
 		RuntimeStatus: &kubecontainer.RuntimeStatus{
 			Conditions: []kubecontainer.RuntimeCondition{
