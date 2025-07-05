@@ -63,6 +63,11 @@ import (
 	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
+var supportedPodLevelResources = sets.New(
+	core.ResourceCPU,
+	core.ResourceMemory,
+)
+
 const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
@@ -7121,15 +7126,15 @@ func validateBasicResource(quantity resource.Quantity, fldPath *field.Path) fiel
 }
 
 func validatePodResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, validatePodResourceName, podClaimNames, fldPath, opts)
+	return validateResourceRequirements(requirements, validatePodResourceName, podClaimNames, fldPath, opts, true)
 }
 
 func ValidateContainerResourceRequirements(requirements *core.ResourceRequirements, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
-	return validateResourceRequirements(requirements, validateContainerResourceName, podClaimNames, fldPath, opts)
+	return validateResourceRequirements(requirements, validateContainerResourceName, podClaimNames, fldPath, opts ,false)
 }
 
 // Validates resource requirement spec.
-func validateResourceRequirements(requirements *core.ResourceRequirements, resourceNameFn func(core.ResourceName, *field.Path) field.ErrorList, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateResourceRequirements(requirements *core.ResourceRequirements, resourceNameFn func(core.ResourceName, *field.Path) field.ErrorList, podClaimNames sets.Set[string], fldPath *field.Path, opts PodValidationOptions, isPodLevel bool ) field.ErrorList {
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
 	reqPath := fldPath.Child("requests")
@@ -7138,9 +7143,18 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 	limContainsHugePages := false
 	reqContainsHugePages := false
 	supportedQoSComputeResources := sets.New(core.ResourceCPU, core.ResourceMemory)
+	// isPodLevel := resourceNameFn == validatePodResourceName
+	//cool
+
 	for resourceName, quantity := range requirements.Limits {
 
 		fldPath := limPath.Key(string(resourceName))
+
+		// Skip validation for unsupported pod-level resources
+		if isPodLevel && !supportedPodLevelResources.Has(resourceName) {
+			continue
+		}
+
 		// Validate resource name.
 		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath)...)
 
@@ -7160,6 +7174,11 @@ func validateResourceRequirements(requirements *core.ResourceRequirements, resou
 	}
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))
+
+		// Skip validation for unsupported pod-level resources
+		if isPodLevel && !supportedPodLevelResources.Has(resourceName) {
+			continue
+		}
 		// Validate resource name.
 		allErrs = append(allErrs, resourceNameFn(resourceName, fldPath)...)
 
