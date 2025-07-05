@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/utils/pointer"
-
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,6 +35,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -47,7 +46,7 @@ const (
 func AllowAllSchema() *apiextensionsv1.CustomResourceValidation {
 	return &apiextensionsv1.CustomResourceValidation{
 		OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-			XPreserveUnknownFields: pointer.BoolPtr(true),
+			XPreserveUnknownFields: ptr.To(true),
 			Type:                   "object",
 		},
 	}
