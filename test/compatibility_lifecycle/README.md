@@ -7,4 +7,7 @@ go run test/compatibility_lifecycle/main.go feature-gates verify
 
 # Update feature gate list
 go run test/compatibility_lifecycle/main.go feature-gates update
+
+# Verify no feature gates need to be cleaned up
+go run test/compatibility_lifecycle/main.go feature-gates verify-cleanup
 ```
