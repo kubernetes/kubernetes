@@ -1199,6 +1199,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		podIPs = podStatus.IPs
 	}
 
+	if isAllowed, msg := allocation.IsPodLevelResourcesAllowed(pod); pod.Spec.Resources != nil && !isAllowed {
+		result.Fail(fmt.Errorf("unable to set pod-level resources for pod %q: %s", pod.Name, msg))
+		return
+	}
+
 	// Step 4: Create a sandbox for the pod if necessary.
 	podSandboxID := podContainerChanges.SandboxID
 	if podContainerChanges.CreateSandbox {
