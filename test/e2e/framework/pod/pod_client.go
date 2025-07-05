@@ -130,6 +130,19 @@ func (c *PodClient) Create(ctx context.Context, pod *v1.Pod) *v1.Pod {
 
 }
 
+// TryCreate attempts to create a new pod according to the provided specification.
+// This function is designed to return an error to the caller if pod creation fails.
+func (c *PodClient) TryCreate(ctx context.Context, pod *v1.Pod) (*v1.Pod, error) {
+	ginkgo.GinkgoHelper()
+	c.mungeSpec(pod)
+	c.setOwnerAnnotation(pod)
+	p, err := c.PodInterface.Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error creating pod %s/%s: %w", pod.Namespace, pod.Name, err)
+	}
+	return p, nil
+}
+
 // CreateSync creates a new pod according to the framework specifications, and wait for it to start and be running and ready.
 func (c *PodClient) CreateSync(ctx context.Context, pod *v1.Pod) *v1.Pod {
 	ginkgo.GinkgoHelper()
