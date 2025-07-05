@@ -45,6 +45,27 @@ func ResourceSlice(name string) *ResourceSliceApplyConfiguration {
 	return b
 }
 
+// ExtractResourceSliceFrom extracts the applied configuration owned by fieldManager from
+// resourceSlice for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// resourceSlice must be a unmodified ResourceSlice API object that was retrieved from the Kubernetes API.
+// ExtractResourceSliceFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractResourceSliceFrom(resourceSlice *resourcev1beta2.ResourceSlice, fieldManager string, subresource string) (*ResourceSliceApplyConfiguration, error) {
+	b := &ResourceSliceApplyConfiguration{}
+	err := managedfields.ExtractInto(resourceSlice, internal.Parser().Type("io.k8s.api.resource.v1beta2.ResourceSlice"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(resourceSlice.Name)
+
+	b.WithKind("ResourceSlice")
+	b.WithAPIVersion("resource.k8s.io/v1beta2")
+	return b, nil
+}
+
 // ExtractResourceSlice extracts the applied configuration owned by fieldManager from
 // resourceSlice. If no managedFields are found in resourceSlice for fieldManager, a
 // ResourceSliceApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func ResourceSlice(name string) *ResourceSliceApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractResourceSlice(resourceSlice *resourcev1beta2.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
-	return extractResourceSlice(resourceSlice, fieldManager, "")
+	return ExtractResourceSliceFrom(resourceSlice, fieldManager, "")
 }
 
-// ExtractResourceSliceStatus is the same as ExtractResourceSlice except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractResourceSliceStatus(resourceSlice *resourcev1beta2.ResourceSlice, fieldManager string) (*ResourceSliceApplyConfiguration, error) {
-	return extractResourceSlice(resourceSlice, fieldManager, "status")
-}
-
-func extractResourceSlice(resourceSlice *resourcev1beta2.ResourceSlice, fieldManager string, subresource string) (*ResourceSliceApplyConfiguration, error) {
-	b := &ResourceSliceApplyConfiguration{}
-	err := managedfields.ExtractInto(resourceSlice, internal.Parser().Type("io.k8s.api.resource.v1beta2.ResourceSlice"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(resourceSlice.Name)
-
-	b.WithKind("ResourceSlice")
-	b.WithAPIVersion("resource.k8s.io/v1beta2")
-	return b, nil
-}
 func (b ResourceSliceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

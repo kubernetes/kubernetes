@@ -43,6 +43,7 @@ func Example(name, namespace string) *ExampleApplyConfiguration {
 	b.WithAPIVersion("cr.example.apiextensions.k8s.io/v1")
 	return b
 }
+
 func (b ExampleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
