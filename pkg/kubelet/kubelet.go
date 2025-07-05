@@ -1838,6 +1838,8 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 // the most accurate information possible about an error situation to aid debugging.
 // Callers should not write an event if this operation returns an error.
 func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (isTerminal bool, err error) {
+	klog.Infof("[KEP-4680 DEBUG] 3. Kubelet syncPod: Called for pod")
+
 	ctx, otelSpan := kl.tracer.Start(ctx, "syncPod", trace.WithAttributes(
 		semconv.K8SPodUIDKey.String(string(pod.UID)),
 		attribute.String("k8s.pod", klog.KObj(pod).String()),

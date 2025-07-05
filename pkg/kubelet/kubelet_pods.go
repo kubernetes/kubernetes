@@ -1822,6 +1822,9 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	// update the allocated resources status
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
 		kl.containerManager.UpdateAllocatedResourcesStatus(pod, s)
+		if len(s.ContainerStatuses) > 0 && len(s.ContainerStatuses[0].AllocatedResourcesStatus) > 0 {
+			klog.Infof("[KEP-4680 DEBUG] 4. Kubelet generateAPIPodStatus: Status updated for pod %s. AllocatedResourcesStatus: %+v", klog.KObj(pod), s.ContainerStatuses[0].AllocatedResourcesStatus)
+		}
 	}
 
 	// preserve all conditions not owned by the kubelet

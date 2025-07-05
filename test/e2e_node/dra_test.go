@@ -711,6 +711,49 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			ginkgo.Entry("1 common socket", path.Join(kubeletplugin.KubeletRegistryDir, driverName+"-common.sock")),
 		)
 	})
+
+	f.Context("Resource Health", f.WithSerial(), func() {
+		ginkgo.It("should reflect device health changes in the Pod's status", func(ctx context.Context) {
+			ginkgo.By("Starting the test driver with channel-based control")
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
+			className := "health-test-class"
+			claimName := "health-test-claim"
+			podName := "health-test-pod"
+			poolNameForTest := "pool-a"
+			deviceNameForTest := "dev-0"
+
+			pod := createHealthTestPodAndClaim(ctx, f, driverName, podName, claimName, className, poolNameForTest, deviceNameForTest)
+
+			ginkgo.By("Waiting for the pod to be running")
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+
+			ginkgo.By("Forcing a 'Healthy' status update to establish a baseline")
+			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
+				PoolName:   poolNameForTest,
+				DeviceName: deviceNameForTest,
+				Health:     "Healthy",
+			}
+
+			ginkgo.By("Verifying device health is now Healthy in the pod status")
+			gomega.Eventually(func() (string, error) {
+				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
+			}).WithTimeout(2*time.Minute).WithPolling(2*time.Second).Should(gomega.Equal("Healthy"), "Device health should be Healthy after explicit update")
+
+			ginkgo.By("Setting device health to Unhealthy via control channel")
+			kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
+				PoolName:   poolNameForTest,
+				DeviceName: deviceNameForTest,
+				Health:     "Unhealthy",
+			}
+
+			ginkgo.By("Verifying device health is now Unhealthy")
+			// Verify the status has been updated to Unhealthy.
+			gomega.Eventually(func() (string, error) {
+				return getDeviceHealthFromAPIServer(f, pod.Namespace, pod.Name, driverName, claimName, poolNameForTest, deviceNameForTest)
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal("Unhealthy"), "Device health should update to Unhealthy")
+		})
+	})
 })
 
 // Run Kubelet plugin and wait until it's registered
@@ -948,6 +991,7 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 	// NOTE: This is usually done by the DRA controller or the scheduler.
 	results := make([]resourceapi.DeviceRequestAllocationResult, len(driverNames))
 	config := make([]resourceapi.DeviceAllocationConfiguration, len(driverNames))
+
 	for i, driverName := range driverNames {
 		results[i] = resourceapi.DeviceRequestAllocationResult{
 			Driver:      driverName,
@@ -1034,4 +1078,134 @@ func listAndStoreResources(client kubernetes.Interface, lastSlices *[]resourceap
 
 func matchResourcesByNodeName(nodeName string) types.GomegaMatcher {
 	return gomega.HaveField("Spec.NodeName", gomega.Equal(nodeName))
+
+}
+
+// This helper function queries the main API server for the pod's status.
+func getDeviceHealthFromAPIServer(f *framework.Framework, namespace, podName, driverName, claimName, poolName, deviceName string) (string, error) {
+	// Get the Pod object from the API server
+	pod, err := f.ClientSet.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return "NotFound", nil
+		}
+		return "", fmt.Errorf("failed to get pod %s/%s: %w", namespace, podName, err)
+	}
+
+	// This is the unique ID for the device based on how Kubelet manager code constructs it.
+	expectedResourceID := v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, poolName, deviceName))
+
+	expectedResourceStatusNameSimple := v1.ResourceName(fmt.Sprintf("claim:%s", claimName))
+	expectedResourceStatusNameWithRequest := v1.ResourceName(fmt.Sprintf("claim:%s/%s", claimName, "my-request"))
+
+	// Loop through container statuses.
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.AllocatedResourcesStatus != nil {
+			for _, resourceStatus := range containerStatus.AllocatedResourcesStatus {
+				if resourceStatus.Name != expectedResourceStatusNameSimple && resourceStatus.Name != expectedResourceStatusNameWithRequest {
+					continue
+				}
+				for _, resourceHealth := range resourceStatus.Resources {
+					if resourceHealth.ResourceID == expectedResourceID || strings.HasPrefix(string(resourceHealth.ResourceID), driverName) {
+						return string(resourceHealth.Health), nil
+					}
+				}
+			}
+		}
+	}
+
+	return "NotFound", nil
+}
+
+// createHealthTestPodAndClaim is a specialized helper for the Resource Health test.
+// It creates all necessary objects (DeviceClass, ResourceClaim, Pod) and ensures
+// the pod is long-running and the claim is allocated from the specified pool.
+func createHealthTestPodAndClaim(ctx context.Context, f *framework.Framework, driverName, podName, claimName, className, poolName, deviceName string) *v1.Pod {
+	ginkgo.By(fmt.Sprintf("Creating DeviceClass %q", className))
+	dc := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: className,
+		},
+	}
+	_, err := f.ClientSet.ResourceV1beta1().DeviceClasses().Create(ctx, dc, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create DeviceClass "+className)
+	ginkgo.DeferCleanup(f.ClientSet.ResourceV1beta1().DeviceClasses().Delete, ctx, className, metav1.DeleteOptions{})
+
+	ginkgo.By(fmt.Sprintf("Creating ResourceClaim %q", claimName))
+	claim := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: claimName,
+		},
+		Spec: resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{{
+					Name:            "my-request",
+					DeviceClassName: className,
+				}},
+			},
+		},
+	}
+
+	_, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create ResourceClaim "+claimName)
+	ginkgo.DeferCleanup(f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Delete, ctx, claimName, metav1.DeleteOptions{})
+
+	ginkgo.By(fmt.Sprintf("Creating long-running Pod %q (without claim allocation yet)", podName))
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: f.Namespace.Name,
+		},
+		Spec: v1.PodSpec{
+			NodeName:      getNodeName(ctx, f),
+			RestartPolicy: v1.RestartPolicyNever,
+			ResourceClaims: []v1.PodResourceClaim{
+				{Name: claimName, ResourceClaimName: &claimName},
+			},
+			Containers: []v1.Container{
+				{
+					Name:    "testcontainer",
+					Image:   e2epod.GetDefaultTestImage(),
+					Command: []string{"/bin/sh", "-c", "sleep 600"},
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{{Name: claimName, Request: "my-request"}},
+					},
+				},
+			},
+		},
+	}
+	// Create the pod on the API server to assign the real UID.
+	createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create Pod "+podName)
+	ginkgo.DeferCleanup(func() {
+		e2epod.DeletePodOrFail(ctx, f.ClientSet, createdPod.Namespace, createdPod.Name)
+	})
+
+	ginkgo.By(fmt.Sprintf("Allocating claim %q to pod %q with its real UID", claimName, podName))
+	// Get the created claim to ensure the latest version before updating.
+	claimToUpdate, err := f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Get(ctx, claimName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "failed to get latest version of ResourceClaim "+claimName)
+
+	// Update the claims status to reserve it for the *real* pod UID.
+	claimToUpdate.Status = resourceapi.ResourceClaimStatus{
+		ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+			{Resource: "pods", Name: createdPod.Name, UID: createdPod.UID},
+		},
+		Allocation: &resourceapi.AllocationResult{
+			Devices: resourceapi.DeviceAllocationResult{
+				Results: []resourceapi.DeviceRequestAllocationResult{
+					{
+						Driver:  driverName,
+						Pool:    poolName,
+						Device:  deviceName,
+						Request: "my-request",
+					},
+				},
+			},
+		},
+	}
+	_, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).UpdateStatus(ctx, claimToUpdate, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "failed to update ResourceClaim status for test")
+
+	return createdPod
 }
