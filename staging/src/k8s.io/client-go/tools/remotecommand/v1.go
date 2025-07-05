@@ -21,9 +21,10 @@ import (
 	"io"
 	"net/http"
 
+	"k8s.io/klog/v2"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/klog/v2"
 )
 
 // streamProtocolV1 implements the first version of the streaming exec & attach
@@ -45,6 +46,28 @@ func newStreamProtocolV1(options StreamOptions) streamProtocolHandler {
 	return &streamProtocolV1{
 		StreamOptions: options,
 	}
+}
+
+func (p *streamProtocolV1) streams() (count int) {
+	// set up error stream
+	count = 1
+
+	// set up stdin stream
+	if p.Stdin != nil {
+		count++
+	}
+
+	// set up stdout stream
+	if p.Stdout != nil {
+		count++
+	}
+
+	// set up stderr stream
+	if p.Stderr != nil && !p.Tty {
+		count++
+	}
+
+	return
 }
 
 func (p *streamProtocolV1) stream(conn streamCreator) error {
