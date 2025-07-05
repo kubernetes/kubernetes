@@ -222,3 +222,30 @@ No changes
   - CRI field `affinity_cpus` to `WindowsContainerResources` struct to support CPU affinity on Windows.
     This field will be used by Windows CPU manager to set the logical processors to affinitize
     for a particular container down to containerd/hcsshim.
+
+### v1.33
+
+`git diff v1.32.0 v1.33.0 -- staging/src/k8s.io/cri-api/pkg/apis/runtime/v1/api.proto`
+
+- [Clarify the behavior when the host_port value is set to 0 in CRI](https://github.com/kubernetes/kubernetes/pull/130512)
+  - Added clarifying comment to the [host_port] field of [PortMapping].
+
+- [\[KEP-4639\] Graduate image volume sources to beta](https://github.com/kubernetes/kubernetes/pull/130135)
+  - Added `image_sub_path` to the  type `Mount` to represent the subpath inside the image to mount.
+
+- [\[FG:InPlacePodVerticalScaling\] Add UpdatePodSandboxResources CRI method](https://github.com/kubernetes/kubernetes/pull/128123)
+  - New method `UpdatePodSandboxResources` to synchronously updates the PodSandboxConfig with the pod-level resource configuration.
+  - Added the `UpdatePodSandboxResourcesRequest` type to pass as an argument to `UpdatePodSandboxResources`.
+  - Added the `UpdatePodSandboxResourcesResponse` empty type to return from the `UpdatePodSandboxResources`.
+
+- [Withdraw alpha support for HostNetwork containers on Windows](https://github.com/kubernetes/kubernetes/pull/130250)
+  - Added clarifying comment on the `network` field of the type `WindowsNamespaceOption` as HostNetwork containers are not supported.
+
+- [Surface Pressure Stall Information (PSI) metrics](https://github.com/kubernetes/kubernetes/pull/130701)
+  - Added `io` field to the types `LinuxPodSandboxStats` and `ContainerStats` to represent the IO usage.
+  - Added  `psi` field to the type `CpuUsage`.
+  - Added types `IoUsage`, `PsiStats`, and `PsiData` to represent IO usage and PSI statistics.
+
+- [KEP 4960: Container Stop Signals](https://github.com/kubernetes/kubernetes/pull/130556)
+  - Added the field `stop_signal` to the `ContainerConfig` type.
+  - Added the enum `Signal` listing all possible stop signals.
