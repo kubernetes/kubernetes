@@ -24,7 +24,13 @@ import (
 	celgo "github.com/google/cel-go/cel"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/cel/common"
+	celopenapi "k8s.io/apiserver/pkg/cel/openapi"
+	"k8s.io/apiserver/pkg/cel/openapi/resolver"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
 )
 
 type CELMatcher struct {
@@ -57,8 +63,12 @@ func (c *CELMatcher) Eval(ctx context.Context, r *authorizationv1.SubjectAccessR
 		}
 	}()
 
+	specSchema, err := getSpecSchema(r)
+	if err != nil {
+		return false, fmt.Errorf("failed to get spec schema: %w", err)
+	}
 	va := map[string]interface{}{
-		"request": convertObjectToUnstructured(&r.Spec, c.UsesFieldSelector, c.UsesLabelSelector),
+		"request": common.TypedToVal(&r.Spec, &celopenapi.Schema{Schema: specSchema}),
 	}
 	for _, compilationResult := range c.CompilationResults {
 		evalResult, _, err := compilationResult.Program.ContextEval(ctx, va)
@@ -88,4 +98,19 @@ func (c *CELMatcher) Eval(ctx context.Context, r *authorizationv1.SubjectAccessR
 	}
 	// return ALL matchConditions evaluate to TRUE successfully without error
 	return true, nil
+}
+
+func getSpecSchema(r *authorizationv1.SubjectAccessReview) (*spec.Schema, error) {
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(authorizationv1.SchemeGroupVersion, &authorizationv1.SubjectAccessReview{})
+	schemaResolver := resolver.NewDefinitionsSchemaResolver(generatedopenapi.GetOpenAPIDefinitions, scheme)
+	s, err := schemaResolver.ResolveSchema(r.GroupVersionKind())
+	if err != nil {
+		return nil, err
+	}
+	specSchema, ok := s.Properties["spec"]
+	if !ok {
+		return nil, fmt.Errorf("spec property not found in schema for %v", r.GroupVersionKind())
+	}
+	return &specSchema, nil
 }
