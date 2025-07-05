@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -463,6 +464,14 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 
 func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
 	qos := v1qos.GetPodQOS(pod)
+
+	// The CPU manager static policy does not support pod-level resources.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		klog.V(5).InfoS("CPU Manager allocation skipped, pod is using pod-level resources which are not supported by the static CPU manager policy", "pod", klog.KObj(pod), "containerName", container.Name)
+
+		return 0
+	}
+
 	if qos != v1.PodQOSGuaranteed {
 		klog.V(5).InfoS("Exclusive CPU allocation skipped, pod QoS is not guaranteed", "pod", klog.KObj(pod), "containerName", container.Name, "qos", qos)
 		return 0

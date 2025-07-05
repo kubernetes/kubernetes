@@ -69,6 +69,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-helpers/apimachinery/lease"
+	resourcehelper "k8s.io/component-helpers/resource"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
@@ -85,6 +86,7 @@ import (
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
@@ -1890,6 +1892,23 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		pod, err = kl.allocationManager.HandlePodResourcesResize(kl.containerRuntime, allocatedPods, pod, podStatus)
 		if err != nil {
 			return false, err
+		}
+	}
+
+	// If pod-level resources are set, CPU and Memory managers alignment is skipped,
+	// an event is surfaced to inform the user when skipped in the corresponding pod.
+	if updateType == kubetypes.SyncPodCreate &&
+		utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
+		resourcehelper.IsPodLevelResourcesSet(pod) &&
+		v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
+
+		if kl.containerManager.GetNodeConfig().CPUManagerPolicy == string(cpumanager.PolicyStatic) {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.CPUManagerPodLevelResourceAllocation, "Pod has pod-level resources, CPU Manager alignment is skipped")
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) &&
+			kl.containerManager.GetNodeConfig().MemoryManagerPolicy == string("Static") {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.MemoryManagerPodLevelResourceAllocation, "Pod has pod-level resources, Memory manager alignment is skipped")
 		}
 	}
 
