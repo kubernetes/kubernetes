@@ -176,7 +176,7 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
-	caInfos, allInfos := getCRICadvisorStats(allInfos)
+	caInfos, _, allInfos := getCRICadvisorStats(allInfos)
 
 	// get network stats for containers.
 	// This is only used on Windows. For other platforms, (nil, nil) should be returned.
@@ -233,7 +233,7 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 
 	result := make([]statsapi.PodStats, 0, len(sandboxIDToPodStats))
 	for _, s := range sandboxIDToPodStats {
-		makePodStorageStats(s, rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, true)
+		makePodStorageStats(s, nil, rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, true)
 		result = append(result, *s)
 	}
 	return result, nil
@@ -265,7 +265,7 @@ func (p *criStatsProvider) listPodStatsStrictlyFromCRI(ctx context.Context, upda
 		addCRIPodMemoryStats(ps, criSandboxStat)
 		addCRIPodProcessStats(ps, criSandboxStat)
 		addCRIPodIOStats(ps, criSandboxStat)
-		makePodStorageStats(ps, rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, true)
+		makePodStorageStats(ps, nil, rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, true)
 		summarySandboxStats = append(summarySandboxStats, *ps)
 	}
 	return summarySandboxStats, nil
@@ -318,7 +318,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
 	}
-	caInfos, allInfos := getCRICadvisorStats(allInfos)
+	caInfos, _, allInfos := getCRICadvisorStats(allInfos)
 
 	for _, stats := range resp {
 		containerID := stats.Attributes.Id
@@ -1022,9 +1022,10 @@ func (p *criStatsProvider) addCadvisorContainerCPUAndMemoryStats(
 	}
 }
 
-func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) (map[string]cadvisorapiv2.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo) {
+func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) (map[string]cadvisorapiv2.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo) {
 	stats := make(map[string]cadvisorapiv2.ContainerInfo)
-	filteredInfos, cinfosByPodCgroupKey := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
+	terminatedStats := make(map[string]cadvisorapiv2.ContainerInfo)
+	filteredInfos, terminatedInfos, cinfosByPodCgroupKey := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
 	for key, info := range filteredInfos {
 		// On systemd using devicemapper each mount into the container has an
 		// associated cgroup. We ignore them to ensure we do not get duplicate
@@ -1039,7 +1040,16 @@ func getCRICadvisorStats(infos map[string]cadvisorapiv2.ContainerInfo) (map[stri
 		}
 		stats[extractIDFromCgroupPath(key)] = info
 	}
-	return stats, cinfosByPodCgroupKey
+	for key, info := range terminatedInfos {
+		if strings.HasSuffix(key, ".mount") {
+			continue
+		}
+		if !isPodManagedContainer(&info) {
+			continue
+		}
+		terminatedStats[extractIDFromCgroupPath(key)] = info
+	}
+	return stats, terminatedStats, cinfosByPodCgroupKey
 }
 
 func extractIDFromCgroupPath(cgroupPath string) string {
