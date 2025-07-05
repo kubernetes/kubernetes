@@ -241,6 +241,14 @@
   - 1310.72
   - 2621.44
   - 5242.88
+- name: statefulset_unavailability_violation
+  subsystem: statefulset_controller
+  help: Number of times maxunavailable has been violated
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - statefulset_name
+  - statefulset_namespace
 - name: controller_admission_duration_seconds
   subsystem: admission
   namespace: apiserver
