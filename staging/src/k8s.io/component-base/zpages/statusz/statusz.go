@@ -21,6 +21,7 @@ import (
 	"html"
 	"math/rand"
 	"net/http"
+	"sort"
 	"time"
 
 	"k8s.io/component-base/compatibility"
@@ -43,8 +44,8 @@ type mux interface {
 	Handle(path string, handler http.Handler)
 }
 
-func NewRegistry(effectiveVersion compatibility.EffectiveVersion) statuszRegistry {
-	return &registry{effectiveVersion: effectiveVersion}
+func NewRegistry(effectiveVersion compatibility.EffectiveVersion, endpoints map[string]string) statuszRegistry {
+	return &registry{effectiveVersion: effectiveVersion, endpoints: endpoints}
 }
 
 func Install(m mux, componentName string, reg statuszRegistry) {
@@ -91,6 +92,28 @@ Go version%[1]s %[4]s
 Binary version%[1]s %[5]s
 %[6]s
 `, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion)
+
+	endpoints := reg.usefulEndpoints()
+	if len(endpoints) > 0 {
+		var endpointsText string
+		endpointsText += `
+Useful Endpoints:
+----------------
+`
+		endpointNames := make([]string, 0, len(endpoints))
+		for key := range endpoints {
+			endpointNames = append(endpointNames, key)
+		}
+
+		sort.Slice(endpointNames, func(i, j int) bool {
+			return endpointNames[i] > endpointNames[j]
+		})
+
+		for _, endpointName := range endpointNames {
+			endpointsText += fmt.Sprintf("%s%s %q\n", html.EscapeString(endpointName), delim, html.EscapeString(endpoints[endpointName]))
+		}
+		status += endpointsText
+	}
 
 	return status, nil
 }
