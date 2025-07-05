@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"sync"
 
@@ -52,6 +53,17 @@ var (
 		},
 		[]string{"status", "apiserver_id_hash"},
 	)
+
+	authenticationConfigAutomaticReloadLastConfigHash = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "automatic_reload_last_config_hash",
+			Help:           "Hash of the last applied authentication configuration split by apiserver identity.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"apiserver_id_hash"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -60,12 +72,14 @@ func RegisterMetrics() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(authenticationConfigAutomaticReloadsTotal)
 		legacyregistry.MustRegister(authenticationConfigAutomaticReloadLastTimestampSeconds)
+		legacyregistry.MustRegister(authenticationConfigAutomaticReloadLastConfigHash)
 	})
 }
 
 func ResetMetricsForTest() {
 	authenticationConfigAutomaticReloadsTotal.Reset()
 	authenticationConfigAutomaticReloadLastTimestampSeconds.Reset()
+	authenticationConfigAutomaticReloadLastConfigHash.Reset()
 }
 
 func RecordAuthenticationConfigAutomaticReloadFailure(apiServerID string) {
@@ -74,10 +88,15 @@ func RecordAuthenticationConfigAutomaticReloadFailure(apiServerID string) {
 	authenticationConfigAutomaticReloadLastTimestampSeconds.WithLabelValues("failure", apiServerIDHash).SetToCurrentTime()
 }
 
-func RecordAuthenticationConfigAutomaticReloadSuccess(apiServerID string) {
+func RecordAuthenticationConfigAutomaticReloadSuccess(apiServerID, authConfigData string) {
 	apiServerIDHash := getHash(apiServerID)
 	authenticationConfigAutomaticReloadsTotal.WithLabelValues("success", apiServerIDHash).Inc()
 	authenticationConfigAutomaticReloadLastTimestampSeconds.WithLabelValues("success", apiServerIDHash).SetToCurrentTime()
+
+	hash := sha256.Sum256([]byte(authConfigData))
+	truncated := binary.BigEndian.Uint64(hash[0:8]) // Truncate to 8 bytes for the gauge
+
+	authenticationConfigAutomaticReloadLastConfigHash.WithLabelValues(apiServerIDHash).Set(float64(truncated))
 }
 
 func getHash(data string) string {
