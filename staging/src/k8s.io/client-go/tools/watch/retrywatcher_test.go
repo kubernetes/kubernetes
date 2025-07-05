@@ -595,7 +595,7 @@ func TestRetryWatcher(t *testing.T) {
 				counter = atomic.LoadUint32(atomicCounter)
 				return counter == tc.watchCount, nil
 			})
-			if err == wait.ErrWaitTimeout {
+			if wait.Interrupted(err) {
 				t.Errorf("expected %d watcher starts, but it has started %d times", tc.watchCount, counter)
 			} else if err != nil {
 				t.Fatal(err)
