@@ -1009,7 +1009,7 @@ func TestPlugin(t *testing.T) {
 			})
 			unschedulable := status.Code() != fwk.Success
 
-			var potentialNodes []*framework.NodeInfo
+			var potentialNodes []fwk.NodeInfo
 
 			initialObjects = testCtx.listAll(t)
 			testCtx.updateAPIServer(t, initialObjects, tc.prepare.filter)
@@ -1039,7 +1039,7 @@ func TestPlugin(t *testing.T) {
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.prescore)
 			}
 
-			var selectedNode *framework.NodeInfo
+			var selectedNode fwk.NodeInfo
 			if !unschedulable && len(potentialNodes) > 0 {
 				selectedNode = potentialNodes[0]
 
@@ -1109,7 +1109,7 @@ type testContext struct {
 	informerFactory informers.SharedInformerFactory
 	draManager      *DefaultDRAManager
 	p               *DynamicResources
-	nodeInfos       []*framework.NodeInfo
+	nodeInfos       []fwk.NodeInfo
 	state           fwk.CycleState
 }
 

@@ -690,7 +690,7 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 	if f == nil {
 		// If frameworkImpl is nil, simply keep their order unchanged.
 		// NOTE: this is primarily for tests.
-		return func(_, _ *framework.QueuedPodInfo) bool { return false }
+		return func(_, _ fwk.QueuedPodInfo) bool { return false }
 	}
 
 	if len(f.queueSortPlugins) == 0 {
@@ -770,7 +770,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state fwk.Cycle
 	return result, returnStatus, pluginsWithNodes
 }
 
-func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilter(ctx, state, pod, nodes)
 	}
@@ -787,8 +787,8 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 	ctx context.Context,
 	state fwk.CycleState,
 	podToSchedule *v1.Pod,
-	podInfoToAdd *framework.PodInfo,
-	nodeInfo *framework.NodeInfo,
+	podInfoToAdd fwk.PodInfo,
+	nodeInfo fwk.NodeInfo,
 ) (status *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -815,7 +815,7 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 	return nil
 }
 
-func (f *frameworkImpl) runPreFilterExtensionAddPod(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (f *frameworkImpl) runPreFilterExtensionAddPod(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilterExtensions().AddPod(ctx, state, podToSchedule, podInfoToAdd, nodeInfo)
 	}
@@ -832,8 +832,8 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 	ctx context.Context,
 	state fwk.CycleState,
 	podToSchedule *v1.Pod,
-	podInfoToRemove *framework.PodInfo,
-	nodeInfo *framework.NodeInfo,
+	podInfoToRemove fwk.PodInfo,
+	nodeInfo fwk.NodeInfo,
 ) (status *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -852,7 +852,11 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 		status = f.runPreFilterExtensionRemovePod(ctx, pl, state, podToSchedule, podInfoToRemove, nodeInfo)
 		if !status.IsSuccess() {
 			err := status.AsError()
-			logger.Error(err, "Plugin failed", "node", klog.KObj(nodeInfo.Node()), "operation", "removePod", "plugin", pl.Name(), "pod", klog.KObj(podToSchedule))
+			var node *v1.Node
+			if nodeInfo != nil {
+				node = nodeInfo.Node()
+			}
+			logger.Error(err, "Plugin failed", "node", klog.KObj(node), "operation", "removePod", "plugin", pl.Name(), "pod", klog.KObj(podToSchedule))
 			return fwk.AsStatus(fmt.Errorf("running RemovePod on PreFilter plugin %q: %w", pl.Name(), err))
 		}
 	}
@@ -860,7 +864,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 	return nil
 }
 
-func (f *frameworkImpl) runPreFilterExtensionRemovePod(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (f *frameworkImpl) runPreFilterExtensionRemovePod(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilterExtensions().RemovePod(ctx, state, podToSchedule, podInfoToRemove, nodeInfo)
 	}
@@ -878,7 +882,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 	ctx context.Context,
 	state fwk.CycleState,
 	pod *v1.Pod,
-	nodeInfo *framework.NodeInfo,
+	nodeInfo fwk.NodeInfo,
 ) *fwk.Status {
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -909,7 +913,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 	return nil
 }
 
-func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.FilterPlugin, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.FilterPlugin, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.Filter(ctx, state, pod, nodeInfo)
 	}
@@ -986,7 +990,7 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.Po
 // and add the nominated pods. Removal of the victims is done by
 // SelectVictimsOnNode(). Preempt removes victims from PreFilter state and
 // NodeInfo before calling this function.
-func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info *framework.NodeInfo) *fwk.Status {
+func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info fwk.NodeInfo) *fwk.Status {
 	var status *fwk.Status
 
 	podsAdded := false
@@ -1036,7 +1040,7 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 // addGENominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
 // 3) augmented nodeInfo.
-func addGENominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, state fwk.CycleState, nodeInfo *framework.NodeInfo) (bool, fwk.CycleState, *framework.NodeInfo, error) {
+func addGENominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, state fwk.CycleState, nodeInfo fwk.NodeInfo) (bool, fwk.CycleState, fwk.NodeInfo, error) {
 	if fh == nil {
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
@@ -1049,7 +1053,7 @@ func addGENominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, s
 	stateOut := state.Clone()
 	podsAdded := false
 	for _, pi := range nominatedPodInfos {
-		if corev1.PodPriority(pi.Pod) >= corev1.PodPriority(pod) && pi.Pod.UID != pod.UID {
+		if corev1.PodPriority(pi.GetPod()) >= corev1.PodPriority(pod) && pi.GetPod().UID != pod.UID {
 			nodeInfoOut.AddPodInfo(pi)
 			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
 			if !status.IsSuccess() {
@@ -1069,7 +1073,7 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	ctx context.Context,
 	state fwk.CycleState,
 	pod *v1.Pod,
-	nodes []*framework.NodeInfo,
+	nodes []fwk.NodeInfo,
 ) (status *fwk.Status) {
 	startTime := time.Now()
 	skipPlugins := sets.New[string]()
@@ -1100,7 +1104,7 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	return nil
 }
 
-func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreScorePlugin, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreScorePlugin, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreScore(ctx, state, pod, nodes)
 	}
@@ -1114,7 +1118,7 @@ func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreS
 // It returns a list that stores scores from each plugin and total score for each Node.
 // It also returns *Status, which is set to non-success if any of the plugins returns
 // a non-success status.
-func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (ns []framework.NodePluginScores, status *fwk.Status) {
+func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (ns []framework.NodePluginScores, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
@@ -1223,7 +1227,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 	return allNodePluginScores, nil
 }
 
-func (f *frameworkImpl) runScorePlugin(ctx context.Context, pl framework.ScorePlugin, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (f *frameworkImpl) runScorePlugin(ctx context.Context, pl framework.ScorePlugin, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.Score(ctx, state, pod, nodeInfo)
 	}

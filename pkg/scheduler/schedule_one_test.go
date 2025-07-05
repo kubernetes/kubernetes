@@ -121,13 +121,13 @@ func (f *fakeExtender) SupportsPreemption() bool {
 	return false
 }
 
-func (f *fakeExtender) Filter(pod *v1.Pod, nodes []*framework.NodeInfo) ([]*framework.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
+func (f *fakeExtender) Filter(pod *v1.Pod, nodes []fwk.NodeInfo) ([]fwk.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
 	return nil, nil, nil, nil
 }
 
 func (f *fakeExtender) Prioritize(
 	_ *v1.Pod,
-	_ []*framework.NodeInfo,
+	_ []fwk.NodeInfo,
 ) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error) {
 	return nil, 0, nil
 }
@@ -171,7 +171,7 @@ func (pl *falseMapPlugin) Name() string {
 	return "FalseMap"
 }
 
-func (pl *falseMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *falseMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) (int64, *fwk.Status) {
 	return 0, fwk.AsStatus(errPrioritize)
 }
 
@@ -191,7 +191,7 @@ func (pl *numericMapPlugin) Name() string {
 	return "NumericMap"
 }
 
-func (pl *numericMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *numericMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	nodeName := nodeInfo.Node().Name
 	score, err := strconv.Atoi(nodeName)
 	if err != nil {
@@ -215,7 +215,7 @@ func (pl *reverseNumericMapPlugin) Name() string {
 	return "ReverseNumericMap"
 }
 
-func (pl *reverseNumericMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *reverseNumericMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	nodeName := nodeInfo.Node().Name
 	score, err := strconv.Atoi(nodeName)
 	if err != nil {
@@ -257,7 +257,7 @@ func (pl *trueMapPlugin) Name() string {
 	return "TrueMap"
 }
 
-func (pl *trueMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *trueMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) (int64, *fwk.Status) {
 	return 1, nil
 }
 
@@ -288,8 +288,8 @@ func (pl *noPodsFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
-	if len(nodeInfo.Pods) == 0 {
+func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	if len(nodeInfo.GetPods()) == 0 {
 		return nil
 	}
 	return fwk.NewStatus(fwk.Unschedulable, tf.ErrReasonFake)
@@ -307,7 +307,7 @@ func (s *fakeNodeSelector) Name() string {
 	return "FakeNodeSelector"
 }
 
-func (s *fakeNodeSelector) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (s *fakeNodeSelector) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if nodeInfo.Node().Name != s.NodeName {
 		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable)
 	}
@@ -334,7 +334,7 @@ func (f *fakeNodeSelectorDependOnPodAnnotation) Name() string {
 }
 
 // Filter selects the specified one node and rejects other non-specified nodes.
-func (f *fakeNodeSelectorDependOnPodAnnotation) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (f *fakeNodeSelectorDependOnPodAnnotation) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	resolveNodeNameFromPodAnnotation := func(pod *v1.Pod) (string, error) {
 		if pod == nil {
 			return "", fmt.Errorf("empty pod")
@@ -371,7 +371,7 @@ func (t *TestPlugin) Name() string {
 	return t.name
 }
 
-func (t *TestPlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (t *TestPlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	return 1, nil
 }
 
@@ -379,7 +379,7 @@ func (t *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (t *TestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (t *TestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -2126,7 +2126,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			extenders: []tf.FakeExtender{
 				{
 					ExtenderName: "FakeExtender1",
-					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 						if node.Node().Name == "a" {
 							return fwk.NewStatus(fwk.Success)
 						}
@@ -2147,7 +2147,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			extenders: []tf.FakeExtender{
 				{
 					ExtenderName: "FakeExtender1",
-					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 						if node.Node().Name == "a" {
 							return fwk.NewStatus(fwk.Success)
 						}
@@ -2172,7 +2172,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			extenders: []tf.FakeExtender{
 				{
 					ExtenderName: "FakeExtender1",
-					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 						if node.Node().Name == "a" {
 							return fwk.NewStatus(fwk.Success)
 						}
@@ -2199,7 +2199,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 			extenders: []tf.FakeExtender{
 				{
 					ExtenderName: "FakeExtender1",
-					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 						if node.Node().Name == "a" {
 							return fwk.NewStatus(fwk.Success)
 						}
@@ -2211,7 +2211,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 				},
 				{
 					ExtenderName: "FakeExtender1",
-					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+					Predicates: []tf.FitPredicate{func(pod *v1.Pod, node fwk.NodeInfo) *fwk.Status {
 						if node.Node().Name == "a" {
 							return fwk.NewStatus(fwk.Success)
 						}

@@ -263,9 +263,9 @@ func TestIsStatusEqual(t *testing.T) {
 	}
 }
 
-type nodeInfoLister []*NodeInfo
+type nodeInfoLister []fwk.NodeInfo
 
-func (nodes nodeInfoLister) Get(nodeName string) (*NodeInfo, error) {
+func (nodes nodeInfoLister) Get(nodeName string) (fwk.NodeInfo, error) {
 	for _, node := range nodes {
 		if node != nil && node.Node().Name == nodeName {
 			return node, nil
@@ -274,15 +274,15 @@ func (nodes nodeInfoLister) Get(nodeName string) (*NodeInfo, error) {
 	return nil, fmt.Errorf("unable to find node: %s", nodeName)
 }
 
-func (nodes nodeInfoLister) List() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) List() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
-func (nodes nodeInfoLister) HavePodsWithAffinityList() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) HavePodsWithAffinityList() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
-func (nodes nodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
