@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -135,9 +136,11 @@ type testStaticPolicy struct {
 }
 
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
-	manager := topologymanager.NewFakeManager()
+	tCtx := ktesting.Init(t)
+
+	manager := topologymanager.NewFakeManager(tCtx)
 	if hint != nil {
-		manager = topologymanager.NewFakeManagerWithHint(hint)
+		manager = topologymanager.NewFakeManagerWithHint(tCtx, hint)
 	}
 
 	p, err := NewPolicyStatic(testCase.machineInfo, testCase.systemReserved, manager)

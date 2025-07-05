@@ -17,11 +17,12 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"reflect"
 	"testing"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 )
 
 func TestGetAffinity(t *testing.T) {
@@ -110,7 +111,7 @@ func TestRemoveContainer(t *testing.T) {
 		scope.podTopologyHints[string(tc.podUID)][tc.name] = TopologyHint{}
 		len1 = len(scope.podMap)
 		lenHints1 = len(scope.podTopologyHints)
-		err := scope.RemoveContainer(tc.containerID)
+		err := scope.RemoveContainer(t.Context(), tc.containerID)
 		len2 = len(scope.podMap)
 		lenHints2 = len(scope.podTopologyHints)
 		if err != nil {
