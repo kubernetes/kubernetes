@@ -29,10 +29,21 @@ import (
 
 // ResourceClaimTemplateApplyConfiguration represents a declarative configuration of the ResourceClaimTemplate type for use
 // with apply.
+//
+// ResourceClaimTemplate is used to produce ResourceClaim objects.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
 type ResourceClaimTemplateApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ResourceClaimTemplateSpecApplyConfiguration `json:"spec,omitempty"`
+	// Describes the ResourceClaim that is to be generated.
+	//
+	// This field is immutable. A ResourceClaim will get created by the
+	// control plane for a Pod when needed and then not get updated
+	// anymore.
+	Spec *ResourceClaimTemplateSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ResourceClaimTemplate constructs a declarative configuration of the ResourceClaimTemplate type for use with

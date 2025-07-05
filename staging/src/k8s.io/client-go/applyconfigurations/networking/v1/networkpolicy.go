@@ -29,10 +29,15 @@ import (
 
 // NetworkPolicyApplyConfiguration represents a declarative configuration of the NetworkPolicy type for use
 // with apply.
+//
+// NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicyApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *NetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
+	// spec represents the specification of the desired behavior for this NetworkPolicy.
+	Spec *NetworkPolicySpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // NetworkPolicy constructs a declarative configuration of the NetworkPolicy type for use with

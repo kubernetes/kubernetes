@@ -29,10 +29,18 @@ import (
 
 // DeviceTaintRuleApplyConfiguration represents a declarative configuration of the DeviceTaintRule type for use
 // with apply.
+//
+// DeviceTaintRule adds one taint to all devices which match the selector.
+// This has the same effect as if the taint was specified directly
+// in the ResourceSlice by the DRA driver.
 type DeviceTaintRuleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *DeviceTaintRuleSpecApplyConfiguration `json:"spec,omitempty"`
+	// Spec specifies the selector and one taint.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec *DeviceTaintRuleSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // DeviceTaintRule constructs a declarative configuration of the DeviceTaintRule type for use with

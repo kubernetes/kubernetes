@@ -29,10 +29,16 @@ import (
 
 // EvictionApplyConfiguration represents a declarative configuration of the Eviction type for use
 // with apply.
+//
+// Eviction evicts a pod from its node subject to certain policies and safety constraints.
+// This is a subresource of Pod.  A request to cause such an eviction is
+// created by POSTing to .../pods/<pod name>/evictions.
 type EvictionApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// ObjectMeta describes the pod that is being evicted.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DeleteOptions                        *metav1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
+	// DeleteOptions may be provided
+	DeleteOptions *metav1.DeleteOptionsApplyConfiguration `json:"deleteOptions,omitempty"`
 }
 
 // Eviction constructs a declarative configuration of the Eviction type for use with

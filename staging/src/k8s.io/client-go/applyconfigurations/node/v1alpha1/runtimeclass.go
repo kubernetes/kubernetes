@@ -29,10 +29,21 @@ import (
 
 // RuntimeClassApplyConfiguration represents a declarative configuration of the RuntimeClass type for use
 // with apply.
+//
+// RuntimeClass defines a class of container runtime supported in the cluster.
+// The RuntimeClass is used to determine which container runtime is used to run
+// all containers in a pod. RuntimeClasses are (currently) manually defined by a
+// user or cluster provisioner, and referenced in the PodSpec. The Kubelet is
+// responsible for resolving the RuntimeClassName reference before running the
+// pod.  For more details, see
+// https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 type RuntimeClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *RuntimeClassSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec represents specification of the RuntimeClass
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *RuntimeClassSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // RuntimeClass constructs a declarative configuration of the RuntimeClass type for use with

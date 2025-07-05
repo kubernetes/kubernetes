@@ -25,14 +25,54 @@ import (
 
 // BasicDeviceApplyConfiguration represents a declarative configuration of the BasicDevice type for use
 // with apply.
+//
+// BasicDevice defines one device instance.
 type BasicDeviceApplyConfiguration struct {
-	Attributes       map[resourcev1beta1.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
-	Capacity         map[resourcev1beta1.QualifiedName]DeviceCapacityApplyConfiguration  `json:"capacity,omitempty"`
-	ConsumesCounters []DeviceCounterConsumptionApplyConfiguration                        `json:"consumesCounters,omitempty"`
-	NodeName         *string                                                             `json:"nodeName,omitempty"`
-	NodeSelector     *v1.NodeSelectorApplyConfiguration                                  `json:"nodeSelector,omitempty"`
-	AllNodes         *bool                                                               `json:"allNodes,omitempty"`
-	Taints           []DeviceTaintApplyConfiguration                                     `json:"taints,omitempty"`
+	// Attributes defines the set of attributes for this device.
+	// The name of each attribute must be unique in that set.
+	//
+	// The maximum number of attributes and capacities combined is 32.
+	Attributes map[resourcev1beta1.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
+	// Capacity defines the set of capacities for this device.
+	// The name of each capacity must be unique in that set.
+	//
+	// The maximum number of attributes and capacities combined is 32.
+	Capacity map[resourcev1beta1.QualifiedName]DeviceCapacityApplyConfiguration `json:"capacity,omitempty"`
+	// ConsumesCounters defines a list of references to sharedCounters
+	// and the set of counters that the device will
+	// consume from those counter sets.
+	//
+	// There can only be a single entry per counterSet.
+	//
+	// The total number of device counter consumption entries
+	// must be <= 32. In addition, the total number in the
+	// entire ResourceSlice must be <= 1024 (for example,
+	// 64 devices with 16 counters each).
+	ConsumesCounters []DeviceCounterConsumptionApplyConfiguration `json:"consumesCounters,omitempty"`
+	// NodeName identifies the node where the device is available.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	NodeName *string `json:"nodeName,omitempty"`
+	// NodeSelector defines the nodes where the device is available.
+	//
+	// Must use exactly one term.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	// AllNodes indicates that all nodes have access to the device.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	AllNodes *bool `json:"allNodes,omitempty"`
+	// If specified, these are the driver-defined taints.
+	//
+	// The maximum number of taints is 4.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	Taints []DeviceTaintApplyConfiguration `json:"taints,omitempty"`
 }
 
 // BasicDeviceApplyConfiguration constructs a declarative configuration of the BasicDevice type for use with

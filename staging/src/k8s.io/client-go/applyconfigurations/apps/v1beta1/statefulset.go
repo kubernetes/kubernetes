@@ -29,11 +29,24 @@ import (
 
 // StatefulSetApplyConfiguration represents a declarative configuration of the StatefulSet type for use
 // with apply.
+//
+// DEPRECATED - This group version of StatefulSet is deprecated by apps/v1beta2/StatefulSet. See the release notes for
+// more information.
+// StatefulSet represents a set of pods with consistent identities.
+// Identities are defined as:
+// - Network: A single stable DNS and hostname.
+// - Storage: As many VolumeClaims as requested.
+//
+// The StatefulSet guarantees that a given network identity will always
+// map to the same storage identity.
 type StatefulSetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *StatefulSetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *StatefulSetStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the desired identities of pods in this set.
+	Spec *StatefulSetSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is the current status of Pods in this StatefulSet. This data
+	// may be out of date by some window of time.
+	Status *StatefulSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // StatefulSet constructs a declarative configuration of the StatefulSet type for use with

@@ -29,11 +29,23 @@ import (
 
 // VolumeAttachmentApplyConfiguration represents a declarative configuration of the VolumeAttachment type for use
 // with apply.
+//
+// VolumeAttachment captures the intent to attach or detach the specified volume
+// to/from the specified node.
+//
+// VolumeAttachment objects are non-namespaced.
 type VolumeAttachmentApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *VolumeAttachmentSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *VolumeAttachmentStatusApplyConfiguration `json:"status,omitempty"`
+	// spec represents specification of the desired attach/detach volume behavior.
+	// Populated by the Kubernetes system.
+	Spec *VolumeAttachmentSpecApplyConfiguration `json:"spec,omitempty"`
+	// status represents status of the VolumeAttachment request.
+	// Populated by the entity completing the attach or detach
+	// operation, i.e. the external-attacher.
+	Status *VolumeAttachmentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // VolumeAttachment constructs a declarative configuration of the VolumeAttachment type for use with

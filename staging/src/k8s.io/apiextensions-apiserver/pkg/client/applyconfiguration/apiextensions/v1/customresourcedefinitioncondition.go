@@ -25,12 +25,20 @@ import (
 
 // CustomResourceDefinitionConditionApplyConfiguration represents a declarative configuration of the CustomResourceDefinitionCondition type for use
 // with apply.
+//
+// CustomResourceDefinitionCondition contains details for the current condition of this pod.
 type CustomResourceDefinitionConditionApplyConfiguration struct {
-	Type               *apiextensionsv1.CustomResourceDefinitionConditionType `json:"type,omitempty"`
-	Status             *apiextensionsv1.ConditionStatus                       `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                                           `json:"lastTransitionTime,omitempty"`
-	Reason             *string                                                `json:"reason,omitempty"`
-	Message            *string                                                `json:"message,omitempty"`
+	// type is the type of the condition. Types include Established, NamesAccepted and Terminating.
+	Type *apiextensionsv1.CustomResourceDefinitionConditionType `json:"type,omitempty"`
+	// status is the status of the condition.
+	// Can be True, False, Unknown.
+	Status *apiextensionsv1.ConditionStatus `json:"status,omitempty"`
+	// lastTransitionTime last time the condition transitioned from one status to another.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
+	// reason is a unique, one-word, CamelCase reason for the condition's last transition.
+	Reason *string `json:"reason,omitempty"`
+	// message is a human-readable message indicating details about last transition.
+	Message *string `json:"message,omitempty"`
 }
 
 // CustomResourceDefinitionConditionApplyConfiguration constructs a declarative configuration of the CustomResourceDefinitionCondition type for use with

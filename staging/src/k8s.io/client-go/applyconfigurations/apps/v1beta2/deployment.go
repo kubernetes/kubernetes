@@ -29,11 +29,18 @@ import (
 
 // DeploymentApplyConfiguration represents a declarative configuration of the Deployment type for use
 // with apply.
+//
+// DEPRECATED - This group version of Deployment is deprecated by apps/v1/Deployment. See the release notes for
+// more information.
+// Deployment enables declarative updates for Pods and ReplicaSets.
 type DeploymentApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *DeploymentSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the Deployment.
+	Spec *DeploymentSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the Deployment.
+	Status *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Deployment constructs a declarative configuration of the Deployment type for use with

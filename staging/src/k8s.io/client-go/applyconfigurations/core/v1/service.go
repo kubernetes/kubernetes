@@ -29,11 +29,23 @@ import (
 
 // ServiceApplyConfiguration represents a declarative configuration of the Service type for use
 // with apply.
+//
+// Service is a named abstraction of software service (for example, mysql) consisting of local port
+// (for example 3306) that the proxy listens on, and the selector that determines which pods
+// will answer requests sent through the proxy.
 type ServiceApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ServiceSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *ServiceStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the behavior of a service.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ServiceSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the service.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ServiceStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Service constructs a declarative configuration of the Service type for use with

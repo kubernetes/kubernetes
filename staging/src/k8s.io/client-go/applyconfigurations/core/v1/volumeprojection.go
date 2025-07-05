@@ -20,12 +20,32 @@ package v1
 
 // VolumeProjectionApplyConfiguration represents a declarative configuration of the VolumeProjection type for use
 // with apply.
+//
+// Projection that may be projected along with other supported volume types.
+// Exactly one of these fields must be set.
 type VolumeProjectionApplyConfiguration struct {
-	Secret              *SecretProjectionApplyConfiguration              `json:"secret,omitempty"`
-	DownwardAPI         *DownwardAPIProjectionApplyConfiguration         `json:"downwardAPI,omitempty"`
-	ConfigMap           *ConfigMapProjectionApplyConfiguration           `json:"configMap,omitempty"`
+	// secret information about the secret data to project
+	Secret *SecretProjectionApplyConfiguration `json:"secret,omitempty"`
+	// downwardAPI information about the downwardAPI data to project
+	DownwardAPI *DownwardAPIProjectionApplyConfiguration `json:"downwardAPI,omitempty"`
+	// configMap information about the configMap data to project
+	ConfigMap *ConfigMapProjectionApplyConfiguration `json:"configMap,omitempty"`
+	// serviceAccountToken is information about the serviceAccountToken data to project
 	ServiceAccountToken *ServiceAccountTokenProjectionApplyConfiguration `json:"serviceAccountToken,omitempty"`
-	ClusterTrustBundle  *ClusterTrustBundleProjectionApplyConfiguration  `json:"clusterTrustBundle,omitempty"`
+	// ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field
+	// of ClusterTrustBundle objects in an auto-updating file.
+	//
+	// Alpha, gated by the ClusterTrustBundleProjection feature gate.
+	//
+	// ClusterTrustBundle objects can either be selected by name, or by the
+	// combination of signer name and a label selector.
+	//
+	// Kubelet performs aggressive normalization of the PEM contents written
+	// into the pod filesystem.  Esoteric PEM features such as inter-block
+	// comments and block headers are stripped.  Certificates are deduplicated.
+	// The ordering of certificates within the file is arbitrary, and Kubelet
+	// may change the order over time.
+	ClusterTrustBundle *ClusterTrustBundleProjectionApplyConfiguration `json:"clusterTrustBundle,omitempty"`
 }
 
 // VolumeProjectionApplyConfiguration constructs a declarative configuration of the VolumeProjection type for use with

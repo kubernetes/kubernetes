@@ -29,11 +29,16 @@ import (
 
 // HorizontalPodAutoscalerApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscaler type for use
 // with apply.
+//
+// configuration of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *HorizontalPodAutoscalerSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *HorizontalPodAutoscalerStatusApplyConfiguration `json:"status,omitempty"`
+	// spec defines the behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+	Spec *HorizontalPodAutoscalerSpecApplyConfiguration `json:"spec,omitempty"`
+	// status is the current information about the autoscaler.
+	Status *HorizontalPodAutoscalerStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // HorizontalPodAutoscaler constructs a declarative configuration of the HorizontalPodAutoscaler type for use with

@@ -29,7 +29,8 @@ import (
 type FischerApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DisallowedFlunders               []string `json:"disallowedFlunders,omitempty"`
+	// DisallowedFlunders holds a list of Flunder.Names that are disallowed.
+	DisallowedFlunders []string `json:"disallowedFlunders,omitempty"`
 }
 
 // Fischer constructs a declarative configuration of the Fischer type for use with
