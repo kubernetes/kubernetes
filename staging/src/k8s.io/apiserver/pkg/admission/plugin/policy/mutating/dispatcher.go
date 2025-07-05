@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/api/core/v1"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
+	celmetrics "k8s.io/apiserver/pkg/admission/plugin/policy/mutating/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
 	webhookgeneric "k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
@@ -151,6 +153,7 @@ func (d *dispatcher) dispatchInvocations(
 		if invocation.Evaluator.Matcher != nil {
 			matchResults := invocation.Evaluator.Matcher.Match(ctx, versionedAttr, invocation.Param, authz)
 			if matchResults.Error != nil {
+				celmetrics.Metrics.ObserveRejection(ctx, time.Duration(0), invocation.Policy.Name, invocation.Binding.Name, ErrorType(matchResults.Error))
 				addConfigError(matchResults.Error, invocation, metav1.StatusReasonInvalid)
 				continue
 			}
@@ -182,8 +185,12 @@ func (d *dispatcher) dispatchInvocations(
 
 			patcher := invocation.Evaluator.Mutators[mutationIndex]
 			optionalVariables := cel.OptionalVariableBindings{VersionedParams: invocation.Param, Authorizer: authz}
+			startTime := time.Now()
 			err = d.dispatchOne(ctx, patcher, o, versionedAttr, namespace, invocation.Resource, optionalVariables)
+			elapsed := time.Since(startTime)
+
 			if err != nil {
+				celmetrics.Metrics.ObserveRejection(ctx, elapsed, invocation.Policy.Name, invocation.Binding.Name, ErrorType(err))
 				var statusError *k8serrors.StatusError
 				if errors.As(err, &statusError) {
 					return nil, statusError
@@ -192,6 +199,8 @@ func (d *dispatcher) dispatchInvocations(
 				addConfigError(err, invocation, metav1.StatusReasonInvalid)
 				continue
 			}
+			celmetrics.Metrics.ObserveAdmission(ctx, elapsed, invocation.Policy.Name, invocation.Binding.Name, celmetrics.MutationNoError)
+
 		}
 		if !apiequality.Semantic.DeepEqual(objectBeforeMutations, versionedAttr.VersionedObject) {
 			// The mutation has changed the object. Prepare to reinvoke all previous mutations that are eligible for re-invocation.
