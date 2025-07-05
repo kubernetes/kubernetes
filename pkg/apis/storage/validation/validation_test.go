@@ -1270,7 +1270,8 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 	//driverName2 := "1io.kubernetes-storage-2-csi-driver3"
 	//longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
 	nodeID := "nodeA"
-
+	// Test with feature gate disabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, false)
 	old := storage.CSINode{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
 		Spec: storage.CSINodeSpec{
