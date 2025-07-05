@@ -259,6 +259,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "External-IP", Type: "string", Priority: 1, Description: apiv1.NodeStatus{}.SwaggerDoc()["addresses"]},
 		{Name: "OS-Image", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["osImage"]},
 		{Name: "Kernel-Version", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["kernelVersion"]},
+		{Name: "Arch", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["architecture"]},
 		{Name: "Container-Runtime", Type: "string", Priority: 1, Description: apiv1.NodeSystemInfo{}.SwaggerDoc()["containerRuntimeVersion"]},
 	}
 
@@ -1954,6 +1955,7 @@ func printNode(obj *api.Node, options printers.GenerateOptions) ([]metav1.TableR
 	row.Cells = append(row.Cells, obj.Name, strings.Join(status, ","), roles, translateTimestampSince(obj.CreationTimestamp), obj.Status.NodeInfo.KubeletVersion)
 	if options.Wide {
 		osImage, kernelVersion, crVersion := obj.Status.NodeInfo.OSImage, obj.Status.NodeInfo.KernelVersion, obj.Status.NodeInfo.ContainerRuntimeVersion
+		arch := obj.Status.NodeInfo.Architecture
 		if osImage == "" {
 			osImage = "<unknown>"
 		}
@@ -1963,7 +1965,10 @@ func printNode(obj *api.Node, options printers.GenerateOptions) ([]metav1.TableR
 		if crVersion == "" {
 			crVersion = "<unknown>"
 		}
-		row.Cells = append(row.Cells, getNodeInternalIP(obj), getNodeExternalIP(obj), osImage, kernelVersion, crVersion)
+		if arch == "" {
+			arch = "<unknown>"
+		}
+		row.Cells = append(row.Cells, getNodeInternalIP(obj), getNodeExternalIP(obj), osImage, kernelVersion, arch, crVersion)
 	}
 
 	return []metav1.TableRow{row}, nil
