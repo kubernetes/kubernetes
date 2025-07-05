@@ -77,6 +77,7 @@ func Convert_v1beta1_DeviceRequest_To_resource_DeviceRequest(in *resourcev1beta1
 			tolerations = append(tolerations, toleration)
 		}
 		exactDeviceRequest.Tolerations = tolerations
+		exactDeviceRequest.CapacityRequests = (*resource.CapacityRequirements)(unsafe.Pointer(in.CapacityRequests))
 		out.Exactly = &exactDeviceRequest
 	}
 	return nil
@@ -88,7 +89,8 @@ func hasAnyMainRequestFieldsSet(deviceRequest *resourcev1beta1.DeviceRequest) bo
 		deviceRequest.AllocationMode != "" ||
 		deviceRequest.Count != 0 ||
 		deviceRequest.AdminAccess != nil ||
-		deviceRequest.Tolerations != nil
+		deviceRequest.Tolerations != nil ||
+		deviceRequest.CapacityRequests != nil
 }
 
 func Convert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.DeviceRequest, out *resourcev1beta1.DeviceRequest, s conversion.Scope) error {
@@ -121,6 +123,9 @@ func Convert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.Device
 			tolerations = append(tolerations, toleration)
 		}
 		out.Tolerations = tolerations
+		if in.Exactly != nil && in.Exactly.CapacityRequests != nil {
+			out.CapacityRequests = (*resourcev1beta1.CapacityRequirements)(unsafe.Pointer(in.Exactly.CapacityRequests))
+		}
 	}
 	return nil
 }
@@ -200,6 +205,7 @@ func Convert_v1beta1_Device_To_resource_Device(in *resourcev1beta1.Device, out *
 			taints = append(taints, taint)
 		}
 		out.Taints = taints
+		out.AllowMultipleAllocations = in.Basic.AllowMultipleAllocations
 	}
 	return nil
 }
@@ -245,6 +251,7 @@ func Convert_resource_Device_To_v1beta1_Device(in *resource.Device, out *resourc
 		taints = append(taints, taint)
 	}
 	out.Basic.Taints = taints
+	out.Basic.AllowMultipleAllocations = in.AllowMultipleAllocations
 	return nil
 }
 
@@ -284,7 +291,7 @@ func convert_v1beta1_Attributes_To_resource_Attributes(in map[resourcev1beta1.Qu
 func convert_v1beta1_Capacity_To_resource_Capacity(in map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity, out map[resource.QualifiedName]resource.DeviceCapacity, s conversion.Scope) error {
 	for k, v := range in {
 		var c resource.DeviceCapacity
-		if err := Convert_v1beta1_DeviceCapacity_To_resource_DeviceCapacity(&v, &c, s); err != nil {
+		if err := autoConvert_v1beta1_DeviceCapacity_To_resource_DeviceCapacity(&v, &c, s); err != nil {
 			return err
 		}
 		out[resource.QualifiedName(k)] = c

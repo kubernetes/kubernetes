@@ -25,7 +25,8 @@ import (
 // DeviceCapacityApplyConfiguration represents a declarative configuration of the DeviceCapacity type for use
 // with apply.
 type DeviceCapacityApplyConfiguration struct {
-	Value *resource.Quantity `json:"value,omitempty"`
+	Value         *resource.Quantity                       `json:"value,omitempty"`
+	SharingPolicy *CapacitySharingPolicyApplyConfiguration `json:"sharingPolicy,omitempty"`
 }
 
 // DeviceCapacityApplyConfiguration constructs a declarative configuration of the DeviceCapacity type for use with
@@ -39,5 +40,13 @@ func DeviceCapacity() *DeviceCapacityApplyConfiguration {
 // If called multiple times, the Value field is set to the value of the last call.
 func (b *DeviceCapacityApplyConfiguration) WithValue(value resource.Quantity) *DeviceCapacityApplyConfiguration {
 	b.Value = &value
+	return b
+}
+
+// WithSharingPolicy sets the SharingPolicy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SharingPolicy field is set to the value of the last call.
+func (b *DeviceCapacityApplyConfiguration) WithSharingPolicy(value *CapacitySharingPolicyApplyConfiguration) *DeviceCapacityApplyConfiguration {
+	b.SharingPolicy = value
 	return b
 }

@@ -55,6 +55,9 @@ message AllocatedDeviceStatus {
   // Device references one device instance via its name in the driver's
   // resource pool. It must be a DNS label.
   //
+  // If the allocation result includes a ShareID, the Device field is extended with the ShareID,
+  // formatted as `<device name>/<share id>`.
+  //
   // +required
   optional string device = 3;
 
@@ -151,6 +154,83 @@ message CELDeviceSelector {
   //
   // +required
   optional string expression = 1;
+}
+
+// CapacityRequirements defines the capacity requirements for a specific device request.
+message CapacityRequirements {
+  // Minimum defines the minimum amount of each device capacity required for the request.
+  //
+  // If the capacity has a sharing policy, this value is rounded up to the nearest valid amount
+  // according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.
+  //
+  // If the quantity does not have a sharing policy, this value is used as an additional filtering
+  // condition against the available capacity on the device.
+  // This is semantically equivalent to a CEL selector with
+  // `device.capacity[<domain>].<name>.compareTo(quantity(<minimum quantity>)) >= 0`
+  // For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0
+  //
+  // +optional
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> minimum = 1;
+}
+
+// CapacitySharingPolicy defines how requests consume the available capacity.
+// A policy must have a default value to be applied when no value is explicitly provided.
+// Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range.
+// If valid values are specified, the default must be included within them.
+message CapacitySharingPolicy {
+  // Default specifies the default capacity to be used for a consumption request.
+  //
+  // +required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity default = 1;
+
+  // ValidValues defines a set of acceptable quantity values in consuming requests.
+  //
+  // +optional
+  // +listType=atomic
+  // +oneOf=ValidSharingValues
+  repeated .k8s.io.apimachinery.pkg.api.resource.Quantity validValues = 2;
+
+  // ValidRange defines an acceptable quantity value range in consuming requests.
+  //
+  // +optional
+  // +oneOf=ValidSharingValues
+  optional CapacitySharingPolicyRange validRange = 3;
+}
+
+// CapacitySharingPolicyRange defines a valid range for consumable capacity values.
+//
+//   - If the requested amount is less than Minimum, it is rounded up to the Minimum value.
+//   - If the requested amount is between Minimum and Maximum, ChunkSize is set,
+//     and the amount does not align with the ChunkSize,
+//     it will be rounded up to the next value matching Minimum + (n * ChunkSize).
+//   - If the requested or rounded amount exceeds Maximum (if set), the request does not satisfy the policy,
+//     and the device cannot be allocated.
+//
+// - If ChunkSize is not set, the requested amount is used as-is, provided it falls within the range.
+message CapacitySharingPolicyRange {
+  // Minimum specifies the minimum capacity allowed for a consumption request.
+  //
+  // Minimum must be less than or equal to the capacity value.
+  // Default must be more than or equal to the minimum.
+  //
+  // +required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity minimum = 1;
+
+  // Maximum defines the upper limit for capacity that can be requested.
+  //
+  // Maximum must be less than or equal to the capacity value.
+  // Minimum and default must be less than or equal to the maximum.
+  //
+  // +optional
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity maximum = 2;
+
+  // ChunkSize defines the step size between valid capacity amounts within the range.
+  //
+  // Maximum and default must be a multiple of the chunk size.
+  // Minimum + chunk size must be less than or equal to the capacity value.
+  //
+  // +optional
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity chunkSize = 3;
 }
 
 // Counter describes a quantity associated with a device.
@@ -269,6 +349,15 @@ message Device {
   // +listType=atomic
   // +featureGate=DRADeviceTaints
   repeated DeviceTaint taints = 8;
+
+  // AllowMultipleAllocations marks whether the device is allowed to be allocated for multiple times.
+  //
+  // A device with allowMultipleAllocations="true" can be allocated more than once,
+  // and its capacity is shared, regardless of whether the CapacitySharingPolicy is defined or not.
+  //
+  // +optional
+  // +featureGate=DRAConsumableCapacity
+  optional bool allowMultipleAllocations = 9;
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -349,6 +438,14 @@ message DeviceCapacity {
   //
   // +required
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
+
+  // SharingPolicy specifies that this device capacity must be consumed
+  // by each resource claim according to the defined sharing policy.
+  // The Device must allow multiple allocations.
+  //
+  // +optional
+  // +featureGate=DRAConsumableCapacity
+  optional CapacitySharingPolicy sharingPolicy = 2;
 }
 
 // DeviceClaim defines how to request devices with a ResourceClaim.
@@ -493,6 +590,21 @@ message DeviceConstraint {
   // +optional
   // +oneOf=ConstraintType
   optional string matchAttribute = 2;
+
+  // DistinctAttribute requires that all devices in question have this
+  // attribute and that its type and value are unique across those devices.
+  //
+  // This acts as the inverse of MatchAttribute.
+  //
+  // This constraint is used to avoid allocating multiple requests to the same device
+  // by ensuring attribute-level differentiation.
+  //
+  // This is useful for scenarios where resource requests must be fulfilled by separate physical devices.
+  // For example, a container requests two network interfaces that must be allocated from two different physical NICs.
+  //
+  // +optional
+  // +oneOf=ConstraintType
+  optional string distinctAttribute = 3;
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -626,6 +738,34 @@ message DeviceRequestAllocationResult {
   // +listType=atomic
   // +featureGate=DRADeviceTaints
   repeated DeviceToleration tolerations = 6;
+
+  // ShareID uniquely identifies an individual allocation share of a device,
+  // used when the device supports multiple simultaneous allocations.
+  // It serves as an additional map key to differentiate concurrent shares
+  // of the same device.
+  //
+  // The ID is randomly generated as a hexadecimal (hex) string for each allocation share.
+  // It must be unique among all currently allocated shares for the same device
+  // (i.e., uniqueness is required only at the device level, not globally).
+  //
+  // Hex is chosen for its compact representation, ease of generation from binary,
+  // and suitability for identifiers in logs, APIs, and storage.
+  //
+  // +optional
+  // +featureGate=DRAConsumableCapacity
+  optional string shareID = 7;
+
+  // ConsumedCapacities tracks the amount of capacity consumed per device as part of the claim request.
+  // The consumed amount may differ from the requested amount: it is rounded up to the nearest valid
+  // value based on the device’s sharing policy if applicable (i.e., may not be less than the requested amount).
+  //
+  // The total consumed capacity for each device must not exceed its available capacity.
+  //
+  // This field references only consumable capacities of a device and is empty when there are none.
+  //
+  // +optional
+  // +featureGate=DRAConsumableCapacity
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> consumedCapacities = 8;
 }
 
 // DeviceSelector must have exactly one field set.
@@ -729,6 +869,12 @@ message DeviceSubRequest {
   // +listType=atomic
   // +featureGate=DRADeviceTaints
   repeated DeviceToleration tolerations = 6;
+
+  // CapacityRequests define resource requirements against each capacity.
+  //
+  // +optional
+  // +featureGate=DRAConsumableCapacity
+  optional CapacityRequirements capacityRequests = 7;
 }
 
 // The device this taint is attached to has the "effect" on
@@ -898,6 +1044,12 @@ message ExactDeviceRequest {
   // +listType=atomic
   // +featureGate=DRADeviceTaints
   repeated DeviceToleration tolerations = 6;
+
+  // CapacityRequests define resource requirements against each capacity.
+  //
+  // +optional
+  // +featureGate=DRAConsumableCapacity
+  optional CapacityRequirements capacityRequests = 7;
 }
 
 // NetworkDeviceData provides network-related details for the allocated device.

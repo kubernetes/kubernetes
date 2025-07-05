@@ -36,6 +36,7 @@ spec:
   allNodes: true
   devices:
   - allNodes: true
+    allowMultipleAllocations: true
     attributes:
       attributesKey:
         bool: true
@@ -44,6 +45,14 @@ spec:
         version: versionValue
     capacity:
       capacityKey:
+        sharingPolicy:
+          default: "0"
+          validRange:
+            chunkSize: "0"
+            maximum: "0"
+            minimum: "0"
+          validValues:
+          - "0"
         value: "0"
     consumesCounters:
     - counterSet: counterSetValue
