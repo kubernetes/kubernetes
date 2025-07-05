@@ -26,10 +26,12 @@ import (
 // CategorizeEndpoints returns:
 //
 //   - The service's usable Cluster-traffic-policy endpoints (taking topology into account, if
-//     relevant). This will be nil if the service does not ever use Cluster traffic policy.
+//     relevant). This will be nil if the service does not ever use Cluster traffic policy, or
+//     if the set of endpoints passed in is empty.
 //
 //   - The service's usable Local-traffic-policy endpoints. This will be nil if the
-//     service does not ever use Local traffic policy.
+//     service does not ever use Local traffic policy, or if the set of endpoints passed in is
+//     empty.
 //
 //   - The combined list of all endpoints reachable from this node (which is the union of the
 //     previous two lists, but in the case where it is identical to one or the other, we avoid
@@ -42,6 +44,12 @@ import (
 // Serving-Terminating endpoints (independently for Cluster and Local) if no Ready
 // endpoints are available.
 func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeName string, nodeLabels map[string]string) (clusterEndpoints, localEndpoints, allReachableEndpoints []Endpoint, hasAnyEndpoints bool) {
+
+	if len(endpoints) == 0 {
+		// If there are no endpoints, we have nothing to categorize
+		return
+	}
+
 	var topologyMode string
 	var useServingTerminatingEndpoints bool
 
@@ -153,6 +161,12 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeName str
 //     hinted for this node's zone, then it returns "PreferSameZone".
 //   - Otherwise it returns "" (meaning, no topology / default traffic distribution).
 func topologyModeFromHints(svcInfo ServicePort, endpoints []Endpoint, nodeName, zone string) string {
+	if len(endpoints) == 0 {
+		// The code below assumes at least 1 endpoint; if there are no endpoints,
+		// there are no hints.
+		return ""
+	}
+
 	hasEndpointForNode := false
 	allEndpointsHaveNodeHints := true
 	hasEndpointForZone := false
