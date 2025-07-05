@@ -1330,3 +1330,52 @@ func numOccurrences(hay, needle string) int {
 		hay = hay[index+len(needle):]
 	}
 }
+
+func TestHandlerHasSyncedAfterPanic(t *testing.T) {
+	// This test verifies that even if a panic occurs during the execution of
+	// the AddFunc handler, the informer correctly calls syncTracker.Finished(),
+	// allowing handle.HasSynced() to eventually return true.
+	var buffer threadSafeBuffer
+	var logger klog.Logger
+
+	t.Cleanup(klog.CaptureState().Restore) //nolint:logcheck // CaptureState shouldn't be used in packages with contextual logging, but here it is okay.
+	buffer.buffer.Reset()
+	logger = textlogger.NewLogger(textlogger.NewConfig(
+		textlogger.Output(&buffer),
+	))
+	klog.SetLogger(logger)
+
+	oldReallyCrash := utilruntime.ReallyCrash
+	utilruntime.ReallyCrash = false
+	t.Cleanup(func() { utilruntime.ReallyCrash = oldReallyCrash })
+
+	source := newFakeControllerSource(t)
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
+	handler := ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			panic("fake panic")
+		},
+	}
+
+	handle, err := informer.AddEventHandlerWithOptions(handler, HandlerOptions{})
+	require.NoError(t, err)
+
+	stop := make(chan struct{})
+	var wg wait.Group
+	wg.StartWithChannel(stop, informer.Run)
+	defer func() {
+		close(stop)
+		wg.Wait()
+	}()
+
+	require.Eventually(t, informer.HasSynced, time.Minute, time.Millisecond, "informer has synced")
+	require.Eventually(t, handle.HasSynced, time.Minute, time.Millisecond, "handler has synced")
+
+	assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		output := buffer.String()
+		assert.Contains(t, output, "Observed a panic")
+		assert.Contains(t, output, "fake panic")
+	}, time.Minute, time.Millisecond, "panic should be logged")
+}
