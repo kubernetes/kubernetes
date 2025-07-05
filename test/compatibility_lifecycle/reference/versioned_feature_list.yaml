@@ -141,6 +141,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: AuthorizeWithSelectors
   versionedSpecs:
   - default: false
@@ -151,6 +155,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: BtreeWatchCache
   versionedSpecs:
   - default: true

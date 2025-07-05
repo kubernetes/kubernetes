@@ -25,9 +25,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestGetAPIRequestInfo(t *testing.T) {
@@ -314,8 +311,6 @@ func TestSelectorParsing(t *testing.T) {
 	}
 
 	resolver := newTestRequestInfoResolver()
-
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
 
 	for _, tc := range tests {
 		ctx := t.Context()

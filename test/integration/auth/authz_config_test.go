@@ -41,13 +41,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	celmetrics "k8s.io/apiserver/pkg/authorization/cel"
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
-	"k8s.io/apiserver/pkg/features"
 	authzmetrics "k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	webhookmetrics "k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -124,7 +121,6 @@ authorizers:
 func TestMultiWebhookAuthzConfig(t *testing.T) {
 	authzmetrics.ResetMetricsForTest()
 	defer authzmetrics.ResetMetricsForTest()
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AuthorizeWithSelectors, true)
 
 	dir := t.TempDir()
 
