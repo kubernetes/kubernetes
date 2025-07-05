@@ -413,6 +413,8 @@ type NodeLifecycleControllerConfiguration struct {
 	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
 	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
 	UnhealthyZoneThreshold float32
+	// Pauses all pod evictions in a zone when there is full zonal disruption
+	PauseEvictionOnFullDisruption bool
 }
 
 // PersistentVolumeBinderControllerConfiguration contains elements describing
