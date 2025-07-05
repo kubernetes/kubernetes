@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# DEBUG, must be removed
+set -x
+
 # Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -822,31 +825,6 @@ function wait_node_ready(){
   fi
 }
 
-function refresh_docker_containerd_runc {
-  apt update
-  apt-get install ca-certificates curl gnupg ripgrep tree vim
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  chmod a+r /etc/apt/keyrings/docker.gpg
-
-  # shellcheck disable=SC2027 disable=SC2046
-  echo \
-    "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-    "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-    tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-  apt-get update
-  apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin
-  groupadd docker
-  usermod -aG docker "$USER"
-
-  if ! grep -q "cri-containerd" "/lib/systemd/system/docker.service"; then
-    sed -i "s/ExecStart=\(.*\)/ExecStart=\1 --cri-containerd/" /lib/systemd/system/docker.service
-  fi
-
-  apt install -y conntrack vim htop ripgrep dnsutils tree ripgrep build-essential
-}
-
 function wait_coredns_available(){
   if [[ -n "${DRY_RUN}" ]]; then
     return
@@ -887,6 +865,7 @@ function wait_coredns_available(){
 }
 
 function start_kubelet {
+    echo "Starting kubelet"
     KUBELET_LOG=${LOG_DIR}/kubelet.log
     mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
 
@@ -1284,22 +1263,6 @@ function parse_eviction {
   done
 }
 
-function update_packages {
-  apt-get update && apt-get install -y sudo
-  apt-get remove -y systemd
-
-  # Do not update docker / containerd / runc
-  sed -i 's/\(.*\)docker\(.*\)/#\1docker\2/' /etc/apt/sources.list
-
-  # jump through hoops to avoid removing docker/containerd
-  # when installing nftables and kmod, as those docker/containerd
-  # packages depend on iptables
-  dpkg -r --force-depends iptables && \
-  apt -y --fix-broken install && \
-  apt -y install nftables kmod && \
-  apt -y install iptables
-}
-
 function tolerate_cgroups_v2 {
   # https://github.com/moby/moby/blob/be220af9fb36e9baa9a75bbc41f784260aa6f96e/hack/dind#L28-L38
   # cgroup v2: enable nesting
@@ -1398,8 +1361,9 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
   KUBE_FASTBUILD=true make ginkgo cross
 
-  # install things we need that are missing from the kubekins image
-  update_packages
+  echo "install additional packages"
+  apt-get update
+  apt-get install -y apt-utils conntrack dnsutils htop nftables ripgrep sudo tree vim
 
   # configure shared mounts to prevent failure in DIND scenarios
   mount --make-rshared /
@@ -1416,11 +1380,6 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # we need to enable nesting
   tolerate_cgroups_v2
 
-  # enable cri for docker in docker
-  echo "enable cri"
-  # shellcheck disable=SC2129
-  echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --cri-containerd\"" >> /etc/default/docker
-
   # enable debug
   echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --debug\"" >> /etc/default/docker
 
@@ -1428,18 +1387,41 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   echo "DOCKER_LOGFILE=${LOG_DIR}/docker.log" >> /etc/default/docker
 
   echo "stopping docker"
-  service docker stop
+  timeout 30 service docker stop || true
+  # force kill docker related processes
+  (cat /var/run/docker*.pid | xargs kill -9) || true
 
-  # bump up things
-  refresh_docker_containerd_runc
+  echo "add $USER to docker group"
+  usermod -aG docker "$USER"
 
-  # check if the new stuff is there
+  # output version information
   docker version
   containerd --version
   runc --version
 
+  # configure and start containerd so docker can use it
+  echo "Configuring containerd"
+  containerd config default > /etc/containerd/config.toml
+  sed -ie 's/enable_cdi = false/enable_cdi = true/' /etc/containerd/config.toml
+  mkdir -p /etc/cdi /var/run/cdi
+
+  echo "starting containerd"
+  start-stop-daemon --start --background --exec /usr/bin/containerd --pidfile /var/run/containerd.pid --output ${LOG_DIR}/containerd.log
+  kube::util::wait_for_success 60 2 "ctr images list"
+
   echo "starting docker"
   service docker start
+
+  # wait for docker to start
+  echo "Waiting for docker to start"
+  kube::util::wait_for_success 60 2 "docker ps"
+
+  echo "Docker log:" 
+  cat ${LOG_DIR}/docker.log
+  echo "Containerd log:"
+  cat ${LOG_DIR}/containerd.log
+  echo "List of processes:"
+  ps auxf
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.
