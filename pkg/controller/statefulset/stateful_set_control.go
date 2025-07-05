@@ -549,8 +549,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	replicas := make([]*v1.Pod, replicaCount)
 	// slice that will contain all Pods such that getOrdinal(pod) < getStartOrdinal(set) OR getOrdinal(pod) > getEndOrdinal(set)
 	condemned := make([]*v1.Pod, 0, len(pods))
-	unhealthy := 0
-	var firstUnhealthyPod *v1.Pod
+	unavailable := 0
+	var firstUnavailablePod *v1.Pod
 
 	// First we partition pods into two lists valid replicas and condemned Pods
 	for _, pod := range pods {
@@ -583,26 +583,26 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// find the first unhealthy Pod
 	for i := range replicas {
-		if !isHealthy(replicas[i]) {
-			unhealthy++
-			if firstUnhealthyPod == nil {
-				firstUnhealthyPod = replicas[i]
+		if isUnavailable(replicas[i], set.Spec.MinReadySeconds) {
+			unavailable++
+			if firstUnavailablePod == nil {
+				firstUnavailablePod = replicas[i]
 			}
 		}
 	}
 
 	// or the first unhealthy condemned Pod (condemned are sorted in descending order for ease of use)
 	for i := len(condemned) - 1; i >= 0; i-- {
-		if !isHealthy(condemned[i]) {
-			unhealthy++
-			if firstUnhealthyPod == nil {
-				firstUnhealthyPod = condemned[i]
+		if isUnavailable(condemned[i], set.Spec.MinReadySeconds) {
+			unavailable++
+			if firstUnavailablePod == nil {
+				firstUnavailablePod = condemned[i]
 			}
 		}
 	}
 
-	if unhealthy > 0 {
-		logger.V(4).Info("StatefulSet has unhealthy Pods", "statefulSet", klog.KObj(set), "unhealthyReplicas", unhealthy, "pod", klog.KObj(firstUnhealthyPod))
+	if unavailable > 0 {
+		logger.V(4).Info("StatefulSet has unavailable Pods", "statefulSet", klog.KObj(set), "unavailableReplicas", unavailable, "pod", klog.KObj(firstUnavailablePod))
 	}
 
 	// If the StatefulSet is being deleted, don't do anything other than updating
@@ -642,12 +642,12 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// At this point, in monotonic mode all of the current Replicas are Running, Ready and Available,
 	// and we can consider termination.
-	// We will wait for all predecessors to be Running and Ready prior to attempting a deletion.
+	// We will wait for all predecessors to be Running and Available prior to attempting a deletion.
 	// We will terminate Pods in a monotonically decreasing order.
 	// Note that we do not resurrect Pods in this interval. Also note that scaling will take precedence over
 	// updates.
 	processCondemnedFn := func(i int) (bool, error) {
-		return ssc.processCondemned(ctx, set, firstUnhealthyPod, monotonic, condemned, i)
+		return ssc.processCondemned(ctx, set, firstUnavailablePod, monotonic, condemned, i)
 	}
 	if shouldExit, err := runForAll(condemned, processCondemnedFn, monotonic); shouldExit || err != nil {
 		updateStatus(&status, set.Spec.MinReadySeconds, currentRevision, updateRevision, replicas, condemned)
@@ -692,8 +692,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return &status, err
 		}
 
-		// wait for unhealthy Pods on update
-		if !isHealthy(replicas[target]) {
+		// wait for unavailable Pods on update
+		if isUnavailable(replicas[target], set.Spec.MinReadySeconds) {
 			logger.V(4).Info("StatefulSet is waiting for Pod to update",
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
 			return &status, nil
@@ -732,12 +732,12 @@ func updateStatefulSetAfterInvariantEstablished(
 	}
 
 	// Collect all targets in the range between getStartOrdinal(set) and getEndOrdinal(set). Count any targets in that range
-	// that are unhealthy i.e. terminated or not running and ready as unavailable). Select the
+	// that are unavailable. Select the
 	// (MaxUnavailable - Unavailable) Pods, in order with respect to their ordinal for termination. Delete
 	// those pods and count the successful deletions. Update the status with the correct number of deletions.
 	unavailablePods := 0
 	for target := len(replicas) - 1; target >= 0; target-- {
-		if !isHealthy(replicas[target]) {
+		if isUnavailable(replicas[target], set.Spec.MinReadySeconds) {
 			unavailablePods++
 		}
 	}
