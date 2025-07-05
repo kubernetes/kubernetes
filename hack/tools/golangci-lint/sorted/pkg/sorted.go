@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package sortedfeatures implements a linter that checks if feature gates are sorted alphabetically.
+// Package pkg implements a linter that checks if feature gates are sorted alphabetically.
 package pkg
 
 import (
@@ -29,7 +29,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Config holds the configuration for the sortedfeatures analyzer
+// Config holds the configuration for the sorted analyzer
 type Config struct {
 	// Files contains files to check. If specified, only these files will be checked.
 	Files []string
@@ -37,15 +37,15 @@ type Config struct {
 	Debug bool
 }
 
-// NewAnalyzer returns a new sortedfeatures analyzer.
+// NewAnalyzer returns a new sorted analyzer.
 func NewAnalyzer() *analysis.Analyzer {
 	return NewAnalyzerWithConfig(Config{Debug: true})
 }
 
-// NewAnalyzerWithConfig returns a new sortedfeatures analyzer with the given configuration.
+// NewAnalyzerWithConfig returns a new sorted analyzer with the given configuration.
 func NewAnalyzerWithConfig(config Config) *analysis.Analyzer {
 	return &analysis.Analyzer{
-		Name: "sortedfeatures",
+		Name: "sorted",
 		Doc:  "Checks if feature gates are sorted alphabetically in const and var blocks",
 		Run: func(pass *analysis.Pass) (interface{}, error) {
 			if config.Debug {
@@ -299,7 +299,7 @@ func reportSortingIssue(pass *analysis.Pass, decl *ast.GenDecl, current, sorted 
 	}
 
 	// Report the issue with the diff
-	pass.Reportf(decl.Pos(), "not sorted alphabetically:\n%s\n", stripHeader(diffText, 3))
+	pass.Reportf(decl.Pos(), "not sorted alphabetically (-got, +want):\n%s\n", stripHeader(diffText, 3))
 }
 
 func stripHeader(input string, n int) string {
@@ -341,7 +341,7 @@ func reportMapSortingIssue(pass *analysis.Pass, decl *ast.GenDecl, mapName strin
 	}
 
 	// Report the issue with the diff
-	pass.Reportf(decl.Pos(), "map '%s' keys not sorted alphabetically:\n%s\n", mapName, stripHeader(diffText, 3))
+	pass.Reportf(decl.Pos(), "map '%s' keys not sorted alphabetically (-got, +want):\n%s\n", mapName, stripHeader(diffText, 3))
 }
 
 // generateMapSourceCode recreates the source code for map keys
