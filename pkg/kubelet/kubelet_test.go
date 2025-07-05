@@ -175,7 +175,7 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/, nil /*nodeConfig*/)
 }
 
 func newTestKubeletExcludeAdmitHandlers(t *testing.T, controllerAttachDetachEnabled bool) *TestKubelet {
@@ -191,7 +191,23 @@ func newTestKubeletExcludeAdmitHandlers(t *testing.T, controllerAttachDetachEnab
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, true /*excludePodAdmitHandlers*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, true /*excludePodAdmitHandlers*/, nil /*nodeConfig*/)
+}
+
+func newTestKubeletWithNodeConfig(t *testing.T, nodeConfig cm.NodeConfig) *TestKubelet {
+	imageList := []kubecontainer.Image{
+		{
+			ID:       "abc",
+			RepoTags: []string{"registry.k8s.io:v1", "registry.k8s.io:v2"},
+			Size:     123,
+		},
+		{
+			ID:       "efg",
+			RepoTags: []string{"registry.k8s.io:v3", "registry.k8s.io:v4"},
+			Size:     456,
+		},
+	}
+	return newTestKubeletWithImageList(t, imageList, false /*controllerAttachDetachEnabled*/, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, true /*excludePodAdmitHandlers*/, &nodeConfig)
 }
 
 func newTestKubeletWithImageList(
@@ -201,6 +217,7 @@ func newTestKubeletWithImageList(
 	initFakeVolumePlugin bool,
 	localStorageCapacityIsolation bool,
 	excludeAdmitHandlers bool,
+	nodeConfig *cm.NodeConfig,
 ) *TestKubelet {
 	logger, _ := ktesting.NewTestContext(t)
 
@@ -311,7 +328,12 @@ func newTestKubeletWithImageList(
 	kubelet.readinessManager = proberesults.NewManager()
 	kubelet.startupManager = proberesults.NewManager()
 
-	fakeContainerManager := cm.NewFakeContainerManager()
+	var fakeContainerManager *cm.FakeContainerManager
+	if nodeConfig == nil {
+		fakeContainerManager = cm.NewFakeContainerManager()
+	} else {
+		fakeContainerManager = cm.NewFakeContainerManagerWithNodeConfig(*nodeConfig)
+	}
 	kubelet.containerManager = fakeContainerManager
 	fakeNodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -3227,6 +3249,267 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					resizeStatus[i].Message = tt.expectedResize[i].Message
 				}
 				assert.Equal(t, tt.expectedResize, resizeStatus)
+			})
+		}
+	}
+}
+
+func TestHandlePodResourcesResizeForGuanteedQOSPods(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	nodeConfig := cm.NodeConfig{}
+	nodeConfig.CPUManagerPolicy = "static"
+	nodeConfig.MemoryManagerPolicy = "Static"
+	testKubelet := newTestKubeletWithNodeConfig(t, nodeConfig)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	cpu1000m := resource.MustParse("1")
+	cpu2000m := resource.MustParse("2")
+	mem1000M := resource.MustParse("1Gi")
+	mem2000M := resource.MustParse("2Gi")
+
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{
+				Capacity: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("8"),
+					v1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("4"),
+					v1.ResourceMemory: resource.MustParse("4Gi"),
+					v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+				},
+			},
+		},
+	}
+	kubelet.nodeLister = testNodeLister{nodes: nodes}
+
+	guaranteedQOSPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "1111",
+			Name:      "pod1",
+			Namespace: "ns1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+						Limits:   v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
+	guaranteedQOSPodWithSidecar := guaranteedQOSPod.DeepCopy()
+	guaranteedQOSPodWithSidecar.UID = "2222"
+	guaranteedQOSPodWithSidecar.Name = "pod2"
+	guaranteedQOSPodWithSidecar.Namespace = "ns2"
+	guaranteedQOSPodWithSidecar.Spec = v1.PodSpec{
+		InitContainers: []v1.Container{
+			{
+				Name:  "c1-init",
+				Image: "i1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				},
+				RestartPolicy: &containerRestartPolicyAlways,
+			},
+		},
+	}
+	guaranteedQOSPodWithSidecar.Status = v1.PodStatus{
+		Phase: v1.PodRunning,
+		InitContainerStatuses: []v1.ContainerStatus{
+			{
+				Name:               "c1-init",
+				AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+				Resources:          &v1.ResourceRequirements{},
+			},
+		},
+	}
+
+	testKubelet.fakeKubeClient = fake.NewSimpleClientset(guaranteedQOSPod)
+	kubelet.kubeClient = testKubelet.fakeKubeClient
+	defer testKubelet.fakeKubeClient.ClearActions()
+	kubelet.podManager.AddPod(guaranteedQOSPod)
+	kubelet.podWorkers.(*fakePodWorkers).running = map[types.UID]bool{
+		guaranteedQOSPod.UID: true,
+	}
+	defer kubelet.podManager.RemovePod(guaranteedQOSPod)
+
+	tests := []struct {
+		name                           string
+		originalRequests               v1.ResourceList
+		newRequests                    v1.ResourceList
+		originalLimits                 v1.ResourceList
+		newLimits                      v1.ResourceList
+		newResourcesAllocated          bool // Whether the new requests have already been allocated (but not actuated)
+		expectedAllocatedReqs          v1.ResourceList
+		expectedAllocatedLims          v1.ResourceList
+		expectedResize                 []*v1.PodCondition
+		annotations                    map[string]string
+		ipprExclusiveCPUsFeatureGate   bool
+		ipprExclusiveMemoryFeatureGate bool
+	}{
+		{
+			name:                           "CPU resize with `InPlacePodVerticalScalingExclusiveCPUs`feature gate off and only CPU resize - expect infeasible due to static cpu policy",
+			originalRequests:               v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			originalLimits:                 v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			ipprExclusiveCPUsFeatureGate:   false,
+			ipprExclusiveMemoryFeatureGate: true,
+			newRequests:                    v1.ResourceList{v1.ResourceCPU: cpu2000m, v1.ResourceMemory: mem1000M},
+			newLimits:                      v1.ResourceList{v1.ResourceCPU: cpu2000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedReqs:          v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedLims:          v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Infeasible",
+					Message: "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy",
+				},
+			},
+		},
+		{
+			name:                           "Memory resize with `InPlacePodVerticalScalingExclusiveMemory` feature gates off and only memory resize - expect infeasible due to static memory policy",
+			originalRequests:               v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			originalLimits:                 v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			ipprExclusiveCPUsFeatureGate:   true,
+			ipprExclusiveMemoryFeatureGate: false,
+			newRequests:                    v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem2000M},
+			newLimits:                      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem2000M},
+			expectedAllocatedReqs:          v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedLims:          v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Infeasible",
+					Message: "Resize is infeasible for Guaranteed Pods alongside Memory Manager policy Static",
+				},
+			},
+		},
+		{
+			name:                           "CPU and Memory resize with both feature gates off - expect infeasible due to static memory policy",
+			originalRequests:               v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			originalLimits:                 v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			ipprExclusiveCPUsFeatureGate:   false,
+			ipprExclusiveMemoryFeatureGate: false,
+			newRequests:                    v1.ResourceList{v1.ResourceCPU: cpu2000m, v1.ResourceMemory: mem2000M},
+			newLimits:                      v1.ResourceList{v1.ResourceCPU: cpu2000m, v1.ResourceMemory: mem2000M},
+			expectedAllocatedReqs:          v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedLims:          v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Infeasible",
+					Message: "Resize is infeasible for Guaranteed Pods alongside Memory Manager policy Static",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		for _, isSidecarContainer := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/sidecar=%t", tt.name, isSidecarContainer), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, tt.ipprExclusiveCPUsFeatureGate)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveMemory, tt.ipprExclusiveMemoryFeatureGate)
+
+				var originalPod *v1.Pod
+				var originalCtr *v1.Container
+				if isSidecarContainer {
+					originalPod = guaranteedQOSPodWithSidecar.DeepCopy()
+					originalCtr = &originalPod.Spec.InitContainers[0]
+				} else {
+					originalPod = guaranteedQOSPod.DeepCopy()
+					originalCtr = &originalPod.Spec.Containers[0]
+				}
+
+				originalPod.Annotations = tt.annotations
+				originalCtr.Resources.Requests = tt.originalRequests
+				originalCtr.Resources.Limits = tt.originalLimits
+
+				kubelet.podManager.UpdatePod(originalPod)
+
+				newPod := originalPod.DeepCopy()
+
+				if isSidecarContainer {
+					newPod.Spec.InitContainers[0].Resources.Requests = tt.newRequests
+					newPod.Spec.InitContainers[0].Resources.Limits = tt.newLimits
+				} else {
+					newPod.Spec.Containers[0].Resources.Requests = tt.newRequests
+					newPod.Spec.Containers[0].Resources.Limits = tt.newLimits
+				}
+
+				if !tt.newResourcesAllocated {
+					require.NoError(t, kubelet.allocationManager.SetAllocatedResources(originalPod))
+				} else {
+					require.NoError(t, kubelet.allocationManager.SetAllocatedResources(newPod))
+				}
+				require.NoError(t, kubelet.allocationManager.SetActuatedResources(originalPod, nil))
+				t.Cleanup(func() { kubelet.allocationManager.RemovePod(originalPod.UID) })
+
+				podStatus := &kubecontainer.PodStatus{
+					ID:        originalPod.UID,
+					Name:      originalPod.Name,
+					Namespace: originalPod.Namespace,
+				}
+
+				setContainerStatus := func(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
+					podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
+						Name:  c.Name,
+						State: kubecontainer.ContainerStateRunning,
+						Resources: &kubecontainer.ContainerResources{
+							CPURequest:  c.Resources.Requests.Cpu(),
+							CPULimit:    c.Resources.Limits.Cpu(),
+							MemoryLimit: c.Resources.Limits.Memory(),
+						},
+					}
+				}
+
+				podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(originalPod.Spec.Containers)+len(originalPod.Spec.InitContainers))
+				for i, c := range originalPod.Spec.InitContainers {
+					setContainerStatus(podStatus, &c, i)
+				}
+				for i, c := range originalPod.Spec.Containers {
+					setContainerStatus(podStatus, &c, i+len(originalPod.Spec.InitContainers))
+				}
+
+				updatedPod, err := kubelet.allocationManager.HandlePodResourcesResize(kubelet.containerRuntime, kubelet.getAllocatedPods(), newPod, podStatus)
+				require.NoError(t, err)
+
+				var updatedPodCtr v1.Container
+				if isSidecarContainer {
+					updatedPodCtr = updatedPod.Spec.InitContainers[0]
+				} else {
+					updatedPodCtr = updatedPod.Spec.Containers[0]
+				}
+				assert.Equal(t, tt.expectedAllocatedReqs, updatedPodCtr.Resources.Requests, "updated pod spec requests")
+				assert.Equal(t, tt.expectedAllocatedLims, updatedPodCtr.Resources.Limits, "updated pod spec limits")
+
+				alloc, found := kubelet.allocationManager.GetContainerResourceAllocation(newPod.UID, updatedPodCtr.Name)
+				require.True(t, found, "container allocation")
+				assert.Equal(t, tt.expectedAllocatedReqs, alloc.Requests, "stored container request allocation")
+				assert.Equal(t, tt.expectedAllocatedLims, alloc.Limits, "stored container limit allocation")
 			})
 		}
 	}
