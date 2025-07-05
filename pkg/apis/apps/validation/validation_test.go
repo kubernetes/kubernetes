@@ -219,6 +219,12 @@ func tweakHostname(name string) statefulSetTweak {
 	}
 }
 
+func tweakVolumeClaimTemplates(volumeClaimTemplates []api.PersistentVolumeClaim) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.VolumeClaimTemplates = volumeClaimTemplates
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -257,6 +263,21 @@ func TestValidateStatefulSet(t *testing.T) {
 					TerminationMessagePolicy: api.TerminationMessageReadFile,
 				}},
 				TerminationGracePeriodSeconds: ptr.To[int64](30),
+			},
+		},
+	}
+	validVolumeClaimTemplates := []api.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pvc",
+			},
+			Spec: api.PersistentVolumeClaimSpec{
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				Resources: api.VolumeResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				},
 			},
 		},
 	}
@@ -312,6 +333,20 @@ func TestValidateStatefulSet(t *testing.T) {
 				DNSPolicy:                     api.DNSClusterFirst,
 				ActiveDeadlineSeconds:         &invalidTime,
 				TerminationGracePeriodSeconds: ptr.To[int64](30),
+			},
+		},
+	}
+	invalidVolumeClaimTemplates := []api.PersistentVolumeClaim{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pvc",
+			},
+			Spec: api.PersistentVolumeClaimSpec{
+				Resources: api.VolumeResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				},
 			},
 		},
 	}
@@ -388,6 +423,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			tweakPVCTemplate(api.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 				Spec: api.PersistentVolumeClaimSpec{
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Resources: api.VolumeResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceStorage: resource.MustParse("1Gi"),
@@ -417,6 +453,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "test"},
 					Spec: api.PersistentVolumeClaimSpec{
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 						Resources: api.VolumeResourceRequirements{
 							Requests: api.ResourceList{
 								api.ResourceStorage: resource.MustParse("1Gi"),
@@ -426,6 +463,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				}, {
 					ObjectMeta: metav1.ObjectMeta{Name: "test1"},
 					Spec: api.PersistentVolumeClaimSpec{
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 						Resources: api.VolumeResourceRequirements{
 							Requests: api.ResourceList{
 								api.ResourceStorage: resource.MustParse("1Gi"),
@@ -435,6 +473,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				}, {
 					ObjectMeta: metav1.ObjectMeta{Name: "test2"},
 					Spec: api.PersistentVolumeClaimSpec{
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 						Resources: api.VolumeResourceRequirements{
 							Requests: api.ResourceList{
 								api.ResourceStorage: resource.MustParse("1Gi"),
@@ -456,6 +495,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			tweakPVCTemplate(api.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 				Spec: api.PersistentVolumeClaimSpec{
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Resources: api.VolumeResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceStorage: resource.MustParse("1Gi"),
@@ -463,6 +503,11 @@ func TestValidateStatefulSet(t *testing.T) {
 					},
 				},
 			}),
+		),
+	}, {
+		name: "VolumeClaimTemplates has 1 PVC",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakVolumeClaimTemplates(validVolumeClaimTemplates),
 		),
 	},
 	}
@@ -695,6 +740,7 @@ func TestValidateStatefulSet(t *testing.T) {
 			tweakPVCTemplate(api.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
 				Spec: api.PersistentVolumeClaimSpec{
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Resources: api.VolumeResourceRequirements{
 						Requests: api.ResourceList{
 							api.ResourceStorage: resource.MustParse("1Gi"),
@@ -724,6 +770,14 @@ func TestValidateStatefulSet(t *testing.T) {
 			}...)),
 		errs: field.ErrorList{
 			field.Duplicate(field.NewPath("spec", "template", "spec", "volumes[1]", "name"), "test1"),
+		},
+	}, {
+		name: "invalid volumeClaimTemplates with no accessModes",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakVolumeClaimTemplates(invalidVolumeClaimTemplates),
+		),
+		errs: field.ErrorList{
+			field.Required(field.NewPath("spec", "volumeClaimTemplates").Index(0).Child("spec.accessModes"), ""),
 		},
 	},
 	}
@@ -1010,6 +1064,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			Name: "pvc-abc",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			StorageClassName: &storageClass,
 			Resources: api.VolumeResourceRequirements{
 				Requests: api.ResourceList{
@@ -1029,6 +1084,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			Name: "pvc-abc2",
 		},
 		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 			StorageClassName: &storageClass2,
 			Resources: api.VolumeResourceRequirements{
 				Requests: api.ResourceList{
