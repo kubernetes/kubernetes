@@ -704,3 +704,32 @@ func TestUnauthenticatedHTTP2ClientConnectionClose(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthenticationLatencyTracked(t *testing.T) {
+	receivedCtx := make(chan context.Context, 1)
+	handler := WithAuthentication(
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+			receivedCtx <- req.Context()
+		}),
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
+		}),
+		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+			close(receivedCtx)
+		}),
+		nil,
+		nil,
+	)
+	handler = WithLatencyTrackers(handler)
+	handler = WithRequestInfo(handler, &fakeRequestResolver{})
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Error(err)
+	}
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	ctx := <-receivedCtx
+	annotations := genericapirequest.AuditAnnotationsFromLatencyTrackers(ctx)
+	if len(annotations) == 0 {
+		t.Fatalf("missing authentication latency annotation: %v", annotations)
+	}
+}
