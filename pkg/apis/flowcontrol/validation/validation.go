@@ -166,6 +166,9 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 		if subject.Group != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("group"), "group is forbidden when subject kind is not 'Group'"))
 		}
+		if subject.UserAgent != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("userAgent"), "userAgent is forbidden when subject kind is not 'UserAgent'"))
+		}
 	case flowcontrol.SubjectKindUser:
 		allErrs = append(allErrs, ValidateUserSubject(subject.User, fldPath.Child("user"))...)
 		if subject.ServiceAccount != nil {
@@ -174,6 +177,9 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 		if subject.Group != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("group"), "group is forbidden when subject kind is not 'Group'"))
 		}
+		if subject.UserAgent != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("userAgent"), "userAgent is forbidden when subject kind is not 'UserAgent'"))
+		}
 	case flowcontrol.SubjectKindGroup:
 		allErrs = append(allErrs, ValidateGroupSubject(subject.Group, fldPath.Child("group"))...)
 		if subject.ServiceAccount != nil {
@@ -181,6 +187,20 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 		}
 		if subject.User != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("user"), "user is forbidden when subject kind is not 'User'"))
+		}
+		if subject.UserAgent != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("userAgent"), "userAgent is forbidden when subject kind is not 'UserAgent'"))
+		}
+	case flowcontrol.SubjectKindUserAgent:
+		allErrs = append(allErrs, ValidateUserAgentSubject(subject.UserAgent, fldPath.Child("userAgent"))...)
+		if subject.ServiceAccount != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("serviceAccount"), "serviceAccount is forbidden when subject kind is not 'ServiceAccount'"))
+		}
+		if subject.User != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("user"), "user is forbidden when subject kind is not 'User'"))
+		}
+		if subject.Group != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("group"), "group is forbidden when subject kind is not 'Group'"))
 		}
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("kind"), subject.Kind, supportedSubjectKinds.List()))
@@ -233,6 +253,18 @@ func ValidateGroupSubject(subject *flowcontrol.GroupSubject, fldPath *field.Path
 	}
 	if len(subject.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	}
+	return allErrs
+}
+
+// ValidateUserAgentSubject validates subject of "UserAgent" kind
+func ValidateUserAgentSubject(subject *flowcontrol.UserAgentSubject, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if subject == nil {
+		return append(allErrs, field.Required(fldPath, "userAgent is required when subject kind is 'UserAgent'"))
+	}
+	if len(subject.NameRegexp) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("nameRegexp"), ""))
 	}
 	return allErrs
 }

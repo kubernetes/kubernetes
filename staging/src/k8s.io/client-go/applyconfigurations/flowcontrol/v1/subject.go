@@ -29,6 +29,7 @@ type SubjectApplyConfiguration struct {
 	User           *UserSubjectApplyConfiguration           `json:"user,omitempty"`
 	Group          *GroupSubjectApplyConfiguration          `json:"group,omitempty"`
 	ServiceAccount *ServiceAccountSubjectApplyConfiguration `json:"serviceAccount,omitempty"`
+	UserAgent      *UserAgentSubjectApplyConfiguration      `json:"userAgent,omitempty"`
 }
 
 // SubjectApplyConfiguration constructs a declarative configuration of the Subject type for use with
@@ -66,5 +67,13 @@ func (b *SubjectApplyConfiguration) WithGroup(value *GroupSubjectApplyConfigurat
 // If called multiple times, the ServiceAccount field is set to the value of the last call.
 func (b *SubjectApplyConfiguration) WithServiceAccount(value *ServiceAccountSubjectApplyConfiguration) *SubjectApplyConfiguration {
 	b.ServiceAccount = value
+	return b
+}
+
+// WithUserAgent sets the UserAgent field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UserAgent field is set to the value of the last call.
+func (b *SubjectApplyConfiguration) WithUserAgent(value *UserAgentSubjectApplyConfiguration) *SubjectApplyConfiguration {
+	b.UserAgent = value
 	return b
 }

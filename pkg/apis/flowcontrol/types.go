@@ -184,6 +184,9 @@ type Subject struct {
 	// `serviceAccount` matches ServiceAccounts.
 	// +optional
 	ServiceAccount *ServiceAccountSubject
+	// `userAgent` matches userAgent.
+	// +optional
+	UserAgent *UserAgentSubject
 }
 
 // SubjectKind is the kind of subject.
@@ -194,6 +197,7 @@ const (
 	SubjectKindUser           SubjectKind = "User"
 	SubjectKindGroup          SubjectKind = "Group"
 	SubjectKindServiceAccount SubjectKind = "ServiceAccount"
+	SubjectKindUserAgent      SubjectKind = "UserAgent"
 )
 
 // UserSubject holds detailed information for user-kind subject.
@@ -220,6 +224,13 @@ type ServiceAccountSubject struct {
 	// `name` is the name of matching ServiceAccount objects, or "*" to match regardless of name.
 	// Required.
 	Name string
+}
+
+// UserAgentSubject holds detailed information for user-agent-kind subject.
+type UserAgentSubject struct {
+	// `nameRegexp` is the userAgent name regular expression that matches.
+	// Required.
+	NameRegexp string
 }
 
 // ResourcePolicyRule is a predicate that matches some resource

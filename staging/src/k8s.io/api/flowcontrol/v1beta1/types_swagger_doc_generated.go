@@ -256,10 +256,20 @@ var map_Subject = map[string]string{
 	"user":           "`user` matches based on username.",
 	"group":          "`group` matches based on user group name.",
 	"serviceAccount": "`serviceAccount` matches ServiceAccounts.",
+	"userAgent":      "`userAgent` matches based on user-agent.",
 }
 
 func (Subject) SwaggerDoc() map[string]string {
 	return map_Subject
+}
+
+var map_UserAgentSubject = map[string]string{
+	"":           "UserAgentSubject holds detailed information for user-agent-kind subject.",
+	"nameRegexp": "`nameRegexp` is the agent name regular expression that matches. Required.",
+}
+
+func (UserAgentSubject) SwaggerDoc() map[string]string {
+	return map_UserAgentSubject
 }
 
 var map_UserSubject = map[string]string{
