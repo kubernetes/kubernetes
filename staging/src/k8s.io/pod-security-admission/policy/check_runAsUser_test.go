@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestRunAsUser(t *testing.T) {
@@ -35,7 +35,7 @@ func TestRunAsUser(t *testing.T) {
 		{
 			name: "pod runAsUser=0",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
-				SecurityContext: &corev1.PodSecurityContext{RunAsUser: utilpointer.Int64(0)},
+				SecurityContext: &corev1.PodSecurityContext{RunAsUser: ptr.To[int64](0)},
 				Containers: []corev1.Container{
 					{Name: "a", SecurityContext: nil},
 				},
@@ -46,7 +46,7 @@ func TestRunAsUser(t *testing.T) {
 		{
 			name: "pod runAsUser=non-zero",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
-				SecurityContext: &corev1.PodSecurityContext{RunAsUser: utilpointer.Int64(1000)},
+				SecurityContext: &corev1.PodSecurityContext{RunAsUser: ptr.To[int64](1000)},
 				Containers: []corev1.Container{
 					{Name: "a", SecurityContext: nil},
 				},
@@ -66,14 +66,14 @@ func TestRunAsUser(t *testing.T) {
 		{
 			name: "containers runAsUser=0",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
-				SecurityContext: &corev1.PodSecurityContext{RunAsUser: utilpointer.Int64(1000)},
+				SecurityContext: &corev1.PodSecurityContext{RunAsUser: ptr.To[int64](1000)},
 				Containers: []corev1.Container{
 					{Name: "a", SecurityContext: nil},
 					{Name: "b", SecurityContext: &corev1.SecurityContext{}},
-					{Name: "c", SecurityContext: &corev1.SecurityContext{RunAsUser: utilpointer.Int64(0)}},
-					{Name: "d", SecurityContext: &corev1.SecurityContext{RunAsUser: utilpointer.Int64(0)}},
-					{Name: "e", SecurityContext: &corev1.SecurityContext{RunAsUser: utilpointer.Int64(1)}},
-					{Name: "f", SecurityContext: &corev1.SecurityContext{RunAsUser: utilpointer.Int64(1)}},
+					{Name: "c", SecurityContext: &corev1.SecurityContext{RunAsUser: ptr.To[int64](0)}},
+					{Name: "d", SecurityContext: &corev1.SecurityContext{RunAsUser: ptr.To[int64](0)}},
+					{Name: "e", SecurityContext: &corev1.SecurityContext{RunAsUser: ptr.To[int64](1)}},
+					{Name: "f", SecurityContext: &corev1.SecurityContext{RunAsUser: ptr.To[int64](1)}},
 				},
 			}},
 			expectReason: `runAsUser=0`,
@@ -83,10 +83,10 @@ func TestRunAsUser(t *testing.T) {
 			name: "containers runAsUser=non-zero",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
-					{Name: "c", SecurityContext: &corev1.SecurityContext{RunAsUser: utilpointer.Int64(1)}},
-					{Name: "d", SecurityContext: &corev1.SecurityContext{RunAsUser: utilpointer.Int64(2)}},
-					{Name: "e", SecurityContext: &corev1.SecurityContext{RunAsUser: utilpointer.Int64(3)}},
-					{Name: "f", SecurityContext: &corev1.SecurityContext{RunAsUser: utilpointer.Int64(4)}},
+					{Name: "c", SecurityContext: &corev1.SecurityContext{RunAsUser: ptr.To[int64](1)}},
+					{Name: "d", SecurityContext: &corev1.SecurityContext{RunAsUser: ptr.To[int64](2)}},
+					{Name: "e", SecurityContext: &corev1.SecurityContext{RunAsUser: ptr.To[int64](3)}},
+					{Name: "f", SecurityContext: &corev1.SecurityContext{RunAsUser: ptr.To[int64](4)}},
 				},
 			}},
 			expectAllowed: true,
@@ -94,7 +94,7 @@ func TestRunAsUser(t *testing.T) {
 		{
 			name: "UserNamespacesPodSecurityStandards enabled without HostUsers",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
-				HostUsers: utilpointer.Bool(false),
+				HostUsers: ptr.To(false),
 			}},
 			expectAllowed:  true,
 			relaxForUserNS: true,
@@ -102,11 +102,11 @@ func TestRunAsUser(t *testing.T) {
 		{
 			name: "UserNamespacesPodSecurityStandards enabled with HostUsers",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
-				SecurityContext: &corev1.PodSecurityContext{RunAsUser: utilpointer.Int64(0)},
+				SecurityContext: &corev1.PodSecurityContext{RunAsUser: ptr.To[int64](0)},
 				Containers: []corev1.Container{
 					{Name: "a", SecurityContext: nil},
 				},
-				HostUsers: utilpointer.Bool(true),
+				HostUsers: ptr.To(true),
 			}},
 			expectAllowed:  false,
 			expectReason:   `runAsUser=0`,
