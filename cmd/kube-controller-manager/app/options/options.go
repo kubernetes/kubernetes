@@ -497,6 +497,7 @@ func (s KubeControllerManagerOptions) Config(ctx context.Context, allControllers
 		EventBroadcaster:         eventBroadcaster,
 		EventRecorder:            eventRecorder,
 		ComponentGlobalsRegistry: s.ComponentGlobalsRegistry,
+		Metrics:                  s.Metrics,
 	}
 	if err := s.ApplyTo(c, allControllers, disabledByDefaultControllers, controllerAliases); err != nil {
 		return nil, err
