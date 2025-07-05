@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -270,7 +271,7 @@ func (bq *backoffQueue) popAllBackoffCompletedWithQueue(logger klog.Logger, queu
 		}
 		_, err := queue.Pop()
 		if err != nil {
-			logger.Error(err, "Unable to pop pod from backoff queue despite backoff completion", "pod", klog.KObj(pod))
+			utilruntime.HandleErrorWithLogger(logger, err, "Unable to pop pod from backoff queue despite backoff completion", "pod", klog.KObj(pod))
 			break
 		}
 		poppedPods = append(poppedPods, pInfo)
@@ -301,7 +302,7 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 		// Ensure the pod is not in the podBackoffQ and report the error if it happens.
 		err := bq.podBackoffQ.Delete(pInfo)
 		if err == nil {
-			logger.Error(nil, "BackoffQueue add() was called with a pod that was already in the podBackoffQ", "pod", klog.KObj(pInfo.Pod))
+			utilruntime.HandleErrorWithLogger(logger, nil, "BackoffQueue add() was called with a pod that was already in the podBackoffQ", "pod", klog.KObj(pInfo.Pod))
 			return
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
@@ -311,7 +312,7 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 	// Ensure the pod is not in the podErrorBackoffQ and report the error if it happens.
 	err := bq.podErrorBackoffQ.Delete(pInfo)
 	if err == nil {
-		logger.Error(nil, "BackoffQueue add() was called with a pod that was already in the podErrorBackoffQ", "pod", klog.KObj(pInfo.Pod))
+		utilruntime.HandleErrorWithLogger(logger, nil, "BackoffQueue add() was called with a pod that was already in the podErrorBackoffQ", "pod", klog.KObj(pInfo.Pod))
 		return
 	}
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
