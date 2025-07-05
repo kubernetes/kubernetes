@@ -41,38 +41,44 @@ import (
 )
 
 const (
-	region1     = "region-1"
-	region2     = "region-2"
-	node1       = "node-1"
-	node2       = "node-2"
-	classA      = "class-a"
-	classB      = "class-b"
-	driverA     = "driver-a"
-	driverB     = "driver-b"
-	pool1       = "pool-1"
-	pool2       = "pool-2"
-	pool3       = "pool-3"
-	pool4       = "pool-4"
-	req0        = "req-0"
-	req1        = "req-1"
-	req2        = "req-2"
-	req3        = "req-3"
-	subReq0     = "subReq-0"
-	subReq1     = "subReq-1"
-	req0SubReq0 = "req-0/subReq-0"
-	req0SubReq1 = "req-0/subReq-1"
-	req1SubReq0 = "req-1/subReq-0"
-	req1SubReq1 = "req-1/subReq-1"
-	claim0      = "claim-0"
-	claim1      = "claim-1"
-	slice1      = "slice-1"
-	slice2      = "slice-2"
-	device1     = "device-1"
-	device2     = "device-2"
-	device3     = "device-3"
-	device4     = "device-4"
-	counterSet1 = "counter-set-1"
-	counterSet2 = "counter-set-2"
+	region1                        = "region-1"
+	region2                        = "region-2"
+	node1                          = "node-1"
+	node2                          = "node-2"
+	classA                         = "class-a"
+	classB                         = "class-b"
+	driverA                        = "driver-a"
+	driverB                        = "driver-b"
+	pool1                          = "pool-1"
+	pool2                          = "pool-2"
+	pool3                          = "pool-3"
+	pool4                          = "pool-4"
+	req0                           = "req-0"
+	req1                           = "req-1"
+	req2                           = "req-2"
+	req3                           = "req-3"
+	subReq0                        = "subReq-0"
+	subReq1                        = "subReq-1"
+	req0SubReq0                    = "req-0/subReq-0"
+	req0SubReq1                    = "req-0/subReq-1"
+	req1SubReq0                    = "req-1/subReq-0"
+	req1SubReq1                    = "req-1/subReq-1"
+	claim0                         = "claim-0"
+	claim1                         = "claim-1"
+	slice1                         = "slice-1"
+	slice2                         = "slice-2"
+	device1                        = "device-1"
+	device2                        = "device-2"
+	device3                        = "device-3"
+	device4                        = "device-4"
+	counterSet1                    = "counter-set-1"
+	counterSet2                    = "counter-set-2"
+	counterSetMixin1               = "counter-set-mixin-1"
+	counterSetMixin2               = "counter-set-mixin-2"
+	deviceMixin1                   = "device-mixin-1"
+	deviceMixin2                   = "device-mixin-2"
+	deviceCounterConsumptionMixin1 = "device-counter-consumption-mixin-1"
+	deviceCounterConsumptionMixin2 = "device-counter-consumption-mixin-2"
 )
 
 func init() {
@@ -285,10 +291,10 @@ func (in wrapDevice) withTaints(taints ...resourceapi.DeviceTaint) wrapDevice {
 	return wrapDevice{Device: *device}
 }
 
-func (in wrapDevice) withDeviceCounterConsumption(deviceCounterConsumption ...resourceapi.DeviceCounterConsumption) wrapDevice {
+func (in wrapDevice) withDeviceCounterConsumption(deviceCounterConsumption ...wrapDeviceCounterConsumption) wrapDevice {
 	inDevice := in.Device
 	device := inDevice.DeepCopy()
-	device.Basic.ConsumesCounters = append(device.Basic.ConsumesCounters, deviceCounterConsumption...)
+	device.Basic.ConsumesCounters = append(device.Basic.ConsumesCounters, unwrap(deviceCounterConsumption...)...)
 	if in.capacityFromCounters {
 		c := make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity)
 		for _, dcc := range device.Basic.ConsumesCounters {
@@ -299,6 +305,13 @@ func (in wrapDevice) withDeviceCounterConsumption(deviceCounterConsumption ...re
 		}
 		device.Basic.Capacity = c
 	}
+	return wrapDevice{Device: *device}
+}
+
+func (in wrapDevice) withIncludes(includes ...string) wrapDevice {
+	inDevice := in.Device
+	device := inDevice.DeepCopy()
+	device.Basic.Includes = append(device.Basic.Includes, includes...)
 	return wrapDevice{Device: *device}
 }
 
@@ -325,11 +338,26 @@ func (in wrapDevice) withNodeSelection(nodeSelection any) wrapDevice {
 	return wrapDevice{Device: *device}
 }
 
-func deviceCounterConsumption(counterSet string, counters map[string]resource.Quantity) resourceapi.DeviceCounterConsumption {
-	return resourceapi.DeviceCounterConsumption{
+func deviceCounterConsumption(counterSet string, counters map[string]resource.Quantity) wrapDeviceCounterConsumption {
+	return wrapDeviceCounterConsumption{DeviceCounterConsumption: resourceapi.DeviceCounterConsumption{
 		CounterSet: counterSet,
 		Counters:   toCounters(counters),
-	}
+	}}
+}
+
+type wrapDeviceCounterConsumption struct {
+	resourceapi.DeviceCounterConsumption
+}
+
+func (in wrapDeviceCounterConsumption) obj() resourceapi.DeviceCounterConsumption {
+	return in.DeviceCounterConsumption
+}
+
+func (in wrapDeviceCounterConsumption) withIncludes(includes ...string) wrapDeviceCounterConsumption {
+	inDeviceCounterConsumption := in.DeviceCounterConsumption
+	deviceCounterConsumption := inDeviceCounterConsumption.DeepCopy()
+	deviceCounterConsumption.Includes = append(deviceCounterConsumption.Includes, includes...)
+	return wrapDeviceCounterConsumption{DeviceCounterConsumption: *deviceCounterConsumption}
 }
 
 const (
@@ -389,9 +417,36 @@ func (in wrapResourceSlice) obj() *resourceapi.ResourceSlice {
 	return in.ResourceSlice
 }
 
-func (in wrapResourceSlice) withCounterSet(counterSets ...resourceapi.CounterSet) wrapResourceSlice {
+func (in wrapResourceSlice) withCounterSet(counterSets ...wrapCounterSet) wrapResourceSlice {
 	inResourceSlice := in.DeepCopy()
-	inResourceSlice.Spec.SharedCounters = append(inResourceSlice.Spec.SharedCounters, counterSets...)
+	inResourceSlice.Spec.SharedCounters = append(inResourceSlice.Spec.SharedCounters, unwrap(counterSets...)...)
+	return wrapResourceSlice{ResourceSlice: inResourceSlice}
+}
+
+func (in wrapResourceSlice) withDeviceMixins(deviceMixins ...resourceapi.DeviceMixin) wrapResourceSlice {
+	inResourceSlice := in.DeepCopy()
+	if inResourceSlice.Spec.Mixins == nil {
+		inResourceSlice.Spec.Mixins = &resourceapi.ResourceSliceMixins{}
+	}
+	inResourceSlice.Spec.Mixins.Device = append(inResourceSlice.Spec.Mixins.Device, deviceMixins...)
+	return wrapResourceSlice{ResourceSlice: inResourceSlice}
+}
+
+func (in wrapResourceSlice) withDeviceCounterConsumptionMixins(deviceCounterConsumptionMixins ...resourceapi.DeviceCounterConsumptionMixin) wrapResourceSlice {
+	inResourceSlice := in.DeepCopy()
+	if inResourceSlice.Spec.Mixins == nil {
+		inResourceSlice.Spec.Mixins = &resourceapi.ResourceSliceMixins{}
+	}
+	inResourceSlice.Spec.Mixins.DeviceCounterConsumption = append(inResourceSlice.Spec.Mixins.DeviceCounterConsumption, deviceCounterConsumptionMixins...)
+	return wrapResourceSlice{ResourceSlice: inResourceSlice}
+}
+
+func (in wrapResourceSlice) withCounterSetMixins(counterSetMixins ...resourceapi.CounterSetMixin) wrapResourceSlice {
+	inResourceSlice := in.DeepCopy()
+	if inResourceSlice.Spec.Mixins == nil {
+		inResourceSlice.Spec.Mixins = &resourceapi.ResourceSliceMixins{}
+	}
+	inResourceSlice.Spec.Mixins.CounterSet = append(inResourceSlice.Spec.Mixins.CounterSet, counterSetMixins...)
 	return wrapResourceSlice{ResourceSlice: inResourceSlice}
 }
 
@@ -551,14 +606,54 @@ func sliceWithMultipleDevices(name string, nodeSelection any, pool, driver strin
 	return slice(name, nodeSelection, pool, driver, devices...)
 }
 
-func counterSet(name string, counters map[string]resource.Quantity) resourceapi.CounterSet {
-	return resourceapi.CounterSet{
+func counterSet(name string, counters map[string]resource.Quantity) wrapCounterSet {
+	return wrapCounterSet{CounterSet: resourceapi.CounterSet{
+		Name:     name,
+		Counters: toCounters(counters),
+	}}
+}
+
+type wrapCounterSet struct {
+	resourceapi.CounterSet
+}
+
+func (in wrapCounterSet) obj() resourceapi.CounterSet {
+	return in.CounterSet
+}
+
+func (in wrapCounterSet) withIncludes(includes ...string) wrapCounterSet {
+	inCounterSet := in.CounterSet
+	counterSet := inCounterSet.DeepCopy()
+	counterSet.Includes = append(counterSet.Includes, includes...)
+	return wrapCounterSet{CounterSet: *counterSet}
+}
+
+func deviceMixin(name string, capacity map[resourceapi.QualifiedName]resource.Quantity, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) resourceapi.DeviceMixin {
+	return resourceapi.DeviceMixin{
+		Name:       name,
+		Capacity:   toDeviceCapacity(capacity),
+		Attributes: attributes,
+	}
+}
+
+func deviceCounterConsumptionMixin(name string, counters map[string]resource.Quantity) resourceapi.DeviceCounterConsumptionMixin {
+	return resourceapi.DeviceCounterConsumptionMixin{
+		Name:     name,
+		Counters: toCounters(counters),
+	}
+}
+
+func counterSetMixin(name string, counters map[string]resource.Quantity) resourceapi.CounterSetMixin {
+	return resourceapi.CounterSetMixin{
 		Name:     name,
 		Counters: toCounters(counters),
 	}
 }
 
 func toDeviceCapacity(capacity map[resourceapi.QualifiedName]resource.Quantity) map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
+	if capacity == nil {
+		return nil
+	}
 	out := make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, len(capacity))
 	for name, quantity := range capacity {
 		out[name] = resourceapi.DeviceCapacity{Value: quantity}
@@ -567,6 +662,9 @@ func toDeviceCapacity(capacity map[resourceapi.QualifiedName]resource.Quantity) 
 }
 
 func toCounters(counters map[string]resource.Quantity) map[string]resourceapi.Counter {
+	if counters == nil {
+		return nil
+	}
 	out := make(map[string]resourceapi.Counter, len(counters))
 	for name, quantity := range counters {
 		out[string(name)] = resourceapi.Counter{Value: quantity}
@@ -3462,6 +3560,776 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
 				deviceAllocationResult(req1, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-disabled-counterset": {
+			features: Features{
+				ResourceSliceMixins: false,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil),
+				).withCounterSetMixins(
+					resourceapi.CounterSetMixin{
+						Name:     counterSetMixin1,
+						Counters: toCounters(map[string]resource.Quantity{"memory": resource.MustParse("1Gi")}),
+					},
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{}).withIncludes(counterSetMixin1),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		"mixins-disabled-device": {
+			features: Features{
+				ResourceSliceMixins: false,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withIncludes(deviceMixin1),
+				).withDeviceMixins(
+					resourceapi.DeviceMixin{
+						Name: deviceMixin1,
+						Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+							"special": {
+								BoolValue: ptr.To(true),
+							},
+						},
+					},
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		"mixins-device-attribute-multiple-mixins-override": {
+			features: Features{
+				ResourceSliceMixins: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].special`, driverA),
+						},
+					}),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withIncludes(deviceMixin2, deviceMixin1),
+				).withDeviceMixins(
+					resourceapi.DeviceMixin{
+						Name: deviceMixin1,
+						Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+							"special": {
+								BoolValue: ptr.To(true),
+							},
+						},
+					},
+					resourceapi.DeviceMixin{
+						Name: deviceMixin2,
+						Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+							"special": {
+								BoolValue: ptr.To(false),
+							},
+						},
+					},
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-device-attribute-mixins-device-override": {
+			features: Features{
+				ResourceSliceMixins: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].special`, driverA),
+						},
+					}),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"special": {
+							BoolValue: ptr.To(true),
+						},
+					}).withIncludes(deviceMixin1),
+				).withDeviceMixins(
+					resourceapi.DeviceMixin{
+						Name: deviceMixin1,
+						Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+							"special": {
+								BoolValue: ptr.To(false),
+							},
+						},
+					},
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-device-attribute-mixins-additive": {
+			features: Features{
+				ResourceSliceMixins: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].foo && device.attributes["%s"].bar == 42`, driverA, driverA),
+						},
+					}),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"foo": {
+							BoolValue: ptr.To(true),
+						},
+					}).withIncludes(deviceMixin1),
+				).withDeviceMixins(
+					resourceapi.DeviceMixin{
+						Name: deviceMixin1,
+						Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+							"bar": {
+								IntValue: ptr.To(int64(42)),
+							},
+						},
+					},
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-device-capacity-multiple-mixins-override": {
+			features: Features{
+				ResourceSliceMixins: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.capacity["%s"].memory.compareTo(quantity("15Gi")) >= 0`, driverA),
+						},
+					}),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withIncludes(deviceMixin1, deviceMixin2),
+				).withDeviceMixins(
+					deviceMixin(deviceMixin1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("10Gi"),
+						}, nil,
+					),
+					deviceMixin(deviceMixin2,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("20Gi"),
+						}, nil,
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-device-capacity-mixins-device-override": {
+			features: Features{
+				ResourceSliceMixins: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.capacity["%s"].memory.compareTo(quantity("15Gi")) >= 0`, driverA),
+						},
+					}),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, map[resourceapi.QualifiedName]resource.Quantity{
+						"memory": resource.MustParse("20Gi"),
+					}, nil).withIncludes(deviceMixin1),
+				).withDeviceMixins(
+					deviceMixin(deviceMixin1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("10Gi"),
+						}, nil,
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-device-capacity-mixins-additive": {
+			features: Features{
+				ResourceSliceMixins: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.capacity["%s"].memory.compareTo(quantity("10Gi")) >= 0 && device.capacity["%s"].cpu.compareTo(quantity("10")) >= 0`, driverA, driverA),
+						},
+					}),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, map[resourceapi.QualifiedName]resource.Quantity{
+						"cpu": resource.MustParse("10"),
+					}, nil).withIncludes(deviceMixin1),
+				).withDeviceMixins(
+					deviceMixin(deviceMixin1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("10Gi"),
+						}, nil,
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-device-counter-consumption-multiple-mixins-override": {
+			features: Features{
+				ResourceSliceMixins:  true,
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, nil).withIncludes(deviceCounterConsumptionMixin1, deviceCounterConsumptionMixin2),
+					),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("10Gi"),
+					}),
+				).withDeviceCounterConsumptionMixins(
+					deviceCounterConsumptionMixin(deviceCounterConsumptionMixin1, map[string]resource.Quantity{
+						"memory": resource.MustParse("15Gi"),
+					}),
+					deviceCounterConsumptionMixin(deviceCounterConsumptionMixin2, map[string]resource.Quantity{
+						"memory": resource.MustParse("10Gi"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-device-counter-consumption-device-override": {
+			features: Features{
+				ResourceSliceMixins:  true,
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("10Gi"),
+						}).withIncludes(deviceCounterConsumptionMixin1),
+					),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("10Gi"),
+					}),
+				).withDeviceCounterConsumptionMixins(
+					deviceCounterConsumptionMixin(deviceCounterConsumptionMixin1, map[string]resource.Quantity{
+						"memory": resource.MustParse("15Gi"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-device-counter-consumption-mixins-additive": {
+			features: Features{
+				ResourceSliceMixins:  true,
+				PartitionableDevices: true,
+				PrioritizedList:      true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+					requestWithPrioritizedList(req1,
+						// Try to get device 2, but it should not be available since
+						// device1 was allocated for req0 and it should consume all
+						// available counters for both memory and cpu.
+						subRequest(subReq0, classA, 1, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].special`, driverA),
+							},
+						}),
+						subRequest(subReq1, classA, 1),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"special": {
+							BoolValue: ptr.To(false),
+						},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("10Gi"),
+						}).withIncludes(deviceCounterConsumptionMixin1),
+					),
+					device(device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"special": {
+							BoolValue: ptr.To(true),
+						},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"cpu": resource.MustParse("1"),
+						}),
+					),
+					device(device3, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"special": {
+							BoolValue: ptr.To(false),
+						},
+					}),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("10Gi"),
+						"cpu":    resource.MustParse("10"),
+					}),
+				).withDeviceCounterConsumptionMixins(
+					deviceCounterConsumptionMixin(deviceCounterConsumptionMixin1, map[string]resource.Quantity{
+						"cpu": resource.MustParse("10"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1SubReq1, driverA, pool1, device3, false),
+			)},
+		},
+		"mixins-counter-set-multiple-mixins-override": {
+			features: Features{
+				ResourceSliceMixins:  true,
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("10Gi"),
+						}),
+					),
+				).withCounterSet(
+					counterSet(counterSet1, nil).withIncludes(counterSetMixin1, counterSetMixin2),
+				).withCounterSetMixins(
+					counterSetMixin(counterSetMixin1, map[string]resource.Quantity{
+						"memory": resource.MustParse("5Gi"),
+					}),
+					counterSetMixin(counterSetMixin2, map[string]resource.Quantity{
+						"memory": resource.MustParse("10Gi"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-counter-set-mixins-counter-set-override": {
+			features: Features{
+				ResourceSliceMixins:  true,
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("10Gi"),
+						}),
+					),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("10Gi"),
+					}).withIncludes(counterSetMixin1),
+				).withCounterSetMixins(
+					counterSetMixin(counterSetMixin1, map[string]resource.Quantity{
+						"memory": resource.MustParse("5Gi"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixins-counter-set-mixins-additive": {
+			features: Features{
+				ResourceSliceMixins:  true,
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("10Gi"),
+							"cpu":    resource.MustParse("10"),
+						}),
+					),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("10Gi"),
+					}).withIncludes(counterSetMixin1),
+				).withCounterSetMixins(
+					counterSetMixin(counterSetMixin1, map[string]resource.Quantity{
+						"cpu": resource.MustParse("10"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"partitionable-devices-mixins-multiple-counters": {
+			features: Features{
+				PartitionableDevices: true,
+				ResourceSliceMixins:  true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+					request(req1, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"cpus": resource.MustParse("6"),
+							},
+						).withIncludes("device-counter-consumption-for-counter-set-1-mixin"),
+						deviceCounterConsumption(counterSet2,
+							map[string]resource.Quantity{
+								"cpus":   resource.MustParse("4"),
+								"memory": resource.MustParse("2Gi"),
+							},
+						).withIncludes("device-counter-consumption-for-counter-set-2-mixin"),
+					),
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("6Gi"),
+							},
+						).withIncludes("device-counter-consumption-for-counter-set-1-mixin"),
+						deviceCounterConsumption(counterSet2,
+							map[string]resource.Quantity{
+								"cpus":   resource.MustParse("6"),
+								"memory": resource.MustParse("6Gi"),
+							},
+						).withIncludes("device-counter-consumption-for-counter-set-2-mixin"),
+					),
+					device(device3, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+								"cpus":   resource.MustParse("4"),
+							},
+						),
+						deviceCounterConsumption(counterSet2,
+							map[string]resource.Quantity{
+								"cpus":   resource.MustParse("4"),
+								"memory": resource.MustParse("4Gi"),
+							},
+						).withIncludes("device-counter-consumption-for-counter-set-2-mixin"),
+					),
+				).withCounterSet(
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"cpus":   resource.MustParse("8"),
+							"memory": resource.MustParse("18Gi"),
+						},
+					),
+					counterSet(counterSet2,
+						map[string]resource.Quantity{
+							"cpus":   resource.MustParse("12"),
+							"memory": resource.MustParse("18Gi"),
+						},
+					),
+				).withDeviceCounterConsumptionMixins(
+					deviceCounterConsumptionMixin("device-counter-consumption-for-counter-set-1-mixin", map[string]resource.Quantity{
+						"memory": resource.MustParse("4Gi"),
+						"cpus":   resource.MustParse("4"),
+					}),
+					deviceCounterConsumptionMixin("device-counter-consumption-for-counter-set-2-mixin", map[string]resource.Quantity{
+						"memory": resource.MustParse("6Gi"),
+						"cpus":   resource.MustParse("6"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req1, driverA, pool1, device3, false),
+			)},
+		},
+		"partitionable-devices-mixins-multiple-pools": {
+			features: Features{
+				PartitionableDevices: true,
+				ResourceSliceMixins:  true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+					request(req1, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"cpus": resource.MustParse("6"),
+							},
+						).withIncludes(
+							"device-counter-consumption-cpu-counter-set-1-mixin",
+							"device-counter-consumption-memory-counter-set-1-mixin",
+						),
+					),
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("6Gi"),
+							},
+						).withIncludes(
+							"device-counter-consumption-cpu-counter-set-1-mixin",
+							"device-counter-consumption-memory-counter-set-1-mixin",
+						),
+					),
+					device(device3, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, nil).withIncludes(
+							"device-counter-consumption-cpu-counter-set-1-mixin",
+							"device-counter-consumption-memory-counter-set-1-mixin",
+						),
+					),
+				).withCounterSet(
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"cpus":   resource.MustParse("8"),
+							"memory": resource.MustParse("18Gi"),
+						},
+					),
+				).withDeviceCounterConsumptionMixins(
+					deviceCounterConsumptionMixin("device-counter-consumption-cpu-counter-set-1-mixin", map[string]resource.Quantity{
+						"cpus": resource.MustParse("4"),
+					}),
+					deviceCounterConsumptionMixin("device-counter-consumption-memory-counter-set-1-mixin", map[string]resource.Quantity{
+						"memory": resource.MustParse("4Gi"),
+					}),
+				),
+				slice(slice2, node1, pool2, driverA,
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"cpus":   resource.MustParse("6"),
+								"memory": resource.MustParse("4Gi"),
+							},
+						).withIncludes(
+							"device-counter-consumption-cpu-counter-set-2-mixin",
+							"device-counter-consumption-memory-counter-set-2-mixin",
+						),
+					),
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, nil).withIncludes(
+							"device-counter-consumption-cpu-counter-set-2-mixin",
+							"device-counter-consumption-memory-counter-set-2-mixin",
+						),
+					),
+					device(device3, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"cpus":   resource.MustParse("1"),
+								"memory": resource.MustParse("7Gi"),
+							},
+						).withIncludes(
+							"device-counter-consumption-cpu-counter-set-2-mixin",
+							"device-counter-consumption-memory-counter-set-2-mixin",
+						),
+					),
+				).withCounterSet(
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"cpus":   resource.MustParse("8"),
+							"memory": resource.MustParse("18Gi"),
+						},
+					),
+				).withDeviceCounterConsumptionMixins(
+					deviceCounterConsumptionMixin("device-counter-consumption-cpu-counter-set-2-mixin", map[string]resource.Quantity{
+						"cpus": resource.MustParse("1"),
+					}),
+					deviceCounterConsumptionMixin("device-counter-consumption-memory-counter-set-2-mixin", map[string]resource.Quantity{
+						"memory": resource.MustParse("7Gi"),
+					}),
+				),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device2),
+				MakeDeviceID(driverA, pool1, device3),
+				MakeDeviceID(driverA, pool2, device1),
+			},
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool2, device2, false),
+				deviceAllocationResult(req1, driverA, pool2, device3, false),
+			)},
+		},
+		"mixins-allocated-devices-consumes-capacity-through-mixins": {
+			features: Features{
+				PartitionableDevices: true,
+				ResourceSliceMixins:  true,
+				PrioritizedList:      true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, 1, resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.capacity["%s"].memory.compareTo(quantity("4Gi")) >= 0`, driverA),
+							},
+						}),
+						subRequest(subReq1, classA, 1),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, map[resourceapi.QualifiedName]resource.Quantity{
+						"memory": resource.MustParse("4Gi"),
+					}, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, nil).withIncludes("device-counter-consumption-mixin"),
+					),
+					device(device2, map[resourceapi.QualifiedName]resource.Quantity{
+						"memory": resource.MustParse("4Gi"),
+					}, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, nil).withIncludes("device-counter-consumption-mixin"),
+					),
+					device(device3, map[resourceapi.QualifiedName]resource.Quantity{
+						"memory": resource.MustParse("3Gi"),
+					}, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("3Gi"),
+							"cpus":   resource.MustParse("3"),
+						}),
+					),
+				).withCounterSet(
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"cpus":   resource.MustParse("8"),
+							"memory": resource.MustParse("7Gi"),
+						},
+					),
+				).withDeviceCounterConsumptionMixins(
+					deviceCounterConsumptionMixin("device-counter-consumption-mixin", map[string]resource.Quantity{
+						"memory": resource.MustParse("4Gi"),
+						"cpus":   resource.MustParse("4"),
+					}),
+				),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, device3, false),
 			)},
 		},
 	}

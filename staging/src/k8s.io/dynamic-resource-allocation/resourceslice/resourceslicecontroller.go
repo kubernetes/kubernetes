@@ -161,6 +161,7 @@ type Slice struct {
 	Devices                []resourceapi.Device
 	SharedCounters         []resourceapi.CounterSet
 	PerDeviceNodeSelection *bool
+	Mixins                 *resourceapi.ResourceSliceMixins
 }
 
 // +k8s:deepcopy-gen=true
@@ -284,6 +285,12 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 	if ptr.Deref(err.DesiredSlice.Spec.PerDeviceNodeSelection, false) && !ptr.Deref(err.ActualSlice.Spec.PerDeviceNodeSelection, false) ||
 		len(err.DesiredSlice.Spec.SharedCounters) > len(err.ActualSlice.Spec.SharedCounters) {
 		disabled = append(disabled, "DRAPartitionableDevices")
+	}
+
+	// Dropped fields for resourceslice mixins can be detected just by looking at the spec.mixins property. It
+	// must always be set if mixins are in use.
+	if err.DesiredSlice.Spec.Mixins != nil && err.ActualSlice.Spec.Mixins == nil {
+		disabled = append(disabled, "DRAResourceSliceMixins")
 	}
 
 	return disabled
@@ -694,7 +701,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			ptr.Deref(currentSlice.Spec.AllNodes, false) != desiredAllNodes ||
 			!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
-			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) {
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) ||
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.Mixins, pool.Slices[i].Mixins) {
 			changedDesiredSlices.Insert(i)
 			logger.V(5).Info("Need to update slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
 		}
@@ -744,6 +752,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		slice.Spec.AllNodes = refIfNotZero(desiredAllNodes)
 		slice.Spec.SharedCounters = pool.Slices[i].SharedCounters
 		slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
+		slice.Spec.Mixins = pool.Slices[i].Mixins
 		// Preserve TimeAdded from existing device, if there is a matching device and taint.
 		slice.Spec.Devices = copyTaintTimeAdded(slice.Spec.Devices, pool.Slices[i].Devices)
 
@@ -793,6 +802,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 				Devices:                pool.Slices[i].Devices,
 				SharedCounters:         pool.Slices[i].SharedCounters,
 				PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
+				Mixins:                 pool.Slices[i].Mixins,
 			},
 		}
 
@@ -896,10 +906,12 @@ func (c *Controller) sliceStored(ctx context.Context, msg string, poolName strin
 	// we can store.
 	if !apiequality.Semantic.DeepEqual(desiredSlice.Spec.PerDeviceNodeSelection, actualSlice.Spec.PerDeviceNodeSelection) ||
 		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.SharedCounters, actualSlice.Spec.SharedCounters) ||
-		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.Devices, actualSlice.Spec.Devices) {
+		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.Devices, actualSlice.Spec.Devices) ||
+		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.Mixins, actualSlice.Spec.Mixins) {
 		pool.Slices[sliceIndex].PerDeviceNodeSelection = actualSlice.Spec.PerDeviceNodeSelection
 		pool.Slices[sliceIndex].SharedCounters = actualSlice.Spec.SharedCounters
 		pool.Slices[sliceIndex].Devices = actualSlice.Spec.Devices
+		pool.Slices[sliceIndex].Mixins = actualSlice.Spec.Mixins
 
 		err := &DroppedFieldsError{
 			PoolName:     poolName,

@@ -73,6 +73,7 @@ type Features struct {
 	PrioritizedList      bool
 	PartitionableDevices bool
 	DeviceTaints         bool
+	ResourceSliceMixins  bool
 }
 
 // NewAllocator returns an allocator for a certain set of claims or an error if
@@ -892,6 +893,19 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 		return false, nil
 	}
 
+	// If the device is referencing mixins but the feature is not enabled, we can't
+	// select the device.
+	if !alloc.features.ResourceSliceMixins && isDeviceReferencingMixins(device) {
+		return false, nil
+	}
+
+	// Create a map of only the DeviceMixins that are needed for the device so it can
+	// be provided to both calls to selectorsMatch.
+	deviceMixins := make(map[draapi.UniqueString]draapi.DeviceMixin)
+	for _, mixinRef := range device.MixinRefs {
+		deviceMixins[mixinRef] = slice.Spec.Mixins.Device[mixinRef]
+	}
+
 	deviceID := DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name}
 	matchKey := matchKey{DeviceID: deviceID, requestIndices: r}
 	if matches, ok := alloc.deviceMatchesRequest[matchKey]; ok {
@@ -900,7 +914,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	if requestData.class != nil {
-		match, err := alloc.selectorsMatch(r, device, deviceID, requestData.class, requestData.class.Spec.Selectors)
+		match, err := alloc.selectorsMatch(r, device, deviceMixins, deviceID, requestData.class, requestData.class.Spec.Selectors)
 		if err != nil {
 			return false, err
 		}
@@ -911,7 +925,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	}
 
 	request := requestData.request
-	match, err := alloc.selectorsMatch(r, device, deviceID, nil, request.selectors())
+	match, err := alloc.selectorsMatch(r, device, deviceMixins, deviceID, nil, request.selectors())
 	if err != nil {
 		return false, err
 	}
@@ -944,7 +958,21 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 
 }
 
-func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.BasicDevice, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
+// isDeviceReferencingMixins checks if a device references mixins, either
+// device mixins or counter consumption mixins.
+func isDeviceReferencingMixins(device *draapi.BasicDevice) bool {
+	if len(device.MixinRefs) > 0 {
+		return true
+	}
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
+		if len(deviceCounterConsumption.MixinRefs) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.BasicDevice, deviceMixins map[draapi.UniqueString]draapi.DeviceMixin, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {
 	for i, selector := range selectors {
 		expr := alloc.celCache.GetOrCompile(selector.CEL.Expression)
 		if expr.Error != nil {
@@ -965,7 +993,11 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.BasicDev
 		if err := draapi.Convert_api_BasicDevice_To_v1beta1_BasicDevice(device, &d, nil); err != nil {
 			return false, fmt.Errorf("convert BasicDevice: %w", err)
 		}
-		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), Attributes: d.Attributes, Capacity: d.Capacity})
+		var m resourceapi.ResourceSliceMixins
+		if err := draapi.Convert_api_ResourceSliceMixins_To_v1beta1_ResourceSliceMixins(&draapi.ResourceSliceMixins{Device: deviceMixins}, &m, nil); err != nil {
+			return false, fmt.Errorf("convert ResourceSliceMixins: %w", err)
+		}
+		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), Attributes: d.Attributes, Capacity: d.Capacity, Mixins: m.Device})
 		if class != nil {
 			alloc.logger.V(7).Info("CEL result", "device", deviceID, "class", klog.KObj(class), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "actualCost", ptr.Deref(details.ActualCost(), 0), "err", err)
 		} else {
@@ -1142,6 +1174,14 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 		availableCountersForSlice = make(counterSets, len(slice.Spec.SharedCounters))
 		for _, counterSet := range slice.Spec.SharedCounters {
 			availableCountersForCounterSet := make(map[string]draapi.Counter, len(counterSet.Counters))
+			// Handle mixins first since any counters defined directly on the counter set should override mixins.
+			for _, mixinRef := range counterSet.MixinRefs {
+				mixin := slice.Spec.Mixins.CounterSet[mixinRef]
+				for name, cap := range mixin.Counters {
+					availableCountersForCounterSet[name] = cap
+				}
+			}
+			// Handle counters defined directly on the counter set.
 			for name, c := range counterSet.Counters {
 				availableCountersForCounterSet[name] = c
 			}
@@ -1164,7 +1204,8 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 			}
 			for _, deviceCounterConsumption := range device.Basic.ConsumesCounters {
 				availableCountersForCounterSet := availableCountersForSlice[deviceCounterConsumption.CounterSet]
-				for name, c := range deviceCounterConsumption.Counters {
+				consumedCountersForCounterSet := flattenDeviceCounterConsumptionForCounterSet(deviceCounterConsumption, slice)
+				for name, c := range consumedCountersForCounterSet {
 					existingCounter, ok := availableCountersForCounterSet[name]
 					if !ok {
 						// the API validation logic has been added to make sure the counters referred should exist in counter sets.
@@ -1203,7 +1244,9 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 			consumedCountersForCounterSet = make(map[string]draapi.Counter)
 			consumedCountersForSlice[deviceCounterConsumption.CounterSet] = consumedCountersForCounterSet
 		}
-		for name, c := range deviceCounterConsumption.Counters {
+
+		countersForCounterSet := flattenDeviceCounterConsumptionForCounterSet(deviceCounterConsumption, slice)
+		for name, c := range countersForCounterSet {
 			consumedCounters, found := consumedCountersForCounterSet[name]
 			if !found {
 				consumedCountersForCounterSet[name] = c
@@ -1231,6 +1274,24 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 	return true, nil
 }
 
+func flattenDeviceCounterConsumptionForCounterSet(deviceCounterConsumption draapi.DeviceCounterConsumption, slice *draapi.ResourceSlice) map[string]draapi.Counter {
+	countersForCounterSet := make(map[string]draapi.Counter)
+	// We need to calculate the consumed counters before subtracting it since
+	// we allow overrides.
+	for _, mixinRef := range deviceCounterConsumption.MixinRefs {
+		mixin := slice.Spec.Mixins.DeviceCounterConsumption[mixinRef]
+		for name, cap := range mixin.Counters {
+			countersForCounterSet[name] = cap
+		}
+	}
+	// Handle counters defined directly on the counter set last, as they
+	// will always override mixins.
+	for name, cap := range deviceCounterConsumption.Counters {
+		countersForCounterSet[name] = cap
+	}
+	return countersForCounterSet
+}
+
 func (alloc *allocator) deviceInUse(deviceID DeviceID) bool {
 	return alloc.allocatedDevices.Has(deviceID) || alloc.allocatingDeviceForAnyClaim(deviceID)
 }
@@ -1253,7 +1314,8 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 	for _, deviceCounterConsumption := range device.basic.ConsumesCounters {
 		counterSetName := deviceCounterConsumption.CounterSet
 		consumedCounterSet := consumedCountersForSlice[counterSetName]
-		for name, c := range deviceCounterConsumption.Counters {
+		countersForCounterSet := flattenDeviceCounterConsumptionForCounterSet(deviceCounterConsumption, slice)
+		for name, c := range countersForCounterSet {
 			consumedCounter := consumedCounterSet[name]
 			consumedCounter.Value.Sub(c.Value)
 			consumedCounterSet[name] = consumedCounter
