@@ -1103,7 +1103,18 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 			framework.Failf("Service HealthCheck NodePort was not allocated")
 		}
 
-		ips := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
+		// Only fetch a single v1.NodeInternalIP address from each node.
+		ips := []string{}
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+			for j := range node.Status.Addresses {
+				nodeAddress := &node.Status.Addresses[j]
+				if nodeAddress.Type == v1.NodeInternalIP && nodeAddress.Address != "" {
+					ips = append(ips, nodeAddress.Address)
+					break
+				}
+			}
+		}
 
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		svcTCPPort := int(svc.Spec.Ports[0].Port)
