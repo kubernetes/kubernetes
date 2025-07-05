@@ -31,6 +31,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -80,6 +81,11 @@ func (a *APIServer) Start(ctx context.Context) error {
 	}
 	o.Authentication.TokenFile.TokenFile = tokenFilePath
 	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition"}
+
+	err = filesystem.MkdirAll("/tmp", 0755)
+	if err != nil && !errors.Is(err, os.ErrExist) {
+		return fmt.Errorf("create temp dir failed: %w", err)
+	}
 
 	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
 	if err != nil {
