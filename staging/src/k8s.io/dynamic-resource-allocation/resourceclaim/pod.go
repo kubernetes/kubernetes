@@ -46,3 +46,31 @@ func PodStatusEqual(statusA, statusB []corev1.PodResourceClaimStatus) bool {
 	}
 	return true
 }
+
+func PodExtendedStatusEqual(statusA, statusB *corev1.PodExtendedResourceClaimStatus) bool {
+	if statusA == nil && statusB == nil {
+		return true
+	}
+	if (statusA == nil) != (statusB == nil) {
+		return false
+	}
+	if statusA.ResourceClaimName != statusB.ResourceClaimName {
+		return false
+	}
+
+	// In most cases, status entries only get added once and not modified.
+	// But this cannot be guaranteed, so for the sake of correctness in all
+	// cases this code here has to check.
+	for i := range statusA.RequestMapping {
+		if statusA.RequestMapping[i].ContainerName != statusB.RequestMapping[i].ContainerName {
+			return false
+		}
+		if statusA.RequestMapping[i].ExtendedResourceName != statusB.RequestMapping[i].ExtendedResourceName {
+			return false
+		}
+		if statusA.RequestMapping[i].RequestName != statusB.RequestMapping[i].RequestName {
+			return false
+		}
+	}
+	return true
+}
