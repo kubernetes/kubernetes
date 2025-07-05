@@ -321,7 +321,7 @@ func TestNewExecInContainer(t *testing.T) {
 		container := v1.Container{}
 		containerID := kubecontainer.ContainerID{Type: "docker", ID: "containerID"}
 		cmd := []string{"/foo", "bar"}
-		exec := prober.newExecInContainer(ctx, container, containerID, cmd, 0)
+		exec := prober.newExecInContainer(ctx, &v1.Pod{}, container, containerID, cmd, 0)
 
 		var dataBuffer bytes.Buffer
 		writer := ioutils.LimitWriter(&dataBuffer, int64(limit))
