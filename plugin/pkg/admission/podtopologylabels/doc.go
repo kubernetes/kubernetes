@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package podtopologylabels is a plugin that mutates `pod/binding` requests
-// by copying the `topology.k8s.io/{zone,region}` labels from the assigned Node
+// by copying the `topology.kubernetes.io/{zone,region}` labels from the assigned Node
 // object (in the Binding being admitted) onto the Binding so that it can be
 // persisted onto the Pod object when the Pod is being scheduled.
 // Requests for the regular `pods` resource that set the `spec.nodeName` will

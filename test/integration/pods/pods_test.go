@@ -49,52 +49,52 @@ func TestPodTopologyLabels(t *testing.T) {
 		{
 			name: "zone and region topology labels copied from assigned Node",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
 			},
 			expectedPodLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
 			},
 		},
 		{
-			name: "subdomains of topology.k8s.io are not copied",
+			name: "subdomains of topology.kubernetes.io are not copied",
 			targetNodeLabels: map[string]string{
-				"sub.topology.k8s.io/zone": "zone",
-				"topology.k8s.io/region":   "region",
+				"sub.topology.kubernetes.io/zone": "zone",
+				"topology.kubernetes.io/region":   "region",
 			},
 			expectedPodLabels: map[string]string{
-				"topology.k8s.io/region": "region",
+				"topology.kubernetes.io/region": "region",
 			},
 		},
 		{
-			name: "custom topology.k8s.io labels are not copied",
+			name: "custom topology.kubernetes.io labels are not copied",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/custom": "thing",
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
+				"topology.kubernetes.io/custom": "thing",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
 			},
 			expectedPodLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
 			},
 		},
 		{
 			name: "labels from Bindings overwriting existing labels on Pod",
 			existingPodLabels: map[string]string{
-				"topology.k8s.io/zone":   "bad-zone",
-				"topology.k8s.io/region": "bad-region",
-				"topology.k8s.io/abc":    "123",
+				"topology.kubernetes.io/zone":   "bad-zone",
+				"topology.kubernetes.io/region": "bad-region",
+				"topology.kubernetes.io/abc":    "123",
 			},
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
-				"topology.k8s.io/abc":    "456", // this label isn't in (zone, region) so isn't copied
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+				"topology.kubernetes.io/abc":    "456", // this label isn't in (zone, region) so isn't copied
 			},
 			expectedPodLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
-				"topology.k8s.io/abc":    "123",
+				"topology.kubernetes.io/zone":   "zone",
+				"topology.kubernetes.io/region": "region",
+				"topology.kubernetes.io/abc":    "123",
 			},
 		},
 	}
@@ -110,10 +110,10 @@ func TestPodTopologyLabels_FeatureDisabled(t *testing.T) {
 		{
 			name: "does nothing when the feature is not enabled",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone":     "zone",
-				"topology.k8s.io/region":   "region",
-				"topology.k8s.io/custom":   "thing",
-				"sub.topology.k8s.io/zone": "zone",
+				"topology.kubernetes.io/zone":     "zone",
+				"topology.kubernetes.io/region":   "region",
+				"topology.kubernetes.io/custom":   "thing",
+				"sub.topology.kubernetes.io/zone": "zone",
 			},
 			expectedPodLabels: map[string]string{},
 		},
