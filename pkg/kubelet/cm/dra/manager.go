@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -36,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
@@ -101,8 +102,8 @@ type Manager struct {
 // - Don't include the namespace, it can be inferred from the context.
 // - Avoid repeated "failed to ...: failed to ..." when wrapping errors.
 // - Avoid wrapping when it does not provide relevant additional information to keep the user-visible error short.
-func NewManager(kubeClient clientset.Interface, stateFileDirectory string) (*Manager, error) {
-	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
+func NewManager(logger klog.Logger, kubeClient clientset.Interface, stateFileDirectory string) (*Manager, error) {
+	claimInfoCache, err := newClaimInfoCache(logger, stateFileDirectory, draManagerStateFileName)
 	if err != nil {
 		return nil, fmt.Errorf("create ResourceClaim cache: %w", err)
 	}
@@ -120,6 +121,10 @@ func NewManager(kubeClient clientset.Interface, stateFileDirectory string) (*Man
 	}
 
 	return manager, nil
+}
+
+func (m *Manager) NewMetricsCollector() metrics.StableCollector {
+	return &claimInfoCollector{cache: m.cache}
 }
 
 // GetWatcherHandler must be called after Start, it indirectly depends
@@ -199,7 +204,7 @@ func (m *Manager) reconcileLoop(ctx context.Context) {
 func (m *Manager) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.prepareResources(ctx, pod)
-	metrics.DRAOperationsDuration.WithLabelValues("PrepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
+	kubeletmetrics.DRAOperationsDuration.WithLabelValues("PrepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
 	if err != nil {
 		return fmt.Errorf("prepare dynamic resources: %w", err)
 	}
@@ -481,7 +486,7 @@ func (m *Manager) GetResources(pod *v1.Pod, container *v1.Container) (*Container
 func (m *Manager) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.unprepareResourcesForPod(ctx, pod)
-	metrics.DRAOperationsDuration.WithLabelValues("UnprepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
+	kubeletmetrics.DRAOperationsDuration.WithLabelValues("UnprepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
 	if err != nil {
 		return fmt.Errorf("unprepare dynamic resources: %w", err)
 	}
