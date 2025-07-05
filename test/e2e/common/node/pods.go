@@ -901,8 +901,8 @@ var _ = SIGDescribe("Pods", func() {
 		podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		testNamespaceName := f.Namespace.Name
 		testPodName := "pod-test"
-		testPodImage := imageutils.GetE2EImage(imageutils.Agnhost)
-		testPodImage2 := imageutils.GetE2EImage(imageutils.Httpd)
+		testPodImage := imageutils.GetE2EImage(imageutils.AgnhostPrev)
+		testPodImage2 := imageutils.GetE2EImage(imageutils.Agnhost)
 		testPodLabels := map[string]string{"test-pod-static": "true"}
 		testPodLabelsFlat := "test-pod-static=true"
 		one := int64(1)
