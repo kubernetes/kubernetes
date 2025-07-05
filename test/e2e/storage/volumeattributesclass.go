@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
@@ -50,10 +50,10 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(fea
 	*/
 	framework.It("should run through the lifecycle of a VolumeAttributesClass", func(ctx context.Context) {
 
-		vacClient := f.ClientSet.StorageV1beta1().VolumeAttributesClasses()
-		var initialVAC, replacementVAC *storagev1beta1.VolumeAttributesClass
+		vacClient := f.ClientSet.StorageV1().VolumeAttributesClasses()
+		var initialVAC, replacementVAC *storagev1.VolumeAttributesClass
 
-		initialVAC = &storagev1beta1.VolumeAttributesClass{
+		initialVAC = &storagev1.VolumeAttributesClass{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "VolumeAttributesClass",
 			},
@@ -88,7 +88,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(fea
 
 		vacSelector := labels.Set{patchedVolumeAttributesClass.Name: "patched"}.AsSelector().String()
 		type state struct {
-			VolumeAttributesClasses []storagev1beta1.VolumeAttributesClass
+			VolumeAttributesClasses []storagev1.VolumeAttributesClass
 		}
 
 		err = framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (*state, error) {
@@ -111,7 +111,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(fea
 
 		ginkgo.By("Create a replacement VolumeAttributesClass")
 
-		replacementVAC = &storagev1beta1.VolumeAttributesClass{
+		replacementVAC = &storagev1.VolumeAttributesClass{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "VolumeAttributesClass",
 			},
@@ -128,7 +128,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(fea
 		framework.ExpectNoError(err, "failed to create replacement VolumeAttributesClass")
 
 		ginkgo.By(fmt.Sprintf("Updating VolumeAttributesClass %q", replacementVolumeAttributesClass.Name))
-		var updatedVolumeAttributesClass *storagev1beta1.VolumeAttributesClass
+		var updatedVolumeAttributesClass *storagev1.VolumeAttributesClass
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			vac, err := vacClient.Get(ctx, replacementVolumeAttributesClass.Name, metav1.GetOptions{})
