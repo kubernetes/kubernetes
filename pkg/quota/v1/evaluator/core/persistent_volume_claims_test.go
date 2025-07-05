@@ -219,7 +219,6 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
-			enableRecoverFromExpansion: true,
 		},
 		"pvc-usage-by-class": {
 			pvc: validClaimByStorageClass,
@@ -230,7 +229,6 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				V1ResourceByStorageClass(classGold, corev1.ResourcePersistentVolumeClaims):                        resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
-			enableRecoverFromExpansion: true,
 		},
 
 		"pvc-usage-rounded": {
@@ -240,7 +238,6 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
-			enableRecoverFromExpansion: true,
 		},
 		"pvc-usage-by-class-rounded": {
 			pvc: validClaimByStorageClassWithNonIntegerStorage,
@@ -251,7 +248,6 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				V1ResourceByStorageClass(classGold, corev1.ResourcePersistentVolumeClaims):                        resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
-			enableRecoverFromExpansion: true,
 		},
 		"pvc-usage-higher-allocated-resource": {
 			pvc: getPVCWithAllocatedResource("5G", "10G"),
@@ -260,7 +256,6 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
-			enableRecoverFromExpansion: true,
 		},
 		"pvc-usage-lower-allocated-resource": {
 			pvc: getPVCWithAllocatedResource("10G", "5G"),
@@ -269,12 +264,10 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
-			enableRecoverFromExpansion: true,
 		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, testCase.enableRecoverFromExpansion)
 			actual, err := evaluator.Usage(testCase.pvc)
 			if err != nil {
 				t.Errorf("%s unexpected error: %v", testName, err)

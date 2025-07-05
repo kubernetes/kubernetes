@@ -2175,8 +2175,6 @@ func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *core.PersistentVolume) f
 }
 
 type PersistentVolumeClaimSpecValidationOptions struct {
-	// Allow users to recover from previously failing expansion operation
-	EnableRecoverFromExpansionFailure bool
 	// Allow to validate the label value of the label selector
 	AllowInvalidLabelValueInSelector bool
 	// Allow to validate the API group of the data source and data source reference
@@ -2187,9 +2185,8 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 
 func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
 	opts := PersistentVolumeClaimSpecValidationOptions{
-		EnableRecoverFromExpansionFailure: utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
-		AllowInvalidLabelValueInSelector:  false,
-		EnableVolumeAttributesClass:       utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
+		AllowInvalidLabelValueInSelector: false,
+		EnableVolumeAttributesClass:      utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
 	}
 	if oldPvc == nil {
 		// If there's no old PVC, use the options based solely on feature enablement
@@ -2210,11 +2207,6 @@ func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolum
 	if len(unversionedvalidation.ValidateLabelSelector(oldPvc.Spec.Selector, labelSelectorValidationOpts, nil)) > 0 {
 		// If the old object had an invalid label selector, continue to allow it in the new object
 		opts.AllowInvalidLabelValueInSelector = true
-	}
-
-	if helper.ClaimContainsAllocatedResources(oldPvc) ||
-		helper.ClaimContainsAllocatedResourceStatus(oldPvc) {
-		opts.EnableRecoverFromExpansionFailure = true
 	}
 	return opts
 }
@@ -2440,15 +2432,11 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests and volumeAttributesClassName for bound claims\n%v", specDiff)))
 	}
 	if newSize.Cmp(oldSize) < 0 {
-		if !opts.EnableRecoverFromExpansionFailure {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than previous value"))
-		} else {
-			// This validation permits reducing pvc requested size up to capacity recorded in pvc.status
-			// so that users can recover from volume expansion failure, but Kubernetes does not actually
-			// support volume shrinking
-			if newSize.Cmp(statusSize) <= 0 {
-				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than status.capacity"))
-			}
+		// This validation permits reducing pvc requested size up to capacity recorded in pvc.status
+		// so that users can recover from volume expansion failure, but Kubernetes does not actually
+		// support volume shrinking
+		if newSize.Cmp(statusSize) <= 0 {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "resources", "requests", "storage"), "field can not be less than status.capacity"))
 		}
 	}
 
@@ -2538,32 +2526,31 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 	for r, qty := range newPvc.Status.Capacity {
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
 	}
-	if validationOpts.EnableRecoverFromExpansionFailure {
-		resizeStatusPath := field.NewPath("status", "allocatedResourceStatuses")
-		if newPvc.Status.AllocatedResourceStatuses != nil {
-			resizeStatus := newPvc.Status.AllocatedResourceStatuses
-			for k, v := range resizeStatus {
-				if errs := validatePersistentVolumeClaimResourceKey(k.String(), resizeStatusPath); len(errs) > 0 {
-					allErrs = append(allErrs, errs...)
-				}
-				if !resizeStatusSet.Has(v) {
-					allErrs = append(allErrs, field.NotSupported(resizeStatusPath, k, sets.List(resizeStatusSet)))
-					continue
-				}
-			}
-		}
-		allocPath := field.NewPath("status", "allocatedResources")
-		for r, qty := range newPvc.Status.AllocatedResources {
-			if errs := validatePersistentVolumeClaimResourceKey(r.String(), allocPath); len(errs) > 0 {
+
+	resizeStatusPath := field.NewPath("status", "allocatedResourceStatuses")
+	if newPvc.Status.AllocatedResourceStatuses != nil {
+		resizeStatus := newPvc.Status.AllocatedResourceStatuses
+		for k, v := range resizeStatus {
+			if errs := validatePersistentVolumeClaimResourceKey(k.String(), resizeStatusPath); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
+			}
+			if !resizeStatusSet.Has(v) {
+				allErrs = append(allErrs, field.NotSupported(resizeStatusPath, k, sets.List(resizeStatusSet)))
 				continue
 			}
+		}
+	}
+	allocPath := field.NewPath("status", "allocatedResources")
+	for r, qty := range newPvc.Status.AllocatedResources {
+		if errs := validatePersistentVolumeClaimResourceKey(r.String(), allocPath); len(errs) > 0 {
+			allErrs = append(allErrs, errs...)
+			continue
+		}
 
-			if errs := validateBasicResource(qty, allocPath.Key(string(r))); len(errs) > 0 {
-				allErrs = append(allErrs, errs...)
-			} else {
-				allErrs = append(allErrs, ValidateResourceQuantityValue(core.ResourceStorage, qty, allocPath.Key(string(r)))...)
-			}
+		if errs := validateBasicResource(qty, allocPath.Key(string(r))); len(errs) > 0 {
+			allErrs = append(allErrs, errs...)
+		} else {
+			allErrs = append(allErrs, ValidateResourceQuantityValue(core.ResourceStorage, qty, allocPath.Key(string(r)))...)
 		}
 	}
 	return allErrs
