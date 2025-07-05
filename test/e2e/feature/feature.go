@@ -134,6 +134,10 @@ var (
 	// their dependency on specific feature gates and the corresponding API groups.
 	DynamicResourceAllocation = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
 
+	// OWNER: sig-node
+	// Allow containers to read environment variables from a file.
+	EnvFiles = framework.WithFeature(framework.ValidFeatures.Add("EnvFiles"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	EphemeralStorage = framework.WithFeature(framework.ValidFeatures.Add("EphemeralStorage"))
 

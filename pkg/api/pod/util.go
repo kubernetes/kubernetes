@@ -724,10 +724,54 @@ func dropDisabledFields(
 		}
 	}
 
+	dropFileKeyRefInUse(podSpec, oldPodSpec)
 	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
 	dropContainerStopSignals(podSpec, oldPodSpec)
+}
+
+func dropFileKeyRefInUse(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles) || podFileKeyRefInUse(oldPodSpec) {
+		return
+	}
+
+	wipeFileKeyRef := func(ctr *api.Container) {
+		for i, env := range ctr.Env {
+			if env.ValueFrom != nil && env.ValueFrom.FileKeyRef != nil {
+				ctr.Env[i].ValueFrom.FileKeyRef = nil
+			}
+		}
+	}
+
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.Env == nil {
+			return true
+		}
+		wipeFileKeyRef(c)
+		return true
+	})
+}
+
+func podFileKeyRefInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		for _, env := range c.Env {
+			if env.ValueFrom == nil {
+				return true
+			}
+
+			if env.ValueFrom.FileKeyRef != nil {
+				inUse = true
+				return false
+			}
+		}
+		return true
+	})
+	return inUse
 }
 
 func dropContainerStopSignals(podSpec, oldPodSpec *api.PodSpec) {

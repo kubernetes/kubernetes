@@ -5099,3 +5099,624 @@ func TestHasAPIReferences(t *testing.T) {
 		})
 	}
 }
+
+func TestDropFileKeyRefInUse(t *testing.T) {
+	testCases := []struct {
+		name           string
+		featureEnabled bool
+		oldPodSpec     *api.PodSpec
+		newPodSpec     *api.PodSpec
+		expectedSpec   *api.PodSpec
+		description    string
+	}{
+		{
+			name:           "feature enabled - should not drop FileKeyRef",
+			featureEnabled: true,
+			oldPodSpec:     nil,
+			newPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name: "TEST_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "test-volume",
+										Path:       "/path/to/file",
+										Key:        "test-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name: "TEST_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "test-volume",
+										Path:       "/path/to/file",
+										Key:        "test-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			description: "When EnvFiles feature gate is enabled, FileKeyRef should not be dropped",
+		},
+		{
+			name:           "feature disabled - old pod has FileKeyRef - should not drop",
+			featureEnabled: false,
+			oldPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "old-container",
+						Env: []api.EnvVar{
+							{
+								Name: "OLD_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "old-volume",
+										Path:       "/old/path",
+										Key:        "old-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			newPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "new-container",
+						Env: []api.EnvVar{
+							{
+								Name: "NEW_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "new-volume",
+										Path:       "/new/path",
+										Key:        "new-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "new-container",
+						Env: []api.EnvVar{
+							{
+								Name: "NEW_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "new-volume",
+										Path:       "/new/path",
+										Key:        "new-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			description: "When feature is disabled but old pod has FileKeyRef, new pod should not be modified",
+		},
+		{
+			name:           "feature disabled - old pod has no FileKeyRef - should drop",
+			featureEnabled: false,
+			oldPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "old-container",
+						Env: []api.EnvVar{
+							{
+								Name:  "OLD_ENV",
+								Value: "old-value",
+							},
+						},
+					},
+				},
+			},
+			newPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "new-container",
+						Env: []api.EnvVar{
+							{
+								Name: "NEW_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "new-volume",
+										Path:       "/new/path",
+										Key:        "new-key",
+									},
+								},
+							},
+							{
+								Name:  "REGULAR_ENV",
+								Value: "regular-value",
+							},
+						},
+					},
+				},
+			},
+			expectedSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "new-container",
+						Env: []api.EnvVar{
+							{
+								Name: "NEW_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: nil,
+								},
+							},
+							{
+								Name:  "REGULAR_ENV",
+								Value: "regular-value",
+							},
+						},
+					},
+				},
+			},
+			description: "When feature is disabled and old pod has no FileKeyRef, FileKeyRef should be dropped from new pod",
+		},
+		{
+			name:           "feature disabled - old pod is nil - should drop",
+			featureEnabled: false,
+			oldPodSpec:     nil,
+			newPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name: "TEST_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "test-volume",
+										Path:       "/path/to/file",
+										Key:        "test-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name: "TEST_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: nil,
+								},
+							},
+						},
+					},
+				},
+			},
+			description: "When feature is disabled and old pod is nil, FileKeyRef should be dropped from new pod",
+		},
+		{
+			name:           "feature disabled - multiple containers with FileKeyRef - should drop all",
+			featureEnabled: false,
+			oldPodSpec:     nil,
+			newPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "container1",
+						Env: []api.EnvVar{
+							{
+								Name: "ENV1",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "volume1",
+										Path:       "/path1",
+										Key:        "key1",
+									},
+								},
+							},
+						},
+					},
+					{
+						Name: "container2",
+						Env: []api.EnvVar{
+							{
+								Name: "ENV2",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "volume2",
+										Path:       "/path2",
+										Key:        "key2",
+									},
+								},
+							},
+						},
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name: "init-container",
+						Env: []api.EnvVar{
+							{
+								Name: "INIT_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "init-volume",
+										Path:       "/init/path",
+										Key:        "init-key",
+									},
+								},
+							},
+						},
+					},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{
+						EphemeralContainerCommon: api.EphemeralContainerCommon{
+							Name: "ephemeral-container",
+							Env: []api.EnvVar{
+								{
+									Name: "EPHEMERAL_ENV",
+									ValueFrom: &api.EnvVarSource{
+										FileKeyRef: &api.FileKeySelector{
+											VolumeName: "ephemeral-volume",
+											Path:       "/ephemeral/path",
+											Key:        "ephemeral-key",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "container1",
+						Env: []api.EnvVar{
+							{
+								Name: "ENV1",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: nil,
+								},
+							},
+						},
+					},
+					{
+						Name: "container2",
+						Env: []api.EnvVar{
+							{
+								Name: "ENV2",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: nil,
+								},
+							},
+						},
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Name: "init-container",
+						Env: []api.EnvVar{
+							{
+								Name: "INIT_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: nil,
+								},
+							},
+						},
+					},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{
+						EphemeralContainerCommon: api.EphemeralContainerCommon{
+							Name: "ephemeral-container",
+							Env: []api.EnvVar{
+								{
+									Name: "EPHEMERAL_ENV",
+									ValueFrom: &api.EnvVarSource{
+										FileKeyRef: nil,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			description: "When feature is disabled, FileKeyRef should be dropped from all container types",
+		},
+		{
+			name:           "feature disabled - mixed env vars - should only drop FileKeyRef",
+			featureEnabled: false,
+			oldPodSpec:     nil,
+			newPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name:  "REGULAR_ENV",
+								Value: "regular-value",
+							},
+							{
+								Name: "FILE_KEY_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "test-volume",
+										Path:       "/path/to/file",
+										Key:        "test-key",
+									},
+								},
+							},
+							{
+								Name: "SECRET_ENV",
+								ValueFrom: &api.EnvVarSource{
+									SecretKeyRef: &api.SecretKeySelector{
+										LocalObjectReference: api.LocalObjectReference{
+											Name: "test-secret",
+										},
+										Key: "secret-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name:  "REGULAR_ENV",
+								Value: "regular-value",
+							},
+							{
+								Name: "FILE_KEY_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: nil,
+								},
+							},
+							{
+								Name: "SECRET_ENV",
+								ValueFrom: &api.EnvVarSource{
+									SecretKeyRef: &api.SecretKeySelector{
+										LocalObjectReference: api.LocalObjectReference{
+											Name: "test-secret",
+										},
+										Key: "secret-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			description: "When feature is disabled, only FileKeyRef should be dropped, other env var sources should remain",
+		},
+		{
+			name:           "feature disabled - container with nil Env - should not panic",
+			featureEnabled: false,
+			oldPodSpec:     nil,
+			newPodSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env:  nil,
+					},
+				},
+			},
+			expectedSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env:  nil,
+					},
+				},
+			},
+			description: "When container has nil Env field, function should handle it gracefully",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvFiles, tc.featureEnabled)
+			newPodSpecCopy := tc.newPodSpec.DeepCopy()
+			dropFileKeyRefInUse(newPodSpecCopy, tc.oldPodSpec)
+
+			if !reflect.DeepEqual(newPodSpecCopy, tc.expectedSpec) {
+				t.Errorf("Test case '%s' failed:\nExpected: %+v\nGot: %+v",
+					tc.description, tc.expectedSpec, newPodSpecCopy)
+			}
+
+			if tc.oldPodSpec != nil {
+				oldPodSpecCopy := tc.oldPodSpec.DeepCopy()
+				if !reflect.DeepEqual(tc.oldPodSpec, oldPodSpecCopy) {
+					t.Errorf("Test case '%s' failed: old pod spec was modified", tc.description)
+				}
+			}
+		})
+	}
+}
+
+// TestPodFileKeyRefInUse tests the podFileKeyRefInUse function
+func TestPodFileKeyRefInUse(t *testing.T) {
+	testCases := []struct {
+		name        string
+		podSpec     *api.PodSpec
+		expected    bool
+		description string
+	}{
+		{
+			name:        "nil pod spec",
+			podSpec:     nil,
+			expected:    false,
+			description: "Nil pod spec should return false",
+		},
+		{
+			name: "pod spec with FileKeyRef in container",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name: "TEST_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "test-volume",
+										Path:       "/path/to/file",
+										Key:        "test-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected:    true,
+			description: "Pod spec with FileKeyRef in container should return true",
+		},
+		{
+			name: "pod spec with FileKeyRef in init container",
+			podSpec: &api.PodSpec{
+				InitContainers: []api.Container{
+					{
+						Name: "init-container",
+						Env: []api.EnvVar{
+							{
+								Name: "INIT_ENV",
+								ValueFrom: &api.EnvVarSource{
+									FileKeyRef: &api.FileKeySelector{
+										VolumeName: "init-volume",
+										Path:       "/init/path",
+										Key:        "init-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected:    true,
+			description: "Pod spec with FileKeyRef in init container should return true",
+		},
+		{
+			name: "pod spec with FileKeyRef in ephemeral container",
+			podSpec: &api.PodSpec{
+				EphemeralContainers: []api.EphemeralContainer{
+					{
+						EphemeralContainerCommon: api.EphemeralContainerCommon{
+							Name: "ephemeral-container",
+							Env: []api.EnvVar{
+								{
+									Name: "EPHEMERAL_ENV",
+									ValueFrom: &api.EnvVarSource{
+										FileKeyRef: &api.FileKeySelector{
+											VolumeName: "ephemeral-volume",
+											Path:       "/ephemeral/path",
+											Key:        "ephemeral-key",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected:    true,
+			description: "Pod spec with FileKeyRef in ephemeral container should return true",
+		},
+		{
+			name: "pod spec without FileKeyRef",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name:  "REGULAR_ENV",
+								Value: "regular-value",
+							},
+							{
+								Name: "SECRET_ENV",
+								ValueFrom: &api.EnvVarSource{
+									SecretKeyRef: &api.SecretKeySelector{
+										LocalObjectReference: api.LocalObjectReference{
+											Name: "test-secret",
+										},
+										Key: "secret-key",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected:    false,
+			description: "Pod spec without FileKeyRef should return false",
+		},
+		{
+			name: "pod spec with nil Env in container",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env:  nil,
+					},
+				},
+			},
+			expected:    false,
+			description: "Pod spec with nil Env in container should return false",
+		},
+		{
+			name: "pod spec with env var without ValueFrom",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name:  "REGULAR_ENV",
+								Value: "regular-value",
+							},
+						},
+					},
+				},
+			},
+			expected:    false,
+			description: "Pod spec with env var without ValueFrom should return false",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := podFileKeyRefInUse(tc.podSpec)
+			if result != tc.expected {
+				t.Errorf("Test case '%s' failed: expected %v, got %v",
+					tc.description, tc.expected, result)
+			}
+		})
+	}
+}

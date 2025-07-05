@@ -2689,8 +2689,13 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path, opts PodValida
 		allErrs = append(allErrs, validateSecretKeySelector(ev.ValueFrom.SecretKeyRef, fldPath.Child("secretKeyRef"))...)
 	}
 
+	if ev.ValueFrom.FileKeyRef != nil {
+		numSources++
+		allErrs = append(allErrs, validateFileKeySelector(ev.ValueFrom.FileKeyRef, fldPath.Child("fileKeyRef"))...)
+	}
+
 	if numSources == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`"))
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef`, `secretKeyRef` or `fileKeyRef`"))
 	} else if len(ev.Value) != 0 {
 		if numSources != 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
@@ -2892,6 +2897,20 @@ func validateSecretKeySelector(s *core.SecretKeySelector, fldPath *field.Path) f
 		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
 	} else {
 		for _, msg := range validation.IsConfigMapKey(s.Key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, msg))
+		}
+	}
+
+	return allErrs
+}
+
+func validateFileKeySelector(s *core.FileKeySelector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(s.Key) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
+	} else {
+		for _, msg := range validation.IsRelaxedEnvVarName(s.Key) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, msg))
 		}
 	}
@@ -3682,6 +3701,57 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList 
 	return allErrs
 }
 
+// validateFileKeyRefVolume validates that volumes referenced by FileKeyRef environment variables
+// are of type emptyDir. FileKeyRef requires emptyDir volumes to ensure proper file access.
+func validateFileKeyRefVolume(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Collect all volume names referenced by FileKeyRef environment variables
+	referencedVolumeNames := sets.Set[string]{}
+	for _, container := range spec.Containers {
+		for _, env := range container.Env {
+			if env.ValueFrom != nil && env.ValueFrom.FileKeyRef != nil {
+				referencedVolumeNames.Insert(env.ValueFrom.FileKeyRef.VolumeName)
+			}
+		}
+	}
+
+	existingVolumeNames := sets.Set[string]{}
+	for _, volume := range spec.Volumes {
+		existingVolumeNames.Insert(volume.Name)
+	}
+
+	// Check if all referenced volumes exist
+	for i, container := range spec.Containers {
+		for j, env := range container.Env {
+			if env.ValueFrom != nil && env.ValueFrom.FileKeyRef != nil {
+				volumeName := env.ValueFrom.FileKeyRef.VolumeName
+				if !existingVolumeNames.Has(volumeName) {
+					allErrs = append(allErrs, field.NotFound(
+						fldPath.Child("containers").Index(i).Child("env").Index(j).Child("valueFrom").Child("fileKeyRef").Child("volumeName"),
+						fmt.Sprintf("volume %q referenced by FileKeyRef does not exist", volumeName),
+					))
+				}
+			}
+		}
+	}
+
+	// Check each referenced volume to ensure it's of type emptyDir
+	for _, volume := range spec.Volumes {
+		if referencedVolumeNames.Has(volume.Name) {
+			// Check if the volume is not of type emptyDir
+			if volume.EmptyDir == nil {
+				allErrs = append(allErrs, field.Forbidden(
+					fldPath.Child("volumes").Key(volume.Name),
+					fmt.Sprintf("volume %q referenced by FileKeyRef must be of type emptyDir", volume.Name),
+				))
+			}
+		}
+	}
+
+	return allErrs
+}
+
 // validateContainers is called by pod spec and template validation to validate the list of regular containers.
 func validateContainers(containers []core.Container, os *core.PodOS, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -4351,6 +4421,8 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 			allErrs = append(allErrs, validateWindows(spec, fldPath)...)
 		}
 	}
+
+	allErrs = append(allErrs, validateFileKeyRefVolume(spec, fldPath)...)
 	return allErrs
 }
 
