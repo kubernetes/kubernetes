@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
@@ -244,7 +243,7 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(ctx context.Co
 		return nil, false, err
 	}
 
-	if len(rootCA) == 0 || !utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+	if len(rootCA) == 0 {
 		return nil, false, nil
 	}
 

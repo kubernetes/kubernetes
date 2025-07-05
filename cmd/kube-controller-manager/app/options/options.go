@@ -21,6 +21,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
+
+	"github.com/spf13/pflag"
 
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -62,6 +65,10 @@ const (
 	// KubeControllerManagerUserAgent is the userAgent name when starting kube-controller managers.
 	KubeControllerManagerUserAgent = "kube-controller-manager"
 )
+
+func defaultControllerListFormatter(controllers []string) string {
+	return strings.Join(controllers, ", ")
+}
 
 // KubeControllerManagerOptions is the main context object for the kube-controller manager.
 type KubeControllerManagerOptions struct {
@@ -110,6 +117,8 @@ type KubeControllerManagerOptions struct {
 
 	// Parsedflags holds the parsed CLI flags.
 	ParsedFlags *cliflag.NamedFlagSets
+
+	formatControllers func([]string) string
 }
 
 // NewKubeControllerManagerOptions creates a new KubeControllerManagerOptions with a default config.
@@ -217,6 +226,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		Metrics:                  metrics.NewOptions(),
 		Logs:                     logs.NewOptions(),
 		ComponentGlobalsRegistry: componentGlobalsRegistry,
+		formatControllers:        defaultControllerListFormatter,
 	}
 
 	s.Authentication.RemoteKubeConfigFileOptional = true
@@ -250,10 +260,19 @@ func NewDefaultComponentConfig() (kubectrlmgrconfig.KubeControllerManagerConfigu
 	return internal, nil
 }
 
+// SetControllerListFormatter can be used to set the formatting function to be used when listing controller names.
+// This is used when formatting usage string for e.g. the --controllers flag.
+//
+// By default, the names are simply joined using a comma.
+func (s *KubeControllerManagerOptions) SetControllerListFormatter(format func(controllers []string) string) {
+	s.formatControllers = format
+}
+
 // Flags returns flags for a specific KubeController by section name
 func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) cliflag.NamedFlagSets {
 	fss := cliflag.NamedFlagSets{}
 	s.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers, controllerAliases)
+	s.replaceControllersFlagUsage(fss.FlagSet("generic").Lookup("controllers"), allControllers, disabledByDefaultControllers)
 	s.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
 	s.ServiceController.AddFlags(fss.FlagSet(cpnames.ServiceLBController))
 
@@ -298,6 +317,13 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ComponentGlobalsRegistry.AddFlags(fss.FlagSet("generic"))
 
 	return fss
+}
+
+func (s *KubeControllerManagerOptions) replaceControllersFlagUsage(flag *pflag.Flag, allControllers, disabledByDefaultControllers []string) {
+	flag.Usage = fmt.Sprintf(""+
+		"A list of controllers to enable. '*' enables all on-by-default controllers, 'foo' enables the controller "+
+		"named 'foo', '-foo' disables the controller named 'foo'.\n\nAll controllers: %s\nDisabled-by-default controllers: %s",
+		s.formatControllers(allControllers), s.formatControllers(disabledByDefaultControllers))
 }
 
 // ApplyTo fills up controller manager config with options.
