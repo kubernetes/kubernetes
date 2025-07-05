@@ -3981,6 +3981,8 @@ type PodSpec struct {
 	// +optional
 	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,10,opt,name=nodeName"`
 	// Host networking requested for this pod. Use the host's network namespace.
+	// When using HostNetwork you should specify ports so the scheduler is aware.
+	// When this is set ContainerPort must match HostPort for all Ports.
 	// Default to false.
 	// +k8s:conversion-gen=false
 	// +optional

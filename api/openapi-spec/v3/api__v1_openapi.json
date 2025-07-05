@@ -5591,7 +5591,7 @@
             "type": "boolean"
           },
           "hostNetwork": {
-            "description": "Host networking requested for this pod. Use the host's network namespace. Default to false.",
+            "description": "Host networking requested for this pod. Use the host's network namespace. When using HostNetwork you should specify ports so the scheduler is aware. When this is set ContainerPort must match HostPort for all Ports. Default to false.",
             "type": "boolean"
           },
           "hostPID": {
