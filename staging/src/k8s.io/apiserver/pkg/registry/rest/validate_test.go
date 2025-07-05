@@ -34,6 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/validation"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 )
 
@@ -676,6 +679,74 @@ func TestValidateUpdateDeclarativelyWithRecovery(t *testing.T) {
 			t.Errorf("Expected errors but got nil")
 		}
 	})
+}
+
+func TestDeduplicateValidationErrorsAndRecordDuplicates(t *testing.T) {
+	ctx := context.Background()
+
+	testCases := []struct {
+		name           string
+		operation      string
+		qualifiedKind  schema.GroupKind
+		errs           field.ErrorList
+		wantErrs       field.ErrorList
+		expectedMetric string
+	}{
+		{
+			name:          "deduplicate errors and increment metric",
+			operation:     "UPDATE",
+			qualifiedKind: schema.GroupKind{Group: "apps", Kind: "ReplicaSet"},
+			errs: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("replicas"), -1, "must be greater than or equal to 0").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec").Child("replicas"), -1, "must be greater than or equal to 0").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec").Child("selector"), &metav1.LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []metav1.LabelSelectorRequirement{}}, "empty selector is invalid for deployment"),
+				field.Invalid(field.NewPath("spec").Child("selector"), &metav1.LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []metav1.LabelSelectorRequirement{}}, "empty selector is invalid for deployment"),
+			},
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("replicas"), -1, "must be greater than or equal to 0").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec").Child("selector"), &metav1.LabelSelector{MatchLabels: map[string]string{}, MatchExpressions: []metav1.LabelSelectorRequirement{}}, "empty selector is invalid for deployment"),
+			},
+			expectedMetric: `
+			# HELP apiserver_validation_duplicate_validation_error_total [INTERNAL] Number of duplicate validation errors during validation.
+			# TYPE apiserver_validation_duplicate_validation_error_total counter
+			apiserver_validation_duplicate_validation_error_total 2
+			`,
+		},
+		{
+			name:          "no-op for errors with no duplicates",
+			operation:     "UPDATE",
+			qualifiedKind: schema.GroupKind{Group: "apps", Kind: "ReplicaSet"},
+			errs: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("replicas"), -1, "must be greater than or equal to 0").WithOrigin("minimum"),
+			},
+			wantErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec").Child("replicas"), -1, "must be greater than or equal to 0").WithOrigin("minimum"),
+			},
+			expectedMetric: `
+			# HELP apiserver_validation_duplicate_validation_error_total [INTERNAL] Number of duplicate validation errors during validation.
+			# TYPE apiserver_validation_duplicate_validation_error_total counter
+			apiserver_validation_duplicate_validation_error_total 0
+			`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer legacyregistry.Reset()
+			defer validation.ResetValidationMetricsInstance()
+
+			gotErrs := DeduplicateValidationErrorsAndUpdateMetric(ctx, tc.qualifiedKind, tc.operation, tc.errs)
+			gotErrsStr := fmt.Sprintf("%+v", gotErrs)
+			wantErrsStr := fmt.Sprintf("%+v", tc.wantErrs)
+			if gotErrsStr != wantErrsStr {
+				t.Errorf("DeduplicateValidationErrorsAndUpdateMetric() gotErrs = %s, want %s", gotErrsStr, wantErrsStr)
+			}
+
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.expectedMetric), "apiserver_validation_duplicate_validation_error_total"); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }
 
 func equalErrorLists(a, b field.ErrorList) bool {
