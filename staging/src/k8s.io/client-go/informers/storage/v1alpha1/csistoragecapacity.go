@@ -19,17 +19,17 @@ limitations under the License.
 package v1alpha1
 
 import (
-	context "context"
-	time "time"
+	"context"
+	"time"
 
 	apistoragev1alpha1 "k8s.io/api/storage/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	watch "k8s.io/apimachinery/pkg/watch"
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
-	kubernetes "k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/kubernetes"
 	storagev1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache"
 )
 
 // CSIStorageCapacityInformer provides access to a shared informer and lister for

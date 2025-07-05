@@ -19,15 +19,15 @@ limitations under the License.
 package v1
 
 import (
-	context "context"
+	"context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/gentype"
 	examplev1 "k8s.io/code-generator/examples/MixedCase/apis/example/v1"
 	applyconfigurationexamplev1 "k8s.io/code-generator/examples/MixedCase/applyconfiguration/example/v1"
-	scheme "k8s.io/code-generator/examples/MixedCase/clientset/versioned/scheme"
+	"k8s.io/code-generator/examples/MixedCase/clientset/versioned/scheme"
 )
 
 // TestTypesGetter has a method to return a TestTypeInterface.

@@ -22,7 +22,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	configv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 )
 

@@ -22,14 +22,14 @@ limitations under the License.
 package v1alpha2
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	coordination "k8s.io/kubernetes/pkg/apis/coordination"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/coordination"
 )
 
 func init() {

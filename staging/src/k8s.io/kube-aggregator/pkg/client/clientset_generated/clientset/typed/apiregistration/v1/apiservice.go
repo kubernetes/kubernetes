@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	context "context"
+	"context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/gentype"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
+	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
 
 // APIServicesGetter has a method to return a APIServiceInterface.

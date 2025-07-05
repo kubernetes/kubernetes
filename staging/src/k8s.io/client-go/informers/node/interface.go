@@ -19,10 +19,10 @@ limitations under the License.
 package node
 
 import (
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
-	v1 "k8s.io/client-go/informers/node/v1"
-	v1alpha1 "k8s.io/client-go/informers/node/v1alpha1"
-	v1beta1 "k8s.io/client-go/informers/node/v1beta1"
+	"k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/informers/node/v1"
+	"k8s.io/client-go/informers/node/v1alpha1"
+	"k8s.io/client-go/informers/node/v1beta1"
 )
 
 // Interface provides access to each of this group's versions.

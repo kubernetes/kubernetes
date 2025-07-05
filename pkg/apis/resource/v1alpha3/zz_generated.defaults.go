@@ -23,7 +23,7 @@ package v1alpha3
 
 import (
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.

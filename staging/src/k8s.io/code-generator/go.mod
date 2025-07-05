@@ -14,7 +14,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.2
 	golang.org/x/text v0.23.0
 	k8s.io/apimachinery v0.0.0
-	k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f
+	k8s.io/gengo/v2 v2.0.0-20250701181758-a2d61268f2ac
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-openapi v0.0.0-20250628140032-d90c4fd18f59
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
@@ -49,4 +49,7 @@ require (
 	sigs.k8s.io/yaml v1.5.0 // indirect
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	k8s.io/apimachinery => ../apimachinery
+	k8s.io/gengo/v2 => github.com/brandond/gengo/v2 v2.0.0-20250701181758-a2d61268f2ac
+)

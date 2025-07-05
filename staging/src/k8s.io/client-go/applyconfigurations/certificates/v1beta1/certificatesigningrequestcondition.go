@@ -20,7 +20,7 @@ package v1beta1
 
 import (
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

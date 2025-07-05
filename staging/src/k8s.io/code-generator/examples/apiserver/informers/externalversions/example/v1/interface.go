@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	internalinterfaces "k8s.io/code-generator/examples/apiserver/informers/externalversions/internalinterfaces"
+	"k8s.io/code-generator/examples/apiserver/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.

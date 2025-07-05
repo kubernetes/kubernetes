@@ -19,7 +19,7 @@ limitations under the License.
 package v2
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 )
 
 // ContainerResourceMetricStatusApplyConfiguration represents a declarative configuration of the ContainerResourceMetricStatus type for use

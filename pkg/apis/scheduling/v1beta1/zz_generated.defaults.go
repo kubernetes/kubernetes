@@ -23,7 +23,7 @@ package v1beta1
 
 import (
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.

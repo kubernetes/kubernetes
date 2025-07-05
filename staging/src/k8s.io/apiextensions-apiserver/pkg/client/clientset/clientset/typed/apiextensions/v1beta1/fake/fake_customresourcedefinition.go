@@ -19,10 +19,10 @@ limitations under the License.
 package fake
 
 import (
-	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1beta1"
 	typedapiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 )
 
 // fakeCustomResourceDefinitions implements CustomResourceDefinitionInterface

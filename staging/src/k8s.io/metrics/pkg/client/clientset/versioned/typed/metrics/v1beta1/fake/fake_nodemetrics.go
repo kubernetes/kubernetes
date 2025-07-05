@@ -19,8 +19,8 @@ limitations under the License.
 package fake
 
 import (
-	gentype "k8s.io/client-go/gentype"
-	v1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	"k8s.io/client-go/gentype"
+	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 

@@ -19,7 +19,7 @@ limitations under the License.
 package v2beta2
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 )
 
 // ContainerResourceMetricSourceApplyConfiguration represents a declarative configuration of the ContainerResourceMetricSource type for use

@@ -21,10 +21,10 @@ package v2beta2
 import (
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/client-go/applyconfigurations/internal"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // HorizontalPodAutoscalerApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscaler type for use

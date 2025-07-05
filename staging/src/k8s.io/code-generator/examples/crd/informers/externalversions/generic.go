@@ -19,11 +19,11 @@ limitations under the License.
 package externalversions
 
 import (
-	fmt "fmt"
+	"fmt"
 
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	cache "k8s.io/client-go/tools/cache"
-	v1 "k8s.io/code-generator/examples/crd/apis/conflicting/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/code-generator/examples/crd/apis/conflicting/v1"
 	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 	example2v1 "k8s.io/code-generator/examples/crd/apis/example2/v1"
 	extensionsv1 "k8s.io/code-generator/examples/crd/apis/extensions/v1"

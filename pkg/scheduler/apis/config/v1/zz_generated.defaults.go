@@ -22,7 +22,7 @@ limitations under the License.
 package v1
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 )
 

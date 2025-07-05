@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1 "k8s.io/api/networking/v1"
+	"k8s.io/api/networking/v1"
 	networkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typednetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 )
 

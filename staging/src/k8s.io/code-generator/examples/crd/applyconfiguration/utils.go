@@ -19,10 +19,10 @@ limitations under the License.
 package applyconfiguration
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	v1 "k8s.io/code-generator/examples/crd/apis/conflicting/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/code-generator/examples/crd/apis/conflicting/v1"
 	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 	example2v1 "k8s.io/code-generator/examples/crd/apis/example2/v1"
 	extensionsv1 "k8s.io/code-generator/examples/crd/apis/extensions/v1"
@@ -30,7 +30,7 @@ import (
 	applyconfigurationexamplev1 "k8s.io/code-generator/examples/crd/applyconfiguration/example/v1"
 	applyconfigurationexample2v1 "k8s.io/code-generator/examples/crd/applyconfiguration/example2/v1"
 	applyconfigurationextensionsv1 "k8s.io/code-generator/examples/crd/applyconfiguration/extensions/v1"
-	internal "k8s.io/code-generator/examples/crd/applyconfiguration/internal"
+	"k8s.io/code-generator/examples/crd/applyconfiguration/internal"
 )
 
 // ForKind returns an apply configuration type for the given GroupVersionKind, or nil if no

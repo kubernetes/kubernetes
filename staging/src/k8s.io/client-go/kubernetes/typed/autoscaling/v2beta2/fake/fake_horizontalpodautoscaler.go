@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v2beta2 "k8s.io/api/autoscaling/v2beta2"
+	"k8s.io/api/autoscaling/v2beta2"
 	autoscalingv2beta2 "k8s.io/client-go/applyconfigurations/autoscaling/v2beta2"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedautoscalingv2beta2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
 )
 

@@ -22,9 +22,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	internal "k8s.io/client-go/applyconfigurations/internal"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/client-go/applyconfigurations/internal"
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 

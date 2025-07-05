@@ -23,7 +23,7 @@ package v1
 
 import (
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.

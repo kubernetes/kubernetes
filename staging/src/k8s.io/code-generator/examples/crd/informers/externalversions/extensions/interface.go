@@ -19,8 +19,8 @@ limitations under the License.
 package extensions
 
 import (
-	v1 "k8s.io/code-generator/examples/crd/informers/externalversions/extensions/v1"
-	internalinterfaces "k8s.io/code-generator/examples/crd/informers/externalversions/internalinterfaces"
+	"k8s.io/code-generator/examples/crd/informers/externalversions/extensions/v1"
+	"k8s.io/code-generator/examples/crd/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

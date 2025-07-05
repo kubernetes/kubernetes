@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
-	applyconfiguration "k8s.io/sample-apiserver/pkg/generated/applyconfiguration"
+	"k8s.io/sample-apiserver/pkg/generated/applyconfiguration"
 	clientset "k8s.io/sample-apiserver/pkg/generated/clientset/versioned"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1alpha1"
 	fakewardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1alpha1/fake"

@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	resource "k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // ResourceFieldSelectorApplyConfiguration represents a declarative configuration of the ResourceFieldSelector type for use

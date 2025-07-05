@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // AllocationResultApplyConfiguration represents a declarative configuration of the AllocationResult type for use

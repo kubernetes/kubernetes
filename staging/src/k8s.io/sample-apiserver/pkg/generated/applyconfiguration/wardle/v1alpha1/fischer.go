@@ -20,8 +20,8 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // FischerApplyConfiguration represents a declarative configuration of the Fischer type for use

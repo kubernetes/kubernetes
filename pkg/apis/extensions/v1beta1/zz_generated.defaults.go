@@ -22,9 +22,9 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 

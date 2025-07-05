@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ValidatingAdmissionPolicyStatusApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicyStatus type for use

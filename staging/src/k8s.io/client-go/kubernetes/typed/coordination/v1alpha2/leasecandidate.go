@@ -19,15 +19,15 @@ limitations under the License.
 package v1alpha2
 
 import (
-	context "context"
+	"context"
 
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscoordinationv1alpha2 "k8s.io/client-go/applyconfigurations/coordination/v1alpha2"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // LeaseCandidatesGetter has a method to return a LeaseCandidateInterface.

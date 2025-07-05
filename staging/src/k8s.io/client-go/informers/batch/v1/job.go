@@ -19,17 +19,17 @@ limitations under the License.
 package v1
 
 import (
-	context "context"
-	time "time"
+	"context"
+	"time"
 
 	apibatchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	watch "k8s.io/apimachinery/pkg/watch"
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
-	kubernetes "k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/kubernetes"
 	batchv1 "k8s.io/client-go/listers/batch/v1"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache"
 )
 
 // JobInformer provides access to a shared informer and lister for

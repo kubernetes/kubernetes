@@ -19,11 +19,11 @@ limitations under the License.
 package v1
 
 import (
-	http "net/http"
+	"net/http"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type AutoscalingV1Interface interface {

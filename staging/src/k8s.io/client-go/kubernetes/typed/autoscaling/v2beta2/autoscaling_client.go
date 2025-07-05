@@ -19,11 +19,11 @@ limitations under the License.
 package v2beta2
 
 import (
-	http "net/http"
+	"net/http"
 
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type AutoscalingV2beta2Interface interface {

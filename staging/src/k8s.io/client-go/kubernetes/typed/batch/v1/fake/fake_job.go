@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1 "k8s.io/api/batch/v1"
+	"k8s.io/api/batch/v1"
 	batchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 )
 

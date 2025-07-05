@@ -23,8 +23,8 @@ package v1alpha1
 
 import (
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.

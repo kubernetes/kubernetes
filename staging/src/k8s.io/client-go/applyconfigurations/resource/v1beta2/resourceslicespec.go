@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // ResourceSliceSpecApplyConfiguration represents a declarative configuration of the ResourceSliceSpec type for use

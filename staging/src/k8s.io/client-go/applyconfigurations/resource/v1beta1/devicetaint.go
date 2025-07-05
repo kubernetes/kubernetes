@@ -20,7 +20,7 @@ package v1beta1
 
 import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // DeviceTaintApplyConfiguration represents a declarative configuration of the DeviceTaint type for use

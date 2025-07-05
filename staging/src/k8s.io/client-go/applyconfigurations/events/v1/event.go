@@ -21,10 +21,10 @@ package v1
 import (
 	eventsv1 "k8s.io/api/events/v1"
 	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	internal "k8s.io/client-go/applyconfigurations/internal"
+	"k8s.io/client-go/applyconfigurations/internal"
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 

@@ -20,8 +20,8 @@ package fake
 
 import (
 	v1beta3 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta3"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/testing"
 )
 
 type FakeFlowcontrolV1beta3 struct {

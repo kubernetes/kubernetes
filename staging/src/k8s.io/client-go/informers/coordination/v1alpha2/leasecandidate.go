@@ -19,17 +19,17 @@ limitations under the License.
 package v1alpha2
 
 import (
-	context "context"
-	time "time"
+	"context"
+	"time"
 
 	apicoordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	watch "k8s.io/apimachinery/pkg/watch"
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
-	kubernetes "k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/kubernetes"
 	coordinationv1alpha2 "k8s.io/client-go/listers/coordination/v1alpha2"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache"
 )
 
 // LeaseCandidateInformer provides access to a shared informer and lister for

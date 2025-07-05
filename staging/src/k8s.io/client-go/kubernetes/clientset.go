@@ -19,10 +19,10 @@ limitations under the License.
 package kubernetes
 
 import (
-	fmt "fmt"
-	http "net/http"
+	"fmt"
+	"net/http"
 
-	discovery "k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery"
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
@@ -77,8 +77,8 @@ import (
 	storagev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 	storagemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1"
-	rest "k8s.io/client-go/rest"
-	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 type Interface interface {

@@ -22,7 +22,7 @@ limitations under the License.
 package pointer
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.

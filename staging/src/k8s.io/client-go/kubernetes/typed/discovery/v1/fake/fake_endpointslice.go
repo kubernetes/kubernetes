@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1 "k8s.io/api/discovery/v1"
+	"k8s.io/api/discovery/v1"
 	discoveryv1 "k8s.io/client-go/applyconfigurations/discovery/v1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typeddiscoveryv1 "k8s.io/client-go/kubernetes/typed/discovery/v1"
 )
 

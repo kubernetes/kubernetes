@@ -19,11 +19,11 @@ limitations under the License.
 package v1alpha3
 
 import (
-	http "net/http"
+	"net/http"
 
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type ResourceV1alpha3Interface interface {

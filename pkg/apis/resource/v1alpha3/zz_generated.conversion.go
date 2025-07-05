@@ -22,13 +22,13 @@ limitations under the License.
 package v1alpha3
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	resource "k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
 func init() {

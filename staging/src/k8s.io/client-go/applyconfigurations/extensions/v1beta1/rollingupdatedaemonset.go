@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // RollingUpdateDaemonSetApplyConfiguration represents a declarative configuration of the RollingUpdateDaemonSet type for use

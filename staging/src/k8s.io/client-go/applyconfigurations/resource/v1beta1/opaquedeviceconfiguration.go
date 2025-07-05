@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // OpaqueDeviceConfigurationApplyConfiguration represents a declarative configuration of the OpaqueDeviceConfiguration type for use

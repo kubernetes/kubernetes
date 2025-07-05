@@ -19,10 +19,10 @@ limitations under the License.
 package apps
 
 import (
-	v1 "k8s.io/client-go/informers/apps/v1"
-	v1beta1 "k8s.io/client-go/informers/apps/v1beta1"
-	v1beta2 "k8s.io/client-go/informers/apps/v1beta2"
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/informers/apps/v1"
+	"k8s.io/client-go/informers/apps/v1beta1"
+	"k8s.io/client-go/informers/apps/v1beta2"
+	"k8s.io/client-go/informers/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.
