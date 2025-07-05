@@ -21,6 +21,7 @@ keep track of registered plugins.
 package cache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -38,7 +39,7 @@ type DesiredStateOfWorld interface {
 	// AddOrUpdatePlugin add the given plugin in the cache if it doesn't already exist.
 	// If it does exist in the cache, then the timestamp of the PluginInfo object in the cache will be updated.
 	// An error will be returned if socketPath is empty.
-	AddOrUpdatePlugin(socketPath string) error
+	AddOrUpdatePlugin(ctx context.Context, socketPath string) error
 
 	// RemovePlugin deletes the plugin with the given socket path from the desired
 	// state of world.
@@ -122,15 +123,17 @@ func errSuffix(err error) string {
 	return errStr
 }
 
-func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
+func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(ctx context.Context, socketPath string) error {
 	dsw.Lock()
 	defer dsw.Unlock()
+
+	logger := klog.FromContext(ctx)
 
 	if socketPath == "" {
 		return fmt.Errorf("socket path is empty")
 	}
 	if _, ok := dsw.socketFileToInfo[socketPath]; ok {
-		klog.V(2).InfoS("Plugin exists in desired state cache, timestamp will be updated", "path", socketPath)
+		logger.V(2).Info("Plugin exists in desired state cache, timestamp will be updated", "path", socketPath)
 	}
 
 	// Update the PluginInfo object.
