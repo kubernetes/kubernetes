@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // monitorCallback is the function called when a device's health state changes,
@@ -77,9 +79,9 @@ func TestNewEndpoint(t *testing.T) {
 	devs := []*pluginapi.Device{
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 	}
-
-	p, e := esetup(t, devs, socket, "mock", func(n string, d []pluginapi.Device) {})
-	defer ecleanup(t, p, e)
+	ctx := ktesting.Init(t)
+	p, e := esetup(ctx, t, devs, socket, "mock", func(n string, d []pluginapi.Device) {})
+	defer ecleanup(ctx, t, p, e)
 }
 
 func TestRun(t *testing.T) {
@@ -131,11 +133,11 @@ func TestRun(t *testing.T) {
 		callbackCount++
 		callbackChan <- callbackCount
 	}
+	ctx := ktesting.Init(t)
+	p, e := esetup(ctx, t, devs, socket, "mock", callback)
+	defer ecleanup(ctx, t, p, e)
 
-	p, e := esetup(t, devs, socket, "mock", callback)
-	defer ecleanup(t, p, e)
-
-	go e.client.Run()
+	go e.client.Run(ctx)
 	// Wait for the first callback to be issued.
 	<-callbackChan
 
@@ -154,11 +156,12 @@ func TestAllocate(t *testing.T) {
 	}
 	callbackCount := 0
 	callbackChan := make(chan int)
-	p, e := esetup(t, devs, socket, "mock", func(n string, d []pluginapi.Device) {
+	ctx := ktesting.Init(t)
+	p, e := esetup(ctx, t, devs, socket, "mock", func(n string, d []pluginapi.Device) {
 		callbackCount++
 		callbackChan <- callbackCount
 	})
-	defer ecleanup(t, p, e)
+	defer ecleanup(ctx, t, p, e)
 
 	resp := new(pluginapi.AllocateResponse)
 	contResp := new(pluginapi.ContainerAllocateResponse)
@@ -186,7 +189,7 @@ func TestAllocate(t *testing.T) {
 		return resp, nil
 	})
 
-	go e.client.Run()
+	go e.client.Run(ctx)
 	// Wait for the callback to be issued.
 	select {
 	case <-callbackChan:
@@ -204,11 +207,12 @@ func TestGetPreferredAllocation(t *testing.T) {
 	socket := filepath.Join(os.TempDir(), esocketName())
 	callbackCount := 0
 	callbackChan := make(chan int)
-	p, e := esetup(t, []*pluginapi.Device{}, socket, "mock", func(n string, d []pluginapi.Device) {
+	ctx := ktesting.Init(t)
+	p, e := esetup(ctx, t, []*pluginapi.Device{}, socket, "mock", func(n string, d []pluginapi.Device) {
 		callbackCount++
 		callbackChan <- callbackCount
 	})
-	defer ecleanup(t, p, e)
+	defer ecleanup(ctx, t, p, e)
 
 	resp := &pluginapi.PreferredAllocationResponse{
 		ContainerResponses: []*pluginapi.ContainerPreferredAllocationResponse{
@@ -220,7 +224,7 @@ func TestGetPreferredAllocation(t *testing.T) {
 		return resp, nil
 	})
 
-	go e.client.Run()
+	go e.client.Run(ctx)
 	// Wait for the callback to be issued.
 	select {
 	case <-callbackChan:
@@ -234,7 +238,7 @@ func TestGetPreferredAllocation(t *testing.T) {
 	require.Equal(t, resp, respOut)
 }
 
-func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*plugin.Stub, *endpointImpl) {
+func esetup(ctx context.Context, t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*plugin.Stub, *endpointImpl) {
 	m := newMockPluginManager()
 
 	m.pluginListAndWatchReceiver = func(r string, resp *pluginapi.ListAndWatchResponse) {
@@ -259,7 +263,7 @@ func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string,
 	require.NoError(t, err)
 
 	c := plugin.NewPluginClient(resourceName, socket, m)
-	err = c.Connect()
+	err = c.Connect(ctx)
 	require.NoError(t, err)
 
 	wg.Wait()
@@ -274,7 +278,7 @@ func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string,
 	return p, e
 }
 
-func ecleanup(t *testing.T, p *plugin.Stub, e *endpointImpl) {
+func ecleanup(ctx context.Context, t *testing.T, p *plugin.Stub, e *endpointImpl) {
 	p.Stop()
-	e.client.Disconnect()
+	e.client.Disconnect(ctx)
 }
