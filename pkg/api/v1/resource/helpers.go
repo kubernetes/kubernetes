@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 // GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
@@ -64,6 +65,47 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 	return requestQuantity
 }
 
+// GetResourceAllocatedQuantity finds and returns the allocated quantity for a specific resource.
+func GetResourceAllocatedQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
+	allocatedQuantity := resource.Quantity{}
+
+	switch resourceName {
+	case v1.ResourceCPU:
+		allocatedQuantity = resource.Quantity{Format: resource.DecimalSI}
+	case v1.ResourceMemory, v1.ResourceStorage, v1.ResourceEphemeralStorage:
+		allocatedQuantity = resource.Quantity{Format: resource.BinarySI}
+	default:
+		allocatedQuantity = resource.Quantity{Format: resource.DecimalSI}
+	}
+
+	for _, container := range pod.Spec.Containers {
+		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
+			rQuantity := cs.AllocatedResources[resourceName]
+			allocatedQuantity.Add(rQuantity)
+		}
+
+	}
+
+	for _, container := range pod.Spec.InitContainers {
+		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
+			rQuantity := cs.AllocatedResources[resourceName]
+			if allocatedQuantity.Cmp(rQuantity) < 0 {
+				allocatedQuantity = rQuantity.DeepCopy()
+			}
+		}
+	}
+
+	// Add overhead for running a pod
+	// to the total requests if the resource total is non-zero
+	if pod.Spec.Overhead != nil {
+		if podOverhead, ok := pod.Spec.Overhead[resourceName]; ok && !allocatedQuantity.IsZero() {
+			allocatedQuantity.Add(podOverhead)
+		}
+	}
+
+	return allocatedQuantity
+}
+
 // GetResourceRequest finds and returns the request value for a specific resource.
 func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	if resource == v1.ResourcePods {
@@ -77,6 +119,21 @@ func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	}
 
 	return requestQuantity.Value()
+}
+
+// GetResourceAllocated finds and returns the allocated value for a specific resource.
+func GetResourceAllocated(pod *v1.Pod, resource v1.ResourceName) int64 {
+	if resource == v1.ResourcePods {
+		return 1
+	}
+
+	allocatedQuantity := GetResourceAllocatedQuantity(pod, resource)
+
+	if resource == v1.ResourceCPU {
+		return allocatedQuantity.MilliValue()
+	}
+
+	return allocatedQuantity.Value()
 }
 
 // ExtractResourceValueByContainerName extracts the value of a resource
