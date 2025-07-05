@@ -50,6 +50,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AuthenticationConfiguration{},
 		&AuthorizationConfiguration{},
 		&EncryptionConfiguration{},
+		&TracingConfiguration{},
 	)
 	// also register into the v1 group as EncryptionConfig (due to a docs bug)
 	scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "EncryptionConfig"}, &EncryptionConfiguration{})
