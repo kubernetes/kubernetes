@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
@@ -37,10 +36,10 @@ func newDaemonSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.DaemonSetController,
 		aliases:  []string{"daemonset"},
-		initFunc: startDaemonSetController,
+		initFunc: initWithStartFunc(startDaemonSetController),
 	}
 }
-func startDaemonSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+func startDaemonSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) error {
 	dsc, err := daemon.NewDaemonSetsController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
@@ -51,21 +50,21 @@ func startDaemonSetController(ctx context.Context, controllerContext ControllerC
 		flowcontrol.NewBackOff(1*time.Second, 15*time.Minute),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating DaemonSets controller: %v", err)
+		return fmt.Errorf("error creating DaemonSets controller: %v", err)
 	}
-	go dsc.Run(ctx, int(controllerContext.ComponentConfig.DaemonSetController.ConcurrentDaemonSetSyncs))
-	return nil, true, nil
+	dsc.Run(ctx, int(controllerContext.ComponentConfig.DaemonSetController.ConcurrentDaemonSetSyncs))
+	return nil
 }
 
 func newStatefulSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.StatefulSetController,
 		aliases:  []string{"statefulset"},
-		initFunc: startStatefulSetController,
+		initFunc: initWithStartFunc(startStatefulSetController),
 	}
 }
-func startStatefulSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	go statefulset.NewStatefulSetController(
+func startStatefulSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) error {
+	statefulset.NewStatefulSetController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Apps().V1().StatefulSets(),
@@ -73,37 +72,37 @@ func startStatefulSetController(ctx context.Context, controllerContext Controlle
 		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
 		controllerContext.ClientBuilder.ClientOrDie("statefulset-controller"),
 	).Run(ctx, int(controllerContext.ComponentConfig.StatefulSetController.ConcurrentStatefulSetSyncs))
-	return nil, true, nil
+	return nil
 }
 
 func newReplicaSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.ReplicaSetController,
 		aliases:  []string{"replicaset"},
-		initFunc: startReplicaSetController,
+		initFunc: initWithStartFunc(startReplicaSetController),
 	}
 }
 
-func startReplicaSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	go replicaset.NewReplicaSetController(
+func startReplicaSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) error {
+	replicaset.NewReplicaSetController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
 	).Run(ctx, int(controllerContext.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs))
-	return nil, true, nil
+	return nil
 }
 
 func newDeploymentControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.DeploymentController,
 		aliases:  []string{"deployment"},
-		initFunc: startDeploymentController,
+		initFunc: initWithStartFunc(startDeploymentController),
 	}
 }
 
-func startDeploymentController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+func startDeploymentController(ctx context.Context, controllerContext ControllerContext, controllerName string) error {
 	dc, err := deployment.NewDeploymentController(
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().Deployments(),
@@ -112,8 +111,8 @@ func startDeploymentController(ctx context.Context, controllerContext Controller
 		controllerContext.ClientBuilder.ClientOrDie("deployment-controller"),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating Deployment controller: %v", err)
+		return fmt.Errorf("error creating Deployment controller: %v", err)
 	}
-	go dc.Run(ctx, int(controllerContext.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs))
-	return nil, true, nil
+	dc.Run(ctx, int(controllerContext.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs))
+	return nil
 }

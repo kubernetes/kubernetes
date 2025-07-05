@@ -21,10 +21,9 @@ package app
 
 import (
 	"context"
-
+	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -38,33 +37,38 @@ func newHorizontalPodAutoscalerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.HorizontalPodAutoscalerController,
 		aliases:  []string{"horizontalpodautoscaling"},
-		initFunc: startHorizontalPodAutoscalerControllerWithRESTClient,
+		initFunc: initWithStartFunc(startHorizontalPodAutoscalerControllerWithRESTClient),
 	}
 }
 
-func startHorizontalPodAutoscalerControllerWithRESTClient(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-
+func startHorizontalPodAutoscalerControllerWithRESTClient(ctx context.Context, controllerContext ControllerContext, controllerName string) error {
 	clientConfig := controllerContext.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
 	hpaClient := controllerContext.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
-
 	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(hpaClient.Discovery())
+
+	eg, ctx := errgroup.WithContext(ctx)
 	// invalidate the discovery information roughly once per resync interval our API
 	// information is *at most* two resync intervals old.
-	go custom_metrics.PeriodicallyInvalidate(
-		apiVersionsGetter,
-		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
-		ctx.Done())
+	eg.Go(func() error {
+		custom_metrics.PeriodicallyInvalidate(
+			apiVersionsGetter,
+			controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
+			ctx.Done())
+		return nil
+	})
 
-	metricsClient := metrics.NewRESTMetricsClient(
-		resourceclient.NewForConfigOrDie(clientConfig),
-		custom_metrics.NewForConfig(clientConfig, controllerContext.RESTMapper, apiVersionsGetter),
-		external_metrics.NewForConfigOrDie(clientConfig),
-	)
-	return startHPAControllerWithMetricsClient(ctx, controllerContext, metricsClient)
+	eg.Go(func() error {
+		metricsClient := metrics.NewRESTMetricsClient(
+			resourceclient.NewForConfigOrDie(clientConfig),
+			custom_metrics.NewForConfig(clientConfig, controllerContext.RESTMapper, apiVersionsGetter),
+			external_metrics.NewForConfigOrDie(clientConfig),
+		)
+		return startHPAControllerWithMetricsClient(ctx, controllerContext, metricsClient)
+	})
+	return eg.Wait()
 }
 
-func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext ControllerContext, metricsClient metrics.MetricsClient) (controller.Interface, bool, error) {
-
+func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext ControllerContext, metricsClient metrics.MetricsClient) error {
 	hpaClient := controllerContext.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 	hpaClientConfig := controllerContext.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
 
@@ -73,10 +77,10 @@ func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext 
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(hpaClient.Discovery())
 	scaleClient, err := scale.NewForConfig(hpaClientConfig, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
-		return nil, false, err
+		return err
 	}
 
-	go podautoscaler.NewHorizontalController(
+	podautoscaler.NewHorizontalController(
 		ctx,
 		hpaClient.CoreV1(),
 		scaleClient,
@@ -91,5 +95,5 @@ func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext 
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
 	).Run(ctx, int(controllerContext.ComponentConfig.HPAController.ConcurrentHorizontalPodAutoscalerSyncs))
-	return nil, true, nil
+	return nil
 }

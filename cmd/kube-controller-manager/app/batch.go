@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
@@ -33,11 +32,11 @@ func newJobControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.JobController,
 		aliases:  []string{"job"},
-		initFunc: startJobController,
+		initFunc: initWithStartFunc(startJobController),
 	}
 }
 
-func startJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+func startJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) error {
 	jobController, err := job.NewController(
 		ctx,
 		controllerContext.InformerFactory.Core().V1().Pods(),
@@ -45,29 +44,29 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("creating Job controller: %v", err)
+		return fmt.Errorf("creating Job controller: %v", err)
 	}
-	go jobController.Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
-	return nil, true, nil
+	jobController.Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
+	return nil
 }
 
 func newCronJobControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.CronJobController,
 		aliases:  []string{"cronjob"},
-		initFunc: startCronJobController,
+		initFunc: initWithStartFunc(startCronJobController),
 	}
 }
 
-func startCronJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+func startCronJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) error {
 	cj2c, err := cronjob.NewControllerV2(ctx, controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.InformerFactory.Batch().V1().CronJobs(),
 		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("creating CronJob controller V2: %v", err)
+		return fmt.Errorf("creating CronJob controller V2: %v", err)
 	}
 
-	go cj2c.Run(ctx, int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs))
-	return nil, true, nil
+	cj2c.Run(ctx, int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs))
+	return nil
 }

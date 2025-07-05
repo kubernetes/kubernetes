@@ -18,6 +18,7 @@ package app
 
 import (
 	"context"
+	"golang.org/x/sync/errgroup"
 	"testing"
 	"time"
 
@@ -130,26 +131,36 @@ func TestController_DiscoveryError(t *testing.T) {
 		},
 	}
 	for name, test := range tcs {
-		testDiscovery := FakeDiscoveryWithError{Err: test.discoveryError, PossibleResources: test.possibleResources}
-		testClientset := NewFakeClientset(testDiscovery)
-		testClientBuilder := TestClientBuilder{clientset: testClientset}
-		testInformerFactory := informers.NewSharedInformerFactoryWithOptions(testClientset, time.Duration(1))
-		ctx := ControllerContext{
-			ClientBuilder:                   testClientBuilder,
-			InformerFactory:                 testInformerFactory,
-			ObjectOrMetadataInformerFactory: testInformerFactory,
-			InformersStarted:                make(chan struct{}),
-		}
-		for controllerName, controllerDesc := range controllerDescriptorMap {
-			_, _, err := controllerDesc.GetInitFunc()(context.TODO(), ctx, controllerName)
-			if test.expectedErr != (err != nil) {
-				t.Errorf("%v test failed for use case: %v", controllerName, name)
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			testDiscovery := FakeDiscoveryWithError{Err: test.discoveryError, PossibleResources: test.possibleResources}
+			testClientset := NewFakeClientset(testDiscovery)
+			testClientBuilder := TestClientBuilder{clientset: testClientset}
+			testInformerFactory := informers.NewSharedInformerFactoryWithOptions(testClientset, time.Duration(1))
+			controllerContext := ControllerContext{
+				ClientBuilder:                   testClientBuilder,
+				InformerFactory:                 testInformerFactory,
+				ObjectOrMetadataInformerFactory: testInformerFactory,
+				InformersStarted:                make(chan struct{}),
 			}
-		}
-		_, _, err := startModifiedNamespaceController(
-			context.TODO(), ctx, testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
-		if test.expectedErr != (err != nil) {
-			t.Errorf("Namespace Controller test failed for use case: %v", name)
-		}
+			for controllerName, controllerDesc := range controllerDescriptorMap {
+				_, err := controllerDesc.GetInitFunc()(ctx, controllerContext, controllerName)
+				if test.expectedErr != (err != nil) {
+					t.Errorf("%v test failed for use case: %v", controllerName, name)
+				}
+			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			eg, ctx := errgroup.WithContext(ctx)
+			eg.Go(func() error {
+				return startModifiedNamespaceController(
+					ctx, controllerContext, testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
+			})
+			cancel()
+			err := eg.Wait()
+			if test.expectedErr != (err != nil) {
+				t.Errorf("Namespace Controller test failed for use case: %v", name)
+			}
+		})
 	}
 }
