@@ -60,8 +60,8 @@ const (
 
 var (
 	containerRestartPolicyAlways    = core.ContainerRestartPolicyAlways
-	containerRestartPolicyOnFailure = core.ContainerRestartPolicy("OnFailure")
-	containerRestartPolicyNever     = core.ContainerRestartPolicy("Never")
+	containerRestartPolicyOnFailure = core.ContainerRestartPolicyOnFailure
+	containerRestartPolicyNever     = core.ContainerRestartPolicyNever
 	containerRestartPolicyInvalid   = core.ContainerRestartPolicy("invalid")
 	containerRestartPolicyEmpty     = core.ContainerRestartPolicy("")
 	defaultGracePeriod              = ptr.To[int64](30)
@@ -21753,6 +21753,9 @@ func TestValidateOSFields(t *testing.T) {
 		"Containers[*].ResizePolicy[*].RestartPolicy",
 		"Containers[*].ResizePolicy[*].ResourceName",
 		"Containers[*].RestartPolicy",
+		"Containers[*].RestartPolicyRules[*].Action",
+		"Containers[*].RestartPolicyRules[*].ExitCodes.Operator",
+		"Containers[*].RestartPolicyRules[*].ExitCodes.Values[*]",
 		"Containers[*].SecurityContext.RunAsNonRoot",
 		"Containers[*].Stdin",
 		"Containers[*].StdinOnce",
@@ -21780,6 +21783,9 @@ func TestValidateOSFields(t *testing.T) {
 		"EphemeralContainers[*].EphemeralContainerCommon.ResizePolicy[*].RestartPolicy",
 		"EphemeralContainers[*].EphemeralContainerCommon.ResizePolicy[*].ResourceName",
 		"EphemeralContainers[*].EphemeralContainerCommon.RestartPolicy",
+		"EphemeralContainers[*].EphemeralContainerCommon.RestartPolicyRules[*].Action",
+		"EphemeralContainers[*].EphemeralContainerCommon.RestartPolicyRules[*].ExitCodes.Operator",
+		"EphemeralContainers[*].EphemeralContainerCommon.RestartPolicyRules[*].ExitCodes.Values[*]",
 		"EphemeralContainers[*].EphemeralContainerCommon.Stdin",
 		"EphemeralContainers[*].EphemeralContainerCommon.StdinOnce",
 		"EphemeralContainers[*].EphemeralContainerCommon.TTY",
@@ -21809,6 +21815,9 @@ func TestValidateOSFields(t *testing.T) {
 		"InitContainers[*].ResizePolicy[*].RestartPolicy",
 		"InitContainers[*].ResizePolicy[*].ResourceName",
 		"InitContainers[*].RestartPolicy",
+		"InitContainers[*].RestartPolicyRules[*].Action",
+		"InitContainers[*].RestartPolicyRules[*].ExitCodes.Operator",
+		"InitContainers[*].RestartPolicyRules[*].ExitCodes.Values[*]",
 		"InitContainers[*].Stdin",
 		"InitContainers[*].StdinOnce",
 		"InitContainers[*].TTY",
@@ -27331,6 +27340,176 @@ func TestValidateStopSignal(t *testing.T) {
 				if tc.expectErr[0].Error() != errs[0].Error() {
 					t.Errorf("Unexpected error(s): %v", errs)
 				}
+			}
+		})
+	}
+}
+
+func TestValidateContainerRestartPolicy(t *testing.T) {
+	successCases := []struct {
+		Name               string
+		RestartPolicy      *core.ContainerRestartPolicy
+		RestartPolicyRules []core.ContainerRestartRule
+	}{
+		{
+			Name: "no-restart-policy-and-rules",
+		},
+		{
+			Name:          "restart-policy-always",
+			RestartPolicy: &containerRestartPolicyAlways,
+		}, {
+			Name:          "restart-policy-never",
+			RestartPolicy: &containerRestartPolicyNever,
+		}, {
+			Name:          "restart-policy-on-failure",
+			RestartPolicy: &containerRestartPolicyOnFailure,
+		}, {
+			Name:          "restart-policy-rules",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "Restart",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   []int32{42},
+				},
+			}},
+		},
+	}
+
+	for _, tc := range successCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			errs := validateContainerRestartPolicy(tc.RestartPolicy, tc.RestartPolicyRules, field.NewPath(""))
+			if len(errs) > 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+
+	errorCases := []struct {
+		Name               string
+		RestartPolicy      *core.ContainerRestartPolicy
+		RestartPolicyRules []core.ContainerRestartRule
+		ExpectedErrors     field.ErrorList
+	}{
+		{
+			Name:          "invalid container restart policy",
+			RestartPolicy: &containerRestartPolicyInvalid,
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeNotSupported,
+				Field:    "container.restartPolicy",
+				BadValue: containerRestartPolicyInvalid,
+			}},
+		},
+		{
+			Name:          "empty container restart policy",
+			RestartPolicy: &containerRestartPolicyEmpty,
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeNotSupported,
+				Field:    "container.restartPolicy",
+				BadValue: containerRestartPolicyEmpty,
+			}},
+		},
+		{
+			Name: "missing container restart policy when restart rules are specified",
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "Restart",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   []int32{42},
+				},
+			}},
+			ExpectedErrors: field.ErrorList{{
+				Type: field.ErrorTypeRequired, Field: "container.restartPolicy", BadValue: "",
+			}},
+		},
+		{
+			Name:          "invalid action",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "invalid",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   []int32{42},
+				},
+			}},
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeNotSupported,
+				Field:    "container.restartPolicyRules[0].action",
+				BadValue: core.ContainerRestartRuleAction("invalid"),
+			}},
+		},
+		{
+			Name:          "empty action",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "In",
+					Values:   []int32{42},
+				},
+			}},
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeNotSupported,
+				Field:    "container.restartPolicyRules[0].action",
+				BadValue: core.ContainerRestartRuleAction(""),
+			}},
+		},
+		{
+			Name:          "empty ExitCodes",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "Restart",
+			}},
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeRequired,
+				Field:    "container.restartPolicyRules[0].when",
+				BadValue: "",
+			}},
+		},
+		{
+			Name:          "invalid ExitCodes Operator",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "Restart",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "invalid",
+					Values:   []int32{42},
+				},
+			}},
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeNotSupported,
+				Field:    "container.restartPolicyRules[0].when.exitCodes.operator",
+				BadValue: core.ContainerRestartRuleOnExitCodesOperator("invalid"),
+			}},
+		},
+		{
+			Name:          "empty ExitCodes Operator",
+			RestartPolicy: &containerRestartPolicyNever,
+			RestartPolicyRules: []core.ContainerRestartRule{{
+				Action: "Restart",
+				ExitCodes: &core.ContainerRestartRuleOnExitCodes{
+					Operator: "",
+					Values:   []int32{42},
+				},
+			}},
+			ExpectedErrors: field.ErrorList{{
+				Type:     field.ErrorTypeNotSupported,
+				Field:    "container.restartPolicyRules[0].when.exitCodes.operator",
+				BadValue: core.ContainerRestartRuleOnExitCodesOperator(""),
+			}},
+		},
+	}
+
+	for _, tc := range errorCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			errs := validateContainerRestartPolicy(tc.RestartPolicy, tc.RestartPolicyRules, field.NewPath("container"))
+			if len(errs) == 0 {
+				t.Fatal("expected error but received none")
+			}
+
+			if diff := cmp.Diff(tc.ExpectedErrors, errs, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
+				t.Errorf("unexpected diff in errors (-want, +got):\n%s", diff)
+				t.Errorf("INFO: all errors:\n%s", prettyErrorList(errs))
 			}
 		})
 	}
