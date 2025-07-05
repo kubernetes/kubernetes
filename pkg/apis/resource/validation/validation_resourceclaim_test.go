@@ -115,7 +115,7 @@ func TestValidateClaim(t *testing.T) {
 			claim:        testClaim("", goodNS, validClaimSpec),
 		},
 		"bad-name": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')") /* no WithOrigin https://github.com/kubernetes/kubernetes/blob/6ed5b60f71930d51bfcf8bfa6f3506b099811318/staging/src/k8s.io/apimachinery/pkg/api/validation/objectmeta.go#L160 */},
 			claim:        testClaim(badName, goodNS, validClaimSpec),
 		},
 		"missing-namespace": {
@@ -211,7 +211,7 @@ func TestValidateClaim(t *testing.T) {
 			}(),
 		},
 		"bad-labels": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "").WithOrigin("format=label-value")},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
 				claim.Labels = map[string]string{
@@ -230,7 +230,7 @@ func TestValidateClaim(t *testing.T) {
 			}(),
 		},
 		"bad-annotations": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"), badName, "").WithOrigin("format=qualified-name")},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
 				claim.Annotations = map[string]string{
@@ -240,7 +240,7 @@ func TestValidateClaim(t *testing.T) {
 			}(),
 		},
 		"bad-classname": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "deviceClassName"), badName, "").WithOrigin("format=dns-subdomain")},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
 				claim.Spec.Devices.Requests[0].Exactly.DeviceClassName = badName
@@ -258,14 +258,14 @@ func TestValidateClaim(t *testing.T) {
 		"invalid-request": {
 			wantFailures: field.ErrorList{
 				field.TooMany(field.NewPath("spec", "devices", "requests"), resource.DeviceRequestsMaxSize+1, resource.DeviceRequestsMaxSize),
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "").WithOrigin("format=dns-label"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), resource.FullyQualifiedName("missing-domain"), "must include a domain"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), "name required"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(2).Child("matchAttribute"), ""),
 				field.TooMany(field.NewPath("spec", "devices", "constraints"), resource.DeviceConstraintsMaxSize+1, resource.DeviceConstraintsMaxSize),
-				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "").WithOrigin("format=dns-label"),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
 				field.TooMany(field.NewPath("spec", "devices", "config"), resource.DeviceConfigMaxSize+1, resource.DeviceConfigMaxSize),
 			},
@@ -345,13 +345,13 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"invalid-spec": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "").WithOrigin("format=dns-label"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("matchAttribute"), resource.FullyQualifiedName("missing-domain"), "must include a domain"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(1).Child("matchAttribute"), "name required"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(2).Child("matchAttribute"), ""),
-				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "").WithOrigin("format=dns-label"),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
 			},
 			claim: func() *resource.ResourceClaim {
@@ -597,7 +597,7 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"prioritized-list-invalid-nested-request": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("name"), badName, "").WithOrigin("format=dns-label"),
 				field.Required(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), ""),
 				field.NotSupported(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("allocationMode"), resource.DeviceAllocationMode(""), []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}),
 			},
@@ -751,8 +751,8 @@ func TestValidateClaim(t *testing.T) {
 
 					field.NotSupported(fldPath.Index(4).Child("operator"), resource.DeviceTolerationOperator("some-other-op"), []resource.DeviceTolerationOperator{resource.DeviceTolerationOpEqual, resource.DeviceTolerationOpExists}),
 
-					field.Invalid(fldPath.Index(5).Child("key"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
-					field.Invalid(fldPath.Index(5).Child("value"), badName, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')"),
+					field.Invalid(fldPath.Index(5).Child("key"), badName, "").WithOrigin("format=qualified-name"),
+					field.Invalid(fldPath.Index(5).Child("value"), badName, "").WithOrigin("format=label-value"),
 					field.NotSupported(fldPath.Index(5).Child("effect"), resource.DeviceTaintEffect("some-other-effect"), []resource.DeviceTaintEffect{resource.DeviceTaintEffectNoExecute, resource.DeviceTaintEffectNoSchedule}),
 				)
 				return allErrs
@@ -919,7 +919,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-add-allocation-bad-request": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("request"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("request"), badName, "").WithOrigin("format=dns-label"),
 				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("request"), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
 			},
 			oldClaim: validClaim,
@@ -1127,7 +1127,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-request-name": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests").Index(1), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests").Index(1), badName, "").WithOrigin("format=dns-label"),
 				field.Invalid(field.NewPath("status", "allocation", "devices", "config").Index(0).Child("requests").Index(1), badName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
 			},
 			oldClaim: validClaim,
@@ -1155,7 +1155,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				field.NotSupported(field.NewPath("status", "allocation", "devices", "config").Index(2).Child("source"), resource.AllocationConfigSource("no-such-source"), []resource.AllocationConfigSource{resource.AllocationConfigSourceClaim, resource.AllocationConfigSourceClass}),
 				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(3).Child("opaque"), ""),
 				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "driver"), ""),
-				field.Invalid(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "driver"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "driver"), "", "").WithOrigin("format=dns-subdomain"),
 				field.Required(field.NewPath("status", "allocation", "devices", "config").Index(4).Child("opaque", "parameters"), ""),
 				field.TooLong(field.NewPath("status", "allocation", "devices", "config").Index(6).Child("opaque", "parameters"), "" /* unused */, resource.OpaqueParametersMaxLength),
 			},
@@ -1555,7 +1555,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-update-invalid-label-value": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')"),
+				field.Invalid(field.NewPath("status", "allocation", "nodeSelector", "nodeSelectorTerms").Index(0).Child("matchExpressions").Index(0).Child("values").Index(0), "-1", "").WithOrigin("format=label-value"),
 			},
 			oldClaim: validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1662,8 +1662,8 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-add-allocation-with-sub-requests-invalid-request-names": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("request"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
-				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("request"), badSubrequestName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("request"), badName, "").WithOrigin("format=dns-label"),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("request"), badSubrequestName, "").WithOrigin("format=dns-label"),
 				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("request"), badFullSubrequestName, "must be the name of a request in the claim or the name of a request and a subrequest separated by '/'"),
 			},
 			oldClaim: testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable),
