@@ -56,13 +56,38 @@ func TestGetWarningsForService(t *testing.T) {
 			s.Spec.ExternalName = "example.com"
 		},
 		numWarnings: 1,
+	}, {
+		name: "LoadBalancerIP set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.LoadBalancerIP = "1.2.3.4"
+		},
+		numWarnings: 1,
+	}, {
+		name: "ExternalIPs set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.ExternalIPs = []string{"1.2.3.4"}
+		},
+		numWarnings: 1,
+	}, {
+		name: "ExternalIPs and LoadBalancerIP set when headless service",
+		tweakSvc: func(s *api.Service) {
+			s.Spec.Type = api.ServiceTypeClusterIP
+			s.Spec.ClusterIP = api.ClusterIPNone
+			s.Spec.ExternalIPs = []string{"1.2.3.4"}
+			s.Spec.LoadBalancerIP = "1.2.3.4"
+		},
+		numWarnings: 2,
 	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := &api.Service{}
 			tc.tweakSvc(svc)
-			warnings := GetWarningsForService(svc, svc)
+			warnings := GetWarningsForService(svc)
 			if want, got := tc.numWarnings, len(warnings); got != want {
 				t.Errorf("Unexpected warning list: expected %d, got %d\n%q", want, got, warnings)
 			}
@@ -90,10 +115,9 @@ func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		service    *api.Service
-		oldService *api.Service
-		want       []string
+		name    string
+		service *api.Service
+		want    []string
 	}{
 		{
 			name:    "IPv4 No failures",
@@ -190,7 +214,7 @@ func TestGetWarningsForServiceClusterIPs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetWarningsForService(tt.service, tt.oldService); !reflect.DeepEqual(got, tt.want) {
+			if got := GetWarningsForService(tt.service); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetWarningsForService() = %v", cmp.Diff(got, tt.want))
 			}
 		})
