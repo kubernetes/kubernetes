@@ -243,20 +243,17 @@ func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 // isContainerActuallyUsingImage determines if a container is actually using its image.
 // Containers in error states or not running are not considered to be using their image
 // for garbage collection purposes.
-func isContainerActuallyUsingImage(container *container.Container) bool {
+func isContainerActuallyUsingImage(c *container.Container) bool {
 	// Only consider containers that are actually running or in a valid state
 	// that indicates they are using the image
-	switch container.State {
-	case "running":
+	switch c.State {
+	case container.ContainerStateRunning:
 		return true
-	case "created":
-		// Created containers may be using the image but haven't started yet
+	case container.ContainerStateCreated:
 		return true
-	case "exited":
-		// Exited containers are not currently using the image
+	case container.ContainerStateExited:
 		return false
-	case "unknown":
-		// Unknown state containers are not considered to be using the image
+	case container.ContainerStateUnknown:
 		return false
 	default:
 		// For any other state, be conservative and assume they're not using the image
