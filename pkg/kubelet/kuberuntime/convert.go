@@ -27,7 +27,7 @@ import (
 
 // This file contains help function to kuberuntime types to CRI runtime API types, or vice versa.
 
-func toKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
+func ToKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
 	var annotations []kubecontainer.Annotation
 
 	if image.Spec != nil && len(image.Spec.Annotations) > 0 {
@@ -60,7 +60,7 @@ func toKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
 	return spec
 }
 
-func toRuntimeAPIImageSpec(imageSpec kubecontainer.ImageSpec) *runtimeapi.ImageSpec {
+func ToRuntimeAPIImageSpec(imageSpec kubecontainer.ImageSpec) *runtimeapi.ImageSpec {
 	var annotations = make(map[string]string)
 	if imageSpec.Annotations != nil {
 		for _, a := range imageSpec.Annotations {
