@@ -1929,13 +1929,15 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			pool := resourceslice.Pool{
 				Slices: make([]resourceslice.Slice, numSlices),
 			}
+			numDevices := 0
 			for i := 0; i < numSlices; i++ {
 				devices := make([]resourceapi.Device, resourceapi.ResourceSliceMaxDevices)
 				for e := 0; e < resourceapi.ResourceSliceMaxDevices; e++ {
 					device := resourceapi.Device{
-						Name:       devicePrefix + strings.Repeat("x", validation.DNS1035LabelMaxLength-len(devicePrefix)-4) + fmt.Sprintf("%04d", e),
+						Name:       devicePrefix + strings.Repeat("x", validation.DNS1035LabelMaxLength-len(devicePrefix)-6) + fmt.Sprintf("%06d", numDevices),
 						Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice),
 					}
+					numDevices++
 					for j := 0; j < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; j++ {
 						name := resourceapi.QualifiedName(domain + "/" + strings.Repeat("x", resourceapi.DeviceMaxIDLength-4) + fmt.Sprintf("%04d", j))
 						device.Attributes[name] = resourceapi.DeviceAttribute{
@@ -1949,6 +1951,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			resources := &resourceslice.DriverResources{
 				Pools: map[string]resourceslice.Pool{poolName: pool},
 			}
+			listSlices := framework.ListObjects(f.ClientSet.ResourceV1beta2().ResourceSlices().List, metav1.ListOptions{
+				FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName,
+			})
 
 			ginkgo.By("Creating slices")
 			mutationCacheTTL := 10 * time.Second
@@ -1961,17 +1966,19 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			framework.ExpectNoError(err, "start controller")
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				controller.Stop()
-				err := f.ClientSet.ResourceV1beta2().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
-					FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName,
-				})
-				framework.ExpectNoError(err, "delete resource slices")
+				gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceSliceList, error) {
+					err := f.ClientSet.ResourceV1beta2().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{
+						FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName,
+					})
+					if err != nil {
+						return nil, fmt.Errorf("delete slices: %w", err)
+					}
+					return listSlices(ctx)
+				}).Should(gomega.HaveField("Items", gomega.BeEmpty()))
 			})
 
 			// Eventually we should have all desired slices.
-			listSlices := framework.ListObjects(f.ClientSet.ResourceV1beta2().ResourceSlices().List, metav1.ListOptions{
-				FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName,
-			})
-			gomega.Eventually(ctx, listSlices).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
+			gomega.Eventually(ctx, listSlices).WithTimeout(3 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
 
 			// Verify state.
 			expectSlices, err := listSlices(ctx)
@@ -1994,7 +2001,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 
 			// One empty slice should remain, after removing the full ones and adding the empty one.
 			emptySlice := gomega.HaveField("Spec.Devices", gomega.BeEmpty())
-			gomega.Eventually(ctx, listSlices).WithTimeout(time.Minute).Should(gomega.HaveField("Items", gomega.ConsistOf(emptySlice)))
+			gomega.Eventually(ctx, listSlices).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveExactElements(emptySlice)))
 			expectStats = resourceslice.Stats{NumCreates: int64(numSlices) + 1, NumDeletes: int64(numSlices)}
 			gomega.Consistently(ctx, controller.GetStats).WithTimeout(2 * mutationCacheTTL).Should(gomega.Equal(expectStats))
 		})
