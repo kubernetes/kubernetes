@@ -48,7 +48,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe("ReplicationController", func() {
@@ -461,7 +461,7 @@ func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageNa
 			Name: rsName,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(replicas),
+			Replicas: ptr.To[int32](replicas),
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: rcPodLabels,
