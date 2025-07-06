@@ -42,7 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // utilities for loading JOSE keys.
@@ -388,7 +388,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -419,7 +419,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -447,7 +447,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "email",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -479,7 +479,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "email",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -510,7 +510,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "email",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -541,7 +541,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "email",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -572,11 +572,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -609,11 +609,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -666,11 +666,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -724,11 +724,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -778,11 +778,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -826,11 +826,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -880,11 +880,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "rabbits",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -937,11 +937,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -992,11 +992,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1049,11 +1049,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1109,11 +1109,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1147,11 +1147,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1204,11 +1204,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1248,11 +1248,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1283,11 +1283,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1317,11 +1317,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1364,11 +1364,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1403,11 +1403,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1443,7 +1443,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -1472,7 +1472,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -1501,7 +1501,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -1532,7 +1532,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1565,7 +1565,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1598,7 +1598,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1631,7 +1631,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1662,7 +1662,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1701,7 +1701,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -1737,7 +1737,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -1766,7 +1766,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("oidc:"),
+							Prefix: ptr.To("oidc:"),
 						},
 					},
 				},
@@ -1797,11 +1797,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("oidc:"),
+							Prefix: ptr.To("oidc:"),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String("groups:"),
+							Prefix: ptr.To("groups:"),
 						},
 					},
 				},
@@ -1834,11 +1834,11 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("oidc:"),
+							Prefix: ptr.To("oidc:"),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String("groups:"),
+							Prefix: ptr.To("groups:"),
 						},
 					},
 				},
@@ -1891,7 +1891,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -1921,7 +1921,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1953,7 +1953,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -1986,7 +1986,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2007,7 +2007,7 @@ func TestToken(t *testing.T) {
 					},
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -2029,7 +2029,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2052,7 +2052,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2077,7 +2077,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2101,7 +2101,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2121,7 +2121,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "email",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -2152,7 +2152,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("prefix:"),
+							Prefix: ptr.To("prefix:"),
 						},
 					},
 				},
@@ -2181,7 +2181,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("system:"),
+							Prefix: ptr.To("system:"),
 						},
 					},
 					UserValidationRules: []apiserver.UserValidationRule{
@@ -2219,7 +2219,7 @@ func TestToken(t *testing.T) {
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Claim:  "groups",
-							Prefix: pointer.String("system:"),
+							Prefix: ptr.To("system:"),
 						},
 					},
 					UserValidationRules: []apiserver.UserValidationRule{
@@ -2255,7 +2255,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -2290,7 +2290,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -2328,7 +2328,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -2369,7 +2369,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 					ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -3092,7 +3092,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String("oidc:"),
+							Prefix: ptr.To("oidc:"),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Expression: `(claims.roles.split(",") + claims.other_roles.split(",")).map(role, "groups:" + role)`,
@@ -3673,7 +3673,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 						Groups: apiserver.PrefixedClaimOrExpression{
 							Expression: "claims.groups",
@@ -3758,7 +3758,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -3795,7 +3795,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -3832,7 +3832,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -3869,7 +3869,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
@@ -3906,7 +3906,7 @@ func TestToken(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "username",
-							Prefix: pointer.String(""),
+							Prefix: ptr.To(""),
 						},
 					},
 				},
