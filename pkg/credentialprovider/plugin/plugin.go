@@ -532,42 +532,31 @@ func (p *pluginProvider) getCachedCredentials(image, serviceAccountCacheKey stri
 	}
 	p.Unlock()
 
-	cacheKey, err := generateCacheKey(image, serviceAccountCacheKey)
+	cacheKeyCandidates := []string{
+		image,
+		parseRegistry(image),
+		globalCacheKey,
+	}
+
+	for _, baseKey := range cacheKeyCandidates {
+		if config, found, err := p.lookupCredentialsInCache(baseKey, serviceAccountCacheKey); err != nil {
+			return nil, false, err
+		} else if found {
+			return config, true, nil
+		}
+	}
+
+	return nil, false, nil
+}
+
+// lookupCredentialsInCache performs a single cache lookup for the given base key and service account cache key
+func (p *pluginProvider) lookupCredentialsInCache(baseKey, serviceAccountCacheKey string) (credentialprovider.DockerConfig, bool, error) {
+	cacheKey, err := generateCacheKey(baseKey, serviceAccountCacheKey)
 	if err != nil {
 		return nil, false, fmt.Errorf("error generating cache key: %w", err)
 	}
 
 	obj, found, err := p.cache.GetByKey(cacheKey)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if found {
-		return obj.(*cacheEntry).credentials, true, nil
-	}
-
-	registry := parseRegistry(image)
-
-	cacheKey, err = generateCacheKey(registry, serviceAccountCacheKey)
-	if err != nil {
-		return nil, false, fmt.Errorf("error generating cache key: %w", err)
-	}
-
-	obj, found, err = p.cache.GetByKey(cacheKey)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if found {
-		return obj.(*cacheEntry).credentials, true, nil
-	}
-
-	cacheKey, err = generateCacheKey(globalCacheKey, serviceAccountCacheKey)
-	if err != nil {
-		return nil, false, fmt.Errorf("error generating cache key: %w", err)
-	}
-
-	obj, found, err = p.cache.GetByKey(cacheKey)
 	if err != nil {
 		return nil, false, err
 	}
