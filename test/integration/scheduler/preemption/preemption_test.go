@@ -1512,6 +1512,10 @@ func (af *alwaysFail) Name() string {
 	return alwaysFailPlugin
 }
 
+func (af *alwaysFail) PreBindPreFlight(_ context.Context, _ fwk.CycleState, p *v1.Pod, _ string) *fwk.Status {
+	return nil
+}
+
 func (af *alwaysFail) PreBind(_ context.Context, _ fwk.CycleState, p *v1.Pod, _ string) *fwk.Status {
 	if strings.Contains(p.Name, doNotFailMe) {
 		return nil

@@ -541,6 +541,26 @@ func (pl *VolumeBinding) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1
 	return nil
 }
 
+var errNoPodVolumeForNode = fmt.Errorf("no pod volume found for node")
+
+// PreBindPreFlight is called before PreBind, and determines whether PreBind is going to do something for this pod, or not.
+// It checks state.podVolumesByNode to determine whether there are any pod volumes for the node and hence the plugin has to handle them at PreBind.
+func (pl *VolumeBinding) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	s, err := getStateData(state)
+	if err != nil {
+		return fwk.AsStatus(err)
+	}
+	if s.allBound {
+		// no need to bind volumes
+		return fwk.NewStatus(fwk.Skip)
+	}
+
+	if _, ok := s.podVolumesByNode[nodeName]; !ok {
+		return fwk.AsStatus(fmt.Errorf("%w %q", errNoPodVolumeForNode, nodeName))
+	}
+	return nil
+}
+
 // PreBind will make the API update with the assumed bindings and wait until
 // the PV controller has completely finished the binding operation.
 //
@@ -558,7 +578,7 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs fwk.CycleState, pod *v1
 	// we don't need to hold the lock as only one node will be pre-bound for the given pod
 	podVolumes, ok := s.podVolumesByNode[nodeName]
 	if !ok {
-		return fwk.AsStatus(fmt.Errorf("no pod volumes found for node %q", nodeName))
+		return fwk.AsStatus(fmt.Errorf("%w %q", errNoPodVolumeForNode, nodeName))
 	}
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Trying to bind volumes for pod", "pod", klog.KObj(pod))

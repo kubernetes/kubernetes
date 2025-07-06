@@ -73,6 +73,10 @@ func (mc CommunicatingPlugin) Unreserve(ctx context.Context, state fwk.CycleStat
 	}
 }
 
+func (mc CommunicatingPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
 // PreBind is the function invoked by the framework at "prebind" extension point.
 func (mc CommunicatingPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	if pod == nil {
