@@ -26,7 +26,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilptr "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
@@ -56,7 +56,7 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 			{
 				desc:                  "token should be plumbed down when csiServiceAccountTokenEnabled=true",
 				deployCSIDriverObject: true,
-				tokenRequests:         []storagev1.TokenRequest{{ExpirationSeconds: utilptr.Int64Ptr(60 * 10)}},
+				tokenRequests:         []storagev1.TokenRequest{{ExpirationSeconds: ptr.To[int64](60 * 10)}},
 			},
 		}
 		for _, test := range tests {
