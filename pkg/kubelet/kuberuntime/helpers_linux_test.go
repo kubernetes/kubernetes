@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/utils/ptr"
 )
 
 func seccompLocalhostRef(profileName string) string {
@@ -323,8 +324,8 @@ func TestSubtractOverheadFromResourceConfig(t *testing.T) {
 
 	resCfg := &cm.ResourceConfig{
 		Memory:    int64Ptr(335544320),
-		CPUShares: uint64Ptr(306),
-		CPUPeriod: uint64Ptr(100000),
+		CPUShares: ptr.To[uint64](306),
+		CPUPeriod: ptr.To[uint64](100000),
 		CPUQuota:  int64Ptr(30000),
 	}
 
@@ -357,8 +358,8 @@ func TestSubtractOverheadFromResourceConfig(t *testing.T) {
 			},
 			expected: &cm.ResourceConfig{
 				Memory:    int64Ptr(335544320),
-				CPUShares: uint64Ptr(306),
-				CPUPeriod: uint64Ptr(100000),
+				CPUShares: ptr.To[uint64](306),
+				CPUPeriod: ptr.To[uint64](100000),
 				CPUQuota:  int64Ptr(30000),
 			},
 		},
@@ -388,8 +389,8 @@ func TestSubtractOverheadFromResourceConfig(t *testing.T) {
 			},
 			expected: &cm.ResourceConfig{
 				Memory:    int64Ptr(268435456),
-				CPUShares: uint64Ptr(306),
-				CPUPeriod: uint64Ptr(100000),
+				CPUShares: ptr.To[uint64](306),
+				CPUPeriod: ptr.To[uint64](100000),
 				CPUQuota:  int64Ptr(30000),
 			},
 		},
@@ -419,8 +420,8 @@ func TestSubtractOverheadFromResourceConfig(t *testing.T) {
 			},
 			expected: &cm.ResourceConfig{
 				Memory:    int64Ptr(335544320),
-				CPUShares: uint64Ptr(203),
-				CPUPeriod: uint64Ptr(100000),
+				CPUShares: ptr.To[uint64](203),
+				CPUPeriod: ptr.To[uint64](100000),
 				CPUQuota:  int64Ptr(20000),
 			},
 		},
@@ -428,7 +429,7 @@ func TestSubtractOverheadFromResourceConfig(t *testing.T) {
 			name: "withoutCPUPeriod",
 			cfgInput: &cm.ResourceConfig{
 				Memory:    int64Ptr(335544320),
-				CPUShares: uint64Ptr(306),
+				CPUShares: ptr.To[uint64](306),
 			},
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -453,14 +454,14 @@ func TestSubtractOverheadFromResourceConfig(t *testing.T) {
 			},
 			expected: &cm.ResourceConfig{
 				Memory:    int64Ptr(335544320),
-				CPUShares: uint64Ptr(203),
+				CPUShares: ptr.To[uint64](203),
 			},
 		},
 		{
 			name: "withoutCPUShares",
 			cfgInput: &cm.ResourceConfig{
 				Memory:    int64Ptr(335544320),
-				CPUPeriod: uint64Ptr(100000),
+				CPUPeriod: ptr.To[uint64](100000),
 				CPUQuota:  int64Ptr(30000),
 			},
 			pod: &v1.Pod{
@@ -486,7 +487,7 @@ func TestSubtractOverheadFromResourceConfig(t *testing.T) {
 			},
 			expected: &cm.ResourceConfig{
 				Memory:    int64Ptr(335544320),
-				CPUPeriod: uint64Ptr(100000),
+				CPUPeriod: ptr.To[uint64](100000),
 				CPUQuota:  int64Ptr(20000),
 			},
 		},
@@ -517,8 +518,8 @@ func TestSubtractOverheadFromResourceConfig(t *testing.T) {
 			},
 			expected: &cm.ResourceConfig{
 				Memory:    int64Ptr(268435456),
-				CPUShares: uint64Ptr(203),
-				CPUPeriod: uint64Ptr(100000),
+				CPUShares: ptr.To[uint64](203),
+				CPUPeriod: ptr.To[uint64](100000),
 				CPUQuota:  int64Ptr(20000),
 			},
 		},

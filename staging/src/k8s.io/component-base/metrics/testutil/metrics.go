@@ -292,10 +292,6 @@ func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, l
 	return vec, nil
 }
 
-func uint64Ptr(u uint64) *uint64 {
-	return &u
-}
-
 // Bucket of a histogram
 type bucket struct {
 	upperBound float64

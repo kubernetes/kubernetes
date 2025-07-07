@@ -32,13 +32,13 @@ import (
 
 func samples2Histogram(samples []float64, upperBounds []float64) Histogram {
 	histogram := dto.Histogram{
-		SampleCount: uint64Ptr(0),
+		SampleCount: ptr.To[uint64](0),
 		SampleSum:   ptr.To[float64](0.0),
 	}
 
 	for _, ub := range upperBounds {
 		histogram.Bucket = append(histogram.Bucket, &dto.Bucket{
-			CumulativeCount: uint64Ptr(0),
+			CumulativeCount: ptr.To[uint64](0),
 			UpperBound:      ptr.To[float64](ub),
 		})
 	}
@@ -142,7 +142,7 @@ func TestHistogramValidate(t *testing.T) {
 			name: "empty SampleCount",
 			h: Histogram{
 				&dto.Histogram{
-					SampleCount: uint64Ptr(0),
+					SampleCount: ptr.To[uint64](0),
 				},
 			},
 			err: fmt.Errorf("nil or empty histogram SampleCount"),
@@ -151,7 +151,7 @@ func TestHistogramValidate(t *testing.T) {
 			name: "nil SampleSum",
 			h: Histogram{
 				&dto.Histogram{
-					SampleCount: uint64Ptr(1),
+					SampleCount: ptr.To[uint64](1),
 				},
 			},
 			err: fmt.Errorf("nil or empty histogram SampleSum"),
@@ -160,7 +160,7 @@ func TestHistogramValidate(t *testing.T) {
 			name: "empty SampleSum",
 			h: Histogram{
 				&dto.Histogram{
-					SampleCount: uint64Ptr(1),
+					SampleCount: ptr.To[uint64](1),
 					SampleSum:   ptr.To[float64](0.0),
 				},
 			},
@@ -170,7 +170,7 @@ func TestHistogramValidate(t *testing.T) {
 			name: "nil bucket",
 			h: Histogram{
 				&dto.Histogram{
-					SampleCount: uint64Ptr(1),
+					SampleCount: ptr.To[uint64](1),
 					SampleSum:   ptr.To[float64](1.0),
 					Bucket: []*dto.Bucket{
 						nil,
@@ -183,7 +183,7 @@ func TestHistogramValidate(t *testing.T) {
 			name: "nil bucket UpperBound",
 			h: Histogram{
 				&dto.Histogram{
-					SampleCount: uint64Ptr(1),
+					SampleCount: ptr.To[uint64](1),
 					SampleSum:   ptr.To[float64](1.0),
 					Bucket: []*dto.Bucket{
 						{},
@@ -196,7 +196,7 @@ func TestHistogramValidate(t *testing.T) {
 			name: "negative bucket UpperBound",
 			h: Histogram{
 				&dto.Histogram{
-					SampleCount: uint64Ptr(1),
+					SampleCount: ptr.To[uint64](1),
 					SampleSum:   ptr.To[float64](1.0),
 					Bucket: []*dto.Bucket{
 						{UpperBound: ptr.To[float64](-1.0)},
@@ -329,25 +329,25 @@ func TestHistogramVec_GetAggregatedSampleCount(t *testing.T) {
 		{
 			name: "zero case",
 			vec: HistogramVec{
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(0), SampleSum: ptr.To[float64](0.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](0), SampleSum: ptr.To[float64](0.0)}},
 			},
 			want: 0,
 		},
 		{
 			name: "standard case",
 			vec: HistogramVec{
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: ptr.To[float64](2.0)}},
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(2), SampleSum: ptr.To[float64](4.0)}},
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(4), SampleSum: ptr.To[float64](8.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](1), SampleSum: ptr.To[float64](2.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](2), SampleSum: ptr.To[float64](4.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](4), SampleSum: ptr.To[float64](8.0)}},
 			},
 			want: 7,
 		},
 		{
 			name: "mixed case",
 			vec: HistogramVec{
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: ptr.To[float64](2.0)}},
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(0), SampleSum: ptr.To[float64](0.0)}},
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(2), SampleSum: ptr.To[float64](4.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](1), SampleSum: ptr.To[float64](2.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](0), SampleSum: ptr.To[float64](0.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](2), SampleSum: ptr.To[float64](4.0)}},
 			},
 			want: 3,
 		},
@@ -375,25 +375,25 @@ func TestHistogramVec_GetAggregatedSampleSum(t *testing.T) {
 		{
 			name: "zero case",
 			vec: HistogramVec{
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(0), SampleSum: ptr.To[float64](0.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](0), SampleSum: ptr.To[float64](0.0)}},
 			},
 			want: 0.0,
 		},
 		{
 			name: "standard case",
 			vec: HistogramVec{
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: ptr.To[float64](2.0)}},
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(2), SampleSum: ptr.To[float64](4.0)}},
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(4), SampleSum: ptr.To[float64](8.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](1), SampleSum: ptr.To[float64](2.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](2), SampleSum: ptr.To[float64](4.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](4), SampleSum: ptr.To[float64](8.0)}},
 			},
 			want: 14.0,
 		},
 		{
 			name: "mixed case",
 			vec: HistogramVec{
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: ptr.To[float64](2.0)}},
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(0), SampleSum: ptr.To[float64](0.0)}},
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(2), SampleSum: ptr.To[float64](4.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](1), SampleSum: ptr.To[float64](2.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](0), SampleSum: ptr.To[float64](0.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](2), SampleSum: ptr.To[float64](4.0)}},
 			},
 			want: 6.0,
 		},
@@ -471,7 +471,7 @@ func TestHistogramVec_Validate(t *testing.T) {
 		{
 			name: "nil SampleCount",
 			vec: HistogramVec{
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: ptr.To[float64](1.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](1), SampleSum: ptr.To[float64](1.0)}},
 				&Histogram{&dto.Histogram{SampleSum: ptr.To[float64](2.0)}},
 			},
 			want: fmt.Errorf("nil or empty histogram SampleCount"),
@@ -479,28 +479,28 @@ func TestHistogramVec_Validate(t *testing.T) {
 		{
 			name: "valid HistogramVec",
 			vec: HistogramVec{
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: ptr.To[float64](1.0)}},
-				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(2), SampleSum: ptr.To[float64](2.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](1), SampleSum: ptr.To[float64](1.0)}},
+				&Histogram{&dto.Histogram{SampleCount: ptr.To[uint64](2), SampleSum: ptr.To[float64](2.0)}},
 			},
 		},
 		{
 			name: "different bucket size",
 			vec: HistogramVec{
 				&Histogram{&dto.Histogram{
-					SampleCount: uint64Ptr(4),
+					SampleCount: ptr.To[uint64](4),
 					SampleSum:   ptr.To[float64](10.0),
 					Bucket: []*dto.Bucket{
-						{CumulativeCount: uint64Ptr(1), UpperBound: ptr.To[float64](1)},
-						{CumulativeCount: uint64Ptr(2), UpperBound: ptr.To[float64](2)},
-						{CumulativeCount: uint64Ptr(5), UpperBound: ptr.To[float64](4)},
+						{CumulativeCount: ptr.To[uint64](1), UpperBound: ptr.To[float64](1)},
+						{CumulativeCount: ptr.To[uint64](2), UpperBound: ptr.To[float64](2)},
+						{CumulativeCount: ptr.To[uint64](5), UpperBound: ptr.To[float64](4)},
 					},
 				}},
 				&Histogram{&dto.Histogram{
-					SampleCount: uint64Ptr(3),
+					SampleCount: ptr.To[uint64](3),
 					SampleSum:   ptr.To[float64](8.0),
 					Bucket: []*dto.Bucket{
-						{CumulativeCount: uint64Ptr(1), UpperBound: ptr.To[float64](2)},
-						{CumulativeCount: uint64Ptr(3), UpperBound: ptr.To[float64](4)},
+						{CumulativeCount: ptr.To[uint64](1), UpperBound: ptr.To[float64](2)},
+						{CumulativeCount: ptr.To[uint64](3), UpperBound: ptr.To[float64](4)},
 					},
 				}},
 			},
@@ -527,21 +527,21 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 			lvMap: map[string]string{"label1": "value1-0"},
 			wantVec: HistogramVec{
 				&Histogram{&dto.Histogram{
-					SampleCount: uint64Ptr(1),
+					SampleCount: ptr.To[uint64](1),
 					SampleSum:   ptr.To[float64](1.5),
 					Bucket: []*dto.Bucket{
-						{CumulativeCount: uint64Ptr(0), UpperBound: ptr.To[float64](0.5)},
-						{CumulativeCount: uint64Ptr(1), UpperBound: ptr.To[float64](2.0)},
-						{CumulativeCount: uint64Ptr(1), UpperBound: ptr.To[float64](5.0)},
+						{CumulativeCount: ptr.To[uint64](0), UpperBound: ptr.To[float64](0.5)},
+						{CumulativeCount: ptr.To[uint64](1), UpperBound: ptr.To[float64](2.0)},
+						{CumulativeCount: ptr.To[uint64](1), UpperBound: ptr.To[float64](5.0)},
 					},
 				}},
 				&Histogram{&dto.Histogram{
-					SampleCount: uint64Ptr(1),
+					SampleCount: ptr.To[uint64](1),
 					SampleSum:   ptr.To[float64](2.5),
 					Bucket: []*dto.Bucket{
-						{CumulativeCount: uint64Ptr(0), UpperBound: ptr.To[float64](0.5)},
-						{CumulativeCount: uint64Ptr(0), UpperBound: ptr.To[float64](2.0)},
-						{CumulativeCount: uint64Ptr(1), UpperBound: ptr.To[float64](5.0)},
+						{CumulativeCount: ptr.To[uint64](0), UpperBound: ptr.To[float64](0.5)},
+						{CumulativeCount: ptr.To[uint64](0), UpperBound: ptr.To[float64](2.0)},
+						{CumulativeCount: ptr.To[uint64](1), UpperBound: ptr.To[float64](5.0)},
 					},
 				}},
 			},
@@ -551,12 +551,12 @@ func TestGetHistogramVecFromGatherer(t *testing.T) {
 			lvMap: map[string]string{"label1": "value1-0", "label2": "value2-1"},
 			wantVec: HistogramVec{
 				&Histogram{&dto.Histogram{
-					SampleCount: uint64Ptr(1),
+					SampleCount: ptr.To[uint64](1),
 					SampleSum:   ptr.To[float64](2.5),
 					Bucket: []*dto.Bucket{
-						{CumulativeCount: uint64Ptr(0), UpperBound: ptr.To[float64](0.5)},
-						{CumulativeCount: uint64Ptr(0), UpperBound: ptr.To[float64](2.0)},
-						{CumulativeCount: uint64Ptr(1), UpperBound: ptr.To[float64](5.0)},
+						{CumulativeCount: ptr.To[uint64](0), UpperBound: ptr.To[float64](0.5)},
+						{CumulativeCount: ptr.To[uint64](0), UpperBound: ptr.To[float64](2.0)},
+						{CumulativeCount: ptr.To[uint64](1), UpperBound: ptr.To[float64](5.0)},
 					},
 				}},
 			},
