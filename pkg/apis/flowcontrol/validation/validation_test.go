@@ -31,7 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/internalbootstrap"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestFlowSchemaValidation(t *testing.T) {
@@ -746,15 +746,15 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 	badExemptSpec1 := flowcontrol.PriorityLevelConfigurationSpec{
 		Type: flowcontrol.PriorityLevelEnablementExempt,
 		Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
-			NominalConcurrencyShares: pointer.Int32(-1),
-			LendablePercent:          pointer.Int32(101),
+			NominalConcurrencyShares: ptr.To[int32](-1),
+			LendablePercent:          ptr.To[int32](101),
 		},
 	}
 	badExemptSpec2 := flowcontrol.PriorityLevelConfigurationSpec{
 		Type: flowcontrol.PriorityLevelEnablementExempt,
 		Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
-			NominalConcurrencyShares: pointer.Int32(-1),
-			LendablePercent:          pointer.Int32(-1),
+			NominalConcurrencyShares: ptr.To[int32](-1),
+			LendablePercent:          ptr.To[int32](-1),
 		},
 	}
 
@@ -773,8 +773,8 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		return flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementExempt,
 			Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
-				NominalConcurrencyShares: pointer.Int32(*have.Spec.Exempt.NominalConcurrencyShares + 10),
-				LendablePercent:          pointer.Int32(*have.Spec.Exempt.LendablePercent + 10),
+				NominalConcurrencyShares: ptr.To[int32](*have.Spec.Exempt.NominalConcurrencyShares + 10),
+				LendablePercent:          ptr.To[int32](*have.Spec.Exempt.LendablePercent + 10),
 			},
 		}
 	}
@@ -809,8 +809,8 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: flowcontrol.PriorityLevelConfigurationSpec{
 				Type: flowcontrol.PriorityLevelEnablementExempt,
 				Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
-					NominalConcurrencyShares: pointer.Int32(0),
-					LendablePercent:          pointer.Int32(0),
+					NominalConcurrencyShares: ptr.To[int32](0),
+					LendablePercent:          ptr.To[int32](0),
 				},
 			},
 		},
@@ -960,7 +960,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 				Type: flowcontrol.PriorityLevelEnablementLimited,
 				Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 					NominalConcurrencyShares: 5,
-					LendablePercent:          pointer.Int32(0),
+					LendablePercent:          ptr.To[int32](0),
 					LimitResponse: flowcontrol.LimitResponse{
 						Type: flowcontrol.LimitResponseTypeReject,
 					}}},
@@ -1378,31 +1378,31 @@ func TestValidateLimitedPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 		lendablePercent: nil,
 		errExpected:     nil,
 	}, {
-		lendablePercent: pointer.Int32(0),
+		lendablePercent: ptr.To[int32](0),
 		errExpected:     nil,
 	}, {
-		lendablePercent: pointer.Int32(100),
+		lendablePercent: ptr.To[int32](100),
 		errExpected:     nil,
 	}, {
-		lendablePercent: pointer.Int32(101),
+		lendablePercent: ptr.To[int32](101),
 		errExpected:     errLendablePercentFn(101),
 	}, {
-		lendablePercent: pointer.Int32(-1),
+		lendablePercent: ptr.To[int32](-1),
 		errExpected:     errLendablePercentFn(-1),
 	}, {
 		borrowingLimitPercent: nil,
 		errExpected:           nil,
 	}, {
-		borrowingLimitPercent: pointer.Int32(1),
+		borrowingLimitPercent: ptr.To[int32](1),
 		errExpected:           nil,
 	}, {
-		borrowingLimitPercent: pointer.Int32(100),
+		borrowingLimitPercent: ptr.To[int32](100),
 		errExpected:           nil,
 	}, {
-		borrowingLimitPercent: pointer.Int32(0),
+		borrowingLimitPercent: ptr.To[int32](0),
 		errExpected:           nil,
 	}, {
-		borrowingLimitPercent: pointer.Int32(-1),
+		borrowingLimitPercent: ptr.To[int32](-1),
 		errExpected:           errBorrowingLimitPercentFn(-1),
 	}}
 
