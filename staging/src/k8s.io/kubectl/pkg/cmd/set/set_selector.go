@@ -72,9 +72,9 @@ var (
 		If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.
         Note: currently selectors can only be set on Service objects.`))
 	selectorExample = templates.Examples(`
-        # Set the labels and selector before creating a deployment/service pair
+        # Set the selector for a service before creating a matching pod
         kubectl create service clusterip my-svc --clusterip="None" -o yaml --dry-run=client | kubectl set selector --local -f - 'environment=qa' -o yaml | kubectl create -f -
-        kubectl create deployment my-dep -o yaml --dry-run=client | kubectl label --local -f - environment=qa -o yaml | kubectl create -f -`)
+        kubectl run my-pod --image=nginx --labels=environment=qa`)
 )
 
 // NewSelectorOptions returns an initialized SelectorOptions instance
