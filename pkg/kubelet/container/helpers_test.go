@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestEnvVarsToMap(t *testing.T) {
@@ -493,9 +494,6 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 }
 
 func TestHasPrivilegedContainer(t *testing.T) {
-	newBoolPtr := func(b bool) *bool {
-		return &b
-	}
 	tests := map[string]struct {
 		securityContext *v1.SecurityContext
 		expected        bool
@@ -509,11 +507,11 @@ func TestHasPrivilegedContainer(t *testing.T) {
 			expected:        false,
 		},
 		"false privileged": {
-			securityContext: &v1.SecurityContext{Privileged: newBoolPtr(false)},
+			securityContext: &v1.SecurityContext{Privileged: ptr.To(false)},
 			expected:        false,
 		},
 		"true privileged": {
-			securityContext: &v1.SecurityContext{Privileged: newBoolPtr(true)},
+			securityContext: &v1.SecurityContext{Privileged: ptr.To(true)},
 			expected:        true,
 		},
 	}
