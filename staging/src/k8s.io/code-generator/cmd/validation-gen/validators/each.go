@@ -46,7 +46,9 @@ func init() {
 	shared := map[string]*listMetadata{} // keyed by the fieldpath
 	RegisterTagValidator(listTypeTagValidator{byFieldPath: shared})
 	RegisterTagValidator(listMapKeyTagValidator{byFieldPath: shared})
-	RegisterFieldValidator(listFieldValidator{byFieldPath: shared})
+
+	RegisterFieldValidator(listValidator{byFieldPath: shared})
+	RegisterTypeValidator(listValidator{byFieldPath: shared})
 
 	globalEachVal = &eachValTagValidator{byFieldPath: shared, validator: nil}
 	RegisterTagValidator(globalEachVal)
@@ -73,9 +75,7 @@ func (lm *listMetadata) makeListMapMatchFunc(t *types.Type) FunctionLiteral {
 	if !lm.declaredAsMap {
 		panic("makeListMapMatchFunc called on a non-map list")
 	}
-	if len(lm.keyFields) == 0 {
-		panic("makeListMapMatchFunc called on a list-map with no key fields")
-	}
+	// If no keys are defined, we will throw a good error later.
 
 	matchFn := FunctionLiteral{
 		Parameters: []ParamResult{{"a", t}, {"b", t}},
@@ -117,7 +117,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := util.NativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
-		return Validations{}, fmt.Errorf("can only be used on list types")
+		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
 
 	switch tag.Value {
@@ -158,7 +158,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		}
 		lm := lttv.byFieldPath[context.Path.String()]
 		lm.declaredAsMap = true
-		// NOTE: we validate uniqueness of the keys in the listFieldValidator.
+		// NOTE: we validate uniqueness of the keys in the listValidator.
 	default:
 		return Validations{}, fmt.Errorf("unknown list type %q", tag.Value)
 	}
@@ -201,7 +201,7 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := util.NativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
-		return Validations{}, fmt.Errorf("can only be used on list types")
+		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
 	// NOTE: lists of pointers are not supported, so we should never see a pointer here.
 	if util.NativeType(t.Elem).Kind != types.Struct {
@@ -244,18 +244,18 @@ func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 	return doc
 }
 
-type listFieldValidator struct {
+type listValidator struct {
 	byFieldPath map[string]*listMetadata
 }
 
-func (listFieldValidator) Init(_ Config) {}
+func (listValidator) Init(_ Config) {}
 
-func (listFieldValidator) Name() string {
-	return "listFieldValidator"
+func (listValidator) Name() string {
+	return "listValidator"
 }
 
-func (lfv listFieldValidator) GetValidations(context Context) (Validations, error) {
-	lm := lfv.byFieldPath[context.Path.String()]
+func (lv listValidator) GetValidations(context Context) (Validations, error) {
+	lm := lv.byFieldPath[context.Path.String()]
 	if lm == nil {
 		// TODO(thockin): enable this once the whole codebase is converted or
 		// if we only run against fields which are opted-in.
@@ -289,7 +289,7 @@ func (lfv listFieldValidator) GetValidations(context Context) (Validations, erro
 		// is also not able to handle these well.
 		t := util.NativeType(context.Type)
 		matchArg := lm.makeListMapMatchFunc(t.Elem)
-		f := Function("listFieldValidator", DefaultFlags, validateUnique, matchArg)
+		f := Function("listValidator", DefaultFlags, validateUnique, matchArg)
 		result.Functions = append(result.Functions, f)
 	}
 
@@ -330,7 +330,7 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	switch t.Kind {
 	case types.Slice, types.Array, types.Map:
 	default:
-		return Validations{}, fmt.Errorf("can only be used on list or map types")
+		return Validations{}, fmt.Errorf("can only be used on list or map types (%s)", t.Kind)
 	}
 
 	elemContext := Context{
@@ -478,7 +478,7 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := util.NativeType(context.Type)
 	if t.Kind != types.Map {
-		return Validations{}, fmt.Errorf("can only be used on map types")
+		return Validations{}, fmt.Errorf("can only be used on map types (%s)", t.Kind)
 	}
 
 	elemContext := Context{
