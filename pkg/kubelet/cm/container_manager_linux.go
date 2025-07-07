@@ -62,6 +62,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -310,10 +311,11 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// Initialize DRA manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
-		cm.draManager, err = dra.NewManager(kubeClient, nodeConfig.KubeletRootDir)
+		cm.draManager, err = dra.NewManager(klog.TODO(), kubeClient, nodeConfig.KubeletRootDir)
 		if err != nil {
 			return nil, err
 		}
+		metrics.Register(cm.draManager.NewMetricsCollector())
 	}
 	cm.kubeClient = kubeClient
 
