@@ -1367,9 +1367,7 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # kubekins has a special directory for docker root
   DOCKER_ROOT="/docker-graph"
 
-  # to use docker installed containerd as kubelet container runtime
-  # we need to enable cri and install cni
-  # install cni for docker in docker
+  # to use containerd as kubelet container runtime we need to install cni
   install_cni 
 
   # If we are running in a cgroups v2 environment
@@ -1394,6 +1392,23 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   docker version
   containerd --version
   runc --version
+
+  # configure and start containerd
+  echo "configuring containerd"
+  containerd config default > /etc/containerd/config.toml
+  sed -ie 's|root = "/var/lib/containerd"|root = "/docker-graph/containerd/daemon"|' /etc/containerd/config.toml
+  sed -ie 's|state = "/run/containerd"|state = "/var/run/docker/containerd/daemon"|' /etc/containerd/config.toml
+  sed -ie 's|enable_cdi = false|enable_cdi = true|' /etc/containerd/config.toml
+
+  echo "starting containerd"
+  containerd_endpoint="${CONTAINER_RUNTIME_ENDPOINT#unix://}"
+  start-stop-daemon --start --background --pidfile /var/run/containerd.pid --output ${LOG_DIR}/containerd.log \
+          --exec /usr/bin/containerd -- --address "${containerd_endpoint}"
+  kube::util::wait_for_success 60 2 "ctr --address ${containerd_endpoint} images list"
+  if [ $? == "1" ]; then
+    echo "time out on waiting for containerd to start"
+    exit 1
+  fi
 
   echo "starting docker"
   service docker start
