@@ -129,18 +129,22 @@ spec:
       httpGet:
         host: 127.0.0.1
         path: /livez
-        port: 2381
+        port: probe-port
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10
       timeoutSeconds: 15
     name: etcd
+    ports:
+    - containerPort: 2381
+      name: probe-port
+      protocol: TCP
     readinessProbe:
       failureThreshold: 3
       httpGet:
         host: 127.0.0.1
         path: /readyz
-        port: 2381
+        port: probe-port
         scheme: HTTP
       periodSeconds: 1
       timeoutSeconds: 15
@@ -153,7 +157,7 @@ spec:
       httpGet:
         host: 127.0.0.1
         path: /readyz
-        port: 2381
+        port: probe-port
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10

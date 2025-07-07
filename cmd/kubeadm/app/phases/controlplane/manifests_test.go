@@ -71,8 +71,9 @@ func TestGetStaticPodSpecs(t *testing.T) {
 		expectLivenessProbe  bool
 		expectReadinessProbe bool
 		expectStartupProbe   bool
-		probePort            int32
+		probePort            string
 		env                  []v1.EnvVar
+		containerPorts       []v1.ContainerPort
 	}{
 		{
 			name:                 "KubeAPIServer",
@@ -80,7 +81,14 @@ func TestGetStaticPodSpecs(t *testing.T) {
 			expectLivenessProbe:  true,
 			expectReadinessProbe: true,
 			expectStartupProbe:   true,
-			probePort:            kubeadmconstants.KubeAPIServerPort,
+			probePort:            kubeadmconstants.ProbePort,
+			containerPorts: []v1.ContainerPort{
+				{
+					Name:          kubeadmconstants.ProbePort,
+					ContainerPort: kubeadmconstants.KubeAPIServerPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
 		},
 		{
 			name:                 "KubeControllerManager",
@@ -88,7 +96,14 @@ func TestGetStaticPodSpecs(t *testing.T) {
 			expectLivenessProbe:  true,
 			expectReadinessProbe: false,
 			expectStartupProbe:   true,
-			probePort:            kubeadmconstants.KubeControllerManagerPort,
+			probePort:            kubeadmconstants.ProbePort,
+			containerPorts: []v1.ContainerPort{
+				{
+					Name:          kubeadmconstants.ProbePort,
+					ContainerPort: kubeadmconstants.KubeControllerManagerPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
 		},
 		{
 			name:                 "KubeScheduler",
@@ -96,8 +111,15 @@ func TestGetStaticPodSpecs(t *testing.T) {
 			expectLivenessProbe:  true,
 			expectReadinessProbe: true,
 			expectStartupProbe:   true,
-			probePort:            kubeadmconstants.KubeSchedulerPort,
+			probePort:            kubeadmconstants.ProbePort,
 			env:                  []v1.EnvVar{{Name: "Foo", Value: "Bar"}},
+			containerPorts: []v1.ContainerPort{
+				{
+					Name:          kubeadmconstants.ProbePort,
+					ContainerPort: kubeadmconstants.KubeSchedulerPort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
 		},
 	}
 
@@ -125,14 +147,22 @@ func TestGetStaticPodSpecs(t *testing.T) {
 					t.Errorf("expected startupProbe: %v, got: %v", tc.expectStartupProbe, (spec.Spec.Containers[0].StartupProbe != nil))
 				}
 
-				if spec.Spec.Containers[0].LivenessProbe != nil && tc.probePort > 0 && !reflect.DeepEqual(intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].LivenessProbe.HTTPGet.Port) {
-					t.Errorf("expected livenessProbe port: %v, got: %v", intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].LivenessProbe.HTTPGet.Port)
+				if len(tc.probePort) > 0 {
+					if spec.Spec.Containers[0].LivenessProbe != nil && !reflect.DeepEqual(intstr.FromString(tc.probePort), spec.Spec.Containers[0].LivenessProbe.HTTPGet.Port) {
+						t.Errorf("expected livenessProbe port: %v, got: %v", intstr.FromString(tc.probePort), spec.Spec.Containers[0].LivenessProbe.HTTPGet.Port)
+					}
+					if spec.Spec.Containers[0].ReadinessProbe != nil && len(tc.probePort) > 0 && !reflect.DeepEqual(intstr.FromString(tc.probePort), spec.Spec.Containers[0].ReadinessProbe.HTTPGet.Port) {
+						t.Errorf("expected readinessProbe port: %v, got: %v", intstr.FromString(tc.probePort), spec.Spec.Containers[0].ReadinessProbe.HTTPGet.Port)
+					}
+					if spec.Spec.Containers[0].StartupProbe != nil && !reflect.DeepEqual(intstr.FromString(tc.probePort), spec.Spec.Containers[0].StartupProbe.HTTPGet.Port) {
+						t.Errorf("expected startupProbe port: %v, got: %v", intstr.FromString(tc.probePort), spec.Spec.Containers[0].StartupProbe.HTTPGet.Port)
+					}
 				}
-				if spec.Spec.Containers[0].ReadinessProbe != nil && tc.probePort > 0 && !reflect.DeepEqual(intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].ReadinessProbe.HTTPGet.Port) {
-					t.Errorf("expected readinessProbe port: %v, got: %v", intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].ReadinessProbe.HTTPGet.Port)
-				}
-				if spec.Spec.Containers[0].StartupProbe != nil && tc.probePort > 0 && !reflect.DeepEqual(intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].StartupProbe.HTTPGet.Port) {
-					t.Errorf("expected startupProbe port: %v, got: %v", intstr.FromInt32(tc.probePort), spec.Spec.Containers[0].StartupProbe.HTTPGet.Port)
+
+				if len(tc.containerPorts) > 0 {
+					if !reflect.DeepEqual(spec.Spec.Containers[0].Ports, tc.containerPorts) {
+						t.Errorf("expected ports: %v, got: %v", tc.containerPorts, spec.Spec.Containers[0].Ports)
+					}
 				}
 
 			} else {

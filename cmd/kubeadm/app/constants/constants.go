@@ -466,6 +466,9 @@ const (
 	EnvVarJoinDryRunDir = "KUBEADM_JOIN_DRYRUN_DIR"
 	// EnvVarUpgradeDryRunDir has the environment variable for upgrade dry run directory override.
 	EnvVarUpgradeDryRunDir = "KUBEADM_UPGRADE_DRYRUN_DIR"
+
+	// ProbePort is a general named port to be used in pod manifests.
+	ProbePort = "probe-port"
 )
 
 var (
