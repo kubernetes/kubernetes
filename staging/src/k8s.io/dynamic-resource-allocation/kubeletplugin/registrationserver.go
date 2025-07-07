@@ -32,6 +32,8 @@ type registrationServer struct {
 	status            *registerapi.RegistrationStatus
 
 	getInfoError atomic.Pointer[error]
+
+	registerapi.UnsafeRegistrationServer
 }
 
 var _ registerapi.RegistrationServer = &registrationServer{}

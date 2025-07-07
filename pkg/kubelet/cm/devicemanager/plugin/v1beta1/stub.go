@@ -63,6 +63,7 @@ type Stub struct {
 	kubeletRestartWatcher *fsnotify.Watcher
 
 	pluginapi.UnsafeDevicePluginServer
+	watcherapi.UnsafeRegistrationServer
 }
 
 // stubGetPreferredAllocFunc is the function called when a getPreferredAllocation request is received from Kubelet
