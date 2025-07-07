@@ -627,29 +627,30 @@ func (tc *throughputCollector) collect() []DataItem {
 		progress: tc.progress,
 		start:    tc.start,
 	}
-	if length := len(tc.schedulingThroughputs); length > 0 {
-		sort.Float64s(tc.schedulingThroughputs)
-		sum := 0.0
-		for i := range tc.schedulingThroughputs {
-			sum += tc.schedulingThroughputs[i]
-		}
-
-		throughputSummary.Labels["Metric"] = "SchedulingThroughput"
-		throughputSummary.Data = map[string]float64{
-			"Average": sum / float64(length),
-			"Perc50":  tc.schedulingThroughputs[int(math.Ceil(float64(length*50)/100))-1],
-			"Perc90":  tc.schedulingThroughputs[int(math.Ceil(float64(length*90)/100))-1],
-			"Perc95":  tc.schedulingThroughputs[int(math.Ceil(float64(length*95)/100))-1],
-			"Perc99":  tc.schedulingThroughputs[int(math.Ceil(float64(length*99)/100))-1],
-		}
-		throughputSummary.Unit = "pods/s"
-	}
 
 	// tc.schedulingThroughputs can be empty if the scenario doesn't have
 	// enough number of pods and nodes to take more than throughputSampleInterval (i.e. 1 second).
-	if throughputSummary.Data == nil {
+	length := len(tc.schedulingThroughputs)
+	if length == 0 {
 		klog.Warningf("Failed to measure SchedulingThroughput for %s. Increase pods and/or nodes to make scheduling take longer", tc.resultLabels["Name"])
+		return []DataItem{throughputSummary}
 	}
+
+	sort.Float64s(tc.schedulingThroughputs)
+	sum := 0.0
+	for i := range tc.schedulingThroughputs {
+		sum += tc.schedulingThroughputs[i]
+	}
+
+	throughputSummary.Labels["Metric"] = "SchedulingThroughput"
+	throughputSummary.Data = map[string]float64{
+		"Average": sum / float64(length),
+		"Perc50":  tc.schedulingThroughputs[int(math.Ceil(float64(length*50)/100))-1],
+		"Perc90":  tc.schedulingThroughputs[int(math.Ceil(float64(length*90)/100))-1],
+		"Perc95":  tc.schedulingThroughputs[int(math.Ceil(float64(length*95)/100))-1],
+		"Perc99":  tc.schedulingThroughputs[int(math.Ceil(float64(length*99)/100))-1],
+	}
+	throughputSummary.Unit = "pods/s"
 
 	return []DataItem{throughputSummary}
 }
