@@ -493,7 +493,12 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 			detail = ruleMessageOrDefault(rule)
 		}
 
-		addErr(fieldErrorForReason(currentFldPath, sts.Type, detail, rule.Reason))
+		value := obj
+		if sts.Type == "object" || sts.Type == "array" {
+			value = sts.Type
+		}
+
+		addErr(fieldErrorForReason(currentFldPath, value, detail, rule.Reason))
 	}
 	return errs, remainingBudget
 }
