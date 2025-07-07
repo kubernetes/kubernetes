@@ -89,13 +89,6 @@ type Manager interface {
 	// calculations after this function is called. It also updates the cached ResizeStatus according to
 	// the allocation decision and pod status.
 	HandlePodResourcesResize(runtime kubecontainer.Runtime, allocatedPods []*v1.Pod, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, error)
-
-	// IsPodResizingInProgress checks whether the actuated resizable resources differ from the allocated resources
-	// for any running containers. Specifically, the following differences are ignored:
-	// - Non-resizable containers: non-restartable init containers, ephemeral containers
-	// - Non-resizable resources: only CPU & memory are resizable
-	// - Non-running containers: they will be sized correctly when (re)started
-	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool
 }
 
 type manager struct {
@@ -295,7 +288,7 @@ func (m *manager) HandlePodResourcesResize(
 		if err != nil {
 			return
 		}
-		if m.IsPodResizeInProgress(allocatedPod, podStatus) {
+		if m.isPodResizeInProgress(allocatedPod, podStatus) {
 			// If a resize is in progress, make sure the cache has the correct state in case the Kubelet restarted.
 			m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", false)
 		} else {
@@ -452,7 +445,12 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 	return true, "", ""
 }
 
-func (m *manager) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+// IsPodResizingInProgress checks whether the actuated resizable resources differ from the allocated resources
+// for any running containers. Specifically, the following differences are ignored:
+// - Non-resizable containers: non-restartable init containers, ephemeral containers
+// - Non-resizable resources: only CPU & memory are resizable
+// - Non-running containers: they will be sized correctly when (re)started
+func (m *manager) isPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	return !podutil.VisitContainers(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers,
 		func(allocatedContainer *v1.Container, containerType podutil.ContainerType) (shouldContinue bool) {
 			if !isResizableContainer(allocatedContainer, containerType) {
