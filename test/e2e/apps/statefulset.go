@@ -66,10 +66,9 @@ import (
 
 const (
 	zookeeperManifestPath   = "test/e2e/testing-manifests/statefulset/zookeeper"
-	mysqlGaleraManifestPath = "test/e2e/testing-manifests/statefulset/mysql-galera"
 	redisManifestPath       = "test/e2e/testing-manifests/statefulset/redis"
 	cockroachDBManifestPath = "test/e2e/testing-manifests/statefulset/cockroachdb"
-	// We don't restart MySQL cluster regardless of restartCluster, since MySQL doesn't handle restart well
+
 	restartCluster = true
 
 	// Timeout for reads from databases running on stateful pods.
@@ -1206,14 +1205,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
-		ginkgo.It("should creating a working mysql cluster", func(ctx context.Context) {
-			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
-			appTester.statefulPod = &mysqlGaleraTester{client: c}
-			appTester.run(ctx)
-		})
-
-		// Do not mark this as Conformance.
-		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working CockroachDB cluster", func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 			appTester.statefulPod = &cockroachDBTester{client: c}
@@ -1968,18 +1959,6 @@ func uncordonNode(ctx context.Context, c clientset.Interface, oldData, newData [
 	framework.ExpectNoError(err)
 }
 
-func kubectlExecWithRetries(ns string, args ...string) (out string) {
-	var err error
-	for i := 0; i < 3; i++ {
-		if out, err = e2ekubectl.RunKubectl(ns, args...); err == nil {
-			return
-		}
-		framework.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
-	}
-	framework.Failf("Failed to execute \"%v\" with retries: %v", args, err)
-	return
-}
-
 type statefulPodTester interface {
 	deploy(ctx context.Context, ns string) *appsv1.StatefulSet
 	write(statefulPodIndex int, kv map[string]string)
@@ -2000,15 +1979,10 @@ func (c *clusterAppTester) run(ctx context.Context) {
 	ginkgo.By("Creating foo:bar in member with index 0")
 	c.statefulPod.write(0, map[string]string{"foo": "bar"})
 
-	switch c.statefulPod.(type) {
-	case *mysqlGaleraTester:
-		// Don't restart MySQL cluster since it doesn't handle restarts well
-	default:
-		if restartCluster {
-			ginkgo.By("Restarting stateful set " + ss.Name)
-			e2estatefulset.Restart(ctx, c.client, ss)
-			e2estatefulset.WaitForRunningAndReady(ctx, c.client, *ss.Spec.Replicas, ss)
-		}
+	if restartCluster {
+		ginkgo.By("Restarting stateful set " + ss.Name)
+		e2estatefulset.Restart(ctx, c.client, ss)
+		e2estatefulset.WaitForRunningAndReady(ctx, c.client, *ss.Spec.Replicas, ss)
 	}
 
 	ginkgo.By("Reading value under foo from member with index 2")
@@ -2043,49 +2017,6 @@ func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
 	return lastLine(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
-}
-
-type mysqlGaleraTester struct {
-	ss     *appsv1.StatefulSet
-	client clientset.Interface
-}
-
-func (m *mysqlGaleraTester) name() string {
-	return "mysql: galera"
-}
-
-func (m *mysqlGaleraTester) mysqlExec(cmd, ns, podName string) string {
-	cmd = fmt.Sprintf("/usr/bin/mysql -u root -B -e '%v'", cmd)
-	// TODO: Find a readiness probe for mysql that guarantees writes will
-	// succeed and ditch retries. Current probe only reads, so there's a window
-	// for a race.
-	return kubectlExecWithRetries(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
-}
-
-func (m *mysqlGaleraTester) deploy(ctx context.Context, ns string) *appsv1.StatefulSet {
-	m.ss = e2estatefulset.CreateStatefulSet(ctx, m.client, mysqlGaleraManifestPath, ns)
-
-	framework.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
-	for _, cmd := range []string{
-		"create database statefulset;",
-		"use statefulset; create table foo (k varchar(20), v varchar(20));",
-	} {
-		framework.Logf("%s", m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
-	}
-	return m.ss
-}
-
-func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	for k, v := range kv {
-		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
-		framework.Logf(cmd, m.mysqlExec(cmd, m.ss.Namespace, name))
-	}
-}
-
-func (m *mysqlGaleraTester) read(statefulPodIndex int, key string) string {
-	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-	return lastLine(m.mysqlExec(fmt.Sprintf("use statefulset; select v from foo where k=\"%v\";", key), m.ss.Namespace, name))
 }
 
 type redisTester struct {

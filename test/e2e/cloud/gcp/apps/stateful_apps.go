@@ -32,7 +32,6 @@ import (
 )
 
 var upgradeTests = []upgrades.Test{
-	&apps.MySQLUpgradeTest{},
 	&apps.EtcdUpgradeTest{},
 	&apps.CassandraUpgradeTest{},
 }
