@@ -38,7 +38,7 @@ import (
 	"k8s.io/client-go/util/certificate/csr"
 	capi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -270,7 +270,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					Usages:            validUsages,
 					Request:           newCSRPEM(t),
 					SignerName:        validSignerName,
-					ExpirationSeconds: pointer.Int32(-1),
+					ExpirationSeconds: ptr.To[int32](-1),
 				},
 			},
 			errs: field.ErrorList{
@@ -284,7 +284,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					Usages:            validUsages,
 					Request:           newCSRPEM(t),
 					SignerName:        validSignerName,
-					ExpirationSeconds: pointer.Int32(0),
+					ExpirationSeconds: ptr.To[int32](0),
 				},
 			},
 			errs: field.ErrorList{
@@ -298,7 +298,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 					Usages:            validUsages,
 					Request:           newCSRPEM(t),
 					SignerName:        validSignerName,
-					ExpirationSeconds: pointer.Int32(1),
+					ExpirationSeconds: ptr.To[int32](1),
 				},
 			},
 			errs: field.ErrorList{
