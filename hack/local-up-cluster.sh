@@ -1357,6 +1357,13 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
   KUBE_FASTBUILD=true make ginkgo cross
 
+  log_dir="${LOG_DIR}"
+  if [[ -n "${ARTIFACTS}" ]]; then
+    # Store logs in the artifacts directory so that they are
+    # available in the prow web UI.
+    log_dir="${ARTIFACTS}"
+  fi
+
   echo "install additional packages"
   apt-get update
   apt-get install -y conntrack dnsutils nftables ripgrep sudo tree vim
@@ -1383,7 +1390,7 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --debug\"" >> /etc/default/docker
 
   # let's log it where we can grab it later
-  echo "DOCKER_LOGFILE=${LOG_DIR}/docker.log" >> /etc/default/docker
+  echo "DOCKER_LOGFILE=${log_dir}/docker.log" >> /etc/default/docker
 
   echo "stopping docker"
   service docker stop
@@ -1402,7 +1409,7 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
 
   echo "starting containerd"
   containerd_endpoint="${CONTAINER_RUNTIME_ENDPOINT#unix://}"
-  start-stop-daemon --start --background --pidfile /var/run/containerd.pid --output ${LOG_DIR}/containerd.log \
+  start-stop-daemon --start --background --pidfile /var/run/containerd.pid --output "${log_dir}/containerd.log" \
           --exec /usr/bin/containerd -- --address "${containerd_endpoint}"
   kube::util::wait_for_success 60 2 "ctr --address ${containerd_endpoint} images list"
   if [ $? == "1" ]; then
