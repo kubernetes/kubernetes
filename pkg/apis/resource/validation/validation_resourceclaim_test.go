@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -160,7 +159,7 @@ func TestValidateClaim(t *testing.T) {
 		"deletion-grace-period-seconds": {
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
-				claim.DeletionGracePeriodSeconds = pointer.Int64(10)
+				claim.DeletionGracePeriodSeconds = ptr.To[int64](10)
 				return claim
 			}(),
 		},
