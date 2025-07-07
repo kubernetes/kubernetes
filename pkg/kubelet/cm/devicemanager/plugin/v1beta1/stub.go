@@ -61,6 +61,7 @@ type Stub struct {
 	endpoint           string                             // for testing
 
 	kubeletRestartWatcher *fsnotify.Watcher
+	watcherapi.UnsafeRegistrationServer
 }
 
 // stubGetPreferredAllocFunc is the function called when a getPreferredAllocation request is received from Kubelet
