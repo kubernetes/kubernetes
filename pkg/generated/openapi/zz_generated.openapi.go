@@ -1280,6 +1280,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kubelet/config/v1alpha1.ImagePullCredentials":                                                   schema_k8sio_kubelet_config_v1alpha1_ImagePullCredentials(ref),
 		"k8s.io/kubelet/config/v1alpha1.ImagePullIntent":                                                        schema_k8sio_kubelet_config_v1alpha1_ImagePullIntent(ref),
 		"k8s.io/kubelet/config/v1alpha1.ImagePullSecret":                                                        schema_k8sio_kubelet_config_v1alpha1_ImagePullSecret(ref),
+		"k8s.io/kubelet/config/v1alpha1.ImagePullServiceAccountTokenSource":                                     schema_k8sio_kubelet_config_v1alpha1_ImagePullServiceAccountTokenSource(ref),
 		"k8s.io/kubelet/config/v1alpha1.ImagePulledRecord":                                                      schema_k8sio_kubelet_config_v1alpha1_ImagePulledRecord(ref),
 		"k8s.io/kubelet/config/v1beta1.CrashLoopBackOffConfig":                                                  schema_k8sio_kubelet_config_v1beta1_CrashLoopBackOffConfig(ref),
 		"k8s.io/kubelet/config/v1beta1.CredentialProvider":                                                      schema_k8sio_kubelet_config_v1beta1_CredentialProvider(ref),
@@ -65775,16 +65776,35 @@ func schema_k8sio_kubelet_config_v1alpha1_ImagePullCredentials(ref common.Refere
 					},
 					"nodePodsAccessible": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodePodsAccessible is a flag denoting the pull credentials are accessible by all the pods on the node, or that no credentials are needed for the pull.\n\nIf true, it is mutually exclusive with the `kubernetesSecrets` field.",
+							Description: "NodePodsAccessible is a flag denoting the pull credentials are accessible by all the pods on the node, or that no credentials are needed for the pull.\n\nIf true, it is mutually exclusive with the `kubernetesSecrets` and `serviceAccountTokenSources` fields.",
 							Type:        []string{"boolean"},
 							Format:      "",
+						},
+					},
+					"serviceAccountTokenSources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ServiceAccountTokenSources is an index of service account tokens that were provided to the credential provider plugin by the kubelet for the image that resulted in a valid credential for the image pull.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubelet/config/v1alpha1.ImagePullServiceAccountTokenSource"),
+									},
+								},
+							},
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kubelet/config/v1alpha1.ImagePullSecret"},
+			"k8s.io/kubelet/config/v1alpha1.ImagePullSecret", "k8s.io/kubelet/config/v1alpha1.ImagePullServiceAccountTokenSource"},
 	}
 }
 
@@ -65862,6 +65882,91 @@ func schema_k8sio_kubelet_config_v1alpha1_ImagePullSecret(ref common.ReferenceCa
 					},
 				},
 				Required: []string{"uid", "namespace", "name", "credentialHash"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1alpha1_ImagePullServiceAccountTokenSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullServiceAccountTokenSource is a representation of a service account token that was provided to the credential provider plugin by the kubelet.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"audience": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"serviceAccountName": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"serviceAccountUID": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"serviceAccountAnnotations": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"podName": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"podUID": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"serviceAccountTokenHash": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"cacheType": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"audience", "namespace", "serviceAccountName", "serviceAccountUID", "podName", "podUID", "serviceAccountTokenHash", "cacheType"},
 			},
 		},
 	}

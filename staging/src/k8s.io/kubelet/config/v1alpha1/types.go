@@ -152,9 +152,16 @@ type ImagePullCredentials struct {
 	// NodePodsAccessible is a flag denoting the pull credentials are accessible
 	// by all the pods on the node, or that no credentials are needed for the pull.
 	//
-	// If true, it is mutually exclusive with the `kubernetesSecrets` field.
+	// If true, it is mutually exclusive with the `kubernetesSecrets` and `serviceAccountTokenSources` fields.
 	// +optional
 	NodePodsAccessible bool `json:"nodePodsAccessible,omitempty"`
+
+	// ServiceAccountTokenSources is an index of service account tokens
+	// that were provided to the credential provider plugin by the kubelet for the
+	// image that resulted in a valid credential for the image pull.
+	// +optional
+	// +listType=set
+	ServiceAccountTokenSources []ImagePullServiceAccountTokenSource `json:"serviceAccountTokenSources,omitempty"`
 }
 
 // ImagePullSecret is a representation of a Kubernetes secret object coordinates along
@@ -167,4 +174,18 @@ type ImagePullSecret struct {
 	// CredentialHash is a SHA-256 retrieved by hashing the image pull credentials
 	// content of the secret specified by the UID/Namespace/Name coordinates.
 	CredentialHash string `json:"credentialHash"`
+}
+
+// ImagePullServiceAccountTokenSource is a representation of a service account token
+// that was provided to the credential provider plugin by the kubelet.
+type ImagePullServiceAccountTokenSource struct {
+	Audience                  string            `json:"audience"`
+	Namespace                 string            `json:"namespace"`
+	ServiceAccountName        string            `json:"serviceAccountName"`
+	ServiceAccountUID         string            `json:"serviceAccountUID"`
+	ServiceAccountAnnotations map[string]string `json:"serviceAccountAnnotations,omitempty"`
+	PodName                   string            `json:"podName"`
+	PodUID                    string            `json:"podUID"`
+	ServiceAccountTokenHash   string            `json:"serviceAccountTokenHash"`
+	CacheType                 string            `json:"cacheType"`
 }
