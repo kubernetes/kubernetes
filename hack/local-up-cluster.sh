@@ -22,7 +22,7 @@ fi
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # This script builds and runs a local kubernetes cluster. You may need to run
-# this as root to allow kubelet to open docker's socket, and to write the test
+# this as root to allow kubelet to open containerd's socket, and to write the test
 # CA in /var/run/kubernetes.
 # Usage: `hack/local-up-cluster.sh`.
 
@@ -31,9 +31,6 @@ if (( KUBE_VERBOSE >= 2 )); then
   set -x
 fi
 
-DOCKER_OPTS=${DOCKER_OPTS:-""}
-export DOCKER=(docker "${DOCKER_OPTS[@]}")
-DOCKER_ROOT=${DOCKER_ROOT:-""}
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
@@ -1302,7 +1299,7 @@ function install_cni {
         \) \
         -delete
 
-  # containerd 1.4.12 installed by docker in kubekins supports CNI version 0.4.0
+  # containerd in kubekins supports CNI version 0.4.0
   echo "Configuring cni"
   sudo mkdir -p "$CNI_CONFIG_DIR"
   cat << EOF | sudo tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
@@ -1371,9 +1368,6 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # configure shared mounts to prevent failure in DIND scenarios
   mount --make-rshared /
 
-  # kubekins has a special directory for docker root
-  DOCKER_ROOT="/docker-graph"
-
   # to use containerd as kubelet container runtime we need to install cni
   install_cni 
 
@@ -1381,22 +1375,10 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # we need to enable nesting
   tolerate_cgroups_v2
 
-  # enable cri for docker in docker
-  echo "enable cri"
-  # shellcheck disable=SC2129
-  echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --cri-containerd\"" >> /etc/default/docker
-
-  # enable debug
-  echo "DOCKER_OPTS=\"\${DOCKER_OPTS} --debug\"" >> /etc/default/docker
-
-  # let's log it where we can grab it later
-  echo "DOCKER_LOGFILE=${log_dir}/docker.log" >> /etc/default/docker
-
   echo "stopping docker"
   service docker stop
 
-  # check if the new stuff is there
-  docker version
+  # output version info
   containerd --version
   runc --version
 
@@ -1416,9 +1398,6 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
     echo "time out on waiting for containerd to start"
     exit 1
   fi
-
-  echo "starting docker"
-  service docker start
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.
