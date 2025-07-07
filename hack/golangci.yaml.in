@@ -102,6 +102,12 @@ linters:
           - revive
         text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
 
+      # The generated swagger docs also don't follow the naming convention.
+      - linters:
+          - staticcheck
+        text: "ST1003: should not use underscores in Go names"
+        path: types_swagger_doc_generated.go$
+
       {{- if .Hints}}
 
       - path: (.+)\.go$

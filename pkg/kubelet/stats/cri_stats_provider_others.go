@@ -21,6 +21,7 @@ package stats
 
 import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
@@ -32,7 +33,7 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 }
 
 func (p *criStatsProvider) addCRIPodContainerStats(criSandboxStat *runtimeapi.PodSandboxStats,
-	ps *statsapi.PodStats, fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
+	ps *statsapi.PodStats, fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
 	containerMap map[string]*runtimeapi.Container,
 	podSandbox *runtimeapi.PodSandbox,
 	rootFsInfo *cadvisorapiv2.FsInfo, updateCPUNanoCoreUsage bool) error {

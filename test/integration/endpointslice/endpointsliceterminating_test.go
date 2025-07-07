@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/endpointslice"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // TestEndpointSliceTerminating tests that terminating endpoints are included with the
@@ -65,9 +65,9 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				{
 					Addresses: []string{"10.0.0.1"},
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(false),
-						Serving:     utilpointer.BoolPtr(true),
-						Terminating: utilpointer.BoolPtr(true),
+						Ready:       ptr.To(false),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(true),
 					},
 				},
 			},
@@ -93,9 +93,9 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				{
 					Addresses: []string{"10.0.0.1"},
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(false),
-						Serving:     utilpointer.BoolPtr(false),
-						Terminating: utilpointer.BoolPtr(true),
+						Ready:       ptr.To(false),
+						Serving:     ptr.To(false),
+						Terminating: ptr.To(true),
 					},
 				},
 			},

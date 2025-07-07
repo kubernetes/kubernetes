@@ -19,7 +19,7 @@ package test
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 /*
@@ -44,11 +44,11 @@ func init() {
 			return []*corev1.Pod{
 				// explicit true
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = pointer.BoolPtr(true)
+					p.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = ptr.To(true)
 				}),
 				// ensure initContainers are checked
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.InitContainers[0].SecurityContext.AllowPrivilegeEscalation = pointer.BoolPtr(true)
+					p.Spec.InitContainers[0].SecurityContext.AllowPrivilegeEscalation = ptr.To(true)
 				}),
 				// nil AllowPrivilegeEscalation
 				tweak(p, func(p *corev1.Pod) { p.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil }),

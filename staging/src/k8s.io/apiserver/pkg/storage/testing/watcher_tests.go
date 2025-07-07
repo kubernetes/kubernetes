@@ -44,7 +44,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func RunTestWatch(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -1273,7 +1273,7 @@ func RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx context.Context
 // In that case we expect a watch request to be established.
 func RunSendInitialEventsBackwardCompatibility(ctx context.Context, t *testing.T, store storage.Interface) {
 	opts := storage.ListOptions{Predicate: storage.Everything}
-	opts.SendInitialEvents = pointer.Bool(true)
+	opts.SendInitialEvents = ptr.To(true)
 	w, err := store.Watch(ctx, "/pods", opts)
 	require.NoError(t, err)
 	w.Stop()

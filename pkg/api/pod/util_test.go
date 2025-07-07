@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,7 +38,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestVisitContainers(t *testing.T) {
@@ -984,7 +983,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		Status: api.PodStatus{
 			ResourceClaimStatuses: []api.PodResourceClaimStatus{
-				{Name: "my-claim", ResourceClaimName: pointer.String("pod-my-claim")},
+				{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
 			},
 		},
 	}
@@ -3347,7 +3346,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -3380,7 +3379,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -3397,7 +3396,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -3414,7 +3413,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -3438,7 +3437,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -3455,7 +3454,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},

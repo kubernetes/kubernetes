@@ -102,6 +102,12 @@ linters:
           - revive
         text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
 
+      # The generated swagger docs also don't follow the naming convention.
+      - linters:
+          - staticcheck
+        text: "ST1003: should not use underscores in Go names"
+        path: types_swagger_doc_generated.go$
+
       - path: (.+)\.go$
         # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
         text: ineffective break statement. Did you mean to break out of the outer loop

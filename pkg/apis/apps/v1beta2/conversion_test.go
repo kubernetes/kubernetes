@@ -26,14 +26,14 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/ptr"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestV1beta2StatefulSetSpecConversion(t *testing.T) {
-	replicas := utilpointer.Int32(2)
+	replicas := ptr.To(int32(2))
 	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}
 	v1beta2Template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -104,7 +104,7 @@ func TestV1beta2StatefulSetSpecConversion(t *testing.T) {
 }
 
 func TestV1beta2StatefulSetUpdateStrategyConversion(t *testing.T) {
-	partition := utilpointer.Int32(2)
+	partition := ptr.To(int32(2))
 	v1beta2rollingUpdate := new(v1beta2.RollingUpdateStatefulSetStrategy)
 	v1beta2rollingUpdate.Partition = partition
 	appsrollingUpdate := new(apps.RollingUpdateStatefulSetStrategy)
@@ -261,7 +261,7 @@ func TestV1beta2StatefulSetStatusConversion(t *testing.T) {
 }
 
 func TestV1beta2DeploymentConversion(t *testing.T) {
-	replica := utilpointer.Int32(2)
+	replica := ptr.To(int32(2))
 	rollbackTo := new(apps.RollbackConfig)
 	rollbackTo.Revision = int64(2)
 	testcases := map[string]struct {
@@ -391,9 +391,9 @@ func TestV1beta2ScaleStatusConversion(t *testing.T) {
 }
 
 func TestV1beta2DeploymentSpecConversion(t *testing.T) {
-	replica := utilpointer.Int32(2)
-	revisionHistoryLimit := utilpointer.Int32(2)
-	progressDeadlineSeconds := utilpointer.Int32(2)
+	replica := ptr.To(int32(2))
+	revisionHistoryLimit := ptr.To(int32(2))
+	progressDeadlineSeconds := ptr.To(int32(2))
 
 	testcases := map[string]struct {
 		deploymentSpec1 *apps.DeploymentSpec

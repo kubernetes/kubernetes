@@ -184,6 +184,11 @@ func UpdateObjectCount(groupResource schema.GroupResource, count int64) {
 	objectCounts.WithLabelValues(groupResource.String()).Set(float64(count))
 }
 
+// DeleteObjectCount delete the apiserver_storage_object_counts metric.
+func DeleteObjectCount(groupResource schema.GroupResource) {
+	objectCounts.DeleteLabelValues(groupResource.String())
+}
+
 // RecordEtcdRequest updates and sets the etcd_request_duration_seconds,
 // etcd_request_total, etcd_request_errors_total metrics.
 func RecordEtcdRequest(verb string, groupResource schema.GroupResource, err error, startTime time.Time) {

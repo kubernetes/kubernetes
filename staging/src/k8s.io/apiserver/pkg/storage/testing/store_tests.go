@@ -44,7 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type KeyValidation func(ctx context.Context, t *testing.T, key string)
@@ -817,7 +817,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   currentRV,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(currentRV))),
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			expectEtcdRequest: func() []RecordedList {
 				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
 					return nil
@@ -841,7 +841,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(list.ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         list.ResourceVersion,
 			expectRV:                   list.ResourceVersion,
 		},
@@ -856,7 +856,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(list.ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchExact,
 			expectRV:                   list.ResourceVersion,
@@ -871,7 +871,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
 			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
@@ -891,7 +891,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			ignoreForWatchCache:        true,
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         "0",
 			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
 		},
@@ -910,7 +910,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			ignoreForWatchCache:        true,
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         "0",
 			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
 			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
@@ -1319,7 +1319,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinueExact:        encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[1].ResourceVersion))),
 			rvMatch:                    metav1.ResourceVersionMatchExact,
 			expectRV:                   createdPods[1].ResourceVersion,
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 		},
 		{
 			name:   "test List with limit, resource version of third write, match=Exact",
@@ -1335,7 +1335,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[2].ResourceVersion))),
 			expectRV:                   createdPods[2].ResourceVersion,
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 		},
 		{
 			name:   "test List with limit, resource version of fourth write, match=Exact",
@@ -1364,7 +1364,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   createdPods[4].ResourceVersion,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(4),
+			expectedRemainingItemCount: ptr.To[int64](4),
 		},
 		{
 			name:   "test List with limit, resource version of six write, match=Exact",
@@ -1380,7 +1380,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   createdPods[5].ResourceVersion,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(4),
+			expectedRemainingItemCount: ptr.To[int64](4),
 		},
 		{
 			name:   "test List with limit, resource version of seventh write, match=Exact",
@@ -1396,7 +1396,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   updatedPod.ResourceVersion,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(updatedPod.ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(2),
+			expectedRemainingItemCount: ptr.To[int64](2),
 		},
 		{
 			name:   "test List with limit, resource version of eight write, match=Exact",
@@ -1425,7 +1425,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   fmt.Sprint(continueRV + 1),
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(updatedPod.Namespace+"/"+updatedPod.Name+"\x00", int64(continueRV+1)),
-			expectedRemainingItemCount: utilpointer.Int64(4),
+			expectedRemainingItemCount: ptr.To[int64](4),
 		},
 		// Continue
 		{
@@ -1465,7 +1465,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   createdPods[4].ResourceVersion,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(3),
+			expectedRemainingItemCount: ptr.To[int64](3),
 		},
 		{
 			name:   "test List with continue, resource version of six write",
@@ -1480,7 +1480,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   createdPods[5].ResourceVersion,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(2),
+			expectedRemainingItemCount: ptr.To[int64](2),
 		},
 		{
 			name:   "test List with continue, resource version of seventh write",
@@ -1507,7 +1507,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   fmt.Sprint(continueRV + 1),
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(continueRV+1)),
-			expectedRemainingItemCount: utilpointer.Int64(3),
+			expectedRemainingItemCount: ptr.To[int64](3),
 		},
 		{
 			name:   "test List with continue from second pod, negative resource version gives consistent read",
@@ -1533,7 +1533,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(continueRV+1)),
 			expectRV:                   currentRV,
-			expectedRemainingItemCount: utilpointer.Int64(2),
+			expectedRemainingItemCount: ptr.To[int64](2),
 		},
 		{
 			name:   "test List with continue from third pod, negative resource version gives consistent read",
