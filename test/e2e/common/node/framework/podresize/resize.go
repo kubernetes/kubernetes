@@ -53,29 +53,6 @@ type ResizableContainerInfo struct {
 	InitCtr       bool
 }
 
-type containerPatch struct {
-	Name      string `json:"name"`
-	Resources struct {
-		Requests struct {
-			CPU     string `json:"cpu,omitempty"`
-			Memory  string `json:"memory,omitempty"`
-			EphStor string `json:"ephemeral-storage,omitempty"`
-		} `json:"requests,omitzero"`
-		Limits struct {
-			CPU     string `json:"cpu,omitempty"`
-			Memory  string `json:"memory,omitempty"`
-			EphStor string `json:"ephemeral-storage,omitempty"`
-		} `json:"limits,omitzero"`
-	} `json:"resources"`
-}
-
-type patchSpec struct {
-	Spec struct {
-		Containers     []containerPatch `json:"containers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
-		InitContainers []containerPatch `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
-	} `json:"spec"`
-}
-
 func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.ContainerResizePolicy) {
 	if tcInfo.CPUPolicy != nil {
 		cpuPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: *tcInfo.CPUPolicy}
@@ -369,33 +346,6 @@ func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v
 		framework.ExpectNoError(formatErrors(utilerrors.NewAggregate(errs)),
 			"Verifying pod resources resize state. Pod: %s", framework.PrettyPrintJSON(resizedPod))
 	}
-}
-
-// ResizeContainerPatch generates a patch string to resize the pod container.
-func ResizeContainerPatch(containers []ResizableContainerInfo) ([]byte, error) {
-	var patch patchSpec
-
-	for _, container := range containers {
-		var cPatch containerPatch
-		cPatch.Name = container.Name
-		cPatch.Resources.Requests.CPU = container.Resources.CPUReq
-		cPatch.Resources.Requests.Memory = container.Resources.MemReq
-		cPatch.Resources.Limits.CPU = container.Resources.CPULim
-		cPatch.Resources.Limits.Memory = container.Resources.MemLim
-
-		if container.InitCtr {
-			patch.Spec.InitContainers = append(patch.Spec.InitContainers, cPatch)
-		} else {
-			patch.Spec.Containers = append(patch.Spec.Containers, cPatch)
-		}
-	}
-
-	patchBytes, err := json.Marshal(patch)
-	if err != nil {
-		return nil, err
-	}
-
-	return patchBytes, nil
 }
 
 func MakeResizePatch(originalContainers, desiredContainers []ResizableContainerInfo) []byte {
