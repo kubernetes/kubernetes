@@ -822,31 +822,6 @@ function wait_node_ready(){
   fi
 }
 
-function refresh_docker_containerd_runc {
-  apt update
-  apt-get install ca-certificates curl gnupg ripgrep tree vim
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  chmod a+r /etc/apt/keyrings/docker.gpg
-
-  # shellcheck disable=SC2027 disable=SC2046
-  echo \
-    "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-    "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-    tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-  apt-get update
-  apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin
-  groupadd docker
-  usermod -aG docker "$USER"
-
-  if ! grep -q "cri-containerd" "/lib/systemd/system/docker.service"; then
-    sed -i "s/ExecStart=\(.*\)/ExecStart=\1 --cri-containerd/" /lib/systemd/system/docker.service
-  fi
-
-  apt install -y conntrack vim htop ripgrep dnsutils tree ripgrep build-essential
-}
-
 function wait_coredns_available(){
   if [[ -n "${DRY_RUN}" ]]; then
     return
@@ -1284,22 +1259,6 @@ function parse_eviction {
   done
 }
 
-function update_packages {
-  apt-get update && apt-get install -y sudo
-  apt-get remove -y systemd
-
-  # Do not update docker / containerd / runc
-  sed -i 's/\(.*\)docker\(.*\)/#\1docker\2/' /etc/apt/sources.list
-
-  # jump through hoops to avoid removing docker/containerd
-  # when installing nftables and kmod, as those docker/containerd
-  # packages depend on iptables
-  dpkg -r --force-depends iptables && \
-  apt -y --fix-broken install && \
-  apt -y install nftables kmod && \
-  apt -y install iptables
-}
-
 function tolerate_cgroups_v2 {
   # https://github.com/moby/moby/blob/be220af9fb36e9baa9a75bbc41f784260aa6f96e/hack/dind#L28-L38
   # cgroup v2: enable nesting
@@ -1398,8 +1357,9 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
   KUBE_FASTBUILD=true make ginkgo cross
 
-  # install things we need that are missing from the kubekins image
-  update_packages
+  echo "install additional packages"
+  apt-get update
+  apt-get install -y conntrack dnsutils nftables ripgrep sudo tree vim
 
   # configure shared mounts to prevent failure in DIND scenarios
   mount --make-rshared /
@@ -1429,9 +1389,6 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
 
   echo "stopping docker"
   service docker stop
-
-  # bump up things
-  refresh_docker_containerd_runc
 
   # check if the new stuff is there
   docker version
