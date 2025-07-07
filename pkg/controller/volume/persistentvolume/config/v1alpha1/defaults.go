@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // RecommendedDefaultPersistentVolumeBinderControllerConfiguration defaults a pointer to a
@@ -53,10 +53,10 @@ func RecommendedDefaultPersistentVolumeBinderControllerConfiguration(obj *kubect
 // this defaulting method run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultVolumeConfiguration(obj *kubectrlmgrconfigv1alpha1.VolumeConfiguration) {
 	if obj.EnableHostPathProvisioning == nil {
-		obj.EnableHostPathProvisioning = pointer.Bool(false)
+		obj.EnableHostPathProvisioning = ptr.To(false)
 	}
 	if obj.EnableDynamicProvisioning == nil {
-		obj.EnableDynamicProvisioning = pointer.Bool(true)
+		obj.EnableDynamicProvisioning = ptr.To(true)
 	}
 	if obj.FlexVolumePluginDir == "" {
 		obj.FlexVolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"

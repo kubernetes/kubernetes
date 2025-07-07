@@ -47,7 +47,7 @@ import (
 	controllerpkg "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	utilnet "k8s.io/utils/net"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var alwaysReady = func() bool { return true }
@@ -2185,7 +2185,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 		expectedAnnotation:  true,
 	}, {
 		name:                "annotation removed below capacity",
-		startingAnnotation:  pointer.String("truncated"),
+		startingAnnotation:  ptr.To("truncated"),
 		numExisting:         maxCapacity - 1,
 		numDesired:          maxCapacity - 1,
 		numDesiredNotReady:  0,
@@ -2194,7 +2194,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 		expectedAnnotation:  false,
 	}, {
 		name:                "annotation was set to warning previously, annotation removed at capacity",
-		startingAnnotation:  pointer.String("warning"),
+		startingAnnotation:  ptr.To("warning"),
 		numExisting:         maxCapacity,
 		numDesired:          maxCapacity,
 		numDesiredNotReady:  0,
@@ -2203,7 +2203,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 		expectedAnnotation:  false,
 	}, {
 		name:                "annotation was set to warning previously but still over capacity",
-		startingAnnotation:  pointer.String("warning"),
+		startingAnnotation:  ptr.To("warning"),
 		numExisting:         maxCapacity + 1,
 		numDesired:          maxCapacity + 1,
 		numDesiredNotReady:  0,
@@ -2212,7 +2212,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 		expectedAnnotation:  true,
 	}, {
 		name:                "annotation removed at capacity",
-		startingAnnotation:  pointer.String("truncated"),
+		startingAnnotation:  ptr.To("truncated"),
 		numExisting:         maxCapacity,
 		numDesired:          maxCapacity,
 		numDesiredNotReady:  0,
@@ -2221,7 +2221,7 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 		expectedAnnotation:  false,
 	}, {
 		name:                "no endpoints change, annotation value corrected",
-		startingAnnotation:  pointer.String("invalid"),
+		startingAnnotation:  ptr.To("invalid"),
 		numExisting:         maxCapacity + 1,
 		numDesired:          maxCapacity + 1,
 		numDesiredNotReady:  0,
@@ -2384,7 +2384,7 @@ func TestTruncateEndpoints(t *testing.T) {
 }
 
 func TestEndpointPortFromServicePort(t *testing.T) {
-	http := pointer.String("http")
+	http := ptr.To("http")
 	testCases := map[string]struct {
 		serviceAppProtocol           *string
 		expectedEndpointsAppProtocol *string
