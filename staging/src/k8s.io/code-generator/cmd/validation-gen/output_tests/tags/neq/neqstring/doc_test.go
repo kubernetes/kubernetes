@@ -19,46 +19,12 @@ package neqstring
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
-
-	st.Value(&Struct{
-		StringField:              "disallowed-string",
-		StringPtrField:           ptr.To("disallowed-pointer"),
-		StringTypedefField:       "disallowed-typedef",
-		StringTypedefPtrField:    ptr.To(StringType("disallowed-typedef-pointer")),
-		ValidatedTypedefField:    "disallowed-on-type",
-		ValidatedTypedefPtrField: ptr.To(ValidatedStringType("disallowed-on-type")),
-	}).ExpectInvalid(
-		field.Invalid(field.NewPath("stringField"), "disallowed-string", content.NEQError("disallowed-string")),
-		field.Invalid(field.NewPath("stringPtrField"), "disallowed-pointer", content.NEQError("disallowed-pointer")),
-		field.Invalid(field.NewPath("stringTypedefField"), StringType("disallowed-typedef"), content.NEQError(StringType("disallowed-typedef"))),
-		field.Invalid(field.NewPath("stringTypedefPtrField"), StringType("disallowed-typedef-pointer"), content.NEQError(StringType("disallowed-typedef-pointer"))),
-		field.Invalid(field.NewPath("validatedTypedefField"), ValidatedStringType("disallowed-on-type"), content.NEQError(ValidatedStringType("disallowed-on-type"))),
-		field.Invalid(field.NewPath("validatedTypedefPtrField"), ValidatedStringType("disallowed-on-type"), content.NEQError(ValidatedStringType("disallowed-on-type"))),
-	)
-
-	// Test validation ratcheting
-	st.Value(&Struct{
-		StringField:              "disallowed-string",
-		StringPtrField:           ptr.To("disallowed-pointer"),
-		StringTypedefField:       "disallowed-typedef",
-		StringTypedefPtrField:    ptr.To(StringType("disallowed-typedef-pointer")),
-		ValidatedTypedefField:    "disallowed-on-type",
-		ValidatedTypedefPtrField: ptr.To(ValidatedStringType("disallowed-on-type")),
-	}).OldValue(&Struct{
-		StringField:              "disallowed-string",
-		StringPtrField:           ptr.To("disallowed-pointer"),
-		StringTypedefField:       "disallowed-typedef",
-		StringTypedefPtrField:    ptr.To(StringType("disallowed-typedef-pointer")),
-		ValidatedTypedefField:    "disallowed-on-type",
-		ValidatedTypedefPtrField: ptr.To(ValidatedStringType("disallowed-on-type")),
-	}).ExpectValid()
 
 	st.Value(&Struct{
 		StringField:              "allowed-string",
@@ -77,4 +43,25 @@ func Test(t *testing.T) {
 		ValidatedTypedefField:    "allowed-on-type",
 		ValidatedTypedefPtrField: nil,
 	}).ExpectValid()
+
+	invalid := &Struct{
+		StringField:              "disallowed-string",
+		StringPtrField:           ptr.To("disallowed-pointer"),
+		StringTypedefField:       "disallowed-typedef",
+		StringTypedefPtrField:    ptr.To(StringType("disallowed-typedef-pointer")),
+		ValidatedTypedefField:    "disallowed-on-type",
+		ValidatedTypedefPtrField: ptr.To(ValidatedStringType("disallowed-on-type")),
+	}
+
+	st.Value(invalid).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("stringField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringPtrField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringTypedefField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringTypedefPtrField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedTypedefField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedTypedefPtrField"), nil, "").WithOrigin("neq"),
+	})
+
+	// Test validation ratcheting.
+	st.Value(invalid).OldValue(invalid).ExpectValid()
 }

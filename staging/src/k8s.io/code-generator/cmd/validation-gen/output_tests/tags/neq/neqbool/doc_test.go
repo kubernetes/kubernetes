@@ -19,7 +19,6 @@ package neqbool
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
@@ -28,35 +27,29 @@ func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{
-		Enabled:               true,
-		DisabledPtr:           ptr.To(false),
-		ValidatedTypedefField: true,
-	}).ExpectInvalid(
-		field.Invalid(field.NewPath("enabled"), true, content.NEQError(true)),
-		field.Invalid(field.NewPath("disabledPtr"), false, content.NEQError(false)),
-		field.Invalid(field.NewPath("validatedTypedefField"), ValidatedBoolType(true), content.NEQError(ValidatedBoolType(true))),
-	)
-
-	// Test validation ratcheting
-	st.Value(&Struct{
-		Enabled:               true,
-		DisabledPtr:           ptr.To(false),
-		ValidatedTypedefField: true,
-	}).OldValue(&Struct{
-		Enabled:               true,
-		DisabledPtr:           ptr.To(false),
-		ValidatedTypedefField: true,
-	}).ExpectValid()
-
-	st.Value(&Struct{
-		Enabled:               false,
-		DisabledPtr:           ptr.To(true),
+		NeqTrueField:          false,
+		NeqFalsePtrField:      ptr.To(true),
 		ValidatedTypedefField: false,
 	}).ExpectValid()
 
 	st.Value(&Struct{
-		Enabled:               false,
-		DisabledPtr:           nil,
+		NeqTrueField:          false,
+		NeqFalsePtrField:      nil,
 		ValidatedTypedefField: false,
 	}).ExpectValid()
+
+	invalid := &Struct{
+		NeqTrueField:          true,
+		NeqFalsePtrField:      ptr.To(false),
+		ValidatedTypedefField: true,
+	}
+
+	st.Value(invalid).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("neqTrueField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("neqFalsePtrField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedTypedefField"), nil, "").WithOrigin("neq"),
+	})
+
+	// Test validation ratcheting.
+	st.Value(invalid).OldValue(invalid).ExpectValid()
 }

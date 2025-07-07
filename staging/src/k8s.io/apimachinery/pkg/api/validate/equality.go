@@ -31,7 +31,7 @@ func NEQ[T comparable](_ context.Context, _ operation.Operation, fldPath *field.
 	}
 	if *value == disallowed {
 		return field.ErrorList{
-			field.Invalid(fldPath, *value, content.NEQError(disallowed)).WithOrigin("k8s:neq"),
+			field.Invalid(fldPath, *value, content.NEQError(disallowed)).WithOrigin("neq"),
 		}
 	}
 	return nil
