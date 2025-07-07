@@ -27,7 +27,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -50,7 +50,7 @@ func NewRuntimeClassPod(runtimeClassName string) *v1.Pod {
 				Command: []string{"true"},
 			}},
 			RestartPolicy:                v1.RestartPolicyNever,
-			AutomountServiceAccountToken: utilpointer.BoolPtr(false),
+			AutomountServiceAccountToken: ptr.To(false),
 		},
 	}
 }
