@@ -740,7 +740,7 @@ func Test_getCachedCredentials(t *testing.T) {
 			fakeClock.Step(tc.step)
 
 			// getCachedCredentials returns unexpired credentials.
-			res, _, err := p.getCachedCredentials(tc.getKey, "")
+			res, _, _, err := p.getCachedCredentials(tc.getKey, "")
 			if err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
@@ -886,7 +886,7 @@ func Test_getCachedCredentials_pluginUsingServiceAccount(t *testing.T) {
 			fakeClock.Step(tc.step)
 
 			// getCachedCredentials returns unexpired credentials.
-			res, _, err := p.getCachedCredentials(tc.getKey, serviceAccountCacheKey)
+			res, _, _, err := p.getCachedCredentials(tc.getKey, serviceAccountCacheKey)
 			if err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
