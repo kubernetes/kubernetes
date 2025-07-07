@@ -87,7 +87,7 @@ func NewTrackedAuthConfig(c *AuthConfig, src *CredentialSource) *TrackedAuthConf
 }
 
 type CredentialSource struct {
-	Secret              SecretCoordinates
+	Secret              *SecretCoordinates
 	ServiceAccountToken *ServiceAccountTokenSource
 }
 

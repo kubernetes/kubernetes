@@ -450,7 +450,7 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 				intentCounters:      &sync.Map{},
 				pulledAccessors:     NewStripedLockSet(10),
 			}
-			if got := f.MustAttemptImagePull(tt.image, tt.imageRef, tt.podSecrets); got != tt.want {
+			if got := f.MustAttemptImagePull(tt.image, tt.imageRef, tt.podSecrets, nil); got != tt.want {
 				t.Errorf("FileBasedImagePullManager.MustAttemptImagePull() = %v, want %v", got, tt.want)
 			}
 

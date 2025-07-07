@@ -214,20 +214,36 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		}
 
 		var imagePullSecrets []kubeletconfiginternal.ImagePullSecret
+		var imagePullServiceAccountTokenSources []kubeletconfiginternal.ImagePullServiceAccountTokenSource
 		for _, s := range pullCredentials {
 			if s.Source == nil {
 				// we're only interested in creds that are not node accessible
 				continue
 			}
-			imagePullSecrets = append(imagePullSecrets, kubeletconfiginternal.ImagePullSecret{
-				UID:            string(s.Source.Secret.UID),
-				Name:           s.Source.Secret.Name,
-				Namespace:      s.Source.Secret.Namespace,
-				CredentialHash: s.AuthConfigHash,
-			})
+			if s.Source.Secret != nil {
+				imagePullSecrets = append(imagePullSecrets, kubeletconfiginternal.ImagePullSecret{
+					UID:            string(s.Source.Secret.UID),
+					Name:           s.Source.Secret.Name,
+					Namespace:      s.Source.Secret.Namespace,
+					CredentialHash: s.AuthConfigHash,
+				})
+			}
+			if s.Source.ServiceAccountToken != nil {
+				imagePullServiceAccountTokenSources = append(imagePullServiceAccountTokenSources, kubeletconfiginternal.ImagePullServiceAccountTokenSource{
+					Audience:                  s.Source.ServiceAccountToken.Audience,
+					Namespace:                 s.Source.ServiceAccountToken.Namespace,
+					ServiceAccountName:        s.Source.ServiceAccountToken.ServiceAccountName,
+					ServiceAccountUID:         s.Source.ServiceAccountToken.ServiceAccountUID,
+					ServiceAccountAnnotations: s.Source.ServiceAccountToken.ServiceAccountAnnotations,
+					PodName:                   s.Source.ServiceAccountToken.PodName,
+					PodUID:                    s.Source.ServiceAccountToken.PodUID,
+					ServiceAccountTokenHash:   s.Source.ServiceAccountToken.ServiceAccountTokenHash,
+					CacheType:                 s.Source.ServiceAccountToken.CacheType,
+				})
+			}
 		}
 
-		pullRequired := m.imagePullManager.MustAttemptImagePull(requestedImage, imageRef, imagePullSecrets)
+		pullRequired := m.imagePullManager.MustAttemptImagePull(requestedImage, imageRef, imagePullSecrets, imagePullServiceAccountTokenSources)
 		if !pullRequired {
 			msg := fmt.Sprintf("Container image %q already present on machine and can be accessed by the pod", requestedImage)
 			m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
@@ -366,7 +382,7 @@ func trackedToImagePullCreds(trackedCreds *credentialprovider.TrackedAuthConfig)
 	switch {
 	case trackedCreds == nil, trackedCreds.Source == nil:
 		ret.NodePodsAccessible = true
-	default:
+	case trackedCreds.Source.Secret != nil:
 		sourceSecret := trackedCreds.Source.Secret
 		ret.KubernetesSecrets = []kubeletconfiginternal.ImagePullSecret{
 			{
@@ -376,6 +392,25 @@ func trackedToImagePullCreds(trackedCreds *credentialprovider.TrackedAuthConfig)
 				CredentialHash: trackedCreds.AuthConfigHash,
 			},
 		}
+	case trackedCreds.Source.ServiceAccountToken != nil:
+		sourceServiceAccountToken := trackedCreds.Source.ServiceAccountToken
+		ret.ServiceAccountTokenSources = []kubeletconfiginternal.ImagePullServiceAccountTokenSource{
+			{
+				Audience:                  sourceServiceAccountToken.Audience,
+				Namespace:                 sourceServiceAccountToken.Namespace,
+				ServiceAccountName:        sourceServiceAccountToken.ServiceAccountName,
+				ServiceAccountUID:         sourceServiceAccountToken.ServiceAccountUID,
+				ServiceAccountAnnotations: sourceServiceAccountToken.ServiceAccountAnnotations,
+				PodName:                   sourceServiceAccountToken.PodName,
+				PodUID:                    sourceServiceAccountToken.PodUID,
+				ServiceAccountTokenHash:   sourceServiceAccountToken.ServiceAccountTokenHash,
+				CacheType:                 sourceServiceAccountToken.CacheType,
+			},
+		}
+	default:
+		// This should never happen, but if it does, we assume that the credentials are
+		// accessible by all the pods on the node.
+		ret.NodePodsAccessible = true
 	}
 
 	return ret

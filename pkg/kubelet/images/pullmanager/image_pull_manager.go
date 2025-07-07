@@ -19,6 +19,7 @@ package pullmanager
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -179,7 +180,7 @@ func (f *PullManager) decrementImagePullIntent(image string) {
 	f.decrementIntentCounterForImage(image)
 }
 
-func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret) bool {
+func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret, serviceAccountTokenCredentials []kubeletconfiginternal.ImagePullServiceAccountTokenSource) bool {
 	if len(imageRef) == 0 {
 		return true
 	}
@@ -292,7 +293,59 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 		}
 	}
 
+	for _, serviceAccountToken := range serviceAccountTokenCredentials {
+		for _, cachedServiceAccountToken := range cachedCreds.ServiceAccountTokenSources {
+			if serviceAccountTokenMatches(serviceAccountToken, cachedServiceAccountToken) {
+				return false
+			}
+		}
+	}
+
 	return true
+}
+
+// serviceAccountTokenMatches checks if two service account token sources match
+// based on their cache type and the corresponding required fields.
+func serviceAccountTokenMatches(current, cached kubeletconfiginternal.ImagePullServiceAccountTokenSource) bool {
+	if current.CacheType != cached.CacheType {
+		return false
+	}
+
+	// All cache types require service account fields to match
+	if !serviceAccountFieldsMatch(current, cached) {
+		return false
+	}
+
+	cacheType := kubeletconfiginternal.ServiceAccountTokenCacheType(current.CacheType)
+	switch cacheType {
+	case kubeletconfiginternal.ServiceAccountServiceAccountTokenCacheType:
+		// Only service account fields need to match (already checked above)
+		return true
+	case kubeletconfiginternal.PodServiceAccountTokenCacheType:
+		// Service account + pod fields must match
+		return podFieldsMatch(current, cached)
+	case kubeletconfiginternal.TokenServiceAccountTokenCacheType:
+		// Service account + pod + token must match
+		return podFieldsMatch(current, cached) && tokenMatch(current, cached)
+	default:
+		return false
+	}
+}
+
+func serviceAccountFieldsMatch(current, cached kubeletconfiginternal.ImagePullServiceAccountTokenSource) bool {
+	return current.Audience == cached.Audience &&
+		current.Namespace == cached.Namespace &&
+		current.ServiceAccountName == cached.ServiceAccountName &&
+		current.ServiceAccountUID == cached.ServiceAccountUID &&
+		reflect.DeepEqual(current.ServiceAccountAnnotations, cached.ServiceAccountAnnotations)
+}
+
+func podFieldsMatch(current, cached kubeletconfiginternal.ImagePullServiceAccountTokenSource) bool {
+	return current.PodName == cached.PodName && current.PodUID == cached.PodUID
+}
+
+func tokenMatch(current, cached kubeletconfiginternal.ImagePullServiceAccountTokenSource) bool {
+	return strings.EqualFold(current.ServiceAccountTokenHash, cached.ServiceAccountTokenHash)
 }
 
 func (f *PullManager) PruneUnknownRecords(imageList []string, until time.Time) {
