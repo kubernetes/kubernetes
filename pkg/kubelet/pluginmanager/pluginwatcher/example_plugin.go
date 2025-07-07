@@ -43,10 +43,13 @@ type examplePlugin struct {
 	pluginName         string
 	pluginType         string
 	versions           []string
+
+	registerapi.UnsafeRegistrationServer
 }
 
 type pluginServiceV1Beta1 struct {
 	server *examplePlugin
+	v1beta1.UnsafeExampleServer
 }
 
 func (s *pluginServiceV1Beta1) GetExampleInfo(ctx context.Context, rqt *v1beta1.ExampleRequest) (*v1beta1.ExampleResponse, error) {
@@ -60,6 +63,7 @@ func (s *pluginServiceV1Beta1) RegisterService() {
 
 type pluginServiceV1Beta2 struct {
 	server *examplePlugin
+	v1beta2.UnsafeExampleServer
 }
 
 func (s *pluginServiceV1Beta2) GetExampleInfo(ctx context.Context, rqt *v1beta2.ExampleRequest) (*v1beta2.ExampleResponse, error) {
