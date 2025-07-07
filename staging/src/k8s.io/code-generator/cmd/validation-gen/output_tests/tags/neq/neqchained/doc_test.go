@@ -19,7 +19,6 @@ package neqchained
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -59,16 +58,16 @@ func Test(t *testing.T) {
 	}
 
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("structField", "stringField"), "disallowed-subfield", content.NEQError("disallowed-subfield")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("structPtrField", "stringField"), "disallowed-subfield-ptr", content.NEQError("disallowed-subfield-ptr")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("stringSliceField").Index(1), "disallowed-slice", content.NEQError("disallowed-slice")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("stringSliceField").Index(2), "disallowed-slice", content.NEQError("disallowed-slice")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("stringMapField").Key("a"), "disallowed-map-val", content.NEQError("disallowed-map-val")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("stringMapField").Key("c"), "disallowed-map-val", content.NEQError("disallowed-map-val")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("stringMapKeyField"), "disallowed-key", content.NEQError("disallowed-key")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("validatedSliceField").Index(1), "disallowed-typedef", content.NEQError("disallowed-typedef")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("validatedSliceField").Index(2), "disallowed-typedef", content.NEQError("disallowed-typedef")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("validatedStructField", "stringField"), "disallowed-typedef-struct", content.NEQError("disallowed-typedef-struct")).WithOrigin("neq"),
+		field.Invalid(field.NewPath("structField", "stringField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("structPtrField", "stringField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringSliceField").Index(1), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringSliceField").Index(2), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringMapField").Key("a"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringMapField").Key("c"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringMapKeyField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedSliceField").Index(1), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedSliceField").Index(2), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedStructField", "stringField"), nil, "").WithOrigin("neq"),
 	})
 
 	// Test validation ratcheting allows existing invalid values
