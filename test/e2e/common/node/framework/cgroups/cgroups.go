@@ -207,23 +207,6 @@ func getExpectedCPULimitFromCPUQuota(cpuQuota int64, podOnCgroupV2 bool) string 
 	return expectedCPULimitString
 }
 
-func getExpectedCPUShares(rr *v1.ResourceRequirements, podOnCgroupv2 bool) int64 {
-	cpuRequest := rr.Requests.Cpu()
-	cpuLimit := rr.Limits.Cpu()
-	var shares int64
-	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
-		shares = int64(kubecm.MilliCPUToShares(cpuLimit.MilliValue()))
-	} else {
-		shares = int64(kubecm.MilliCPUToShares(cpuRequest.MilliValue()))
-	}
-	if podOnCgroupv2 {
-		// TODO: This fomula should be a shared function.
-		return 1 + ((shares-2)*9999)/262142
-	} else {
-		return shares
-	}
-}
-
 func getExpectedMemLimitString(rr *v1.ResourceRequirements, podOnCgroupv2 bool) string {
 	expectedMemLimitInBytes := rr.Limits.Memory().Value()
 	expectedMemLimitString := strconv.FormatInt(expectedMemLimitInBytes, 10)
@@ -236,7 +219,7 @@ func getExpectedMemLimitString(rr *v1.ResourceRequirements, podOnCgroupv2 bool) 
 func verifyContainerCPUWeight(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	cpuWeightCgPath := getCgroupCPURequestPath(cgroupFsPath, podOnCgroupv2)
 	expectedCPUShares := getExpectedCPUShares(expectedResources, podOnCgroupv2)
-	if err := VerifyCgroupValue(f, pod, containerName, cpuWeightCgPath, strconv.FormatInt(expectedCPUShares, 10)); err != nil {
+	if err := VerifyCgroupValue(f, pod, containerName, cpuWeightCgPath, expectedCPUShares...); err != nil {
 		return fmt.Errorf("failed to verify cpu request cgroup value: %w", err)
 	}
 	return nil
@@ -286,7 +269,7 @@ func verifyPodCPUWeight(f *framework.Framework, pod *v1.Pod, expectedResources *
 		cpuWeightCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupCPUSharesFile)
 	}
 	expectedCPUShares := getExpectedCPUShares(expectedResources, podOnCgroupv2)
-	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuWeightCgPath, strconv.FormatInt(expectedCPUShares, 10)); err != nil {
+	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuWeightCgPath, expectedCPUShares...); err != nil {
 		return fmt.Errorf("pod cgroup cpu weight verification failed: %w", err)
 	}
 	return nil
