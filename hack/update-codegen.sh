@@ -1033,10 +1033,10 @@ function codegen::protobindings() {
         "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"
         "pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis"
 
-        "staging/src/k8s.io/externaljwt/apis"
     )
     local apis_using_protoc=(
         "staging/src/k8s.io/cri-api/pkg/apis/runtime"
+        "staging/src/k8s.io/externaljwt/apis"
     )
     local apis=("${apis_using_gogo[@]}" "${apis_using_protoc[@]}")
 
