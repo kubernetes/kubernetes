@@ -46,10 +46,6 @@ func int64Ptr(i int64) *int64 {
 	return &i
 }
 
-func uint64Ptr(i uint64) *uint64 {
-	return &i
-}
-
 func TestIsInitContainerFailed(t *testing.T) {
 	tests := []struct {
 		status      *kubecontainer.Status
@@ -517,11 +513,11 @@ func TestMergeResourceConfig(t *testing.T) {
 	}{
 		{
 			name:   "merge all fields",
-			source: &cm.ResourceConfig{Memory: int64Ptr(1024), CPUShares: uint64Ptr(2)},
+			source: &cm.ResourceConfig{Memory: int64Ptr(1024), CPUShares: ptr.To[uint64](2)},
 			update: &cm.ResourceConfig{Memory: int64Ptr(2048), CPUQuota: int64Ptr(5000)},
 			expected: &cm.ResourceConfig{
 				Memory:    int64Ptr(2048),
-				CPUShares: uint64Ptr(2),
+				CPUShares: ptr.To[uint64](2),
 				CPUQuota:  int64Ptr(5000),
 			},
 		},
@@ -572,8 +568,8 @@ func TestMergeResourceConfig(t *testing.T) {
 func TestConvertResourceConfigToLinuxContainerResources(t *testing.T) {
 	resCfg := &cm.ResourceConfig{
 		Memory:        int64Ptr(2048),
-		CPUShares:     uint64Ptr(2),
-		CPUPeriod:     uint64Ptr(10000),
+		CPUShares:     ptr.To[uint64](2),
+		CPUPeriod:     ptr.To[uint64](10000),
 		CPUQuota:      int64Ptr(5000),
 		HugePageLimit: map[int64]int64{4096: 2048},
 		Unified:       map[string]string{"key1": "value1"},
