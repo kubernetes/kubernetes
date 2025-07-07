@@ -38,7 +38,7 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -499,7 +499,7 @@ func TestAbsentOwnerCache(t *testing.T) {
 			Name:       "rc1",
 			UID:        "1",
 			APIVersion: "v1",
-			Controller: pointer.Bool(true),
+			Controller: ptr.To(true),
 		},
 	})
 	rc1Pod2 := getPod("rc1Pod2", []metav1.OwnerReference{
@@ -508,7 +508,7 @@ func TestAbsentOwnerCache(t *testing.T) {
 			Name:       "rc1",
 			UID:        "1",
 			APIVersion: "v1",
-			Controller: pointer.Bool(false),
+			Controller: ptr.To(false),
 		},
 	})
 	rc2Pod1 := getPod("rc2Pod1", []metav1.OwnerReference{
