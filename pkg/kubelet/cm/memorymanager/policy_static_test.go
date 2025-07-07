@@ -205,8 +205,8 @@ func TestStaticPolicyName(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			if p.Name() != string(policyTypeStatic) {
-				t.Errorf("policy name is different, expected: %q, actual: %q", p.Name(), policyTypeStatic)
+			if p.Name() != string(PolicyTypeStatic) {
+				t.Errorf("policy name is different, expected: %q, actual: %q", p.Name(), PolicyTypeStatic)
 			}
 		})
 	}

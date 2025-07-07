@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
-const policyTypeStatic policyType = "Static"
+const PolicyTypeStatic policyType = "Static"
 
 type systemReservedMemory map[int]map[v1.ResourceName]uint64
 type reusableMemory map[string]map[string]map[v1.ResourceName]uint64
@@ -82,7 +82,7 @@ func NewPolicyStatic(machineInfo *cadvisorapi.MachineInfo, reserved systemReserv
 }
 
 func (p *staticPolicy) Name() string {
-	return string(policyTypeStatic)
+	return string(PolicyTypeStatic)
 }
 
 func (p *staticPolicy) Start(s state.State) error {
