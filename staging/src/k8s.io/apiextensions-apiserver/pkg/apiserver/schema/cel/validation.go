@@ -494,7 +494,9 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 		}
 
 		value := obj
-		if sts.Type == "object" || sts.Type == "array" {
+		if ok {
+			value = field.OmitValueType{}
+		} else if sts.Type == "object" || sts.Type == "array" {
 			value = sts.Type
 		}
 
