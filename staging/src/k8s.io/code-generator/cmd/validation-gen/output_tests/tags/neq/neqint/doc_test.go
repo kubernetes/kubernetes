@@ -19,7 +19,6 @@ package neqint
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
@@ -49,10 +48,10 @@ func Test(t *testing.T) {
 	}
 
 	st.Value(invalid).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("intField"), 0, content.NEQError(0)).WithOrigin("neq"),
-		field.Invalid(field.NewPath("intPtrField"), -1, content.NEQError(-1)).WithOrigin("neq"),
-		field.Invalid(field.NewPath("intTypedefField"), IntType(42), content.NEQError(IntType(42))).WithOrigin("neq"),
-		field.Invalid(field.NewPath("validatedTypedefField"), ValidatedIntType(100), content.NEQError(ValidatedIntType(100))).WithOrigin("neq"),
+		field.Invalid(field.NewPath("intField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("intPtrField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("intTypedefField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedTypedefField"), nil, "").WithOrigin("neq"),
 	})
 
 	// Test validation ratcheting.

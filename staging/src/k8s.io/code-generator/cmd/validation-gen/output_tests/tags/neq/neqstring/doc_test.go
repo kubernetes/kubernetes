@@ -19,7 +19,6 @@ package neqstring
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
@@ -55,12 +54,12 @@ func Test(t *testing.T) {
 	}
 
 	st.Value(invalid).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("stringField"), "disallowed-string", content.NEQError("disallowed-string")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("stringPtrField"), "disallowed-pointer", content.NEQError("disallowed-pointer")).WithOrigin("neq"),
-		field.Invalid(field.NewPath("stringTypedefField"), StringType("disallowed-typedef"), content.NEQError(StringType("disallowed-typedef"))).WithOrigin("neq"),
-		field.Invalid(field.NewPath("stringTypedefPtrField"), StringType("disallowed-typedef-pointer"), content.NEQError(StringType("disallowed-typedef-pointer"))).WithOrigin("neq"),
-		field.Invalid(field.NewPath("validatedTypedefField"), ValidatedStringType("disallowed-on-type"), content.NEQError(ValidatedStringType("disallowed-on-type"))).WithOrigin("neq"),
-		field.Invalid(field.NewPath("validatedTypedefPtrField"), ValidatedStringType("disallowed-on-type"), content.NEQError(ValidatedStringType("disallowed-on-type"))).WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringPtrField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringTypedefField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("stringTypedefPtrField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedTypedefField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedTypedefPtrField"), nil, "").WithOrigin("neq"),
 	})
 
 	// Test validation ratcheting.

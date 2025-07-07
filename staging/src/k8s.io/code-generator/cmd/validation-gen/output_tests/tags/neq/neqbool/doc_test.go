@@ -19,7 +19,6 @@ package neqbool
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
@@ -46,9 +45,9 @@ func Test(t *testing.T) {
 	}
 
 	st.Value(invalid).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("neqTrueField"), true, content.NEQError(true)).WithOrigin("neq"),
-		field.Invalid(field.NewPath("neqFalsePtrField"), false, content.NEQError(false)).WithOrigin("neq"),
-		field.Invalid(field.NewPath("validatedTypedefField"), ValidatedBoolType(true), content.NEQError(ValidatedBoolType(true))).WithOrigin("neq"),
+		field.Invalid(field.NewPath("neqTrueField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("neqFalsePtrField"), nil, "").WithOrigin("neq"),
+		field.Invalid(field.NewPath("validatedTypedefField"), nil, "").WithOrigin("neq"),
 	})
 
 	// Test validation ratcheting.
