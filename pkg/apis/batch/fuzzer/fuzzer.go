@@ -39,9 +39,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(j *batch.JobSpec, c randfill.Continue) {
 			c.FillNoCustom(j) // fuzz self without calling this function again
-			completions := int32(c.Rand.Int31())
-			parallelism := int32(c.Rand.Int31())
-			backoffLimit := int32(c.Rand.Int31())
+			completions := c.Int31()
+			parallelism := c.Int31()
+			backoffLimit := c.Int31()
 			j.Completions = &completions
 			j.Parallelism = &parallelism
 			j.BackoffLimit = &backoffLimit
@@ -75,9 +75,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			sds := int64(c.Uint64())
 			sj.StartingDeadlineSeconds = &sds
 			sj.Schedule = c.String(0)
-			successfulJobsHistoryLimit := int32(c.Rand.Int31())
+			successfulJobsHistoryLimit := c.Int31()
 			sj.SuccessfulJobsHistoryLimit = &successfulJobsHistoryLimit
-			failedJobsHistoryLimit := int32(c.Rand.Int31())
+			failedJobsHistoryLimit := c.Int31()
 			sj.FailedJobsHistoryLimit = &failedJobsHistoryLimit
 		},
 		func(cp *batch.ConcurrencyPolicy, c randfill.Continue) {
