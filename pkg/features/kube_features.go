@@ -430,7 +430,6 @@ const (
 	// KubeletPSI enables Kubelet to surface PSI metrics
 	// owner: @roycaihw
 	// kep: https://kep.k8s.io/4205
-	// alpha: v1.33
 	KubeletPSI featuregate.Feature = "KubeletPSI"
 
 	// owner: @moshe010
@@ -1271,6 +1270,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	KubeletPSI: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KubeletPodResourcesDynamicResources: {
