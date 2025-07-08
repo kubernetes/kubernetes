@@ -109,6 +109,9 @@ type EventRecorder interface {
 
 	// AnnotatedEventf is just like eventf, but with annotations attached
 	AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{})
+
+	// LabeledAnnotatedEventf is just like eventf, but with labelsannotations、 attached
+	LabeledAnnotatedEventf(object runtime.Object, labels, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{})
 }
 
 // EventRecorderLogger extends EventRecorder such that a logger can
@@ -436,7 +439,7 @@ type recorderImpl struct {
 
 var _ EventRecorder = &recorderImpl{}
 
-func (recorder *recorderImpl) generateEvent(logger klog.Logger, object runtime.Object, annotations map[string]string, eventtype, reason, message string) {
+func (recorder *recorderImpl) generateEvent(logger klog.Logger, object runtime.Object, labels, annotations map[string]string, eventtype, reason, message string) {
 	ref, err := ref.GetReference(recorder.scheme, object)
 	if err != nil {
 		logger.Error(err, "Could not construct reference, will not report event", "object", object, "eventType", eventtype, "reason", reason, "message", message)
@@ -448,7 +451,7 @@ func (recorder *recorderImpl) generateEvent(logger klog.Logger, object runtime.O
 		return
 	}
 
-	event := recorder.makeEvent(ref, annotations, eventtype, reason, message)
+	event := recorder.makeEvent(ref, labels, annotations, eventtype, reason, message)
 	event.Source = recorder.source
 
 	event.ReportingInstance = recorder.source.Host
@@ -470,7 +473,7 @@ func (recorder *recorderImpl) generateEvent(logger klog.Logger, object runtime.O
 }
 
 func (recorder *recorderImpl) Event(object runtime.Object, eventtype, reason, message string) {
-	recorder.generateEvent(klog.Background(), object, nil, eventtype, reason, message)
+	recorder.generateEvent(klog.Background(), object, nil, nil, eventtype, reason, message)
 }
 
 func (recorder *recorderImpl) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
@@ -478,10 +481,14 @@ func (recorder *recorderImpl) Eventf(object runtime.Object, eventtype, reason, m
 }
 
 func (recorder *recorderImpl) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	recorder.generateEvent(klog.Background(), object, annotations, eventtype, reason, fmt.Sprintf(messageFmt, args...))
+	recorder.generateEvent(klog.Background(), object, nil, annotations, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
-func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, annotations map[string]string, eventtype, reason, message string) *v1.Event {
+func (recorder *recorderImpl) LabeledAnnotatedEventf(object runtime.Object, labels, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	recorder.generateEvent(klog.Background(), object, labels, annotations, eventtype, reason, fmt.Sprintf(messageFmt, args...))
+}
+
+func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, labels, annotations map[string]string, eventtype, reason, message string) *v1.Event {
 	t := metav1.Time{Time: recorder.clock.Now()}
 	namespace := ref.Namespace
 	if namespace == "" {
@@ -491,6 +498,7 @@ func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, annotations map
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        util.GenerateEventName(ref.Name, t.UnixNano()),
 			Namespace:   namespace,
+			Labels:      labels,
 			Annotations: annotations,
 		},
 		InvolvedObject: *ref,
@@ -511,7 +519,7 @@ type recorderImplLogger struct {
 var _ EventRecorderLogger = &recorderImplLogger{}
 
 func (recorder recorderImplLogger) Event(object runtime.Object, eventtype, reason, message string) {
-	recorder.recorderImpl.generateEvent(recorder.logger, object, nil, eventtype, reason, message)
+	recorder.recorderImpl.generateEvent(recorder.logger, object, nil, nil, eventtype, reason, message)
 }
 
 func (recorder recorderImplLogger) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
@@ -519,7 +527,10 @@ func (recorder recorderImplLogger) Eventf(object runtime.Object, eventtype, reas
 }
 
 func (recorder recorderImplLogger) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	recorder.generateEvent(recorder.logger, object, annotations, eventtype, reason, fmt.Sprintf(messageFmt, args...))
+	recorder.generateEvent(recorder.logger, object, nil, annotations, eventtype, reason, fmt.Sprintf(messageFmt, args...))
+}
+func (recorder recorderImplLogger) LabeledAnnotatedEventf(object runtime.Object, labels, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	recorder.generateEvent(recorder.logger, object, labels, annotations, eventtype, reason, fmt.Sprintf(messageFmt, args...))
 }
 
 func (recorder recorderImplLogger) WithLogger(logger klog.Logger) EventRecorderLogger {

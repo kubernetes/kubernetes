@@ -51,6 +51,8 @@ func (r *noopRecorder) Eventf(object runtime.Object, eventtype, reason, messageF
 }
 func (r *noopRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
 }
+func (r *noopRecorder) LabeledAnnotatedEventf(object runtime.Object, labels, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+}
 
 // getClaimPodName gets the name of the Pod associated with the Claim, or an empty string if this doesn't look matching.
 func getClaimPodName(set *apps.StatefulSet, claim *v1.PersistentVolumeClaim) string {

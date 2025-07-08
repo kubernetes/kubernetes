@@ -1187,6 +1187,10 @@ func (f *fakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[st
 	f.aEvents = append(f.aEvents, eventtype+":"+reason+":"+messageFmt)
 }
 
+func (f *fakeRecorder) LabeledAnnotatedEventf(object runtime.Object, labels, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	f.aEvents = append(f.aEvents, eventtype+":"+reason+":"+messageFmt)
+}
+
 func TestFilterEventRecorder(t *testing.T) {
 	recorder := &fakeRecorder{}
 	filtered := FilterEventRecorder(recorder)

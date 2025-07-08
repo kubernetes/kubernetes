@@ -243,7 +243,12 @@ func (irecorder *innerEventRecorder) AnnotatedEventf(object runtime.Object, anno
 	if ref, ok := irecorder.shouldRecordEvent(object); ok {
 		irecorder.recorder.AnnotatedEventf(ref, annotations, eventtype, reason, messageFmt, args...)
 	}
+}
 
+func (irecorder *innerEventRecorder) LabeledAnnotatedEventf(object runtime.Object, labels, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
+	if ref, ok := irecorder.shouldRecordEvent(object); ok {
+		irecorder.recorder.LabeledAnnotatedEventf(ref, labels, annotations, eventtype, reason, messageFmt, args...)
+	}
 }
 
 // IsHostNetworkPod returns whether the host networking requested for the given Pod.
