@@ -395,8 +395,8 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering", framework.WithSlow(), fram
 			{
 				evictionPriority: 1,
 				pod:              getMemhogPod("high-priority-memory-hog-pod", "high-priority-memory-hog", v1.ResourceRequirements{}),
-				prePodCreationModificationFunc: func(pod *v1.Pod) {
-					nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+				prePodCreationModificationFunc: func(ctx context.Context, pod *v1.Pod) {
+					nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 					framework.ExpectNoError(err)
 					gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 
@@ -592,7 +592,7 @@ type podEvictSpec struct {
 	evictionSoftGracePeriod   int
 
 	// Can be used in order to alter pod using runtime data
-	prePodCreationModificationFunc func(pod *v1.Pod)
+	prePodCreationModificationFunc func(ctx context.Context, pod *v1.Pod)
 }
 
 // runEvictionTest sets up a testing environment given the provided pods, and checks a few things:
@@ -616,7 +616,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			pods := []*v1.Pod{}
 			for _, spec := range testSpecs {
 				if spec.prePodCreationModificationFunc != nil {
-					spec.prePodCreationModificationFunc(spec.pod)
+					spec.prePodCreationModificationFunc(ctx, spec.pod)
 				}
 				pods = append(pods, spec.pod)
 			}
