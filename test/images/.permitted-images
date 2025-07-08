@@ -14,7 +14,7 @@ registry.k8s.io/e2e-test-images/apparmor-loader
 registry.k8s.io/e2e-test-images/busybox
 registry.k8s.io/e2e-test-images/httpd
 registry.k8s.io/e2e-test-images/ipc-utils
-registry.k8s.io/e2e-test-images/jessie-dnsutils
+registry.k8s.io/e2e-test-images/debian-dnsutils
 registry.k8s.io/e2e-test-images/kitten
 registry.k8s.io/e2e-test-images/nautilus
 registry.k8s.io/e2e-test-images/nginx

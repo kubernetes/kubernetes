@@ -175,8 +175,8 @@ const (
 	InvalidRegistryImage
 	// IpcUtils image
 	IpcUtils
-	// JessieDnsutils image
-	JessieDnsutils
+	// DebianDnsutils image
+	DebianDnsutils
 	// Kitten image
 	Kitten
 	// Nautilus image
@@ -229,7 +229,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-4"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.3"}
-	configs[JessieDnsutils] = Config{list.PromoterE2eRegistry, "jessie-dnsutils", "1.7"}
+	configs[DebianDnsutils] = Config{list.PromoterE2eRegistry, "debian-dnsutils", "1.0"}
 	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.7"}
 	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.7"}
 	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v4.0.8"}
