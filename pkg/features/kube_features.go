@@ -706,6 +706,12 @@ const (
 	// Allow almost all printable ASCII characters in environment variables
 	RelaxedEnvironmentVariableValidation featuregate.Feature = "RelaxedEnvironmentVariableValidation"
 
+	// owner: @adrianmoisey
+	// kep: https://kep.k8s.io/5311
+	//
+	// Relaxed DNS search string validation.
+	RelaxedServiceNameValidation featuregate.Feature = "RelaxedServiceNameValidation"
+
 	// owner: @zhangweikop
 	//
 	// Enable kubelet tls server to update certificate if the specified certificate files are changed.
@@ -1485,6 +1491,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
+	},
+
+	RelaxedServiceNameValidation: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	ReloadKubeletServerCertificateFile: {

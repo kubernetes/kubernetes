@@ -1016,8 +1016,9 @@ func TestValidateIngressCreate(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		tweakIngress func(ingress *networking.Ingress)
-		expectedErrs field.ErrorList
+		tweakIngress       func(ingress *networking.Ingress)
+		expectedErrs       field.ErrorList
+		relaxedServiceName bool
 	}{
 		"class field set": {
 			tweakIngress: func(ingress *networking.Ingress) {
@@ -1150,10 +1151,76 @@ func TestValidateIngressCreate(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("http").Child("paths").Index(0).Child("path"), "foo", `must be an absolute path`)},
 		},
+		"create service name with RelaxedServiceNameValidation feature gate enabled": {
+			tweakIngress: func(ingress *networking.Ingress) {
+				ingress.Spec.Rules = []networking.IngressRule{{
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/foo",
+								PathType: &exactPathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: "1test-service",
+										Port: networking.ServiceBackendPort{Number: 80},
+									},
+								},
+							}},
+						},
+					},
+				}}
+			},
+			relaxedServiceName: true,
+		},
+		"create default service name with RelaxedServiceNameValidation feature gate enabled": {
+			tweakIngress: func(ingress *networking.Ingress) {
+				ingress.Spec.DefaultBackend = &networking.IngressBackend{
+					Service: &networking.IngressServiceBackend{
+						Name: "1-test-service",
+						Port: networking.ServiceBackendPort{Number: 80},
+					},
+				}
+			},
+			relaxedServiceName: true,
+		},
+		"create service name with RelaxedServiceNameValidation feature gate disabled": {
+			tweakIngress: func(ingress *networking.Ingress) {
+				ingress.Spec.Rules = []networking.IngressRule{{
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/foo",
+								PathType: &exactPathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: "1-test-service",
+										Port: networking.ServiceBackendPort{Number: 80},
+									},
+								},
+							}},
+						},
+					},
+				}}
+			},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("http").Child("paths").Index(0).Child("backend").Child("service").Child("name"), "1-test-service", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
+		},
+		"create default service name with RelaxedServiceNameValidation feature gate disabled": {
+			tweakIngress: func(ingress *networking.Ingress) {
+				ingress.Spec.DefaultBackend = &networking.IngressBackend{
+					Service: &networking.IngressServiceBackend{
+						Name: "1-test-default-backend",
+						Port: networking.ServiceBackendPort{Number: 80},
+					},
+				}
+			},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("defaultBackend").Child("service").Child("name"), "1-test-default-backend", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
+		},
 	}
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, testCase.relaxedServiceName)
+
 			newIngress := baseIngress.DeepCopy()
 			testCase.tweakIngress(newIngress)
 			errs := ValidateIngressCreate(newIngress)
@@ -1199,8 +1266,9 @@ func TestValidateIngressUpdate(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		tweakIngresses func(newIngress, oldIngress *networking.Ingress)
-		expectedErrs   field.ErrorList
+		tweakIngresses     func(newIngress, oldIngress *networking.Ingress)
+		expectedErrs       field.ErrorList
+		relaxedServiceName bool
 	}{
 		"class field set": {
 			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
@@ -1556,6 +1624,160 @@ func TestValidateIngressUpdate(t *testing.T) {
 				}}
 			},
 		},
+		"update service to conform to relaxed service name - RelaxedServiceNameValidation disabled": {
+			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
+				oldIngress.Spec.Rules = []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/foo",
+								PathType: &implementationPathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: "test-service",
+										Port: networking.ServiceBackendPort{Number: 80},
+									},
+								},
+							}},
+						},
+					},
+				}}
+				newIngress.Spec.Rules = []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/foo",
+								PathType: &implementationPathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: "1-test-service",
+										Port: networking.ServiceBackendPort{Number: 80},
+									},
+								},
+							}},
+						},
+					},
+				}}
+			},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec").Child("rules").Index(0).Child("http").Child("paths").Index(0).Child("backend").Child("service").Child("name"), "1-test-service", `a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character (e.g. 'my-name',  or 'abc-123', regex used for validation is '[a-z]([-a-z0-9]*[a-z0-9])?')`)},
+		},
+		"update service to conform to relaxed service name - RelaxedServiceNameValidation enabled": {
+			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
+				oldIngress.Spec.Rules = []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/foo",
+								PathType: &implementationPathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: "test-service",
+										Port: networking.ServiceBackendPort{Number: 80},
+									},
+								},
+							}},
+						},
+					},
+				}}
+				newIngress.Spec.Rules = []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/foo",
+								PathType: &implementationPathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: "1-test-service",
+										Port: networking.ServiceBackendPort{Number: 80},
+									},
+								},
+							}},
+						},
+					},
+				}}
+			},
+			relaxedServiceName: true,
+		},
+		"updating an already existing relaxed validation service name with RelaxedServiceNameValidation disabled": {
+			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
+				oldIngress.Spec.Rules = []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/",
+								PathType: &implementationPathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: "1-test-service",
+										Port: networking.ServiceBackendPort{Number: 80},
+									},
+								},
+							}},
+						},
+					},
+				}}
+				newIngress.Spec.Rules = []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/",
+								PathType: &implementationPathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: "2-test-service",
+										Port: networking.ServiceBackendPort{Number: 80},
+									},
+								},
+							}},
+						},
+					},
+				}}
+			},
+		},
+		"updating an already existing relaxed validation service name to a non-relaxed name with RelaxedServiceNameValidation disabled": {
+			tweakIngresses: func(newIngress, oldIngress *networking.Ingress) {
+				oldIngress.Spec.Rules = []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/",
+								PathType: &implementationPathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: "1-test-service",
+										Port: networking.ServiceBackendPort{Number: 80},
+									},
+								},
+							}},
+						},
+					},
+				}}
+				newIngress.Spec.Rules = []networking.IngressRule{{
+					Host: "foo.bar.com",
+					IngressRuleValue: networking.IngressRuleValue{
+						HTTP: &networking.HTTPIngressRuleValue{
+							Paths: []networking.HTTPIngressPath{{
+								Path:     "/",
+								PathType: &implementationPathType,
+								Backend: networking.IngressBackend{
+									Service: &networking.IngressServiceBackend{
+										Name: "test-service",
+										Port: networking.ServiceBackendPort{Number: 80},
+									},
+								},
+							}},
+						},
+					},
+				}}
+			},
+		},
 	}
 
 	for name, testCase := range testCases {
@@ -1563,6 +1785,7 @@ func TestValidateIngressUpdate(t *testing.T) {
 			newIngress := baseIngress.DeepCopy()
 			oldIngress := baseIngress.DeepCopy()
 			testCase.tweakIngresses(newIngress, oldIngress)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, testCase.relaxedServiceName)
 
 			errs := ValidateIngressUpdate(newIngress, oldIngress)
 
@@ -2643,6 +2866,73 @@ func TestValidateServiceCIDRUpdate(t *testing.T) {
 				if errs[i].Error() != expectedErr.Error() {
 					t.Errorf("Expected error %d: %v, got: %v", i, expectedErr, errs[i])
 				}
+			}
+		})
+	}
+}
+
+func TestAllowRelaxedServiceNameValidation(t *testing.T) {
+	basicIngress := func(serviceNames ...string) *networking.Ingress {
+		if len(serviceNames) == 0 {
+			return &networking.Ingress{Spec: networking.IngressSpec{Rules: nil}}
+		}
+		rules := make([]networking.IngressRule, len(serviceNames))
+		for i, name := range serviceNames {
+			rules[i] = networking.IngressRule{
+				IngressRuleValue: networking.IngressRuleValue{
+					HTTP: &networking.HTTPIngressRuleValue{
+						Paths: []networking.HTTPIngressPath{{
+							Backend: networking.IngressBackend{
+								Service: &networking.IngressServiceBackend{
+									Name: name,
+									Port: networking.ServiceBackendPort{Number: 80},
+								},
+							},
+						}},
+					},
+				},
+			}
+		}
+		return &networking.Ingress{Spec: networking.IngressSpec{Rules: rules}}
+	}
+
+	tests := []struct {
+		name    string
+		ingress *networking.Ingress
+		expect  bool
+	}{
+		{
+			name:    "nil ingress",
+			ingress: nil,
+			expect:  false,
+		},
+		{
+			name:    "no rules",
+			ingress: basicIngress(),
+			expect:  false,
+		},
+		{
+			name:    "service name is valid DNS1035 and DNS1123",
+			ingress: basicIngress("validname"),
+			expect:  false,
+		},
+		{
+			name:    "service name is valid DNS1123 but not DNS1035 (contains dash, starts with digit)",
+			ingress: basicIngress("1abc-def"),
+			expect:  true,
+		},
+		{
+			name:    "multiple rules, one triggers relaxed validation",
+			ingress: basicIngress("validname", "1abc-def"),
+			expect:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := allowRelaxedServiceNameValidation(tc.ingress)
+			if got != tc.expect {
+				t.Errorf("allowRelaxedServiceNameValidation() = %v, want %v", got, tc.expect)
 			}
 		})
 	}

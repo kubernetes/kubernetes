@@ -1195,6 +1195,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
+- name: RelaxedServiceNameValidation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.34"
 - name: ReloadKubeletServerCertificateFile
   versionedSpecs:
   - default: true
