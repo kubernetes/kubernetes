@@ -17,8 +17,8 @@ limitations under the License.
 package dra
 
 import (
-	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -37,6 +37,7 @@ import (
 	testapigrouprest "k8s.io/kubernetes/pkg/registry/testapigroup/rest"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
@@ -89,13 +90,21 @@ func testOptionalListMapKey(tCtx ktesting.TContext) {
 				unstructured.RemoveNestedField(managers[i].(map[string]any), "time")
 			}
 		}
-		require.Equal(tCtx, dump(expectedManagedFields), dump(actualManagedFields), fmt.Sprintf("%s:\n%s", what, dump(obj)))
+		require.Equal(tCtx, dump(expectedManagedFields), dump(actualManagedFields), "%s:\n%s", what, dump(obj))
 	}
 
 	requireInfos := func(what string, obj *unstructured.Unstructured, expectedInfos []testapigroupv1.CarpInfo) {
 		tCtx.Helper()
 		actualInfos, _, _ := unstructured.NestedFieldCopy(obj.Object, "status", "infos")
-		require.Equal(tCtx, dump(expectedInfos), dump(actualInfos), fmt.Sprintf("%s:\n%s", what, dump(obj)))
+		// Order of list entries may vary. Sort by manager.
+		if actualInfos, ok := actualInfos.([]map[string]any); ok {
+			slices.SortFunc(actualInfos, func(a, b map[string]any) int {
+				managerA, _, _ := unstructured.NestedString(a, "manager")
+				managerB, _, _ := unstructured.NestedString(b, "manager")
+				return strings.Compare(managerA, managerB)
+			})
+		}
+		require.Equal(tCtx, dump(expectedInfos), dump(actualInfos), "%s:\n%s", what, dump(obj))
 	}
 
 	carp := &unstructured.Unstructured{}
@@ -110,8 +119,17 @@ func testOptionalListMapKey(tCtx ktesting.TContext) {
 	tCtx.ExpectNoError(err, "create carp")
 	requireManagedFields("after creation", carp, nil)
 
+	apply := func(what, manager, applyconfig, expectedManagedFields string, expectedInfos []testapigroupv1.CarpInfo) {
+		tCtx.Helper()
+
+		carp, err := client.ApplyStatus(tCtx, name, parseObj(tCtx, applyconfig), metav1.ApplyOptions{FieldManager: manager})
+		tCtx.ExpectNoError(err, what)
+		requireManagedFields(what, carp, parseAny(tCtx, expectedManagedFields))
+		requireInfos(what, carp, expectedInfos)
+	}
+
 	// Set infos with "A: 1, B: x" and "A: 2, B: x".
-	carp, err = client.ApplyStatus(tCtx, name, parseObj(tCtx, `
+	apply("add status #1", "status1", `
 kind: Carp
 apiVersion: testapigroup.apimachinery.k8s.io/v1
 status:
@@ -122,10 +140,8 @@ status:
   - a: 2
     b: "x"
     data: status1_a2_bx
-`),
-		metav1.ApplyOptions{FieldManager: "status1"})
-	tCtx.ExpectNoError(err, "add status #1")
-	requireManagedFields("add status #1", carp, parseAny(tCtx, `
+`,
+		`
 - apiVersion: testapigroup.apimachinery.k8s.io/v1
   fieldsType: FieldsV1
   fieldsV1:
@@ -144,11 +160,12 @@ status:
   manager: status1
   operation: Apply
   subresource: status
-`))
-	requireInfos("add status #1", carp, []testapigroupv1.CarpInfo{{A: 1, B: "x", Data: "status1_a1_bx"}, {A: 2, B: "x", Data: "status1_a2_bx"}})
+`,
+		[]testapigroupv1.CarpInfo{{A: 1, B: "x", Data: "status1_a1_bx"}, {A: 2, B: "x", Data: "status1_a2_bx"}},
+	)
 
 	// Second status infos with "A: 1, B: y" and "A: 2, B: y".
-	carp, err = client.ApplyStatus(tCtx, name, parseObj(tCtx, `
+	apply("add status #2", "status2", `
 kind: Carp
 apiVersion: testapigroup.apimachinery.k8s.io/v1
 status:
@@ -159,10 +176,7 @@ status:
   - a: 2
     b: "y"
     data: status2_a2_by
-`),
-		metav1.ApplyOptions{FieldManager: "status2"})
-	tCtx.ExpectNoError(err, "add status #2")
-	requireManagedFields("add status #2", carp, parseAny(tCtx, `
+`, `
 - apiVersion: testapigroup.apimachinery.k8s.io/v1
   fieldsType: FieldsV1
   fieldsV1:
@@ -199,11 +213,12 @@ status:
   manager: status2
   operation: Apply
   subresource: status
-`))
-	requireInfos("add status #2", carp, []testapigroupv1.CarpInfo{{A: 1, B: "x", Data: "status1_a1_bx"}, {A: 2, B: "x", Data: "status1_a2_bx"}, {A: 1, B: "y", Data: "status2_a1_by"}, {A: 2, B: "y", Data: "status2_a2_by"}})
+`,
+		[]testapigroupv1.CarpInfo{{A: 1, B: "x", Data: "status1_a1_bx"}, {A: 2, B: "x", Data: "status1_a2_bx"}, {A: 1, B: "y", Data: "status2_a1_by"}, {A: 2, B: "y", Data: "status2_a2_by"}},
+	)
 
 	// Remove one entry of first field manager.
-	carp, err = client.ApplyStatus(tCtx, name, parseObj(tCtx, `
+	apply("remove status #1", "status1", `
 kind: Carp
 apiVersion: testapigroup.apimachinery.k8s.io/v1
 status:
@@ -211,10 +226,7 @@ status:
   - a: 1
     b: "x"
     data: status1_a1_bx
-`),
-		metav1.ApplyOptions{FieldManager: "status1"})
-	tCtx.ExpectNoError(err, "remove status #1")
-	requireManagedFields("remove status #1", carp, parseAny(tCtx, `
+`, `
 - apiVersion: testapigroup.apimachinery.k8s.io/v1
   fieldsType: FieldsV1
   fieldsV1:
@@ -246,11 +258,12 @@ status:
   manager: status2
   operation: Apply
   subresource: status
-`))
-	requireInfos("remove status #1", carp, []testapigroupv1.CarpInfo{{A: 1, B: "x", Data: "status1_a1_bx"}, {A: 1, B: "y", Data: "status2_a1_by"}, {A: 2, B: "y", Data: "status2_a2_by"}})
+`,
+		[]testapigroupv1.CarpInfo{{A: 1, B: "x", Data: "status1_a1_bx"}, {A: 1, B: "y", Data: "status2_a1_by"}, {A: 2, B: "y", Data: "status2_a2_by"}},
+	)
 
 	// Update one entry of second field manager.
-	carp, err = client.ApplyStatus(tCtx, name, parseObj(tCtx, `
+	apply("update status #2", "status2", `
 kind: Carp
 apiVersion: testapigroup.apimachinery.k8s.io/v1
 status:
@@ -261,10 +274,7 @@ status:
   - a: 2
     b: "y"
     data: status2_a2_by_updated
-`),
-		metav1.ApplyOptions{FieldManager: "status2"})
-	tCtx.ExpectNoError(err, "update status #2")
-	requireManagedFields("update status #2", carp, parseAny(tCtx, `
+`, `
 - apiVersion: testapigroup.apimachinery.k8s.io/v1
   fieldsType: FieldsV1
   fieldsV1:
@@ -296,23 +306,113 @@ status:
   manager: status2
   operation: Apply
   subresource: status
-`))
-	requireInfos("update status #2", carp, []testapigroupv1.CarpInfo{{A: 1, B: "x", Data: "status1_a1_bx"}, {A: 1, B: "y", Data: "status2_a1_by"}, {A: 2, B: "y", Data: "status2_a2_by_updated"}})
-}
+`, []testapigroupv1.CarpInfo{{A: 1, B: "x", Data: "status1_a1_bx"}, {A: 1, B: "y", Data: "status2_a1_by"}, {A: 2, B: "y", Data: "status2_a2_by_updated"}},
+	)
 
-func nestedFieldNoCopy(obj *unstructured.Unstructured, fields ...string) fieldLookupResult {
-	field, found, err := unstructured.NestedFieldNoCopy(obj.Object, fields...)
-	return fieldLookupResult{
-		field: field,
-		found: found,
-		err:   err,
-	}
-}
+	// Add entries with empty and non-empty C.
+	apply("add with C", "status1", `
+kind: Carp
+apiVersion: testapigroup.apimachinery.k8s.io/v1
+status:
+  infos:
+  - a: 1
+    b: "x"
+    data: status1_a1_bx
+  - a: 1
+    b: "x"
+    c: ""
+    data: status1_a1_bx_c
+  - a: 1
+    b: "x"
+    c: "z"
+    data: status1_a1_bx_cz
+`, `
+- apiVersion: testapigroup.apimachinery.k8s.io/v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:status:
+      f:infos:
+        k:{"a":1,"b":"x"}:
+          .: {}
+          f:a: {}
+          f:b: {}
+          f:data: {}
+        k:{"a":1,"b":"x","c":""}:
+          .: {}
+          f:a: {}
+          f:b: {}
+          f:c: {}
+          f:data: {}
+        k:{"a":1,"b":"x","c":"z"}:
+          .: {}
+          f:a: {}
+          f:b: {}
+          f:c: {}
+          f:data: {}
+  manager: status1
+  operation: Apply
+  subresource: status
+- apiVersion: testapigroup.apimachinery.k8s.io/v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:status:
+      f:infos:
+        k:{"a":1,"b":"y"}:
+          .: {}
+          f:a: {}
+          f:b: {}
+          f:data: {}
+        k:{"a":2,"b":"y"}:
+          .: {}
+          f:a: {}
+          f:b: {}
+          f:data: {}
+  manager: status2
+  operation: Apply
+  subresource: status
+`, []testapigroupv1.CarpInfo{{A: 1, B: "x", Data: "status1_a1_bx"}, {A: 1, B: "y", Data: "status2_a1_by"}, {A: 2, B: "y", Data: "status2_a2_by_updated"}, {A: 1, B: "x", C: ptr.To(""), Data: "status1_a1_bx_c"}, {A: 1, B: "x", C: ptr.To("z"), Data: "status1_a1_bx_cz"}},
+	)
 
-type fieldLookupResult struct {
-	field any
-	found bool
-	err   error
+	// Wipe entries of second manager.
+	apply("remove second manager", "status2", `
+kind: Carp
+apiVersion: testapigroup.apimachinery.k8s.io/v1
+`, `
+- apiVersion: testapigroup.apimachinery.k8s.io/v1
+  fieldsType: FieldsV1
+  fieldsV1:
+    f:status:
+      f:infos:
+        k:{"a":1,"b":"x"}:
+          .: {}
+          f:a: {}
+          f:b: {}
+          f:data: {}
+        k:{"a":1,"b":"x","c":""}:
+          .: {}
+          f:a: {}
+          f:b: {}
+          f:c: {}
+          f:data: {}
+        k:{"a":1,"b":"x","c":"z"}:
+          .: {}
+          f:a: {}
+          f:b: {}
+          f:c: {}
+          f:data: {}
+  manager: status1
+  operation: Apply
+  subresource: status
+`, []testapigroupv1.CarpInfo{{A: 1, B: "x", Data: "status1_a1_bx"}, {A: 1, B: "x", C: ptr.To(""), Data: "status1_a1_bx_c"}, {A: 1, B: "x", C: ptr.To("z"), Data: "status1_a1_bx_cz"}},
+	)
+
+	// Wipe entries of first manager.
+	apply("remove first manager", "status1", `
+kind: Carp
+apiVersion: testapigroup.apimachinery.k8s.io/v1
+`,
+		``, nil,
+	)
 }
 
 // createTestNamespace creates a namespace with a name that is derived from the
@@ -345,20 +445,24 @@ func dump(in any) string {
 	return string(out)
 }
 
-func parseObj(tCtx ktesting.TContext, data string) *unstructured.Unstructured {
+func parseAs[T any](tCtx ktesting.TContext, data string) T {
 	tCtx.Helper()
 
-	var obj unstructured.Unstructured
+	var obj T
 	err := yaml.Unmarshal([]byte(data), &obj)
 	tCtx.ExpectNoError(err, data)
-	return &obj
+	return obj
 }
 
 func parseAny(tCtx ktesting.TContext, data string) any {
 	tCtx.Helper()
 
-	var result any
-	err := yaml.Unmarshal([]byte(data), &result)
-	tCtx.ExpectNoError(err, data)
-	return result
+	return parseAs[any](tCtx, data)
+}
+
+func parseObj(tCtx ktesting.TContext, data string) *unstructured.Unstructured {
+	tCtx.Helper()
+
+	obj := parseAs[unstructured.Unstructured](tCtx, data)
+	return &obj
 }

@@ -59794,6 +59794,13 @@ func schema_pkg_apis_testapigroup_v1_CarpInfo(ref common.ReferenceCallback) comm
 							Format:      "",
 						},
 					},
+					"c": {
+						SchemaProps: spec.SchemaProps{
+							Description: "C is the third, optional map key",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"data": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Some data for each pair of A and B.",
@@ -60051,6 +60058,7 @@ func schema_pkg_apis_testapigroup_v1_CarpStatus(ref common.ReferenceCallback) co
 								"x-kubernetes-list-map-keys": []interface{}{
 									"a",
 									"b",
+									"c",
 								},
 								"x-kubernetes-list-type": "map",
 							},

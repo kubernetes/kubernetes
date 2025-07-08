@@ -93,6 +93,7 @@ type CarpStatus struct {
 	// +listType=map
 	// +listMapKey=a
 	// +listMapKey=b
+	// +listMapKey=c
 	Infos []CarpInfo `json:"infos,omitempty" protobuf:"bytes,8,rep,name=infos"`
 }
 
@@ -126,6 +127,9 @@ type CarpInfo struct {
 	// B is the second map key.
 	// +required
 	B string `json:"b" protobuf:"bytes,2,name=b"`
+	// C is the third, optional map key
+	// +optional
+	C *string `json:"c,omitempty" protobuf:"bytes,4,opt,name=c"`
 
 	// Some data for each pair of A and B.
 	Data string `json:"data" protobuf:"bytes,3,name=data"`
