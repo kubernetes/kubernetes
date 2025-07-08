@@ -382,9 +382,6 @@ func TestIsPodResizeInProgress(t *testing.T) {
 		return container
 	}
 
-	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
-	containerManager := cm.NewFakeContainerManager()
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			pod := &v1.Pod{
@@ -398,22 +395,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 				Name: pod.Name,
 			}
 
-			runtime := &containertest.FakeRuntime{PodStatus: *podStatus}
-			am := NewInMemoryManager(
-				containerManager,
-				statusManager,
-				nil,
-				func() []*v1.Pod {
-					return []*v1.Pod{pod}
-				},
-				func(uid types.UID) (*v1.Pod, bool) {
-					v, ok := map[types.UID]*v1.Pod{pod.UID: pod}[uid]
-					return v, ok
-				},
-				containertest.NewFakeCache(runtime),
-			)
-			am.SetContainerRuntime(runtime)
-
+			am := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{pod})
 			t.Cleanup(func() { am.RemovePod(pod.UID) })
 
 			for i, c := range test.containers {
@@ -811,6 +793,8 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				}
 				allocationManager.PushPendingResize(originalPod.UID)
 				allocationManager.RetryPendingResizes()
+				allocatedPod, _ := allocationManager.UpdatePodFromAllocation(newPod)
+				allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
 
 				var updatedPod *v1.Pod
 				if allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID) || allocationManager.(*manager).statusManager.IsPodResizeDeferred(newPod.UID) {
@@ -990,6 +974,8 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 			}
 			allocationManager.PushPendingResize(testPod.UID)
 			allocationManager.RetryPendingResizes()
+			allocatedPod, _ := allocationManager.UpdatePodFromAllocation(newPod)
+			allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
 
 			var updatedPod *v1.Pod
 			if allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID) {
@@ -1035,7 +1021,6 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			}
 			return nil, false
 		},
-		containertest.NewFakeCache(runtime),
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
 	)
 	allocationManager.SetContainerRuntime(runtime)

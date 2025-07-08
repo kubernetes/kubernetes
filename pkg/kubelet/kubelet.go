@@ -691,7 +691,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		func(pod *v1.Pod) { klet.HandlePodSyncs([]*v1.Pod{pod}) },
 		klet.GetActivePods,
 		klet.podManager.GetPodByUID,
-		klet.podCache,
 		klet.sourcesReady,
 	)
 
@@ -1893,6 +1892,12 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
+		allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+		kl.allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
+	}
+
 	// Generate final API pod status with pod and status manager status
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
 	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
@@ -2029,15 +2034,8 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		for _, r := range result.SyncResults {
-			if r.Action == kubecontainer.ResizePodInPlace {
-				if r.Error == nil {
-					// The pod was resized successfully, mark the pod resize as completed.
-					kl.statusManager.ClearPodResizeInProgressCondition(pod.UID)
-					// TODO: We only need to make this call if any of the resources were decreased.
-					kl.allocationManager.RetryPendingResizes()
-				} else {
-					kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, false)
-				}
+			if r.Action == kubecontainer.ResizePodInPlace && r.Error != nil {
+				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, false)
 			}
 		}
 	}
@@ -2591,7 +2589,6 @@ func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandle
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
-	var updates []UpdatePodOptions
 	var pendingResizes []types.UID
 	for _, pod := range pods {
 		// Always add the pod to the pod manager. Kubelet relies on the pod
@@ -2606,7 +2603,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
 				continue
 			}
-			updates = append(updates, UpdatePodOptions{
+			kl.podWorkers.UpdatePod(UpdatePodOptions{
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
 				UpdateType: kubetypes.SyncPodUpdate,
@@ -2640,24 +2637,18 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				// Backfill the queue of pending resizes, but only after all the pods have
 				// been added. This ensures that no resizes get resolved until all the
 				// existing pods are added.
-				allocatedPod, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 				if updatedFromAllocation {
-					pod = allocatedPod
 					pendingResizes = append(pendingResizes, pod.UID)
 				}
 			}
 		}
-		updates = append(updates, UpdatePodOptions{
+		kl.podWorkers.UpdatePod(UpdatePodOptions{
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
 			UpdateType: kubetypes.SyncPodCreate,
 			StartTime:  start,
 		})
-	}
-	// We call UpdatePod only after all pods have been added to avoid kicking off a SyncPod that
-	// could potentially resolve a pending resize before the existing pods have been admitted.
-	for _, update := range updates {
-		kl.podWorkers.UpdatePod(update)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		for _, uid := range pendingResizes {
@@ -2684,17 +2675,17 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 			}
 		}
 
-		var resizeRequest bool
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			allocatedPod, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+			_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 			if updatedFromAllocation {
-				resizeRequest = true
-				pod = allocatedPod
 				kl.allocationManager.PushPendingResize(pod.UID)
+				// TODO (natasha41575): If the resize is immediately actuated, it will trigger a pod sync
+				// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
+				kl.allocationManager.RetryPendingResizes()
 			} else {
 				// We can hit this case if a pending resize has been reverted,
 				// so we need to clear the pending resize condition.
-				kl.allocationManager.ClearPodResizePendingCondition(pod.UID)
+				kl.statusManager.ClearPodResizePendingCondition(pod.UID)
 			}
 		}
 
@@ -2704,12 +2695,6 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 			UpdateType: kubetypes.SyncPodUpdate,
 			StartTime:  start,
 		})
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			if resizeRequest {
-				kl.allocationManager.RetryPendingResizes()
-			}
-		}
 	}
 }
 

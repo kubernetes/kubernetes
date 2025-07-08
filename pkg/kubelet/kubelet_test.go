@@ -326,7 +326,6 @@ func newTestKubeletWithImageList(
 		func(pod *v1.Pod) { kubelet.HandlePodSyncs([]*v1.Pod{pod}) },
 		kubelet.GetActivePods,
 		kubelet.podManager.GetPodByUID,
-		kubelet.podCache,
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
 	)
 	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)

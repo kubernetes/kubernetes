@@ -2210,6 +2210,51 @@ func TestPodResizeConditions(t *testing.T) {
 	}
 }
 
+func TestClearPodResizeInProgressCondition(t *testing.T) {
+	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
+	podUID := types.UID("12345")
+
+	testCases := []struct {
+		name               string
+		existingConditions podResizeConditions
+		expectedConditions []*v1.PodCondition
+		expected           bool
+	}{
+		{
+			name:     "no existing conditions",
+			expected: false,
+		},
+		{
+			name: "existing pod resize in progress condition",
+			existingConditions: podResizeConditions{
+				PodResizeInProgress: &v1.PodCondition{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m.(*manager).podResizeConditions[podUID] = tc.existingConditions
+			assert.Equal(t, tc.expected, m.ClearPodResizeInProgressCondition(podUID))
+			resizeConditions := m.GetPodResizeConditions(podUID)
+			if tc.expectedConditions == nil {
+				require.Nil(t, resizeConditions)
+			} else {
+				// ignore the last probe and transition times
+				for _, c := range resizeConditions {
+					c.LastProbeTime = metav1.Time{}
+					c.LastTransitionTime = metav1.Time{}
+				}
+				require.Equal(t, tc.expectedConditions, resizeConditions)
+			}
+		})
+	}
+}
+
 func statusEqual(left, right v1.PodStatus) bool {
 	left.Conditions = nil
 	right.Conditions = nil
