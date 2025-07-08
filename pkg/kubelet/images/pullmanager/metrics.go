@@ -24,10 +24,21 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
+const imageManagerSubsystem = kubeletmetrics.KubeletSubsystem + "_imagemanager"
+
+type mustAttemptImagePullResult string
+
+const (
+	checkResultCredentialPolicyAllowed mustAttemptImagePullResult = "credentialPolicyAllowed"
+	checkResultCredentialRecordFound   mustAttemptImagePullResult = "credentialRecordFound"
+	checkResultMustAuthenticate        mustAttemptImagePullResult = "mustAuthenticate"
+	checkResultError                   mustAttemptImagePullResult = "error"
+)
+
 var (
 	fsPullIntentsSize = metrics.NewGauge(
 		&metrics.GaugeOpts{
-			Subsystem:      kubeletmetrics.KubeletSubsystem + "_imagemanager",
+			Subsystem:      imageManagerSubsystem,
 			Name:           "ondisk_pullintents",
 			Help:           "Number of ImagePullIntents stored on disk.",
 			StabilityLevel: metrics.ALPHA,
@@ -35,17 +46,28 @@ var (
 	)
 	fsPulledRecordsSize = metrics.NewGauge(
 		&metrics.GaugeOpts{
-			Subsystem:      kubeletmetrics.KubeletSubsystem + "_imagemanager",
+			Subsystem:      imageManagerSubsystem,
 			Name:           "ondisk_pulledrecords",
 			Help:           "Number of ImagePulledRecords stored on disk.",
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+
+	mustPullChecksTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      imageManagerSubsystem,
+			Name:           "image_mustpull_checks_total",
+			Help:           "Counter for how many times kubelet checked whether credentials need to be re-verified to access an image",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"},
 	)
 )
 
 func init() {
 	legacyregistry.MustRegister(fsPullIntentsSize)
 	legacyregistry.MustRegister(fsPulledRecordsSize)
+	legacyregistry.MustRegister(mustPullChecksTotal)
 }
 
 // meteringRecordsAccessor wraps a PullRecordsAccessor that's capable of reporting its size
@@ -118,4 +140,8 @@ func (m *meteringRecordsAccessor) recordPulledRecordsSize() {
 		return
 	}
 	m.pulledRecordsSize.Set(float64(pulledRecordsSize))
+}
+
+func recordMustAttemptImagePullResult(result mustAttemptImagePullResult) {
+	mustPullChecksTotal.WithLabelValues(string(result)).Inc()
 }

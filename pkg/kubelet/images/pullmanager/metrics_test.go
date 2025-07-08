@@ -18,6 +18,7 @@ package pullmanager
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -25,9 +26,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/legacyregistry"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestFSPullRecordsMetrics(t *testing.T) {
@@ -55,33 +59,33 @@ func TestFSPullRecordsMetrics(t *testing.T) {
 	cmpIntents(t, 3)
 
 	cmpPulledRecords(t, 0)
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&config.ImagePulledRecord{
+	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-latest-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
 	cmpPulledRecords(t, 1)
 
 	// Test that writing the same record does not increase the count
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&config.ImagePulledRecord{
+	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-latest-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&config.ImagePulledRecord{
+	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-latest-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
 	cmpPulledRecords(t, 1)
 
 	// Test adding more records
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&config.ImagePulledRecord{
+	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-v1-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&config.ImagePulledRecord{
+	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-v1.1-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
-	require.NoError(t, fsAccessor.WriteImagePulledRecord(&config.ImagePulledRecord{
+	require.NoError(t, fsAccessor.WriteImagePulledRecord(&kubeletconfig.ImagePulledRecord{
 		ImageRef:        "test-image-v1.2-ref",
 		LastUpdatedTime: metav1.NewTime(time.Now()),
 	}))
@@ -121,6 +125,73 @@ func TestFSPullRecordsMetrics(t *testing.T) {
 	cmpPulledRecords(t, 0)
 }
 
+func TestMustAttemptPullMetrics(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	tempDir := t.TempDir()
+	pulledDir := filepath.Join(tempDir, "image_manager", "pulled")
+	legacyregistry.Reset()
+	defer legacyregistry.Reset()
+
+	fsAccessor, err := NewFSPullRecordsAccessor(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fakeRuntime := &containertest.FakeRuntime{}
+	imageManager, err := NewImagePullManager(ctx,
+		fsAccessor,
+		&NeverVerifyAllowlistedImages{absoluteURLs: sets.New("docker.io/testing/policyexempt")},
+		fakeRuntime,
+		1,
+	)
+	require.NoError(t, err)
+
+	copyTestData(t, pulledDir, "pulled", []string{
+		"sha256-e766e4624f9bc4d3847d6c5b470d9d5362cc8d0c250bd9572daf95278e044263",
+		"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+		"sha256-f4058727984875eb66ddbf289f7013096d4cbaa167e591fbcb2e447e36391c1f",
+		"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+	})
+
+	expectedMetrics := make(map[string]int)
+	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil, nil))
+	expectedMetrics[string(checkResultError)]++
+	cmpMustAttemptPullMetrics(t, expectedMetrics)
+
+	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil, nil))
+	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/broken", "testbrokenrecord", nil, nil))
+	expectedMetrics[string(checkResultError)] += 2
+
+	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
+	expectedMetrics[string(checkResultCredentialRecordFound)]++
+	cmpMustAttemptPullMetrics(t, expectedMetrics)
+
+	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
+	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
+	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimage-anonpull", nil, nil))
+	expectedMetrics[string(checkResultCredentialRecordFound)] += 3
+	cmpMustAttemptPullMetrics(t, expectedMetrics)
+
+	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/policyexempt", "policyallowed", nil, nil))
+	expectedMetrics[string(checkResultCredentialPolicyAllowed)]++
+	cmpMustAttemptPullMetrics(t, expectedMetrics)
+
+	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/policyexempt", "policyallowed", nil, nil))
+	expectedMetrics[string(checkResultCredentialPolicyAllowed)]++
+	cmpMustAttemptPullMetrics(t, expectedMetrics)
+
+	require.True(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/norecords", "somewhatunknown", nil, nil))
+	expectedMetrics[string(checkResultMustAuthenticate)]++
+	cmpMustAttemptPullMetrics(t, expectedMetrics)
+
+	require.False(t, imageManager.MustAttemptImagePull(ctx, "docker.io/testing/test", "testimageref", []kubeletconfig.ImagePullSecret{
+		{UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash"},
+	}, nil))
+	expectedMetrics[string(checkResultCredentialRecordFound)]++
+	cmpMustAttemptPullMetrics(t, expectedMetrics)
+}
+
 func cmpIntents(t *testing.T, expected uint) {
 	t.Helper()
 	const metricFormat = `
@@ -146,6 +217,25 @@ kubelet_imagemanager_ondisk_pulledrecords %d
 
 	err := metricstestutil.GatherAndCompare(
 		legacyregistry.DefaultGatherer, strings.NewReader(fmt.Sprintf(metricFormat, expected)), "kubelet_imagemanager_ondisk_pulledrecords",
+	)
+	if err != nil {
+		t.Errorf("failed to gather metrics: %v", err)
+	}
+}
+
+func cmpMustAttemptPullMetrics(t *testing.T, labelMap map[string]int) {
+	t.Helper()
+	const metricFormat = `
+# HELP kubelet_imagemanager_image_mustpull_checks_total [ALPHA] Counter for how many times kubelet checked whether credentials need to be re-verified to access an image
+# TYPE kubelet_imagemanager_image_mustpull_checks_total counter
+`
+	expected := metricFormat
+	for label, val := range labelMap {
+		expected += fmt.Sprintf("kubelet_imagemanager_image_mustpull_checks_total{result=\"%s\"} %d\n", label, val)
+	}
+
+	err := metricstestutil.GatherAndCompare(
+		legacyregistry.DefaultGatherer, strings.NewReader(expected), "kubelet_imagemanager_image_mustpull_checks_total",
 	)
 	if err != nil {
 		t.Errorf("failed to gather metrics: %v", err)
