@@ -1198,22 +1198,11 @@ func validateLabelValue(value string, fldPath *field.Path) field.ErrorList {
 
 func validateDeviceBindingParameters(bindingConditions, bindingFailureConditions []string, bindingTimeoutSeconds *int64, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateSlice(bindingConditions, resource.BindingConditionsMaxSize,
+		metav1validation.ValidateLabelName, fldPath.Child("bindingConditions"))...)
 
-	if len(bindingConditions) > resource.BindingConditionsMaxSize {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingConditions"), len(bindingConditions), resource.BindingConditionsMaxSize))
-	}
-	for i, condition := range bindingConditions {
-		fieldPath := fldPath.Child("bindingConditions").Index(i)
-		allErrs = append(allErrs, metav1validation.ValidateLabelName(condition, fieldPath)...)
-	}
-	if len(bindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(bindingFailureConditions), resource.BindingFailureConditionsMaxSize))
-	}
-
-	for i, condition := range bindingFailureConditions {
-		fieldPath := fldPath.Child("bindingFailureConditions").Index(i)
-		allErrs = append(allErrs, metav1validation.ValidateLabelName(condition, fieldPath)...)
-	}
+	allErrs = append(allErrs, validateSlice(bindingFailureConditions, resource.BindingFailureConditionsMaxSize,
+		metav1validation.ValidateLabelName, fldPath.Child("bindingFailureConditions"))...)
 
 	if bindingTimeoutSeconds != nil && *bindingTimeoutSeconds <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeoutSeconds"), bindingTimeoutSeconds, "must be greater than zero"))

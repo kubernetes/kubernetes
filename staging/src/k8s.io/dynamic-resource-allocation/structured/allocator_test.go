@@ -325,6 +325,27 @@ func (in wrapDevice) withNodeSelection(nodeSelection any) wrapDevice {
 	return wrapDevice{Device: *device}
 }
 
+func (in wrapDevice) withBindingConditions(bindingConditions, bindingFailureConditions []string) wrapDevice {
+	inDevice := in.Device
+	device := inDevice.DeepCopy()
+	if device.Basic == nil {
+		device.Basic = &resourceapi.BasicDevice{}
+	}
+	device.Basic.BindingConditions = bindingConditions
+	device.Basic.BindingFailureConditions = bindingFailureConditions
+	return wrapDevice{Device: *device}
+}
+
+func (in wrapDevice) withUsageRestrictedToNode(usageRestrictedToNode bool) wrapDevice {
+	inDevice := in.Device
+	device := inDevice.DeepCopy()
+	if device.Basic == nil {
+		device.Basic = &resourceapi.BasicDevice{}
+	}
+	device.Basic.UsageRestrictedToNode = ptr.To(usageRestrictedToNode)
+	return wrapDevice{Device: *device}
+}
+
 func deviceCounterConsumption(counterSet string, counters map[string]resource.Quantity) resourceapi.DeviceCounterConsumption {
 	return resourceapi.DeviceCounterConsumption{
 		CounterSet: counterSet,
@@ -575,25 +596,10 @@ func toCounters(counters map[string]resource.Quantity) map[string]resourceapi.Co
 	return out
 }
 
-// generate a ResourceSlice object with the given parameters and one device with restricted usage
-func sliceWithOneDeviceAndRestrictedUsage(name string, nodeSelection any, pool, driver string) wrapResourceSlice {
-	d := device(device1, nil, nil)
-	d.Basic.UsageRestrictedToNode = ptr.To(true)
-	return slice(name, nodeSelection, pool, driver, d)
-}
-
-// generate a ResourceSlice object with the given parameters and one device with binding conditions
-func sliceWithOneDeviceAndBindingConditions(name, node, pool, driver string, bindingConditions, bindingFailureConditions []string) wrapResourceSlice {
-	slice := sliceWithOneDevice(name, node, pool, driver)
-	slice.Spec.Devices[0].Basic.BindingConditions = bindingConditions
-	slice.Spec.Devices[0].Basic.BindingFailureConditions = bindingFailureConditions
-	return slice
-}
-
-// deviceRequestAllocationResult returns an DeviceRequestAllocationResult object for testing purposes,
+// deviceRequestAllocationResultWithBindingConditions returns an DeviceRequestAllocationResult object for testing purposes,
 // specifying the driver, pool, device, usage restriction, binding conditions,
 // binding failure conditions, and binding timeout.
-func deviceRequestAllocationResult(request, driver, pool, device string, bindingConditions, bindingFailureConditions []string, bindingTimeout *int64) resourceapi.DeviceRequestAllocationResult {
+func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, device string, bindingConditions, bindingFailureConditions []string, bindingTimeout *int64) resourceapi.DeviceRequestAllocationResult {
 	return resourceapi.DeviceRequestAllocationResult{
 		Request:                  request,
 		Driver:                   driver,
@@ -3363,14 +3369,15 @@ func TestAllocator(t *testing.T) {
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1))),
 			classes: objects(class(classA, driverA)),
-			slices:  unwrap(sliceWithOneDeviceAndBindingConditions(slice1, node1, pool1, driverA, []string{"IsPrepare"}, []string{"BindingFailed"})),
-			node:    node(node1, region1),
+			slices: unwrap(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}))),
+			node: node(node1, region1),
 
 			expectResults: []any{
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResult(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
 						},
 					},
 					NodeSelector: localNodeSelector(node1),
@@ -3383,12 +3390,289 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
-			slices:           unwrap(sliceWithOneDeviceAndRestrictedUsage(slice1, nodeLabelSelector(planetKey, planetValueEarth), pool1, driverA)),
-			node:             node(node1, region1),
+			slices: unwrap(slice(slice1, nodeLabelSelector(planetKey, planetValueEarth), pool1, driverA,
+				device(device1, nil, nil).withUsageRestrictedToNode(true))),
+			node: node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
+		},
+		"partitionable-devices-with-binding-conditions": {
+			features: Features{
+				PartitionableDevices: true,
+				DeviceBinding:        true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							}),
+						).
+						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				resourceapi.AllocationResult{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+						},
+					},
+					NodeSelector: localNodeSelector(node1),
+				},
+			},
+		},
+		"partitionable-devices-with-binding-conditions-multiple": {
+			features: Features{
+				PartitionableDevices: true,
+				DeviceBinding:        true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 2),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							}),
+						).
+						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
+					device(device2, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							}),
+						).
+						withBindingConditions([]string{"IsPrepare2"}, []string{"BindingFailed2"}),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				resourceapi.AllocationResult{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, []string{"IsPrepare2"}, []string{"BindingFailed2"}, nil),
+						},
+					},
+					NodeSelector: localNodeSelector(node1),
+				},
+			},
+		},
+		"partitionable-devices-with-binding-conditions-some-devices-no-conditions": {
+			features: Features{
+				PartitionableDevices: true,
+				DeviceBinding:        true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 3),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("2Gi"),
+							}),
+						).
+						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
+					device(device2, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("2Gi"),
+							}),
+						),
+					device(device3, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							}),
+						).
+						withBindingConditions([]string{"IsReady"}, []string{"BindingTimeout"}),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				resourceapi.AllocationResult{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device3, []string{"IsReady"}, []string{"BindingTimeout"}, nil),
+						},
+					},
+					NodeSelector: localNodeSelector(node1),
+				},
+			},
+		},
+		"partitionable-devices-with-binding-conditions-multi-slices": {
+			features: Features{
+				PartitionableDevices: true,
+				DeviceBinding:        true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							}),
+						).
+						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+				slice(slice2, node1, pool1, driverA,
+					device(device2, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							}),
+						),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				resourceapi.AllocationResult{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+						},
+					},
+					NodeSelector: localNodeSelector(node1),
+				},
+			},
+		},
+		"partitionable-devices-with-binding-conditions-and-taints": {
+			features: Features{
+				PartitionableDevices: true,
+				DeviceBinding:        true,
+				DeviceTaints:         true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 2)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							}),
+						).
+						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}).
+						withTaints(resourceapi.DeviceTaint{
+							Key:    "key1",
+							Value:  "value1",
+							Effect: resourceapi.DeviceTaintEffectNoSchedule,
+						}),
+					device(device2, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							}),
+						),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		"partitionable-devices-with-binding-conditions-and-taints-tolerated": {
+			features: Features{
+				PartitionableDevices: true,
+				DeviceBinding:        true,
+				DeviceTaints:         true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 2)).withTolerations(resourceapi.DeviceToleration{
+					Operator: resourceapi.DeviceTolerationOpExists,
+					Key:      "key1",
+					Effect:   resourceapi.DeviceTaintEffectNoSchedule,
+				}),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							}),
+						).
+						withBindingConditions([]string{"IsPrepare"}, []string{"BindingFailed"}).
+						withTaints(resourceapi.DeviceTaint{
+							Key:    "key1",
+							Value:  "value1",
+							Effect: resourceapi.DeviceTaintEffectNoSchedule,
+						}),
+					device(device2, fromCounters, nil).
+						withDeviceCounterConsumption(
+							deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							}),
+						),
+				).withCounterSet(
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				resourceapi.AllocationResult{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+						},
+					},
+					NodeSelector: localNodeSelector(node1),
+				},
+			},
 		},
 		"prioritized-list-allocation-mode-all": {
 			features: Features{

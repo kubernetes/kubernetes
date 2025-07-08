@@ -356,10 +356,12 @@ func dropDisabledDRADeviceBindingConditionsFields(newClaim, oldClaim *resource.R
 	}
 
 	klog.Info("drop disabled DRADeviceBindingConditions fields")
-	if newClaim.Status.Allocation != nil {
+	if newClaim.Status.Allocation == nil {
+		return
+	} else {
 		newClaim.Status.Allocation.AllocationTimestamp = nil
 	}
-	for i := range newClaim.Status.Devices {
+	for i := range newClaim.Status.Allocation.Devices.Results {
 		newClaim.Status.Allocation.Devices.Results[i].BindingConditions = nil
 		newClaim.Status.Allocation.Devices.Results[i].BindingFailureConditions = nil
 		newClaim.Status.Allocation.Devices.Results[i].BindingTimeoutSeconds = nil

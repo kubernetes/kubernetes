@@ -78,11 +78,13 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 							nodeSlice.Spec.Devices = append(nodeSlice.Spec.Devices, device)
 						}
 					}
-					needBindingSlices = append(needBindingSlices, needBindingSlice)
-					if err := addSlice(pools, nodeSlice); err != nil {
-						return nil, fmt.Errorf("failed to add node slice %s: %w", nodeSlice.Name, err)
+					if len(needBindingSlice.Spec.Devices) > 0 {
+						// If there are devices that need binding, we create a separate slice
+						// for them, so that they can be handled separately.
+						nodeSlice.Spec.Devices = append(nodeSlice.Spec.Devices, needBindingSlice.Spec.Devices...)
+						needBindingSlices = append(needBindingSlices, nodeSlice)
+						continue
 					}
-					continue
 				}
 				if err := addSlice(pools, slice); err != nil {
 					return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
@@ -107,6 +109,26 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 						device.String(), slice.Name, err)
 				}
 				if match {
+					if hasBindingConditions(slice) {
+						needBindingSlice := slice.DeepCopy()
+						needBindingSlice.Spec.Devices = nil
+						nodeSlice := slice.DeepCopy()
+						nodeSlice.Spec.Devices = nil
+						for _, device := range slice.Spec.Devices {
+							if device.Basic != nil && device.Basic.BindingConditions != nil {
+								needBindingSlice.Spec.Devices = append(needBindingSlice.Spec.Devices, device)
+							} else {
+								nodeSlice.Spec.Devices = append(nodeSlice.Spec.Devices, device)
+							}
+						}
+						if len(needBindingSlice.Spec.Devices) > 0 {
+							// If there are devices that need binding, we create a separate slice
+							// for them, so that they can be handled separately.
+							nodeSlice.Spec.Devices = append(nodeSlice.Spec.Devices, needBindingSlice.Spec.Devices...)
+							needBindingSlices = append(needBindingSlices, nodeSlice)
+							continue
+						}
+					}
 					if err := addSlice(pools, slice); err != nil {
 						return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
 					}
