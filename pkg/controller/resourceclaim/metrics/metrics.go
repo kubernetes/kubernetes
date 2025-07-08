@@ -53,12 +53,28 @@ var (
 			Help:           "Number of ResourceClaims",
 			StabilityLevel: metrics.ALPHA,
 		})
+	// NumResourceClaimsWithAdminAccess tracks the current number of ResourceClaims with AdminAccess.
+	NumResourceClaimsWithAdminAccess = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      ResourceClaimSubsystem,
+			Name:           "resource_claims_adminaccess",
+			Help:           "Number of ResourceClaims with AdminAccess",
+			StabilityLevel: metrics.ALPHA,
+		})
 	// NumAllocatedResourceClaims tracks the current number of allocated ResourceClaims.
 	NumAllocatedResourceClaims = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      ResourceClaimSubsystem,
 			Name:           "allocated_resource_claims",
 			Help:           "Number of allocated ResourceClaims",
+			StabilityLevel: metrics.ALPHA,
+		})
+	// NumAllocatedResourceClaimsWithAdminAccess tracks the current number of allocated ResourceClaims with AdminAccess.
+	NumAllocatedResourceClaimsWithAdminAccess = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      ResourceClaimSubsystem,
+			Name:           "allocated_resource_claims_adminaccess",
+			Help:           "Number of allocated ResourceClaims with AdminAccess",
 			StabilityLevel: metrics.ALPHA,
 		})
 )
@@ -71,6 +87,8 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(ResourceClaimCreateAttempts)
 		legacyregistry.MustRegister(ResourceClaimCreateFailures)
 		legacyregistry.MustRegister(NumResourceClaims)
+		legacyregistry.MustRegister(NumResourceClaimsWithAdminAccess)
 		legacyregistry.MustRegister(NumAllocatedResourceClaims)
+		legacyregistry.MustRegister(NumAllocatedResourceClaimsWithAdminAccess)
 	})
 }

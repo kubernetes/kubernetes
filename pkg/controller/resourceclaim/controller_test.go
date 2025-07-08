@@ -65,9 +65,11 @@ var (
 	testClaimKey           = claimKeyPrefix + testClaim.Namespace + "/" + testClaim.Name
 
 	generatedTestClaim          = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), nil)
-	generatedTestClaimWithAdmin = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), ptr.To(true))
 	generatedTestClaimAllocated = allocateClaim(generatedTestClaim)
 	generatedTestClaimReserved  = reserveClaim(generatedTestClaimAllocated, testPodWithResource)
+
+	generatedTestClaimWithAdmin          = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), ptr.To(true))
+	generatedTestClaimWithAdminAllocated = allocateClaim(generatedTestClaimWithAdmin)
 
 	conflictingClaim        = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, className, nil)
 	otherNamespaceClaim     = makeClaim(testPodName+"-"+podResourceClaimName, otherNamespace, className, nil)
@@ -615,7 +617,193 @@ func TestResourceClaimEventHandler(t *testing.T) {
 		expectQueue(tCtx, []string{})
 	})
 
+	_, err = claimClient.Create(tCtx, generatedTestClaimWithAdmin, metav1.CreateOptions{})
+	em.claims++
+	em.claimsWithAdminAccess++
+	ktesting.Step(tCtx, "create claim with admin access", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	modifiedClaim = generatedTestClaimWithAdmin.DeepCopy()
+	modifiedClaim.Labels = map[string]string{"foo": "bar"}
+	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
+	ktesting.Step(tCtx, "modify claim", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Consistently(tCtx)
+	})
+
+	_, err = claimClient.Update(tCtx, generatedTestClaimWithAdminAllocated, metav1.UpdateOptions{})
+	em.allocated++
+	em.allocatedWithAdminAccess++
+	ktesting.Step(tCtx, "allocate claim with admin access", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	modifiedClaim = generatedTestClaimWithAdminAllocated.DeepCopy()
+	modifiedClaim.Labels = map[string]string{"foo": "bar2"}
+	_, err = claimClient.Update(tCtx, modifiedClaim, metav1.UpdateOptions{})
+	ktesting.Step(tCtx, "modify claim", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Consistently(tCtx)
+	})
+
+	otherClaimAllocated = generatedTestClaimWithAdminAllocated.DeepCopy()
+	otherClaimAllocated.Name += "2"
+	_, err = claimClient.Create(tCtx, otherClaimAllocated, metav1.CreateOptions{})
+	em.claims++
+	em.claimsWithAdminAccess++
+	em.allocated++
+	em.allocatedWithAdminAccess++
+	ktesting.Step(tCtx, "create allocated claim with admin access", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	_, err = claimClient.Update(tCtx, generatedTestClaimWithAdmin, metav1.UpdateOptions{})
+	em.allocated--
+	em.allocatedWithAdminAccess--
+	ktesting.Step(tCtx, "deallocate claim with admin access", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	err = claimClient.Delete(tCtx, generatedTestClaimWithAdmin.Name, metav1.DeleteOptions{})
+	em.claims--
+	em.claimsWithAdminAccess--
+	ktesting.Step(tCtx, "delete deallocated claim with admin access", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
+	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
+	em.claims--
+	em.claimsWithAdminAccess--
+	em.allocated--
+	em.allocatedWithAdminAccess--
+	ktesting.Step(tCtx, "delete allocated claim with admin access", func(tCtx ktesting.TContext) {
+		tCtx.ExpectNoError(err)
+		em.Eventually(tCtx)
+	})
+
 	em.Consistently(tCtx)
+}
+func TestHasAdminAccess(t *testing.T) {
+	tests := []struct {
+		name  string
+		claim *resourceapi.ResourceClaim
+		want  bool
+	}{
+		{
+			name: "no requests",
+			claim: &resourceapi.ResourceClaim{
+				Spec: resourceapi.ResourceClaimSpec{
+					Devices: resourceapi.DeviceClaim{
+						Requests: nil,
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "single request without admin access",
+			claim: &resourceapi.ResourceClaim{
+				Spec: resourceapi.ResourceClaimSpec{
+					Devices: resourceapi.DeviceClaim{
+						Requests: []resourceapi.DeviceRequest{
+							{
+								Name:        "req-0",
+								AdminAccess: ptr.To(false),
+							},
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "single request with admin access",
+			claim: &resourceapi.ResourceClaim{
+				Spec: resourceapi.ResourceClaimSpec{
+					Devices: resourceapi.DeviceClaim{
+						Requests: []resourceapi.DeviceRequest{
+							{
+								Name:        "req-0",
+								AdminAccess: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "multiple requests, one with admin access",
+			claim: &resourceapi.ResourceClaim{
+				Spec: resourceapi.ResourceClaimSpec{
+					Devices: resourceapi.DeviceClaim{
+						Requests: []resourceapi.DeviceRequest{
+							{
+								Name:        "req-0",
+								AdminAccess: ptr.To(false),
+							},
+							{
+								Name:        "req-1",
+								AdminAccess: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "multiple requests, none with admin access",
+			claim: &resourceapi.ResourceClaim{
+				Spec: resourceapi.ResourceClaimSpec{
+					Devices: resourceapi.DeviceClaim{
+						Requests: []resourceapi.DeviceRequest{
+							{
+								Name:        "req-0",
+								AdminAccess: nil,
+							},
+							{
+								Name:        "req-1",
+								AdminAccess: ptr.To(false),
+							},
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "admin access nil (defaults to false)",
+			claim: &resourceapi.ResourceClaim{
+				Spec: resourceapi.ResourceClaimSpec{
+					Devices: resourceapi.DeviceClaim{
+						Requests: []resourceapi.DeviceRequest{
+							{
+								Name:        "req-0",
+								AdminAccess: nil,
+							},
+						},
+					},
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := hasAdminAccess(tc.claim)
+			if got != tc.want {
+				t.Errorf("hasAdminAccess() = %v, want %v", got, tc.want)
+			}
+		})
+	}
 }
 
 func makeClaim(name, namespace, classname string, owner *metav1.OwnerReference) *resourceapi.ResourceClaim {
@@ -788,8 +976,10 @@ func createResourceClaimReactor() func(action k8stesting.Action) (handled bool, 
 // Metrics helpers
 
 type numMetrics struct {
-	claims    float64
-	allocated float64
+	claims                   float64
+	claimsWithAdminAccess    float64
+	allocated                float64
+	allocatedWithAdminAccess float64
 }
 
 func getNumMetric() (em numMetrics, err error) {
@@ -797,7 +987,15 @@ func getNumMetric() (em numMetrics, err error) {
 	if err != nil {
 		return
 	}
+	em.claimsWithAdminAccess, err = testutil.GetGaugeMetricValue(metrics.NumResourceClaimsWithAdminAccess)
+	if err != nil {
+		return
+	}
 	em.allocated, err = testutil.GetGaugeMetricValue(metrics.NumAllocatedResourceClaims)
+	if err != nil {
+		return
+	}
+	em.allocatedWithAdminAccess, err = testutil.GetGaugeMetricValue(metrics.NumAllocatedResourceClaimsWithAdminAccess)
 	return
 }
 
@@ -846,5 +1044,7 @@ func setupMetrics() {
 	metrics.ResourceClaimCreateAttempts.Reset()
 	metrics.ResourceClaimCreateFailures.Reset()
 	metrics.NumResourceClaims.Set(0)
+	metrics.NumResourceClaimsWithAdminAccess.Set(0)
 	metrics.NumAllocatedResourceClaims.Set(0)
+	metrics.NumAllocatedResourceClaimsWithAdminAccess.Set(0)
 }
