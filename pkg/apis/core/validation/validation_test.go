@@ -2154,7 +2154,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"invaild-apigroup-in-data-source": {
+		"invalid-apigroup-in-data-source": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
@@ -2172,7 +2172,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"invaild-apigroup-in-data-source-ref": {
+		"invalid-apigroup-in-data-source-ref": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
@@ -2335,7 +2335,7 @@ func TestAlphaPVVolumeModeUpdate(t *testing.T) {
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
-	invaildAPIGroup := "^invalid"
+	invalidAPIGroup := "^invalid"
 
 	validClaim := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
@@ -2718,7 +2718,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 		DataSource: &core.TypedLocalObjectReference{
-			APIGroup: &invaildAPIGroup,
+			APIGroup: &invalidAPIGroup,
 			Kind:     "Foo",
 			Name:     "foo",
 		},
@@ -2736,7 +2736,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 		DataSourceRef: &core.TypedObjectReference{
-			APIGroup: &invaildAPIGroup,
+			APIGroup: &invalidAPIGroup,
 			Kind:     "Foo",
 			Name:     "foo",
 		},
@@ -3097,7 +3097,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 }
 
 func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
-	invaildAPIGroup := "^invalid"
+	invalidAPIGroup := "^invalid"
 
 	tests := map[string]struct {
 		oldPvc                      *core.PersistentVolumeClaim
@@ -3111,15 +3111,15 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 				EnableVolumeAttributesClass:       false,
 			},
 		},
-		"invaild apiGroup in dataSource allowed because the old pvc is used": {
-			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invaildAPIGroup}),
+		"invalid apiGroup in dataSource allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
-		"invaild apiGroup in dataSourceRef allowed because the old pvc is used": {
-			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invaildAPIGroup}),
+		"invalid apiGroup in dataSourceRef allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
