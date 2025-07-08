@@ -73,7 +73,7 @@ type RuntimeHelper interface {
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
 // TODO(yifan): Think about how to refactor this.
-func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
+func ShouldContainerBeRestarted(logger klog.Logger, container *v1.Container, pod *v1.Pod, podStatus *PodStatus) bool {
 	// Once a pod has been marked deleted, it should not be restarted
 	if pod.DeletionTimestamp != nil {
 		return false
@@ -95,13 +95,13 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 	}
 	// Check RestartPolicy for dead container
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
-		klog.V(4).InfoS("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
+		logger.V(4).Info("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
 		return false
 	}
 	if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
 		// Check the exit code.
 		if status.ExitCode == 0 {
-			klog.V(4).InfoS("Already successfully ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
+			logger.V(4).Info("Already successfully ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
 			return false
 		}
 	}
@@ -357,7 +357,7 @@ func AllContainersAreWindowsHostProcess(pod *v1.Pod) bool {
 }
 
 // MakePortMappings creates internal port mapping from api port mapping.
-func MakePortMappings(container *v1.Container) (ports []PortMapping) {
+func MakePortMappings(logger klog.Logger, container *v1.Container) (ports []PortMapping) {
 	names := make(map[string]struct{})
 	for _, p := range container.Ports {
 		pm := PortMapping{
@@ -386,7 +386,7 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 
 		// Protect against a port name being used more than once in a container.
 		if _, ok := names[name]; ok {
-			klog.InfoS("Port name conflicted, it is defined more than once", "portName", name)
+			logger.Info("Port name conflicted, it is defined more than once", "portName", name)
 			continue
 		}
 		ports = append(ports, pm)
