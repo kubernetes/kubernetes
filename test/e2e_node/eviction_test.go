@@ -396,11 +396,9 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering", framework.WithSlow(), fram
 				evictionPriority: 1,
 				pod:              getMemhogPod("high-priority-memory-hog-pod", "high-priority-memory-hog", v1.ResourceRequirements{}),
 				prePodCreationModificationFunc: func(ctx context.Context, pod *v1.Pod) {
-					nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-					framework.ExpectNoError(err)
-					gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
+					node := getLocalNode(ctx, f)
 
-					nodeSwapInfo := nodeList.Items[0].Status.NodeInfo.Swap
+					nodeSwapInfo := node.Status.NodeInfo.Swap
 					if nodeSwapInfo == nil || nodeSwapInfo.Capacity == nil || *nodeSwapInfo.Capacity <= 0 {
 						return
 					}
