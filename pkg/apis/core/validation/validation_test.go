@@ -19607,6 +19607,33 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 		},
 		expectedErrors: []string{"must be greater than or equal to aggregate container requests"},
 	}, {
+		name: "container requests with resources unsupported at pod-level",
+		podResources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:     resource.MustParse("6"),
+						core.ResourceMemory:  resource.MustParse("5Mi"),
+						core.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:     resource.MustParse("4"),
+						core.ResourceMemory:  resource.MustParse("3Mi"),
+						core.ResourceStorage: resource.MustParse("5Gi"),
+					},
+				},
+			},
+		},
+	}, {
 		name: "aggregate container limits less than pod limits",
 		podResources: core.ResourceRequirements{
 			Limits: core.ResourceList{
