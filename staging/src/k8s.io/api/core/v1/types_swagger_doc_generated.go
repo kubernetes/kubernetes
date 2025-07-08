@@ -623,6 +623,7 @@ var map_EnvVarSource = map[string]string{
 	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.",
 	"configMapKeyRef":  "Selects a key of a ConfigMap.",
 	"secretKeyRef":     "Selects a key of a secret in the pod's namespace",
+	"fileKeyRef":       "FileKeyRef selects a key of the env file. Requires the EnvFiles feature gate to be enabled.",
 }
 
 func (EnvVarSource) SwaggerDoc() map[string]string {
@@ -752,6 +753,18 @@ var map_FCVolumeSource = map[string]string{
 
 func (FCVolumeSource) SwaggerDoc() map[string]string {
 	return map_FCVolumeSource
+}
+
+var map_FileKeySelector = map[string]string{
+	"":           "FileKeySelector selects a key of the env file.",
+	"volumeName": "The name of the volume mount containing the env file.",
+	"path":       "The path within the volume from which to select the file. Must be relative and may not contain the '..' path or start with '..'.",
+	"key":        "The key within the env file. An invalid key will prevent the pod from starting. The keys defined within a source may consist of any printable ASCII characters except '='. During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.",
+	"optional":   "Specify whether the file or its key must be defined. If the file or key does not exist, then the env var is not published. If optional is set to true and the specified key does not exist, the environment variable will not be set in the Pod's containers.\n\nIf optional is set to false and the specified key does not exist, an error will be returned during Pod creation.",
+}
+
+func (FileKeySelector) SwaggerDoc() map[string]string {
+	return map_FileKeySelector
 }
 
 var map_FlexPersistentVolumeSource = map[string]string{
