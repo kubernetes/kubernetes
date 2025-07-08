@@ -56,27 +56,27 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForStructunion1, func(obj *Struct) any {
-		if obj != nil {
-			return obj.U1M1
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForStructunion1, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
-	}, func(obj *Struct) any {
-		if obj != nil {
-			return obj.U1M2
+		return obj.U1M1 != nil
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
+		return obj.U1M2 != nil
 	})...)
-	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForStructunion2, func(obj *Struct) any {
-		if obj != nil {
-			return obj.U2M1
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForStructunion2, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
-	}, func(obj *Struct) any {
-		if obj != nil {
-			return obj.U2M2
+		return obj.U2M1 != nil
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
+		return obj.U2M2 != nil
 	})...)
 
 	// field Struct.TypeMeta has no validation

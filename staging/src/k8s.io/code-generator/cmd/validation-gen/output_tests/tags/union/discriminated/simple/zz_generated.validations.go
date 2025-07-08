@@ -56,20 +56,20 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 		return nil // no changes
 	}
 	errs = append(errs, validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipForStruct, func(obj *Struct) string {
-		if obj != nil {
-			return string(obj.D)
+		if obj == nil {
+			return ""
 		}
-		return ""
-	}, func(obj *Struct) any {
-		if obj != nil {
-			return obj.M1
+		return string(obj.D)
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
-	}, func(obj *Struct) any {
-		if obj != nil {
-			return obj.M2
+		return obj.M1 != nil
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
+		return obj.M2 != nil
 	})...)
 
 	// field Struct.TypeMeta has no validation

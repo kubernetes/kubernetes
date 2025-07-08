@@ -55,16 +55,16 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForStruct, func(obj *Struct) any {
-		if obj != nil {
-			return obj.M1
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForStruct, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
-	}, func(obj *Struct) any {
-		if obj != nil {
-			return obj.M2
+		return obj.M1 != nil
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
+		return obj.M2 != nil
 	})...)
 
 	// field Struct.TypeMeta has no validation

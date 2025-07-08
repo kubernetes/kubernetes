@@ -82,7 +82,26 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 			//       The correct package would be the output package but is not known here. This does not show up in generated code.
 			// TODO: Append a consistent hash suffix to avoid generated name conflicts?
 			supportVarName := PrivateVar{Name: "UnionMembershipFor" + context.Type.Name.Name + unionName, Package: "local"}
+
+			var extractorArgs []any
 			ptrType := types.PointerTo(context.Type)
+			for _, member := range u.fieldMembers {
+				extractor := FunctionLiteral{
+					Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
+					Results:    []ParamResult{{Type: types.Bool}},
+				}
+				nt := util.NativeType(member.Type)
+				switch nt.Kind {
+				case types.Pointer, types.Map, types.Slice:
+					extractor.Body = fmt.Sprintf("if obj == nil {return false}; return obj.%s != nil", member.Name)
+				case types.Builtin:
+					extractor.Body = fmt.Sprintf("if obj == nil {return false}; var z %s; return obj.%s != z", member.Type, member.Name)
+				default:
+					// This should be caught before we get here, but JIC.
+					return Validations{}, fmt.Errorf("unsupported union member kind: %s", nt.Kind)
+				}
+				extractorArgs = append(extractorArgs, extractor)
+			}
 
 			if u.discriminator != nil {
 				supportVar := Variable(supportVarName,
@@ -90,44 +109,21 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 						append([]any{*u.discriminator}, toSliceAny(u.fields)...)...))
 				result.Variables = append(result.Variables, supportVar)
 
-				var extractorArgs []any
-				extractorArgs = append(extractorArgs, supportVarName)
-
 				discriminatorExtractor := FunctionLiteral{
 					Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
 					Results:    []ParamResult{{Type: types.String}},
-					Body:       fmt.Sprintf("if obj != nil {return string(obj.%s)}; return \"\"", u.discriminatorMember.Name), // Cast to string
-				}
-				extractorArgs = append(extractorArgs, discriminatorExtractor)
-
-				for _, member := range u.fieldMembers {
-					extractor := FunctionLiteral{
-						Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
-						Results:    []ParamResult{{Type: types.Any}},
-						Body:       fmt.Sprintf("if obj != nil {return obj.%s}; return nil", member.Name),
-					}
-					extractorArgs = append(extractorArgs, extractor)
+					Body:       fmt.Sprintf("if obj == nil {return \"\"}; return string(obj.%s)", u.discriminatorMember.Name), // Cast to string
 				}
 
-				fn := Function(unionMemberTagName, DefaultFlags, discriminatedUnionValidator, extractorArgs...)
+				extraArgs := append([]any{supportVarName, discriminatorExtractor}, extractorArgs...)
+				fn := Function(unionMemberTagName, DefaultFlags, discriminatedUnionValidator, extraArgs...)
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(unionMemberTagName, DefaultFlags, newUnionMembership, toSliceAny(u.fields)...))
 				result.Variables = append(result.Variables, supportVar)
 
-				var extractorArgs []any
-				extractorArgs = append(extractorArgs, supportVarName)
-
-				for _, member := range u.fieldMembers {
-					extractor := FunctionLiteral{
-						Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
-						Results:    []ParamResult{{Type: types.Any}},
-						Body:       fmt.Sprintf("if obj != nil {return obj.%s}; return nil", member.Name),
-					}
-					extractorArgs = append(extractorArgs, extractor)
-				}
-
-				fn := Function(unionMemberTagName, DefaultFlags, unionValidator, extractorArgs...)
+				extraArgs := append([]any{supportVarName}, extractorArgs...)
+				fn := Function(unionMemberTagName, DefaultFlags, unionValidator, extraArgs...)
 				result.Functions = append(result.Functions, fn)
 			}
 		}
@@ -219,6 +215,15 @@ func (unionMemberTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	nt := util.NativeType(context.Member.Type)
+	switch nt.Kind {
+	case types.Pointer, types.Map, types.Slice, types.Builtin:
+		// OK
+	default:
+		// In particular non-pointer structs are not supported.
+		return Validations{}, fmt.Errorf("can only be used on nilable and primitive types (%s)", nt.Kind)
+	}
+
 	var fieldName string
 	jsonTag, ok := tags.LookupJSON(*context.Member)
 	if !ok {
