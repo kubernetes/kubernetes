@@ -2032,6 +2032,14 @@
             ],
             "description": "Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs."
           },
+          "fileKeyRef": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.FileKeySelector"
+              }
+            ],
+            "description": "FileKeyRef selects a key of the env file. Requires the EnvFiles feature gate to be enabled."
+          },
           "resourceFieldRef": {
             "allOf": [
               {
@@ -2537,6 +2545,38 @@
           }
         },
         "type": "object"
+      },
+      "io.k8s.api.core.v1.FileKeySelector": {
+        "description": "FileKeySelector selects a key of the env file.",
+        "properties": {
+          "key": {
+            "default": "",
+            "description": "The key within the env file. An invalid key will prevent the pod from starting. The keys defined within a source may consist of any printable ASCII characters except '='. During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.",
+            "type": "string"
+          },
+          "optional": {
+            "default": false,
+            "description": "Specify whether the file or its key must be defined. If the file or key does not exist, then the env var is not published. If optional is set to true and the specified key does not exist, the environment variable will not be set in the Pod's containers.\n\nIf optional is set to false and the specified key does not exist, an error will be returned during Pod creation.",
+            "type": "boolean"
+          },
+          "path": {
+            "default": "",
+            "description": "The path within the volume from which to select the file. Must be relative and may not contain the '..' path or start with '..'.",
+            "type": "string"
+          },
+          "volumeName": {
+            "default": "",
+            "description": "The name of the volume mount containing the env file.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "volumeName",
+          "path",
+          "key"
+        ],
+        "type": "object",
+        "x-kubernetes-map-type": "atomic"
       },
       "io.k8s.api.core.v1.FlexPersistentVolumeSource": {
         "description": "FlexPersistentVolumeSource represents a generic persistent volume resource that is provisioned/attached using an exec based plugin.",

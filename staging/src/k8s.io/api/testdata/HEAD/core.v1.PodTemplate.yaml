@@ -213,6 +213,11 @@ template:
           fieldRef:
             apiVersion: apiVersionValue
             fieldPath: fieldPathValue
+          fileKeyRef:
+            key: keyValue
+            optional: true
+            path: pathValue
+            volumeName: volumeNameValue
           resourceFieldRef:
             containerName: containerNameValue
             divisor: "0"
@@ -430,6 +435,11 @@ template:
           fieldRef:
             apiVersion: apiVersionValue
             fieldPath: fieldPathValue
+          fileKeyRef:
+            key: keyValue
+            optional: true
+            path: pathValue
+            volumeName: volumeNameValue
           resourceFieldRef:
             containerName: containerNameValue
             divisor: "0"
@@ -649,6 +659,11 @@ template:
           fieldRef:
             apiVersion: apiVersionValue
             fieldPath: fieldPathValue
+          fileKeyRef:
+            key: keyValue
+            optional: true
+            path: pathValue
+            volumeName: volumeNameValue
           resourceFieldRef:
             containerName: containerNameValue
             divisor: "0"

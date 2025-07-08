@@ -780,6 +780,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ExecActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("FCVolumeSource"):
 		return &applyconfigurationscorev1.FCVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("FileKeySelector"):
+		return &applyconfigurationscorev1.FileKeySelectorApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("FlexPersistentVolumeSource"):
 		return &applyconfigurationscorev1.FlexPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("FlexVolumeSource"):

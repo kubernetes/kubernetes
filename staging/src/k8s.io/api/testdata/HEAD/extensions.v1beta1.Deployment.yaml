@@ -234,6 +234,11 @@ spec:
             fieldRef:
               apiVersion: apiVersionValue
               fieldPath: fieldPathValue
+            fileKeyRef:
+              key: keyValue
+              optional: true
+              path: pathValue
+              volumeName: volumeNameValue
             resourceFieldRef:
               containerName: containerNameValue
               divisor: "0"
@@ -451,6 +456,11 @@ spec:
             fieldRef:
               apiVersion: apiVersionValue
               fieldPath: fieldPathValue
+            fileKeyRef:
+              key: keyValue
+              optional: true
+              path: pathValue
+              volumeName: volumeNameValue
             resourceFieldRef:
               containerName: containerNameValue
               divisor: "0"
@@ -670,6 +680,11 @@ spec:
             fieldRef:
               apiVersion: apiVersionValue
               fieldPath: fieldPathValue
+            fileKeyRef:
+              key: keyValue
+              optional: true
+              path: pathValue
+              volumeName: volumeNameValue
             resourceFieldRef:
               containerName: containerNameValue
               divisor: "0"
