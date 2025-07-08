@@ -1145,112 +1145,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			}))
 		})
 
-		ginkgo.It("should not disable for guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
-			cpuCount := 1
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			ctnName := "gu-container-cfsquota-disabled"
-			pod := makeCPUManagerPod("gu-pod-cfsquota-off", []ctnAttribute{
-				{
-					ctnName:    ctnName,
-					cpuRequest: "1",
-					cpuLimit:   "1",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("max"))
-			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
-		})
-
-		ginkgo.It("should not disable for guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
-			cpuCount := 4
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			ctnName := "gu-container-cfsquota-disabled"
-			pod := makeCPUManagerPod("gu-pod-cfsquota-off", []ctnAttribute{
-				{
-					ctnName:    ctnName,
-					cpuRequest: "3",
-					cpuLimit:   "3",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("max"))
-			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
-
-			gomega.Expect(pod).To(HaveContainerCPUsCount(ctnName, 3))
-			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(ctnName, onlineCPUs))
-			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(ctnName, reservedCPUs))
-		})
-
-		ginkgo.It("should enforce for guaranteed pod", func(ctx context.Context) {
-			cpuCount := 1 // overshoot, minimum request is 1
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			ctnName := "gu-container-cfsquota-enabled"
-			pod := makeCPUManagerPod("gu-pod-cfs-quota-on", []ctnAttribute{
-				{
-					ctnName:    ctnName,
-					cpuRequest: "500m",
-					cpuLimit:   "500m",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("50000"))
-			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "50000"))
-		})
-
-		ginkgo.It("should not enforce with multiple containers only in the container with exclusive CPUs", func(ctx context.Context) {
-			cpuCount := 2
-			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
-
-			pod := makeCPUManagerPod("gu-pod-multicontainer-mixed", []ctnAttribute{
-				{
-					ctnName:    "gu-container-non-int-values",
-					cpuRequest: "500m",
-					cpuLimit:   "500m",
-				},
-				{
-					ctnName:    "gu-container-int-values",
-					cpuRequest: "1",
-					cpuLimit:   "1",
-				},
-			})
-			ginkgo.By("creating the test pod")
-			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			podMap[string(pod.UID)] = pod
-
-			gomega.Expect(pod).To(HaveSandboxQuota("max"))
-			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values", "50000"))
-			gomega.Expect(pod).To(HaveContainerQuota("gu-container-int-values", "max"))
-		})
-	})
-
-	ginkgo.When("checking the CFS quota management can be disabled", ginkgo.Label("cfs-quota"), func() {
-		// NOTE: these tests check only cases on which the quota is set to "max", so we intentionally
-		// don't duplicate the all the tests
-
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
-			//          this means on more-than-2-way SMT systems this test will prove nothing
-			reservedCPUs = cpuset.New(0)
-			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
-				reservedSystemCPUs:               reservedCPUs,
-				disableCPUQuotaWithExclusiveCPUs: false,
-			}))
-		})
-
-		ginkgo.It("should not disable for guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
+		ginkgo.It("should enforce for a guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
 			cpuCount := 1
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
@@ -1270,7 +1165,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "100000"))
 		})
 
-		ginkgo.It("should not disable for guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
+		ginkgo.It("should enforce for a guaranteed pod with multiple exclusive CPUs assigned", func(ctx context.Context) {
 			cpuCount := 4
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
@@ -1294,7 +1189,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(ctnName, reservedCPUs))
 		})
 
-		ginkgo.It("should enforce for guaranteed pod", func(ctx context.Context) {
+		ginkgo.It("should enforce for guaranteed pod not requiring exclusive CPUs", func(ctx context.Context) {
 			cpuCount := 1 // overshoot, minimum request is 1
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
@@ -1314,7 +1209,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "50000"))
 		})
 
-		ginkgo.It("should not enforce with multiple containers only in the container with exclusive CPUs", func(ctx context.Context) {
+		ginkgo.It("should enforce with multiple containers regardless if they require exclusive CPUs or not", func(ctx context.Context) {
 			cpuCount := 2
 			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
