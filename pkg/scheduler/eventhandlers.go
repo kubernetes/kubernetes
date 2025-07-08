@@ -56,7 +56,7 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 	logger := sched.logger
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		logger.Error(nil, "Cannot convert to *v1.Node", "obj", obj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Node", "obj", obj)
 		return
 	}
 
@@ -70,12 +70,12 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 	logger := sched.logger
 	oldNode, ok := oldObj.(*v1.Node)
 	if !ok {
-		logger.Error(nil, "Cannot convert oldObj to *v1.Node", "oldObj", oldObj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1.Node", "oldObj", oldObj)
 		return
 	}
 	newNode, ok := newObj.(*v1.Node)
 	if !ok {
-		logger.Error(nil, "Cannot convert newObj to *v1.Node", "newObj", newObj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1.Node", "newObj", newObj)
 		return
 	}
 
@@ -110,11 +110,11 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 		var ok bool
 		node, ok = t.Obj.(*v1.Node)
 		if !ok {
-			logger.Error(nil, "Cannot convert to *v1.Node", "obj", t.Obj)
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Node", "obj", t.Obj)
 			return
 		}
 	default:
-		logger.Error(nil, "Cannot convert to *v1.Node", "obj", t)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Node", "obj", t)
 		return
 	}
 
@@ -122,7 +122,7 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 
 	logger.V(3).Info("Delete event for node", "node", klog.KObj(node))
 	if err := sched.Cache.RemoveNode(logger, node); err != nil {
-		logger.Error(err, "Scheduler cache RemoveNode failed")
+		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache RemoveNode failed")
 	}
 }
 
@@ -202,7 +202,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
-		logger.Error(err, "Unable to get profile", "pod", klog.KObj(pod))
+		utilruntime.HandleErrorWithLogger(logger, err, "Unable to get profile", "pod", klog.KObj(pod))
 		return
 	}
 	// If a waiting pod is rejected, it indicates it's previously assumed and we're
@@ -233,13 +233,13 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 	logger := sched.logger
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
-		logger.Error(nil, "Cannot convert to *v1.Pod", "obj", obj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", obj)
 		return
 	}
 
 	logger.V(3).Info("Add event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.AddPod(logger, pod); err != nil {
-		logger.Error(err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
+		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
 
 	// SchedulingQueue.AssignedPodAdded has a problem:
@@ -265,18 +265,18 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	logger := sched.logger
 	oldPod, ok := oldObj.(*v1.Pod)
 	if !ok {
-		logger.Error(nil, "Cannot convert oldObj to *v1.Pod", "oldObj", oldObj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert oldObj to *v1.Pod", "oldObj", oldObj)
 		return
 	}
 	newPod, ok := newObj.(*v1.Pod)
 	if !ok {
-		logger.Error(nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
 		return
 	}
 
 	logger.V(4).Info("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 	if err := sched.Cache.UpdatePod(logger, oldPod, newPod); err != nil {
-		logger.Error(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
+		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
 	events := framework.PodSchedulingPropertiesChange(newPod, oldPod)
@@ -318,17 +318,17 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		var ok bool
 		pod, ok = t.Obj.(*v1.Pod)
 		if !ok {
-			logger.Error(nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
 			return
 		}
 	default:
-		logger.Error(nil, "Cannot convert to *v1.Pod", "obj", t)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t)
 		return
 	}
 
 	logger.V(3).Info("Delete event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.RemovePod(logger, pod); err != nil {
-		logger.Error(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
+		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
 	}
 
 	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventAssignedPodDelete, pod, nil, nil)
@@ -461,7 +461,7 @@ func addAllEventHandlers(
 				if resource == fwk.StorageClass && !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 					sc, ok := obj.(*storagev1.StorageClass)
 					if !ok {
-						logger.Error(nil, "Cannot convert to *storagev1.StorageClass", "obj", obj)
+						utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *storagev1.StorageClass", "obj", obj)
 						return
 					}
 
@@ -603,7 +603,7 @@ func addAllEventHandlers(
 			// - foos.v1 (2 sections)
 			// - foo.v1.example.com (the first section should be plural)
 			if strings.Count(string(gvk), ".") < 2 {
-				logger.Error(nil, "incorrect event registration", "gvk", gvk)
+				utilruntime.HandleErrorWithLogger(logger, nil, "Incorrect event registration", "gvk", gvk)
 				continue
 			}
 			// Fall back to try dynamic informers.

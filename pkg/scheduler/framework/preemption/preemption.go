@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
@@ -416,7 +417,7 @@ func (ev *Evaluator) SelectCandidate(ctx context.Context, candidates []Candidate
 	}
 
 	// We shouldn't reach here.
-	logger.Error(errors.New("no candidate selected"), "Should not reach here", "candidates", candidates)
+	utilruntime.HandleErrorWithContext(ctx, nil, "Unexpected case no candidate was selected", "candidates", candidates)
 	// To not break the whole flow, return the first candidate.
 	return candidates[0]
 }
@@ -450,7 +451,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	// lets scheduler find another place for them.
 	nominatedPods := getLowerPriorityNominatedPods(logger, fh, pod, c.Name())
 	if err := util.ClearNominatedNodeName(ctx, cs, nominatedPods...); err != nil {
-		logger.Error(err, "Cannot clear 'NominatedNodeName' field")
+		utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
 	}
 
@@ -504,7 +505,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		// lets scheduler find another place for them.
 		nominatedPods := getLowerPriorityNominatedPods(logger, ev.Handler, pod, c.Name())
 		if err := util.ClearNominatedNodeName(ctx, ev.Handler.ClientSet(), nominatedPods...); err != nil {
-			logger.Error(err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
+			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
 			result = metrics.GoroutineResultError
 			// We do not return as this error is not critical.
 		}
@@ -525,7 +526,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		// by all the pod removal events being ignored.
 		ev.Handler.Parallelizer().Until(ctx, len(c.Victims().Pods)-1, preemptPod, ev.PluginName)
 		if err := errCh.ReceiveError(); err != nil {
-			logger.Error(err, "Error occurred during async preemption")
+			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 			result = metrics.GoroutineResultError
 		}
 
@@ -534,7 +535,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		ev.mu.Unlock()
 
 		if err := ev.PreemptPod(ctx, c, pod, c.Victims().Pods[len(c.Victims().Pods)-1], pluginName); err != nil {
-			logger.Error(err, "Error occurred during async preemption")
+			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 			result = metrics.GoroutineResultError
 		}
 
@@ -603,7 +604,7 @@ func pickOneNodeForPreemption(logger klog.Logger, nodesToVictims map[string]*ext
 			// Get the earliest start time of all pods on the current node.
 			earliestStartTimeOnNode := util.GetEarliestPodStartTime(nodesToVictims[node])
 			if earliestStartTimeOnNode == nil {
-				logger.Error(errors.New("earliestStartTime is nil for node"), "Should not reach here", "node", node)
+				utilruntime.HandleErrorWithLogger(logger, nil, "Unexpected nil earliestStartTime for node", "node", node)
 				return int64(math.MinInt64)
 			}
 			// The bigger the earliestStartTimeOnNode, the higher the score.
