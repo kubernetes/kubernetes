@@ -79,7 +79,7 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
-func compactWatchCache(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
+func compactWatch(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
@@ -121,6 +121,20 @@ func compactWatchCache(c *CacheDelegator, client *clientv3.Client) storagetestin
 		if _, err := client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Could not compact: %v", err)
 		}
+	}
+}
+
+func compactStore(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
+	return func(ctx context.Context, t *testing.T, resourceVersion string) {
+		versioner := storage.APIObjectVersioner{}
+		rv, err := versioner.ParseResourceVersion(resourceVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := client.Compact(ctx, int64(rv)); err != nil {
+			t.Fatalf("Unable to compact, %v", err)
+		}
+		c.cacher.watchCache.Compact(int64(rv))
 	}
 }
 

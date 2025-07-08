@@ -187,7 +187,7 @@ func TestLists(t *testing.T) {
 					t.Parallel()
 					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 					t.Cleanup(terminate)
-					storagetesting.RunTestList(ctx, t, cacher, increaseRV(server.V3Client.Client), true, server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder))
+					storagetesting.RunTestList(ctx, t, cacher, increaseRV(server.V3Client.Client), compactStore(cacher, server.V3Client.Client), true, server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder))
 				})
 
 				t.Run("ConsistentList", func(t *testing.T) {
@@ -300,7 +300,7 @@ func TestWatch(t *testing.T) {
 func TestWatchFromZero(t *testing.T) {
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactWatchCache(cacher, server.V3Client.Client))
+	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactWatch(cacher, server.V3Client.Client))
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
