@@ -22903,10 +22903,6 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 }
 
 func TestValidateWindowsSecurityContextOptions(t *testing.T) {
-	toPtr := func(s string) *string {
-		return &s
-	}
-
 	testCases := []struct {
 		testName string
 
@@ -22920,26 +22916,26 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 	}, {
 		testName: "a valid input",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			GMSACredentialSpecName: toPtr("dummy-gmsa-crep-spec-name"),
-			GMSACredentialSpec:     toPtr("dummy-gmsa-crep-spec-contents"),
+			GMSACredentialSpecName: ptr.To("dummy-gmsa-crep-spec-name"),
+			GMSACredentialSpec:     ptr.To("dummy-gmsa-crep-spec-contents"),
 		},
 	}, {
 		testName: "a GMSA cred spec name that is not a valid resource name",
 		windowsOptions: &core.WindowsSecurityContextOptions{
 			// invalid because of the underscore
-			GMSACredentialSpecName: toPtr("not_a-valid-gmsa-crep-spec-name"),
+			GMSACredentialSpecName: ptr.To("not_a-valid-gmsa-crep-spec-name"),
 		},
 		expectedErrorSubstring: dnsSubdomainLabelErrMsg,
 	}, {
 		testName: "empty GMSA cred spec contents",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			GMSACredentialSpec: toPtr(""),
+			GMSACredentialSpec: ptr.To(""),
 		},
 		expectedErrorSubstring: "gmsaCredentialSpec cannot be an empty string",
 	}, {
 		testName: "GMSA cred spec contents that are too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			GMSACredentialSpec: toPtr(strings.Repeat("a", maxGMSACredentialSpecLength+1)),
+			GMSACredentialSpec: ptr.To(strings.Repeat("a", maxGMSACredentialSpecLength+1)),
 		},
 		expectedErrorSubstring: "gmsaCredentialSpec size must be under",
 	}, {
@@ -22950,105 +22946,105 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 	}, {
 		testName: "a valid RunAsUserName",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container. User"),
+			RunAsUserName: ptr.To("Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with NetBios Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Network Service\\Container. User"),
+			RunAsUserName: ptr.To("Network Service\\Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with DNS Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("fOo", 20) + ".liSH\\Container. User"),
+			RunAsUserName: ptr.To(strings.Repeat("fOo", 20) + ".liSH\\Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with DNS Domain with a single character segment",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("fOo", 20) + ".l\\Container. User"),
+			RunAsUserName: ptr.To(strings.Repeat("fOo", 20) + ".l\\Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with a long single segment DNS Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("a", 42) + "\\Container. User"),
+			RunAsUserName: ptr.To(strings.Repeat("a", 42) + "\\Container. User"),
 		},
 	}, {
 		testName: "an empty RunAsUserName",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(""),
+			RunAsUserName: ptr.To(""),
 		},
 		expectedErrorSubstring: "runAsUserName cannot be an empty string",
 	}, {
 		testName: "RunAsUserName containing a control character",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container\tUser"),
+			RunAsUserName: ptr.To("Container\tUser"),
 		},
 		expectedErrorSubstring: "runAsUserName cannot contain control characters",
 	}, {
 		testName: "RunAsUserName containing too many backslashes",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container\\Foo\\Lish"),
+			RunAsUserName: ptr.To("Container\\Foo\\Lish"),
 		},
 		expectedErrorSubstring: "runAsUserName cannot contain more than one backslash",
 	}, {
 		testName: "RunAsUserName containing backslash but empty Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("\\User"),
+			RunAsUserName: ptr.To("\\User"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios nor the DNS format",
 	}, {
 		testName: "RunAsUserName containing backslash but empty User",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container\\"),
+			RunAsUserName: ptr.To("Container\\"),
 		},
 		expectedErrorSubstring: "runAsUserName's User cannot be empty",
 	}, {
 		testName: "RunAsUserName's NetBios Domain is too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("NetBios " + strings.Repeat("a", 8) + "\\user"),
+			RunAsUserName: ptr.To("NetBios " + strings.Repeat("a", 8) + "\\user"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios",
 	}, {
 		testName: "RunAsUserName's DNS Domain is too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
 			// even if this tests the max Domain length, the Domain should still be "valid".
-			RunAsUserName: toPtr(strings.Repeat(strings.Repeat("a", 63)+".", 4)[:253] + ".com\\user"),
+			RunAsUserName: ptr.To(strings.Repeat(strings.Repeat("a", 63)+".", 4)[:253] + ".com\\user"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain length must be under",
 	}, {
 		testName: "RunAsUserName's User is too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("a", maxRunAsUserNameUserLength+1)),
+			RunAsUserName: ptr.To(strings.Repeat("a", maxRunAsUserNameUserLength+1)),
 		},
 		expectedErrorSubstring: "runAsUserName's User length must not be longer than",
 	}, {
 		testName: "RunAsUserName's User cannot contain only spaces or periods",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("... ..."),
+			RunAsUserName: ptr.To("... ..."),
 		},
 		expectedErrorSubstring: "runAsUserName's User cannot contain only periods or spaces",
 	}, {
 		testName: "RunAsUserName's NetBios Domain cannot start with a dot",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(".FooLish\\User"),
+			RunAsUserName: ptr.To(".FooLish\\User"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios",
 	}, {
 		testName: "RunAsUserName's NetBios Domain cannot contain invalid characters",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Foo? Lish?\\User"),
+			RunAsUserName: ptr.To("Foo? Lish?\\User"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios",
 	}, {
 		testName: "RunAsUserName's DNS Domain cannot contain invalid characters",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("a", 32) + ".com-\\user"),
+			RunAsUserName: ptr.To(strings.Repeat("a", 32) + ".com-\\user"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios nor the DNS format",
 	}, {
 		testName: "RunAsUserName's User cannot contain invalid characters",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container/User"),
+			RunAsUserName: ptr.To("Container/User"),
 		},
 		expectedErrorSubstring: "runAsUserName's User cannot contain the following characters",
 	},
