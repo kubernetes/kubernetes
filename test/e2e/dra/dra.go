@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -2020,7 +2022,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		})
 	})
 
-	framework.Context("control plane", func() {
+	framework.Context("control plane", feature.DynamicResourceAllocation, func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false))
 		driver.WithKubelet = false
@@ -2087,7 +2089,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 						Requests: []resourceapi.DeviceRequest{{
 							Name: "req-0",
 							Exactly: &resourceapi.ExactDeviceRequest{
-								DeviceClassName: "my-class",
+								DeviceClassName: b.ClassName(),
 							},
 						}},
 					},
@@ -2131,7 +2133,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		})
 	})
 
-	framework.Context("control plane", func() {
+	framework.Context("control plane", feature.DynamicResourceAllocation, func() {
 		nodes := drautils.NewNodes(f, 1, 4)
 		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
 		driver.WithKubelet = false
@@ -2278,6 +2280,276 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			mustFailToDelete(fictionalNodeClient, "fictional plugin", createdClusterSlice, matchVAPDeniedError(fictionalNodeName, createdClusterSlice))
 			mustDelete(f.ClientSet, "admin", createdClusterSlice)
 		})
+
+		f.It("controller manager metrics track ResourceClaim operations with correct labels", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
+			b := drautils.NewBuilderNow(ctx, f, driver)
+
+			ginkgo.By("Getting initial controller manager metrics")
+			grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, nil, f.ClientConfig(), false, false, true, false, false, false)
+			framework.ExpectNoError(err, "create metrics grabber")
+
+			initialMetrics, err := grabber.GrabFromControllerManager(ctx)
+			framework.ExpectNoError(err, "grab initial controller manager metrics")
+
+			// Extract initial metric values
+			initialCreateCount := getMetricValue(initialMetrics, "resourceclaim_controller_creates_total", map[string]string{"status": "success", "admin_access": "false"})
+			initialCreateCountAdmin := getMetricValue(initialMetrics, "resourceclaim_controller_creates_total", map[string]string{"status": "success", "admin_access": "true"})
+			initialClaimGaugeUnallocated := getMetricValue(initialMetrics, "resourceclaim_controller_resource_claims", map[string]string{"admin_access": "false", "allocated": "false"})
+			initialClaimGaugeAllocated := getMetricValue(initialMetrics, "resourceclaim_controller_resource_claims", map[string]string{"admin_access": "false", "allocated": "true"})
+			initialClaimGaugeAdminUnallocated := getMetricValue(initialMetrics, "resourceclaim_controller_resource_claims", map[string]string{"admin_access": "true", "allocated": "false"})
+			initialClaimGaugeAdminAllocated := getMetricValue(initialMetrics, "resourceclaim_controller_resource_claims", map[string]string{"admin_access": "true", "allocated": "true"})
+
+			ginkgo.By("Creating a ResourceClaimTemplate and Pod to trigger controller processing")
+			// Create a ResourceClaimTemplate without admin access
+			template := &resourceapi.ResourceClaimTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "metrics-test-template-",
+					Namespace:    f.Namespace.Name,
+				},
+				Spec: resourceapi.ResourceClaimTemplateSpec{
+					Spec: resourceapi.ResourceClaimSpec{
+						Devices: resourceapi.DeviceClaim{
+							Requests: []resourceapi.DeviceRequest{{
+								Name: "req-0",
+								Exactly: &resourceapi.ExactDeviceRequest{
+									DeviceClassName: b.ClassName(),
+									// AdminAccess defaults to false when not specified
+								},
+							}},
+						},
+					},
+				},
+			}
+			createdTemplate, err := f.ClientSet.ResourceV1beta2().ResourceClaimTemplates(f.Namespace.Name).Create(ctx, template, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create ResourceClaimTemplate without admin access")
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "metrics-test-pod-",
+					Namespace:    f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{{
+						Name:  "test-container",
+						Image: "busybox:1.35",
+						Command: []string{
+							"sh", "-c", "echo 'Metrics test pod' && exit 0",
+						},
+						Resources: v1.ResourceRequirements{
+							Claims: []v1.ResourceClaim{{
+								Name: "my-claim",
+							}},
+						},
+					}},
+					ResourceClaims: []v1.PodResourceClaim{{
+						Name:                      "my-claim",
+						ResourceClaimTemplateName: &createdTemplate.Name,
+					}},
+				},
+			}
+			createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create Pod with ResourceClaimTemplate")
+
+			ginkgo.By("Waiting for controller to create ResourceClaim from template")
+			var generatedClaimName string
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, createdPod.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("get pod: %w", err)
+				}
+
+				for _, rc := range updatedPod.Spec.ResourceClaims {
+					if rc.Name == "my-claim" && rc.ResourceClaimName != nil {
+						generatedClaimName = *rc.ResourceClaimName
+						return nil
+					}
+				}
+
+				// Check if any ResourceClaims exist in the namespace that are owned by this pod
+				claims, err := f.ClientSet.ResourceV1beta2().ResourceClaims(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				if err == nil {
+					for _, claim := range claims.Items {
+						// Check if this ResourceClaim is owned by our pod
+						for _, ownerRef := range claim.OwnerReferences {
+							if ownerRef.Kind == "Pod" && ownerRef.Name == updatedPod.Name {
+								generatedClaimName = claim.Name
+								return nil
+							}
+						}
+					}
+				}
+
+				return fmt.Errorf("ResourceClaim not yet generated from template")
+			}).WithTimeout(30 * time.Second).WithPolling(1 * time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Verifying metrics reflect the controller-created claim without admin access")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				currentMetrics, err := grabber.GrabFromControllerManager(ctx)
+				if err != nil {
+					return fmt.Errorf("grab current controller manager metrics: %w", err)
+				}
+
+				// Check that creates_total metric incremented for admin_access="false"
+				currentCreateCount := getMetricValue(currentMetrics, "resourceclaim_controller_creates_total", map[string]string{"status": "success", "admin_access": "false"})
+				if currentCreateCount != initialCreateCount+1 {
+					return fmt.Errorf("expected resourceclaim_controller_creates_total{status=\"success\",admin_access=\"false\"} to be %v, got %v", initialCreateCount+1, currentCreateCount)
+				}
+
+				// Check that resource_claims gauge incremented for the claim without admin access
+				// Note: The claim might be allocated or unallocated depending on timing
+				currentClaimGaugeUnallocated := getMetricValue(currentMetrics, "resourceclaim_controller_resource_claims", map[string]string{"admin_access": "false", "allocated": "false"})
+				currentClaimGaugeAllocated := getMetricValue(currentMetrics, "resourceclaim_controller_resource_claims", map[string]string{"admin_access": "false", "allocated": "true"})
+				totalClaims := currentClaimGaugeUnallocated + currentClaimGaugeAllocated
+				expectedTotal := initialClaimGaugeUnallocated + initialClaimGaugeAllocated + 1
+
+				if totalClaims != expectedTotal {
+					return fmt.Errorf("expected total resourceclaim_controller_resource_claims{admin_access=\"false\"} to be %v, got %v", expectedTotal, totalClaims)
+				}
+
+				return nil
+			}).WithTimeout(30 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Cleaning up test resources")
+			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, createdPod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "delete test Pod")
+			if generatedClaimName != "" {
+				err = f.ClientSet.ResourceV1beta2().ResourceClaims(f.Namespace.Name).Delete(ctx, generatedClaimName, metav1.DeleteOptions{})
+				if err != nil && !apierrors.IsNotFound(err) {
+					framework.ExpectNoError(err, "delete generated ResourceClaim")
+				}
+			}
+			err = f.ClientSet.ResourceV1beta2().ResourceClaimTemplates(f.Namespace.Name).Delete(ctx, createdTemplate.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "delete test ResourceClaimTemplate")
+
+			ginkgo.By("Setting up namespace for admin access and creating admin ResourceClaimTemplate")
+			// Label the namespace to allow admin access
+			_, err = f.ClientSet.CoreV1().Namespaces().Apply(ctx,
+				applyv1.Namespace(f.Namespace.Name).WithLabels(map[string]string{"resource.kubernetes.io/admin-access": "true"}),
+				metav1.ApplyOptions{FieldManager: f.UniqueName})
+			framework.ExpectNoError(err, "label namespace for admin access")
+
+			// Create a ResourceClaimTemplate with admin access
+			adminTemplate := &resourceapi.ResourceClaimTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "admin-metrics-test-template-",
+					Namespace:    f.Namespace.Name,
+				},
+				Spec: resourceapi.ResourceClaimTemplateSpec{
+					Spec: resourceapi.ResourceClaimSpec{
+						Devices: resourceapi.DeviceClaim{
+							Requests: []resourceapi.DeviceRequest{{
+								Name: "req-0",
+								Exactly: &resourceapi.ExactDeviceRequest{
+									DeviceClassName: b.ClassName(),
+									AdminAccess:     ptr.To(true),
+								},
+							}},
+						},
+					},
+				},
+			}
+			createdAdminTemplate, err := f.ClientSet.ResourceV1beta2().ResourceClaimTemplates(f.Namespace.Name).Create(ctx, adminTemplate, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create ResourceClaimTemplate with admin access")
+
+			adminPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "admin-metrics-test-pod-",
+					Namespace:    f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{{
+						Name:  "test-container",
+						Image: "busybox:1.35",
+						Command: []string{
+							"sh", "-c", "echo 'Admin metrics test pod' && exit 0",
+						},
+						Resources: v1.ResourceRequirements{
+							Claims: []v1.ResourceClaim{{
+								Name: "my-admin-claim",
+							}},
+						},
+					}},
+					ResourceClaims: []v1.PodResourceClaim{{
+						Name:                      "my-admin-claim",
+						ResourceClaimTemplateName: &createdAdminTemplate.Name,
+					}},
+				},
+			}
+			createdAdminPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, adminPod, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create Pod with admin ResourceClaimTemplate")
+
+			ginkgo.By("Waiting for controller to create admin ResourceClaim from template")
+			var generatedAdminClaimName string
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, createdAdminPod.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("get admin pod: %w", err)
+				}
+
+				for _, rc := range updatedPod.Spec.ResourceClaims {
+					if rc.Name == "my-admin-claim" && rc.ResourceClaimName != nil {
+						generatedAdminClaimName = *rc.ResourceClaimName
+						return nil
+					}
+				}
+
+				// Check if any ResourceClaims exist in the namespace that are owned by this admin pod
+				claims, err := f.ClientSet.ResourceV1beta2().ResourceClaims(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				if err == nil {
+					for _, claim := range claims.Items {
+						// Check if this ResourceClaim is owned by our admin pod
+						for _, ownerRef := range claim.OwnerReferences {
+							if ownerRef.Kind == "Pod" && ownerRef.Name == updatedPod.Name {
+								generatedAdminClaimName = claim.Name
+								return nil
+							}
+						}
+					}
+				}
+
+				return fmt.Errorf("admin ResourceClaim not yet generated from template")
+			}).WithTimeout(30 * time.Second).WithPolling(1 * time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Verifying metrics reflect the controller-created claim with admin access")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				currentMetrics, err := grabber.GrabFromControllerManager(ctx)
+				if err != nil {
+					return fmt.Errorf("grab current controller manager metrics: %w", err)
+				}
+
+				// Check that creates_total metric incremented for admin_access="true"
+				currentCreateCountAdmin := getMetricValue(currentMetrics, "resourceclaim_controller_creates_total", map[string]string{"status": "success", "admin_access": "true"})
+				if currentCreateCountAdmin != initialCreateCountAdmin+1 {
+					return fmt.Errorf("expected resourceclaim_controller_creates_total{status=\"success\",admin_access=\"true\"} to be %v, got %v", initialCreateCountAdmin+1, currentCreateCountAdmin)
+				}
+
+				// Check that resource_claims gauge incremented for admin claim
+				currentClaimGaugeAdminUnallocated := getMetricValue(currentMetrics, "resourceclaim_controller_resource_claims", map[string]string{"admin_access": "true", "allocated": "false"})
+				currentClaimGaugeAdminAllocated := getMetricValue(currentMetrics, "resourceclaim_controller_resource_claims", map[string]string{"admin_access": "true", "allocated": "true"})
+				totalAdminClaims := currentClaimGaugeAdminUnallocated + currentClaimGaugeAdminAllocated
+				expectedAdminTotal := initialClaimGaugeAdminUnallocated + initialClaimGaugeAdminAllocated + 1
+
+				if totalAdminClaims != expectedAdminTotal {
+					return fmt.Errorf("expected total resourceclaim_controller_resource_claims{admin_access=\"true\"} to be %v, got %v", expectedAdminTotal, totalAdminClaims)
+				}
+
+				return nil
+			}).WithTimeout(30 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+
+			ginkgo.By("Cleaning up admin test resources")
+			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, createdAdminPod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "delete admin test Pod")
+			if generatedAdminClaimName != "" {
+				err = f.ClientSet.ResourceV1beta2().ResourceClaims(f.Namespace.Name).Delete(ctx, generatedAdminClaimName, metav1.DeleteOptions{})
+				if err != nil && !apierrors.IsNotFound(err) {
+					framework.ExpectNoError(err, "delete generated admin ResourceClaim")
+				}
+			}
+			err = f.ClientSet.ResourceV1beta2().ResourceClaimTemplates(f.Namespace.Name).Delete(ctx, createdAdminTemplate.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "delete admin test ResourceClaimTemplate")
+		})
 	})
 
 	multipleDrivers := func(nodeV1beta1 bool) {
@@ -2320,3 +2592,26 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		multipleDriversContext("using only drapbv1beta1", true)
 	})
 })
+
+// getMetricValue extracts the value of a metric with specific labels.
+// Returns 0 if the metric is not found or doesn't have the specified labels.
+func getMetricValue(metrics e2emetrics.ControllerManagerMetrics, metricName string, labels map[string]string) float64 {
+	samples, exists := testutil.Metrics(metrics)[metricName]
+	if !exists {
+		return 0
+	}
+
+	for _, sample := range samples {
+		match := true
+		for labelKey, labelValue := range labels {
+			if string(sample.Metric[testutil.LabelName(labelKey)]) != labelValue {
+				match = false
+				break
+			}
+		}
+		if match {
+			return float64(sample.Value)
+		}
+	}
+	return 0
+}
