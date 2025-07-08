@@ -157,13 +157,27 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 				panicChan <- p
 			}
 		}()
+
+		readyChan := make(chan struct{})
 		creator := newWSStreamCreator(conn)
-		go creator.readDemuxLoop(
-			e.upgrader.DataBufferSize(),
-			e.heartbeatPeriod,
-			e.heartbeatDeadline,
-		)
-		errorChan <- streamer.stream(creator)
+		go func() {
+			select {
+			// Wait until all streams have been created before starting the readDemuxLoop.
+			// This is to avoid a race condition where the readDemuxLoop receives a message
+			// for a stream that has not yet been created.
+			case <-readyChan:
+			case <-ctx.Done():
+				creator.closeAllStreamReaders(ctx.Err())
+				return
+			}
+
+			creator.readDemuxLoop(
+				e.upgrader.DataBufferSize(),
+				e.heartbeatPeriod,
+				e.heartbeatDeadline,
+			)
+		}()
+		errorChan <- streamer.stream(creator, readyChan)
 	}()
 
 	select {

@@ -47,7 +47,7 @@ func newStreamProtocolV1(options StreamOptions) streamProtocolHandler {
 	}
 }
 
-func (p *streamProtocolV1) stream(conn streamCreator) error {
+func (p *streamProtocolV1) stream(conn streamCreator, ready chan<- struct{}) error {
 	doneChan := make(chan struct{}, 2)
 	errorChan := make(chan error)
 
@@ -104,6 +104,11 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 			return err
 		}
 		defer p.remoteStderr.Reset()
+	}
+
+	// Signal that all streams have been created.
+	if ready != nil {
+		close(ready)
 	}
 
 	// now that all the streams have been created, proceed with reading & copying
