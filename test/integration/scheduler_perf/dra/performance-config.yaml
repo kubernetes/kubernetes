@@ -641,8 +641,8 @@
   featureGates:
     DynamicResourceAllocation: true
     DRADeviceBindingConditions: true
-    SchedulerQueueingHints: true
     DRAResourceClaimDeviceStatus: true
+    SchedulerQueueingHints: true
   workloadTemplate:
     - opcode: createNodes
       nodeTemplatePath: templates/node-with-dra-test-driver.yaml
@@ -656,21 +656,25 @@
     - opcode: createAny
       namespace: test
       templatePath: templates/resourceclaimtemplate.yaml
+    - opcode: startCollectingMetrics
+      name: binding_conditions
+      namespaces: [test]
     - opcode: createPods
       namespace: test
       podTemplatePath: templates/pod-with-claim-template.yaml
       countParam: $measurePods
-      steadyState: true
-      collectMetrics: true
+      skipWaitToCompletion: true
     - opcode: updateDeviceConditions
       namespace: test
-      ConditionTypeParam: $conditionType
-      ConditionStatusParam: $conditionStatus
+      conditionTypeParam: $conditionType
+      conditionStatusParam: $conditionStatus
+      countParam: $measurePods
       durationParam: $updateDuration
     - opcode: checkPodScheduled
       namespace: test
-      ScheduledParam: $scheduled
+      scheduledParam: $scheduled
       durationParam: $checkDuration
+    - opcode: stopCollectingMetrics
   workloads:
     - name: fast_AttachmentSuccess
       labels: [integration-test, short]
@@ -725,8 +729,8 @@
   featureGates:
     DynamicResourceAllocation: true
     DRADeviceBindingConditions: true
-    SchedulerQueueingHints: true
     DRAResourceClaimDeviceStatus: true
+    SchedulerQueueingHints: true
   workloadTemplate:
     - opcode: createNodes
       nodeTemplatePath: templates/node-with-dra-test-driver.yaml
@@ -740,21 +744,25 @@
     - opcode: createAny
       namespace: test
       templatePath: templates/resourceclaim.yaml
+    - opcode: startCollectingMetrics
+      name: binding_conditions
+      namespaces: [test]
     - opcode: createPods
       namespace: test
       podTemplatePath: templates/pod-with-claim-ref.yaml
       countParam: $measurePods
-      steadyState: true
-      collectMetrics: true
+      skipWaitToCompletion: true
     - opcode: updateDeviceConditions
       namespace: test
-      ConditionTypeParam: $conditionType
-      ConditionStatusParam: $conditionStatus
+      conditionTypeParam: $conditionType
+      conditionStatusParam: $conditionStatus
+      countParam: $resourceClaimCount
       durationParam: $updateDuration
     - opcode: checkPodScheduled
       namespace: test
-      ScheduledParam: $scheduled
+      scheduledParam: $scheduled
       durationParam: $checkDuration
+    - opcode: stopCollectingMetrics
   workloads:
     - name: multiple_pods_AttachmentSuccess
       labels: [integration-test, short]
@@ -764,6 +772,7 @@
         maxClaimsPerNode: 10
         conditionType: DeviceAttached
         conditionStatus: "True"
+        resourceClaimCount: 1
         scheduled: true
         updateDuration: 30s
         checkDuration: 30s
@@ -775,6 +784,7 @@
         maxClaimsPerNode: 10
         conditionType: AttachmentFailed
         conditionStatus: "True"
+        resourceClaimCount: 1
         scheduled: false
         updateDuration: 30s
         checkDuration: 30s

@@ -384,6 +384,10 @@ type updateDeviceConditionsOp struct {
 	Opcode operationCode
 	// Namespace where the claims are located.
 	Namespace string
+	// Count is the number of claims to update.
+	Count int
+	// CountParam is the parameter for the number of claims to update.
+	CountParam string
 	// Conditions to set on the devices.
 	ConditionTypeParam string
 	// ConditionStatusParam is the parameter for the condition status.
@@ -408,10 +412,15 @@ func (op *updateDeviceConditionsOp) isValid(allowParameterization bool) error {
 		return fmt.Errorf("conditions must be set")
 	}
 	if op.ConditionStatusParam != "" && op.ConditionTypeParam == "" {
-		return fmt.Errorf("ConditionStatusParam must be set together with ConditionTypeParam")
+		return fmt.Errorf("conditionStatusParam must be set together with conditionTypeParam")
 	}
 	if op.ConditionTypeParam != "" && op.ConditionStatusParam == "" {
-		return fmt.Errorf("ConditionTypeParam must be set together with ConditionStatusParam")
+		return fmt.Errorf("conditionTypeParam must be set together with conditionStatusParam")
+	}
+	if op.CountParam == "" {
+		if op.Count <= 0 {
+			return fmt.Errorf("count must be greater than 0 if countParam is not set")
+		}
 	}
 
 	return nil
@@ -455,6 +464,17 @@ func (op *updateDeviceConditionsOp) patchParams(w *workload) (realOp, error) {
 		}
 	}
 
+	if op.CountParam != "" {
+		op.Count, err = w.Params.get(op.CountParam[1:])
+		if err != nil {
+			return nil, fmt.Errorf("parsing CountParam %s: %w", op.CountParam, err)
+		} else if op.Count <= 0 {
+			return nil, fmt.Errorf("count must be greater than 0 if CountParam is set")
+		}
+	} else if op.Count <= 0 {
+		return nil, fmt.Errorf("count must be greater than 0 if CountParam is not set")
+	}
+
 	return op, op.isValid(false)
 }
 
@@ -467,6 +487,7 @@ func (op *updateDeviceConditionsOp) requiredNamespaces() []string {
 }
 
 func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
+	tCtx.Logf("updating device conditions in namespace %s with conditions %v", op.Namespace, op.Conditions)
 	var claimList *resourceapi.ResourceClaimList
 	var err error
 
@@ -478,14 +499,15 @@ func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
 		if err != nil {
 			return false, nil
 		}
-		if len(claimList.Items) > 0 {
+		if len(claimList.Items) >= op.Count {
 			return true, nil
 		}
+		tCtx.Logf("Waiting for at least %d claims in namespace %s, found %d", op.Count, op.Namespace, len(claimList.Items))
 		return false, nil
 	})
 
 	if err != nil {
-		tCtx.Fatalf("no claims found in namespace %s within %v: %v", op.Namespace, op.Duration.Duration, err)
+		tCtx.Fatalf("No claims found in namespace %s within %v: %v", op.Namespace, op.Duration.Duration, err)
 	}
 
 	for _, item := range claimList.Items {
@@ -497,7 +519,9 @@ func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
 			if err != nil {
 				return false, err
 			}
-
+			if claim.Status.Allocation == nil || len(claim.Status.Allocation.Devices.Results) == 0 {
+				return false, nil
+			}
 			for _, dev := range claim.Status.Allocation.Devices.Results {
 				if dev.BindingConditions != nil {
 					return true, nil
@@ -507,7 +531,7 @@ func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
 		})
 
 		if err != nil {
-			tCtx.Fatalf("no devices found in claim %s/%s within %v: %v", op.Namespace, claimName, op.Duration.Duration, err)
+			tCtx.Fatalf("No devices found in claim %s/%s within %v: %v", op.Namespace, claimName, op.Duration.Duration, err)
 		}
 
 		updatedClaim := claim.DeepCopy()
@@ -529,8 +553,9 @@ func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
 
 		_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).UpdateStatus(tCtx, updatedClaim, metav1.UpdateOptions{})
 		if err != nil {
-			tCtx.Fatalf("update device conditions for claim %s/%s failed: %v", op.Namespace, claimName, err)
+			tCtx.Fatalf("Update device conditions for claim %s/%s failed: %v", op.Namespace, claimName, err)
 		}
+		tCtx.Logf("Updated device conditions for claim %s/%s: %v", op.Namespace, claimName, op.Conditions)
 	}
 }
 
@@ -548,139 +573,5 @@ func makeBindingConditions(driver, pool, device, condition string, status metav1
 				Message:            "Test",
 			},
 		},
-	}
-}
-
-// checkPodScheduledOp defines an op that checks if all pods in a namespace are scheduled
-// or unscheduled. This is used to test the device binding conditions.
-// The check is done by listing all pods in the namespace and checking their status.
-type checkPodScheduledOp struct {
-	// Must be checkPodScheduledOpcode.
-	Opcode operationCode
-	// Namespace where the pods are located.
-	Namespace string
-	// Duration for the test.
-	Duration metav1.Duration
-	// DurationParam is the parameter for the duration.
-	// If set, the duration is parameterized through this parameter.
-	DurationParam string
-	// ScheduledParam is the parameter for the expected scheduled state.
-	// If set, the expected scheduled state is parameterized through this parameter.
-	ScheduledParam string
-	// ExpectedScheduled is the expected scheduled state.
-	// If true, the op checks if all pods are scheduled.
-	// If false, the op checks if all pods are unscheduled.
-	// This is used to test the device binding conditions.
-	ExpectedScheduled bool
-}
-
-func (op *checkPodScheduledOp) isValid(allowParameterization bool) error {
-	if op.Namespace == "" {
-		return fmt.Errorf("namespace must be set")
-	}
-	return nil
-}
-
-func (op *checkPodScheduledOp) collectsMetrics() bool {
-	return false
-}
-
-func (op *checkPodScheduledOp) patchParams(w *workload) (realOp, error) {
-	if op.ScheduledParam != "" {
-		var err error
-		op.ExpectedScheduled, err = getParam[bool](w.Params, op.ScheduledParam[1:])
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if op.DurationParam != "" {
-		durationStr, err := getParam[string](w.Params, op.DurationParam[1:])
-		if err != nil {
-			return nil, err
-		}
-		if op.Duration.Duration, err = time.ParseDuration(durationStr); err != nil {
-			return nil, fmt.Errorf("parsing duration parameter %s: %w", op.DurationParam, err)
-		}
-	}
-
-	return op, op.isValid(false)
-}
-
-func (op *checkPodScheduledOp) requiredNamespaces() []string {
-	if op.Namespace != "" {
-		return []string{op.Namespace}
-	}
-	return nil
-}
-
-func (op *checkPodScheduledOp) run(tCtx ktesting.TContext) {
-	ctx, cancel := context.WithTimeout(tCtx, op.Duration.Duration)
-	defer cancel()
-
-	var (
-		lastViolation string
-		stableStart   *time.Time
-	)
-
-	validate := func(pod v1.Pod) bool {
-		isScheduled := pod.Spec.NodeName != ""
-		return (op.ExpectedScheduled && isScheduled) || (!op.ExpectedScheduled && !isScheduled)
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			if ctx.Err() == context.DeadlineExceeded {
-				if op.ExpectedScheduled {
-					tCtx.Fatalf("Timeout waiting for pods to be scheduled. Context error: %v. Last violation: %s", ctx.Err(), lastViolation)
-				} else {
-					tCtx.Fatalf("Timeout waiting for pods to be unscheduled. Context error: %v. Last violation: %s", ctx.Err(), lastViolation)
-				}
-			} else {
-				tCtx.Fatalf("Context cancelled: %v. Last violation: %s", ctx.Err(), lastViolation)
-			}
-			return
-		default:
-		}
-
-		pods, err := tCtx.Client().CoreV1().Pods(op.Namespace).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			tCtx.Logf("Failed to list pods: %v", err)
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		allValid := true
-		currentViolation := ""
-		for _, pod := range pods.Items {
-			if !validate(pod) {
-				allValid = false
-				currentViolation = fmt.Sprintf("Pod %s: ExpectedScheduled=%v, ActualScheduled=%v (Node=%s)",
-					pod.Name, op.ExpectedScheduled, pod.Spec.NodeName != "", pod.Spec.NodeName)
-				lastViolation = currentViolation
-				break
-			}
-		}
-
-		if !allValid {
-			stableStart = nil
-		} else {
-			if op.ExpectedScheduled {
-				tCtx.Logf("All pods scheduled successfully")
-				return
-			} else {
-				if stableStart == nil {
-					now := time.Now()
-					stableStart = &now
-					tCtx.Logf("All pods are unscheduled, starting stability check")
-				} else if stableStart != nil && time.Since(*stableStart) >= 5*time.Second {
-					tCtx.Logf("All pods remain unscheduled for 5 seconds")
-					return
-				}
-			}
-		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
