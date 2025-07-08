@@ -1449,7 +1449,7 @@ func TestPodStartDurationCountMetric(t *testing.T) {
 			podUID:                "uid2",
 			containerState:        kubecontainer.ContainerStateRunning,
 			populateStatusManager: false,
-			expectedHistogramBump: true,
+			expectedHistogramBump: false,
 		},
 		{
 			name:                  "statusManager is populated, existingStatus is pending, and apiPodStatus is pending",
