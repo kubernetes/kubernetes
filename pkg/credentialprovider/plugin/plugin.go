@@ -34,6 +34,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -279,8 +280,11 @@ func (s *serviceAccountProvider) getServiceAccountData(namespace, name string) (
 }
 
 // getServiceAccountToken returns a service account token for the service account.
-func (s *serviceAccountProvider) getServiceAccountToken(podNamespace, podName, serviceAccountName string, podUID types.UID) (string, error) {
+func (s *serviceAccountProvider) getServiceAccountToken(podNamespace, podName, serviceAccountName string, serviceAccountUID, podUID types.UID) (string, error) {
 	tr, err := s.getServiceAccountTokenFunc(podNamespace, serviceAccountName, &authenticationv1.TokenRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: serviceAccountUID,
+		},
 		Spec: authenticationv1.TokenRequestSpec{
 			Audiences: []string{s.audience},
 			// expirationSeconds is not set explicitly here. It has the same default value of "ExpirationSeconds" in the TokenRequestSpec.
@@ -387,7 +391,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 				return credentialprovider.DockerConfig{}
 			}
 
-			if serviceAccountToken, err = p.serviceAccountProvider.getServiceAccountToken(podNamespace, podName, serviceAccountName, podUID); err != nil {
+			if serviceAccountToken, err = p.serviceAccountProvider.getServiceAccountToken(podNamespace, podName, serviceAccountName, serviceAccountUID, podUID); err != nil {
 				klog.Errorf("Error getting service account token %s/%s: %v", podNamespace, serviceAccountName, err)
 				return credentialprovider.DockerConfig{}
 			}
