@@ -120,6 +120,12 @@ const (
 	repairLoopInterval = 3 * time.Minute
 )
 
+var (
+	// AdditionalStorageProvidersForTests allows tests to inject additional test-only API groups.
+	// Only meant for use in integration tests.
+	AdditionalStorageProvidersForTests func(client *kubernetes.Clientset) []controlplaneapiserver.RESTStorageProvider
+)
+
 // Extra defines extra configuration for kube-apiserver
 type Extra struct {
 	EndpointReconcilerConfig EndpointReconcilerConfig
@@ -401,7 +407,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 	// with specific priorities.
 	// TODO: describe the priority all the way down in the RESTStorageProviders and plumb it back through the various discovery
 	// handlers that we have.
-	return []controlplaneapiserver.RESTStorageProvider{
+	providers := []controlplaneapiserver.RESTStorageProvider{
 		legacyRESTStorageProvider,
 		apiserverinternalrest.StorageProvider{},
 		authenticationrest.RESTStorageProvider{Authenticator: c.ControlPlane.Generic.Authentication.Authenticator, APIAudiences: c.ControlPlane.Generic.Authentication.APIAudiences},
@@ -425,7 +431,13 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: client.Discovery()},
 		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
 		resourcerest.RESTStorageProvider{NamespaceClient: client.CoreV1().Namespaces()},
-	}, nil
+	}
+
+	if AdditionalStorageProvidersForTests != nil {
+		providers = append(providers, AdditionalStorageProvidersForTests(client)...)
+	}
+
+	return providers, nil
 }
 
 var (

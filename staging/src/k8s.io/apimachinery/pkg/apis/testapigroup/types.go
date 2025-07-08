@@ -68,6 +68,13 @@ type CarpStatus struct {
 	// This is before the Kubelet pulled the container image(s) for the carp.
 	// +optional
 	StartTime *metav1.Time
+
+	// Carp infos are provided by different clients, hence the map type.
+	//
+	// +listType=map
+	// +listKey=a
+	// +listKey=b
+	Infos []CarpInfo
 }
 
 type CarpCondition struct {
@@ -81,6 +88,18 @@ type CarpCondition struct {
 	Reason string
 	// +optional
 	Message string
+}
+
+type CarpInfo struct {
+	// A is the first map key.
+	// +required
+	A int64
+	// B is the second map key.
+	// +required
+	B string
+
+	// Some data for each pair of A and B.
+	Data string
 }
 
 // CarpSpec is a description of a carp

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:openapi-gen=true
-// +k8s:deepcopy-gen=package
-// +k8s:conversion-gen=k8s.io/apimachinery/pkg/apis/testapigroup
-// +k8s:openapi-gen=false
-// +k8s:defaulter-gen=TypeMeta
+package dra
 
-// +k8s:prerelease-lifecycle-gen=true
-// +groupName=testapigroup.apimachinery.k8s.io
+import (
+	"testing"
 
-package v1
+	"k8s.io/kubernetes/test/integration/framework"
+)
+
+func TestMain(m *testing.M) {
+	framework.EtcdMain(m.Run)
+}
