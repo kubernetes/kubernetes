@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
@@ -289,7 +290,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 		if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
 			// Just report it as an error, but no need to stop the scheduler
 			// because it likely doesn't cause any visible issues from the scheduling perspective.
-			logger.Error(nil, "the same pod is tracked in multiple places in the scheduler, and just discard it", "pod", klog.KObj(pInfo.Pod))
+			utilruntime.HandleErrorWithLogger(logger, nil, "The same pod is tracked in multiple places in the scheduler, and just discard it", "pod", klog.KObj(pInfo.Pod))
 			// Just ignore/discard this duplicated pod and try to pop the next one.
 			return aq.unlockedPop(logger)
 		}

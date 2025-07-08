@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -841,7 +842,7 @@ func removeFromSlice(logger klog.Logger, s []*PodInfo, k string) ([]*PodInfo, *P
 	for i := range s {
 		tmpKey, err := GetPodKey(s[i].Pod)
 		if err != nil {
-			logger.Error(err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
+			utilruntime.HandleErrorWithLogger(logger, err, "Cannot get pod key", "pod", klog.KObj(s[i].Pod))
 			continue
 		}
 		if k == tmpKey {

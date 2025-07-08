@@ -223,7 +223,7 @@ func (c *AssumeCache) add(obj interface{}) {
 
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
-		c.logger.Error(&ObjectNameError{err}, "Add failed")
+		utilruntime.HandleErrorWithLogger(c.logger, &ObjectNameError{err}, "Add failed")
 		return
 	}
 
@@ -235,13 +235,13 @@ func (c *AssumeCache) add(obj interface{}) {
 	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
 		newVersion, err := c.getObjVersion(name, obj)
 		if err != nil {
-			c.logger.Error(err, "Add failed: couldn't get object version")
+			utilruntime.HandleErrorWithLogger(c.logger, err, "Add failed: couldn't get object version")
 			return
 		}
 
 		storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
 		if err != nil {
-			c.logger.Error(err, "Add failed: couldn't get stored object version")
+			utilruntime.HandleErrorWithLogger(c.logger, err, "Add failed: couldn't get stored object version")
 			return
 		}
 
@@ -274,7 +274,7 @@ func (c *AssumeCache) delete(obj interface{}) {
 
 	name, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		c.logger.Error(&ObjectNameError{err}, "Failed to delete")
+		utilruntime.HandleErrorWithLogger(c.logger, &ObjectNameError{err}, "Failed to delete")
 		return
 	}
 
@@ -292,7 +292,7 @@ func (c *AssumeCache) delete(obj interface{}) {
 	objInfo := &objInfo{name: name}
 	err = c.store.Delete(objInfo)
 	if err != nil {
-		c.logger.Error(err, "Failed to delete", "description", c.description, "cacheKey", name)
+		utilruntime.HandleErrorWithLogger(c.logger, err, "Failed to delete", "description", c.description, "cacheKey", name)
 	}
 
 	c.pushEvent(oldObj, nil)
@@ -392,7 +392,7 @@ func (c *AssumeCache) listLocked(indexObj interface{}) []interface{} {
 	if c.indexName != "" {
 		o, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
 		if err != nil {
-			c.logger.Error(err, "List index error")
+			utilruntime.HandleErrorWithLogger(c.logger, err, "List index error")
 			return nil
 		}
 		objs = o
@@ -403,7 +403,7 @@ func (c *AssumeCache) listLocked(indexObj interface{}) []interface{} {
 	for _, obj := range objs {
 		objInfo, ok := obj.(*objInfo)
 		if !ok {
-			c.logger.Error(&WrongTypeError{TypeName: "objInfo", Object: obj}, "List error")
+			utilruntime.HandleErrorWithLogger(c.logger, &WrongTypeError{TypeName: "objInfo", Object: obj}, "List error")
 			continue
 		}
 		allObjs = append(allObjs, objInfo.latestObj)
