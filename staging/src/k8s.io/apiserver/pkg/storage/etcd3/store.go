@@ -645,6 +645,9 @@ func (s *store) getKeys(ctx context.Context) ([]string, error) {
 	startTime := time.Now()
 	resp, err := s.client.KV.Get(ctx, s.pathPrefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	metrics.RecordEtcdRequest("listOnlyKeys", s.groupResource, err, startTime)
+	if err != nil {
+		return nil, err
+	}
 	keys := make([]string, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
 		keys = append(keys, string(kv.Key))
