@@ -80,7 +80,7 @@ func IsFullyQualifiedName(fldPath *field.Path, name string) field.ErrorList {
 		return append(allErrors, field.Required(fldPath, ""))
 	}
 	if errs := IsDNS1123Subdomain(name); len(errs) > 0 {
-		return append(allErrors, field.Invalid(fldPath, name, strings.Join(errs, ",")))
+		return append(allErrors, field.Invalid(fldPath, name, strings.Join(errs, ","))).WithOrigin("format=k8s-fully-qualified-name")
 	}
 	if len(strings.Split(name, ".")) < 3 {
 		return append(allErrors, field.Invalid(fldPath, name, "should be a domain with at least three segments separated by dots"))
@@ -100,14 +100,14 @@ func IsFullyQualifiedDomainName(fldPath *field.Path, name string) field.ErrorLis
 		name = name[:len(name)-1]
 	}
 	if errs := IsDNS1123Subdomain(name); len(errs) > 0 {
-		return append(allErrors, field.Invalid(fldPath, name, strings.Join(errs, ",")))
+		return append(allErrors, field.Invalid(fldPath, name, strings.Join(errs, ","))).WithOrigin("format=k8s-fully-qualified-domain-name")
 	}
 	if len(strings.Split(name, ".")) < 2 {
 		return append(allErrors, field.Invalid(fldPath, name, "should be a domain with at least two segments separated by dots"))
 	}
 	for _, label := range strings.Split(name, ".") {
 		if errs := IsDNS1123Label(label); len(errs) > 0 {
-			return append(allErrors, field.Invalid(fldPath, label, strings.Join(errs, ",")))
+			return append(allErrors, field.Invalid(fldPath, label, strings.Join(errs, ","))).WithOrigin("format=k8s-fully-qualified-domain-name")
 		}
 	}
 	return allErrors
@@ -135,17 +135,17 @@ func IsDomainPrefixedPath(fldPath *field.Path, dpPath string) field.ErrorList {
 
 	segments := strings.SplitN(dpPath, "/", 2)
 	if len(segments) != 2 || len(segments[0]) == 0 || len(segments[1]) == 0 {
-		return append(allErrs, field.Invalid(fldPath, dpPath, "must be a domain-prefixed path (such as \"acme.io/foo\")"))
+		return append(allErrs, field.Invalid(fldPath, dpPath, "must be a domain-prefixed path (such as \"acme.io/foo\")")).WithOrigin("format=k8s-domain-prefixed-path")
 	}
 
 	host := segments[0]
 	for _, err := range IsDNS1123Subdomain(host) {
-		allErrs = append(allErrs, field.Invalid(fldPath, host, err))
+		allErrs = append(allErrs, field.Invalid(fldPath, host, err)).WithOrigin("format=k8s-domain-prefixed-path")
 	}
 
 	path := segments[1]
 	if !httpPathRegexp.MatchString(path) {
-		return append(allErrs, field.Invalid(fldPath, path, RegexError("Invalid path", httpPathFmt)))
+		return append(allErrs, field.Invalid(fldPath, path, RegexError("Invalid path", httpPathFmt))).WithOrigin("format=k8s-domain-prefixed-path")
 	}
 
 	return allErrs
