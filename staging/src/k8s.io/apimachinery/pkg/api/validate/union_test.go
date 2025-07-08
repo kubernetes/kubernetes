@@ -31,49 +31,31 @@ func TestUnion(t *testing.T) {
 	testCases := []struct {
 		name        string
 		fields      [][2]string
-		fieldValues []any
+		fieldValues []bool
 		expected    field.ErrorList
 	}{
 		{
-			name:        "valid pointers one of",
+			name:        "one member set",
 			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
-			fieldValues: []any{nil, nil, nil, &testMember{}},
+			fieldValues: []bool{false, false, false, true},
 			expected:    nil,
 		},
 		{
-			name:        "invalid pointers one of",
+			name:        "two members set",
 			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
-			fieldValues: []any{nil, &testMember{}, nil, &testMember{}},
+			fieldValues: []bool{false, true, false, true},
 			expected:    field.ErrorList{field.Invalid(nil, "{b, d}", "must specify exactly one of: `a`, `b`, `c`, `d`")},
 		},
 		{
-			name:        "valid string one of",
+			name:        "all members set",
 			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
-			fieldValues: []any{"", "", "", "x"},
-			expected:    nil,
+			fieldValues: []bool{true, true, true, true},
+			expected:    field.ErrorList{field.Invalid(nil, "{a, b, c, d}", "must specify exactly one of: `a`, `b`, `c`, `d`")},
 		},
 		{
-			name:        "invalid string one of",
+			name:        "no member set",
 			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
-			fieldValues: []any{"", "x", "", "x"},
-			expected:    field.ErrorList{field.Invalid(nil, "{b, d}", "must specify exactly one of: `a`, `b`, `c`, `d`")},
-		},
-		{
-			name:        "valid mixed type one of",
-			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
-			fieldValues: []any{0, "", nil, "x"},
-			expected:    nil,
-		},
-		{
-			name:        "invalid mixed type one of",
-			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
-			fieldValues: []any{0, "x", nil, &testMember{}},
-			expected:    field.ErrorList{field.Invalid(nil, "{b, d}", "must specify exactly one of: `a`, `b`, `c`, `d`")},
-		},
-		{
-			name:        "invalid no member set",
-			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
-			fieldValues: []any{nil, nil, nil, nil},
+			fieldValues: []bool{false, false, false, false},
 			expected:    field.ErrorList{field.Invalid(nil, "", "must specify one of: `a`, `b`, `c`, `d`")},
 		},
 	}
@@ -82,10 +64,9 @@ func TestUnion(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create mock extractors that return predefined values instead of
 			// actually extracting from the object.
-			extractors := make([]ExtractorFn[*testMember, any], len(tc.fieldValues))
+			extractors := make([]ExtractorFn[*testMember, bool], len(tc.fieldValues))
 			for i, val := range tc.fieldValues {
-				val := val
-				extractors[i] = func(_ *testMember) any { return val }
+				extractors[i] = func(_ *testMember) bool { return val }
 			}
 
 			got := Union(context.Background(), operation.Operation{}, nil, &testMember{}, nil, NewUnionMembership(tc.fields...), extractors...)
@@ -102,25 +83,43 @@ func TestDiscriminatedUnion(t *testing.T) {
 		discriminatorField string
 		fields             [][2]string
 		discriminatorValue string
-		fieldValues        []any
+		fieldValues        []bool
 		expected           field.ErrorList
 	}{
 		{
-			name:               "valid discriminated union",
+			name:               "valid discriminated union A",
 			discriminatorField: "d",
 			fields:             [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
 			discriminatorValue: "A",
-			fieldValues:        []any{1, nil, nil, nil},
+			fieldValues:        []bool{true, false, false, false},
+		},
+		{
+			name:               "valid discriminated union C",
+			discriminatorField: "d",
+			fields:             [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
+			discriminatorValue: "C",
+			fieldValues:        []bool{false, false, true, false},
 		},
 		{
 			name:               "invalid, discriminator not set to member that is specified",
 			discriminatorField: "type",
 			fields:             [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
 			discriminatorValue: "C",
-			fieldValues:        []any{nil, 1, nil, nil},
+			fieldValues:        []bool{false, true, false, false},
 			expected: field.ErrorList{
 				field.Invalid(field.NewPath("b"), "", "may only be specified when `type` is \"B\""),
 				field.Invalid(field.NewPath("c"), "", "must be specified when `type` is \"C\""),
+			},
+		},
+		{
+			name:               "invalid, discriminator correct, multiple members set",
+			discriminatorField: "type",
+			fields:             [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
+			discriminatorValue: "C",
+			fieldValues:        []bool{false, true, true, true},
+			expected: field.ErrorList{
+				field.Invalid(field.NewPath("b"), "", "may only be specified when `type` is \"B\""),
+				field.Invalid(field.NewPath("d"), "", "may only be specified when `type` is \"D\""),
 			},
 		},
 	}
@@ -131,10 +130,9 @@ func TestDiscriminatedUnion(t *testing.T) {
 
 			// Create mock extractors that return predefined values instead of
 			// actually extracting from the object.
-			extractors := make([]ExtractorFn[*testMember, any], len(tc.fieldValues))
+			extractors := make([]ExtractorFn[*testMember, bool], len(tc.fieldValues))
 			for i, val := range tc.fieldValues {
-				val := val
-				extractors[i] = func(_ *testMember) any { return val }
+				extractors[i] = func(_ *testMember) bool { return val }
 			}
 
 			got := DiscriminatedUnion(context.Background(), operation.Operation{}, nil, &testMember{}, nil, NewDiscriminatedUnionMembership(tc.discriminatorField, tc.fields...), discriminatorExtractor, extractors...)
@@ -153,18 +151,18 @@ type testStruct struct {
 type m1 struct{}
 type m2 struct{}
 
-var extractors = []ExtractorFn[*testStruct, any]{
-	func(s *testStruct) any {
-		if s != nil {
-			return s.M1
+var extractors = []ExtractorFn[*testStruct, bool]{
+	func(s *testStruct) bool {
+		if s == nil {
+			return false
 		}
-		return nil
+		return s.M1 != nil
 	},
-	func(s *testStruct) any {
-		if s != nil {
-			return s.M2
+	func(s *testStruct) bool {
+		if s == nil {
+			return false
 		}
-		return nil
+		return s.M2 != nil
 	},
 }
 
@@ -233,18 +231,18 @@ var testDiscriminatorExtractor = func(s *testDiscriminatedStruct) string {
 	}
 	return ""
 }
-var testDiscriminatedExtractors = []ExtractorFn[*testDiscriminatedStruct, any]{
-	func(s *testDiscriminatedStruct) any {
-		if s != nil {
-			return s.M1
+var testDiscriminatedExtractors = []ExtractorFn[*testDiscriminatedStruct, bool]{
+	func(s *testDiscriminatedStruct) bool {
+		if s == nil {
+			return false
 		}
-		return nil
+		return s.M1 != nil
 	},
-	func(s *testDiscriminatedStruct) any {
-		if s != nil {
-			return s.M2
+	func(s *testDiscriminatedStruct) bool {
+		if s == nil {
+			return false
 		}
-		return nil
+		return s.M2 != nil
 	},
 }
 

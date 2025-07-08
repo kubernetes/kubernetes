@@ -37,6 +37,14 @@ type Struct struct {
 	// +k8s:unionMember
 	// +k8s:optional
 	M2 *M2 `json:"m2"`
+
+	// +k8s:unionMember
+	// +k8s:optional
+	M3 string `json:"m3"`
+
+	// +k8s:unionMember
+	// +k8s:optional
+	M4 *string `json:"m4"`
 }
 
 type M1 struct{}

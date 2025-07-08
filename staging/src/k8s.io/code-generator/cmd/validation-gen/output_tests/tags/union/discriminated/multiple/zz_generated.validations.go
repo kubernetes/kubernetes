@@ -57,36 +57,36 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 		return nil // no changes
 	}
 	errs = append(errs, validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipForStructunion1, func(obj *Struct) string {
-		if obj != nil {
-			return string(obj.D1)
+		if obj == nil {
+			return ""
 		}
-		return ""
-	}, func(obj *Struct) any {
-		if obj != nil {
-			return obj.U1M1
+		return string(obj.D1)
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
-	}, func(obj *Struct) any {
-		if obj != nil {
-			return obj.U1M2
+		return obj.U1M1 != nil
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
+		return obj.U1M2 != nil
 	})...)
 	errs = append(errs, validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipForStructunion2, func(obj *Struct) string {
-		if obj != nil {
-			return string(obj.D2)
+		if obj == nil {
+			return ""
 		}
-		return ""
-	}, func(obj *Struct) any {
-		if obj != nil {
-			return obj.U2M1
+		return string(obj.D2)
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
-	}, func(obj *Struct) any {
-		if obj != nil {
-			return obj.U2M2
+		return obj.U2M1 != nil
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
 		}
-		return nil
+		return obj.U2M2 != nil
 	})...)
 
 	// field Struct.TypeMeta has no validation

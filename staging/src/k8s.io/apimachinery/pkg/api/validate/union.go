@@ -19,15 +19,17 @@ package validate
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// ExtractorFn extracts a member field from a parent object.
-// Note: obj is not guaranteed to be non-nil, need to handle nil obj in the extractor.
+// ExtractorFn extracts a value from a parent object. Depending on the context,
+// that could be the value of a field or just whether that field was set or
+// not.
+// Note: obj is not guaranteed to be non-nil, need to handle nil obj in the
+// extractor.
 type ExtractorFn[T, V any] func(obj T) V
 
 // Union verifies that exactly one member of a union is specified.
@@ -39,36 +41,33 @@ type ExtractorFn[T, V any] func(obj T) V
 //	var UnionMembershipForABC := validate.NewUnionMembership([2]string{"a", "A"}, [2]string{"b", "B"}, [2]string{"c", "C"})
 //	func ValidateABC(ctx context.Context, op operation.Operation, fldPath *field.Path, in *ABC) (errs fields.ErrorList) {
 //		errs = append(errs, Union(ctx, op, fldPath, in, oldIn, UnionMembershipForABC,
-//			func(in *ABC) any { return in.A },
-//			func(in *ABC) any { return in.B },
-//			func(in *ABC) any { return in.C },
+//			func(in *ABC) bool { return in.A != nil },
+//			func(in *ABC) bool { return in.B != ""},
+//			func(in *ABC) bool { return in.C != 0 },
 //		)...)
 //		return errs
 //	}
-func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, extractorFns ...ExtractorFn[T, any]) field.ErrorList {
-	if len(union.members) != len(extractorFns) {
+func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, isSetFns ...ExtractorFn[T, bool]) field.ErrorList {
+	if len(union.members) != len(isSetFns) {
 		return field.ErrorList{
 			field.InternalError(fldPath,
-				fmt.Errorf("number of field extractors (%d) does not match number of union members (%d)",
-					len(extractorFns), len(union.members))),
+				fmt.Errorf("number of extractors (%d) does not match number of union members (%d)",
+					len(isSetFns), len(union.members))),
 		}
 	}
 	var specifiedFields []string
 	var changed bool
-	for i, extractor := range extractorFns {
-		fieldValue := extractor(obj)
+	for i, fieldIsSet := range isSetFns {
+		newIsSet := fieldIsSet(obj)
 		if op.Type == operation.Update && !changed {
-			oldFieldValue := extractor(oldObj)
-			// TODO: consider passing an equiv function to DirectEqual instead of SemanticDeepEqual
-			// if value can be compared directly, to improve performance.
-			changed = !SemanticDeepEqual(fieldValue, oldFieldValue)
+			oldIsSet := fieldIsSet(oldObj)
+			changed = changed || newIsSet != oldIsSet
 		}
-		rv := reflect.ValueOf(fieldValue)
-		if rv.IsValid() && !rv.IsZero() {
+		if newIsSet {
 			specifiedFields = append(specifiedFields, union.members[i].fieldName)
 		}
 	}
-	// If all union members are unchanged, we don't need to validate the union.
+	// If the union membership is unchanged, we don't need to re-validate.
 	if op.Type == operation.Update && !changed {
 		return nil
 	}
@@ -96,21 +95,21 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 //	func ValidateABC(ctx context.Context, op operation.Operation, fldPath, *field.Path, in *ABC) (errs fields.ErrorList) {
 //		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, oldIn, UnionMembershipForABC,
 //			func(in *ABC) string { return string(in.Type) },
-//			func(in *ABC) any { return in.A },
-//			func(in *ABC) any { return in.B },
-//			func(in *ABC) any { return in.C },
+//			func(in *ABC) bool { return in.A != nil },
+//			func(in *ABC) bool { return in.B != ""},
+//			func(in *ABC) bool { return in.C != 0 },
 //		)...)
 //		return errs
 //	}
 //
 // It is not an error for the discriminatorValue to be unknown.  That must be
 // validated on its own.
-func DiscriminatedUnion[T any, D ~string](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, discriminatorExtractor ExtractorFn[T, D], extractorFns ...ExtractorFn[T, any]) (errs field.ErrorList) {
-	if len(union.members) != len(extractorFns) {
+func DiscriminatedUnion[T any, D ~string](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, discriminatorExtractor ExtractorFn[T, D], isSetFns ...ExtractorFn[T, bool]) (errs field.ErrorList) {
+	if len(union.members) != len(isSetFns) {
 		return field.ErrorList{
 			field.InternalError(fldPath,
-				fmt.Errorf("number of field extractors (%d) does not match number of union members (%d)",
-					len(extractorFns), len(union.members))),
+				fmt.Errorf("number of extractors (%d) does not match number of union members (%d)",
+					len(isSetFns), len(union.members))),
 		}
 	}
 	var changed bool
@@ -120,26 +119,24 @@ func DiscriminatedUnion[T any, D ~string](_ context.Context, op operation.Operat
 		changed = discriminatorValue != oldDiscriminatorValue
 	}
 
-	for i, extractor := range extractorFns {
+	for i, fieldIsSet := range isSetFns {
 		member := union.members[i]
 		isDiscriminatedMember := string(discriminatorValue) == member.discriminatorValue
-		fieldValue := extractor(obj)
+		newIsSet := fieldIsSet(obj)
 		if op.Type == operation.Update && !changed {
-			oldFieldValue := extractor(oldObj)
-			changed = !SemanticDeepEqual(fieldValue, oldFieldValue)
+			oldIsSet := fieldIsSet(oldObj)
+			changed = changed || newIsSet != oldIsSet
 		}
-		rv := reflect.ValueOf(fieldValue)
-		isSpecified := rv.IsValid() && !rv.IsZero()
-		if isSpecified && !isDiscriminatedMember {
+		if newIsSet && !isDiscriminatedMember {
 			errs = append(errs, field.Invalid(fldPath.Child(member.fieldName), "",
 				fmt.Sprintf("may only be specified when `%s` is %q", union.discriminatorName, member.discriminatorValue)))
-		} else if !isSpecified && isDiscriminatedMember {
+		} else if !newIsSet && isDiscriminatedMember {
 			errs = append(errs, field.Invalid(fldPath.Child(member.fieldName), "",
 				fmt.Sprintf("must be specified when `%s` is %q", union.discriminatorName, discriminatorValue)))
 		}
 	}
-	// If all union discriminator and union members are unchanged,
-	// We can ignore this union validation.
+	// If the union discriminator and membership is unchanged, we don't need to
+	// re-validate.
 	if op.Type == operation.Update && !changed {
 		return nil
 	}
