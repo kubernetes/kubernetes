@@ -177,10 +177,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 	})
 
 	ginkgo.JustBeforeEach(func(ctx context.Context) {
-		if !e2enodeCgroupV2Enabled {
-			e2eskipper.Skipf("Skipping since CgroupV2 not used")
-		}
-
 		// note intentionally NOT set reservedCPUs -  this must be initialized on a test-by-test basis
 
 		// use a closure to minimize the arguments, to make the usage more straightforward
@@ -1600,6 +1596,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 
 	ginkgo.When("checking the CFS quota management", ginkgo.Label("cfs-quota"), func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			requireCGroupV2()
 			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
 			//          this means on more-than-2-way SMT systems this test will prove nothing
 			reservedCPUs = cpuset.New(0)
@@ -1765,6 +1762,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 		// don't duplicate the all the tests
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			requireCGroupV2()
 			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
 			//          this means on more-than-2-way SMT systems this test will prove nothing
 			reservedCPUs = cpuset.New(0)
@@ -2189,12 +2187,13 @@ func HaveContainerCPUsShareUncoreCacheWith(ctnName string, ref cpuset.CPUSet) ty
 // Other helpers
 
 func getContainerAllowedCPUs(pod *v1.Pod, ctnName string, isInit bool) (cpuset.CPUSet, error) {
-	cgPath, err := makeCgroupPathForContainer(pod, ctnName, isInit)
+	cgPath, err := makeCgroupPathForContainer(pod, ctnName, isInit, e2enodeCgroupV2Enabled)
 	if err != nil {
 		return cpuset.CPUSet{}, err
 	}
+	cgPath = filepath.Join(cgPath, cpusetFileNameFromVersion(e2enodeCgroupV2Enabled))
 	framework.Logf("pod %s/%s cnt %s qos=%s path %q", pod.Namespace, pod.Name, ctnName, pod.Status.QOSClass, cgPath)
-	data, err := os.ReadFile(filepath.Join(cgPath, "cpuset.cpus.effective"))
+	data, err := os.ReadFile(cgPath)
 	if err != nil {
 		return cpuset.CPUSet{}, err
 	}
@@ -2204,7 +2203,10 @@ func getContainerAllowedCPUs(pod *v1.Pod, ctnName string, isInit bool) (cpuset.C
 }
 
 func getSandboxCFSQuota(pod *v1.Pod) (string, error) {
-	cgPath := filepath.Join(makeCgroupPathForPod(pod), "cpu.max")
+	if !e2enodeCgroupV2Enabled {
+		return "", fmt.Errorf("only Cgroup V2 is supported")
+	}
+	cgPath := filepath.Join(makeCgroupPathForPod(pod, true), "cpu.max")
 	data, err := os.ReadFile(cgPath)
 	if err != nil {
 		return "", err
@@ -2215,7 +2217,10 @@ func getSandboxCFSQuota(pod *v1.Pod) (string, error) {
 }
 
 func getContainerCFSQuota(pod *v1.Pod, ctnName string, isInit bool) (string, error) {
-	cgPath, err := makeCgroupPathForContainer(pod, ctnName, isInit)
+	if !e2enodeCgroupV2Enabled {
+		return "", fmt.Errorf("only Cgroup V2 is supported")
+	}
+	cgPath, err := makeCgroupPathForContainer(pod, ctnName, isInit, true)
 	if err != nil {
 		return "", err
 	}
@@ -2232,10 +2237,12 @@ const (
 	kubeCgroupRoot = "/sys/fs/cgroup"
 )
 
-// example path (systemd):
+// example path (systemd, crio, v2):
 // /sys/fs/cgroup/ kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod0b7632a2_a56e_4278_987a_22de18008dbe.slice/ crio-conmon-0bc5eac79e3ae7a0c2651f14722aa10fa333eb2325c2ca97da33aa284cda81b0.scope
+// example path (cgroup, containerd, v1):
+// /sys/fs/cgroup/cpuset kubepods/burstable pod8e414e92-17c2-41de-81c7-0045bba9103b b5791f89a6971bb4a751ffbebf533399c91630aa2906d7c6b5e239f405f3b97a
 
-func makeCgroupPathForPod(pod *v1.Pod) string {
+func makeCgroupPathForPod(pod *v1.Pod, isV2 bool) string {
 	components := []string{defaultNodeAllocatableCgroup}
 	if pod.Status.QOSClass != v1.PodQOSGuaranteed {
 		components = append(components, strings.ToLower(string(pod.Status.QOSClass)))
@@ -2250,11 +2257,13 @@ func makeCgroupPathForPod(pod *v1.Pod) string {
 	} else {
 		cgroupFsName = cgroupName.ToCgroupfs()
 	}
-
+	if !isV2 {
+		cgroupFsName = filepath.Join("cpuset", cgroupFsName)
+	}
 	return filepath.Join(kubeCgroupRoot, cgroupFsName)
 }
 
-func makeCgroupPathForContainer(pod *v1.Pod, ctnName string, isInit bool) (string, error) {
+func makeCgroupPathForContainer(pod *v1.Pod, ctnName string, isInit, isV2 bool) (string, error) {
 	fullCntID, ok := findContainerIDByName(pod, ctnName, isInit)
 	if !ok {
 		return "", fmt.Errorf("cannot find status for container %q", ctnName)
@@ -2270,7 +2279,14 @@ func makeCgroupPathForContainer(pod *v1.Pod, ctnName string, isInit bool) (strin
 		cntPath = cntID
 	}
 
-	return filepath.Join(makeCgroupPathForPod(pod), cntPath), nil
+	return filepath.Join(makeCgroupPathForPod(pod, isV2), cntPath), nil
+}
+
+func cpusetFileNameFromVersion(isV2 bool) string {
+	if isV2 {
+		return "cpuset.cpus.effective"
+	}
+	return "cpuset.cpus"
 }
 
 func containerCgroupPathPrefixFromDriver(runtimeName string) string {
@@ -2449,4 +2465,12 @@ func makeCPUManagerBEPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 			},
 		},
 	}
+}
+
+func requireCGroupV2() {
+	if e2enodeCgroupV2Enabled {
+		return
+	}
+	e2eskipper.Skipf("Skipping since CgroupV2 not used")
+
 }
