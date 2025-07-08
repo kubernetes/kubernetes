@@ -920,6 +920,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta1.AllocationResult":                                                          schema_k8sio_api_resource_v1beta1_AllocationResult(ref),
 		"k8s.io/api/resource/v1beta1.BasicDevice":                                                               schema_k8sio_api_resource_v1beta1_BasicDevice(ref),
 		"k8s.io/api/resource/v1beta1.CELDeviceSelector":                                                         schema_k8sio_api_resource_v1beta1_CELDeviceSelector(ref),
+		"k8s.io/api/resource/v1beta1.CapacityRequirements":                                                      schema_k8sio_api_resource_v1beta1_CapacityRequirements(ref),
+		"k8s.io/api/resource/v1beta1.CapacitySharingPolicy":                                                     schema_k8sio_api_resource_v1beta1_CapacitySharingPolicy(ref),
+		"k8s.io/api/resource/v1beta1.CapacitySharingPolicyRange":                                                schema_k8sio_api_resource_v1beta1_CapacitySharingPolicyRange(ref),
 		"k8s.io/api/resource/v1beta1.Counter":                                                                   schema_k8sio_api_resource_v1beta1_Counter(ref),
 		"k8s.io/api/resource/v1beta1.CounterSet":                                                                schema_k8sio_api_resource_v1beta1_CounterSet(ref),
 		"k8s.io/api/resource/v1beta1.Device":                                                                    schema_k8sio_api_resource_v1beta1_Device(ref),
@@ -959,6 +962,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta2.AllocatedDeviceStatus":                                                     schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref),
 		"k8s.io/api/resource/v1beta2.AllocationResult":                                                          schema_k8sio_api_resource_v1beta2_AllocationResult(ref),
 		"k8s.io/api/resource/v1beta2.CELDeviceSelector":                                                         schema_k8sio_api_resource_v1beta2_CELDeviceSelector(ref),
+		"k8s.io/api/resource/v1beta2.CapacityRequirements":                                                      schema_k8sio_api_resource_v1beta2_CapacityRequirements(ref),
+		"k8s.io/api/resource/v1beta2.CapacitySharingPolicy":                                                     schema_k8sio_api_resource_v1beta2_CapacitySharingPolicy(ref),
+		"k8s.io/api/resource/v1beta2.CapacitySharingPolicyRange":                                                schema_k8sio_api_resource_v1beta2_CapacitySharingPolicyRange(ref),
 		"k8s.io/api/resource/v1beta2.Counter":                                                                   schema_k8sio_api_resource_v1beta2_Counter(ref),
 		"k8s.io/api/resource/v1beta2.CounterSet":                                                                schema_k8sio_api_resource_v1beta2_CounterSet(ref),
 		"k8s.io/api/resource/v1beta2.Device":                                                                    schema_k8sio_api_resource_v1beta2_Device(ref),
@@ -47122,7 +47128,7 @@ func schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref common.Referenc
 					},
 					"device": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+							Description: "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.\n\nIf the allocation result includes a ShareID, the Device field is extended with the ShareID, formatted as `<device name>/<share id>`.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -47294,6 +47300,13 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 					},
+					"allowMultipleAllocations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllowMultipleAllocations marks whether the device is allowed to be allocated multiple times.\n\nA device with allowMultipleAllocations=\"true\" can be allocated more than once, and its capacity is shared, regardless of whether the CapacitySharingPolicy is defined or not.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -47321,6 +47334,115 @@ func schema_k8sio_api_resource_v1beta1_CELDeviceSelector(ref common.ReferenceCal
 				Required: []string{"expression"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CapacityRequirements(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CapacityRequirements defines the capacity requirements for a specific device request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minimum": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum defines the minimum amount of each device capacity required for the request.\n\nIf the capacity has a sharing policy, this value is rounded up to the nearest valid amount according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.\n\nIf the quantity does not have a sharing policy, this value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<minimum quantity>)) >= 0` For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CapacitySharingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CapacitySharingPolicy defines how requests consume the available capacity. A policy must have a default value to be applied when no value is explicitly provided. Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range. If valid values are specified, the default must be included within them.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"default": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Default specifies the default capacity to be used for a consumption request.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+					"validValues": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ValidValues defines a set of acceptable quantity values in consuming requests.\n\nMust not contain more than 10 entries.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+					"validRange": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ValidRange defines an acceptable quantity value range in consuming requests.",
+							Ref:         ref("k8s.io/api/resource/v1beta1.CapacitySharingPolicyRange"),
+						},
+					},
+				},
+				Required: []string{"default"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta1.CapacitySharingPolicyRange", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CapacitySharingPolicyRange(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CapacitySharingPolicyRange defines a valid range for consumable capacity values.\n\n  - If the requested amount is less than Minimum, it is rounded up to the Minimum value.\n  - If the requested amount is between Minimum and Maximum, ChunkSize is set,\n    and the amount does not align with the ChunkSize,\n    it will be rounded up to the next value matching Minimum + (n * ChunkSize).\n  - If the requested or rounded amount exceeds Maximum (if set), the request does not satisfy the policy,\n    and the device cannot be allocated.\n\n- If ChunkSize is not set, the requested amount is used as-is, provided it falls within the range.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minimum": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum specifies the minimum capacity allowed for a consumption request.\n\nMinimum must be less than or equal to the capacity value. Default must be more than or equal to the minimum.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+					"maximum": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Maximum defines the upper limit for capacity that can be requested.\n\nMaximum must be less than or equal to the capacity value. Minimum and default must be less than or equal to the maximum.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+					"chunkSize": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ChunkSize defines the step size between valid capacity amounts within the range.\n\nMaximum and default must be a multiple of the chunk size. Minimum + chunk size must be less than or equal to the capacity value.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"minimum"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -47572,12 +47694,18 @@ func schema_k8sio_api_resource_v1beta1_DeviceCapacity(ref common.ReferenceCallba
 							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 						},
 					},
+					"sharingPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SharingPolicy specifies that this device capacity must be consumed by each resource claim according to the defined sharing policy. The Device must allow multiple allocations.\n\nIf this field is unset, capacity sharing is unconstrained. All ResourceClaims or requests share the same capacity pool.",
+							Ref:         ref("k8s.io/api/resource/v1beta1.CapacitySharingPolicy"),
+						},
+					},
 				},
 				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/resource/v1beta1.CapacitySharingPolicy", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -47918,6 +48046,13 @@ func schema_k8sio_api_resource_v1beta1_DeviceConstraint(ref common.ReferenceCall
 							Format:      "",
 						},
 					},
+					"distinctAttribute": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -48064,12 +48199,18 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequest(ref common.ReferenceCallbac
 							},
 						},
 					},
+					"capacityRequests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityRequests define resource requirements against each capacity.\n\nIf this field is unset and the device supports multiple allocations, the default value will be applied to each capacity with a defined sharing policy.",
+							Ref:         ref("k8s.io/api/resource/v1beta1.CapacityRequirements"),
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.DeviceSelector", "k8s.io/api/resource/v1beta1.DeviceSubRequest", "k8s.io/api/resource/v1beta1.DeviceToleration"},
+			"k8s.io/api/resource/v1beta1.CapacityRequirements", "k8s.io/api/resource/v1beta1.DeviceSelector", "k8s.io/api/resource/v1beta1.DeviceSubRequest", "k8s.io/api/resource/v1beta1.DeviceToleration"},
 	}
 }
 
@@ -48138,12 +48279,33 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							},
 						},
 					},
+					"shareID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ShareID uniquely identifies an individual allocation share of a device, used when the device supports multiple simultaneous allocations. It serves as an additional map key to differentiate concurrent shares of the same device.\n\nThe ID is randomly generated as a hexadecimal (hex) string for each allocation share. It must be unique among all currently allocated shares for the same device (i.e., uniqueness is required only at the device level, not globally).\n\nHex is chosen for its compact representation, ease of generation from binary, and suitability for identifiers in logs, APIs, and storage.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"consumedCapacities": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConsumedCapacities tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s sharing policy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed its available capacity.\n\nThis field references only consumable capacities of a device and is empty when there are none.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.DeviceToleration"},
+			"k8s.io/api/resource/v1beta1.DeviceToleration", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -48243,12 +48405,18 @@ func schema_k8sio_api_resource_v1beta1_DeviceSubRequest(ref common.ReferenceCall
 							},
 						},
 					},
+					"capacityRequests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityRequests define resource requirements against each capacity.",
+							Ref:         ref("k8s.io/api/resource/v1beta1.CapacityRequirements"),
+						},
+					},
 				},
 				Required: []string{"name", "deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.DeviceSelector", "k8s.io/api/resource/v1beta1.DeviceToleration"},
+			"k8s.io/api/resource/v1beta1.CapacityRequirements", "k8s.io/api/resource/v1beta1.DeviceSelector", "k8s.io/api/resource/v1beta1.DeviceToleration"},
 	}
 }
 
@@ -49043,7 +49211,7 @@ func schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref common.Referenc
 					},
 					"device": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+							Description: "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.\n\nIf the allocation result includes a ShareID, the Device field is extended with the ShareID, formatted as `<device name>/<share id>`.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -49139,6 +49307,115 @@ func schema_k8sio_api_resource_v1beta2_CELDeviceSelector(ref common.ReferenceCal
 				Required: []string{"expression"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_CapacityRequirements(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CapacityRequirements defines the capacity requirements for a specific device request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minimum": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum defines the minimum amount of each device capacity required for the request.\n\nIf the capacity has a sharing policy, this value is rounded up to the nearest valid amount according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.\n\nIf the quantity does not have a sharing policy, this value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<minimum quantity>)) >= 0` For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_CapacitySharingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CapacitySharingPolicy defines how requests consume the available capacity. A policy must have a default value to be applied when no value is explicitly provided. Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range. If valid values are specified, the default must be included within them.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"default": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Default specifies the default capacity to be used for a consumption request.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+					"validValues": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ValidValues defines a set of acceptable quantity values in consuming requests.\n\nMust not contain more than 10 entries.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+					"validRange": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ValidRange defines an acceptable quantity value range in consuming requests.",
+							Ref:         ref("k8s.io/api/resource/v1beta2.CapacitySharingPolicyRange"),
+						},
+					},
+				},
+				Required: []string{"default"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta2.CapacitySharingPolicyRange", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_CapacitySharingPolicyRange(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CapacitySharingPolicyRange defines a valid range for consumable capacity values.\n\n  - If the requested amount is less than Minimum, it is rounded up to the Minimum value.\n  - If the requested amount is between Minimum and Maximum, ChunkSize is set,\n    and the amount does not align with the ChunkSize,\n    it will be rounded up to the next value matching Minimum + (n * ChunkSize).\n  - If the requested or rounded amount exceeds Maximum (if set), the request does not satisfy the policy,\n    and the device cannot be allocated.\n\n- If ChunkSize is not set, the requested amount is used as-is, provided it falls within the range.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minimum": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum specifies the minimum capacity allowed for a consumption request.\n\nMinimum must be less than or equal to the capacity value. Default must be more than or equal to the minimum.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+					"maximum": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Maximum defines the upper limit for capacity that can be requested.\n\nMaximum must be less than or equal to the capacity value. Minimum and default must be less than or equal to the maximum.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+					"chunkSize": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ChunkSize defines the step size between valid capacity amounts within the range.\n\nMaximum and default must be a multiple of the chunk size. Minimum + chunk size must be less than or equal to the capacity value.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"minimum"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -49304,6 +49581,13 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 									},
 								},
 							},
+						},
+					},
+					"allowMultipleAllocations": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllowMultipleAllocations marks whether the device is allowed to be allocated multiple times.\n\nA device with allowMultipleAllocations=\"true\" can be allocated more than once, and its capacity is shared, regardless of whether the CapacitySharingPolicy is defined or not.",
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 				},
@@ -49472,12 +49756,18 @@ func schema_k8sio_api_resource_v1beta2_DeviceCapacity(ref common.ReferenceCallba
 							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
 						},
 					},
+					"sharingPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SharingPolicy specifies that this device capacity must be consumed by each resource claim according to the defined sharing policy. The Device must allow multiple allocations.\n\nIf this field is unset, capacity sharing is unconstrained. All ResourceClaims or requests share the same capacity pool.",
+							Ref:         ref("k8s.io/api/resource/v1beta2.CapacitySharingPolicy"),
+						},
+					},
 				},
 				Required: []string{"value"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/resource/v1beta2.CapacitySharingPolicy", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -49818,6 +50108,13 @@ func schema_k8sio_api_resource_v1beta2_DeviceConstraint(ref common.ReferenceCall
 							Format:      "",
 						},
 					},
+					"distinctAttribute": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -49977,12 +50274,33 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							},
 						},
 					},
+					"shareID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ShareID uniquely identifies an individual allocation share of a device, used when the device supports multiple simultaneous allocations. It serves as an additional map key to differentiate concurrent shares of the same device.\n\nThe ID is randomly generated as a hexadecimal (hex) string for each allocation share. It must be unique among all currently allocated shares for the same device (i.e., uniqueness is required only at the device level, not globally).\n\nHex is chosen for its compact representation, ease of generation from binary, and suitability for identifiers in logs, APIs, and storage.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"consumedCapacities": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ConsumedCapacities tracks the amount of capacity consumed per device as part of the claim request. The consumed amount may differ from the requested amount: it is rounded up to the nearest valid value based on the device’s sharing policy if applicable (i.e., may not be less than the requested amount).\n\nThe total consumed capacity for each device must not exceed its available capacity.\n\nThis field references only consumable capacities of a device and is empty when there are none.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta2.DeviceToleration"},
+			"k8s.io/api/resource/v1beta2.DeviceToleration", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -50082,12 +50400,18 @@ func schema_k8sio_api_resource_v1beta2_DeviceSubRequest(ref common.ReferenceCall
 							},
 						},
 					},
+					"capacityRequests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityRequests define resource requirements against each capacity.",
+							Ref:         ref("k8s.io/api/resource/v1beta2.CapacityRequirements"),
+						},
+					},
 				},
 				Required: []string{"name", "deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta2.DeviceSelector", "k8s.io/api/resource/v1beta2.DeviceToleration"},
+			"k8s.io/api/resource/v1beta2.CapacityRequirements", "k8s.io/api/resource/v1beta2.DeviceSelector", "k8s.io/api/resource/v1beta2.DeviceToleration"},
 	}
 }
 
@@ -50262,12 +50586,18 @@ func schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref common.ReferenceCa
 							},
 						},
 					},
+					"capacityRequests": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityRequests define resource requirements against each capacity.\n\nIf this field is unset and the device supports multiple allocations, the default value will be applied to each capacity with a defined sharing policy.",
+							Ref:         ref("k8s.io/api/resource/v1beta2.CapacityRequirements"),
+						},
+					},
 				},
 				Required: []string{"deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta2.DeviceSelector", "k8s.io/api/resource/v1beta2.DeviceToleration"},
+			"k8s.io/api/resource/v1beta2.CapacityRequirements", "k8s.io/api/resource/v1beta2.DeviceSelector", "k8s.io/api/resource/v1beta2.DeviceToleration"},
 	}
 }
 
