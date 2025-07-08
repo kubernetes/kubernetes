@@ -41,6 +41,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/utils/ptr"
 )
 
 // ResourceConstraint is a struct to hold constraints.
@@ -259,10 +260,10 @@ func getOneTimeResourceUsageOnNode(
 		return &ContainerResourceUsage{
 			Name:                    name,
 			Timestamp:               newStats.StartTime.Time,
-			CPUUsageInCores:         float64(removeUint64Ptr(newStats.CPU.UsageNanoCores)) / 1000000000,
-			MemoryUsageInBytes:      removeUint64Ptr(newStats.Memory.UsageBytes),
-			MemoryWorkingSetInBytes: removeUint64Ptr(newStats.Memory.WorkingSetBytes),
-			MemoryRSSInBytes:        removeUint64Ptr(newStats.Memory.RSSBytes),
+			CPUUsageInCores:         float64(ptr.Deref(newStats.CPU.UsageNanoCores, 0)) / 1000000000,
+			MemoryUsageInBytes:      ptr.Deref(newStats.Memory.UsageBytes, 0),
+			MemoryWorkingSetInBytes: ptr.Deref(newStats.Memory.WorkingSetBytes, 0),
+			MemoryRSSInBytes:        ptr.Deref(newStats.Memory.RSSBytes, 0),
 			CPUInterval:             0,
 		}
 	}
@@ -311,13 +312,6 @@ func getStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alp
 		return nil, err
 	}
 	return &summary, nil
-}
-
-func removeUint64Ptr(ptr *uint64) uint64 {
-	if ptr == nil {
-		return 0
-	}
-	return *ptr
 }
 
 func (w *resourceGatherWorker) gather(ctx context.Context, initialSleep time.Duration) {

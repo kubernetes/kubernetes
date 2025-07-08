@@ -11348,14 +11348,14 @@ func TestCostInfo(t *testing.T) {
 			schema: []*apiextensions.JSONSchemaProps{
 				genObjectSchema(),
 			},
-			expectedMaxCardinality: uint64ptr(1),
+			expectedMaxCardinality: ptr.To[uint64](1),
 		},
 		{
 			name: "array",
 			schema: []*apiextensions.JSONSchemaProps{
 				withMaxItems(genArraySchema(), int64ptr(5)),
 			},
-			expectedMaxCardinality: uint64ptr(5),
+			expectedMaxCardinality: ptr.To[uint64](5),
 		},
 		{
 			name:                   "unbounded array",
@@ -11365,7 +11365,7 @@ func TestCostInfo(t *testing.T) {
 		{
 			name:                   "map",
 			schema:                 []*apiextensions.JSONSchemaProps{withMaxProperties(genMapSchema(), int64ptr(10))},
-			expectedMaxCardinality: uint64ptr(10),
+			expectedMaxCardinality: ptr.To[uint64](10),
 		},
 		{
 			name: "unbounded map",
@@ -11380,7 +11380,7 @@ func TestCostInfo(t *testing.T) {
 				withMaxProperties(genMapSchema(), int64ptr(5)),
 				withMaxItems(genArraySchema(), int64ptr(5)),
 			},
-			expectedMaxCardinality: uint64ptr(25),
+			expectedMaxCardinality: ptr.To[uint64](25),
 		},
 		{
 			name: "unbounded array inside bounded map",
@@ -11396,7 +11396,7 @@ func TestCostInfo(t *testing.T) {
 				withMaxItems(genArraySchema(), int64ptr(3)),
 				genObjectSchema(),
 			},
-			expectedMaxCardinality: uint64ptr(3),
+			expectedMaxCardinality: ptr.To[uint64](3),
 		},
 		{
 			name: "map inside object inside array",
@@ -11405,7 +11405,7 @@ func TestCostInfo(t *testing.T) {
 				genObjectSchema(),
 				withMaxProperties(genMapSchema(), int64ptr(4)),
 			},
-			expectedMaxCardinality: uint64ptr(8),
+			expectedMaxCardinality: ptr.To[uint64](8),
 		},
 		{
 			name: "integer overflow bounds check",
@@ -11413,7 +11413,7 @@ func TestCostInfo(t *testing.T) {
 				withMaxItems(genArraySchema(), int64ptr(math.MaxInt)),
 				withMaxItems(genArraySchema(), int64ptr(100)),
 			},
-			expectedMaxCardinality: uint64ptr(math.MaxUint),
+			expectedMaxCardinality: ptr.To[uint64](math.MaxUint),
 		},
 	}
 	for _, tt := range tests {
