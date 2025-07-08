@@ -46,6 +46,7 @@ import (
 const (
 	deviceVar     = "device"
 	driverVar     = "driver"
+	multiAllocVar = "allowMultipleAllocations"
 	attributesVar = "attributes"
 	capacityVar   = "capacity"
 )
@@ -62,6 +63,9 @@ var (
 	domainType = withMaxElements(apiservercel.StringType, resourceapi.DeviceMaxDomainLength)
 	idType     = withMaxElements(apiservercel.StringType, resourceapi.DeviceMaxIDLength)
 	driverType = withMaxElements(apiservercel.StringType, resourceapi.DriverNameMaxLength)
+
+	// A variant of BoolType with a known maximum size.
+	allowMultipleAllocationsType = withMaxElements(apiservercel.BoolType, 1)
 
 	// Each map is bound by the maximum number of different attributes.
 	innerAttributesMapType = apiservercel.NewMapType(idType, attributeType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
@@ -99,9 +103,10 @@ type Device struct {
 	// Driver gets used as domain for any attribute which does not already
 	// have a domain prefix. If set, then it is also made available as a
 	// string attribute.
-	Driver     string
-	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+	Driver                   string
+	AllowMultipleAllocations *bool
+	Attributes               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+	Capacity                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 }
 
 type compiler struct {
@@ -250,9 +255,15 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
 	}
 
+	multiAlloc := false
+	if input.AllowMultipleAllocations != nil {
+		multiAlloc = *input.AllowMultipleAllocations
+	}
+
 	variables := map[string]any{
 		deviceVar: map[string]any{
 			driverVar:     input.Driver,
+			multiAllocVar: multiAlloc,
 			attributesVar: newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), attributes, c.emptyMapVal),
 			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
 		},
@@ -288,6 +299,7 @@ func newCompiler() *compiler {
 
 	deviceType := apiservercel.NewObjectType("kubernetes.DRADevice", fields(
 		field(driverVar, driverType, true),
+		field(multiAllocVar, allowMultipleAllocationsType, true),
 		field(attributesVar, outerAttributesMapType, true),
 		field(capacityVar, outerCapacityMapType, true),
 	))
