@@ -127,3 +127,11 @@ func SetDefaults_ServiceReference(obj *admissionregistrationv1beta1.ServiceRefer
 		obj.Port = ptr.To[int32](443)
 	}
 }
+
+// SetDefaults_MutatingAdmissionPolicySpec sets defaults for MutatingAdmissionPolicySpec
+func SetDefaults_MutatingAdmissionPolicySpec(obj *admissionregistrationv1beta1.MutatingAdmissionPolicySpec) {
+	if obj.FailurePolicy == nil {
+		policy := admissionregistrationv1beta1.Fail
+		obj.FailurePolicy = &policy
+	}
+}

@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -55,10 +55,11 @@ import (
 // and waiting for bindings to become ready by dry-running marker requests until the binding successfully
 // mutates a marker, and then verifies the policy exactly once.
 func TestMutatingAdmissionPolicy(t *testing.T) {
-	matchEndpointResources := v1alpha1.MatchResources{
-		ResourceRules: []v1alpha1.NamedRuleWithOperations{
+	allow := v1beta1.AllowAction
+	matchEndpointResources := v1beta1.MatchResources{
+		ResourceRules: []v1beta1.NamedRuleWithOperations{
 			{
-				RuleWithOperations: v1alpha1.RuleWithOperations{
+				RuleWithOperations: v1beta1.RuleWithOperations{
 					Operations: []admissionregistrationv1.OperationType{"*"},
 					Rule: admissionregistrationv1.Rule{
 						APIGroups:   []string{""},
@@ -72,8 +73,8 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		policies []*v1alpha1.MutatingAdmissionPolicy
-		bindings []*v1alpha1.MutatingAdmissionPolicyBinding
+		policies []*v1beta1.MutatingAdmissionPolicy
+		bindings []*v1beta1.MutatingAdmissionPolicyBinding
 		params   []*corev1.ConfigMap
 
 		requestOperation admissionregistrationv1.OperationType
@@ -84,10 +85,10 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 	}{
 		{
 			name: "basic",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				mutatingPolicy("basic-policy", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeApplyConfiguration,
-					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				mutatingPolicy("basic-policy", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1beta1.ApplyConfiguration{
 						Expression: `
 						Object{
 							metadata: Object.metadata{
@@ -99,7 +100,7 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 					},
 				}),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
 				mutatingBinding("basic-policy", nil, nil),
 			},
 			requestOperation: admissionregistrationv1.Create,
@@ -122,10 +123,10 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 		},
 		{
 			name: "multiple policies",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				mutatingPolicy("multi-policy-1", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeApplyConfiguration,
-					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				mutatingPolicy("multi-policy-1", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1beta1.ApplyConfiguration{
 						Expression: `
 						Object{
 							metadata: Object.metadata{
@@ -136,9 +137,9 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 						}`,
 					},
 				}),
-				mutatingPolicy("multi-policy-2", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeApplyConfiguration,
-					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+				mutatingPolicy("multi-policy-2", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1beta1.ApplyConfiguration{
 						Expression: `
 						Object{
 							metadata: Object.metadata{
@@ -150,7 +151,7 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 					},
 				}),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
 				mutatingBinding("multi-policy-1", nil, nil),
 				mutatingBinding("multi-policy-2", nil, nil),
 			},
@@ -175,13 +176,13 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 		},
 		{
 			name: "policy with native param",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				mutatingPolicy("policy-with-native", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, &v1alpha1.ParamKind{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				mutatingPolicy("policy-with-native", v1beta1.NeverReinvocationPolicy, matchEndpointResources, &v1beta1.ParamKind{
 					APIVersion: "v1",
 					Kind:       "ConfigMap",
-				}, v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeApplyConfiguration,
-					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+				}, v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1beta1.ApplyConfiguration{
 						Expression: `
 						Object{
 							metadata: Object.metadata{
@@ -193,9 +194,10 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 					},
 				}),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				mutatingBinding("policy-with-native", &v1alpha1.ParamRef{
-					Name: "policy-with-native-param",
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("policy-with-native", &v1beta1.ParamRef{
+					Name:                    "policy-with-native-param",
+					ParameterNotFoundAction: &allow,
 				}, nil),
 			},
 			params: []*corev1.ConfigMap{
@@ -230,19 +232,19 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 		},
 		{
 			name: "policy with multiple params quantified by single binding",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				mutatingPolicy("multi-param-binding", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, &v1alpha1.ParamKind{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				mutatingPolicy("multi-param-binding", v1beta1.NeverReinvocationPolicy, matchEndpointResources, &v1beta1.ParamKind{
 					APIVersion: "v1",
 					Kind:       "ConfigMap",
-				}, v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeApplyConfiguration,
-					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+				}, v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1beta1.ApplyConfiguration{
 						Expression: `Object{metadata: Object.metadata{annotations: params.data}}`,
 					},
 				}),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				mutatingBinding("multi-param-binding", &v1alpha1.ParamRef{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("multi-param-binding", &v1beta1.ParamRef{
 					// note empty namespace. all params matching request namespace
 					// will be used
 					Selector: &metav1.LabelSelector{
@@ -250,7 +252,8 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 							"multi-param-binding-param": "true",
 						},
 					},
-					Namespace: "default",
+					Namespace:               "default",
+					ParameterNotFoundAction: &allow,
 				}, nil),
 			},
 			params: []*corev1.ConfigMap{
@@ -302,15 +305,15 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 		},
 		{
 			name: "policy with variables",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				withMutatingVariables([]v1alpha1.Variable{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				withMutatingVariables([]v1beta1.Variable{
 					{Name: "foo1", Expression: `"foo1" + "Value"`},
 					{Name: "foo2", Expression: `variables.foo1.replace("1", "2")`},
 				},
-					mutatingPolicy("policy-with-multiple-mutations", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil,
-						v1alpha1.Mutation{
-							PatchType: v1alpha1.PatchTypeApplyConfiguration,
-							ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+					mutatingPolicy("policy-with-multiple-mutations", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil,
+						v1beta1.Mutation{
+							PatchType: v1beta1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1beta1.ApplyConfiguration{
 								Expression: `
 							Object{
 								metadata: Object.metadata{
@@ -321,18 +324,18 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 							}`,
 							},
 						},
-						v1alpha1.Mutation{
-							PatchType: v1alpha1.PatchTypeJSONPatch,
-							JSONPatch: &v1alpha1.JSONPatch{
+						v1beta1.Mutation{
+							PatchType: v1beta1.PatchTypeJSONPatch,
+							JSONPatch: &v1beta1.JSONPatch{
 								Expression: `[
 									JSONPatch{op: "test", path: "/metadata/annotations", value: {"foo1": variables.foo1}},
 									JSONPatch{op: "add", path: "/metadata/annotations/foo2", value: variables.foo2},
 								]`,
 							},
 						},
-						v1alpha1.Mutation{
-							PatchType: v1alpha1.PatchTypeApplyConfiguration,
-							ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+						v1beta1.Mutation{
+							PatchType: v1beta1.PatchTypeApplyConfiguration,
+							ApplyConfiguration: &v1beta1.ApplyConfiguration{
 								Expression: `
 							Object{
 								metadata: Object.metadata{
@@ -345,7 +348,7 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 						},
 					)),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
 				mutatingBinding("policy-with-multiple-mutations", nil, nil),
 			},
 			requestOperation: admissionregistrationv1.Create,
@@ -370,16 +373,16 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 		},
 		{
 			name: "match condition matches",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				withMutatingMatchConditions([]v1alpha1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("test")`}},
-					mutatingPolicy("policy-match-condition", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				withMutatingMatchConditions([]v1beta1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("test")`}},
+					mutatingPolicy("policy-match-condition", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `Object{metadata: Object.metadata{labels: {"applied": "updated"}}}`,
 						},
 					})),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
 				mutatingBinding("policy-match-condition", nil, nil),
 			},
 			requestOperation: admissionregistrationv1.Create,
@@ -403,11 +406,11 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			// same as the multiple mutations test, but the mutations are split
 			// across multiple policies
 			name: "multiple policies requiring reinvocation",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				mutatingPolicy("policy-1", v1alpha1.IfNeededReinvocationPolicy, matchEndpointResources, nil,
-					v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				mutatingPolicy("policy-1", v1beta1.IfNeededReinvocationPolicy, matchEndpointResources, nil,
+					v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `
 							Object{
 								metadata: Object.metadata{
@@ -420,10 +423,10 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 						},
 					},
 				),
-				mutatingPolicy("policy-2", v1alpha1.IfNeededReinvocationPolicy, matchEndpointResources, nil,
-					v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+				mutatingPolicy("policy-2", v1beta1.IfNeededReinvocationPolicy, matchEndpointResources, nil,
+					v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `
 							Object{
 								metadata: Object.metadata{
@@ -436,10 +439,10 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 						},
 					},
 				),
-				mutatingPolicy("policy-3", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil,
-					v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+				mutatingPolicy("policy-3", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil,
+					v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `
 							Object{
 								metadata: Object.metadata{
@@ -453,7 +456,7 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 					},
 				),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
 				mutatingBinding("policy-1", nil, nil),
 				mutatingBinding("policy-2", nil, nil),
 				mutatingBinding("policy-3", nil, nil),
@@ -493,7 +496,7 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 
 	// Run all tests in a shared apiserver
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha1.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, nil, flags, framework.SharedEtcd())
 	require.NoError(t, err)
 	defer server.TearDownFn()
@@ -519,7 +522,7 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 			for _, p := range tc.policies {
 				// Modify each policy to also mutate marker requests.
 				p = withMutatingWaitReadyConstraintAndExpression(p, fmt.Sprintf("%d-%s", i, p.Name))
-				_, err = client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(ctx, p, metav1.CreateOptions{FieldManager: "integration-test"})
+				_, err = client.AdmissionregistrationV1beta1().MutatingAdmissionPolicies().Create(ctx, p, metav1.CreateOptions{FieldManager: "integration-test"})
 				require.NoError(t, err)
 			}
 
@@ -572,10 +575,11 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 // a single apiserver and then uses marker requests to check that a binding is ready before testing it exactly once.
 // Only test cases that cannot be run in TestMutatingAdmissionPolicy should be added here.
 func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
-	matchEndpointResources := v1alpha1.MatchResources{
-		ResourceRules: []v1alpha1.NamedRuleWithOperations{
+	allow := v1beta1.AllowAction
+	matchEndpointResources := v1beta1.MatchResources{
+		ResourceRules: []v1beta1.NamedRuleWithOperations{
 			{
-				RuleWithOperations: v1alpha1.RuleWithOperations{
+				RuleWithOperations: v1beta1.RuleWithOperations{
 					Operations: []admissionregistrationv1.OperationType{"*"},
 					Rule: admissionregistrationv1.Rule{
 						APIGroups:   []string{""},
@@ -589,8 +593,8 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		policies []*v1alpha1.MutatingAdmissionPolicy
-		bindings []*v1alpha1.MutatingAdmissionPolicyBinding
+		policies []*v1beta1.MutatingAdmissionPolicy
+		bindings []*v1beta1.MutatingAdmissionPolicyBinding
 		params   []*corev1.ConfigMap
 
 		requestOperation admissionregistrationv1.OperationType
@@ -602,10 +606,10 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 	}{
 		{
 			name: "unbound policy is no-op",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				mutatingPolicy("unbound-policy", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeApplyConfiguration,
-					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				mutatingPolicy("unbound-policy", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1beta1.ApplyConfiguration{
 						Expression: `
 						Object{
 							metadata: Object.metadata{
@@ -634,16 +638,16 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 		},
 		{
 			name: "failure policy ignore",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				withMutatingFailurePolicy(v1alpha1.Ignore,
-					mutatingPolicy("policy", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				withMutatingFailurePolicy(v1beta1.Ignore,
+					mutatingPolicy("policy", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `Object{spec: Object.spec{invalidField: "invalid apply configuration"}}`,
 						},
 					})),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
 				mutatingBinding("policy", nil, nil),
 			},
 			requestOperation: admissionregistrationv1.Create,
@@ -663,16 +667,16 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 		},
 		{
 			name: "match condition does not match",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				withMutatingMatchConditions([]v1alpha1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("test")`}},
-					mutatingPolicy("policy-no-match-condition", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				withMutatingMatchConditions([]v1beta1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("test")`}},
+					mutatingPolicy("policy-no-match-condition", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `Object{metadata: Object.metadata{labels: {"applied": "updated"}}}`,
 						},
 					})),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
 				mutatingBinding("policy-no-match-condition", nil, nil),
 			},
 			requestOperation: admissionregistrationv1.Create,
@@ -694,23 +698,23 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 		},
 		{
 			name: "some policy conditions match",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				withMutatingMatchConditions([]v1alpha1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("production")`}},
-					mutatingPolicy("policy-1", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				withMutatingMatchConditions([]v1beta1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("production")`}},
+					mutatingPolicy("policy-1", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `Object{metadata: Object.metadata{labels: {"applied": "wrong"}}}`,
 						},
 					})),
-				withMutatingMatchConditions([]v1alpha1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("test")`}},
-					mutatingPolicy("policy-2", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, nil, v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+				withMutatingMatchConditions([]v1beta1.MatchCondition{{Name: "test-only", Expression: `object.metadata.?labels["environment"] == optional.of("test")`}},
+					mutatingPolicy("policy-2", v1beta1.NeverReinvocationPolicy, matchEndpointResources, nil, v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `Object{metadata: Object.metadata{labels: {"applied": "updated"}}}`,
 						},
 					})),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
 				mutatingBinding("policy-1", nil, nil),
 				mutatingBinding("policy-2", nil, nil),
 			},
@@ -733,11 +737,11 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 		},
 		{
 			name: "mutate status subresource",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				mutatingPolicy("subresource-status", v1alpha1.NeverReinvocationPolicy, v1alpha1.MatchResources{
-					ResourceRules: []v1alpha1.NamedRuleWithOperations{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				mutatingPolicy("subresource-status", v1beta1.NeverReinvocationPolicy, v1beta1.MatchResources{
+					ResourceRules: []v1beta1.NamedRuleWithOperations{
 						{
-							RuleWithOperations: v1alpha1.RuleWithOperations{
+							RuleWithOperations: v1beta1.RuleWithOperations{
 								Operations: []admissionregistrationv1.OperationType{"*"},
 								Rule: admissionregistrationv1.Rule{
 									APIGroups:   []string{""},
@@ -747,9 +751,9 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 							},
 						},
 					},
-				}, nil, v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeApplyConfiguration,
-					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+				}, nil, v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1beta1.ApplyConfiguration{
 						Expression: `Object{
 							status: Object.status{
 								conditions: [Object.status.conditions{
@@ -761,7 +765,7 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 					},
 				}),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
 				mutatingBinding("subresource-status", nil, nil),
 			},
 			requestOperation: admissionregistrationv1.Update,
@@ -803,25 +807,27 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 		},
 		{
 			name: "multiple bindings with different params",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
-				mutatingPolicy("multi-binding", v1alpha1.NeverReinvocationPolicy, matchEndpointResources, &v1alpha1.ParamKind{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
+				mutatingPolicy("multi-binding", v1beta1.NeverReinvocationPolicy, matchEndpointResources, &v1beta1.ParamKind{
 					APIVersion: "v1",
 					Kind:       "ConfigMap",
-				}, v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeApplyConfiguration,
-					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+				}, v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1beta1.ApplyConfiguration{
 						Expression: `Object{metadata: Object.metadata{annotations: params.data}}`,
 					},
 				}),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				mutatingBinding("multi-binding", &v1alpha1.ParamRef{
-					Name:      "multi-binding-param-1",
-					Namespace: "default",
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("multi-binding", &v1beta1.ParamRef{
+					Name:                    "multi-binding-param-1",
+					Namespace:               "default",
+					ParameterNotFoundAction: &allow,
 				}, nil),
-				mutatingBinding("multi-binding", &v1alpha1.ParamRef{
-					Name:      "multi-binding-param-2",
-					Namespace: "default",
+				mutatingBinding("multi-binding", &v1beta1.ParamRef{
+					Name:                    "multi-binding-param-2",
+					Namespace:               "default",
+					ParameterNotFoundAction: &allow,
 				}, nil),
 			},
 			params: []*corev1.ConfigMap{
@@ -869,24 +875,24 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 			// Same as the other cases, but the reinvocation is caused by
 			// multiple params bound
 			name: "multiple params causing reinvocation",
-			policies: []*v1alpha1.MutatingAdmissionPolicy{
+			policies: []*v1beta1.MutatingAdmissionPolicy{
 				mutatingPolicy(
 					"multi-param-reinvocation",
-					v1alpha1.IfNeededReinvocationPolicy,
+					v1beta1.IfNeededReinvocationPolicy,
 					matchEndpointResources,
-					&v1alpha1.ParamKind{
+					&v1beta1.ParamKind{
 						APIVersion: "v1",
 						Kind:       "ConfigMap",
 					},
-					v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+					v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `Object{metadata: Object.metadata{annotations: params.data}}`,
 						},
 					},
-					v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+					v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `
 							Object{
 								metadata: Object.metadata{
@@ -900,21 +906,21 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 				),
 				mutatingPolicy(
 					"policy-with-param-no-reinvoke",
-					v1alpha1.NeverReinvocationPolicy,
+					v1beta1.NeverReinvocationPolicy,
 					matchEndpointResources,
-					&v1alpha1.ParamKind{
+					&v1beta1.ParamKind{
 						APIVersion: "v1",
 						Kind:       "ConfigMap",
 					},
-					v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+					v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `Object{metadata: Object.metadata{annotations: params.data}}`,
 						},
 					},
-					v1alpha1.Mutation{
-						PatchType: v1alpha1.PatchTypeApplyConfiguration,
-						ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+					v1beta1.Mutation{
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: `
 							Object{
 								metadata: Object.metadata{
@@ -927,8 +933,8 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 					},
 				),
 			},
-			bindings: []*v1alpha1.MutatingAdmissionPolicyBinding{
-				mutatingBinding("multi-param-reinvocation", &v1alpha1.ParamRef{
+			bindings: []*v1beta1.MutatingAdmissionPolicyBinding{
+				mutatingBinding("multi-param-reinvocation", &v1beta1.ParamRef{
 					// note empty namespace. all params matching request namespace
 					// will be used
 					Selector: &metav1.LabelSelector{
@@ -936,11 +942,13 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 							"multi-param-reinvocation": "true",
 						},
 					},
+					ParameterNotFoundAction: &allow,
 				}, nil),
-				mutatingBinding("policy-with-param-no-reinvoke", &v1alpha1.ParamRef{
+				mutatingBinding("policy-with-param-no-reinvoke", &v1beta1.ParamRef{
 					// note empty namespace. all params matching request namespace
 					// will be used
-					Name: "multi-param-reinvocation-param-3",
+					Name:                    "multi-param-reinvocation-param-3",
+					ParameterNotFoundAction: &allow,
 				}, nil),
 			},
 			params: []*corev1.ConfigMap{
@@ -1007,7 +1015,7 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-			flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha1.SchemeGroupVersion)}
+			flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 			server, err := apiservertesting.StartTestServer(t, nil, flags, framework.SharedEtcd())
 			require.NoError(t, err)
 			defer server.TearDownFn()
@@ -1027,12 +1035,12 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 			}
 
 			for _, p := range tc.policies {
-				_, err = client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(ctx, p, metav1.CreateOptions{FieldManager: "integration-test"})
+				_, err = client.AdmissionregistrationV1beta1().MutatingAdmissionPolicies().Create(ctx, p, metav1.CreateOptions{FieldManager: "integration-test"})
 				require.NoError(t, err)
 			}
 
 			for _, b := range tc.bindings {
-				_, err = client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Create(ctx, b, metav1.CreateOptions{FieldManager: "integration-test"})
+				_, err = client.AdmissionregistrationV1beta1().MutatingAdmissionPolicyBindings().Create(ctx, b, metav1.CreateOptions{FieldManager: "integration-test"})
 				require.NoError(t, err)
 			}
 
@@ -1093,7 +1101,7 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 // tested.
 func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha1.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, nil, flags, framework.SharedEtcd())
 	etcd.CreateTestCRDs(t, apiextensions.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
 	if err != nil {
@@ -1111,14 +1119,14 @@ func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	policy := withMutatingFailurePolicy(v1alpha1.Fail, mutatingPolicy("match-by-match-policy-equivalent", v1alpha1.IfNeededReinvocationPolicy, v1alpha1.MatchResources{
-		ResourceRules: []v1alpha1.NamedRuleWithOperations{
+	policy := withMutatingFailurePolicy(v1beta1.Fail, mutatingPolicy("match-by-match-policy-equivalent", v1beta1.IfNeededReinvocationPolicy, v1beta1.MatchResources{
+		ResourceRules: []v1beta1.NamedRuleWithOperations{
 			{
-				RuleWithOperations: v1alpha1.RuleWithOperations{
-					Operations: []v1alpha1.OperationType{
+				RuleWithOperations: v1beta1.RuleWithOperations{
+					Operations: []v1beta1.OperationType{
 						"*",
 					},
-					Rule: v1alpha1.Rule{
+					Rule: v1beta1.Rule{
 						APIGroups: []string{
 							"awesome.bears.com",
 						},
@@ -1133,16 +1141,16 @@ func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 			},
 		}},
 		nil,
-		v1alpha1.Mutation{
-			PatchType: v1alpha1.PatchTypeApplyConfiguration,
-			ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+		v1beta1.Mutation{
+			PatchType: v1beta1.PatchTypeApplyConfiguration,
+			ApplyConfiguration: &v1beta1.ApplyConfiguration{
 				Expression: `Object{ metadata: Object.metadata{ labels: {"mutated-panda": "true"} } }`,
 			},
 		},
 	))
 	testID := "policy-equivalent"
 	policy = withMutatingWaitReadyConstraintAndExpression(policy, testID)
-	if _, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{}); err != nil {
+	if _, err := client.AdmissionregistrationV1beta1().MutatingAdmissionPolicies().Create(ctx, policy, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1213,12 +1221,12 @@ func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 
 }
 
-func mutatingPolicy(name string, reinvocationPolicy v1alpha1.ReinvocationPolicyType, matchResources v1alpha1.MatchResources, paramKind *v1alpha1.ParamKind, mutations ...v1alpha1.Mutation) *v1alpha1.MutatingAdmissionPolicy {
-	return &v1alpha1.MutatingAdmissionPolicy{
+func mutatingPolicy(name string, reinvocationPolicy v1beta1.ReinvocationPolicyType, matchResources v1beta1.MatchResources, paramKind *v1beta1.ParamKind, mutations ...v1beta1.Mutation) *v1beta1.MutatingAdmissionPolicy {
+	return &v1beta1.MutatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: v1alpha1.MutatingAdmissionPolicySpec{
+		Spec: v1beta1.MutatingAdmissionPolicySpec{
 			MatchConstraints:   &matchResources,
 			ParamKind:          paramKind,
 			Mutations:          mutations,
@@ -1227,24 +1235,24 @@ func mutatingPolicy(name string, reinvocationPolicy v1alpha1.ReinvocationPolicyT
 	}
 }
 
-func withMutatingVariables(variables []v1alpha1.Variable, policy *v1alpha1.MutatingAdmissionPolicy) *v1alpha1.MutatingAdmissionPolicy {
+func withMutatingVariables(variables []v1beta1.Variable, policy *v1beta1.MutatingAdmissionPolicy) *v1beta1.MutatingAdmissionPolicy {
 	policy.Spec.Variables = variables
 	return policy
 }
 
-func withMutatingFailurePolicy(failure v1alpha1.FailurePolicyType, policy *v1alpha1.MutatingAdmissionPolicy) *v1alpha1.MutatingAdmissionPolicy {
+func withMutatingFailurePolicy(failure v1beta1.FailurePolicyType, policy *v1beta1.MutatingAdmissionPolicy) *v1beta1.MutatingAdmissionPolicy {
 	policy.Spec.FailurePolicy = &failure
 	return policy
 }
 
-func withMutatingMatchConditions(matchConditions []v1alpha1.MatchCondition, policy *v1alpha1.MutatingAdmissionPolicy) *v1alpha1.MutatingAdmissionPolicy {
+func withMutatingMatchConditions(matchConditions []v1beta1.MatchCondition, policy *v1beta1.MutatingAdmissionPolicy) *v1beta1.MutatingAdmissionPolicy {
 	policy.Spec.MatchConditions = matchConditions
 	return policy
 }
 
-func withMutatingWaitReadyConstraintAndExpression(policy *v1alpha1.MutatingAdmissionPolicy, testID string) *v1alpha1.MutatingAdmissionPolicy {
+func withMutatingWaitReadyConstraintAndExpression(policy *v1beta1.MutatingAdmissionPolicy, testID string) *v1beta1.MutatingAdmissionPolicy {
 	policy = policy.DeepCopy()
-	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, v1alpha1.NamedRuleWithOperations{
+	policy.Spec.MatchConstraints.ResourceRules = append(policy.Spec.MatchConstraints.ResourceRules, v1beta1.NamedRuleWithOperations{
 		ResourceNames: []string{"test-marker"},
 		RuleWithOperations: admissionregistrationv1.RuleWithOperations{
 			Operations: []admissionregistrationv1.OperationType{
@@ -1273,9 +1281,9 @@ func withMutatingWaitReadyConstraintAndExpression(policy *v1alpha1.MutatingAdmis
 			m.ApplyConfiguration.Expression = bypass + m.ApplyConfiguration.Expression
 		}
 	}
-	policy.Spec.Mutations = append([]v1alpha1.Mutation{{
-		PatchType: v1alpha1.PatchTypeApplyConfiguration,
-		ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+	policy.Spec.Mutations = append([]v1beta1.Mutation{{
+		PatchType: v1beta1.PatchTypeApplyConfiguration,
+		ApplyConfiguration: &v1beta1.ApplyConfiguration{
 			// Only mutate mutation-markers.
 			Expression: fmt.Sprintf(`object.metadata.?labels["mutation-marker"] == optional.of("%v") ? Object{ metadata: Object.metadata{ labels: {"mutated":"%v"}}}: Object{}`, testID, testID),
 		},
@@ -1283,12 +1291,12 @@ func withMutatingWaitReadyConstraintAndExpression(policy *v1alpha1.MutatingAdmis
 	return policy
 }
 
-func mutatingBinding(policyName string, paramRef *v1alpha1.ParamRef, matchResources *v1alpha1.MatchResources) *v1alpha1.MutatingAdmissionPolicyBinding {
-	return &v1alpha1.MutatingAdmissionPolicyBinding{
+func mutatingBinding(policyName string, paramRef *v1beta1.ParamRef, matchResources *v1beta1.MatchResources) *v1beta1.MutatingAdmissionPolicyBinding {
+	return &v1beta1.MutatingAdmissionPolicyBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: policyName + "-binding-" + string(uuid.NewUUID()),
 		},
-		Spec: v1alpha1.MutatingAdmissionPolicyBindingSpec{
+		Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 			PolicyName:     policyName,
 			ParamRef:       paramRef,
 			MatchResources: matchResources,
@@ -1296,12 +1304,12 @@ func mutatingBinding(policyName string, paramRef *v1alpha1.ParamRef, matchResour
 	}
 }
 
-func createAndWaitReadyMutating(ctx context.Context, t *testing.T, client kubernetes.Interface, binding *v1alpha1.MutatingAdmissionPolicyBinding, testID string) error {
+func createAndWaitReadyMutating(ctx context.Context, t *testing.T, client kubernetes.Interface, binding *v1beta1.MutatingAdmissionPolicyBinding, testID string) error {
 	return createAndWaitReadyNamespacedWithWarnHandlerMutating(ctx, t, client, binding, "default", testID)
 }
 
-func createAndWaitReadyNamespacedWithWarnHandlerMutating(ctx context.Context, t *testing.T, client kubernetes.Interface, binding *v1alpha1.MutatingAdmissionPolicyBinding, ns string, testID string) error {
-	_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Create(ctx, binding, metav1.CreateOptions{})
+func createAndWaitReadyNamespacedWithWarnHandlerMutating(ctx context.Context, t *testing.T, client kubernetes.Interface, binding *v1beta1.MutatingAdmissionPolicyBinding, ns string, testID string) error {
+	_, err := client.AdmissionregistrationV1beta1().MutatingAdmissionPolicyBindings().Create(ctx, binding, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1326,14 +1334,14 @@ func createAndWaitReadyNamespacedWithWarnHandlerMutating(ctx context.Context, t 
 	return nil
 }
 
-func cleanupMutatingPolicy(ctx context.Context, t *testing.T, client kubernetes.Interface, policies []*v1alpha1.MutatingAdmissionPolicy, bindings []*v1alpha1.MutatingAdmissionPolicyBinding, params []*corev1.ConfigMap) error {
+func cleanupMutatingPolicy(ctx context.Context, t *testing.T, client kubernetes.Interface, policies []*v1beta1.MutatingAdmissionPolicy, bindings []*v1beta1.MutatingAdmissionPolicyBinding, params []*corev1.ConfigMap) error {
 	for _, policy := range policies {
-		if err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Delete(ctx, policy.Name, metav1.DeleteOptions{}); err != nil {
+		if err := client.AdmissionregistrationV1beta1().MutatingAdmissionPolicies().Delete(ctx, policy.Name, metav1.DeleteOptions{}); err != nil {
 			t.Fatal(err)
 		}
 
 		if waitErr := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
-			_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicies().Get(ctx, policy.Name, metav1.GetOptions{})
+			_, err := client.AdmissionregistrationV1beta1().MutatingAdmissionPolicies().Get(ctx, policy.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
@@ -1344,13 +1352,13 @@ func cleanupMutatingPolicy(ctx context.Context, t *testing.T, client kubernetes.
 	}
 
 	for _, binding := range bindings {
-		err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Delete(ctx, binding.Name, metav1.DeleteOptions{})
+		err := client.AdmissionregistrationV1beta1().MutatingAdmissionPolicyBindings().Delete(ctx, binding.Name, metav1.DeleteOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		if waitErr := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Minute, true, func(ctx context.Context) (bool, error) {
-			_, err := client.AdmissionregistrationV1alpha1().MutatingAdmissionPolicyBindings().Get(ctx, binding.Name, metav1.GetOptions{})
+			_, err := client.AdmissionregistrationV1beta1().MutatingAdmissionPolicyBindings().Get(ctx, binding.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
