@@ -165,6 +165,7 @@ func Convert_testapigroup_CarpCondition_To_v1_CarpCondition(in *testapigroup.Car
 func autoConvert_v1_CarpInfo_To_testapigroup_CarpInfo(in *CarpInfo, out *testapigroup.CarpInfo, s conversion.Scope) error {
 	out.A = in.A
 	out.B = in.B
+	out.C = (*string)(unsafe.Pointer(in.C))
 	out.Data = in.Data
 	return nil
 }
@@ -177,6 +178,7 @@ func Convert_v1_CarpInfo_To_testapigroup_CarpInfo(in *CarpInfo, out *testapigrou
 func autoConvert_testapigroup_CarpInfo_To_v1_CarpInfo(in *testapigroup.CarpInfo, out *CarpInfo, s conversion.Scope) error {
 	out.A = in.A
 	out.B = in.B
+	out.C = (*string)(unsafe.Pointer(in.C))
 	out.Data = in.Data
 	return nil
 }

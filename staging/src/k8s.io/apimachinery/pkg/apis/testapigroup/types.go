@@ -74,6 +74,7 @@ type CarpStatus struct {
 	// +listType=map
 	// +listKey=a
 	// +listKey=b
+	// +listKey=c
 	Infos []CarpInfo
 }
 
@@ -97,6 +98,9 @@ type CarpInfo struct {
 	// B is the second map key.
 	// +required
 	B string
+	// C is the third, optional map key
+	// +optional
+	C *string
 
 	// Some data for each pair of A and B.
 	Data string
