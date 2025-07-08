@@ -186,8 +186,16 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 	if len(imageRef) == 0 {
 		return true
 	}
-
 	logger := klog.FromContext(ctx)
+
+	var resultForMetrics mustAttemptImagePullResult
+	defer func() {
+		if len(resultForMetrics) == 0 {
+			resultForMetrics = checkResultError
+		}
+		recordMustAttemptImagePullResult(resultForMetrics)
+	}()
+
 	var imagePulledByKubelet bool
 	var pulledRecord *kubeletconfiginternal.ImagePulledRecord
 
@@ -228,36 +236,43 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 	}()
 
 	if err != nil {
+		resultForMetrics = checkResultError
 		logger.Error(err, "Unable to access cache records about image pulls")
 		return true
 	}
 
 	if !f.imagePolicyEnforcer.RequireCredentialVerificationForImage(image, imagePulledByKubelet) {
+		resultForMetrics = checkResultCredentialPolicyAllowed
 		return false
 	}
 
 	if pulledRecord == nil {
 		// we have no proper records of the image being pulled in the past, we can short-circuit here
+		resultForMetrics = checkResultMustAuthenticate
 		return true
 	}
 
 	sanitizedImage, err := trimImageTagDigest(image)
 	if err != nil {
+		resultForMetrics = checkResultError
 		logger.Error(err, "failed to parse image name, forcing image credentials reverification", "image", sanitizedImage)
 		return true
 	}
 
 	cachedCreds, ok := pulledRecord.CredentialMapping[sanitizedImage]
 	if !ok {
+		resultForMetrics = checkResultMustAuthenticate
 		return true
 	}
 
 	if cachedCreds.NodePodsAccessible {
 		// anyone on this node can access the image
+		resultForMetrics = checkResultCredentialRecordFound
 		return false
 	}
 
 	if len(cachedCreds.KubernetesSecrets) == 0 && len(cachedCreds.KubernetesServiceAccounts) == 0 {
+		resultForMetrics = checkResultMustAuthenticate
 		return true
 	}
 
@@ -279,6 +294,7 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 						logger.Error(err, "failed to write an image pulled record", "image", image, "imageRef", imageRef)
 					}
 				}
+				resultForMetrics = checkResultCredentialRecordFound
 				return false
 			}
 
@@ -290,6 +306,7 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 					if err := f.writePulledRecordIfChanged(ctx, image, imageRef, &kubeletconfiginternal.ImagePullCredentials{KubernetesSecrets: []kubeletconfiginternal.ImagePullSecret{podSecret}}); err != nil {
 						logger.Error(err, "failed to write an image pulled record", "image", image, "imageRef", imageRef)
 					}
+					resultForMetrics = checkResultCredentialRecordFound
 					return false
 				}
 			}
@@ -298,9 +315,11 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 
 	if podServiceAccount != nil && slices.Contains(cachedCreds.KubernetesServiceAccounts, *podServiceAccount) {
 		// we found a matching service account, no need to pull the image
+		resultForMetrics = checkResultCredentialRecordFound
 		return false
 	}
 
+	resultForMetrics = checkResultMustAuthenticate
 	return true
 }
 
