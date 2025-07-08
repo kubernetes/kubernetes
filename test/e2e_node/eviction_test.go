@@ -395,6 +395,26 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering", framework.WithSlow(), fram
 			{
 				evictionPriority: 1,
 				pod:              getMemhogPod("high-priority-memory-hog-pod", "high-priority-memory-hog", v1.ResourceRequirements{}),
+				prePodCreationModificationFunc: func(pod *v1.Pod) {
+					nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+					framework.ExpectNoError(err)
+					gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
+
+					nodeSwapInfo := nodeList.Items[0].Status.NodeInfo.Swap
+					if nodeSwapInfo == nil || nodeSwapInfo.Capacity == nil || *nodeSwapInfo.Capacity <= 0 {
+						return
+					}
+
+					// Whenever swap is provisioned on the node, the kernel might be able to reclaim much more memory,
+					// hence it is harder to get the node to be memory pressured. This will add another container that allocates
+					// the same amount as the swap capacity to help bring the node to memory pressure.
+					pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+						Name:            pod.Spec.Containers[0].Name + "-static-allocator",
+						Image:           imageutils.GetE2EImage(imageutils.Agnhost),
+						ImagePullPolicy: "Always",
+						Args:            []string{"stress", "--mem-alloc-size", "2Mi", "--mem-alloc-sleep", "1s", "--mem-total", fmt.Sprintf("%d", *nodeSwapInfo.Capacity)},
+					})
+				},
 			},
 			{
 				evictionPriority: 0,
@@ -570,6 +590,9 @@ type podEvictSpec struct {
 
 	evictionMaxPodGracePeriod int
 	evictionSoftGracePeriod   int
+
+	// Can be used in order to alter pod using runtime data
+	prePodCreationModificationFunc func(pod *v1.Pod)
 }
 
 // runEvictionTest sets up a testing environment given the provided pods, and checks a few things:
@@ -592,6 +615,9 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			ginkgo.By("setting up pods to be used by tests")
 			pods := []*v1.Pod{}
 			for _, spec := range testSpecs {
+				if spec.prePodCreationModificationFunc != nil {
+					spec.prePodCreationModificationFunc(spec.pod)
+				}
 				pods = append(pods, spec.pod)
 			}
 			e2epod.NewPodClient(f).CreateBatch(ctx, pods)
@@ -845,10 +871,13 @@ func verifyEvictionEvents(ctx context.Context, f *framework.Framework, testSpecs
 							pod.Name)
 					}
 					offendingContainers := strings.Split(offendersString, ",")
-					gomega.Expect(offendingContainers).To(gomega.HaveLen(1), "Expected to find the offending container's usage in the %s annotation, but no container was found",
-						eviction.OffendingContainersKey)
-					gomega.Expect(offendingContainers[0]).To(gomega.Equal(pod.Spec.Containers[0].Name), "Expected to find the offending container: %s's usage in the %s annotation, but found %s instead",
-						pod.Spec.Containers[0].Name, eviction.OffendingContainersKey, offendingContainers[0])
+					gomega.Expect(len(offendingContainers)).To(gomega.And(
+						gomega.BeNumerically(">", 0),
+						gomega.BeNumerically("<=", len(pod.Spec.Containers))),
+						"Expected the length of offending container usage in the %s annotation to be above 0 and below len(pod.Spec.Containers)=%d: %v", eviction.OffendingContainersKey, len(pod.Spec.Containers), offendingContainers,
+					)
+					gomega.Expect(offendingContainers).To(gomega.ContainElement(pod.Spec.Containers[0].Name), "Expected to find the offending container: %s's usage in the %s annotation, but found %v instead",
+						pod.Spec.Containers[0].Name, eviction.OffendingContainersKey, offendingContainers)
 
 					// Check the eviction.OffendingContainersUsageKey
 					offendingUsageString, found := event.Annotations[eviction.OffendingContainersUsageKey]
@@ -857,8 +886,11 @@ func verifyEvictionEvents(ctx context.Context, f *framework.Framework, testSpecs
 							pod.Name)
 					}
 					offendingContainersUsage := strings.Split(offendingUsageString, ",")
-					gomega.Expect(offendingContainersUsage).To(gomega.HaveLen(1), "Expected to find the offending container's usage in the %s annotation, but found %+v",
-						eviction.OffendingContainersUsageKey, offendingContainersUsage)
+					gomega.Expect(len(offendingContainersUsage)).To(gomega.And(
+						gomega.BeNumerically(">", 0),
+						gomega.BeNumerically("<=", len(pod.Spec.Containers))),
+						"Expected the length of offending container usage in the %s annotation to be above 0 and below len(pod.Spec.Containers)=%d: %v", eviction.OffendingContainersUsageKey, len(pod.Spec.Containers), offendingContainersUsage,
+					)
 					usageQuantity, err := resource.ParseQuantity(offendingContainersUsage[0])
 					framework.ExpectNoError(err, "parsing pod %s's %s annotation as a quantity", pod.Name, eviction.OffendingContainersUsageKey)
 					request := pod.Spec.Containers[0].Resources.Requests[starvedResource]
@@ -941,14 +973,12 @@ func logDiskMetrics(ctx context.Context) {
 	}
 }
 
-func logMemoryMetrics(ctx context.Context) {
-	summary, err := getNodeSummary(ctx)
-	if err != nil {
-		framework.Logf("Error getting summary: %v", err)
-		return
-	}
+func logMemoryMetricsWithSummary(ctx context.Context, summary *kubeletstatsv1alpha1.Summary) {
 	if summary.Node.Memory != nil && summary.Node.Memory.WorkingSetBytes != nil && summary.Node.Memory.AvailableBytes != nil {
 		framework.Logf("Node.Memory.WorkingSetBytes: %d, Node.Memory.AvailableBytes: %d", *summary.Node.Memory.WorkingSetBytes, *summary.Node.Memory.AvailableBytes)
+	}
+	if summary.Node.Swap != nil && summary.Node.Swap.SwapUsageBytes != nil && summary.Node.Swap.SwapAvailableBytes != nil {
+		framework.Logf("summary.Node.Swap.SwapUsageBytes: %d, summary.Node.Swap.SwapAvailableBytes: %d", *summary.Node.Swap.SwapUsageBytes, *summary.Node.Swap.SwapAvailableBytes)
 	}
 	for _, sysContainer := range summary.Node.SystemContainers {
 		if sysContainer.Name == kubeletstatsv1alpha1.SystemContainerPods && sysContainer.Memory != nil && sysContainer.Memory.WorkingSetBytes != nil && sysContainer.Memory.AvailableBytes != nil {
@@ -960,9 +990,29 @@ func logMemoryMetrics(ctx context.Context) {
 		for _, container := range pod.Containers {
 			if container.Memory != nil && container.Memory.WorkingSetBytes != nil {
 				framework.Logf("--- summary Container: %s WorkingSetBytes: %d", container.Name, *container.Memory.WorkingSetBytes)
+				if container.Memory.UsageBytes != nil {
+					framework.Logf("--- summary Container: %s UsageBytes: %d", container.Name, *container.Memory.UsageBytes)
+				}
+			}
+			if container.Swap != nil {
+				if container.Swap.SwapUsageBytes != nil {
+					framework.Logf("--- summary Container: %s SwapUsageBytes: %d", container.Name, *container.Swap.SwapUsageBytes)
+				}
+				if container.Swap.SwapAvailableBytes != nil {
+					framework.Logf("--- summary Container: %s SwapAvailableBytes: %d", container.Name, *container.Swap.SwapAvailableBytes)
+				}
 			}
 		}
 	}
+}
+
+func logMemoryMetrics(ctx context.Context) {
+	summary, err := getNodeSummary(ctx)
+	if err != nil {
+		framework.Logf("Error getting summary: %v", err)
+		return
+	}
+	logMemoryMetricsWithSummary(ctx, summary)
 }
 
 func logPidMetrics(ctx context.Context) {

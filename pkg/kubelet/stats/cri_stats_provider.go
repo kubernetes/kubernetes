@@ -31,6 +31,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -43,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -159,10 +161,10 @@ func (p *criStatsProvider) listPodStats(ctx context.Context, updateCPUNanoCoreUs
 }
 
 func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, updateCPUNanoCoreUsage bool, containerMap map[string]*runtimeapi.Container, podSandboxMap map[string]*runtimeapi.PodSandbox, rootFsInfo *cadvisorapiv2.FsInfo) ([]statsapi.PodStats, error) {
-	// fsIDtoInfo is a map from filesystem id to its stats. This will be used
+	// fsIDtoInfo is a map from mountpoint to its stats. This will be used
 	// as a cache to avoid querying cAdvisor for the filesystem stats with the
 	// same filesystem id many times.
-	fsIDtoInfo := make(map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo)
+	fsIDtoInfo := make(map[string]*cadvisorapiv2.FsInfo)
 
 	// sandboxIDToPodStats is a temporary map from sandbox ID to its pod stats.
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
@@ -244,7 +246,7 @@ func (p *criStatsProvider) listPodStatsStrictlyFromCRI(ctx context.Context, upda
 		return nil, err
 	}
 
-	fsIDtoInfo := make(map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo)
+	fsIDtoInfo := make(map[string]*cadvisorapiv2.FsInfo)
 	summarySandboxStats := make([]statsapi.PodStats, 0, len(podSandboxMap))
 	for _, criSandboxStat := range criSandboxStats {
 		if criSandboxStat == nil || criSandboxStat.Attributes == nil {
@@ -627,7 +629,7 @@ func (p *criStatsProvider) makeContainerStats(
 	stats *runtimeapi.ContainerStats,
 	container *runtimeapi.Container,
 	rootFsInfo *cadvisorapiv2.FsInfo,
-	fsIDtoInfo map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo,
+	fsIDtoInfo map[string]*cadvisorapiv2.FsInfo,
 	meta *runtimeapi.PodSandboxMetadata,
 	updateCPUNanoCoreUsage bool,
 ) (*statsapi.ContainerStats, error) {
@@ -658,8 +660,8 @@ func (p *criStatsProvider) makeContainerStats(
 		result.CPU.PSI = makePSIStats(stats.Cpu.Psi)
 	} else {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.CPU.UsageCoreNanoSeconds = uint64Ptr(0)
-		result.CPU.UsageNanoCores = uint64Ptr(0)
+		result.CPU.UsageCoreNanoSeconds = ptr.To[uint64](0)
+		result.CPU.UsageNanoCores = ptr.To[uint64](0)
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
@@ -669,7 +671,7 @@ func (p *criStatsProvider) makeContainerStats(
 		result.Memory.PSI = makePSIStats(stats.Memory.Psi)
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.Memory.WorkingSetBytes = uint64Ptr(0)
+		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
 	}
 	if stats.Swap != nil {
 		result.Swap.Time = metav1.NewTime(time.Unix(0, stats.Swap.Timestamp))
@@ -681,8 +683,8 @@ func (p *criStatsProvider) makeContainerStats(
 		}
 	} else {
 		result.Swap.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.Swap.SwapUsageBytes = uint64Ptr(0)
-		result.Swap.SwapAvailableBytes = uint64Ptr(0)
+		result.Swap.SwapUsageBytes = ptr.To[uint64](0)
+		result.Swap.SwapAvailableBytes = ptr.To[uint64](0)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 		result.IO = &statsapi.IOStats{}
@@ -705,13 +707,13 @@ func (p *criStatsProvider) makeContainerStats(
 	fsID := stats.GetWritableLayer().GetFsId()
 	var err error
 	if fsID != nil {
-		imageFsInfo, found := fsIDtoInfo[*fsID]
+		imageFsInfo, found := fsIDtoInfo[fsID.Mountpoint]
 		if !found {
 			imageFsInfo, err = p.getFsInfo(fsID)
 			if err != nil {
 				return nil, fmt.Errorf("get filesystem info: %w", err)
 			}
-			fsIDtoInfo[*fsID] = imageFsInfo
+			fsIDtoInfo[fsID.Mountpoint] = imageFsInfo
 		}
 		if imageFsInfo != nil {
 			// The image filesystem id is unknown to the local node or there's
@@ -746,8 +748,8 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 		Memory:    &statsapi.MemoryStats{},
 		Swap: &statsapi.SwapStats{
 			Time:               metav1.NewTime(time.Unix(0, time.Now().UnixNano())),
-			SwapUsageBytes:     uint64Ptr(0),
-			SwapAvailableBytes: uint64Ptr(0),
+			SwapUsageBytes:     ptr.To[uint64](0),
+			SwapAvailableBytes: ptr.To[uint64](0),
 		},
 		// UserDefinedMetrics is not supported by CRI.
 	}
@@ -764,8 +766,8 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 		result.CPU.PSI = makePSIStats(stats.Cpu.Psi)
 	} else {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.CPU.UsageCoreNanoSeconds = uint64Ptr(0)
-		result.CPU.UsageNanoCores = uint64Ptr(0)
+		result.CPU.UsageCoreNanoSeconds = ptr.To[uint64](0)
+		result.CPU.UsageNanoCores = ptr.To[uint64](0)
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
@@ -775,7 +777,7 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 		result.Memory.PSI = makePSIStats(stats.Memory.Psi)
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.Memory.WorkingSetBytes = uint64Ptr(0)
+		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
 	}
 	if stats.Swap != nil {
 		result.Swap.Time = metav1.NewTime(time.Unix(0, stats.Swap.Timestamp))

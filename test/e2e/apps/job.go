@@ -50,7 +50,6 @@ import (
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
@@ -271,7 +270,7 @@ var _ = SIGDescribe("Job", func() {
 
 		ginkgo.By("Creating a job with suspend=true")
 		job := e2ejob.NewTestJob("succeed", "suspend-true-to-false", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
-		job.Spec.Suspend = pointer.BoolPtr(true)
+		job.Spec.Suspend = ptr.To(true)
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -287,7 +286,7 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Updating the job with suspend=false")
 		job, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Get(ctx, job.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get job in namespace: %s", f.Namespace.Name)
-		job.Spec.Suspend = pointer.BoolPtr(false)
+		job.Spec.Suspend = ptr.To(false)
 		job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
 
@@ -303,7 +302,7 @@ var _ = SIGDescribe("Job", func() {
 
 		ginkgo.By("Creating a job with suspend=false")
 		job := e2ejob.NewTestJob("notTerminate", "suspend-false-to-true", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
-		job.Spec.Suspend = pointer.Bool(false)
+		job.Spec.Suspend = ptr.To(false)
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
@@ -315,7 +314,7 @@ var _ = SIGDescribe("Job", func() {
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 			framework.ExpectNoError(err, "unable to get job %s in namespace %s", job.Name, f.Namespace.Name)
-			job.Spec.Suspend = pointer.Bool(true)
+			job.Spec.Suspend = ptr.To(true)
 			updatedJob, err := e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 			if err == nil {
 				job = updatedJob
@@ -1180,7 +1179,7 @@ done`}
 		ginkgo.By("Creating a suspended job")
 		job := e2ejob.NewTestJob("succeed", jobName, v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		job.Labels = label
-		job.Spec.Suspend = pointer.BoolPtr(true)
+		job.Spec.Suspend = ptr.To(true)
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, ns, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", ns)
 
@@ -1210,7 +1209,7 @@ done`}
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			patchedJob, err = jobClient.Get(ctx, jobName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Unable to get job %s", jobName)
-			patchedJob.Spec.Suspend = pointer.BoolPtr(false)
+			patchedJob.Spec.Suspend = ptr.To(false)
 			if patchedJob.Annotations == nil {
 				patchedJob.Annotations = map[string]string{}
 			}

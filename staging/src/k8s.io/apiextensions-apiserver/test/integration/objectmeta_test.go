@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -122,7 +122,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 				"embedded": {
 					Type:                   "object",
 					XEmbeddedResource:      true,
-					XPreserveUnknownFields: pointer.BoolPtr(true),
+					XPreserveUnknownFields: ptr.To(true),
 				},
 			},
 		},

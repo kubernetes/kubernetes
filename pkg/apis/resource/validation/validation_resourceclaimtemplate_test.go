@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func testClaimTemplate(name, namespace string, spec resource.ResourceClaimSpec) *resource.ResourceClaimTemplate {
@@ -98,7 +98,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 		"deletion-grace-period-seconds": {
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
-				template.DeletionGracePeriodSeconds = pointer.Int64(10)
+				template.DeletionGracePeriodSeconds = ptr.To[int64](10)
 				return template
 			}(),
 		},

@@ -73,8 +73,7 @@ message CSIDriverSpec {
   // and waits until the volume is attached before proceeding to mounting.
   // The CSI external-attacher coordinates with CSI volume driver and updates
   // the volumeattachment status when the attach operation is complete.
-  // If the CSIDriverRegistry feature gate is enabled and the value is
-  // specified to false, the attach operation will be skipped.
+  // If the value is specified to false, the attach operation will be skipped.
   // Otherwise the attach operation will be called.
   //
   // This field is immutable.

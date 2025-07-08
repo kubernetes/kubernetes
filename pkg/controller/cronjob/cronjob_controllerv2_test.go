@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -1223,7 +1223,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			jobPresentInCJActiveStatus: false,
 		},
 		"set lastsuccessfultime if successfulJobHistoryLimit is zero": {
-			successfulJobsHistoryLimit: pointer.Int32(0),
+			successfulJobsHistoryLimit: ptr.To[int32](0),
 			ranPreviously:              true,
 			schedule:                   onTheHour,
 			expectUpdateStatus:         true,
@@ -1231,7 +1231,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 			jobPresentInCJActiveStatus: true,
 		},
 		"set lastsuccessfultime if successfulJobHistoryLimit is ten": {
-			successfulJobsHistoryLimit: pointer.Int32(10),
+			successfulJobsHistoryLimit: ptr.To[int32](10),
 			ranPreviously:              true,
 			schedule:                   onTheHour,
 			expectUpdateStatus:         true,
@@ -1787,7 +1787,7 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"},
 				Spec: batchv1.CronJobSpec{
 					Schedule:                   onTheHour,
-					SuccessfulJobsHistoryLimit: pointer.Int32(1),
+					SuccessfulJobsHistoryLimit: ptr.To[int32](1),
 					JobTemplate: batchv1.JobTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"key": "value"}},
 					},
@@ -1799,7 +1799,7 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "foo-ns",
 						Name:            "finished-job-started-hour-ago",
-						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: ptr.To(true)}},
 					},
 					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeThePriorHour()}},
 				},
@@ -1807,7 +1807,7 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "foo-ns",
 						Name:            "finished-job-started-minute-ago",
-						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: ptr.To(true)}},
 					},
 					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeTheHour()}},
 				},
@@ -1822,7 +1822,7 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"},
 				Spec: batchv1.CronJobSpec{
 					Schedule:                   onTheHour,
-					SuccessfulJobsHistoryLimit: pointer.Int32(2),
+					SuccessfulJobsHistoryLimit: ptr.To[int32](2),
 					JobTemplate: batchv1.JobTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"key": "value"}},
 					},
@@ -1834,7 +1834,7 @@ func TestControllerV2CleanupFinishedJobs(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "foo-ns",
 						Name:            "finished-job-started-hour-ago",
-						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: pointer.Bool(true)}},
+						OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: ptr.To(true)}},
 					},
 					Status: batchv1.JobStatus{StartTime: &metav1.Time{Time: justBeforeThePriorHour()}},
 				},

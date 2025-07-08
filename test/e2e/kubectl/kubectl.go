@@ -84,7 +84,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	uexec "k8s.io/utils/exec"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -1237,7 +1237,7 @@ metadata:
 					framework.Failf("failed to unmarshal schema: %v", err)
 				}
 				// Allow for arbitrary-extra properties.
-				props.XPreserveUnknownFields = pointer.BoolPtr(true)
+				props.XPreserveUnknownFields = ptr.To(true)
 				for i := range crd.Spec.Versions {
 					crd.Spec.Versions[i].Schema = &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: props}
 				}

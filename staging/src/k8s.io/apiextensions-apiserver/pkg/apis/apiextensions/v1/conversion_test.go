@@ -27,7 +27,6 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -504,7 +503,7 @@ func TestConversion(t *testing.T) {
 			In: &apiextensions.CustomResourceDefinition{
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Conversion: &apiextensions.CustomResourceConversion{
-						WebhookClientConfig: &apiextensions.WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{URL: ptr.To("http://example.com")},
 					},
 				},
 			},
@@ -513,7 +512,7 @@ func TestConversion(t *testing.T) {
 				Spec: CustomResourceDefinitionSpec{
 					Conversion: &CustomResourceConversion{
 						Webhook: &WebhookConversion{
-							ClientConfig: &WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+							ClientConfig: &WebhookClientConfig{URL: ptr.To("http://example.com")},
 						},
 					},
 				},
@@ -560,7 +559,7 @@ func TestConversion(t *testing.T) {
 				Spec: CustomResourceDefinitionSpec{
 					Conversion: &CustomResourceConversion{
 						Webhook: &WebhookConversion{
-							ClientConfig: &WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+							ClientConfig: &WebhookClientConfig{URL: ptr.To("http://example.com")},
 						},
 					},
 				},
@@ -569,7 +568,7 @@ func TestConversion(t *testing.T) {
 			ExpectOut: &apiextensions.CustomResourceDefinition{
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Conversion: &apiextensions.CustomResourceConversion{
-						WebhookClientConfig: &apiextensions.WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{URL: ptr.To("http://example.com")},
 					},
 					PreserveUnknownFields: ptr.To(false),
 				},

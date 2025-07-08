@@ -48,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/kubeconfig"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -238,8 +237,8 @@ func TestNodeAuthorizer(t *testing.T) {
 						{Name: "pvc", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "mypvc"}}},
 					},
 					ResourceClaims: []corev1.PodResourceClaim{
-						{Name: "namedclaim", ResourceClaimName: pointer.String("mynamedresourceclaim")},
-						{Name: "templateclaim", ResourceClaimTemplateName: pointer.String("myresourceclaimtemplate")},
+						{Name: "namedclaim", ResourceClaimName: ptr.To("mynamedresourceclaim")},
+						{Name: "templateclaim", ResourceClaimTemplateName: ptr.To("myresourceclaimtemplate")},
 					},
 				},
 			}, metav1.CreateOptions{})
@@ -384,8 +383,8 @@ func TestNodeAuthorizer(t *testing.T) {
 					Name: "node1",
 				},
 				Spec: coordination.LeaseSpec{
-					HolderIdentity:       pointer.String("node1"),
-					LeaseDurationSeconds: pointer.Int32(node1LeaseDurationSeconds),
+					HolderIdentity:       ptr.To("node1"),
+					LeaseDurationSeconds: ptr.To[int32](node1LeaseDurationSeconds),
 					RenewTime:            &metav1.MicroTime{Time: time.Now()},
 				},
 			}

@@ -31,7 +31,7 @@ import (
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -241,7 +241,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 				NS:                     f.Namespace.Name,
 				NodeSelection:          l.config.ClientNodeSelection,
 				PVCs:                   []*v1.PersistentVolumeClaim{l.resource.Pvc},
-				FsGroup:                utilpointer.Int64Ptr(int64(test.initialPodFsGroup)),
+				FsGroup:                ptr.To[int64](int64(test.initialPodFsGroup)),
 				PodFSGroupChangePolicy: &policy,
 			}
 			// Create initial pod and create files in root and sub-directory and verify ownership.
@@ -262,7 +262,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))
 
 			// Create a second pod with existing volume and verify the contents ownership.
-			podConfig.FsGroup = utilpointer.Int64Ptr(int64(test.secondPodFsGroup))
+			podConfig.FsGroup = ptr.To[int64](int64(test.secondPodFsGroup))
 			pod = createPodAndVerifyContentGid(ctx, l.config.Framework, &podConfig, false /* createInitialFiles */, strconv.Itoa(test.finalExpectedRootDirFileOwnership), strconv.Itoa(test.finalExpectedSubDirFileOwnership))
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
 			framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, f.ClientSet, pod))

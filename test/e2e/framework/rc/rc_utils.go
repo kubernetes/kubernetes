@@ -31,7 +31,7 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // ByNameContainer returns a ReplicationController with specified name and container
@@ -52,7 +52,7 @@ func ByNameContainer(name string, replicas int32, labels map[string]string, c v1
 			Name: name,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(replicas),
+			Replicas: ptr.To[int32](replicas),
 			Selector: labels,
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
