@@ -205,13 +205,15 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// test the defaults.
 		driver := drautils.NewDriverInstance(f)
 		driver.IsLocal = true
-		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 4)) // Increased from 1 to 4 to support multiple concurrent pods
+		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 5)) // Increased to support multiple concurrent pods
 		b := drautils.NewBuilderNow(ctx, f, driver)
 
 		claim := b.ExternalClaim()
-		pod := b.PodExternal()
-		b.Create(ctx, claim, pod)
-		b.TestPod(ctx, f, pod)
+		podExternal := b.PodExternal()
+		podInline, claimTemplate := b.PodInline()
+		b.Create(ctx, claim, podExternal, claimTemplate, podInline)
+		b.TestPod(ctx, f, podExternal)
+		b.TestPod(ctx, f, podInline)
 
 		// Create admin namespace with admin-access labels for both 1.33/1.34
 		adminNamespace, err := f.CreateNamespace(tCtx, f.BaseName+"-admin", map[string]string{
@@ -360,17 +362,24 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		f.Namespace = namespace
 		f.UniqueName = namespace.Name
 
-		// Remove pod prepared by previous Kubernetes.
-		framework.ExpectNoError(f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, namespace.Name, f.Timeouts.PodDelete))
+		// Remove pods prepared by previous Kubernetes.
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podExternal.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podExternal.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podInline.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podInline.Name, namespace.Name, f.Timeouts.PodDelete))
 
 		// Create another claim and pod, this time using the latest Kubernetes.
 		claim = b.ExternalClaim()
-		pod = b.PodExternal()
-		pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
-		b.Create(ctx, claim, pod)
-		b.TestPod(ctx, f, pod)
+		podExternal = b.PodExternal()
+		podExternal.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+		podInline, claimTemplate = b.PodInline()
+		podInline.Spec.ResourceClaims[0].ResourceClaimTemplateName = &claimTemplate.Name
+		b.Create(ctx, claim, podExternal, claimTemplate, podInline)
+		b.TestPod(ctx, f, podExternal)
+		b.TestPod(ctx, f, podInline)
 
 		// Roll back.
 		tCtx = ktesting.Begin(tCtx, "downgrade")
@@ -457,16 +466,31 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 			return f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
 		}).Should(gomega.Succeed(), "delete claim after downgrade")
 		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-			return f.ClientSet.CoreV1().Pods(namespace.Name).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
-		}).Should(gomega.Succeed(), "delete pod after downgrade")
+			return f.ClientSet.CoreV1().Pods(namespace.Name).Delete(tCtx, podExternal.Name, metav1.DeleteOptions{})
+		}).Should(gomega.Succeed(), "delete pod with external claim after downgrade")
 		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-			pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Get(tCtx, pod.Name, metav1.GetOptions{})
+			pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Get(tCtx, podExternal.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return nil
 			}
-			tCtx.ExpectNoError(err, "get pod")
+			tCtx.ExpectNoError(err, "get pod with external claim")
 			return pod
-		}).Should(gomega.BeNil(), "no pod after deletion after downgrade")
+		}).Should(gomega.BeNil(), "no pod with external claim after deletion after downgrade")
+
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+			return f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(tCtx, claimTemplate.Name, metav1.DeleteOptions{})
+		}).Should(gomega.Succeed(), "delete claim template after downgrade")
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+			return f.ClientSet.CoreV1().Pods(namespace.Name).Delete(tCtx, podInline.Name, metav1.DeleteOptions{})
+		}).Should(gomega.Succeed(), "delete pod with inline claim after downgrade")
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+			pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Get(tCtx, podInline.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			tCtx.ExpectNoError(err, "get pod with inline claim")
+			return pod
+		}).Should(gomega.BeNil(), "no pod with inline claim after deletion after downgrade")
 	})
 })
 
