@@ -449,7 +449,10 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 			errCh <- err
 		}
 	}()
-
+	
+	server.GenericAPIServer.LoopbackClientConfig.Context = tCtx	
+	t.Logf("The context of the LoopbackClientConfig is %v", server.GenericAPIServer.LoopbackClientConfig.Context)
+	klog.Infof("The context of the LoopbackClientConfig is %v", server.GenericAPIServer.LoopbackClientConfig.Context)
 	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
