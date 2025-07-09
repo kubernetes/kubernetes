@@ -22,7 +22,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/kubernetes"
 	"math/rand"
 	"net/http"
 	"os"
@@ -45,6 +44,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
@@ -479,12 +479,14 @@ type Controller interface {
 	Runnable
 }
 
+// runnableFunc makes it possible to turn a function into a Runnable quickly.
 type runnableFunc func(context.Context)
 
 func (run runnableFunc) Run(ctx context.Context) {
 	run(ctx)
 }
 
+// runnables is a slice of Runnable objects that are to be run concurrently.
 type runnables []Runnable
 
 func (rx runnables) Run(ctx context.Context) {
@@ -498,6 +500,7 @@ func (rx runnables) Run(ctx context.Context) {
 	}
 }
 
+// namedRunnable implements the Controller interface.
 type namedRunnable struct {
 	Runnable
 	name string
@@ -514,17 +517,13 @@ func newNamedRunnable(runnable Runnable, name string) *namedRunnable {
 	}
 }
 
+// newNamedRunnableFunc makes it easy to turn a single function into a Controller.
 func newNamedRunnableFunc(fnc func(context.Context), name string) *namedRunnable {
 	return newNamedRunnable(runnableFunc(fnc), name)
 }
 
-// InitFunc is used to launch a particular controller. It returns a controller
-// that can optionally implement other interfaces so that the controller manager
-// can support the requested features.
-// The returned controller may be nil, which will be considered an anonymous controller
-// that requests no additional features from the controller manager.
-// Any error returned will cause the controller process to `Fatal`
-// The bool indicates whether the controller was enabled.
+// InitFunc is a constructor for a controller.
+// A nil Controller returned means that the associated controller is disabled.
 type InitFunc func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error)
 
 type ControllerDescriptor struct {
@@ -569,7 +568,7 @@ func (r *ControllerDescriptor) RequiresSpecialHandling() bool {
 }
 
 // BuildController creates a controller based on the given descriptor.
-// When the controller is disabled, (nil, nil) is returned.
+// The associated controller's InitFunc is called at the end, so the same contract applies for the return values here.
 func (r *ControllerDescriptor) BuildController(ctx context.Context, controllerCtx ControllerContext) (Controller, error) {
 	logger := klog.FromContext(ctx)
 	controllerName := r.Name()
@@ -813,10 +812,17 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	return controllerContext, nil
 }
 
+// HealthCheckAdder is an interface to represent a healthz handler.
+// The extra level of indirection is useful for testing.
 type HealthCheckAdder interface {
 	AddHealthChecker(checks ...healthz.HealthChecker)
 }
 
+// BuildControllers builds all controllers in the given descriptor map. Disabled controllers are obviously skipped.
+//
+// A health check is registered for each controller using the controller name. The default check always passes.
+// If the controller implements controller.HealthCheckable, though, the given check is used.
+// The controller can also implement controller.Debuggable, in which case the debug handler is registered with the given mux.
 func BuildControllers(ctx context.Context, controllerCtx ControllerContext, controllerDescriptors map[string]*ControllerDescriptor,
 	unsecuredMux *mux.PathRecorderMux, healthzHandler HealthCheckAdder) ([]Controller, error) {
 	logger := klog.FromContext(ctx)
@@ -891,7 +897,7 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 	return controllers, nil
 }
 
-// StartControllers starts all controllers and blocks until the context is cancelled and all controllers are terminated.
+// StartControllers starts all controllers concurrently and blocks until the context is cancelled and all controllers are terminated.
 func StartControllers(ctx context.Context, controllerCtx ControllerContext, controllers []Controller) {
 	logger := klog.FromContext(ctx)
 	var wg sync.WaitGroup
