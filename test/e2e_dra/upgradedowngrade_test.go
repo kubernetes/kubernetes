@@ -212,6 +212,15 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		b.TestPod(ctx, f, podExternal)
 		b.TestPod(ctx, f, podInline)
 
+		claim2 := b.ExternalClaim()
+		podExternal2 := b.PodExternal()
+		podExternal2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+		podInline2, claimTemplate2 := b.PodInline()
+		podInline2.Spec.ResourceClaims[0].ResourceClaimTemplateName = &claimTemplate2.Name
+		b.Create(ctx, claim2, podExternal2, claimTemplate2, podInline2)
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podExternal2.Name, podExternal2.Namespace))
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podInline2.Name, podInline2.Namespace))
+
 		tCtx = ktesting.End(tCtx)
 
 		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("update to %s", gitVersion))
@@ -236,6 +245,10 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podInline.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podInline.Name, namespace.Name, f.Timeouts.PodDelete))
 
+		// The previously unschedulable pods can now be scheduled.
+		b.TestPod(ctx, f, podExternal2)
+		b.TestPod(ctx, f, podInline2)
+
 		// Create another claim and pod, this time using the latest Kubernetes.
 		claim = b.ExternalClaim()
 		podExternal = b.PodExternal()
@@ -243,8 +256,8 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		podInline, claimTemplate = b.PodInline()
 		podInline.Spec.ResourceClaims[0].ResourceClaimTemplateName = &claimTemplate.Name
 		b.Create(ctx, claim, podExternal, claimTemplate, podInline)
-		b.TestPod(ctx, f, podExternal)
-		b.TestPod(ctx, f, podInline)
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podExternal.Name, podExternal.Namespace))
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podInline.Name, podInline.Namespace))
 
 		// Roll back.
 		tCtx = ktesting.Begin(tCtx, "downgrade")
@@ -260,6 +273,19 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 			return output
 		}).Should(gomega.ContainSubstring(`"Caches are synced" controller="resource_claim"`))
 		tCtx = ktesting.End(tCtx)
+
+		// Remove running pods.
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podExternal2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podExternal2.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podInline2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podInline2.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		// The previously unschedulable pods can now be scheduled.
+		b.TestPod(ctx, f, podExternal)
+		b.TestPod(ctx, f, podInline)
 
 		// We need to clean up explicitly because the normal
 		// cleanup doesn't work (driver shuts down first).
