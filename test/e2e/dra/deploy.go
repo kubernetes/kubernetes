@@ -342,8 +342,11 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 							Generation:         pool.Generation,
 							ResourceSliceCount: int64(len(pool.Slices)),
 						},
-						NodeSelector: pool.NodeSelector,
-						Devices:      slice.Devices,
+						NodeSelector:           pool.NodeSelector,
+						Devices:                slice.Devices,
+						Mixins:                 slice.Mixins,
+						SharedCounters:         slice.SharedCounters,
+						PerDeviceNodeSelection: slice.PerDeviceNodeSelection,
 					},
 				}
 				_, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().Create(ctx, resourceSlice, metav1.CreateOptions{})
