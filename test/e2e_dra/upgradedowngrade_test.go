@@ -205,7 +205,7 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// test the defaults.
 		driver := drautils.NewDriverInstance(f)
 		driver.IsLocal = true
-		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 5)) // Increased to support multiple concurrent pods
+		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 3)) // Increased to support multiple concurrent pods
 		b := drautils.NewBuilderNow(ctx, f, driver)
 
 		claim := b.ExternalClaim()
@@ -295,6 +295,16 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		}
 		tCtx.Logf("Expected error creating admin template in regular namespace: %v", err)
 
+		claim2 := b.ExternalClaim()
+		podExternal2 := b.PodExternal()
+		podExternal2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+		podInline2, claimTemplate2 := b.PodInline()
+		podInline2.Spec.ResourceClaims[0].ResourceClaimTemplateName = &claimTemplate2.Name
+		b.Create(ctx, claim2, podExternal2, claimTemplate2, podInline2)
+		// All devices are already allocated, new pods requesting devices shouldn't be scheduled.
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podExternal2.Name, podExternal2.Namespace))
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podInline2.Name, podInline2.Namespace))
+
 		tCtx = ktesting.End(tCtx)
 
 		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("update to %s", gitVersion))
@@ -309,6 +319,19 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		tCtx = ktesting.Begin(tCtx, "wait for ResourceSlices after upgrade")
 		gomega.Eventually(ctx, driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
 		tCtx = ktesting.End(tCtx)
+
+		// Remove pods prepared by previous Kubernetes.
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podExternal.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podExternal.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podInline.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podInline.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		// The previously unschedulable pods can now be scheduled since the devices have been deallocated.
+		b.TestPod(ctx, f, podExternal2)
+		b.TestPod(ctx, f, podInline2)
 
 		// Verify existing admin and regular pods still work after upgrade
 		// Switch namespace to admin namespace
@@ -325,6 +348,28 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 			_, err := f.ClientSet.CoreV1().Pods(adminNamespace.Name).Get(ctx, regularPod.Name, metav1.GetOptions{})
 			return err
 		}).WithTimeout(2*time.Minute).Should(gomega.Succeed(), "regular pod should survive upgrade")
+		tCtx = ktesting.End(tCtx)
+
+		// Clean up admin namespace pods
+		tCtx = ktesting.Begin(tCtx, "cleanup admin namespace pods")
+		adminPodNames := []string{regularPod.Name}
+		for _, podName := range adminPodNames {
+			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+				return f.ClientSet.CoreV1().Pods(adminNamespace.Name).Delete(tCtx, podName, metav1.DeleteOptions{})
+			}).Should(gomega.Succeed(), fmt.Sprintf("delete pod %s", podName))
+		}
+
+		// Wait for admin namespace pods to be deleted
+		for _, podName := range adminPodNames {
+			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+				pod, err := f.ClientSet.CoreV1().Pods(adminNamespace.Name).Get(tCtx, podName, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+				tCtx.ExpectNoError(err, "get pod")
+				return pod
+			}).Should(gomega.BeNil(), fmt.Sprintf("pod %s should be deleted", podName))
+		}
 		tCtx = ktesting.End(tCtx)
 
 		// Test new admin access pod in v1.34 using v1beta2
@@ -362,15 +407,6 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		f.Namespace = namespace
 		f.UniqueName = namespace.Name
 
-		// Remove pods prepared by previous Kubernetes.
-		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podExternal.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podExternal.Name, namespace.Name, f.Timeouts.PodDelete))
-
-		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podInline.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podInline.Name, namespace.Name, f.Timeouts.PodDelete))
-
 		// Create another claim and pod, this time using the latest Kubernetes.
 		claim = b.ExternalClaim()
 		podExternal = b.PodExternal()
@@ -378,8 +414,9 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		podInline, claimTemplate = b.PodInline()
 		podInline.Spec.ResourceClaims[0].ResourceClaimTemplateName = &claimTemplate.Name
 		b.Create(ctx, claim, podExternal, claimTemplate, podInline)
-		b.TestPod(ctx, f, podExternal)
-		b.TestPod(ctx, f, podInline)
+		// All devices are already allocated, new pods requesting devices shouldn't be scheduled.
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podExternal.Name, podExternal.Namespace))
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podInline.Name, podInline.Namespace))
 
 		// Roll back.
 		tCtx = ktesting.Begin(tCtx, "downgrade")
@@ -396,6 +433,19 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		}).Should(gomega.ContainSubstring(`"Caches are synced" controller="resource_claim"`))
 		tCtx = ktesting.End(tCtx)
 
+		// Remove running pods.
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podExternal2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podExternal2.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podInline2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podInline2.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		// The previously unschedulable pods can now be scheduled since the devices have been deallocated.
+		b.TestPod(ctx, f, podExternal)
+		b.TestPod(ctx, f, podInline)
+
 		// Switch namespace to admin namespace
 		f.Namespace = adminNamespace
 		f.UniqueName = adminNamespace.Name
@@ -411,6 +461,28 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 			_, err := f.ClientSet.CoreV1().Pods(adminNamespace.Name).Get(ctx, adminPod2.Name, metav1.GetOptions{})
 			return err
 		}).WithTimeout(2*time.Minute).Should(gomega.Succeed(), "second admin pod should survive downgrade")
+
+		// Clean up admin namespace pods
+		tCtx = ktesting.Begin(tCtx, "cleanup admin namespace pods")
+		adminPodNames = []string{regularPod2.Name}
+		for _, podName := range adminPodNames {
+			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+				return f.ClientSet.CoreV1().Pods(adminNamespace.Name).Delete(tCtx, podName, metav1.DeleteOptions{})
+			}).Should(gomega.Succeed(), fmt.Sprintf("delete pod %s", podName))
+		}
+
+		// Wait for admin namespace pods to be deleted
+		for _, podName := range adminPodNames {
+			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+				pod, err := f.ClientSet.CoreV1().Pods(adminNamespace.Name).Get(tCtx, podName, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+				tCtx.ExpectNoError(err, "get pod")
+				return pod
+			}).Should(gomega.BeNil(), fmt.Sprintf("pod %s should be deleted", podName))
+		}
+		tCtx = ktesting.End(tCtx)
 
 		// Create a new regular pod in admin namespace to ensure normal operation after downgrade
 		regularPod3 := b.Pod()
@@ -438,7 +510,7 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 
 		// Clean up admin namespace pods
 		tCtx = ktesting.Begin(tCtx, "cleanup admin namespace pods")
-		adminPodNames := []string{adminPod.Name, adminPod2.Name, regularPod.Name, regularPod2.Name, regularPod3.Name}
+		adminPodNames = []string{adminPod.Name, adminPod2.Name, regularPod3.Name}
 		for _, podName := range adminPodNames {
 			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
 				return f.ClientSet.CoreV1().Pods(adminNamespace.Name).Delete(tCtx, podName, metav1.DeleteOptions{})
