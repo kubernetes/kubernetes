@@ -1896,8 +1896,9 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		// Check whether a resize is in progress so we can set the PodResizeInProgressCondition accordingly.
 		kl.allocationManager.CheckPodResizeInProgress(pod, podStatus)
 		// TODO(natasha41575): There is a race condition here, where the goroutine in the
-		// allocation manager may allocate a new resize and clear the PodResizeInProgressCondition
-		// before we set the status below. See https://github.com/kubernetes/kubernetes/issues/132851.
+		// allocation manager may allocate a new resize and unconditionally set the
+		// PodResizeInProgressCondition before we set the status below.
+		// See https://github.com/kubernetes/kubernetes/issues/132851.
 	}
 
 	// Generate final API pod status with pod and status manager status

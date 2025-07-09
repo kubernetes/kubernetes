@@ -451,8 +451,8 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		m.statusManager.ClearPodResizePendingCondition(pod.UID)
 
 		// Clear any errors that may have been surfaced from a previous resize. The condition will be
-		// added back in the sync loop but this prevents old errors from being preserved.
-		m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
+		// re-assesssed in the sync loop but this prevents old errors from being preserved.
+		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", true)
 
 		return true, nil
 	}
