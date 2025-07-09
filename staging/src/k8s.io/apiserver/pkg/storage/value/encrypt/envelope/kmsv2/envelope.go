@@ -27,9 +27,9 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/gogo/protobuf/proto"
 	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/crypto/cryptobyte"
+	"google.golang.org/protobuf/proto"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -268,6 +268,7 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 
 	metrics.RecordKeyID(metrics.ToStorageLabel, t.providerName, state.EncryptedObject.KeyID, t.apiServerID)
 
+	//nolint:govet // copy lock works for this protobuf version
 	encObjectCopy := state.EncryptedObject
 	encObjectCopy.EncryptedData = result
 

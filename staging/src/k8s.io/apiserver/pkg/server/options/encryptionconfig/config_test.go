@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -2074,6 +2075,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 				`encryptKeyIDHash="", stateKeyIDHash="sha256:d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35", expirationTimestamp=` + now.Format(time.RFC3339),
 		},
 	}
+	//nolint:govet // copy lock works for this protobuf version
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			kmsName := fmt.Sprintf("panda-%d", i)
@@ -2100,16 +2102,19 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			}
 
 			ignoredFields := sets.NewString("Transformer", "EncryptedObject.EncryptedDEKSource", "UID", "CacheKey")
+			ignoreUnexported := cmpopts.IgnoreUnexported(kmstypes.EncryptedObject{})
 
 			gotState := *h.state.Load()
 
+			//nolint:govet // copy lock works for this protobuf version
 			if diff := cmp.Diff(tt.wantState, gotState,
-				cmp.FilterPath(func(path cmp.Path) bool { return ignoredFields.Has(path.String()) }, cmp.Ignore()),
+				cmp.FilterPath(func(path cmp.Path) bool { return ignoredFields.Has(path.String()) }, cmp.Ignore()), ignoreUnexported,
 			); len(diff) > 0 {
 				t.Errorf("state mismatch (-want +got):\n%s", diff)
 			}
 
-			if len(cmp.Diff(tt.wantState, gotState)) > 0 { // we only need to run this check when the state changes
+			//nolint:govet // copy lock works for this protobuf version
+			if len(cmp.Diff(tt.wantState, gotState, ignoreUnexported)) > 0 { // we only need to run this check when the state changes
 				validCiphertext := len(gotState.EncryptedObject.EncryptedDEKSource) > 0
 				if tt.useSeed {
 					validCiphertext = validCiphertext && gotState.EncryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
@@ -2171,7 +2176,7 @@ func validState(t *testing.T, keyID string, exp time.Time, useSeed bool) envelop
 	}
 	return envelopekmsv2.State{
 		Transformer:         transformer,
-		EncryptedObject:     *encObject,
+		EncryptedObject:     *encObject, //nolint:govet // copy lock works for this protobuf version
 		ExpirationTimestamp: exp,
 		CacheKey:            cacheKey,
 	}

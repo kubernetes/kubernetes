@@ -33,6 +33,7 @@ type GRPCService struct {
 	server  *grpc.Server
 
 	kmsService Service
+	kmsapi.UnsafeKeyManagementServiceServer
 }
 
 var _ kmsapi.KeyManagementServiceServer = (*GRPCService)(nil)

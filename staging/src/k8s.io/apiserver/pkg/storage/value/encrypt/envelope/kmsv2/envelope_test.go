@@ -35,9 +35,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"google.golang.org/protobuf/proto"
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -185,6 +185,7 @@ func TestEnvelopeCaching(t *testing.T) {
 			}
 
 			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
+				//nolint:govet // copy lock works for this protobuf version
 				func() (State, error) { return state, nil }, testAPIServerID,
 				tt.cacheTTL, fakeClock)
 
@@ -248,7 +249,7 @@ func testStateFunc(ctx context.Context, envelopeService kmsservice.Service, cloc
 		}
 		return State{
 			Transformer:         transformer,
-			EncryptedObject:     *encObject,
+			EncryptedObject:     *encObject, //nolint:govet // copy lock works for this protobuf version
 			UID:                 "panda",
 			ExpirationTimestamp: clock.Now().Add(time.Hour),
 			CacheKey:            cacheKey,
@@ -326,6 +327,7 @@ func TestEnvelopeTransformerStaleness(t *testing.T) {
 			var stateErr error
 
 			transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
+				//nolint:govet // copy lock works for this protobuf version
 				func() (State, error) { return state, stateErr }, testAPIServerID,
 			)
 
@@ -383,6 +385,7 @@ func TestEnvelopeTransformerStateFunc(t *testing.T) {
 	stateErr := fmt.Errorf("some state error")
 
 	transformer := NewEnvelopeTransformer(envelopeService, testProviderName,
+		//nolint:govet // copy lock works for this protobuf version
 		func() (State, error) { return state, stateErr }, testAPIServerID,
 	)
 
@@ -552,9 +555,7 @@ func TestEncodeDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("envelopeTransformer: error while decoding data: %s", err)
 	}
-	// reset internal field modified by marshaling obj
-	obj.XXX_sizecache = 0
-	if !reflect.DeepEqual(got, obj) {
+	if !proto.Equal(got, obj) {
 		t.Fatalf("envelopeTransformer: decoded data does not match original data. Got: %v, want %v", got, obj)
 	}
 }
@@ -941,8 +942,10 @@ func TestEnvelopeMetricsCache(t *testing.T) {
 		// return different states to ensure we get expected number of cache keys after restart on decryption
 		return testStateFunc(ctx, envelopeService, clock.RealClock{}, randomBool())()
 	}, testAPIServerID)
+	//nolint:govet // copy lock works for this protobuf version
 	transformer2 := NewEnvelopeTransformer(envelopeService, provider2, func() (State, error) { return state, nil }, testAPIServerID)
 	// used for restart
+	//nolint:govet // copy lock works for this protobuf version
 	transformer3 := NewEnvelopeTransformer(envelopeService, provider1, func() (State, error) { return state, nil }, testAPIServerID)
 	var transformedDatas [][]byte
 	for j := 0; j < numOfStates; j++ {
@@ -1090,6 +1093,7 @@ func TestCacheNotCorrupted(t *testing.T) {
 	}
 
 	transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
+		//nolint:govet // copy lock works for this protobuf version
 		func() (State, error) { return state, nil }, testAPIServerID,
 		1*time.Second, fakeClock)
 
@@ -1116,6 +1120,7 @@ func TestCacheNotCorrupted(t *testing.T) {
 	}
 
 	transformer = newEnvelopeTransformerWithClock(envelopeService, testProviderName,
+		//nolint:govet // copy lock works for this protobuf version
 		func() (State, error) { return state, nil }, testAPIServerID,
 		1*time.Second, fakeClock)
 
@@ -1300,6 +1305,7 @@ func TestEnvelopeTracing_TransformToStorage(t *testing.T) {
 			}
 
 			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
+				//nolint:govet // copy lock works for this protobuf version
 				func() (State, error) { return state, nil }, testAPIServerID, 1*time.Second, fakeClock)
 
 			dataCtx := value.DefaultContext([]byte(testContextText))
@@ -1377,6 +1383,7 @@ func TestEnvelopeTracing_TransformFromStorage(t *testing.T) {
 			}
 
 			transformer := newEnvelopeTransformerWithClock(envelopeService, testProviderName,
+				//nolint:govet // copy lock works for this protobuf version
 				func() (State, error) { return state, nil }, testAPIServerID, tc.cacheTTL, fakeClock)
 
 			dataCtx := value.DefaultContext([]byte(testContextText))
