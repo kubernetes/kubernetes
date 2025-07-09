@@ -73,7 +73,7 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 	// all lower-case, dashes between words. See
 	// https://json-schema.org/draft/2020-12/json-schema-validation#name-defined-formats
 	// for more examples.
-	if format == "k8s-ip-sloppy" {
+	if format == "k8s-ip" {
 		return Function(formatTagName, DefaultFlags, ipSloppyValidator), nil
 	}
 	if format == "k8s-short-name" {
@@ -90,7 +90,7 @@ func (ftv formatTagValidator) Docs() TagDoc {
 		Scopes:      ftv.ValidScopes().UnsortedList(),
 		Description: "Indicates that a string field has a particular format.",
 		Payloads: []TagPayloadDoc{{
-			Description: "k8s-ip-sloppy",
+			Description: "k8s-ip",
 			Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
 		}, {
 			Description: "k8s-short-name",
