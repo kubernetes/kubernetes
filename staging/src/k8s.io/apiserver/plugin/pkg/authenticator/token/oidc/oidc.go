@@ -87,7 +87,7 @@ type Options struct {
 	// EgressLookup allows for optional opt-in egress configuration via a custom dialer.  Mutually exclusive with Client.
 	EgressLookup egressselector.Lookup
 
-	// Optional http.Client used to make all requests to the remote issuer.  Mutually exclusive with CAContentProvider.
+	// Optional http.Client used to make all requests to the remote issuer.  Mutually exclusive with CAContentProvider and EgressLookup.
 	Client *http.Client
 
 	// Optional CEL compiler used to compile the CEL expressions. This is useful to use a shared instance
