@@ -49,7 +49,7 @@ var (
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_full_proxy_rules_duration_seconds",
 			Help:           "SyncProxyRules latency in seconds for full resyncs",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 17),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"ip_family"},
@@ -61,7 +61,7 @@ var (
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_partial_proxy_rules_duration_seconds",
 			Help:           "SyncProxyRules latency in seconds for partial resyncs",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 17),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"ip_family"},
@@ -95,8 +95,20 @@ var (
 				metrics.LinearBuckets(0.25, 0.25, 2), // 0.25s, 0.50s
 				metrics.LinearBuckets(1, 1, 59),      // 1s, 2s, 3s, ... 59s
 				metrics.LinearBuckets(60, 5, 12),     // 60s, 65s, 70s, ... 115s
-				metrics.LinearBuckets(120, 30, 7),    // 2min, 2.5min, 3min, ..., 5min
+				metrics.LinearBuckets(120, 30, 17),   // 2min, 2.5min, 3min, ..., 10min
 			),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// NetworkProgrammingQueueLatency tracks the time spent waiting in queue before obtaining the sync lock
+	NetworkProgrammingQueueLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: kubeProxySubsystem,
+			Name:      "network_programming_queue_duration_seconds",
+			Help:      "Network programming queue latency in seconds",
+			Buckets:   metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"ip_family"},
@@ -326,6 +338,7 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 
 		// FIXME: winkernel does not implement these
 		legacyregistry.MustRegister(NetworkProgrammingLatency)
+		legacyregistry.MustRegister(NetworkProgrammingQueueLatency)
 		legacyregistry.MustRegister(SyncProxyRulesNoLocalEndpointsTotal)
 
 		switch mode {

@@ -1861,8 +1861,10 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {
 		for _, lastChangeTriggerTime := range lastChangeTriggerTimes {
 			latency := metrics.SinceInSeconds(lastChangeTriggerTime)
+			queueLatency := metrics.SinceInSeconds(start) - metrics.SinceInSeconds(lastChangeTriggerTime)
 			metrics.NetworkProgrammingLatency.WithLabelValues(string(proxier.ipFamily)).Observe(latency)
-			proxier.logger.V(4).Info("Network programming", "endpoint", klog.KRef(name.Namespace, name.Name), "elapsed", latency)
+			metrics.NetworkProgrammingQueueLatency.WithLabelValues(string(proxier.ipFamily)).Observe(queueLatency)
+			proxier.logger.V(4).Info("Network programming", "endpoint", klog.KRef(name.Namespace, name.Name), "elapsed", latency, "queueLatency", queueLatency)
 		}
 	}
 
