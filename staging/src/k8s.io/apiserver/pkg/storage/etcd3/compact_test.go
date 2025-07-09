@@ -18,7 +18,6 @@ package etcd3
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -38,21 +37,17 @@ func TestCompact(t *testing.T) {
 	client := testserver.RunEtcd(t, nil).Client
 	ctx := context.Background()
 	clock := testingclock.NewFakeClock(time.Now())
-	wg := sync.WaitGroup{}
-	defer wg.Wait()
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		compactor(ctx, client, clock, time.Minute)
-	}()
+	c := newCompactor(client, time.Minute, clock, nil)
+	t.Cleanup(c.Stop)
 	waitForClockWaiters(t, clock)
 
 	t.Log("First compaction cycle saves revision before first write")
 	clock.Step(time.Minute)
 	waitForClockWaiters(t, clock)
+	compactRev := c.CompactRevision()
+	if compactRev != 0 {
+		t.Errorf("CompactRevision()=%d, expected %d", compactRev, 0)
+	}
 
 	t.Log("First write")
 	putResp, err := client.Put(ctx, "/somekey", "data")
@@ -65,6 +60,10 @@ func TestCompact(t *testing.T) {
 	clock.Step(time.Minute)
 	waitForClockWaiters(t, clock)
 	assertNotCompacted(t, ctx, client, putResp.Header.Revision)
+	compactRev = c.CompactRevision()
+	if compactRev != putResp.Header.Revision-1 {
+		t.Errorf("CompactRevision()=%d, expected %d", compactRev, 0)
+	}
 
 	t.Log("Create second revision")
 	putResp1, err := client.Put(ctx, "/somekey", "data2")
@@ -77,6 +76,10 @@ func TestCompact(t *testing.T) {
 	clock.Step(time.Minute)
 	waitForClockWaiters(t, clock)
 	assertCompacted(t, ctx, client, putResp.Header.Revision)
+	compactRev = c.CompactRevision()
+	if compactRev != putResp.Header.Revision+1 {
+		t.Errorf("CompactRevision()=%d, expected %d", compactRev, putResp.Header.Revision)
+	}
 
 	assertNotCompacted(t, ctx, client, putResp1.Header.Revision)
 
@@ -85,6 +88,10 @@ func TestCompact(t *testing.T) {
 	waitForClockWaiters(t, clock)
 	assertCompacted(t, ctx, client, putResp.Header.Revision)
 	assertCompacted(t, ctx, client, putResp1.Header.Revision)
+	compactRev = c.CompactRevision()
+	if compactRev != putResp1.Header.Revision+1 {
+		t.Errorf("CompactRevision()=%d, expected %d", compactRev, putResp1.Header.Revision)
+	}
 }
 
 func assertCompacted(t *testing.T, ctx context.Context, client *clientv3.Client, rev int64) {
@@ -103,6 +110,18 @@ func assertNotCompacted(t *testing.T, ctx context.Context, client *clientv3.Clie
 	}
 }
 
+func TestCompactIntervalZero(t *testing.T) {
+	client := testserver.RunEtcd(t, nil).Client
+	clock := testingclock.NewFakeClock(time.Now())
+	c := newCompactor(client, 0, clock, nil)
+	t.Cleanup(c.Stop)
+
+	t.Log("Compact loop is disabled, no goroutine is waiting on clock")
+	clockNoWaiters(t, clock)
+	clock.Step(time.Minute)
+	clockNoWaiters(t, clock)
+}
+
 func waitForClockWaiters(t *testing.T, clock *testingclock.FakeClock) {
 	t.Helper()
 	for start := time.Now(); time.Since(start) < waitTimeout; {
@@ -114,11 +133,24 @@ func waitForClockWaiters(t *testing.T, clock *testingclock.FakeClock) {
 	t.Fatal("No waiters")
 }
 
+func clockNoWaiters(t *testing.T, clock *testingclock.FakeClock) {
+	t.Helper()
+	for start := time.Now(); time.Since(start) < waitTimeout; {
+		if clock.Waiters() != 0 {
+			t.Fatal("waiter")
+		}
+		time.Sleep(waitDelay)
+	}
+	if clock.Waiters() != 0 {
+		t.Fatal("waiter")
+	}
+}
+
 // TestCompactConflict tests that multiple compactors are trying to compact etcd cluster with the same
 // logical time.
 // - C1 compacts on time 0. It will succeed.
 // - C2 compacts on time 0. It will fail as this time was compacted. But it will get latest logical time, which should be larger by one.
-// - C3 compacts on time 1. It will succeed
+// - C3 compacts on time 1. It will succeed.
 func TestCompactConflict(t *testing.T) {
 	client := testserver.RunEtcd(t, nil).Client
 	ctx := context.Background()
@@ -130,9 +162,13 @@ func TestCompactConflict(t *testing.T) {
 
 	t.Log("First compact on time 0")
 	wantCompactRev := putResp.Header.Revision
-	curTime, curRev, err := compact(ctx, client, 0, wantCompactRev)
+	curTime, curRev, compactRev, err := compact(ctx, client, 0, wantCompactRev)
 	if err != nil {
 		t.Fatalf("compact failed: %v", err)
+	}
+	t.Log("Compaction should succeed")
+	if compactRev != wantCompactRev {
+		t.Errorf("Expect compact revision = %d, get = %d", wantCompactRev, compactRev)
 	}
 	t.Log("Current time should increase by 1")
 	if curTime != 1 {
@@ -145,9 +181,13 @@ func TestCompactConflict(t *testing.T) {
 	}
 
 	t.Log("Second compact on time 0")
-	curTime2, curRev2, err := compact(ctx, client, 0, wantCompactRev+1)
+	curTime2, curRev2, compactRev2, err := compact(ctx, client, 0, wantCompactRev+1)
 	if err != nil {
 		t.Fatalf("compact failed: %v", err)
+	}
+	t.Log("Compaction should fail")
+	if compactRev2 != wantCompactRev {
+		t.Errorf("Expect compact revision = %d, get = %d", wantCompactRev, compactRev2)
 	}
 	t.Log("Should return same time as from the first compacty")
 	if curTime != curTime2 {
@@ -159,9 +199,14 @@ func TestCompactConflict(t *testing.T) {
 	}
 
 	t.Log("Third compact on time 1")
-	curTime3, curRev3, err := compact(ctx, client, 1, wantCompactRev+1)
+	curTime3, curRev3, compactRev3, err := compact(ctx, client, 1, wantCompactRev+1)
 	if err != nil {
 		t.Fatalf("compact failed: %v", err)
+	}
+	t.Log("Compaction should succeed")
+	wantCompactRev += 1
+	if compactRev3 != wantCompactRev {
+		t.Errorf("Expect compact revision = %d, get = %d", wantCompactRev, compactRev3)
 	}
 	t.Log("Current time should increase by 1")
 	if curTime3 != 2 {
