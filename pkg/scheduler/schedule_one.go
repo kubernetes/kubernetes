@@ -606,8 +606,8 @@ func (sched *Scheduler) findNodesThatPassFilters(
 
 	errCh := parallelize.NewErrorChannel()
 	var feasibleNodesLen int32
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("findNodesThatPassFilters has completed"))
 
 	type nodeStatus struct {
 		node   string
@@ -620,13 +620,15 @@ func (sched *Scheduler) findNodesThatPassFilters(
 		nodeInfo := nodes[(sched.nextStartNodeIndex+i)%numAllNodes]
 		status := schedFramework.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
 		if status.Code() == fwk.Error {
-			errCh.SendErrorWithCancel(status.AsError(), cancel)
+			errCh.SendErrorWithCancel(status.AsError(), func() {
+				cancel(errors.New("some other Filter operation failed"))
+			})
 			return
 		}
 		if status.IsSuccess() {
 			length := atomic.AddInt32(&feasibleNodesLen, 1)
 			if length > numNodesToFind {
-				cancel()
+				cancel(errors.New("findNodesThatPassFilters has found enough nodes"))
 				atomic.AddInt32(&feasibleNodesLen, -1)
 			} else {
 				feasibleNodes[length-1] = nodeInfo

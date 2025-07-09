@@ -17,11 +17,14 @@ limitations under the License.
 package cel
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
@@ -321,6 +324,52 @@ func TestCEL(t *testing.T) {
 			}
 			if match != scenario.expectMatch {
 				t.Fatalf("FAILURE: expected result %v, got %v", scenario.expectMatch, match)
+			}
+		})
+	}
+}
+
+func TestInterrupt(t *testing.T) {
+	for _, name := range []string{"timeout", "deadline", "cancel"} {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			// Adapted from https://github.com/kubernetes/kubernetes/blob/e0859f91b7d269bb7e2f43e23d202ccccaf34c0c/staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/validation_test.go#L3006
+			expression := `device.attributes["dra.example.com"].map(key, device.attributes["dra.example.com"][key] * 20).filter(e, e > 50).exists(e, e == 60)`
+			result := GetCompiler().CompileCELExpression(expression, Options{})
+			if result.Error != nil {
+				t.Fatalf("unexpected compile error: %v", result.Error)
+			}
+			switch name {
+			case "timeout":
+				c, cancel := context.WithTimeout(ctx, time.Nanosecond)
+				defer cancel()
+				ctx = c
+			case "deadline":
+				c, cancel := context.WithDeadline(ctx, time.Now())
+				defer cancel()
+				ctx = c
+			case "cancel":
+				c, cancel := context.WithCancel(ctx)
+				cancel()
+				ctx = c
+			}
+			device := Device{
+				Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute),
+			}
+			for i := int64(0); i < 1000; i++ {
+				device.Attributes[resourceapi.QualifiedName(fmt.Sprintf("dra.example.com/attr%d", i))] = resourceapi.DeviceAttribute{
+					IntValue: ptr.To(i),
+				}
+			}
+			_, _, err := result.DeviceMatches(ctx, device)
+			if ctx.Err() != nil {
+				if !errors.Is(err, ctx.Err()) {
+					t.Fatalf("expected %v, got error: %v", ctx.Err(), err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
 			}
 		})
 	}

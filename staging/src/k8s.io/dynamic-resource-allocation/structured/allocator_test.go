@@ -17,17 +17,20 @@ limitations under the License.
 package structured
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -166,11 +169,13 @@ func claimWithRequests(name string, constraints []resourceapi.DeviceConstraint, 
 // generate a DeviceRequest object with the given name, class and selectors.
 func request(name, class string, count int64, selectors ...resourceapi.DeviceSelector) resourceapi.DeviceRequest {
 	return resourceapi.DeviceRequest{
-		Name:            name,
-		Count:           count,
-		AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-		DeviceClassName: class,
-		Selectors:       selectors,
+		Name: name,
+		Exactly: &resourceapi.ExactDeviceRequest{
+			Count:           count,
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			DeviceClassName: class,
+			Selectors:       selectors,
+		},
 	}
 }
 
@@ -207,7 +212,7 @@ func (in wrapResourceClaim) obj() *resourceapi.ResourceClaim {
 func (in wrapResourceClaim) withTolerations(tolerations ...resourceapi.DeviceToleration) wrapResourceClaim {
 	out := in.DeepCopy()
 	for i := range out.Spec.Devices.Requests {
-		out.Spec.Devices.Requests[i].Tolerations = append(out.Spec.Devices.Requests[i].Tolerations, tolerations...)
+		out.Spec.Devices.Requests[i].Exactly.Tolerations = append(out.Spec.Devices.Requests[i].Exactly.Tolerations, tolerations...)
 	}
 	return wrapResourceClaim{out}
 }
@@ -244,16 +249,14 @@ const (
 // generate a Device object with the given name, capacity and attributes.
 func device(name string, capacity any, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) wrapDevice {
 	device := resourceapi.Device{
-		Name: name,
-		Basic: &resourceapi.BasicDevice{
-			Attributes: attributes,
-		},
+		Name:       name,
+		Attributes: attributes,
 	}
 
 	var capacityFromCounters bool
 	switch capacity := capacity.(type) {
 	case map[resourceapi.QualifiedName]resource.Quantity:
-		device.Basic.Capacity = toDeviceCapacity(capacity)
+		device.Capacity = toDeviceCapacity(capacity)
 	case string:
 		if capacity == fromCounters {
 			capacityFromCounters = true
@@ -281,23 +284,23 @@ func (in wrapDevice) obj() resourceapi.Device {
 func (in wrapDevice) withTaints(taints ...resourceapi.DeviceTaint) wrapDevice {
 	inDevice := resourceapi.Device(in.Device)
 	device := inDevice.DeepCopy()
-	device.Basic.Taints = append(device.Basic.Taints, taints...)
+	device.Taints = append(device.Taints, taints...)
 	return wrapDevice{Device: *device}
 }
 
 func (in wrapDevice) withDeviceCounterConsumption(deviceCounterConsumption ...resourceapi.DeviceCounterConsumption) wrapDevice {
 	inDevice := in.Device
 	device := inDevice.DeepCopy()
-	device.Basic.ConsumesCounters = append(device.Basic.ConsumesCounters, deviceCounterConsumption...)
+	device.ConsumesCounters = append(device.ConsumesCounters, deviceCounterConsumption...)
 	if in.capacityFromCounters {
 		c := make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity)
-		for _, dcc := range device.Basic.ConsumesCounters {
+		for _, dcc := range device.ConsumesCounters {
 			for name, cap := range dcc.Counters {
 				ccap := resourceapi.DeviceCapacity(cap)
 				c[resourceapi.QualifiedName(name)] = ccap
 			}
 		}
-		device.Basic.Capacity = c
+		device.Capacity = c
 	}
 	return wrapDevice{Device: *device}
 }
@@ -307,17 +310,17 @@ func (in wrapDevice) withNodeSelection(nodeSelection any) wrapDevice {
 	device := inDevice.DeepCopy()
 	switch nodeSelection := nodeSelection.(type) {
 	case *v1.NodeSelector:
-		device.Basic.NodeSelector = nodeSelection
+		device.NodeSelector = nodeSelection
 	case string:
 		if nodeSelection == nodeSelectionAll {
-			device.Basic.AllNodes = func() *bool {
+			device.AllNodes = func() *bool {
 				r := true
 				return &r
 			}()
 		} else if nodeSelection == nodeSelectionPerDevice {
 			panic("nodeSelectionPerDevice is not supported for devices")
 		} else {
-			device.Basic.NodeName = &nodeSelection
+			device.NodeName = &nodeSelection
 		}
 	default:
 		panic(fmt.Sprintf("unexpected nodeSelection type %T: %+v", nodeSelection, nodeSelection))
@@ -365,14 +368,14 @@ func slice(name string, nodeSelection any, pool, driver string, devices ...wrapD
 		slice.Spec.NodeSelector = nodeSelection
 	case string:
 		if nodeSelection == nodeSelectionAll {
-			slice.Spec.AllNodes = true
+			slice.Spec.AllNodes = ptr.To(true)
 		} else if nodeSelection == nodeSelectionPerDevice {
 			slice.Spec.PerDeviceNodeSelection = func() *bool {
 				r := true
 				return &r
 			}()
 		} else {
-			slice.Spec.NodeName = nodeSelection
+			slice.Spec.NodeName = ptr.To(nodeSelection)
 		}
 	default:
 		panic(fmt.Sprintf("unexpected nodeSelection type %T: %+v", nodeSelection, nodeSelection))
@@ -744,10 +747,12 @@ func TestAllocator(t *testing.T) {
 		},
 		"devices-split-across-different-slices": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-				Name:            req0,
-				Count:           2,
-				AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-				DeviceClassName: classA,
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					Count:           2,
+					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+					DeviceClassName: classA,
+				},
 			})),
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(
@@ -857,9 +862,11 @@ func TestAllocator(t *testing.T) {
 		},
 		"all-devices-single": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-				Name:            req0,
-				AllocationMode:  resourceapi.DeviceAllocationModeAll,
-				DeviceClassName: classA,
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				},
 			})),
 			classes: objects(class(classA, driverA)),
 			slices:  unwrap(sliceWithOneDevice(slice1, node1, pool1, driverA)),
@@ -872,9 +879,11 @@ func TestAllocator(t *testing.T) {
 		},
 		"all-devices-many": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-				Name:            req0,
-				AllocationMode:  resourceapi.DeviceAllocationModeAll,
-				DeviceClassName: classA,
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				},
 			})),
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(
@@ -891,10 +900,12 @@ func TestAllocator(t *testing.T) {
 		},
 		"all-devices-of-the-incomplete-pool": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-				Name:            req0,
-				AllocationMode:  resourceapi.DeviceAllocationModeAll,
-				Count:           1,
-				DeviceClassName: classA,
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					Count:           1,
+					DeviceClassName: classA,
+				},
 			})),
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(
@@ -913,15 +924,19 @@ func TestAllocator(t *testing.T) {
 		"all-devices-plus-another": {
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeAll,
-					DeviceClassName: classA,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeAll,
+						DeviceClassName: classA,
+					},
 				}),
 				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-					Count:           1,
-					DeviceClassName: classB,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						Count:           1,
+						DeviceClassName: classB,
+					},
 				}),
 			),
 			classes: objects(
@@ -948,15 +963,19 @@ func TestAllocator(t *testing.T) {
 		"all-devices-plus-another-reversed": {
 			claimsToAllocate: objects(
 				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-					Count:           1,
-					DeviceClassName: classB,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						Count:           1,
+						DeviceClassName: classB,
+					},
 				}),
 				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeAll,
-					DeviceClassName: classA,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeAll,
+						DeviceClassName: classA,
+					},
 				}),
 			),
 			classes: objects(
@@ -983,15 +1002,19 @@ func TestAllocator(t *testing.T) {
 		"all-devices-many-plus-another": {
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeAll,
-					DeviceClassName: classA,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeAll,
+						DeviceClassName: classA,
+					},
 				}),
 				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-					Count:           1,
-					DeviceClassName: classB,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						Count:           1,
+						DeviceClassName: classB,
+					},
 				}),
 			),
 			classes: objects(
@@ -1022,15 +1045,19 @@ func TestAllocator(t *testing.T) {
 		"all-devices-many-plus-another-reversed": {
 			claimsToAllocate: objects(
 				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-					Count:           1,
-					DeviceClassName: classB,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						Count:           1,
+						DeviceClassName: classB,
+					},
 				}),
 				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeAll,
-					DeviceClassName: classA,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeAll,
+						DeviceClassName: classA,
+					},
 				}),
 			),
 			classes: objects(
@@ -1062,15 +1089,19 @@ func TestAllocator(t *testing.T) {
 			// One device, two claims both trying to allocate it.
 			claimsToAllocate: objects(
 				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-					Count:           1,
-					DeviceClassName: classA,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						Count:           1,
+						DeviceClassName: classA,
+					},
 				}),
 				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeAll,
-					DeviceClassName: classA,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeAll,
+						DeviceClassName: classA,
+					},
 				}),
 			),
 			classes: objects(
@@ -1085,15 +1116,19 @@ func TestAllocator(t *testing.T) {
 			// One device, two claims both trying to allocate it.
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeAll,
-					DeviceClassName: classA,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeAll,
+						DeviceClassName: classA,
+					},
 				}),
 				claimWithRequests(claim1, nil, resourceapi.DeviceRequest{
-					Name:            req0,
-					AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-					Count:           1,
-					DeviceClassName: classA,
+					Name: req0,
+					Exactly: &resourceapi.ExactDeviceRequest{
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						Count:           1,
+						DeviceClassName: classA,
+					},
 				}),
 			),
 			classes: objects(
@@ -1106,9 +1141,11 @@ func TestAllocator(t *testing.T) {
 		},
 		"all-devices-slice-without-devices": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-				Name:            req0,
-				AllocationMode:  resourceapi.DeviceAllocationModeAll,
-				DeviceClassName: classA,
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				},
 			})),
 			classes:       objects(class(classA, driverA)),
 			slices:        unwrap(sliceWithNoDevices(slice1, node1, pool1, driverA)),
@@ -1117,9 +1154,11 @@ func TestAllocator(t *testing.T) {
 		},
 		"all-devices-no-slices": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-				Name:            req0,
-				AllocationMode:  resourceapi.DeviceAllocationModeAll,
-				DeviceClassName: classA,
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				},
 			})),
 			classes:       objects(class(classA, driverA)),
 			slices:        nil,
@@ -1128,9 +1167,11 @@ func TestAllocator(t *testing.T) {
 		},
 		"all-devices-some-allocated": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-				Name:            req0,
-				AllocationMode:  resourceapi.DeviceAllocationModeAll,
-				DeviceClassName: classA,
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				},
 			})),
 			allocatedDevices: []DeviceID{
 				MakeDeviceID(driverA, pool1, device1),
@@ -1148,8 +1189,8 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: func() []wrapResourceClaim {
 				c := claim(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
-				c.Spec.Devices.Requests[0].AllocationMode = resourceapi.DeviceAllocationModeAll
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
+				c.Spec.Devices.Requests[0].Exactly.AllocationMode = resourceapi.DeviceAllocationModeAll
 				return []wrapResourceClaim{c}
 			}(),
 			allocatedDevices: []DeviceID{
@@ -1172,11 +1213,11 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: func() []wrapResourceClaim {
 				c := claimWithRequests(claim0, nil, request(req0, classA, 1), request(req1, classA, 1))
-				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 				// Second request for `All` cannot be fulfilled because
 				// the first request claims a device.
-				c.Spec.Devices.Requests[1].AdminAccess = ptr.To(true)
-				c.Spec.Devices.Requests[1].AllocationMode = resourceapi.DeviceAllocationModeAll
+				c.Spec.Devices.Requests[1].Exactly.AdminAccess = ptr.To(true)
+				c.Spec.Devices.Requests[1].Exactly.AllocationMode = resourceapi.DeviceAllocationModeAll
 				return []wrapResourceClaim{c}
 			}(),
 			classes: objects(class(classA, driverA)),
@@ -1192,9 +1233,9 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: func() []wrapResourceClaim {
 				c := claim(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
-				c.Spec.Devices.Requests[0].AllocationMode = resourceapi.DeviceAllocationModeExactCount
-				c.Spec.Devices.Requests[0].Count = 2
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
+				c.Spec.Devices.Requests[0].Exactly.AllocationMode = resourceapi.DeviceAllocationModeExactCount
+				c.Spec.Devices.Requests[0].Exactly.Count = 2
 				return []wrapResourceClaim{c}
 			}(),
 			allocatedDevices: []DeviceID{
@@ -1217,10 +1258,10 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: func() []wrapResourceClaim {
 				c1 := claim(claim0, req0, classA)
-				c1.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				c1.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 
 				c2 := claim(claim1, req0, classA)
-				c2.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				c2.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 				return []wrapResourceClaim{c1, c2}
 			}(),
 			classes: objects(class(classA, driverA)),
@@ -1245,7 +1286,7 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: func() []wrapResourceClaim {
 				admin := claim(claim1, req0, classA)
-				admin.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				admin.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 				return []wrapResourceClaim{claim(claim0, req0, classA), admin}
 			}(),
 			classes: objects(class(classA, driverA)),
@@ -1451,7 +1492,7 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: func() []wrapResourceClaim {
 				c := claim(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 				return []wrapResourceClaim{c}
 			}(),
 			classes: objects(class(classA, driverA)),
@@ -1467,7 +1508,7 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: func() []wrapResourceClaim {
 				c := claim(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 				return []wrapResourceClaim{c}
 			}(),
 			allocatedDevices: []DeviceID{
@@ -1555,7 +1596,7 @@ func TestAllocator(t *testing.T) {
 						[]resourceapi.DeviceConstraint{{MatchAttribute: &intAttribute}},
 						request(req0, classA, 0),
 					)
-					claim.Spec.Devices.Requests[0].AllocationMode = resourceapi.DeviceAllocationModeAll
+					claim.Spec.Devices.Requests[0].Exactly.AllocationMode = resourceapi.DeviceAllocationModeAll
 					return claim
 				}(),
 			),
@@ -1735,7 +1776,7 @@ func TestAllocator(t *testing.T) {
 			claimsToAllocate: objects(
 				func() wrapResourceClaim {
 					claim := claim(claim0, req0, classA)
-					claim.Spec.Devices.Requests[0].Selectors = []resourceapi.DeviceSelector{
+					claim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{
 						{ /* empty = unknown future selector */ },
 					}
 					return claim
@@ -1751,7 +1792,7 @@ func TestAllocator(t *testing.T) {
 			claimsToAllocate: objects(
 				func() wrapResourceClaim {
 					claim := claim(claim0, req0, classA)
-					claim.Spec.Devices.Requests[0].AllocationMode = resourceapi.DeviceAllocationMode("future-mode")
+					claim.Spec.Devices.Requests[0].Exactly.AllocationMode = resourceapi.DeviceAllocationMode("future-mode")
 					return claim
 				}(),
 			),
@@ -1777,23 +1818,11 @@ func TestAllocator(t *testing.T) {
 
 			expectError: gomega.MatchError(gomega.ContainSubstring("empty constraint (unsupported constraint type?)")),
 		},
-		"unknown-device": {
-			claimsToAllocate: objects(claim(claim0, req0, classA)),
-			classes:          objects(class(classA, driverA)),
-			slices: unwrap(
-				func() wrapResourceSlice {
-					slice := sliceWithOneDevice(slice1, node1, pool1, driverA)
-					slice.Spec.Devices[0].Basic = nil /* empty = unknown future extension */
-					return slice
-				}(),
-			),
-			node: node(node1, region1),
-		},
 		"invalid-CEL-one-device": {
 			claimsToAllocate: objects(
 				func() wrapResourceClaim {
 					claim := claim(claim0, req0, classA)
-					claim.Spec.Devices.Requests[0].Selectors = []resourceapi.DeviceSelector{
+					claim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{
 						{CEL: &resourceapi.CELDeviceSelector{Expression: "noSuchVar"}},
 					}
 					return claim
@@ -1823,10 +1852,10 @@ func TestAllocator(t *testing.T) {
 			claimsToAllocate: objects(
 				func() wrapResourceClaim {
 					claim := claim(claim0, req0, classA)
-					claim.Spec.Devices.Requests[0].Selectors = []resourceapi.DeviceSelector{
+					claim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{
 						{CEL: &resourceapi.CELDeviceSelector{Expression: "noSuchVar"}},
 					}
-					claim.Spec.Devices.Requests[0].AllocationMode = resourceapi.DeviceAllocationModeAll
+					claim.Spec.Devices.Requests[0].Exactly.AllocationMode = resourceapi.DeviceAllocationModeAll
 					return claim
 				}(),
 			),
@@ -3252,7 +3281,7 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: func() []wrapResourceClaim {
 				c := claim(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 				return []wrapResourceClaim{c}
 			}(),
 			allocatedDevices: []DeviceID{
@@ -3272,7 +3301,7 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: func() []wrapResourceClaim {
 				c := claim(claim0, req0, classA)
-				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				c.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 				return []wrapResourceClaim{c}
 			}(),
 			allocatedDevices: []DeviceID{
@@ -3295,9 +3324,11 @@ func TestAllocator(t *testing.T) {
 				DeviceTaints: true,
 			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-				Name:            req0,
-				AllocationMode:  resourceapi.DeviceAllocationModeAll,
-				DeviceClassName: classA,
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				},
 			})),
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
@@ -3310,9 +3341,11 @@ func TestAllocator(t *testing.T) {
 				DeviceTaints: false,
 			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
-				Name:            req0,
-				AllocationMode:  resourceapi.DeviceAllocationModeAll,
-				DeviceClassName: classA,
+				Name: req0,
+				Exactly: &resourceapi.ExactDeviceRequest{
+					AllocationMode:  resourceapi.DeviceAllocationModeAll,
+					DeviceClassName: classA,
+				},
 			})),
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(slice(slice1, node1, pool1, driverA,
@@ -3522,4 +3555,62 @@ func (l informerLister[T]) Get(name string) (*T, error) {
 		}
 	}
 	return nil, apierrors.NewNotFound(schema.GroupResource{}, "not found")
+}
+
+func TestInterrupt(t *testing.T) {
+	for _, name := range []string{"off", "timeout", "deadline", "cancel"} {
+		t.Run(name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			g := gomega.NewWithT(t)
+
+			// This testcase is a smaller variant of the one in https://github.com/kubernetes/kubernetes/issues/131730#issuecomment-2873598287.
+			// That one took over 30 seconds, this one here only 0.07 seconds.
+			// But even that is too long when we interrupt in the near future or
+			// even before starting...
+			classLister := informerLister[resourceapi.DeviceClass]{
+				objs: []*resourceapi.DeviceClass{class(classA, driverA)},
+			}
+			claimsToAllocate := unwrap(claimWithRequests(claim0, nil,
+				request(req0, classA, 6),
+			))
+			slices := unwrap(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil),
+				device(device2, nil, nil),
+				device(device3, nil, nil),
+				device(device4, nil, nil),
+				device("device-5", nil, nil),
+			))
+			node := node(node1, region1)
+
+			switch name {
+			case "off":
+			case "timeout":
+				c, cancel := context.WithTimeout(ctx, time.Nanosecond)
+				defer cancel()
+				ctx = c
+			case "deadline":
+				c, cancel := context.WithDeadline(ctx, time.Now())
+				defer cancel()
+				ctx = c
+			case "cancel":
+				c, cancel := context.WithCancel(ctx)
+				cancel()
+				ctx = c
+			}
+
+			allocator, err := NewAllocator(ctx, Features{}, claimsToAllocate, nil, classLister, slices, cel.NewCache(1))
+			g.Expect(err).ToNot(gomega.HaveOccurred())
+			_, err = allocator.Allocate(ctx, node)
+			t.Logf("got error %v", err)
+			if ctx.Err() != nil {
+				if !errors.Is(err, ctx.Err()) {
+					t.Fatalf("expected %v, got error: %v", ctx.Err(), err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
+			}
+		})
+	}
 }
