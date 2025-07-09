@@ -713,7 +713,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 		apiServerID: "",
 	}
 	keyID := "1"
-	kmsv2Probe.state.Store(&envelopekmsv2.State{EncryptedObject: kmstypes.EncryptedObject{KeyID: keyID}})
+	kmsv2Probe.state.Store(&envelopekmsv2.State{EncryptedObjectKeyID: keyID})
 
 	testCases := []struct {
 		desc    string
@@ -1888,8 +1888,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			state:       envelopekmsv2.State{},
 			statusKeyID: "1",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "1"},
-				ExpirationTimestamp: now.Add(3 * time.Minute),
+				EncryptedObjectKeyID: "1",
+				ExpirationTimestamp:  now.Add(3 * time.Minute),
 			},
 			wantEncryptCalls: 1,
 			wantLogs: []string{
@@ -1905,8 +1905,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			state:       validState(t, "2", now, false),
 			statusKeyID: "2",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2"},
-				ExpirationTimestamp: now.Add(3 * time.Minute),
+				EncryptedObjectKeyID: "2",
+				ExpirationTimestamp:  now.Add(3 * time.Minute),
 			},
 			wantEncryptCalls: 0,
 			wantLogs:         nil,
@@ -1919,8 +1919,9 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			useSeed:     true,
 			statusKeyID: "2",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2", EncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED},
-				ExpirationTimestamp: now.Add(3 * time.Minute),
+				EncryptedObjectKeyID:                  "2",
+				EncryptedObjectEncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED,
+				ExpirationTimestamp:                   now.Add(3 * time.Minute),
 			},
 			wantEncryptCalls: 1,
 			wantLogs: []string{
@@ -1936,8 +1937,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			state:       validState(t, "2", now, true),
 			statusKeyID: "2",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2"},
-				ExpirationTimestamp: now.Add(3 * time.Minute),
+				EncryptedObjectKeyID: "2",
+				ExpirationTimestamp:  now.Add(3 * time.Minute),
 			},
 			wantEncryptCalls: 1,
 			wantLogs: []string{
@@ -1954,8 +1955,9 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			useSeed:     true,
 			statusKeyID: "2",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2", EncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED},
-				ExpirationTimestamp: now.Add(3 * time.Minute),
+				EncryptedObjectKeyID:                  "2",
+				EncryptedObjectEncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED,
+				ExpirationTimestamp:                   now.Add(3 * time.Minute),
 			},
 			wantEncryptCalls: 0,
 			wantLogs:         nil,
@@ -1968,8 +1970,9 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			useSeed:     defaultUseSeed,
 			statusKeyID: "2",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2", EncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED},
-				ExpirationTimestamp: now.Add(3 * time.Minute),
+				EncryptedObjectKeyID:                  "2",
+				EncryptedObjectEncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED,
+				ExpirationTimestamp:                   now.Add(3 * time.Minute),
 			},
 			wantEncryptCalls: 1,
 			wantLogs: []string{
@@ -1986,8 +1989,9 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			useSeed:     defaultUseSeed,
 			statusKeyID: "2",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2", EncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED},
-				ExpirationTimestamp: now.Add(3 * time.Minute),
+				EncryptedObjectKeyID:                  "2",
+				EncryptedObjectEncryptedDEKSourceType: kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED,
+				ExpirationTimestamp:                   now.Add(3 * time.Minute),
 			},
 			wantEncryptCalls: 0,
 			wantLogs:         nil,
@@ -1999,8 +2003,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			state:       validState(t, "3", now.Add(-time.Hour), false),
 			statusKeyID: "3",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "3"},
-				ExpirationTimestamp: now.Add(3 * time.Minute),
+				EncryptedObjectKeyID: "3",
+				ExpirationTimestamp:  now.Add(3 * time.Minute),
 			},
 			wantEncryptCalls: 0,
 			wantLogs:         nil,
@@ -2012,8 +2016,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			state:       validState(t, "3", now.Add(-time.Hour), false),
 			statusKeyID: "4",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "4"},
-				ExpirationTimestamp: now.Add(3 * time.Minute),
+				EncryptedObjectKeyID: "4",
+				ExpirationTimestamp:  now.Add(3 * time.Minute),
 			},
 			wantEncryptCalls: 1,
 			wantLogs: []string{
@@ -2029,8 +2033,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			state:       validState(t, "4", now.Add(7*time.Minute), false),
 			statusKeyID: "5",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "4"},
-				ExpirationTimestamp: now.Add(7 * time.Minute),
+				EncryptedObjectKeyID: "4",
+				ExpirationTimestamp:  now.Add(7 * time.Minute),
 			},
 			wantEncryptCalls: 1,
 			wantLogs: []string{
@@ -2061,8 +2065,8 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			state:       validState(t, "2", now, false),
 			statusKeyID: "3",
 			wantState: envelopekmsv2.State{
-				EncryptedObject:     kmstypes.EncryptedObject{KeyID: "2"},
-				ExpirationTimestamp: now,
+				EncryptedObjectKeyID: "2",
+				ExpirationTimestamp:  now,
 			},
 			wantEncryptCalls: 1,
 			wantLogs: []string{
@@ -2099,7 +2103,7 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 				t.Errorf("log mismatch (-want +got):\n%s", diff)
 			}
 
-			ignoredFields := sets.NewString("Transformer", "EncryptedObject.EncryptedDEKSource", "UID", "CacheKey")
+			ignoredFields := sets.NewString("Transformer", "EncryptedObjectEncryptedDEKSource", "UID", "CacheKey")
 
 			gotState := *h.state.Load()
 
@@ -2110,15 +2114,15 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 			}
 
 			if len(cmp.Diff(tt.wantState, gotState)) > 0 { // we only need to run this check when the state changes
-				validCiphertext := len(gotState.EncryptedObject.EncryptedDEKSource) > 0
+				validCiphertext := len(gotState.EncryptedObjectEncryptedDEKSource) > 0
 				if tt.useSeed {
-					validCiphertext = validCiphertext && gotState.EncryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
+					validCiphertext = validCiphertext && gotState.EncryptedObjectEncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
 				} else {
-					validCiphertext = validCiphertext && gotState.EncryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_AES_GCM_KEY
+					validCiphertext = validCiphertext && gotState.EncryptedObjectEncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_AES_GCM_KEY
 				}
 				if !validCiphertext {
 					t.Errorf("invalid ciphertext with useSeed=%v, encryptedDEKSourceLen=%d, encryptedDEKSourceType=%d", tt.useSeed,
-						len(gotState.EncryptedObject.EncryptedDEKSource), gotState.EncryptedObject.EncryptedDEKSourceType)
+						len(gotState.EncryptedObjectEncryptedDEKSource), gotState.EncryptedObjectEncryptedDEKSourceType)
 				}
 			}
 
@@ -2170,10 +2174,13 @@ func validState(t *testing.T, keyID string, exp time.Time, useSeed bool) envelop
 		t.Fatal(err)
 	}
 	return envelopekmsv2.State{
-		Transformer:         transformer,
-		EncryptedObject:     *encObject,
-		ExpirationTimestamp: exp,
-		CacheKey:            cacheKey,
+		Transformer:                           transformer,
+		EncryptedObjectKeyID:                  encObject.KeyID,
+		EncryptedObjectEncryptedDEKSource:     encObject.EncryptedDEKSource,
+		EncryptedObjectAnnotations:            encObject.Annotations,
+		EncryptedObjectEncryptedDEKSourceType: encObject.EncryptedDEKSourceType,
+		ExpirationTimestamp:                   exp,
+		CacheKey:                              cacheKey,
 	}
 }
 
