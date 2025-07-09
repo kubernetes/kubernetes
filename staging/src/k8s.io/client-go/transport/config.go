@@ -77,6 +77,11 @@ type Config struct {
 	//
 	// socks5 proxying does not currently support spdy streaming endpoints.
 	Proxy func(*http.Request) (*url.URL, error)
+	
+	// Context is the context for the transport. It can be used to cancel
+	// background processes associated with the transport. If nil,
+	// context.Background() will be used.
+	Context context.Context
 }
 
 // DialHolder is used to make the wrapped function comparable so that it can be used as a map key.
@@ -135,6 +140,7 @@ type TLSConfig struct {
 	CertFile       string // Path of the PEM-encoded client certificate.
 	KeyFile        string // Path of the PEM-encoded client key.
 	ReloadTLSFiles bool   // Set to indicate that the original config provided files, and that they should be reloaded
+	ReloadCAFiles  bool   // Set to indicate that CA files should be reloaded from disk on each connection
 
 	Insecure   bool   // Server should be accessed without verifying the certificate. For testing only.
 	ServerName string // Override for the server name passed to the server for SNI and used to verify certificates.

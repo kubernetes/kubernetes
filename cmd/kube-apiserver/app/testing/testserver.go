@@ -427,10 +427,12 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if err != nil {
 		return result, err
 	}
+	t.Logf("Completed config created.")
 	completed, err := config.Complete()
 	if err != nil {
 		return result, err
 	}
+	t.Logf("Creating server chain...")
 	server, err := app.CreateServerChain(completed)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
@@ -449,7 +451,10 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 			errCh <- err
 		}
 	}()
-
+	
+	server.GenericAPIServer.LoopbackClientConfig.Context = tCtx	
+	fmt.Printf("The context of the LoopbackClientConfig is %v", server.GenericAPIServer.LoopbackClientConfig.Context)
+	fmt.Printf("The context of the LoopbackClientConfig is %v", server.GenericAPIServer.LoopbackClientConfig.Context)
 	client, err := kubernetes.NewForConfig(server.GenericAPIServer.LoopbackClientConfig)
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)

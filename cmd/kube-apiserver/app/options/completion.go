@@ -40,6 +40,7 @@ type completedOptions struct {
 type CompletedOptions struct {
 	// Embed a private pointer that cannot be instantiated outside of this package.
 	*completedOptions
+	Context context.Context
 }
 
 // Complete set default ServerRunOptions.
@@ -88,6 +89,7 @@ func (s *ServerRunOptions) Complete(ctx context.Context) (CompletedOptions, erro
 
 	return CompletedOptions{
 		completedOptions: &completed,
+		Context: ctx,
 	}, nil
 }
 

@@ -109,6 +109,7 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			Extra:    c.Impersonate.Extra,
 		},
 		Proxy: c.Proxy,
+		Context: c.Context,
 	}
 
 	if c.Dial != nil {

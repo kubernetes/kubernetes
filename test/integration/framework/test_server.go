@@ -78,7 +78,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	if err != nil {
 		t.Fatalf("Couldn't create temp dir: %v", err)
 	}
-
+	
 	var errCh chan error
 	tearDownFn := func() {
 		// Calling cancel function is stopping apiserver and cleaning up
@@ -226,10 +226,12 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	}()
 
 	// Adjust the loopback config for external use (external server name and CA)
+	kubeAPIServerConfig.ControlPlane.Generic.LoopbackClientConfig.Context = ctx	
 	kubeAPIServerClientConfig := rest.CopyConfig(kubeAPIServerConfig.ControlPlane.Generic.LoopbackClientConfig)
 	kubeAPIServerClientConfig.CAFile = path.Join(certDir, "apiserver.crt")
 	kubeAPIServerClientConfig.CAData = nil
 	kubeAPIServerClientConfig.ServerName = ""
+	kubeAPIServerClientConfig.Context = ctx
 
 	// wait for health
 	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
@@ -242,6 +244,8 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		healthzConfig := rest.CopyConfig(kubeAPIServerClientConfig)
 		healthzConfig.ContentType = ""
 		healthzConfig.AcceptContentTypes = ""
+		healthzConfig.Context = ctx
+		t.Log("healthzConfig context is: %v", healthzConfig.Context)
 		kubeClient, err := client.NewForConfig(healthzConfig)
 		if err != nil {
 			// this happens because we race the API server start

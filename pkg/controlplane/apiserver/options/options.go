@@ -106,6 +106,7 @@ type completedOptions struct {
 type CompletedOptions struct {
 	// Embed a private pointer that cannot be instantiated outside of this package.
 	*completedOptions
+	Context context.Context
 }
 
 // NewOptions creates a new ServerRunOptions object with default parameters
@@ -286,6 +287,7 @@ func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternate
 
 	return CompletedOptions{
 		completedOptions: &completed,
+		Context: ctx,
 	}, nil
 }
 
