@@ -53,9 +53,9 @@ func Test(t *testing.T) {
 		ShortNameTypedefField: "",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
-		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
-		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=k8s-ip"),
+		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=k8s-ip"),
+		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=k8s-ip"),
 		field.Invalid(field.NewPath("shortNameField"), nil, "").WithOrigin("format=k8s-short-name"),
 		field.Invalid(field.NewPath("shortNamePtrField"), nil, "").WithOrigin("format=k8s-short-name"),
 		field.Invalid(field.NewPath("shortNameTypedefField"), nil, "").WithOrigin("format=k8s-short-name"),
@@ -72,9 +72,9 @@ func Test(t *testing.T) {
 		ShortNameTypedefField: "Not a ShortName",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
-		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
-		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=k8s-ip"),
+		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=k8s-ip"),
+		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=k8s-ip"),
 		field.Invalid(field.NewPath("shortNameField"), nil, "").WithOrigin("format=k8s-short-name"),
 		field.Invalid(field.NewPath("shortNamePtrField"), nil, "").WithOrigin("format=k8s-short-name"),
 		field.Invalid(field.NewPath("shortNameTypedefField"), nil, "").WithOrigin("format=k8s-short-name"),
