@@ -24,6 +24,7 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -60,7 +61,7 @@ func StartCompactor(ctx context.Context, client *clientv3.Client, compactInterva
 	}
 
 	if compactInterval != 0 {
-		go compactor(ctx, client, compactInterval)
+		go compactor(ctx, client, clock.RealClock{}, compactInterval)
 	}
 }
 
@@ -69,7 +70,7 @@ func StartCompactor(ctx context.Context, client *clientv3.Client, compactInterva
 // In other words, after compaction, it will only contain keys set during last interval.
 // Any API call for the older versions of keys will return error.
 // Interval is the time interval between each compaction. The first compaction happens after "interval".
-func compactor(ctx context.Context, client *clientv3.Client, interval time.Duration) {
+func compactor(ctx context.Context, client *clientv3.Client, clock clock.Clock, interval time.Duration) {
 	// Technical definitions:
 	// We have a special key in etcd defined as *compactRevKey*.
 	// compactRevKey's value will be set to the string of last compacted revision.
@@ -114,7 +115,7 @@ func compactor(ctx context.Context, client *clientv3.Client, interval time.Durat
 	var err error
 	for {
 		select {
-		case <-time.After(interval):
+		case <-clock.After(interval):
 		case <-ctx.Done():
 			return
 		}
