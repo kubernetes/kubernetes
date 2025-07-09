@@ -67,7 +67,7 @@ func Test_MakeDockerKeyring(t *testing.T) {
 			expectedAuthConfigs: []credentialprovider.TrackedAuthConfig{
 				{
 					Source: &credentialprovider.CredentialSource{
-						Secret: credentialprovider.SecretCoordinates{
+						Secret: &credentialprovider.SecretCoordinates{
 							Name: "s1", Namespace: "ns1", UID: "uid1"},
 					},
 					AuthConfig: credentialprovider.AuthConfig{
@@ -95,7 +95,7 @@ func Test_MakeDockerKeyring(t *testing.T) {
 			expectedAuthConfigs: []credentialprovider.TrackedAuthConfig{
 				{
 					Source: &credentialprovider.CredentialSource{
-						Secret: credentialprovider.SecretCoordinates{
+						Secret: &credentialprovider.SecretCoordinates{
 							Name: "s1", Namespace: "ns1", UID: "uid1"},
 					},
 					AuthConfig: credentialprovider.AuthConfig{
@@ -123,7 +123,7 @@ func Test_MakeDockerKeyring(t *testing.T) {
 			expectedAuthConfigs: []credentialprovider.TrackedAuthConfig{
 				{
 					Source: &credentialprovider.CredentialSource{
-						Secret: credentialprovider.SecretCoordinates{
+						Secret: &credentialprovider.SecretCoordinates{
 							Name: "s1", Namespace: "ns1", UID: "uid1"},
 					},
 					AuthConfig: credentialprovider.AuthConfig{
@@ -151,7 +151,7 @@ func Test_MakeDockerKeyring(t *testing.T) {
 			expectedAuthConfigs: []credentialprovider.TrackedAuthConfig{
 				{
 					Source: &credentialprovider.CredentialSource{
-						Secret: credentialprovider.SecretCoordinates{
+						Secret: &credentialprovider.SecretCoordinates{
 							Name: "s1", Namespace: "ns1", UID: "uid1"},
 					},
 					AuthConfig: credentialprovider.AuthConfig{
@@ -314,7 +314,7 @@ func Test_MakeDockerKeyring(t *testing.T) {
 			expectedAuthConfigs: []credentialprovider.TrackedAuthConfig{
 				{
 					Source: &credentialprovider.CredentialSource{
-						Secret: credentialprovider.SecretCoordinates{
+						Secret: &credentialprovider.SecretCoordinates{
 							Name: "s1", Namespace: "ns1", UID: "uid1"},
 					},
 					AuthConfig: credentialprovider.AuthConfig{
