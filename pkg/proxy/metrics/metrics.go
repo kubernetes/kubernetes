@@ -105,10 +105,10 @@ var (
 	// NetworkProgrammingQueueLatency tracks the time spent waiting in queue before obtaining the sync lock
 	NetworkProgrammingQueueLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Subsystem: kubeProxySubsystem,
-			Name:      "network_programming_queue_duration_seconds",
-			Help:      "Network programming queue latency in seconds",
-			Buckets:   metrics.ExponentialBuckets(0.001, 2, 15),
+			Subsystem:      kubeProxySubsystem,
+			Name:           "network_programming_queue_duration_seconds",
+			Help:           "Network programming queue latency in seconds",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"ip_family"},
