@@ -52,14 +52,13 @@ func runValidation(t *testing.T, scheme *runtime.Scheme, options []string, unver
 		t.Fatal(err)
 	}
 	for _, unversionedGVK := range unversionedGVKs {
+		// skip if passed in unversioned object is not internal.
+		if unversionedGVK.Version != runtime.APIVersionInternal {
+			continue
+		}
 		gvs := scheme.VersionsForGroupKind(unversionedGVK.GroupKind())
 		for _, gv := range gvs {
 			gvk := gv.WithKind(unversionedGVK.Kind)
-			// skip if the version is not the same as the unversioned object.
-			// We should not convert between different versions of the same object.
-			if gvk.Version != unversionedGVK.Version {
-				continue
-			}
 			t.Run(gvk.String(), func(t *testing.T) {
 				if gvk.Version != runtime.APIVersionInternal { // skip internal
 					versioned, err := scheme.New(gvk)
@@ -83,14 +82,13 @@ func runUpdateValidation(t *testing.T, scheme *runtime.Scheme, options []string,
 		t.Fatal(err)
 	}
 	for _, unversionedGVK := range unversionedGVKs {
+		// skip if passed in unversioned object is not internal.
+		if unversionedGVK.Version != runtime.APIVersionInternal {
+			continue
+		}
 		gvs := scheme.VersionsForGroupKind(unversionedGVK.GroupKind())
 		for _, gv := range gvs {
 			gvk := gv.WithKind(unversionedGVK.Kind)
-			// skip if the version is not the same as the unversioned object.
-			// We should not convert between different versions of the same object.
-			if gvk.Version != unversionedGVK.Version {
-				continue
-			}
 			t.Run(gvk.String(), func(t *testing.T) {
 				if gvk.Version != runtime.APIVersionInternal { // skip internal
 					versionedNew, err := scheme.New(gvk)
