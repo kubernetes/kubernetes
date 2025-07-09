@@ -1935,10 +1935,10 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 				for e := 0; e < resourceapi.ResourceSliceMaxDevices; e++ {
 					device := resourceapi.Device{
 						Name:       devicePrefix + strings.Repeat("x", validation.DNS1035LabelMaxLength-len(devicePrefix)-6) + fmt.Sprintf("%06d", numDevices),
-						Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice),
+						Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDeviceAfterMixins),
 					}
 					numDevices++
-					for j := 0; j < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; j++ {
+					for j := 0; j < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDeviceAfterMixins; j++ {
 						name := resourceapi.QualifiedName(domain + "/" + strings.Repeat("x", resourceapi.DeviceMaxIDLength-4) + fmt.Sprintf("%04d", j))
 						device.Attributes[name] = resourceapi.DeviceAttribute{
 							StringValue: &stringValue,
