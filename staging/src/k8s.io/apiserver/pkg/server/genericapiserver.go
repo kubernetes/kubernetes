@@ -57,6 +57,8 @@ import (
 	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/statusz"
 	openapibuilder3 "k8s.io/kube-openapi/pkg/builder3"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
@@ -457,6 +459,10 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 		klog.Errorf("Failed to install readyz shutdown check %s", err)
 	}
 	s.installReadyz()
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
+		statusz.Install(s.Handler.NonGoRestfulMux, "apiserver", statusz.NewRegistry(s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
+	}
 
 	return preparedGenericAPIServer{s}
 }

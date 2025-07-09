@@ -36,7 +36,7 @@ Up: %s
 Go version: %s
 Binary version: %v
 Emulation version: %v
-
+Useful Endpoints:  /livez /readyz
 `
 
 const wantTmplWithoutEmulation = `
@@ -48,7 +48,7 @@ Up: %s
 Go version: %s
 Binary version: %v
 
-
+Useful Endpoints:  /livez /readyz
 `
 
 const wantTmplWithKubeApiserverComp = `
