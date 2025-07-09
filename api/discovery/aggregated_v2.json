@@ -1411,73 +1411,6 @@
               "categories": [
                 "api-extensions"
               ],
-              "resource": "validatingadmissionpolicies",
-              "responseKind": {
-                "group": "",
-                "kind": "ValidatingAdmissionPolicy",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicy",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "ValidatingAdmissionPolicy",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "categories": [
-                "api-extensions"
-              ],
-              "resource": "validatingadmissionpolicybindings",
-              "responseKind": {
-                "group": "",
-                "kind": "ValidatingAdmissionPolicyBinding",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicybinding",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1beta1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "categories": [
-                "api-extensions"
-              ],
               "resource": "mutatingadmissionpolicies",
               "responseKind": {
                 "group": "",
@@ -1772,6 +1705,107 @@
         "name": "resource.k8s.io"
       },
       "versions": [
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "deviceclasses",
+              "responseKind": {
+                "group": "",
+                "kind": "DeviceClass",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "deviceclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceclaims",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClaim",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclaim",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "ResourceClaim",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceclaimtemplates",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClaimTemplate",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclaimtemplate",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceslices",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceSlice",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "resourceslice",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
+          "version": "v1"
+        },
         {
           "freshness": "Current",
           "resources": [

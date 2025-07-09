@@ -481,6 +481,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.34"
 - name: EventedPLEG
   versionedSpecs:
   - default: false

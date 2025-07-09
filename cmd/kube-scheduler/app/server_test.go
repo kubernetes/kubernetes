@@ -105,6 +105,7 @@ profiles:
       - name: NodePorts
       - name: InterPodAffinity
       - name: TaintToleration
+      - name: DynamicResources
       disabled:
       - name: "*"
     preFilter:
@@ -249,13 +250,18 @@ leaderElection:
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": func() *config.Plugins {
 					plugins := defaults.ExpandedPluginsV1.DeepCopy()
+					// With this (and only this?!) config comes DynamicResources after DefaultPreemption.
+					plugins.PreEnqueue.Enabled[1], plugins.PreEnqueue.Enabled[2] = plugins.PreEnqueue.Enabled[2], plugins.PreEnqueue.Enabled[1]
+					plugins.PostFilter.Enabled[0], plugins.PostFilter.Enabled[1] = plugins.PostFilter.Enabled[1], plugins.PostFilter.Enabled[0]
 					plugins.Filter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
+						{Name: "DynamicResources"},
 					}
 					plugins.PreFilter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
+						{Name: "DynamicResources"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
 						{Name: "VolumeBinding"},
