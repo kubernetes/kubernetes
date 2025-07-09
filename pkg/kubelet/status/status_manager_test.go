@@ -1261,6 +1261,10 @@ func TestSetContainerReadiness(t *testing.T) {
 	}
 
 	m := newTestManager(&fake.Clientset{})
+
+	// set container ready status to a pod not exist should not panic
+	m.SetContainerReadiness(logger, types.UID("some-uid"), cID1, true)
+
 	// Add test pod because the container spec has been changed.
 	m.podManager.(mutablePodManager).AddPod(pod)
 
@@ -1347,6 +1351,10 @@ func TestSetContainerStartup(t *testing.T) {
 	}
 
 	m := newTestManager(&fake.Clientset{})
+
+	logger.Info("Setting non-existent pod startup should have no effect")
+	m.SetContainerStartup(logger, "some_uid", cID1, true)
+
 	// Add test pod because the container spec has been changed
 	m.podManager.(mutablePodManager).AddPod(pod)
 
@@ -1374,6 +1382,12 @@ func TestSetContainerStartup(t *testing.T) {
 	verifyUpdates(t, m, 1) // Started = nil to false
 	status = expectPodStatus(t, m, pod)
 	verifyStartup("c1 ready", &status, true, false, false)
+
+	logger.Info("Setting an already startup container should have no effect")
+	m.SetContainerStartup(logger, pod.UID, cID1, true)
+	verifyUpdates(t, m, 0)
+	status = expectPodStatus(t, m, pod)
+	verifyStartup("unchanged", &status, true, false, false)
 
 	logger.Info("Setting both containers to ready should update pod startup")
 	m.SetContainerStartup(logger, pod.UID, cID2, true)
@@ -1501,6 +1515,23 @@ func TestDeletePodBeforeFinished(t *testing.T) {
 	m.SetPodStatus(logger, pod, status)
 	t.Logf("Expect not to see a delete action as the pod isn't finished yet (TerminatePod isn't called)")
 	verifyActions(t, m, []core.Action{getAction(), patchAction()})
+}
+
+func TestDeletePodNonTerminalPhase(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	for _, testPhase := range []v1.PodPhase{v1.PodPending, v1.PodRunning, v1.PodUnknown} {
+		pod := getTestPod()
+		t.Logf("Set the deletion timestamp.")
+		pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+		client := fake.NewSimpleClientset(pod)
+		m := newTestManager(client)
+		m.podManager.(mutablePodManager).AddPod(pod)
+		status := getRandomPodStatus()
+		status.Phase = testPhase
+		m.SetPodStatus(logger, pod, status)
+		t.Logf("Expect not to see a delete action as the pod isn't in valid terminal phase")
+		verifyActions(t, m, []core.Action{getAction(), patchAction()})
+	}
 }
 
 func TestDeletePodFinished(t *testing.T) {
@@ -2227,5 +2258,137 @@ func getPodStatus() v1.PodStatus {
 			},
 		},
 		Message: "Message",
+	}
+}
+
+func TestNeedToReconcilePodReadiness(t *testing.T) {
+	tests := []struct {
+		name     string
+		pod      *v1.Pod
+		expected bool
+	}{
+		{
+			name: "pod without readiness gates should not need reconciliation",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "pod with no condition record should not need reconciliation",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					ReadinessGates: []v1.PodReadinessGate{
+						{ConditionType: v1.PodConditionType("custom-gate")},
+					},
+				},
+				Status: v1.PodStatus{
+					Phase:      v1.PodRunning,
+					Conditions: []v1.PodCondition{},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "pod with satisfied readiness gates should not need reconciliation when ready condition is true",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					ReadinessGates: []v1.PodReadinessGate{
+						{ConditionType: v1.PodConditionType("custom-gate")},
+					},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.PodReady,
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:   v1.ContainersReady,
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:   v1.PodConditionType("custom-gate"),
+							Status: v1.ConditionTrue,
+						},
+					},
+					ContainerStatuses: []v1.ContainerStatus{},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "pod with mismatched condition message should need reconciliation",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					ReadinessGates: []v1.PodReadinessGate{
+						{ConditionType: v1.PodConditionType("custom-gate")},
+					},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Conditions: []v1.PodCondition{
+						{
+							Type:    v1.PodReady,
+							Status:  v1.ConditionFalse,
+							Reason:  ReadinessGatesNotReady,
+							Message: "different message",
+						},
+						{
+							Type:   v1.ContainersReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+					ContainerStatuses: []v1.ContainerStatus{},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "pod with mismatched condition status should need reconciliation",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					ReadinessGates: []v1.PodReadinessGate{
+						{ConditionType: v1.PodConditionType("custom-gate")},
+					},
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					Conditions: []v1.PodCondition{
+						{
+							Type:    v1.PodReady,
+							Status:  v1.ConditionTrue,
+							Reason:  ReadinessGatesNotReady,
+							Message: "corresponding condition of pod readiness gate \"custom-gate\" does not exist.",
+						},
+						{
+							Type:   v1.ContainersReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+					ContainerStatuses: []v1.ContainerStatus{},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := NeedToReconcilePodReadiness(test.pod)
+			if result != test.expected {
+				t.Errorf("NeedToReconcilePodReadiness() = %v, expected %v", result, test.expected)
+			}
+		})
 	}
 }
