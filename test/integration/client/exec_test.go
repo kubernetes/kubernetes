@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -608,7 +607,7 @@ func (is *informerSpy) waitForEvents(t *testing.T, wantEvents bool) {
 			t.Fatalf("wanted events, but got error: %v", err)
 		}
 	} else {
-		if !errors.Is(err, wait.ErrWaitTimeout) {
+		if !wait.Interrupted(err) {
 			if err != nil {
 				t.Fatalf("wanted no events, but got error: %v", err)
 			} else {

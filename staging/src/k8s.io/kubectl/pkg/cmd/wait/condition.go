@@ -174,7 +174,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 		return err
 	})
 	if err != nil {
-		if errors.Is(err, wait.ErrWaitTimeout) { // nolint:staticcheck // SA1019
+		if wait.Interrupted(err) { // nolint:staticcheck // SA1019
 			return result, false, errWaitTimeoutWithName
 		}
 		return result, false, err
