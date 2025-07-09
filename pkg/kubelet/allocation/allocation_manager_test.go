@@ -521,16 +521,17 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	testPod3.Namespace = "ns2"
 
 	tests := []struct {
-		name                  string
-		originalRequests      v1.ResourceList
-		newRequests           v1.ResourceList
-		originalLimits        v1.ResourceList
-		newLimits             v1.ResourceList
-		newResourcesAllocated bool // Whether the new requests have already been allocated (but not actuated)
-		expectedAllocatedReqs v1.ResourceList
-		expectedAllocatedLims v1.ResourceList
-		expectedResize        []*v1.PodCondition
-		annotations           map[string]string
+		name                   string
+		originalRequests       v1.ResourceList
+		newRequests            v1.ResourceList
+		originalLimits         v1.ResourceList
+		newLimits              v1.ResourceList
+		newResourcesAllocated  bool // Whether the new requests have already been allocated (but not actuated)
+		expectedAllocatedReqs  v1.ResourceList
+		expectedAllocatedLims  v1.ResourceList
+		expectedResize         []*v1.PodCondition
+		expectPodSyncTriggered string
+		annotations            map[string]string
 	}{
 		{
 			name:                  "Request CPU and memory decrease - expect InProgress",
@@ -544,6 +545,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Status: "True",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "Request CPU increase, memory decrease - expect InProgress",
@@ -557,6 +559,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Status: "True",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "Request CPU decrease, memory increase - expect InProgress",
@@ -570,6 +573,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Status: "True",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "Request CPU and memory increase beyond current capacity - expect Deferred",
@@ -585,6 +589,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Message: "",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "Request CPU decrease and memory increase beyond current capacity - expect Deferred",
@@ -600,6 +605,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Message: "Node didn't have enough resource: memory",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "Request memory increase beyond node capacity - expect Infeasible",
@@ -615,6 +621,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Message: "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "Request CPU increase beyond node capacity - expect Infeasible",
@@ -630,6 +637,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Message: "Node didn't have enough capacity: cpu, requested: 5000, capacity: 4000",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "CPU increase in progress - expect InProgress",
@@ -667,6 +675,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Message: "In-place resize of static-pods is not supported",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "Increase CPU from min shares",
@@ -680,6 +689,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Status: "True",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "Decrease CPU to min shares",
@@ -693,6 +703,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Status: "True",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "Increase CPU from min limit",
@@ -709,6 +720,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Status: "True",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 		{
 			name:                  "Decrease CPU to min limit",
@@ -725,6 +737,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Status: "True",
 				},
 			},
+			expectPodSyncTriggered: "true",
 		},
 	}
 
@@ -828,6 +841,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					resizeStatus[i].Message = tt.expectedResize[i].Message
 				}
 				assert.Equal(t, tt.expectedResize, resizeStatus)
+				assert.Equal(t, tt.expectPodSyncTriggered, newPod.Annotations["pod-sync-triggered"], "pod sync annotation should be set")
 			})
 		}
 	}
@@ -1000,6 +1014,7 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 				resizeStatus[i].Message = tt.expectedResize[i].Message
 			}
 			assert.Equal(t, tt.expectedResize, resizeStatus)
+			assert.Equal(t, "true", newPod.Annotations["pod-sync-triggered"], "pod sync annotation should be set")
 		})
 	}
 }
@@ -1011,7 +1026,13 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 	allocationManager := NewInMemoryManager(
 		containerManager,
 		statusManager,
-		func(pod *v1.Pod) { /* no-op for testing */ },
+		func(pod *v1.Pod) {
+			/* For testing, just mark the pod as having a pod sync triggered in an annotation. */
+			if pod.Annotations == nil {
+				pod.Annotations = make(map[string]string)
+			}
+			pod.Annotations["pod-sync-triggered"] = "true"
+		},
 		func() []*v1.Pod { return allocatedPods },
 		func(uid types.UID) (*v1.Pod, bool) {
 			for _, p := range allocatedPods {
