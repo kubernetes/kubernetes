@@ -1187,7 +1187,7 @@ type ImagePullCredentials struct {
 	// secrets that were used to pull the image.
 	// +optional
 	// +listType=set
-	KubernetesSecrets []ImagePullSecret `json:"kubernetesSecrets"`
+	KubernetesSecrets []ImagePullSecret `json:"kubernetesSecrets,omitempty"`
 
 	// NodePodsAccessible is a flag denoting the pull credentials are accessible
 	// by all the pods on the node, or that no credentials are needed for the pull.
