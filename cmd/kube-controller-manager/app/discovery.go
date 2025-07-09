@@ -21,7 +21,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
@@ -37,9 +36,9 @@ func newEndpointSliceControllerDescriptor() *ControllerDescriptor {
 }
 
 func newEndpointSliceController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("endpointslice-controller")
+	client, err := controllerContext.NewClient("endpointslice-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	esc := endpointslicecontroller.NewController(
@@ -66,9 +65,9 @@ func newEndpointSliceMirroringControllerDescriptor() *ControllerDescriptor {
 }
 
 func newEndpointSliceMirroringController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("endpointslicemirroring-controller")
+	client, err := controllerContext.NewClient("endpointslicemirroring-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	esmc := endpointslicemirroringcontroller.NewController(

@@ -18,7 +18,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
@@ -33,9 +32,9 @@ func newClusterRoleAggregrationControllerDescriptor() *ControllerDescriptor {
 }
 
 func newClusterRoleAggregationController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("clusterrole-aggregation-controller")
+	client, err := controllerContext.NewClient("clusterrole-aggregation-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	crac := clusterroleaggregation.NewClusterRoleAggregation(

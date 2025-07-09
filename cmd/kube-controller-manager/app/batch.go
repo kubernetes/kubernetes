@@ -37,9 +37,9 @@ func newJobControllerDescriptor() *ControllerDescriptor {
 }
 
 func newJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("job-controller")
+	client, err := controllerContext.NewClient("job-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	jc, err := job.NewController(
@@ -66,9 +66,9 @@ func newCronJobControllerDescriptor() *ControllerDescriptor {
 }
 
 func newCronJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("cronjob-controller")
+	client, err := controllerContext.NewClient("cronjob-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	cj2c, err := cronjob.NewControllerV2(

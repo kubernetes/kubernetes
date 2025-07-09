@@ -41,7 +41,7 @@ func newValidatingAdmissionPolicyStatusControllerDescriptor() *ControllerDescrip
 func newValidatingAdmissionPolicyStatusController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 	discoveryClient, err := controllerContext.ClientBuilder.DiscoveryClient(names.ValidatingAdmissionPolicyStatusController)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create the discovery client for %s: %w", controllerName, err)
+		return nil, fmt.Errorf("failed to create discovery client for %s: %w", controllerName, err)
 	}
 
 	schemaResolver := resolver.NewDefinitionsSchemaResolver(openapi.GetOpenAPIDefinitions, k8sscheme.Scheme, apiextensionsscheme.Scheme).
@@ -52,9 +52,9 @@ func newValidatingAdmissionPolicyStatusController(ctx context.Context, controlle
 		RestMapper:     controllerContext.RESTMapper,
 	}
 
-	client, err := controllerContext.ClientBuilder.Client(names.ValidatingAdmissionPolicyStatusController)
+	client, err := controllerContext.NewClient(names.ValidatingAdmissionPolicyStatusController)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	c, err := validatingadmissionpolicystatus.NewController(

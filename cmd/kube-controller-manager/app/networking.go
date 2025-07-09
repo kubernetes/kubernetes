@@ -21,7 +21,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -40,9 +39,9 @@ func newServiceCIDRsControllerDescriptor() *ControllerDescriptor {
 }
 
 func newServiceCIDRsController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("service-cidrs-controller")
+	client, err := controllerContext.NewClient("service-cidrs-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	// TODO use component config

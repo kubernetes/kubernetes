@@ -59,9 +59,9 @@ func newCertificateSigningRequestSigningController(ctx context.Context, controll
 		return nil, fmt.Errorf("cannot specify default and per controller certs at the same time")
 	}
 
-	c, err := controllerContext.ClientBuilder.Client("certificate-controller")
+	c, err := controllerContext.NewClient("certificate-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	csrInformer := controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests()
@@ -189,9 +189,9 @@ func newCertificateSigningRequestApprovingControllerDescriptor() *ControllerDesc
 	}
 }
 func newCertificateSigningRequestApprovingController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("certificate-controller")
+	client, err := controllerContext.NewClient("certificate-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	ac := approver.NewCSRApprovingController(
@@ -212,9 +212,9 @@ func newCertificateSigningRequestCleanerControllerDescriptor() *ControllerDescri
 	}
 }
 func newCertificateSigningRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("certificate-controller")
+	client, err := controllerContext.NewClient("certificate-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	cc := cleaner.NewCSRCleanerController(
@@ -240,9 +240,9 @@ func newRootCACertificatePublisherController(ctx context.Context, controllerCont
 		return nil, err
 	}
 
-	client, err := controllerContext.ClientBuilder.Client("root-ca-cert-publisher")
+	client, err := controllerContext.NewClient("root-ca-cert-publisher")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	sac, err := rootcacertpublisher.NewPublisher(
@@ -291,9 +291,9 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(
 		certificatesv1beta1.SchemeGroupVersion:  ctbpublisher.NewBetaClusterTrustBundlePublisher,
 	}
 
-	apiserverSignerClient, err := controllerContext.ClientBuilder.Client("kube-apiserver-serving-clustertrustbundle-publisher")
+	apiserverSignerClient, err := controllerContext.NewClient("kube-apiserver-serving-clustertrustbundle-publisher")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	var runner ctbpublisher.PublisherRunner
@@ -346,9 +346,9 @@ func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion sch
 
 func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte, error) {
 	if controllerContext.ComponentConfig.SAController.RootCAFile == "" {
-		config, err := controllerContext.ClientBuilder.Config("root-ca-cert-publisher")
+		config, err := controllerContext.NewClientConfig("root-ca-cert-publisher")
 		if err != nil {
-			return nil, fmt.Errorf("failed to create a client config: %w", err)
+			return nil, err
 		}
 		return config.CAData, nil
 	}

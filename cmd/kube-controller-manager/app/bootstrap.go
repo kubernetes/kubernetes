@@ -34,9 +34,9 @@ func newBootstrapSignerControllerDescriptor() *ControllerDescriptor {
 }
 
 func newBootstrapSignerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("bootstrap-signer")
+	client, err := controllerContext.NewClient("bootstrap-signer")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	bsc, err := bootstrap.NewSigner(
@@ -62,9 +62,9 @@ func newTokenCleanerControllerDescriptor() *ControllerDescriptor {
 }
 
 func newTokenCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("token-cleaner")
+	client, err := controllerContext.NewClient("token-cleaner")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	tcc, err := bootstrap.NewTokenCleaner(

@@ -41,9 +41,9 @@ func newDaemonSetControllerDescriptor() *ControllerDescriptor {
 }
 
 func newDaemonSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("daemon-set-controller")
+	client, err := controllerContext.NewClient("daemon-set-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	dsc, err := daemon.NewDaemonSetsController(
@@ -73,9 +73,9 @@ func newStatefulSetControllerDescriptor() *ControllerDescriptor {
 }
 
 func newStatefulSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("statefulset-controller")
+	client, err := controllerContext.NewClient("statefulset-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	ssc := statefulset.NewStatefulSetController(
@@ -100,9 +100,9 @@ func newReplicaSetControllerDescriptor() *ControllerDescriptor {
 }
 
 func newReplicaSetController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("replicaset-controller")
+	client, err := controllerContext.NewClient("replicaset-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	rsc := replicaset.NewReplicaSetController(
@@ -126,9 +126,9 @@ func newDeploymentControllerDescriptor() *ControllerDescriptor {
 }
 
 func newDeploymentController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("deployment-controller")
+	client, err := controllerContext.NewClient("deployment-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	dc, err := deployment.NewDeploymentController(

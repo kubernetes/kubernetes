@@ -21,8 +21,6 @@ package app
 
 import (
 	"context"
-	"fmt"
-
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -38,14 +36,14 @@ func newDisruptionControllerDescriptor() *ControllerDescriptor {
 }
 
 func newDisruptionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("disruption-controller")
+	client, err := controllerContext.NewClient("disruption-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
-	config, err := controllerContext.ClientBuilder.Config("disruption-controller")
+	config, err := controllerContext.NewClientConfig("disruption-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client config: %w", err)
+		return nil, err
 	}
 
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())

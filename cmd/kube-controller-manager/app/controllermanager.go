@@ -22,6 +22,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/kubernetes"
 	"math/rand"
 	"net/http"
 	"os"
@@ -443,6 +444,24 @@ func (c ControllerContext) IsControllerEnabled(controllerDescriptor *ControllerD
 	return genericcontrollermanager.IsControllerEnabled(controllerDescriptor.Name(), controllersDisabledByDefault, c.ComponentConfig.Generic.Controllers)
 }
 
+// NewClientConfig is a shortcut for ClientBuilder.Config. It wraps the error with an additional message.
+func (c ControllerContext) NewClientConfig(name string) (*restclient.Config, error) {
+	config, err := c.ClientBuilder.Config(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes client config for %q: %w", name, err)
+	}
+	return config, nil
+}
+
+// NewClient is a shortcut for ClientBuilder.Client. It wraps the error with an additional message.
+func (c ControllerContext) NewClient(name string) (kubernetes.Interface, error) {
+	client, err := c.ClientBuilder.Client(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Kubernetes client for %q: %w", name, err)
+	}
+	return client, nil
+}
+
 // Runnable represents a loop implementing any piece of logic really.
 type Runnable interface {
 	// Run implements any kind of processing loop.
@@ -727,7 +746,7 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 
 	versionedClient, err := rootClientBuilder.Client("shared-informers")
 	if err != nil {
-		return ControllerContext{}, fmt.Errorf("failed to create a client: %w", err)
+		return ControllerContext{}, fmt.Errorf("failed to create Kubernetes client for %q: %w", "shared-informers", err)
 	}
 
 	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
@@ -802,8 +821,8 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 	unsecuredMux *mux.PathRecorderMux, healthzHandler HealthCheckAdder) ([]Controller, error) {
 	logger := klog.FromContext(ctx)
 	var (
-		controllers      []Controller
-		controllerChecks []healthz.HealthChecker
+		controllers []Controller
+		checks      []healthz.HealthChecker
 	)
 	buildController := func(controllerDesc *ControllerDescriptor) error {
 		controllerName := controllerDesc.Name()
@@ -834,7 +853,7 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 		}
 
 		controllers = append(controllers, ctrl)
-		controllerChecks = append(controllerChecks, check)
+		checks = append(checks, check)
 		return nil
 	}
 
@@ -848,7 +867,7 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 
 	// Each controller is passed a context where the logger has the name of
 	// the controller set through WithName. That name then becomes the prefix of
-	// of all log messages emitted by that controller.
+	// all log messages emitted by that controller.
 	//
 	// In StartController, an explicit "controller" key is used instead, for two reasons:
 	// - while contextual logging is alpha, klog.LoggerWithName is still a no-op,
@@ -866,14 +885,13 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 	}
 
 	// Register the checks.
-	if len(controllerChecks) > 0 {
-		healthzHandler.AddHealthChecker(controllerChecks...)
+	if len(checks) > 0 {
+		healthzHandler.AddHealthChecker(checks...)
 	}
 	return controllers, nil
 }
 
 // StartControllers starts all controllers and blocks until the context is cancelled and all controllers are terminated.
-// Any error from a controllers Start function will cause all controllers to terminate and return the error.
 func StartControllers(ctx context.Context, controllerCtx ControllerContext, controllers []Controller) {
 	logger := klog.FromContext(ctx)
 	var wg sync.WaitGroup
@@ -932,14 +950,14 @@ func newServiceAccountTokenController(
 	} else {
 		config, err := rootClientBuilder.Config("tokens-controller")
 		if err != nil {
-			return nil, fmt.Errorf("failed to create a client config: %w", err)
+			return nil, fmt.Errorf("failed to create Kubernetes client config for %q: %w", "tokens-controller", err)
 		}
 		rootCA = config.CAData
 	}
 
 	client, err := rootClientBuilder.Client("tokens-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, fmt.Errorf("failed to create Kubernetes client for %q: %w", "tokens-controller", err)
 	}
 
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, privateKey)

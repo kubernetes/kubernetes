@@ -50,17 +50,17 @@ func newSVMController(ctx context.Context, controllerContext ControllerContext, 
 	}
 
 	// svm controller can make a lot of requests during migration, keep it fast
-	config, err := controllerContext.ClientBuilder.Config(controllerName)
+	config, err := controllerContext.NewClientConfig(controllerName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client config: %w", err)
+		return nil, err
 	}
 
 	config.QPS *= 20
 	config.Burst *= 100
 
-	client, err := controllerContext.ClientBuilder.Client(controllerName)
+	client, err := controllerContext.NewClient(controllerName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	informer := controllerContext.InformerFactory.Storagemigration().V1alpha1().StorageVersionMigrations()
@@ -77,7 +77,7 @@ func newSVMController(ctx context.Context, controllerContext ControllerContext, 
 
 	metaClient, err := metadata.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create the metadata client for %s: %w", controllerName, err)
+		return nil, fmt.Errorf("failed to create metadata client for %s: %w", controllerName, err)
 	}
 
 	svmc := svm.NewSVMController(

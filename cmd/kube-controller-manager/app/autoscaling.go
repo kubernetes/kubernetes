@@ -43,14 +43,14 @@ func newHorizontalPodAutoscalerControllerDescriptor() *ControllerDescriptor {
 }
 
 func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	clientConfig, err := controllerContext.ClientBuilder.Config("horizontal-pod-autoscaler")
+	clientConfig, err := controllerContext.NewClientConfig("horizontal-pod-autoscaler")
 	if err != nil {
-		return nil, fmt.Errorf("failed to init client config for %s: %w", controllerName, err)
+		return nil, err
 	}
 
-	client, err := controllerContext.ClientBuilder.Client("horizontal-pod-autoscaler")
+	client, err := controllerContext.NewClient("horizontal-pod-autoscaler")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	// we don't use cached discovery because DiscoveryScaleKindResolver does its own caching,

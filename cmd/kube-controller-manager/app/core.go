@@ -153,9 +153,9 @@ func newNodeIpamController(ctx context.Context, controllerContext ControllerCont
 		return nil, err
 	}
 
-	client, err := controllerContext.ClientBuilder.Client("node-controller")
+	client, err := controllerContext.NewClient("node-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
@@ -187,9 +187,9 @@ func newNodeLifecycleControllerDescriptor() *ControllerDescriptor {
 }
 
 func newNodeLifecycleController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("node-controller")
+	client, err := controllerContext.NewClient("node-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	nlc, err := lifecyclecontroller.NewNodeLifecycleController(
@@ -229,9 +229,9 @@ func newTaintEvictionControllerDescriptor() *ControllerDescriptor {
 
 func newTaintEvictionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 	// taint-manager uses existing cluster role from node-controller
-	client, err := controllerContext.ClientBuilder.Client("node-controller")
+	client, err := controllerContext.NewClient("node-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	tec, err := tainteviction.New(
@@ -261,9 +261,9 @@ func newDeviceTaintEvictionControllerDescriptor() *ControllerDescriptor {
 }
 
 func newDeviceTaintEvictionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client(names.DeviceTaintEvictionController)
+	client, err := controllerContext.NewClient(names.DeviceTaintEvictionController)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	deviceTaintEvictionController := devicetainteviction.New(
@@ -324,9 +324,9 @@ func newPersistentVolumeBinderController(ctx context.Context, controllerContext 
 		return nil, fmt.Errorf("failed to probe volume plugins when starting persistentvolume controller: %w", err)
 	}
 
-	client, err := controllerContext.ClientBuilder.Client("persistent-volume-binder")
+	client, err := controllerContext.NewClient("persistent-volume-binder")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	params := persistentvolumecontroller.ControllerParameters{
@@ -366,9 +366,9 @@ func newPersistentVolumeAttachDetachController(ctx context.Context, controllerCo
 		return nil, fmt.Errorf("failed to probe volume plugins when starting attach/detach controller: %w", err)
 	}
 
-	client, err := controllerContext.ClientBuilder.Client("attachdetach-controller")
+	client, err := controllerContext.NewClient("attachdetach-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	ctx = klog.NewContext(ctx, logger)
@@ -412,9 +412,9 @@ func newPersistentVolumeExpanderController(ctx context.Context, controllerContex
 	}
 	csiTranslator := csitrans.New()
 
-	client, err := controllerContext.ClientBuilder.Client("expand-controller")
+	client, err := controllerContext.NewClient("expand-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	expandController, err := expand.NewExpandController(
@@ -441,9 +441,9 @@ func newEphemeralVolumeControllerDescriptor() *ControllerDescriptor {
 }
 
 func newEphemeralVolumeController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("ephemeral-volume-controller")
+	client, err := controllerContext.NewClient("ephemeral-volume-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	ephemeralController, err := ephemeral.NewController(
@@ -474,9 +474,9 @@ func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 }
 
 func newResourceClaimController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("resource-claim-controller")
+	client, err := controllerContext.NewClient("resource-claim-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	ephemeralController, err := resourceclaim.NewController(
@@ -507,9 +507,9 @@ func newEndpointsControllerDescriptor() *ControllerDescriptor {
 }
 
 func newEndpointsController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("endpoint-controller")
+	client, err := controllerContext.NewClient("endpoint-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	ec := endpointcontroller.NewEndpointController(
@@ -534,9 +534,9 @@ func newReplicationControllerDescriptor() *ControllerDescriptor {
 }
 
 func newReplicationController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("replication-controller")
+	client, err := controllerContext.NewClient("replication-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	rc := replicationcontroller.NewReplicationManager(
@@ -561,9 +561,9 @@ func newPodGarbageCollectorControllerDescriptor() *ControllerDescriptor {
 }
 
 func newPodGarbageCollectorController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("pod-garbage-collector")
+	client, err := controllerContext.NewClient("pod-garbage-collector")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	pgcc := podgc.NewPodGC(
@@ -585,9 +585,9 @@ func newResourceQuotaControllerDescriptor() *ControllerDescriptor {
 }
 
 func newResourceQuotaController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	resourceQuotaControllerClient, err := controllerContext.ClientBuilder.Client("resourcequota-controller")
+	resourceQuotaControllerClient, err := controllerContext.NewClient("resourcequota-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	resourceQuotaControllerDiscoveryClient, err := controllerContext.ClientBuilder.DiscoveryClient("resourcequota-controller")
@@ -646,9 +646,9 @@ func newNamespaceController(ctx context.Context, controllerContext ControllerCon
 	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
 	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
 	// including events), takes ~10 seconds by default.
-	nsKubeconfig, err := controllerContext.ClientBuilder.Config("namespace-controller")
+	nsKubeconfig, err := controllerContext.NewClientConfig("namespace-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client config: %w", err)
+		return nil, err
 	}
 
 	nsKubeconfig.QPS *= 20
@@ -656,7 +656,7 @@ func newNamespaceController(ctx context.Context, controllerContext ControllerCon
 
 	namespaceKubeClient, err := clientset.NewForConfig(nsKubeconfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	return newModifiedNamespaceController(ctx, controllerContext, controllerName, namespaceKubeClient, nsKubeconfig)
@@ -696,9 +696,9 @@ func newServiceAccountControllerDescriptor() *ControllerDescriptor {
 }
 
 func newServiceAccountController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("service-account-controller")
+	client, err := controllerContext.NewClient("service-account-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	sac, err := serviceaccountcontroller.NewServiceAccountsController(
@@ -725,9 +725,9 @@ func newTTLControllerDescriptor() *ControllerDescriptor {
 }
 
 func newTTLController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("ttl-controller")
+	client, err := controllerContext.NewClient("ttl-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	ttlc := ttlcontroller.NewTTLController(
@@ -759,9 +759,9 @@ func newGarbageCollectorController(ctx context.Context, controllerContext Contro
 		return nil, nil
 	}
 
-	client, err := controllerContext.ClientBuilder.Client("generic-garbage-collector")
+	client, err := controllerContext.NewClient("generic-garbage-collector")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	discoveryClient, err := controllerContext.ClientBuilder.DiscoveryClient("generic-garbage-collector")
@@ -769,9 +769,9 @@ func newGarbageCollectorController(ctx context.Context, controllerContext Contro
 		return nil, fmt.Errorf("failed to create the discovery client: %w", err)
 	}
 
-	config, err := controllerContext.ClientBuilder.Config("generic-garbage-collector")
+	config, err := controllerContext.NewClientConfig("generic-garbage-collector")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client config: %w", err)
+		return nil, err
 	}
 
 	// Increase garbage collector controller's throughput: each object deletion takes two API calls,
@@ -829,9 +829,9 @@ func newPersistentVolumeClaimProtectionControllerDescriptor() *ControllerDescrip
 }
 
 func newPersistentVolumeClaimProtectionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("pvc-protection-controller")
+	client, err := controllerContext.NewClient("pvc-protection-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	pvcProtectionController, err := pvcprotection.NewPVCProtectionController(
@@ -858,9 +858,9 @@ func newPersistentVolumeProtectionControllerDescriptor() *ControllerDescriptor {
 }
 
 func newPersistentVolumeProtectionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("pv-protection-controller")
+	client, err := controllerContext.NewClient("pv-protection-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	pvpc := pvprotection.NewPVProtectionController(
@@ -884,9 +884,9 @@ func newVolumeAttributesClassProtectionControllerDescriptor() *ControllerDescrip
 }
 
 func newVolumeAttributesClassProtectionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("volumeattributesclass-protection-controller")
+	client, err := controllerContext.NewClient("volumeattributesclass-protection-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	vacProtectionController, err := vacprotection.NewVACProtectionController(
@@ -914,9 +914,9 @@ func newTTLAfterFinishedControllerDescriptor() *ControllerDescriptor {
 }
 
 func newTTLAfterFinishedController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("ttl-after-finished-controller")
+	client, err := controllerContext.NewClient("ttl-after-finished-controller")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	ttlc := ttlafterfinished.New(
@@ -938,9 +938,9 @@ func newLegacyServiceAccountTokenCleanerControllerDescriptor() *ControllerDescri
 }
 
 func newLegacyServiceAccountTokenCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("legacy-service-account-token-cleaner")
+	client, err := controllerContext.NewClient("legacy-service-account-token-cleaner")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	cleanUpPeriod := controllerContext.ComponentConfig.LegacySATokenCleaner.CleanUpPeriod.Duration
@@ -1091,9 +1091,9 @@ func newStorageVersionGarbageCollectorControllerDescriptor() *ControllerDescript
 }
 
 func newStorageVersionGarbageCollectorController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client("storage-version-garbage-collector")
+	client, err := controllerContext.NewClient("storage-version-garbage-collector")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	svgcc := storageversiongc.NewStorageVersionGC(
@@ -1117,9 +1117,9 @@ func newSELinuxWarningControllerDescriptor() *ControllerDescriptor {
 }
 
 func newSELinuxWarningController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.ClientBuilder.Client(controllerName)
+	client, err := controllerContext.NewClient(controllerName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a client: %w", err)
+		return nil, err
 	}
 
 	logger := klog.FromContext(ctx)
