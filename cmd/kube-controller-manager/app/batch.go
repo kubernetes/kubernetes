@@ -52,9 +52,8 @@ func newJobController(ctx context.Context, controllerContext ControllerContext, 
 		return nil, fmt.Errorf("creating Job controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		jc.Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
-		return nil
 	}, controllerName), nil
 }
 
@@ -82,8 +81,7 @@ func newCronJobController(ctx context.Context, controllerContext ControllerConte
 		return nil, fmt.Errorf("creating CronJob controller V2: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		cj2c.Run(ctx, int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs))
-		return nil
 	}, controllerName), nil
 }

@@ -26,11 +26,11 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -262,10 +262,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 
 		// Actually start the controllers.
 		if len(controllers) > 0 {
-			if err := StartControllers(ctx, controllerContext, controllers); err != nil {
-				logger.Error(err, "Error starting controllers")
-				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-			}
+			StartControllers(ctx, controllerContext, controllers)
 		} else {
 			<-ctx.Done()
 		}
@@ -310,9 +307,9 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			// This wrapping is not exactly flawless as StartControllers uses type casting,
 			// which is now not possible for the wrapped controller.
 			// This fortunately doesn't matter for this particular controller.
-			return newNamedRunnable(runnableFunc(func(ctx context.Context) error {
+			return newNamedRunnable(runnableFunc(func(ctx context.Context) {
 				close(leaderMigrator.MigrationReady)
-				return ctrl.Start(ctx)
+				ctrl.Run(ctx)
 			}), controllerName), nil
 		}
 	}
@@ -446,24 +443,40 @@ func (c ControllerContext) IsControllerEnabled(controllerDescriptor *ControllerD
 	return genericcontrollermanager.IsControllerEnabled(controllerDescriptor.Name(), controllersDisabledByDefault, c.ComponentConfig.Generic.Controllers)
 }
 
-// Runnable is anything that can be run.
+// Runnable represents a loop implementing any piece of logic really.
 type Runnable interface {
-	// Start starts running the component. The component will stop running
-	// when the context is closed. Start blocks until the context is cancelled or
-	// an error occurs.
-	Start(context.Context) error
+	// Run implements any kind of processing loop.
+	// When there is anything to be done, it blocks until the context is cancelled.
+	// Run must ensure all goroutines are terminated before returning.
+	Run(context.Context)
 }
 
 // Controller defines the base interface that all controller wrappers must implement.
 type Controller interface {
-	Runnable
+	// Name returns the controller's canonical name.
 	Name() string
+
+	// Runnable is the main controller loop.
+	Runnable
 }
 
-type runnableFunc func(context.Context) error
+type runnableFunc func(context.Context)
 
-func (run runnableFunc) Start(ctx context.Context) error {
-	return run(ctx)
+func (run runnableFunc) Run(ctx context.Context) {
+	run(ctx)
+}
+
+type runnables []Runnable
+
+func (rx runnables) Run(ctx context.Context) {
+	var wg sync.WaitGroup
+	wg.Add(len(rx))
+	for _, r := range rx {
+		go func() {
+			defer wg.Done()
+			r.Run(ctx)
+		}()
+	}
 }
 
 type namedRunnable struct {
@@ -482,7 +495,7 @@ func newNamedRunnable(runnable Runnable, name string) *namedRunnable {
 	}
 }
 
-func newNamedRunnableFunc(fnc func(context.Context) error, name string) *namedRunnable {
+func newNamedRunnableFunc(fnc func(context.Context), name string) *namedRunnable {
 	return newNamedRunnable(runnableFunc(fnc), name)
 }
 
@@ -861,23 +874,26 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 
 // StartControllers starts all controllers and blocks until the context is cancelled and all controllers are terminated.
 // Any error from a controllers Start function will cause all controllers to terminate and return the error.
-func StartControllers(ctx context.Context, controllerCtx ControllerContext, controllers []Controller) error {
+func StartControllers(ctx context.Context, controllerCtx ControllerContext, controllers []Controller) {
 	logger := klog.FromContext(ctx)
-	eg, ctx := errgroup.WithContext(ctx)
+	var wg sync.WaitGroup
+	wg.Add(len(controllers))
 	for _, controller := range controllers {
-		eg.Go(func() error {
+		go func() {
+			defer wg.Done()
+
 			select {
 			case <-time.After(wait.Jitter(controllerCtx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter)):
 			case <-ctx.Done():
-				return nil
+				return
 			}
 
 			logger.V(1).Info("Controller starting...", "controller", controller.Name())
 			defer logger.V(1).Info("Controller terminated", "controller", controller.Name())
-			return controller.Start(ctx)
-		})
+			controller.Run(ctx)
+		}()
 	}
-	return eg.Wait()
+	wg.Wait()
 }
 
 // serviceAccountTokenControllerStarter is special because it must run first to set up permissions for other controllers.
@@ -944,9 +960,8 @@ func newServiceAccountTokenController(
 		return nil, fmt.Errorf("error creating Tokens controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		tokenController.Run(ctx, int(controllerContext.ComponentConfig.SAController.ConcurrentSATokenSyncs))
-		return nil
 	}, controllerName), nil
 }
 

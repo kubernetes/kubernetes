@@ -42,8 +42,7 @@ func newClusterRoleAggregationController(ctx context.Context, controllerContext 
 		controllerContext.InformerFactory.Rbac().V1().ClusterRoles(),
 		client.RbacV1(),
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		crac.Run(ctx, 5)
-		return nil
 	}, controllerName), nil
 }

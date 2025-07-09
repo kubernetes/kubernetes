@@ -49,10 +49,7 @@ func newBootstrapSignerController(ctx context.Context, controllerContext Control
 		return nil, fmt.Errorf("error creating BootstrapSigner controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		bsc.Run(ctx)
-		return nil
-	}, controllerName), nil
+	return newNamedRunnableFunc(bsc.Run, controllerName), nil
 }
 
 func newTokenCleanerControllerDescriptor() *ControllerDescriptor {
@@ -79,8 +76,5 @@ func newTokenCleanerController(ctx context.Context, controllerContext Controller
 		return nil, fmt.Errorf("error creating TokenCleaner controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		tcc.Run(ctx)
-		return nil
-	}, controllerName), nil
+	return newNamedRunnableFunc(tcc.Run, controllerName), nil
 }

@@ -18,10 +18,10 @@ package app
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
-	"golang.org/x/sync/errgroup"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
@@ -154,20 +154,22 @@ func TestController_DiscoveryError(t *testing.T) {
 				}
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			eg, ctx := errgroup.WithContext(ctx)
-			eg.Go(func() error {
-				namespaceController, err := newModifiedNamespaceController(
-					ctx, controllerContext, names.NamespaceController,
-					testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
-				if err != nil {
-					return err
-				}
+			namespaceController, err := newModifiedNamespaceController(
+				ctx, controllerContext, names.NamespaceController,
+				testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
+			if err != nil {
+				t.Fatal(err)
+			}
 
-				return namespaceController.Start(ctx)
-			})
+			ctx, cancel := context.WithCancel(ctx)
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				namespaceController.Run(ctx)
+			}()
 			cancel()
-			err := eg.Wait()
+			wg.Wait()
 			if test.expectedErr != (err != nil) {
 				t.Errorf("Namespace Controller test failed for use case: %v", name)
 			}

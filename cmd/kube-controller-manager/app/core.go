@@ -25,9 +25,9 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
@@ -173,9 +173,8 @@ func newNodeIpamController(ctx context.Context, controllerContext ControllerCont
 		return nil, err
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		nodeIpamController.RunWithMetrics(ctx, controllerContext.ControllerManagerMetrics)
-		return nil
 	}, controllerName), nil
 }
 
@@ -213,9 +212,8 @@ func newNodeLifecycleController(ctx context.Context, controllerContext Controlle
 		return nil, err
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		nlc.Run(ctx)
-		return nil
 	}, controllerName), nil
 }
 
@@ -247,10 +245,7 @@ func newTaintEvictionController(ctx context.Context, controllerContext Controlle
 		return nil, err
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		tec.Run(ctx)
-		return nil
-	}, controllerName), nil
+	return newNamedRunnableFunc(tec.Run, controllerName), nil
 }
 
 func newDeviceTaintEvictionControllerDescriptor() *ControllerDescriptor {
@@ -280,12 +275,11 @@ func newDeviceTaintEvictionController(ctx context.Context, controllerContext Con
 		controllerContext.InformerFactory.Resource().V1beta1().DeviceClasses(),
 		controllerName,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		if err := deviceTaintEvictionController.Run(ctx); err != nil {
 			klog.FromContext(ctx).Error(err, "Device taint processing leading to Pod eviction failed and is now paused")
 		}
 		<-ctx.Done()
-		return nil
 	}, controllerName), nil
 }
 
@@ -351,10 +345,7 @@ func newPersistentVolumeBinderController(ctx context.Context, controllerContext 
 		return nil, fmt.Errorf("failed to construct persistentvolume controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		volumeController.Run(ctx)
-		return nil
-	}, controllerName), nil
+	return newNamedRunnableFunc(volumeController.Run, controllerName), nil
 }
 
 func newPersistentVolumeAttachDetachControllerDescriptor() *ControllerDescriptor {
@@ -402,10 +393,7 @@ func newPersistentVolumeAttachDetachController(ctx context.Context, controllerCo
 		return nil, fmt.Errorf("failed to start attach/detach controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		attachDetachController.Run(ctx)
-		return nil
-	}, controllerName), nil
+	return newNamedRunnableFunc(attachDetachController.Run, controllerName), nil
 }
 
 func newPersistentVolumeExpanderControllerDescriptor() *ControllerDescriptor {
@@ -441,10 +429,7 @@ func newPersistentVolumeExpanderController(ctx context.Context, controllerContex
 		return nil, fmt.Errorf("failed to init volume expand controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		expandController.Run(ctx)
-		return nil
-	}, controllerName), nil
+	return newNamedRunnableFunc(expandController.Run, controllerName), nil
 }
 
 func newEphemeralVolumeControllerDescriptor() *ControllerDescriptor {
@@ -470,9 +455,8 @@ func newEphemeralVolumeController(ctx context.Context, controllerContext Control
 		return nil, fmt.Errorf("failed to init ephemeral volume controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.EphemeralVolumeController.ConcurrentEphemeralVolumeSyncs))
-		return nil
 	}, controllerName), nil
 }
 
@@ -509,9 +493,8 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 		return nil, fmt.Errorf("failed to init resource claim controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		ephemeralController.Run(ctx, defaultResourceClaimControllerWorkers)
-		return nil
 	}, controllerName), nil
 }
 
@@ -537,9 +520,8 @@ func newEndpointsController(ctx context.Context, controllerContext ControllerCon
 		client,
 		controllerContext.ComponentConfig.EndpointController.EndpointUpdatesBatchPeriod.Duration,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		ec.Run(ctx, int(controllerContext.ComponentConfig.EndpointController.ConcurrentEndpointSyncs))
-		return nil
 	}, controllerName), nil
 }
 
@@ -565,9 +547,8 @@ func newReplicationController(ctx context.Context, controllerContext ControllerC
 		replicationcontroller.BurstReplicas,
 	)
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		rc.Run(ctx, int(controllerContext.ComponentConfig.ReplicationController.ConcurrentRCSyncs))
-		return nil
 	}, controllerName), nil
 }
 
@@ -592,10 +573,7 @@ func newPodGarbageCollectorController(ctx context.Context, controllerContext Con
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		int(controllerContext.ComponentConfig.PodGCController.TerminatedPodGCThreshold),
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		pgcc.Run(ctx)
-		return nil
-	}, controllerName), nil
+	return newNamedRunnableFunc(pgcc.Run, controllerName), nil
 }
 
 func newResourceQuotaControllerDescriptor() *ControllerDescriptor {
@@ -638,19 +616,21 @@ func newResourceQuotaController(ctx context.Context, controllerContext Controlle
 		return nil, err
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		eg, ctx := errgroup.WithContext(ctx)
-		eg.Go(func() error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			resourceQuotaController.Run(ctx, int(controllerContext.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs))
-			return nil
-		})
+		}()
 
 		// Periodically the quota controller to detect new resource types
-		eg.Go(func() error {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
-			return nil
-		})
-		return eg.Wait()
+		}()
+		wg.Wait()
 	}, controllerName), nil
 }
 
@@ -702,9 +682,8 @@ func newModifiedNamespaceController(
 		controllerContext.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
 		v1.FinalizerKubernetes,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		namespaceController.Run(ctx, int(controllerContext.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs))
-		return nil
 	}, controllerName), nil
 }
 
@@ -732,9 +711,8 @@ func newServiceAccountController(ctx context.Context, controllerContext Controll
 		return nil, fmt.Errorf("error creating ServiceAccount controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		sac.Run(ctx, 1)
-		return nil
 	}, controllerName), nil
 }
 
@@ -757,9 +735,8 @@ func newTTLController(ctx context.Context, controllerContext ControllerContext, 
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		client,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		ttlc.Run(ctx, 5)
-		return nil
 	}, controllerName), nil
 }
 
@@ -823,22 +800,24 @@ func newGarbageCollectorController(ctx context.Context, controllerContext Contro
 	}, nil
 }
 
-func (c *garbageCollectorController) Start(ctx context.Context) error {
+func (c *garbageCollectorController) Run(ctx context.Context) {
 	workers := int(c.controllerContext.ComponentConfig.GarbageCollectorController.ConcurrentGCSyncs)
 	const syncPeriod = 30 * time.Second
-	eg, ctx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		c.Run(ctx, workers, syncPeriod)
-		return nil
-	})
 
-	// Periodically refresh the RESTMapper with new discovery information and sync
-	// the garbage collector.
-	eg.Go(func() error {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		c.GarbageCollector.Run(ctx, workers, syncPeriod)
+	}()
+
+	// Periodically refresh the RESTMapper with new discovery information and sync the garbage collector.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 		c.Sync(ctx, c.discoveryClient, syncPeriod)
-		return nil
-	})
-	return eg.Wait()
+	}()
+	wg.Wait()
 }
 
 func newPersistentVolumeClaimProtectionControllerDescriptor() *ControllerDescriptor {
@@ -865,9 +844,8 @@ func newPersistentVolumeClaimProtectionController(ctx context.Context, controlle
 		return nil, fmt.Errorf("failed to init the pvc protection controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		pvcProtectionController.Run(ctx, 1)
-		return nil
 	}, controllerName), nil
 }
 
@@ -890,9 +868,8 @@ func newPersistentVolumeProtectionController(ctx context.Context, controllerCont
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		client,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		pvpc.Run(ctx, 1)
-		return nil
 	}, controllerName), nil
 }
 
@@ -923,9 +900,8 @@ func newVolumeAttributesClassProtectionController(ctx context.Context, controlle
 		return nil, fmt.Errorf("failed to init the vac protection controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		vacProtectionController.Run(ctx, 1)
-		return nil
 	}, controllerName), nil
 }
 
@@ -948,9 +924,8 @@ func newTTLAfterFinishedController(ctx context.Context, controllerContext Contro
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		client,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		ttlc.Run(ctx, int(controllerContext.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs))
-		return nil
 	}, controllerName), nil
 }
 
@@ -984,10 +959,7 @@ func newLegacyServiceAccountTokenCleanerController(ctx context.Context, controll
 		return nil, fmt.Errorf("failed to init the legacy service account token cleaner: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		legacySATokenCleaner.Run(ctx)
-		return nil
-	}, controllerName), nil
+	return newNamedRunnableFunc(legacySATokenCleaner.Run, controllerName), nil
 }
 
 // processCIDRs is a helper function that works on a comma separated cidrs and returns
@@ -1130,10 +1102,7 @@ func newStorageVersionGarbageCollectorController(ctx context.Context, controller
 		controllerContext.InformerFactory.Coordination().V1().Leases(),
 		controllerContext.InformerFactory.Internal().V1alpha1().StorageVersions(),
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		svgcc.Run(ctx)
-		return nil
-	}, controllerName), nil
+	return newNamedRunnableFunc(svgcc.Run, controllerName), nil
 }
 
 func newSELinuxWarningControllerDescriptor() *ControllerDescriptor {
@@ -1174,8 +1143,7 @@ func newSELinuxWarningController(ctx context.Context, controllerContext Controll
 		return nil, fmt.Errorf("failed to start SELinux warning controller: %w", err)
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		seLinuxController.Run(ctx, 1)
-		return nil
 	}, controllerName), nil
 }

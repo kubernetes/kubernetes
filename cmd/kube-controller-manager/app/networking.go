@@ -52,8 +52,7 @@ func newServiceCIDRsController(ctx context.Context, controllerContext Controller
 		controllerContext.InformerFactory.Networking().V1().IPAddresses(),
 		client,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		scc.Run(ctx, 5)
-		return nil
 	}, controllerName), nil
 }

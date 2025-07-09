@@ -52,9 +52,8 @@ func newEndpointSliceController(ctx context.Context, controllerContext Controlle
 		client,
 		controllerContext.ComponentConfig.EndpointSliceController.EndpointUpdatesBatchPeriod.Duration,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		esc.Run(ctx, int(controllerContext.ComponentConfig.EndpointSliceController.ConcurrentServiceEndpointSyncs))
-		return nil
 	}, controllerName), nil
 }
 
@@ -81,8 +80,7 @@ func newEndpointSliceMirroringController(ctx context.Context, controllerContext 
 		client,
 		controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringEndpointUpdatesBatchPeriod.Duration,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		esmc.Run(ctx, int(controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringConcurrentServiceEndpointSyncs))
-		return nil
 	}, controllerName), nil
 }

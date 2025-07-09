@@ -19,8 +19,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"sync"
 
-	"golang.org/x/sync/errgroup"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -89,9 +89,11 @@ func newSVMController(ctx context.Context, controllerContext ControllerContext, 
 		controllerContext.RESTMapper,
 		controllerContext.GraphBuilder,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) error {
-		eg, ctx := errgroup.WithContext(ctx)
-		eg.Go(func() error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			svm.NewResourceVersionController(
 				ctx,
 				client,
@@ -100,13 +102,13 @@ func newSVMController(ctx context.Context, controllerContext ControllerContext, 
 				informer,
 				controllerContext.RESTMapper,
 			).Run(ctx)
-			return nil
-		})
+		}()
 
-		eg.Go(func() error {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			svmc.Run(ctx)
-			return nil
-		})
-		return eg.Wait()
+		}()
+		wg.Wait()
 	}, controllerName), nil
 }

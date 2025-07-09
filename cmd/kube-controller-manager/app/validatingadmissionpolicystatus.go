@@ -66,8 +66,7 @@ func newValidatingAdmissionPolicyStatusController(ctx context.Context, controlle
 		return nil, err
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) error {
+	return newNamedRunnableFunc(func(ctx context.Context) {
 		c.Run(ctx, int(controllerContext.ComponentConfig.ValidatingAdmissionPolicyStatusController.ConcurrentPolicySyncs))
-		return nil
 	}, controllerName), nil
 }
