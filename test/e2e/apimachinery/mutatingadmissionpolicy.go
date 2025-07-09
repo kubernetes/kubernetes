@@ -810,7 +810,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", feature
 		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
 		var itemsColWithoutFinalizer []admissionregistrationv1beta1.MutatingAdmissionPolicy
 		for _, item := range list.Items {
-			if !(item.GetDeletionTimestamp() != nil && len(item.GetFinalizers()) > 0) {
+			if item.GetDeletionTimestamp() == nil || len(item.GetFinalizers()) == 0 {
 				itemsColWithoutFinalizer = append(itemsColWithoutFinalizer, item)
 			}
 		}
@@ -1004,7 +1004,7 @@ var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", feature
 		list, err = client.List(ctx, metav1.ListOptions{LabelSelector: label})
 		var itemsColWithoutFinalizer []admissionregistrationv1beta1.MutatingAdmissionPolicyBinding
 		for _, item := range list.Items {
-			if !(item.GetDeletionTimestamp() != nil && len(item.GetFinalizers()) > 0) {
+			if item.GetDeletionTimestamp() == nil || len(item.GetFinalizers()) == 0 {
 				itemsColWithoutFinalizer = append(itemsColWithoutFinalizer, item)
 			}
 		}

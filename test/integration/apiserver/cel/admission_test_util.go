@@ -155,6 +155,8 @@ var (
 		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicybindings"):       true,
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicies"):         true,
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicybindings"):   true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicies"):          true,
+		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicybindings"):    true,
 		// transient resource exemption
 		gvr("authentication.k8s.io", "v1", "selfsubjectreviews"):       true,
 		gvr("authentication.k8s.io", "v1beta1", "selfsubjectreviews"):  true,
