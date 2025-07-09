@@ -444,7 +444,7 @@ function try-load-docker-image {
 
   # Deliberately word split load_image_command
   # shellcheck disable=SC2086
-  until timeout 30 ${load_image_command} "${img}"; do
+  until timeout 300 ${load_image_command} "${img}"; do
     if [[ "${attempt_num}" == "${max_attempts}" ]]; then
       echo "Fail to load docker image file ${img} using ${load_image_command} after ${max_attempts} retries. Exit!!"
       exit 1
