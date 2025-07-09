@@ -95,7 +95,7 @@ func (m ErrorMatcher) Render(e *Error) string {
 			if rv.Kind() == reflect.Pointer && !rv.IsNil() {
 				rv = rv.Elem()
 			}
-			if rv.CanInterface() {
+			if rv.IsValid() && rv.CanInterface() {
 				buf.WriteString(fmt.Sprintf("Value=%v", rv.Interface()))
 			} else {
 				buf.WriteString(fmt.Sprintf("Value=%v", e.BadValue))
