@@ -38,6 +38,13 @@ const (
 	// events for items popped off the FIFO.
 	AtomicFIFO Feature = "AtomicFIFO"
 
+	// owner: @yt2985
+	// alpha: 1.36
+	//
+	// If enabled, allows clients to gracefully handle Certificate Authority (CA)
+	// rotations without dropping connections or requiring a restart.
+	ClientsAllowCARotation Feature = "ClientsAllowCARotation"
+
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
 	// alpha: 1.32
@@ -91,6 +98,9 @@ const (
 var defaultVersionedKubernetesFeatureGates = map[Feature]VersionedSpecs{
 	AtomicFIFO: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: Beta},
+	},
+	ClientsAllowCARotation: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: Alpha},
 	},
 	ClientsAllowCBOR: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: Alpha},

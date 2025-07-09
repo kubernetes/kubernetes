@@ -24,9 +24,13 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
+
+	clientgofeaturegate "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 )
 
 func TestTLSConfigKey(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientgofeaturegate.ClientsAllowCARotation, true)
 	// Make sure config fields that don't affect the tls config don't affect the cache key
 	identicalConfigurations := map[string]*Config{
 		"empty":          {},
@@ -70,14 +74,18 @@ func TestTLSConfigKey(t *testing.T) {
 	// Make sure config fields that affect the tls config affect the cache key
 	dialer := net.Dialer{}
 	getCert := &GetCertHolder{GetCert: func() (*tls.Certificate, error) { return nil, nil }}
+	caFile, tearFun := writeCAFile(t, []byte(testCACert1))
+	defer tearFun(t)
 	uniqueConfigurations := map[string]*Config{
-		"proxy":    {Proxy: func(request *http.Request) (*url.URL, error) { return nil, nil }},
-		"no tls":   {},
-		"dialer":   {DialHolder: &DialHolder{Dial: dialer.DialContext}},
-		"dialer2":  {DialHolder: &DialHolder{Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil }}},
-		"insecure": {TLS: TLSConfig{Insecure: true}},
-		"cadata 1": {TLS: TLSConfig{CAData: []byte{1}}},
-		"cadata 2": {TLS: TLSConfig{CAData: []byte{2}}},
+		"proxy":                         {Proxy: func(request *http.Request) (*url.URL, error) { return nil, nil }},
+		"no tls":                        {},
+		"dialer":                        {DialHolder: &DialHolder{Dial: dialer.DialContext}},
+		"dialer2":                       {DialHolder: &DialHolder{Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil }}},
+		"insecure":                      {TLS: TLSConfig{Insecure: true}},
+		"cadata 1":                      {TLS: TLSConfig{CAData: []byte{1}}},
+		"cadata 2":                      {TLS: TLSConfig{CAData: []byte{2}}},
+		"with only ca file":             {TLS: TLSConfig{CAFile: caFile}},
+		"with both ca file and ca data": {TLS: TLSConfig{CAFile: caFile, CAData: []byte(testCACert1)}},
 		"cert 1, key 1": {
 			TLS: TLSConfig{
 				CertData: []byte{1},
@@ -186,5 +194,119 @@ func TestTLSConfigKey(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// TestTLSTransportCacheCARotation tests transport cache behavior with CA rotation
+func TestTLSTransportCacheCARotation(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientgofeaturegate.ClientsAllowCARotation, true)
+	caFile, tearFun := writeCAFile(t, []byte(testCACert1))
+	defer tearFun(t)
+	testCases := []struct {
+		name            string
+		config          *Config
+		expectWrapper   bool
+		expectCacheable bool
+	}{
+		{
+			name: "CA rotation should be enabled when only the CAFile is set",
+			config: &Config{
+				TLS: TLSConfig{
+					CAFile: caFile,
+				},
+			},
+			expectWrapper:   true,
+			expectCacheable: true,
+		},
+		{
+			name: "CA rotation should be disabled when both CAFile and CAData are set",
+			config: &Config{
+				TLS: TLSConfig{
+					CAFile: caFile,
+					CAData: []byte(testCACert1),
+				},
+			},
+			expectWrapper:   false,
+			expectCacheable: true,
+		},
+		{
+			name: "CA rotation should be disabled when only the CAData is set",
+			config: &Config{
+				TLS: TLSConfig{
+					CAData: []byte(testCACert1),
+				},
+			},
+			expectWrapper:   false,
+			expectCacheable: true,
+		},
+		{
+			name: "no TLS config",
+			config: &Config{
+				TLS: TLSConfig{},
+			},
+			expectWrapper:   false,
+			expectCacheable: false, // No TLS config means default transport
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create new cache for testing
+			tlsCaches := &tlsTransportCache{
+				transports: make(map[tlsCacheKey]http.RoundTripper),
+			}
+
+			rt, err := tlsCaches.get(tc.config)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if !tc.expectCacheable {
+				// Should return default transport
+				if rt != http.DefaultTransport {
+					t.Errorf("Expected default transport, got %T", rt)
+				}
+				return
+			}
+
+			if tc.expectWrapper {
+				// Should be wrapped in atomicTransportHolder
+				if _, ok := rt.(*atomicTransportHolder); !ok {
+					t.Errorf("Expected atomicTransportHolder, got %T", rt)
+				}
+				if !tc.config.TLS.ReloadCAFiles {
+					t.Errorf("Expected ReloadCAFiles to be true, got %v", tc.config.TLS.ReloadCAFiles)
+				}
+			} else {
+				// Should be a regular http.Transport
+				if _, ok := rt.(*http.Transport); !ok {
+					t.Errorf("Expected *http.Transport, got %T", rt)
+				}
+			}
+
+			// Test caching: second call should return the same instance
+			rt2, err := tlsCaches.get(tc.config)
+			if err != nil {
+				t.Fatalf("Unexpected error on second call: %v", err)
+			}
+
+			if rt != rt2 {
+				t.Error("Expected same transport instance from cache")
+			}
+
+			// Verify cache size
+			tlsCaches.mu.Lock()
+			cacheSize := len(tlsCaches.transports)
+			tlsCaches.mu.Unlock()
+
+			expectedCacheSize := 1
+			if !tc.expectCacheable {
+				expectedCacheSize = 0
+			}
+
+			if cacheSize != expectedCacheSize {
+				t.Errorf("Expected %d transports in cache, got %d", expectedCacheSize, cacheSize)
+			}
+		})
 	}
 }
