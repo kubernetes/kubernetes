@@ -566,6 +566,16 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
 		if allResourcesNamespaced {
+			if o.ExplicitNamespace {
+				client, err := f.KubernetesClientSet()
+				if err == nil {
+					_, err = client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{})
+					if apierrors.IsNotFound(err) {
+						fmt.Fprintf(o.ErrOut, "namespace %q not found\n", o.Namespace)
+						return utilerrors.NewAggregate(allErrs)
+					}
+				}
+			}
 			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		} else {
 			fmt.Fprintln(o.ErrOut, "No resources found")
