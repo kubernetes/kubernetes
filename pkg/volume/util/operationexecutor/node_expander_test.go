@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -45,6 +46,8 @@ func newFakeActualStateOfWorld() *fakeActualStateOfWorld {
 }
 
 func TestNodeExpander(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+
 	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeInfeasible
 
 	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
