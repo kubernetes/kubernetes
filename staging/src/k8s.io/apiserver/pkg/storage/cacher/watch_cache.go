@@ -935,3 +935,10 @@ func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) 
 	}
 	return ci, nil
 }
+
+func (w *watchCache) Compact(rev int64) {
+	if w.snapshots == nil {
+		return
+	}
+	w.snapshots.RemoveLess(uint64(rev))
+}

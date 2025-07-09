@@ -627,7 +627,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, watchCacheEnabled bool, recorder *KubernetesRecorder) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, compact Compaction, watchCacheEnabled bool, recorder *KubernetesRecorder) {
 	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -649,6 +649,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		t.Fatal(err)
 	}
 
+	initialRV2, _ := strconv.Atoi(initialRV)
+
 	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
 		pod := obj.(*example.Pod)
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
@@ -656,6 +658,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 	// Increase RV to test consistent List.
 	increaseRV(ctx, t)
 	currentRV := fmt.Sprintf("%d", continueRV+1)
+	compact(ctx, t, createdPods[0].ResourceVersion)
 
 	tests := []struct {
 		name                       string
@@ -671,6 +674,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		expectedRemainingItemCount *int64
 		expectError                bool
 		expectRVTooLarge           bool
+		expectRVTooOld             bool
+		expectContinueTooOld       bool
 		expectRV                   string
 		expectRVFunc               func(string) error
 		expectEtcdRequest          func() []RecordedList
@@ -715,13 +720,39 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:                   "0",
 		},
 		{
-			name:        "test List on existing key with resource version set before first write, match=Exact",
+			name:        "test List on existing key with resource version set before update, match=Exact",
 			prefix:      "/pods/first/",
 			pred:        storage.Everything,
-			expectedOut: []example.Pod{},
-			rv:          initialRV,
+			expectedOut: []example.Pod{*createdPods[0]},
+			rv:          createdPods[0].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    initialRV,
+			expectRV:    createdPods[0].ResourceVersion,
+		},
+		{
+			name:        "test List on existing key with resource version set before creation, match=Exact",
+			prefix:      "/pods/second/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{},
+			rv:          createdPods[0].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    createdPods[0].ResourceVersion,
+		},
+		{
+			name:        "test List on existing key with resource version set after creation, match=Exact",
+			prefix:      "/pods/second/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*createdPods[1]},
+			rv:          createdPods[1].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    createdPods[1].ResourceVersion,
+		},
+		{
+			name:           "test List on existing key with resource version set before first write, match=Exact",
+			prefix:         "/pods/first/",
+			pred:           storage.Everything,
+			rv:             initialRV,
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRVTooOld: true,
 		},
 		{
 			name:                 "test List on existing key with resource version set to 0, match=NotOlderThan",
@@ -916,7 +947,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
 		},
 		{
-			name:   "test List with limit at resource version before first write and match=Exact",
+			name:   "test List with limit at resource version before created and match=Exact",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
@@ -925,9 +956,23 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut:    []example.Pod{},
 			expectContinue: false,
-			rv:             initialRV,
+			rv:             createdPods[0].ResourceVersion,
 			rvMatch:        metav1.ResourceVersionMatchExact,
-			expectRV:       initialRV,
+			expectRV:       createdPods[0].ResourceVersion,
+		},
+		{
+			name:   "test List with limit at resource version after created and match=Exact",
+			prefix: "/pods/second/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:    []example.Pod{*createdPods[1]},
+			expectContinue: false,
+			rv:             createdPods[1].ResourceVersion,
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRV:       createdPods[1].ResourceVersion,
 		},
 		{
 			name:   "test List with pregenerated continue token",
@@ -1207,13 +1252,12 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		},
 		// match=Exact
 		{
-			name:        "test List with resource version set before first write, match=Exact",
-			prefix:      "/pods/",
-			pred:        storage.Everything,
-			expectedOut: []example.Pod{},
-			rv:          initialRV,
-			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    initialRV,
+			name:           "test List with resource version set before first write, match=Exact",
+			prefix:         "/pods/",
+			pred:           storage.Everything,
+			rv:             initialRV,
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRVTooOld: true,
 		},
 		{
 			name:        "test List with resource version of first write, match=Exact",
@@ -1429,6 +1473,29 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		},
 		// Continue
 		{
+			name:   "test List with continue, resource version before first write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(initialRV2)),
+			},
+			expectContinueTooOld: true,
+		},
+		{
+			name:   "test List with continue, resource version of first write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[0].ResourceVersion))),
+			},
+			expectedOut: []example.Pod{},
+			expectRV:    createdPods[0].ResourceVersion,
+		},
+		{
 			name:   "test List with continue, resource version of second write",
 			prefix: "/pods/",
 			pred: storage.SelectionPredicate{
@@ -1611,6 +1678,18 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			if tt.expectRVTooLarge {
 				if !storage.IsTooLargeResourceVersion(err) {
 					t.Fatalf("expecting resource version too high error, but get: %v", err)
+				}
+				return
+			}
+			if tt.expectRVTooOld {
+				if err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
+					t.Fatalf("expecting resource version too old error, but get: %v", err)
+				}
+				return
+			}
+			if tt.expectContinueTooOld {
+				if err == nil || !strings.Contains(err.Error(), "The provided continue parameter is too old to display a consistent list result") {
+					t.Fatalf("expecting continue too old error, but get: %v", err)
 				}
 				return
 			}

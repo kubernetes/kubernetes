@@ -251,7 +251,7 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, increaseRV(client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+	storagetesting.RunTestList(ctx, t, store, increaseRV(client.Client), compactStorage(client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
 }
 
 func TestConsistentList(t *testing.T) {
