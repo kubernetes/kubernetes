@@ -295,6 +295,10 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		}
 		tCtx.Logf("Expected error creating admin template in regular namespace: %v", err)
 
+		podInline, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(tCtx, podInline.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "get pod with inline claim")
+		inlineClaimName := ptr.Deref(podInline.Status.ResourceClaimStatuses[0].ResourceClaimName, "")
+
 		claim2 := b.ExternalClaim()
 		podExternal2 := b.PodExternal()
 		podExternal2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
@@ -321,13 +325,17 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		tCtx = ktesting.End(tCtx)
 
 		// Remove pods prepared by previous Kubernetes.
-		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podExternal.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podExternal.Name, namespace.Name, f.Timeouts.PodDelete))
 
-		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podInline.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podInline.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		waitForClaimDeallocated(tCtx, f, claim.Name)
+		waitForClaimDeleted(tCtx, f, inlineClaimName)
+
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate.Name, metav1.DeleteOptions{}))
 
 		// The previously unschedulable pods can now be scheduled since the devices have been deallocated.
 		b.TestPod(ctx, f, podExternal2)
@@ -407,6 +415,10 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		f.Namespace = namespace
 		f.UniqueName = namespace.Name
 
+		podInline2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(tCtx, podInline2.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "get pod with inline claim")
+		inlineClaimName2 := ptr.Deref(podInline2.Status.ResourceClaimStatuses[0].ResourceClaimName, "")
+
 		// Create another claim and pod, this time using the latest Kubernetes.
 		claim = b.ExternalClaim()
 		podExternal = b.PodExternal()
@@ -434,13 +446,17 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		tCtx = ktesting.End(tCtx)
 
 		// Remove running pods.
-		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim2.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podExternal2.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podExternal2.Name, namespace.Name, f.Timeouts.PodDelete))
 
-		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate2.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podInline2.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podInline2.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		waitForClaimDeallocated(tCtx, f, claim2.Name)
+		waitForClaimDeleted(tCtx, f, inlineClaimName2)
+
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate2.Name, metav1.DeleteOptions{}))
 
 		// The previously unschedulable pods can now be scheduled since the devices have been deallocated.
 		b.TestPod(ctx, f, podExternal)
@@ -656,4 +672,25 @@ func serverDownloadURL(tCtx ktesting.TContext, major, minor uint) (string, strin
 	version, err := io.ReadAll(resp.Body)
 	tCtx.ExpectNoError(err, "read response body for %s", url)
 	return fmt.Sprintf("https://dl.k8s.io/release/%s/kubernetes-server-%s-%s.tar.gz", string(version), runtime.GOOS, runtime.GOARCH), string(version)
+}
+
+func waitForClaimDeallocated(tCtx ktesting.TContext, f *framework.Framework, claimName string) {
+	tCtx.Helper()
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+		claim, err := f.ClientSet.ResourceV1beta2().ResourceClaims(f.Namespace.Name).Get(tCtx, claimName, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get claim")
+		return claim
+	}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", gomega.BeNil()))
+}
+
+func waitForClaimDeleted(tCtx ktesting.TContext, f *framework.Framework, claimName string) {
+	tCtx.Helper()
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+		claim, err := f.ClientSet.ResourceV1beta2().ResourceClaims(f.Namespace.Name).Get(tCtx, claimName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		tCtx.ExpectNoError(err, "get claim")
+		return claim
+	}).Should(gomega.BeNil(), "claim should have been deleted")
 }
