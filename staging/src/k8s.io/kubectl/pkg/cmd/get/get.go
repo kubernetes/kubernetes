@@ -571,7 +571,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 				if err == nil {
 					_, err = client.CoreV1().Namespaces().Get(context.TODO(), o.Namespace, metav1.GetOptions{})
 					if apierrors.IsNotFound(err) {
-						fmt.Fprintf(o.ErrOut, "namespace %q not found\n", o.Namespace)
+						fmt.Fprintf(o.ErrOut, "Error from server (NotFound): namespaces %q not found\n", o.Namespace)
 						return utilerrors.NewAggregate(allErrs)
 					}
 				}
