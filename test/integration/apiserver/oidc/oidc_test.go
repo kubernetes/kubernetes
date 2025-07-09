@@ -118,6 +118,7 @@ type apiServerOIDCConfig struct {
 	oidcUsernamePrefix       string
 	oidcUsernameClaim        string
 	authenticationConfigYAML string
+	needsEgressProxyOnStart  bool
 }
 
 func TestOIDC(t *testing.T) {
@@ -1001,7 +1002,7 @@ kind: AuthenticationConfiguration
 jwt:
 - issuer:
     url: %s
-    egressSelectorType: cluster ### NEEDS EGRESS ON START ###
+    egressSelectorType: cluster
     audiences:
     - %s
     - another-audience
@@ -1013,7 +1014,7 @@ jwt:
       expression: "'k8s-' + claims.sub"
 `, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
 			},
-			configureInfrastructure: configureTestInfrastructure[*rsa.PrivateKey, *rsa.PublicKey],
+			configureInfrastructure: configureTestInfrastructureWithEgressProxy[*rsa.PrivateKey, *rsa.PublicKey],
 			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
 				idTokenLifetime := time.Second * 1200
 				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
@@ -1078,6 +1079,7 @@ func TestStructuredAuthenticationConfigReload(t *testing.T) {
 	tests := []struct {
 		name                          string
 		authConfigFn, newAuthConfigFn authenticationConfigFunc
+		configureTestInfrastructure   func(t *testing.T, fn authenticationConfigFunc) (*utilsoidc.TestServer, *kubeapiserverapptesting.TestServer, []byte, string)
 		assertErrFn, newAssertErrFn   func(t *testing.T, errorToCheck error)
 		wantUser, newWantUser         *authenticationv1.UserInfo
 		ignoreTransitionErrFn         func(error) bool
@@ -1154,7 +1156,7 @@ apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
-    url: %s ### NEEDS EGRESS ON START ###
+    url: %s
     audiences:
     - %s
     - another-audience
@@ -1184,6 +1186,26 @@ jwt:
     username:
       expression: "'panda-' + claims.sub"   # this is a new part of the config
 `, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			configureTestInfrastructure: func(t *testing.T, fn authenticationConfigFunc) (*utilsoidc.TestServer, *kubeapiserverapptesting.TestServer, []byte, string) {
+				t.Helper()
+
+				oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath := configureTestInfrastructureWithEgressProxy(t, fn, ecdsaGenerateKey)
+
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+					t,
+					signingPrivateKey,
+					map[string]interface{}{
+						"iss": oidcServer.URL(),
+						"sub": defaultOIDCClaimedUsername,
+						"aud": defaultOIDCClientID,
+						"exp": time.Now().Add(10 * time.Minute).Unix(),
+					},
+					defaultStubAccessToken,
+					defaultStubRefreshToken,
+				)).Times(1)
+
+				return oidcServer, apiServer, caCertContent, caFilePath
 			},
 			assertErrFn: func(t *testing.T, errorToCheck error) {
 				assert.NoError(t, errorToCheck)
@@ -1480,7 +1502,11 @@ jwt:
 
 			ctx := testContext(t)
 
-			oidcServer, apiServer, caCert, certPath := configureBasicTestInfrastructureWithRandomKeyType(t, tt.authConfigFn)
+			configureTestInfrastructureFunc := tt.configureTestInfrastructure
+			if configureTestInfrastructureFunc == nil {
+				configureTestInfrastructureFunc = configureBasicTestInfrastructureWithRandomKeyType
+			}
+			oidcServer, apiServer, caCert, certPath := configureTestInfrastructureFunc(t, tt.authConfigFn)
 
 			tokenURL, err := oidcServer.TokenURL()
 			require.NoError(t, err)
@@ -1821,7 +1847,7 @@ func ecdsaGenerateKey(t *testing.T) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
 	return privateKey, &privateKey.PublicKey
 }
 
-func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](t *testing.T, fn authenticationConfigFunc, keyFunc func(t *testing.T) (K, L)) (
+func configureTestInfrastructureAndEgressProxy[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](t *testing.T, fn authenticationConfigFunc, keyFunc func(t *testing.T) (K, L), needsEgressProxyOnStart bool) (
 	oidcServer *utilsoidc.TestServer,
 	apiServer *kubeapiserverapptesting.TestServer,
 	signingPrivateKey K,
@@ -1838,7 +1864,7 @@ func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePub
 
 	authenticationConfig := fn(t, oidcServer.URL(), string(caCertContent))
 	if len(authenticationConfig) > 0 {
-		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey)
+		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig, needsEgressProxyOnStart: needsEgressProxyOnStart}, publicKey)
 	} else {
 		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID, oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix}, publicKey)
 	}
@@ -1849,6 +1875,30 @@ func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePub
 	configureRBAC(t, adminClient, defaultRole, defaultRoleBinding)
 
 	return oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath
+}
+
+func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](t *testing.T, fn authenticationConfigFunc, keyFunc func(t *testing.T) (K, L)) (
+	oidcServer *utilsoidc.TestServer,
+	apiServer *kubeapiserverapptesting.TestServer,
+	signingPrivateKey K,
+	caCertContent []byte,
+	caFilePath string,
+) {
+	t.Helper()
+
+	return configureTestInfrastructureAndEgressProxy[K, L](t, fn, keyFunc, false)
+}
+
+func configureTestInfrastructureWithEgressProxy[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](t *testing.T, fn authenticationConfigFunc, keyFunc func(t *testing.T) (K, L)) (
+	oidcServer *utilsoidc.TestServer,
+	apiServer *kubeapiserverapptesting.TestServer,
+	signingPrivateKey K,
+	caCertContent []byte,
+	caFilePath string,
+) {
+	t.Helper()
+
+	return configureTestInfrastructureAndEgressProxy[K, L](t, fn, keyFunc, true)
 }
 
 func configureClientFetchingOIDCCredentials(t *testing.T, restCfg *rest.Config, caCert []byte, certPath, oidcServerURL, oidcServerTokenURL string) kubernetes.Interface {
@@ -1898,8 +1948,7 @@ func startTestAPIServerForOIDC[L utilsoidc.JosePublicKey](t *testing.T, c apiSer
 	var customFlags []string
 	if len(c.authenticationConfigYAML) > 0 {
 		customFlags = []string{fmt.Sprintf("--authentication-config=%s", writeTempFile(t, c.authenticationConfigYAML))}
-		// super hacky way to also configure egress selector
-		if strings.Contains(c.authenticationConfigYAML, "### NEEDS EGRESS ON START ###") {
+		if c.needsEgressProxyOnStart {
 			udsName := filepath.Join(t.TempDir(), "uds")
 			go runEgressProxy(t, udsName)
 			egressConfig := fmt.Sprintf(`
