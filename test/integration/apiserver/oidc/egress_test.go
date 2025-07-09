@@ -22,11 +22,15 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func runEgressProxy(t testing.TB, udsName string) {
+func runEgressProxy(t testing.TB, udsName string, ready chan<- struct{}) {
 	t.Helper()
 
 	l, err := net.Listen("unix", udsName)
@@ -37,6 +41,12 @@ func runEgressProxy(t testing.TB, udsName string) {
 
 	var called atomic.Bool
 	httpConnectProxy := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ready" {
+			t.Log("egress proxy ready")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		called.Store(true)
 
 		if r.Method != http.MethodConnect {
@@ -108,6 +118,33 @@ func runEgressProxy(t testing.TB, udsName string) {
 		err := server.Shutdown(context.Background())
 		t.Logf("shutdown exit error: %v", err)
 	})
+
+	var once sync.Once
+	readyCheckClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, "unix", udsName)
+			},
+		},
+	}
+	go func() {
+		if err := wait.PollUntilContextCancel(t.Context(), time.Second, false, func(ctx context.Context) (bool, error) {
+			resp, err := readyCheckClient.Get("http://host.does.not.matter/ready")
+			if err != nil {
+				t.Logf("egress proxy error: %v", err)
+				return false, nil
+			}
+			_ = resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Logf("egress proxy unexpected status code: %v", resp.StatusCode)
+				return false, nil
+			}
+			once.Do(func() { close(ready) })
+			return true, nil
+		}); err != nil {
+			t.Errorf("egress proxy is not ready: %v", err)
+		}
+	}()
 
 	err = server.Serve(l)
 	t.Logf("egress exit error: %v", err)

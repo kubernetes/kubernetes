@@ -1950,7 +1950,14 @@ func startTestAPIServerForOIDC[L utilsoidc.JosePublicKey](t *testing.T, c apiSer
 		customFlags = []string{fmt.Sprintf("--authentication-config=%s", writeTempFile(t, c.authenticationConfigYAML))}
 		if c.needsEgressProxyOnStart {
 			udsName := filepath.Join(t.TempDir(), "uds")
-			go runEgressProxy(t, udsName)
+			ready := make(chan struct{})
+			go runEgressProxy(t, udsName, ready)
+			select {
+			case <-ready:
+				// egress proxy is ready
+			case <-time.After(time.Minute):
+				t.Fatalf("timeout waiting for uds server to start")
+			}
 			egressConfig := fmt.Sprintf(`
 apiVersion: apiserver.k8s.io/v1beta1
 kind: EgressSelectorConfiguration
