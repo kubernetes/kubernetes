@@ -19,7 +19,7 @@ package main
 import (
 	"golang.org/x/tools/go/analysis/singlechecker"
 
-	"k8s.io/kubernetes/hack/tools/golangci-lint/sortedfeatures/pkg"
+	"k8s.io/kubernetes/hack/tools/golangci-lint/sorted/pkg"
 )
 
 func main() {

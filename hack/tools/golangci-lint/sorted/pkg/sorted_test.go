@@ -30,8 +30,8 @@ import (
 
 func TestNewAnalyzer(t *testing.T) {
 	analyzer := NewAnalyzer()
-	if analyzer.Name != "sortedfeatures" {
-		t.Errorf("Expected analyzer name to be 'sortedfeatures', got '%s'", analyzer.Name)
+	if analyzer.Name != "sorted" {
+		t.Errorf("Expected analyzer name to be 'sorted', got '%s'", analyzer.Name)
 	}
 }
 
@@ -41,8 +41,8 @@ func TestNewAnalyzerWithConfig(t *testing.T) {
 		Files: []string{"test.go"},
 	}
 	analyzer := NewAnalyzerWithConfig(config)
-	if analyzer.Name != "sortedfeatures" {
-		t.Errorf("Expected analyzer name to be 'sortedfeatures', got '%s'", analyzer.Name)
+	if analyzer.Name != "sorted" {
+		t.Errorf("Expected analyzer name to be 'sorted', got '%s'", analyzer.Name)
 	}
 }
 

@@ -171,7 +171,7 @@ linters:
     - kubeapilinter
     - logcheck
     - revive
-    - sortedfeatures
+    - sorted
     - staticcheck
     - testifylint
     - unused
@@ -189,13 +189,13 @@ linters:
         settings:
           config: |
             {{include "hack/logcheck.conf" | indent 12 | trim}}
-      sortedfeatures:
+      sorted:
         # Installed there by hack/verify-golangci-lint.sh.
-        path: _output/local/bin/sortedfeatures.so
+        path: _output/local/bin/sorted.so
         description: check if feature gates are sorted
-        original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sortedfeatures
+        original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sorted
         settings:
-          {{include "hack/tools/golangci-lint/sortedfeatures/config.yaml" | indent 10 | trim}}
+          {{include "hack/tools/golangci-lint/sorted/config.yaml" | indent 10 | trim}}
       kubeapilinter:
         path: _output/local/bin/kube-api-linter.so
         description: kube-api-linter and lints Kube like APIs based on API conventions and best practices.

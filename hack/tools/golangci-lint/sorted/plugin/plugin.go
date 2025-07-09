@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"golang.org/x/tools/go/analysis"
 
-	"k8s.io/kubernetes/hack/tools/golangci-lint/sortedfeatures/pkg"
+	"k8s.io/kubernetes/hack/tools/golangci-lint/sorted/pkg"
 )
 
 type analyzerPlugin struct{}
@@ -35,7 +35,7 @@ func (*analyzerPlugin) GetAnalyzers() []*analysis.Analyzer {
 // AnalyzerPlugin is the entry point for golangci-lint.
 var AnalyzerPlugin analyzerPlugin
 
-// settings defines the configuration options for the sortedfeatures linter
+// settings defines the configuration options for the sorted linter
 type settings struct {
 	// Debug enables debug logging
 	Debug bool `json:"debug"`
@@ -83,7 +83,7 @@ func New(pluginSettings interface{}) ([]*analysis.Analyzer, error) {
 		}
 
 		if config.Debug {
-			fmt.Printf("sortedfeatures settings: %+v\n", s)
+			fmt.Printf("sorted settings: %+v\n", s)
 			fmt.Printf("final config: %+v\n", config)
 		}
 	}
