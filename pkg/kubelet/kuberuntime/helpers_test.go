@@ -42,10 +42,6 @@ func (f podStatusProviderFunc) GetPodStatus(_ context.Context, uid types.UID, na
 	return f(uid, name, namespace)
 }
 
-func int64Ptr(i int64) *int64 {
-	return &i
-}
-
 func TestIsInitContainerFailed(t *testing.T) {
 	tests := []struct {
 		status      *kubecontainer.Status
@@ -148,7 +144,7 @@ func TestGetBackoffKey(t *testing.T) {
 			originalKey := GetBackoffKey(pod, &pod.Spec.Containers[0])
 
 			podCopy := pod.DeepCopy()
-			podCopy.Spec.ActiveDeadlineSeconds = int64Ptr(1)
+			podCopy.Spec.ActiveDeadlineSeconds = ptr.To[int64](1)
 			assert.Equal(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
 				"Unrelated change should not change the key")
 
@@ -513,12 +509,12 @@ func TestMergeResourceConfig(t *testing.T) {
 	}{
 		{
 			name:   "merge all fields",
-			source: &cm.ResourceConfig{Memory: int64Ptr(1024), CPUShares: ptr.To[uint64](2)},
-			update: &cm.ResourceConfig{Memory: int64Ptr(2048), CPUQuota: int64Ptr(5000)},
+			source: &cm.ResourceConfig{Memory: ptr.To[int64](1024), CPUShares: ptr.To[uint64](2)},
+			update: &cm.ResourceConfig{Memory: ptr.To[int64](2048), CPUQuota: ptr.To[int64](5000)},
 			expected: &cm.ResourceConfig{
-				Memory:    int64Ptr(2048),
+				Memory:    ptr.To[int64](2048),
 				CPUShares: ptr.To[uint64](2),
-				CPUQuota:  int64Ptr(5000),
+				CPUQuota:  ptr.To[int64](5000),
 			},
 		},
 		{
@@ -533,25 +529,25 @@ func TestMergeResourceConfig(t *testing.T) {
 		{
 			name:   "update nil source",
 			source: nil,
-			update: &cm.ResourceConfig{Memory: int64Ptr(4096)},
+			update: &cm.ResourceConfig{Memory: ptr.To[int64](4096)},
 			expected: &cm.ResourceConfig{
-				Memory: int64Ptr(4096),
+				Memory: ptr.To[int64](4096),
 			},
 		},
 		{
 			name:   "update nil update",
-			source: &cm.ResourceConfig{Memory: int64Ptr(1024)},
+			source: &cm.ResourceConfig{Memory: ptr.To[int64](1024)},
 			update: nil,
 			expected: &cm.ResourceConfig{
-				Memory: int64Ptr(1024),
+				Memory: ptr.To[int64](1024),
 			},
 		},
 		{
 			name:   "update empty source",
 			source: &cm.ResourceConfig{},
-			update: &cm.ResourceConfig{Memory: int64Ptr(8192)},
+			update: &cm.ResourceConfig{Memory: ptr.To[int64](8192)},
 			expected: &cm.ResourceConfig{
-				Memory: int64Ptr(8192),
+				Memory: ptr.To[int64](8192),
 			},
 		},
 	}
@@ -567,10 +563,10 @@ func TestMergeResourceConfig(t *testing.T) {
 
 func TestConvertResourceConfigToLinuxContainerResources(t *testing.T) {
 	resCfg := &cm.ResourceConfig{
-		Memory:        int64Ptr(2048),
+		Memory:        ptr.To[int64](2048),
 		CPUShares:     ptr.To[uint64](2),
 		CPUPeriod:     ptr.To[uint64](10000),
-		CPUQuota:      int64Ptr(5000),
+		CPUQuota:      ptr.To[int64](5000),
 		HugePageLimit: map[int64]int64{4096: 2048},
 		Unified:       map[string]string{"key1": "value1"},
 	}
