@@ -19,13 +19,17 @@ package filters
 import (
 	"context"
 	"errors"
+	"fmt"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/klog/v2"
 	"net/http"
 	"strings"
@@ -59,115 +63,171 @@ func WithContrainedImpersonation(handler http.Handler, a authorizer.Authorizer, 
 
 		requestorAttrs := attrs.(*authorizer.AttributesRecord)
 
-		decision, reason, actingAsAttributes, newUser := authorizeConstrainedImpersonation(req, requestorAttrs, impersonationRequests, a)
-		if decision == authorizer.DecisionAllow {
-			handleRequestAfterImpersonation(handler, w, req, newUser)
-			return
+		// if groups are not specified, then we need to look them up differently depending on the type of user
+		// if they are specified, then they are the authority (including the inclusion of system:authenticated/system:unauthenticated groups)
+		groupsSpecified := len(req.Header[authenticationv1.ImpersonateGroupHeader]) > 0
+
+		// Building attributes to authorize, username and group information
+		var actingAsAttrsList []*authorizer.AttributesRecord
+		username := ""
+		groups := []string{}
+		userExtra := map[string][]string{}
+		uid := ""
+		for _, impersonationRequest := range impersonationRequests {
+			gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
+			actingAsAttributes := &authorizer.AttributesRecord{
+				User:            attrs.GetUser(),
+				APIGroup:        gvk.Group,
+				APIVersion:      gvk.Version,
+				Namespace:       impersonationRequest.Namespace,
+				Name:            impersonationRequest.Name,
+				ResourceRequest: true,
+			}
+
+			switch gvk.GroupKind() {
+			case v1.SchemeGroupVersion.WithKind("ServiceAccount").GroupKind():
+				actingAsAttributes.Resource = "serviceaccounts"
+				actingAsAttributes.Verb = "impersonate:serviceaccount"
+				username = serviceaccount.MakeUsername(impersonationRequest.Namespace, impersonationRequest.Name)
+				if !groupsSpecified {
+					// if groups aren't specified for a service account, we know the groups because its a fixed mapping.  Add them
+					groups = serviceaccount.MakeGroupNames(impersonationRequest.Namespace)
+				}
+
+			case v1.SchemeGroupVersion.WithKind("User").GroupKind():
+				actingAsAttributes.Resource = "users"
+				actingAsAttributes.Verb = "impersonate:user-info"
+				username = impersonationRequest.Name
+
+			case v1.SchemeGroupVersion.WithKind("Group").GroupKind():
+				actingAsAttributes.Resource = "groups"
+				actingAsAttributes.Verb = "impersonate:user-info"
+				groups = append(groups, impersonationRequest.Name)
+
+			case authenticationv1.SchemeGroupVersion.WithKind("UserExtra").GroupKind():
+				extraKey := impersonationRequest.FieldPath
+				extraValue := impersonationRequest.Name
+				actingAsAttributes.Resource = "userextras"
+				actingAsAttributes.Verb = "impersonate:user-info"
+				actingAsAttributes.Subresource = extraKey
+				userExtra[extraKey] = append(userExtra[extraKey], extraValue)
+
+			case authenticationv1.SchemeGroupVersion.WithKind("UID").GroupKind():
+				uid = impersonationRequest.Name
+				actingAsAttributes.Resource = "uids"
+				actingAsAttributes.Verb = "impersonate:user-info"
+
+			default:
+				klog.V(4).InfoS("unknown impersonation request type", "request", impersonationRequest)
+				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
+				return
+			}
+
+			actingAsAttrsList = append(actingAsAttrsList, actingAsAttributes)
 		}
 
-		klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
-
-		// fallback to use legacy impersonation
-		legacyDecision, legacyReason, _, newUser := authorizeImpersonation(req, attrs.GetUser(), impersonationRequests, a)
-		if legacyDecision != authorizer.DecisionAllow {
-			klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", legacyReason, "err", err)
-			responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
-			return
+		decision, reason, actingAsAttributes, err := authorizeConstrainedImpersonation(ctx, requestorAttrs, actingAsAttrsList, a)
+		if err != nil || decision != authorizer.DecisionAllow {
+			klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
+			// fallback to use legacy impersonation
+			legacyDecision, legacyReason, err := authorizeLegacyImpersonation(req, actingAsAttrsList, a)
+			if err != nil || legacyDecision != authorizer.DecisionAllow {
+				klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", legacyReason, "err", err)
+				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
+				return
+			}
 		}
 
-		handleRequestAfterImpersonation(handler, w, req, newUser)
+		if username != user.Anonymous {
+			// When impersonating a non-anonymous user, include the 'system:authenticated' group
+			// in the impersonated user info:
+			// - if no groups were specified
+			// - if a group has been specified other than 'system:authenticated'
+			//
+			// If 'system:unauthenticated' group has been specified we should not include
+			// the 'system:authenticated' group.
+			addAuthenticated := true
+			for _, group := range groups {
+				if group == user.AllAuthenticated || group == user.AllUnauthenticated {
+					addAuthenticated = false
+					break
+				}
+			}
+
+			if addAuthenticated {
+				groups = append(groups, user.AllAuthenticated)
+			}
+		} else {
+			addUnauthenticated := true
+			for _, group := range groups {
+				if group == user.AllUnauthenticated {
+					addUnauthenticated = false
+					break
+				}
+			}
+
+			if addUnauthenticated {
+				groups = append(groups, user.AllUnauthenticated)
+			}
+		}
+
+		newUser := &user.DefaultInfo{
+			Name:   username,
+			Groups: groups,
+			Extra:  userExtra,
+			UID:    uid,
+		}
+		req = req.WithContext(request.WithUser(ctx, newUser))
+
+		oldUser, _ := request.UserFrom(ctx)
+		httplog.LogOf(req, w).Addf("%v is impersonating %v", userString(oldUser), userString(newUser))
+
+		audit.LogImpersonatedUser(audit.WithAuditContext(ctx), newUser)
+
+		// clear all the impersonation headers from the request
+		req.Header.Del(authenticationv1.ImpersonateUserHeader)
+		req.Header.Del(authenticationv1.ImpersonateGroupHeader)
+		req.Header.Del(authenticationv1.ImpersonateUIDHeader)
+		for headerName := range req.Header {
+			if strings.HasPrefix(headerName, authenticationv1.ImpersonateUserExtraHeaderPrefix) {
+				req.Header.Del(headerName)
+			}
+		}
+
+		handler.ServeHTTP(w, req)
 	})
 }
 
-func authorizeConstrainedImpersonation(req *http.Request, requestorAttrs *authorizer.AttributesRecord, impersonationRequests []v1.ObjectReference, a authorizer.Authorizer) (authorizer.Decision, string, authorizer.Attributes, *user.DefaultInfo) {
-	ctx := req.Context()
+func authorizeConstrainedImpersonation(ctx context.Context, requestorAttrs *authorizer.AttributesRecord, targetAttributesList []*authorizer.AttributesRecord, a authorizer.Authorizer) (authorizer.Decision, string, authorizer.Attributes, error) {
+	for _, actingAsAttributes := range targetAttributesList {
+		// group and version are always authentication/v1 with constrained impersonation.
+		actingAsAttributesCopy := *actingAsAttributes
+		actingAsAttributesCopy.APIGroup = authenticationv1.SchemeGroupVersion.Group
+		actingAsAttributesCopy.APIVersion = authenticationv1.SchemeGroupVersion.Version
 
-	// if groups are not specified, then we need to look them up differently depending on the type of user
-	// if they are specified, then they are the authority (including the inclusion of system:authenticated/system:unauthenticated groups)
-	groupsSpecified := len(req.Header[authenticationv1.ImpersonateGroupHeader]) > 0
-
-	// make sure we're allowed to impersonate each thing we're requesting.  While we're iterating through, start building username
-	// and group information
-	username := ""
-	groups := []string{}
-	userExtra := map[string][]string{}
-	uid := ""
-
-	for _, impersonationRequest := range impersonationRequests {
-		gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
-
-		actingAsAttributes := &authorizer.AttributesRecord{
-			User: requestorAttrs.User,
-			// group and version should always be authentication.k8s.io and v1
-			APIGroup:        authenticationv1.SchemeGroupVersion.Group,
-			APIVersion:      authenticationv1.SchemeGroupVersion.Version,
-			Namespace:       impersonationRequest.Namespace,
-			Name:            impersonationRequest.Name,
-			ResourceRequest: true,
+		// authorize node verb if the impersonated user is node
+		if actingAsAttributes.Resource == "users" && strings.HasPrefix(actingAsAttributesCopy.Name, "system:node:") {
+			decision, reason, attrs, err := authorizeNodeImperonsation(ctx, requestorAttrs.User, &actingAsAttributesCopy, a)
+			if err != nil || decision != authorizer.DecisionAllow {
+				return decision, reason, attrs, err
+			}
+			continue
 		}
 
-		switch gvk.GroupKind() {
-		case v1.SchemeGroupVersion.WithKind("ServiceAccount").GroupKind():
-			actingAsAttributes.Resource = "serviceaccounts"
-			actingAsAttributes.Verb = "impersonate:serviceaccount"
-			username = serviceaccount.MakeUsername(impersonationRequest.Namespace, impersonationRequest.Name)
-			if !groupsSpecified {
-				// if groups aren't specified for a service account, we know the groups because its a fixed mapping.  Add them
-				groups = serviceaccount.MakeGroupNames(impersonationRequest.Namespace)
-			}
-
-		case v1.SchemeGroupVersion.WithKind("User").GroupKind():
-			// If the user has the prefix of "system:node", impersonate:node or impersonate:scheduled-node is checked
-			// instead of impersonate:user-info
-			if strings.HasPrefix(actingAsAttributes.Name, "system:node:") {
-				decision, attr, reason := authorizeNodeImperonsation(ctx, requestorAttrs.User, actingAsAttributes, a, req.RequestURI)
-				if decision != authorizer.DecisionAllow {
-					return decision, reason, attr, nil
-				}
-			} else {
-				actingAsAttributes.Verb = "impersonate:user-info"
-				actingAsAttributes.Resource = "users"
-			}
-			username = impersonationRequest.Name
-
-		case v1.SchemeGroupVersion.WithKind("Group").GroupKind():
-			actingAsAttributes.Resource = "groups"
-			actingAsAttributes.Verb = "impersonate:user-info"
-			groups = append(groups, impersonationRequest.Name)
-
-		case authenticationv1.SchemeGroupVersion.WithKind("UserExtra").GroupKind():
-			extraKey := impersonationRequest.FieldPath
-			extraValue := impersonationRequest.Name
-			actingAsAttributes.Resource = "userextras"
-			actingAsAttributes.Verb = "impersonate:user-info"
-			actingAsAttributes.Subresource = extraKey
-			userExtra[extraKey] = append(userExtra[extraKey], extraValue)
-
-		case authenticationv1.SchemeGroupVersion.WithKind("UID").GroupKind():
-			actingAsAttributes.Resource = "uids"
-			actingAsAttributes.Verb = "impersonate:user-info"
-			uid = impersonationRequest.Name
-		}
-
-		decision, reason, err := a.Authorize(ctx, actingAsAttributes)
+		decision, reason, err := a.Authorize(ctx, &actingAsAttributesCopy)
 		if err != nil || decision != authorizer.DecisionAllow {
-			klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
-			return decision, reason, actingAsAttributes, nil
+			return decision, reason, &actingAsAttributesCopy, err
 		}
 	}
 
 	// Prepend the impersonate-on prefix to the actual verb.
 	requestorAttrs.Verb = "impersonate-on:" + requestorAttrs.Verb
 	decision, reason, err := a.Authorize(ctx, requestorAttrs)
-	if err != nil || decision != authorizer.DecisionAllow {
-		klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
-	}
-
-	return decision, reason, requestorAttrs, &user.DefaultInfo{Name: username, Groups: groups, UID: uid, Extra: userExtra}
+	return decision, reason, requestorAttrs, err
 }
 
 // authorizeNodeImperonsation authorizes the request impersonating node.
-func authorizeNodeImperonsation(ctx context.Context, requestor user.Info, attr *authorizer.AttributesRecord, a authorizer.Authorizer, requestURI string) (authorizer.Decision, authorizer.Attributes, string) {
+func authorizeNodeImperonsation(ctx context.Context, requestor user.Info, attr *authorizer.AttributesRecord, a authorizer.Authorizer) (authorizer.Decision, string, authorizer.Attributes, error) {
 	attr.Name = strings.TrimPrefix(attr.Name, "system:node:")
 	attr.Resource = "nodes"
 	attr.Verb = "impersonate:node"
@@ -180,18 +240,31 @@ func authorizeNodeImperonsation(ctx context.Context, requestor user.Info, attr *
 		decision, reason, err := a.Authorize(ctx, attr)
 
 		// if impersonate:scheduled-node check fails, fallback to check impersonate:node.
-		if err != nil || decision != authorizer.DecisionAllow {
-			klog.V(4).InfoS("Forbidden", "URI", requestURI, "reason", reason, "err", err)
+		if decision != authorizer.DecisionAllow {
+			klog.V(4).InfoS("Forbidden", "reason", reason, "err", err)
 		} else {
-			return decision, attr, reason
+			return decision, reason, attr, nil
 		}
 	}
 
 	decision, reason, err := a.Authorize(ctx, attr)
-	if err != nil || decision != authorizer.DecisionAllow {
-		klog.V(4).InfoS("Forbidden", "URI", requestURI, "reason", reason, "err", err)
+	return decision, reason, attr, err
+}
+
+func authorizeLegacyImpersonation(req *http.Request, targetAttributesList []*authorizer.AttributesRecord, a authorizer.Authorizer) (authorizer.Decision, string, error) {
+	ctx := req.Context()
+
+	for _, actingAsAttributes := range targetAttributesList {
+		// verb is always impersonate with legacy impersonation.
+		actingAsAttributesCopy := *actingAsAttributes
+		actingAsAttributesCopy.Verb = "impersonate"
+		decision, reason, err := a.Authorize(ctx, &actingAsAttributesCopy)
+		if err != nil || decision != authorizer.DecisionAllow {
+			return decision, reason, err
+		}
 	}
-	return decision, attr, reason
+
+	return authorizer.DecisionAllow, "", nil
 }
 
 // isScheduledNode checks if the requestor is from the scheduled node:

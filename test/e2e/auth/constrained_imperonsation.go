@@ -93,6 +93,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ConstrainedImpersonation)
 
 		nodeScopedClientConfig := rest.AnonymousClientConfig(f.ClientConfig())
 		nodeScopedClientConfig.BearerToken = nodeScopedSAToken
+		nodeScopedClientConfig.Impersonate.UserName = "system:node:" + actualPod.Spec.NodeName
 		nodeScopedClient, err := kubernetes.NewForConfig(nodeScopedClientConfig)
 		framework.ExpectNoError(err)
 
