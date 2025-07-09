@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	helpers "k8s.io/component-helpers/resource"
 	"k8s.io/kubectl/pkg/util/podutils"
 	kubeqos "k8s.io/kubernetes/pkg/kubelet/qos"
@@ -50,28 +51,6 @@ type ResizableContainerInfo struct {
 	RestartCount  int32
 	RestartPolicy v1.ContainerRestartPolicy
 	InitCtr       bool
-}
-
-type containerPatch struct {
-	Name      string `json:"name"`
-	Resources struct {
-		Requests struct {
-			CPU     string `json:"cpu,omitempty"`
-			Memory  string `json:"memory,omitempty"`
-			EphStor string `json:"ephemeral-storage,omitempty"`
-		} `json:"requests"`
-		Limits struct {
-			CPU     string `json:"cpu,omitempty"`
-			Memory  string `json:"memory,omitempty"`
-			EphStor string `json:"ephemeral-storage,omitempty"`
-		} `json:"limits"`
-	} `json:"resources"`
-}
-
-type patchSpec struct {
-	Spec struct {
-		Containers []containerPatch `json:"containers"`
-	} `json:"spec"`
 }
 
 func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.ContainerResizePolicy) {
@@ -369,27 +348,17 @@ func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v
 	}
 }
 
-// ResizeContainerPatch generates a patch string to resize the pod container.
-func ResizeContainerPatch(containers []ResizableContainerInfo) (string, error) {
-	var patch patchSpec
+func MakeResizePatch(originalContainers, desiredContainers []ResizableContainerInfo) []byte {
+	original, err := json.Marshal(MakePodWithResizableContainers("", "", "", originalContainers))
+	framework.ExpectNoError(err)
 
-	for _, container := range containers {
-		var cPatch containerPatch
-		cPatch.Name = container.Name
-		cPatch.Resources.Requests.CPU = container.Resources.CPUReq
-		cPatch.Resources.Requests.Memory = container.Resources.MemReq
-		cPatch.Resources.Limits.CPU = container.Resources.CPULim
-		cPatch.Resources.Limits.Memory = container.Resources.MemLim
+	desired, err := json.Marshal(MakePodWithResizableContainers("", "", "", desiredContainers))
+	framework.ExpectNoError(err)
 
-		patch.Spec.Containers = append(patch.Spec.Containers, cPatch)
-	}
+	patch, err := strategicpatch.CreateTwoWayMergePatch(original, desired, v1.Pod{})
+	framework.ExpectNoError(err)
 
-	patchBytes, err := json.Marshal(patch)
-	if err != nil {
-		return "", err
-	}
-
-	return string(patchBytes), nil
+	return patch
 }
 
 // UpdateExpectedContainerRestarts updates the RestartCounts in expectedContainers by
