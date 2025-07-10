@@ -239,10 +239,6 @@ func (n *NodeInfo) GetGeneration() int64 {
 	return n.Generation
 }
 
-func (n *NodeInfo) SetImageStates(iss map[string]*fwk.ImageStateSummary) {
-	n.ImageStates = iss
-}
-
 // NodeInfo implements KMetadata, so for example klog.KObjSlice(nodes) works
 // when nodes is a []*NodeInfo.
 var _ klog.KMetadata = &NodeInfo{}
@@ -256,7 +252,9 @@ func (n *NodeInfo) GetName() string {
 	}
 	return n.node.Name
 }
-func (n *NodeInfo) GetNamespace() string { return "" }
+func (n *NodeInfo) GetNamespace() string {
+	return ""
+}
 
 // Node returns overall information about this node.
 func (n *NodeInfo) Node() *v1.Node {
