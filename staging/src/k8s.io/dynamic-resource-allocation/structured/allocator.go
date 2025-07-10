@@ -35,7 +35,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-type deviceClassLister interface {
+type DeviceClassLister interface {
 	// List returns a list of all DeviceClasses.
 	List() ([]*resourceapi.DeviceClass, error)
 	// Get returns the DeviceClass with the given className.
@@ -52,7 +52,7 @@ type Allocator struct {
 	features         Features
 	claimsToAllocate []*resourceapi.ResourceClaim
 	allocatedDevices sets.Set[DeviceID]
-	classLister      deviceClassLister
+	classLister      DeviceClassLister
 	slices           []*resourceapi.ResourceSlice
 	celCache         *cel.Cache
 	// availableCounters contains the available counters for individual
@@ -83,7 +83,7 @@ func NewAllocator(ctx context.Context,
 	features Features,
 	claimsToAllocate []*resourceapi.ResourceClaim,
 	allocatedDevices sets.Set[DeviceID],
-	classLister deviceClassLister,
+	classLister DeviceClassLister,
 	slices []*resourceapi.ResourceSlice,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
