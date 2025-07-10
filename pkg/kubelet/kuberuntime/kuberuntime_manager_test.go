@@ -3919,11 +3919,11 @@ func TestIsPodResizeInProgress(t *testing.T) {
 					actuatedContainer.Resources = mkRequirements(*c.actuated)
 					require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
 
-					fetched, found := m.GetActuatedResources(pod.UID, container.Name)
+					fetched, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
 					require.True(t, found)
 					assert.Equal(t, actuatedContainer.Resources, fetched)
 				} else {
-					_, found := m.GetActuatedResources(pod.UID, container.Name)
+					_, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
 					require.False(t, found)
 				}
 			}
