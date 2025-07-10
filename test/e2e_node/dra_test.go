@@ -32,6 +32,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -1090,4 +1091,45 @@ func listAndStoreResources(client kubernetes.Interface, lastSlices *[]resourceap
 
 func matchResourcesByNodeName(nodeName string) types.GomegaMatcher {
 	return gomega.HaveField("Spec.NodeName", gomega.Equal(nodeName))
+}
+
+// errorOnCloseListener is a mock net.Listener that blocks on Accept()
+// until Close() is called, at which point Accept() returns a predefined error.
+//
+// This is useful in tests or simulated environments to trigger grpc.Server.Serve()
+// to exit cleanly with a known error, without needing real network activity.
+type errorOnCloseListener struct {
+	ch     chan struct{}
+	closed atomic.Bool
+	err    error
+}
+
+// newErrorOnCloseListener creates a new listener that causes Accept to fail
+// with the given error after Close is called.
+func newErrorOnCloseListener(err error) *errorOnCloseListener {
+	return &errorOnCloseListener{
+		ch:  make(chan struct{}),
+		err: err,
+	}
+}
+
+// Accept blocks until Close is called, then returns the configured error.
+func (l *errorOnCloseListener) Accept() (net.Conn, error) {
+	<-l.ch
+	return nil, l.err
+}
+
+// Close unblocks Accept and causes it to return the configured error.
+// It is safe to call multiple times.
+func (l *errorOnCloseListener) Close() error {
+	if l.closed.Swap(true) {
+		return nil // already closed
+	}
+	close(l.ch)
+	return nil
+}
+
+// Addr returns a dummy Unix address. Required to satisfy net.Listener.
+func (*errorOnCloseListener) Addr() net.Addr {
+	return &net.UnixAddr{Name: "errorOnCloseListener", Net: "unix"}
 }
