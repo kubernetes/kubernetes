@@ -584,11 +584,11 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			Path:   childPath,
 		}
 
-		Tags, err := td.validator.ExtractTags(context, memb.CommentLines)
+		tags, err := td.validator.ExtractTags(context, memb.CommentLines)
 		if err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
 		}
-		if validations, err := td.validator.ExtractValidations(context, Tags...); err != nil {
+		if validations, err := td.validator.ExtractValidations(context, tags...); err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
 		} else if validations.Empty() {
 			klog.V(6).InfoS("no field-attached validations", "field", childPath)
