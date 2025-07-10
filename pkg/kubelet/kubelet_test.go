@@ -326,7 +326,7 @@ func newTestKubeletWithImageList(
 		func(pod *v1.Pod) { kubelet.HandlePodSyncs([]*v1.Pod{pod}) },
 		kubelet.GetActivePods,
 		kubelet.podManager.GetPodByUID,
-		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
+		config.NewSourcesReady(func(_ sets.Set[string]) bool { return false }),
 	)
 	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)
 	volumeStatsAggPeriod := time.Second * 10
@@ -2522,7 +2522,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			expectedPodResourceInfoMap: state.PodResourceInfoMap{
 				"3": state.PodResourceInfo{
 					ContainerResources: map[string]v1.ResourceRequirements{
-						cpu800mMem800MPodSpec.Containers[0].Name: cpu500mMem500MPodSpec.Containers[0].Resources,
+						cpu800mMem800MPodSpec.Containers[0].Name: cpu800mMem800MPodSpec.Containers[0].Resources,
 					},
 				},
 			},
@@ -2557,7 +2557,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			expectedPodResourceInfoMap: state.PodResourceInfoMap{
 				"6": state.PodResourceInfo{
 					ContainerResources: map[string]v1.ResourceRequirements{
-						cpu800mPodSpec.Containers[0].Name: cpu500mPodSpec.Containers[0].Resources,
+						cpu800mPodSpec.Containers[0].Name: cpu800mPodSpec.Containers[0].Resources,
 					},
 				},
 			},
@@ -2592,7 +2592,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			expectedPodResourceInfoMap: state.PodResourceInfoMap{
 				"9": state.PodResourceInfo{
 					ContainerResources: map[string]v1.ResourceRequirements{
-						mem800MPodSpec.Containers[0].Name: mem500MPodSpec.Containers[0].Resources,
+						mem800MPodSpec.Containers[0].Name: mem800MPodSpec.Containers[0].Resources,
 					},
 				},
 			},
