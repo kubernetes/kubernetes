@@ -107,6 +107,9 @@ type Manager interface {
 	// PushPendingResize queues a pod with a pending resize request for later reevaluation.
 	PushPendingResize(uid types.UID)
 
+	// HasPendingResizes returns whether there are currently any pending resizes.
+	HasPendingResizes() bool
+
 	// RetryPendingResizes retries all pending resizes.
 	RetryPendingResizes(trigger string)
 }
