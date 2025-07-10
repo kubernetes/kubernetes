@@ -2754,7 +2754,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			if test.setupFn != nil {
 				test.setupFn(pod)
 			}
-			t.Cleanup(func() { m.actuatedState.RemovePod(pod.UID) })
+			t.Cleanup(func() { _ = m.actuatedState.RemovePod(pod.UID) })
 
 			for idx := range pod.Spec.Containers {
 				// compute hash
@@ -3919,11 +3919,11 @@ func TestIsPodResizeInProgress(t *testing.T) {
 					actuatedContainer.Resources = mkRequirements(*c.actuated)
 					require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, actuatedContainer.Name, actuatedContainer.Resources))
 
-					fetched, found := m.GetActuatedResources(pod.UID, container.Name)
+					fetched, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
 					require.True(t, found)
 					assert.Equal(t, actuatedContainer.Resources, fetched)
 				} else {
-					_, found := m.GetActuatedResources(pod.UID, container.Name)
+					_, found := m.actuatedState.GetContainerResources(pod.UID, container.Name)
 					require.False(t, found)
 				}
 			}
