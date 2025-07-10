@@ -256,6 +256,9 @@ func (listValidator) Name() string {
 
 func (lv listValidator) GetValidations(context Context) (Validations, error) {
 	lm := lv.byFieldPath[context.Path.String()]
+	if err := lv.check(lm); err != nil {
+		return Validations{}, err
+	}
 	if lm == nil {
 		// TODO(thockin): enable this once the whole codebase is converted or
 		// if we only run against fields which are opted-in.
@@ -263,21 +266,6 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 		//	return Validations{}, fmt.Errorf("found list field without a listType")
 		//}
 		return Validations{}, nil
-	}
-
-	// Check some fundamental constraints on list types' tags.
-	if lm.declaredAsSet && lm.declaredAsMap {
-		return Validations{}, fmt.Errorf("listType cannot be both set and map")
-	}
-	if lm.declaredAsMap && len(lm.keyFields) == 0 {
-		return Validations{}, fmt.Errorf("found listType=map without listMapKey")
-	}
-	if len(lm.keyFields) > 0 && !lm.declaredAsMap {
-		return Validations{}, fmt.Errorf("found listMapKey without listType=map")
-	}
-	// Check for missing listType (after the other checks so the more specific errors take priority)
-	if !lm.declaredAsSet && !lm.declaredAsMap {
-		return Validations{}, fmt.Errorf("found list metadata without a listType")
 	}
 
 	result := Validations{}
@@ -294,6 +282,27 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 	}
 
 	return result, nil
+}
+
+// make sure a given listMetadata makes sense.
+func (lv listValidator) check(lm *listMetadata) error {
+	if lm != nil {
+		// Check some fundamental constraints on list tags.
+		if lm.declaredAsSet && lm.declaredAsMap {
+			return fmt.Errorf("listType cannot be both set and map")
+		}
+		if lm.declaredAsMap && len(lm.keyFields) == 0 {
+			return fmt.Errorf("found listType=map without listMapKey")
+		}
+		if len(lm.keyFields) > 0 && !lm.declaredAsMap {
+			return fmt.Errorf("found listMapKey without listType=map")
+		}
+		// Check for missing listType (after the other checks so the more specific errors take priority)
+		if !lm.declaredAsSet && !lm.declaredAsMap {
+			return fmt.Errorf("found list metadata without a listType")
+		}
+	}
+	return nil
 }
 
 type eachValTagValidator struct {
