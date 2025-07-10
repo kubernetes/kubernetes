@@ -19,92 +19,73 @@ package list
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
 func Test_StructSlice(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
-	st.Value(&StructSlice{
-		SliceField:                      []S{""},
-		TypeDefSliceField:               MySlice{1},
-		SliceStructField:                []DirectComparableStruct{{IntField: 1}},
-		SliceNonComparableStructField:   []NonDirectComparableStruct{{IntPtrField: ptr.To(1)}},
-		SliceStructWithKey:              []DirectComparableStructWithKey{{Key: "x", IntField: 1}},
-		SliceNonComparableStructWithKey: []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}},
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Invalid(field.NewPath("sliceField[0]"), "", ""),
-		field.Invalid(field.NewPath("typedefSliceField[0]"), "", ""),
-		field.Invalid(field.NewPath("sliceStructField[0]"), "", ""),
-		field.Invalid(field.NewPath("sliceNonComparableStructField[0]"), "", ""),
-		field.Invalid(field.NewPath("sliceStructWithKey[0]"), "", ""),
-		field.Invalid(field.NewPath("sliceNonComparableStructWithKey[0]"), "", ""),
+
+	invalidStructSlice := &StructSlice{
+		AtomicSliceStringField:        []StringType{""},
+		AtomicSliceTypeField:          IntSliceType{1},
+		AtomicSliceComparableField:    []ComparableStruct{{IntField: 1}},
+		AtomicSliceNonComparableField: []NonComparableStruct{{IntPtrField: ptr.To(1)}},
+		SetSliceComparableField:       []ComparableStruct{{IntField: 1}},
+		SetSliceNonComparableField:    []NonComparableStruct{{IntPtrField: ptr.To(1)}},
+		MapSliceComparableField:       []ComparableStructWithKey{{Key: "x", IntField: 1}},
+		MapSliceNonComparableField:    []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}},
+	}
+
+	st.Value(invalidStructSlice).ExpectValidateFalseByPath(map[string][]string{
+		"atomicSliceStringField[0]":        {"field AtomicSliceStringField[*]"},
+		"atomicSliceTypeField[0]":          {"field AtomicSliceTypeField[*]"},
+		"atomicSliceComparableField[0]":    {"field AtomicSliceComparableField[*]"},
+		"atomicSliceNonComparableField[0]": {"field AtomicSliceNonComparableField[*]", "type NonComparableStruct"},
+		"setSliceComparableField[0]":       {"field SetSliceComparableField[*]"},
+		"setSliceNonComparableField[0]":    {"field SetSliceNonComparableField[*]", "type NonComparableStruct"},
+		"mapSliceComparableField[0]":       {"field MapSliceComparableField[*]"},
+		"mapSliceNonComparableField[0]":    {"field MapSliceNonComparableField[*]", "type NonComparableStructWithKey"},
 	})
 
 	// No changes.
-	st.Value(&StructSlice{
-		SliceField:                    []S{""},
-		TypeDefSliceField:             MySlice{1},
-		SliceStructField:              []DirectComparableStruct{{IntField: 1}},
-		SliceNonComparableStructField: []NonDirectComparableStruct{{IntPtrField: ptr.To(1)}},
-	}).OldValue(&StructSlice{
-		SliceField:                    []S{""},
-		TypeDefSliceField:             MySlice{1},
-		SliceStructField:              []DirectComparableStruct{{IntField: 1}},
-		SliceNonComparableStructField: []NonDirectComparableStruct{{IntPtrField: ptr.To(1)}},
-	}).ExpectValid()
+	st.Value(&invalidStructSlice).OldValue(&invalidStructSlice).ExpectValid()
 
-	// New elements exist in old.
+	//  Removed elements - errors on atomic.
 	st.Value(&StructSlice{
-		SliceField:                    []S{""},
-		TypeDefSliceField:             MySlice{1},
-		SliceStructField:              []DirectComparableStruct{{IntField: 1}},
-		SliceNonComparableStructField: []NonDirectComparableStruct{{IntPtrField: ptr.To(1)}},
+		AtomicSliceStringField:        []StringType{""},
+		AtomicSliceTypeField:          IntSliceType{1},
+		AtomicSliceComparableField:    []ComparableStruct{{IntField: 1}},
+		AtomicSliceNonComparableField: []NonComparableStruct{{IntPtrField: ptr.To(1)}},
+		SetSliceComparableField:       []ComparableStruct{{IntField: 1}},
+		SetSliceNonComparableField:    []NonComparableStruct{{IntPtrField: ptr.To(1)}},
+		MapSliceComparableField:       []ComparableStructWithKey{{Key: "x", IntField: 1}},
+		MapSliceNonComparableField:    []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}},
 	}).OldValue(&StructSlice{
-		SliceField:                    []S{"", "x"},
-		TypeDefSliceField:             MySlice{1, 2},
-		SliceStructField:              []DirectComparableStruct{{IntField: 2}, {IntField: 1}},
-		SliceNonComparableStructField: []NonDirectComparableStruct{{IntPtrField: ptr.To(2)}, {IntPtrField: ptr.To(1)}},
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Invalid(field.NewPath("sliceField[0]"), "", ""),
-		field.Invalid(field.NewPath("typedefSliceField[0]"), "", ""),
-		field.Invalid(field.NewPath("sliceStructField[0]"), "", ""),
-		field.Invalid(field.NewPath("sliceNonComparableStructField[0]"), "", ""),
+		AtomicSliceStringField:        []StringType{"", "x"},
+		AtomicSliceTypeField:          IntSliceType{1, 2},
+		AtomicSliceComparableField:    []ComparableStruct{{IntField: 2}, {IntField: 1}},
+		AtomicSliceNonComparableField: []NonComparableStruct{{IntPtrField: ptr.To(2)}, {IntPtrField: ptr.To(1)}},
+		SetSliceComparableField:       []ComparableStruct{{IntField: 2}, {IntField: 1}},
+		SetSliceNonComparableField:    []NonComparableStruct{{IntPtrField: ptr.To(2)}, {IntPtrField: ptr.To(1)}},
+		MapSliceComparableField:       []ComparableStructWithKey{{Key: "y", IntField: 2}, {Key: "x", IntField: 1}},
+		MapSliceNonComparableField:    []NonComparableStructWithKey{{Key: "y", IntPtrField: ptr.To(2)}, {Key: "x", IntPtrField: ptr.To(1)}},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"atomicSliceStringField[0]":        {"field AtomicSliceStringField[*]"},
+		"atomicSliceTypeField[0]":          {"field AtomicSliceTypeField[*]"},
+		"atomicSliceComparableField[0]":    {"field AtomicSliceComparableField[*]"},
+		"atomicSliceNonComparableField[0]": {"field AtomicSliceNonComparableField[*]", "type NonComparableStruct"},
 	})
-
-	// No changes.
-	st.Value(&StructSlice{
-		SliceStructWithKey:              []DirectComparableStructWithKey{{Key: "x", IntField: 1}},
-		SliceNonComparableStructWithKey: []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}},
-	}).OldValue(&StructSlice{
-		SliceStructWithKey:              []DirectComparableStructWithKey{{Key: "x", IntField: 1}},
-		SliceNonComparableStructWithKey: []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}},
-	}).ExpectValid()
 
 	// Same data, different order.
 	st.Value(&StructSlice{
-		SliceStructWithKey:              []DirectComparableStructWithKey{{Key: "y", IntField: 1}, {Key: "x", IntField: 1}},
-		SliceNonComparableStructWithKey: []NonComparableStructWithKey{{Key: "y", IntPtrField: ptr.To(2)}, {Key: "x", IntPtrField: ptr.To(1)}},
+		SetSliceComparableField:    []ComparableStruct{{IntField: 2}, {IntField: 1}},
+		SetSliceNonComparableField: []NonComparableStruct{{IntPtrField: ptr.To(2)}, {IntPtrField: ptr.To(1)}},
+		MapSliceComparableField:    []ComparableStructWithKey{{Key: "y", IntField: 2}, {Key: "x", IntField: 1}},
+		MapSliceNonComparableField: []NonComparableStructWithKey{{Key: "y", IntPtrField: ptr.To(2)}, {Key: "x", IntPtrField: ptr.To(1)}},
 	}).OldValue(&StructSlice{
-		SliceStructWithKey:              []DirectComparableStructWithKey{{Key: "x", IntField: 1}, {Key: "y", IntField: 1}},
-		SliceNonComparableStructWithKey: []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}, {Key: "y", IntPtrField: ptr.To(2)}},
-	}).ExpectValid()
-
-	// less data, elements exist in old.
-	st.Value(&StructSlice{
-		SliceNonComparableStructField:   []NonDirectComparableStruct{{IntPtrField: ptr.To(1)}},
-		SliceNonComparableStructWithKey: []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}},
-	}).OldValue(&StructSlice{
-		SliceNonComparableStructField:   []NonDirectComparableStruct{{IntPtrField: ptr.To(1)}, {IntPtrField: ptr.To(2)}},
-		SliceNonComparableStructWithKey: []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}, {Key: "y", IntPtrField: ptr.To(2)}},
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Invalid(field.NewPath("sliceNonComparableStructField[0]"), "", ""),
-	})
-
-	// same data of listType=set, different order.
-	st.Value(&StructSlice{
-		SliceSetStructField: []DirectComparableStruct{{IntField: 1}, {IntField: 2}},
-	}).OldValue(&StructSlice{
-		SliceSetStructField: []DirectComparableStruct{{IntField: 2}, {IntField: 1}},
+		SetSliceComparableField:    []ComparableStruct{{IntField: 1}, {IntField: 2}},
+		SetSliceNonComparableField: []NonComparableStruct{{IntPtrField: ptr.To(1)}, {IntPtrField: ptr.To(2)}},
+		MapSliceComparableField:    []ComparableStructWithKey{{Key: "x", IntField: 1}, {Key: "y", IntField: 2}},
+		MapSliceNonComparableField: []NonComparableStructWithKey{{Key: "x", IntPtrField: ptr.To(1)}, {Key: "y", IntPtrField: ptr.To(2)}},
 	}).ExpectValid()
 }

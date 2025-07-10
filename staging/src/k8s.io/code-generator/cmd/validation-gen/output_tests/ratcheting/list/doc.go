@@ -27,58 +27,57 @@ var localSchemeBuilder = testscheme.New()
 type StructSlice struct {
 	TypeMeta int
 
-	// +k8s:eachVal=+k8s:validateFalse="field SliceField[*]"
-	SliceField []S `json:"sliceField"`
+	// +k8s:eachVal=+k8s:validateFalse="field AtomicSliceStringField[*]"
+	AtomicSliceStringField []StringType `json:"atomicSliceStringField"`
 
-	// +k8s:eachVal=+k8s:validateFalse="field TypeDefSliceField[*]"
-	TypeDefSliceField MySlice `json:"typedefSliceField"`
+	// +k8s:eachVal=+k8s:validateFalse="field AtomicSliceTypeField[*]"
+	AtomicSliceTypeField IntSliceType `json:"atomicSliceTypeField"`
 
-	// +k8s:eachVal=+k8s:validateFalse="field SliceStructField[*]"
-	SliceStructField []DirectComparableStruct `json:"sliceStructField"`
+	// +k8s:eachVal=+k8s:validateFalse="field AtomicSliceComparableField[*]"
+	AtomicSliceComparableField []ComparableStruct `json:"atomicSliceComparableField"`
 
-	// +k8s:eachVal=+k8s:validateFalse="field SliceNonComparableStructField[*]"
-	SliceNonComparableStructField []NonDirectComparableStruct `json:"sliceNonComparableStructField"`
+	// +k8s:eachVal=+k8s:validateFalse="field AtomicSliceNonComparableField[*]"
+	AtomicSliceNonComparableField []NonComparableStruct `json:"atomicSliceNonComparableField"`
+
+	// +k8s:listType=set
+	// +k8s:eachVal=+k8s:validateFalse="field SetSliceComparableField[*]"
+	SetSliceComparableField []ComparableStruct `json:"setSliceComparableField"`
+
+	// +k8s:listType=set
+	// +k8s:eachVal=+k8s:validateFalse="field SetSliceNonComparableField[*]"
+	SetSliceNonComparableField []NonComparableStruct `json:"setSliceNonComparableField"`
 
 	// +k8s:listType=map
 	// +k8s:listMapKey=key
-	// +k8s:eachVal=+k8s:validateFalse="field SliceStructWithKey[*]"
-	SliceStructWithKey []DirectComparableStructWithKey `json:"sliceStructWithKey"`
+	// +k8s:eachVal=+k8s:validateFalse="field MapSliceComparableField[*]"
+	MapSliceComparableField []ComparableStructWithKey `json:"mapSliceComparableField"`
 
 	// +k8s:listType=map
 	// +k8s:listMapKey=key
-	// +k8s:eachVal=+k8s:validateFalse="field SliceNonComparableStructWithKey[*]"
-	SliceNonComparableStructWithKey []NonComparableStructWithKey `json:"sliceNonComparableStructWithKey"`
-
-	// +k8s:listType=set
-	// +k8s:eachVal=+k8s:validateFalse="field SliceSetStructField[*]"
-	SliceSetStructField []DirectComparableStruct `json:"sliceSetStructField"`
-
-	// +k8s:listType=set
-	// +k8s:eachVal=+k8s:validateFalse="field SliceSetNonComparableStructField[*]"
-	SliceSetNonComparableStructField []NonDirectComparableStruct `json:"sliceSetNonComparableStructField"`
+	// +k8s:eachVal=+k8s:validateFalse="field MapSliceNonComparableField[*]"
+	MapSliceNonComparableField []NonComparableStructWithKey `json:"mapSliceNonComparableField"`
 }
 
-type S string
+type StringType string
 
-type MySlice []int
+type IntSliceType []int
 
-type DirectComparableStruct struct {
+type ComparableStruct struct {
 	IntField int `json:"intField"`
 }
 
-// +k8s:validateFalse="type NonDirectComparableStruct"
-type NonDirectComparableStruct struct {
+// +k8s:validateFalse="type NonComparableStruct"
+type NonComparableStruct struct {
 	IntPtrField *int `json:"intPtrField"`
 }
 
-type DirectComparableStructWithKey struct {
-	Key string `json:"key"`
-
-	IntField int `json:"intField"`
+type ComparableStructWithKey struct {
+	Key      string `json:"key"`
+	IntField int    `json:"intField"`
 }
 
+// +k8s:validateFalse="type NonComparableStructWithKey"
 type NonComparableStructWithKey struct {
-	Key string `json:"key"`
-
-	IntPtrField *int `json:"intPtrField"`
+	Key         string `json:"key"`
+	IntPtrField *int   `json:"intPtrField"`
 }
