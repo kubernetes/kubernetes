@@ -142,6 +142,11 @@ type Runtime interface {
 	// GetContainerSwapBehavior reports whether a container could be swappable.
 	// This is used to decide whether to handle InPlacePodVerticalScaling for containers.
 	GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubelettypes.SwapBehavior
+	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
+	// (allocated resources != actuated resources).
+	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
+	// Temporarily expose actuated resources for incremental changes.
+	GetActuatedResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
