@@ -21,8 +21,27 @@ import (
 	"time"
 	"unsafe"
 
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	"k8s.io/component-base/metrics"
+	schedulermetrics "k8s.io/kubernetes/pkg/scheduler/metrics"
 )
+
+// Internal types matching the real MetricAsyncRecorder
+type histogramVecMetric struct {
+	metric      *metrics.HistogramVec //nolint:unused // Required for memory layout matching
+	labelValues []string              //nolint:unused // Required for memory layout matching
+	value       float64               //nolint:unused // Required for memory layout matching
+}
+
+type gaugeVecMetric struct {
+	metric      *metrics.GaugeVec //nolint:unused // Required for memory layout matching
+	labelValues []string          //nolint:unused // Required for memory layout matching
+	valueToAdd  float64           //nolint:unused // Required for memory layout matching
+}
+
+type gaugeVecMetricKey struct {
+	metricName string //nolint:unused // Required for memory layout matching
+	labelValue string //nolint:unused // Required for memory layout matching
+}
 
 // PluginDurationCall records a call to ObservePluginDurationAsync
 type PluginDurationCall struct {
@@ -54,12 +73,12 @@ type FakeMetricAsyncRecorder struct {
 	// This is required for the unsafe casting to work properly
 
 	// From metrics.MetricAsyncRecorder:
-	bufferCh                                   chan any // Using any to match any channel type
+	bufferCh                                   chan *histogramVecMetric
 	bufferSize                                 int
 	interval                                   time.Duration
-	aggregatedInflightEventMetric              map[any]int // Using any to match gaugeVecMetricKey
+	aggregatedInflightEventMetric              map[gaugeVecMetricKey]int
 	aggregatedInflightEventMetricLastFlushTime time.Time
-	aggregatedInflightEventMetricBufferCh      chan any // Using any to match *gaugeVecMetric
+	aggregatedInflightEventMetricBufferCh      chan *gaugeVecMetric
 	stopCh                                     <-chan struct{}
 	IsStoppedCh                                chan struct{}
 
@@ -74,17 +93,19 @@ type FakeMetricAsyncRecorder struct {
 // NewFakeMetricAsyncRecorder creates a new fake recorder for testing
 func NewFakeMetricAsyncRecorder() *FakeMetricAsyncRecorder {
 	stopCh := make(chan struct{})
-	close(stopCh) // Close immediately to prevent goroutine start
+	isStoppedCh := make(chan struct{})
+	close(stopCh)     // Close immediately to prevent goroutine start
+	close(isStoppedCh) // Close immediately to indicate already stopped
 
 	return &FakeMetricAsyncRecorder{
-		bufferCh:                      make(chan any, 1),
+		bufferCh:                      make(chan *histogramVecMetric, 1),
 		bufferSize:                    1,
 		interval:                      time.Millisecond,
-		aggregatedInflightEventMetric: make(map[any]int),
+		aggregatedInflightEventMetric: make(map[gaugeVecMetricKey]int),
 		aggregatedInflightEventMetricLastFlushTime: time.Now(),
-		aggregatedInflightEventMetricBufferCh:      make(chan any, 1),
+		aggregatedInflightEventMetricBufferCh:      make(chan *gaugeVecMetric, 1),
 		stopCh:                                     stopCh,
-		IsStoppedCh:                                make(chan struct{}),
+		IsStoppedCh:                                isStoppedCh,
 		pluginDurationCalls:                        make([]PluginDurationCall, 0),
 		queueingHintCalls:                          make([]QueueingHintCall, 0),
 		inflightEventCalls:                         make([]InflightEventCall, 0),
@@ -197,8 +218,8 @@ func (f *FakeMetricAsyncRecorder) Reset() {
 	f.flushCount = 0
 }
 
-// AsMetricAsyncRecorder returns this fake recorder cast to *metrics.MetricAsyncRecorder
+// AsMetricAsyncRecorder returns this fake recorder cast to *schedulermetrics.MetricAsyncRecorder
 // This works because the memory layout matches
-func (f *FakeMetricAsyncRecorder) AsMetricAsyncRecorder() *metrics.MetricAsyncRecorder {
-	return (*metrics.MetricAsyncRecorder)(unsafe.Pointer(f))
+func (f *FakeMetricAsyncRecorder) AsMetricAsyncRecorder() *schedulermetrics.MetricAsyncRecorder {
+	return (*schedulermetrics.MetricAsyncRecorder)(unsafe.Pointer(f))
 }
