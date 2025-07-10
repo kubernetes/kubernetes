@@ -26,9 +26,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -275,11 +277,115 @@ func (m *manager) PushPendingResize(uid types.UID) {
 		}
 	}
 
-	// Add the pod to the pending resizes list
+	// Add the pod to the pending resizes list and sort by priority.
 	m.podsWithPendingResizes = append(m.podsWithPendingResizes, uid)
+	m.sortPendingResizes()
+}
 
-	// TODO (natasha41575): Sort the pending resizes list by priority.
-	// See https://github.com/kubernetes/enhancements/pull/5266.
+// sortPendingResizes sorts the list of pending resizes:
+// - First, prioritizing resizes that do not increase requests.
+// - Second, based on the pod's PriorityClass.
+// - Third, based on the pod's QoS class.
+// - Last, prioritizing resizes that have been in the deferred state the longest.
+func (m *manager) sortPendingResizes() {
+	var pendingPods []*v1.Pod
+	for _, uid := range m.podsWithPendingResizes {
+		pod, found := m.getPodByUID(uid)
+		if !found {
+			klog.V(4).InfoS("Pod not found; removing from pending resizes", "podUID", uid)
+			continue
+		}
+		pendingPods = append(pendingPods, pod)
+	}
+
+	slices.SortFunc(pendingPods, func(firstPod, secondPod *v1.Pod) int {
+		// First, resizes that don't increase requests will be prioritized.
+		// These resizes are expected to always succeed.
+		firstPodIncreasing := m.isResizeIncreasingRequests(firstPod)
+		secondPodIncreasing := m.isResizeIncreasingRequests(secondPod)
+		if !firstPodIncreasing {
+			return -1
+		}
+		if !secondPodIncreasing {
+			return 1
+		}
+
+		// Second, pods with a higher PriorityClass will be prioritized.
+		firstPodPriority := int32(0)
+		if firstPod.Spec.Priority != nil {
+			firstPodPriority = *firstPod.Spec.Priority
+		}
+		secondPodPriority := int32(0)
+		if secondPod.Spec.Priority != nil {
+			secondPodPriority = *secondPod.Spec.Priority
+		}
+		if firstPodPriority > secondPodPriority {
+			return -1
+		}
+		if secondPodPriority > firstPodPriority {
+			return 1
+		}
+
+		// Third, pods with a higher QoS class will be prioritized, where guaranteed > burstable.
+		// Best effort pods don't have resource requests or limits, so we don't need to consider them here.
+		firstPodQOS := v1qos.GetPodQOS(firstPod)
+		secondPodQOS := v1qos.GetPodQOS(secondPod)
+		if firstPodQOS == v1.PodQOSGuaranteed && secondPodQOS != v1.PodQOSGuaranteed {
+			return -1
+		}
+		if secondPodQOS == v1.PodQOSGuaranteed && firstPodQOS != v1.PodQOSGuaranteed {
+			return 1
+		}
+
+		// If all else is the same, resize requests that have been pending longer will be
+		// evaluated first.
+		var firstPodLastTransitionTime *metav1.Time
+		firstPodResizeConditions := m.statusManager.GetPodResizeConditions(firstPod.UID)
+		for _, c := range firstPodResizeConditions {
+			if c.Type == v1.PodResizePending {
+				firstPodLastTransitionTime = &c.LastTransitionTime
+			}
+		}
+		var secondPodLastTransitionTime *metav1.Time
+		secondPodResizeConditions := m.statusManager.GetPodResizeConditions(secondPod.UID)
+		for _, c := range secondPodResizeConditions {
+			if c.Type == v1.PodResizePending {
+				secondPodLastTransitionTime = &c.LastTransitionTime
+			}
+		}
+		if firstPodLastTransitionTime == nil {
+			return 1
+		}
+		if secondPodLastTransitionTime == nil {
+			return -1
+		}
+		if firstPodLastTransitionTime.Before(secondPodLastTransitionTime) {
+			return -1
+		}
+		return 1
+	})
+
+	m.podsWithPendingResizes = make([]types.UID, len(pendingPods))
+	for i, pod := range pendingPods {
+		m.podsWithPendingResizes[i] = pod.UID
+	}
+}
+
+// isResizeIncreasingRequests returns true if any of the resource requests are increasing.
+func (m *manager) isResizeIncreasingRequests(pod *v1.Pod) bool {
+	allocatedPod, updated := m.UpdatePodFromAllocation(pod)
+	if !updated {
+		return false
+	}
+
+	opts := resourcehelper.PodResourcesOptions{
+		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+	}
+	oldRequest := resourcehelper.PodRequests(allocatedPod, opts)
+	newRequest := resourcehelper.PodRequests(pod, opts)
+
+	return newRequest.Memory().Cmp(*oldRequest.Memory()) > 0 ||
+		newRequest.Cpu().Cmp(*oldRequest.Cpu()) > 0
 }
 
 // GetContainerResourceAllocation returns the last checkpointed AllocatedResources values
