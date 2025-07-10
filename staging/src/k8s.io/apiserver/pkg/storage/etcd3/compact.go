@@ -18,12 +18,15 @@ package etcd3
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -41,11 +44,12 @@ func init() {
 	endpointsMap = make(map[string]*compactor)
 }
 
-// StartCompactor starts a compactor in the background to compact old version of keys that's not needed.
+// StartCompactorPerEndpoint starts a compactor but prevents multiple compactors per client endpoint.
+// Calling the function twice on single endpoint will return the same compactor.
+// Compactor removes old version of keys from etcd.
 // By default, we save the most recent 5 minutes data and compact versions > 5minutes ago.
 // It should be enough for slow watchers and to tolerate burst.
-// TODO: We might keep a longer history (12h) in the future once storage API can take advantage of past version of keys.
-func StartCompactor(client *clientv3.Client, compactInterval time.Duration) *compactor {
+func StartCompactorPerEndpoint(client *clientv3.Client, compactInterval time.Duration) *compactor {
 	endpointsMapMu.Lock()
 	defer endpointsMapMu.Unlock()
 
@@ -57,7 +61,7 @@ func StartCompactor(client *clientv3.Client, compactInterval time.Duration) *com
 			return c
 		}
 	}
-	c := newCompactor(client, compactInterval, clock.RealClock{}, func() {
+	c := NewCompactor(client, compactInterval, clock.RealClock{}, func() {
 		endpointsMapMu.Lock()
 		defer endpointsMapMu.Unlock()
 		for _, ep := range client.Endpoints() {
@@ -70,7 +74,13 @@ func StartCompactor(client *clientv3.Client, compactInterval time.Duration) *com
 	return c
 }
 
-func newCompactor(client *clientv3.Client, compactInterval time.Duration, clock clock.Clock, onClose func()) *compactor {
+type Compactor interface {
+	CompactRevision() int64
+}
+
+// NewCompactor runs dedicated compactor, that removes old versions of keys from etcd.
+// Prefer calling StartCompactorPerEndpoint as this function doesn't prevent multiple compactors running per single endpoint.
+func NewCompactor(client *clientv3.Client, compactInterval time.Duration, clock clock.Clock, onClose func()) *compactor {
 	c := &compactor{
 		client:   client,
 		interval: compactInterval,
@@ -83,6 +93,13 @@ func newCompactor(client *clientv3.Client, compactInterval time.Duration, clock 
 		go func() {
 			defer c.wg.Done()
 			c.runCompactLoop(c.stop)
+		}()
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+		c.wg.Add(1)
+		go func() {
+			defer c.wg.Done()
+			c.runWatchLoop(c.stop)
 		}()
 	}
 	return c
@@ -119,10 +136,13 @@ func (c *compactor) CompactRevision() int64 {
 	return c.compactRevision
 }
 
-func (c *compactor) SetCompactRevision(rev int64) {
+func (c *compactor) UpdateCompactRevision(rev int64) {
+	if rev == 0 {
+		return
+	}
 	c.mux.Lock()
 	defer c.mux.Unlock()
-	c.compactRevision = rev
+	c.compactRevision = max(c.compactRevision, rev)
 }
 
 // compactor periodically compacts historical versions of keys in etcd.
@@ -182,21 +202,21 @@ func (c *compactor) runCompactLoop(stopCh chan struct{}) {
 			return
 		}
 
-		compactTime, rev, compactRev, err = compact(ctx, c.client, compactTime, rev)
+		compactTime, rev, compactRev, err = Compact(ctx, c.client, compactTime, rev)
 		if err != nil {
 			klog.Errorf("etcd: endpoint (%v) compact failed: %v", c.client.Endpoints(), err)
 			continue
 		}
 		if compactRev != 0 {
-			c.SetCompactRevision(compactRev)
+			c.UpdateCompactRevision(compactRev)
 		}
 	}
 }
 
-// compact compacts etcd store and returns current rev.
-// It will return the current compact time and global revision if no error occurred.
+// Compact compacts etcd store and returns current rev.
+// It will return the current Compact time and global revision if no error occurred.
 // Note that CAS fail will not incur any error.
-func compact(ctx context.Context, client *clientv3.Client, expectVersion, rev int64) (currentVersion, currentRev, compactRev int64, err error) {
+func Compact(ctx context.Context, client *clientv3.Client, expectVersion, rev int64) (currentVersion, currentRev, compactRev int64, err error) {
 	resp, err := client.KV.Txn(ctx).If(
 		clientv3.Compare(clientv3.Version(compactRevKey), "=", expectVersion),
 	).Then(
@@ -229,4 +249,65 @@ func compact(ctx context.Context, client *clientv3.Client, expectVersion, rev in
 	}
 	klog.V(4).Infof("etcd: compacted rev (%d), endpoints (%v)", rev, client.Endpoints())
 	return currentVersion, currentRev, rev, nil
+}
+
+// runWatchLoops gets and watches changes to compact_rev_key and updates the compaction revision based on it.
+func (c *compactor) runWatchLoop(stopCh chan struct{}) {
+	ctx := wait.ContextForChannel(stopCh)
+	for {
+		select {
+		case <-time.After(time.Second):
+		case <-ctx.Done():
+			return
+		}
+		compactRev, currentRev, err := c.getCompactRev(ctx)
+		if err != nil {
+			klog.Errorf("etcd: endpoint (%v): %v", c.client.Endpoints(), err)
+			continue
+		}
+		c.UpdateCompactRevision(compactRev)
+		watch := c.client.Watch(ctx, compactRevKey, clientv3.WithRev(currentRev))
+		for resp := range watch {
+			compactRev, err := c.fromWatchResponse(resp)
+			if err != nil {
+				klog.Errorf("etcd: endpoint (%v): %v", c.client.Endpoints(), err)
+				continue
+			}
+			c.UpdateCompactRevision(compactRev)
+		}
+	}
+}
+
+// getCompactRev returns the etcd compaction revision by reading the value stored under compact_rev_key.
+func (c *compactor) getCompactRev(ctx context.Context) (compactRev int64, currentRev int64, err error) {
+	resp, err := c.client.Get(ctx, compactRevKey)
+	if err != nil {
+		return compactRev, currentRev, fmt.Errorf("get %q failed: %w", compactRevKey, err)
+	}
+	if len(resp.Kvs) != 0 {
+		compactRev, err = strconv.ParseInt(string(resp.Kvs[0].Value), 10, 64)
+		if err != nil {
+			return compactRev, currentRev, fmt.Errorf("failed to parse compact revision: %w", err)
+		}
+	}
+	if resp.Header == nil {
+		return compactRev, currentRev, fmt.Errorf("empty response header")
+	}
+	currentRev = resp.Header.Revision
+	return compactRev, currentRev, nil
+}
+
+func (c *compactor) fromWatchResponse(resp clientv3.WatchResponse) (compactRev int64, err error) {
+	if resp.Err() != nil {
+		return 0, resp.Err()
+	}
+	if len(resp.Events) == 0 {
+		return 0, nil
+	}
+	lastEvent := resp.Events[len(resp.Events)-1]
+	compactRev, err = strconv.ParseInt(string(lastEvent.Kv.Value), 10, 64)
+	if err != nil {
+		return compactRev, fmt.Errorf("failed to parse compact revision: %w", err)
+	}
+	return compactRev, nil
 }
