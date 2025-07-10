@@ -1677,11 +1677,12 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, p
 
 func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
 	ctx := context.TODO() // This context will be passed as parameter in the future
+	podUID := kubetypes.UID(event.PodSandboxStatus.Metadata.Uid)
 	podIPs := m.determinePodSandboxIPs(ctx, event.PodSandboxStatus.Metadata.Namespace, event.PodSandboxStatus.Metadata.Name, event.PodSandboxStatus)
 
 	kubeContainerStatuses := []*kubecontainer.Status{}
 	for _, status := range event.ContainersStatuses {
-		kubeContainerStatuses = append(kubeContainerStatuses, m.convertToKubeContainerStatus(ctx, status))
+		kubeContainerStatuses = append(kubeContainerStatuses, m.convertToKubeContainerStatus(ctx, podUID, status))
 	}
 
 	sort.Sort(containerStatusByCreated(kubeContainerStatuses))
@@ -1781,7 +1782,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 				// timestamp from sandboxStatus.
 				timestamp = time.Unix(0, resp.Timestamp)
 				for _, cs := range resp.ContainersStatuses {
-					cStatus := m.convertToKubeContainerStatus(ctx, cs)
+					cStatus := m.convertToKubeContainerStatus(ctx, uid, cs)
 					containerStatuses = append(containerStatuses, cStatus)
 				}
 			}
@@ -1812,20 +1813,24 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 	}, nil
 }
 
-func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, id kubecontainer.ContainerID) (*kubecontainer.Status, error) {
+func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, podUID kubetypes.UID, id kubecontainer.ContainerID) (*kubecontainer.Status, error) {
 	resp, err := m.runtimeService.ContainerStatus(ctx, id.ID, false)
 	if err != nil {
 		return nil, fmt.Errorf("runtime container status: %w", err)
 	}
-	return m.convertToKubeContainerStatus(ctx, resp.GetStatus()), nil
+	return m.convertToKubeContainerStatus(ctx, podUID, resp.GetStatus()), nil
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy.
 func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
+	logger := klog.FromContext(ctx)
 	// Remove terminated pods from the actuated state.
 	for uid := range m.actuatedState.GetPodResourceInfoMap() {
 		if m.podStateProvider.ShouldPodContentBeRemoved(uid) {
-			m.actuatedState.RemovePod(uid)
+			if err := m.actuatedState.RemovePod(uid); err != nil {
+				// No need to act on the error beyond logging it here.
+				logger.Error(err, "Failed to remove pod from actuated state", "podUID", uid)
+			}
 		}
 	}
 
@@ -1859,10 +1864,6 @@ func (m *kubeGenericRuntimeManager) ListPodSandboxMetrics(ctx context.Context) (
 	return m.runtimeService.ListPodSandboxMetrics(ctx)
 }
 
-func (m *kubeGenericRuntimeManager) GetActuatedResources(podUID kubetypes.UID, containerName string) (v1.ResourceRequirements, bool) {
-	return m.actuatedState.GetContainerResources(podUID, containerName)
-}
-
 // isPodResizeInProgress checks whether the actuated resizable resources differ from the allocated resources
 // for any running containers. Specifically, the following differences are ignored:
 // - Non-resizable containers: non-restartable init containers, ephemeral containers
@@ -1881,7 +1882,7 @@ func (m *kubeGenericRuntimeManager) IsPodResizeInProgress(allocatedPod *v1.Pod, 
 				return true
 			}
 
-			actuatedResources, _ := m.GetActuatedResources(allocatedPod.UID, allocatedContainer.Name)
+			actuatedResources, _ := m.actuatedState.GetContainerResources(allocatedPod.UID, allocatedContainer.Name)
 			allocatedResources := allocatedContainer.Resources
 
 			return allocatedResources.Requests[v1.ResourceCPU].Equal(actuatedResources.Requests[v1.ResourceCPU]) &&

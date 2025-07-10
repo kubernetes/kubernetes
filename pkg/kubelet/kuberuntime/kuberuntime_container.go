@@ -587,8 +587,8 @@ func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(ctx context.
 	return buf.String()
 }
 
-func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(ctx context.Context, status *runtimeapi.ContainerStatus) (cStatus *kubecontainer.Status) {
-	cStatus = toKubeContainerStatus(ctx, status, m.runtimeName)
+func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(ctx context.Context, podUID kubetypes.UID, status *runtimeapi.ContainerStatus) (cStatus *kubecontainer.Status) {
+	cStatus = m.toKubeContainerStatus(ctx, podUID, status, m.runtimeName)
 	if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
 		// Populate the termination message if needed.
 		annotatedInfo := getContainerInfoFromAnnotations(ctx, status.Annotations)
@@ -643,7 +643,7 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 		if status == nil {
 			return nil, nil, remote.ErrContainerStatusNil
 		}
-		cStatus := m.convertToKubeContainerStatus(ctx, status)
+		cStatus := m.convertToKubeContainerStatus(ctx, uid, status)
 		statuses = append(statuses, cStatus)
 		if c.PodSandboxId == activePodSandboxID {
 			activeContainerStatuses = append(activeContainerStatuses, cStatus)
@@ -655,13 +655,31 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 	return statuses, activeContainerStatuses, nil
 }
 
-func toKubeContainerStatus(ctx context.Context, status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
+func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, podUID kubetypes.UID, status *runtimeapi.ContainerStatus, runtimeName string) *kubecontainer.Status {
 	annotatedInfo := getContainerInfoFromAnnotations(ctx, status.Annotations)
 	labeledInfo := getContainerInfoFromLabels(ctx, status.Labels)
 	var cStatusResources *kubecontainer.ContainerResources
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// If runtime reports cpu & memory resources info, add it to container status
 		cStatusResources = toKubeContainerResources(status.Resources)
+
+		// Fill missing resource values from the actuated resources.
+		if cStatusResources == nil || cStatusResources.MemoryRequest == nil {
+			if actuatedResources, ok := m.actuatedState.GetContainerResources(podUID, labeledInfo.ContainerName); ok {
+				if cStatusResources == nil {
+					cStatusResources = &kubecontainer.ContainerResources{
+						CPURequest:    actuatedResources.Requests.Cpu(),
+						CPULimit:      actuatedResources.Limits.Cpu(),
+						MemoryRequest: actuatedResources.Requests.Memory(),
+						MemoryLimit:   actuatedResources.Limits.Memory(),
+					}
+				} else if cStatusResources.MemoryRequest == nil {
+					if memReq := actuatedResources.Requests[v1.ResourceMemory]; !memReq.IsZero() {
+						cStatusResources.MemoryRequest = &memReq
+					}
+				}
+			}
+		}
 	}
 
 	// Keep backwards compatibility to older runtimes, status.ImageId has been added in v1.30

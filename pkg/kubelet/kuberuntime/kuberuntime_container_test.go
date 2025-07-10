@@ -39,7 +39,9 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
+	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -146,11 +148,14 @@ func TestToKubeContainerStatus(t *testing.T) {
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
-	var (
-		createdAt  int64 = 327
-		startedAt  int64 = 999
-		finishedAt int64 = 1278
+	const (
+		podUID     types.UID = "12345-abcd"
+		createdAt  int64     = 327
+		startedAt  int64     = 999
+		finishedAt int64     = 1278
 	)
+
+	_, _, m, _ := createTestRuntimeManager(tCtx)
 
 	for desc, test := range map[string]struct {
 		input    *runtimeapi.ContainerStatus
@@ -231,8 +236,10 @@ func TestToKubeContainerStatus(t *testing.T) {
 			},
 		},
 	} {
-		actual := toKubeContainerStatus(tCtx, test.input, cid.Type)
-		assert.Equal(t, test.expected, actual, desc)
+		t.Run(desc, func(t *testing.T) {
+			actual := m.toKubeContainerStatus(tCtx, podUID, test.input, cid.Type)
+			assert.Equal(t, test.expected, actual, desc)
+		})
 	}
 }
 
@@ -241,124 +248,149 @@ func TestToKubeContainerStatus(t *testing.T) {
 func TestToKubeContainerStatusWithResources(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	tCtx := ktesting.Init(t)
-	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
-	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
-	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
-	var (
-		createdAt int64 = 327
-		startedAt int64 = 999
+
+	const (
+		podUID    types.UID = "12345-abcd"
+		createdAt int64     = 327
+		startedAt int64     = 999
+		cName               = "cname-abcd"
 	)
+	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
+	meta := &runtimeapi.ContainerMetadata{Name: cName, Attempt: 3}
+	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
+	labels := map[string]string{
+		kubelettypes.KubernetesPodNameLabel:       "pod-12345",
+		kubelettypes.KubernetesPodNamespaceLabel:  "default",
+		kubelettypes.KubernetesPodUIDLabel:        string(podUID),
+		kubelettypes.KubernetesContainerNameLabel: cName,
+	}
+
+	_, _, m, _ := createTestRuntimeManager(tCtx)
 
 	for desc, test := range map[string]struct {
-		input         *runtimeapi.ContainerStatus
-		expected      *kubecontainer.Status
-		skipOnWindows bool
+		reportedResources *runtimeapi.ContainerResources
+		actuatedResources *v1.ResourceRequirements
+		Resources         *kubecontainer.ContainerResources
+		skipOnWindows     bool
 	}{
 		"container reporting cpu and memory": {
-			input: &runtimeapi.ContainerStatus{
-				Id:        cid.ID,
-				Metadata:  meta,
-				Image:     imageSpec,
-				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
-				CreatedAt: createdAt,
-				StartedAt: startedAt,
-				Resources: func() *runtimeapi.ContainerResources {
-					if goruntime.GOOS == "windows" {
-						return &runtimeapi.ContainerResources{
-							Windows: &runtimeapi.WindowsContainerResources{
-								CpuMaximum:         2500,
-								CpuCount:           1,
-								MemoryLimitInBytes: 524288000,
-							},
-						}
-					}
+			reportedResources: func() *runtimeapi.ContainerResources {
+				if goruntime.GOOS == "windows" {
 					return &runtimeapi.ContainerResources{
-						Linux: &runtimeapi.LinuxContainerResources{
-							CpuQuota:           25000,
-							CpuPeriod:          100000,
+						Windows: &runtimeapi.WindowsContainerResources{
+							CpuMaximum:         2500,
+							CpuCount:           1,
 							MemoryLimitInBytes: 524288000,
-							OomScoreAdj:        -998,
 						},
 					}
-				}(),
-			},
-			expected: &kubecontainer.Status{
-				ID:        *cid,
-				Image:     imageSpec.Image,
-				State:     kubecontainer.ContainerStateRunning,
-				CreatedAt: time.Unix(0, createdAt),
-				StartedAt: time.Unix(0, startedAt),
-				Resources: &kubecontainer.ContainerResources{
-					CPULimit:    resource.NewMilliQuantity(250, resource.DecimalSI),
-					MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
-				},
+				}
+				return &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						CpuQuota:           25000,
+						CpuPeriod:          100000,
+						MemoryLimitInBytes: 524288000,
+						OomScoreAdj:        -998,
+					},
+				}
+			}(),
+			Resources: &kubecontainer.ContainerResources{
+				CPULimit:    resource.NewMilliQuantity(250, resource.DecimalSI),
+				MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
 			},
 			skipOnWindows: true,
 		},
 		"container reporting cpu only": {
-			input: &runtimeapi.ContainerStatus{
-				Id:        cid.ID,
-				Metadata:  meta,
-				Image:     imageSpec,
-				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
-				CreatedAt: createdAt,
-				StartedAt: startedAt,
-				Resources: func() *runtimeapi.ContainerResources {
-					if goruntime.GOOS == "windows" {
-						return &runtimeapi.ContainerResources{
-							Windows: &runtimeapi.WindowsContainerResources{
-								CpuMaximum: 2500,
-								CpuCount:   2,
-							},
-						}
-					}
+			reportedResources: func() *runtimeapi.ContainerResources {
+				if goruntime.GOOS == "windows" {
 					return &runtimeapi.ContainerResources{
-						Linux: &runtimeapi.LinuxContainerResources{
-							CpuQuota:  50000,
-							CpuPeriod: 100000,
+						Windows: &runtimeapi.WindowsContainerResources{
+							CpuMaximum: 2500,
+							CpuCount:   2,
 						},
 					}
-				}(),
-			},
-			expected: &kubecontainer.Status{
-				ID:        *cid,
-				Image:     imageSpec.Image,
-				State:     kubecontainer.ContainerStateRunning,
-				CreatedAt: time.Unix(0, createdAt),
-				StartedAt: time.Unix(0, startedAt),
-				Resources: &kubecontainer.ContainerResources{
-					CPULimit: resource.NewMilliQuantity(500, resource.DecimalSI),
+				}
+				return &runtimeapi.ContainerResources{
+					Linux: &runtimeapi.LinuxContainerResources{
+						CpuShares: int64(cm.MilliCPUToShares(500)),
+						CpuQuota:  50000,
+						CpuPeriod: 100000,
+					},
+				}
+			}(),
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.BinarySI),
+					v1.ResourceMemory: resource.Quantity{},
 				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: *resource.NewMilliQuantity(500, resource.BinarySI),
+				},
+			},
+			Resources: &kubecontainer.ContainerResources{
+				CPURequest: resource.NewMilliQuantity(500, resource.DecimalSI),
+				CPULimit:   resource.NewMilliQuantity(500, resource.DecimalSI),
 			},
 		},
 		"container reporting memory only": {
-			input: &runtimeapi.ContainerStatus{
-				Id:        cid.ID,
-				Metadata:  meta,
-				Image:     imageSpec,
-				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
-				CreatedAt: createdAt,
-				StartedAt: startedAt,
-				Resources: &runtimeapi.ContainerResources{
-					Linux: &runtimeapi.LinuxContainerResources{
-						MemoryLimitInBytes: 524288000,
-						OomScoreAdj:        -998,
-					},
-					Windows: &runtimeapi.WindowsContainerResources{
-						MemoryLimitInBytes: 524288000,
-					},
+			reportedResources: &runtimeapi.ContainerResources{
+				Linux: &runtimeapi.LinuxContainerResources{
+					MemoryLimitInBytes: 524288000,
+					OomScoreAdj:        -998,
+				},
+				Windows: &runtimeapi.WindowsContainerResources{
+					MemoryLimitInBytes: 524288000,
 				},
 			},
-			expected: &kubecontainer.Status{
-				ID:        *cid,
-				Image:     imageSpec.Image,
-				State:     kubecontainer.ContainerStateRunning,
-				CreatedAt: time.Unix(0, createdAt),
-				StartedAt: time.Unix(0, startedAt),
-				Resources: &kubecontainer.ContainerResources{
-					MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
+			Resources: &kubecontainer.ContainerResources{
+				MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
+			},
+		},
+		"container reporting memory limits, reqs from actuated": {
+			reportedResources: &runtimeapi.ContainerResources{
+				Linux: &runtimeapi.LinuxContainerResources{
+					MemoryLimitInBytes: 524288000,
+					OomScoreAdj:        -998,
+				},
+				Windows: &runtimeapi.WindowsContainerResources{
+					MemoryLimitInBytes: 524288000,
 				},
 			},
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: *resource.NewQuantity(262144000, resource.BinarySI),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: *resource.NewQuantity(524288000, resource.BinarySI),
+				},
+			},
+			Resources: &kubecontainer.ContainerResources{
+				MemoryRequest: resource.NewQuantity(262144000, resource.BinarySI),
+				MemoryLimit:   resource.NewQuantity(524288000, resource.BinarySI),
+			},
+		},
+		"reported resources take precedence to actuated resources": {
+			reportedResources: &runtimeapi.ContainerResources{
+				Linux: &runtimeapi.LinuxContainerResources{
+					CpuShares: int64(cm.MilliCPUToShares(500)),
+					CpuQuota:  50000,
+					CpuPeriod: 100000,
+				},
+			},
+			actuatedResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.BinarySI),
+					v1.ResourceMemory: *resource.NewQuantity(262144000, resource.BinarySI),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: *resource.NewMilliQuantity(400, resource.BinarySI),
+				},
+			},
+			Resources: &kubecontainer.ContainerResources{
+				CPURequest:    resource.NewMilliQuantity(500, resource.DecimalSI),
+				CPULimit:      resource.NewMilliQuantity(500, resource.DecimalSI),
+				MemoryRequest: resource.NewQuantity(262144000, resource.BinarySI),
+			},
+			skipOnWindows: true,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
@@ -366,8 +398,35 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 				// TODO: remove skip once the failing test has been fixed.
 				t.Skip("Skip failing test on Windows.")
 			}
-			actual := toKubeContainerStatus(tCtx, test.input, cid.Type)
-			assert.Equal(t, test.expected, actual, desc)
+
+			input := &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Labels:    labels,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				Resources: test.reportedResources,
+			}
+
+			expected := &kubecontainer.Status{
+				ID:        *cid,
+				Name:      cName,
+				Image:     imageSpec.Image,
+				State:     kubecontainer.ContainerStateRunning,
+				CreatedAt: time.Unix(0, createdAt),
+				StartedAt: time.Unix(0, startedAt),
+				Resources: test.Resources,
+			}
+
+			if test.actuatedResources != nil {
+				require.NoError(t, m.actuatedState.SetContainerResources(podUID, meta.Name, *test.actuatedResources))
+				t.Cleanup(func() { _ = m.actuatedState.RemovePod(podUID) })
+			}
+
+			actual := m.toKubeContainerStatus(tCtx, podUID, input, cid.Type)
+			assert.Equal(t, expected, actual, desc)
 		})
 	}
 }
@@ -381,10 +440,13 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
 	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
-	var (
-		createdAt int64 = 327
-		startedAt int64 = 999
+	const (
+		podUID    types.UID = "12345-abcd"
+		createdAt int64     = 327
+		startedAt int64     = 999
 	)
+
+	_, _, m, _ := createTestRuntimeManager(tCtx)
 
 	for desc, test := range map[string]struct {
 		input          *runtimeapi.ContainerUser
@@ -451,7 +513,7 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 				StartedAt: startedAt,
 				User:      test.input,
 			}
-			actual := toKubeContainerStatus(tCtx, cStatus, cid.Type)
+			actual := m.toKubeContainerStatus(tCtx, podUID, cStatus, cid.Type)
 			assert.EqualValues(t, test.expected, actual.User, desc)
 		})
 	}
