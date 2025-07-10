@@ -3679,6 +3679,24 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList 
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostIPC"), "when `pod.Spec.HostUsers` is false"))
 	}
 
+	// volumeDevices won't work, as they don't support idmap mounts nor we are chown-ing them.
+	// Let's return a clear error in this case.
+	for i, c := range spec.EphemeralContainers {
+		if len(c.VolumeDevices) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("ephemeralContainers").Index(i).Child("volumeDevices"), "when `pod.Spec.HostUsers` is false"))
+		}
+	}
+	for i, c := range spec.InitContainers {
+		if len(c.VolumeDevices) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("initContainers").Index(i).Child("volumeDevices"), "when `pod.Spec.HostUsers` is false"))
+		}
+	}
+	for i, c := range spec.Containers {
+		if len(c.VolumeDevices) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("containers").Index(i).Child("volumeDevices"), "when `pod.Spec.HostUsers` is false"))
+		}
+	}
+
 	return allErrs
 }
 
