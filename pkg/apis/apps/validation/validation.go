@@ -248,11 +248,29 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 	newStatefulSetClone.Spec.Ordinals = oldStatefulSet.Spec.Ordinals                         // +k8s:verify-mutation:reason=clone
 	newStatefulSetClone.Spec.RevisionHistoryLimit = oldStatefulSet.Spec.RevisionHistoryLimit // +k8s:verify-mutation:reason=clone
 
-	newStatefulSetClone.Spec.PersistentVolumeClaimRetentionPolicy = oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy // +k8s:verify-mutation:reason=clone
-	if !apiequality.Semantic.DeepEqual(newStatefulSetClone.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'updateStrategy', 'revisionHistoryLimit', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
+	newStatefulSetClone.Spec.PersistentVolumeClaimRetentionPolicy = oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy
+	// +k8s:verify-mutation:reason=clone
+	forbiddenFields := []string{}
+
+	if !apiequality.Semantic.DeepEqual(statefulSet.Spec.ServiceName, oldStatefulSet.Spec.ServiceName) {
+		forbiddenFields = append(forbiddenFields, "serviceName")
+	}
+	if !apiequality.Semantic.DeepEqual(statefulSet.Spec.Selector, oldStatefulSet.Spec.Selector) {
+		forbiddenFields = append(forbiddenFields, "selector")
+	}
+	if !apiequality.Semantic.DeepEqual(statefulSet.Spec.VolumeClaimTemplates, oldStatefulSet.Spec.VolumeClaimTemplates) {
+		forbiddenFields = append(forbiddenFields, "volumeClaimTemplates")
+	}
+	if !apiequality.Semantic.DeepEqual(statefulSet.Spec.PodManagementPolicy, oldStatefulSet.Spec.PodManagementPolicy) {
+		forbiddenFields = append(forbiddenFields, "podManagementPolicy")
 	}
 
+	if len(forbiddenFields) > 0 {
+		allErrs = append(allErrs, field.Forbidden(
+			field.NewPath("spec"),
+			fmt.Sprintf("updates to the following fields are forbidden for StatefulSet: %v", forbiddenFields),
+		))
+	}
 	return allErrs
 }
 
