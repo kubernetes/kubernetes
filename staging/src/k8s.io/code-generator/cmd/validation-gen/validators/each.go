@@ -109,10 +109,6 @@ func (listTypeTagValidator) ValidScopes() sets.Set[Scope] {
 	return listTagsValidScopes
 }
 
-var (
-	validateUnique = types.Name{Package: libValidationPkg, Name: "Unique"}
-)
-
 func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := util.NativeType(context.Type)
@@ -129,23 +125,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		}
 		lm := lttv.byFieldPath[context.Path.String()]
 		lm.declaredAsSet = true
-		// Only compare primitive values when possible. Slices and maps are not
-		// comparable, and structs might hold pointer fields, which are directly
-		// comparable but not what we need.
-		//
-		// NOTE: lists of pointers are not supported, so we should never see a pointer here.
-		if util.IsDirectComparable(util.NonPointer(util.NativeType(t.Elem))) {
-			return Validations{
-				Functions: []FunctionGen{
-					Function(listTypeTagName, DefaultFlags, validateUnique, Identifier(validateDirectEqual)),
-				},
-			}, nil
-		}
-		return Validations{
-			Functions: []FunctionGen{
-				Function(listTypeTagName, DefaultFlags, validateUnique, Identifier(validateSemanticDeepEqual)),
-			},
-		}, nil
+		// NOTE: we validate uniqueness in the listValidator.
 	case "map":
 		// NOTE: maps of pointers are not supported, so we should never see a pointer here.
 		if util.NativeType(t.Elem).Kind != types.Struct {
@@ -254,6 +234,10 @@ func (listValidator) Name() string {
 	return "listValidator"
 }
 
+var (
+	validateUnique = types.Name{Package: libValidationPkg, Name: "Unique"}
+)
+
 func (lv listValidator) GetValidations(context Context) (Validations, error) {
 	lm := lv.byFieldPath[context.Path.String()]
 	if err := lv.check(lm); err != nil {
@@ -288,15 +272,29 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 
 	result := Validations{}
 
+	// Generate uniqueness checks for lists with higher-order semantics.
+	nt := util.NativeType(context.Type)
+	if lm.declaredAsSet {
+		// Only compare primitive values when possible. Slices and maps are not
+		// comparable, and structs might hold pointer fields, which are directly
+		// comparable but not what we need.
+		//
+		// NOTE: lists of pointers are not supported, so we should never see a pointer here.
+		matchArg := validateSemanticDeepEqual
+		if util.IsDirectComparable(util.NonPointer(util.NativeType(nt.Elem))) {
+			matchArg = validateDirectEqual
+		}
+		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg))
+		result.AddFunction(f)
+	}
 	if lm.declaredAsMap {
 		// TODO: There are some fields which are declared as maps which do not
 		// enforce uniqueness in manual validation. Those either need to not be
 		// maps or we need to allow types to opt-out from this validation.  SSA
 		// is also not able to handle these well.
-		t := util.NativeType(context.Type)
-		matchArg := lm.makeListMapMatchFunc(t.Elem)
+		matchArg := lm.makeListMapMatchFunc(nt.Elem)
 		f := Function("listValidator", DefaultFlags, validateUnique, matchArg)
-		result.Functions = append(result.Functions, f)
+		result.AddFunction(f)
 	}
 
 	return result, nil
