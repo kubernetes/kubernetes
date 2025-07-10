@@ -173,6 +173,22 @@ func makePod(podUID, containerName, cpuRequest, cpuLimit string) *v1.Pod {
 	return pod
 }
 
+func makePodWithPodLevelResources(podUID, podCpuRequest, podCpuLimit, containerName, cpuRequest, cpuLimit string) *v1.Pod {
+	pod := makePod(podUID, containerName, cpuRequest, cpuLimit)
+	pod.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceName(v1.ResourceCPU):    resource.MustParse(podCpuRequest),
+			v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceName(v1.ResourceCPU):    resource.MustParse(podCpuLimit),
+			v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+		},
+	}
+
+	return pod
+}
+
 func makeMultiContainerPod(initCPUs, appCPUs []struct{ request, limit string }) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
