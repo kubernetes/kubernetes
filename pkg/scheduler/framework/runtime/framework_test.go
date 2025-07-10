@@ -2922,10 +2922,12 @@ func TestRecordingMetricsRealMetricsSimple(t *testing.T) {
 
 	plugin := &TestPlugin{name: testPlugin, inj: injectedResult{}}
 	r := make(Registry)
-	r.Register(testPlugin,
+	if err := r.Register(testPlugin,
 		func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return plugin, nil
-		})
+		}); err != nil {
+		t.Fatalf("Failed to register plugin %s: %v", testPlugin, err)
+	}
 	pluginSet := config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
 	plugins := &config.Plugins{
 		PreFilter: pluginSet,
@@ -3148,10 +3150,12 @@ func TestRunBindPluginsRealMetricsSimple(t *testing.T) {
 	// Simple success case only
 	name := "bind-0"
 	plugin := &TestPlugin{name: name, inj: injectedResult{BindStatus: int(fwk.Success)}}
-	r.Register(name,
+	if err := r.Register(name,
 		func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return plugin, nil
-		})
+		}); err != nil {
+		t.Fatalf("Failed to register plugin %s: %v", name, err)
+	}
 	pluginSet.Enabled = append(pluginSet.Enabled, config.Plugin{Name: name})
 
 	plugins := &config.Plugins{Bind: pluginSet}

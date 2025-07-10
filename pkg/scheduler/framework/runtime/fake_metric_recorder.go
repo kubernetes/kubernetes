@@ -94,7 +94,7 @@ type FakeMetricAsyncRecorder struct {
 func NewFakeMetricAsyncRecorder() *FakeMetricAsyncRecorder {
 	stopCh := make(chan struct{})
 	isStoppedCh := make(chan struct{})
-	close(stopCh)     // Close immediately to prevent goroutine start
+	close(stopCh)      // Close immediately to prevent goroutine start
 	close(isStoppedCh) // Close immediately to indicate already stopped
 
 	return &FakeMetricAsyncRecorder{
