@@ -111,7 +111,7 @@ const (
 	// owner: @qiujian16
 	// kep: https://kep.k8s.io/5284
 	//
-	// Enables the permission checks for impersonating actions of requests.
+	// Enables impersonation that is constrained to specific requests instead of being all or nothing.
 	ConstrainedImpersonation featuregate.Feature = "ConstrainedImpersonation"
 
 	// owner: @jefftree

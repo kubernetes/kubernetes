@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	authenticationv1 "k8s.io/api/authentication/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -35,98 +34,27 @@ import (
 	"strings"
 )
 
-// WithContrainedImpersonation is a filter that will inspect and check requests that attempt to change the user.Info for their requests
-func WithContrainedImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
+// WithConstrainedImpersonation is a filter that will inspect and check requests that attempt to change the user.Info for their requests
+func WithConstrainedImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		impersonationRequests, err := buildImpersonationRequests(req.Header)
-		if err != nil {
-			klog.V(4).Infof("%v", err)
-			responsewriters.InternalError(w, req, err)
-			return
-		}
-		if len(impersonationRequests) == 0 {
-			handler.ServeHTTP(w, req)
-			return
-		}
-
 		ctx := req.Context()
-
-		// Get request attributes from the context.
-		attrs, err := GetAuthorizerAttributes(ctx)
-		if err != nil {
-			responsewriters.InternalError(w, req, err)
-		}
-		if attrs.GetUser() == nil {
+		requestor, exists := request.UserFrom(ctx)
+		if !exists {
 			responsewriters.InternalError(w, req, errors.New("no user found for request"))
 			return
 		}
 
-		requestorAttrs := attrs.(*authorizer.AttributesRecord)
-
-		// if groups are not specified, then we need to look them up differently depending on the type of user
-		// if they are specified, then they are the authority (including the inclusion of system:authenticated/system:unauthenticated groups)
-		groupsSpecified := len(req.Header[authenticationv1.ImpersonateGroupHeader]) > 0
-
-		// Building attributes to authorize, username and group information
-		var actingAsAttrsList []*authorizer.AttributesRecord
-		username := ""
-		groups := []string{}
-		userExtra := map[string][]string{}
-		uid := ""
-		for _, impersonationRequest := range impersonationRequests {
-			gvk := impersonationRequest.GetObjectKind().GroupVersionKind()
-			actingAsAttributes := &authorizer.AttributesRecord{
-				User:            attrs.GetUser(),
-				APIGroup:        gvk.Group,
-				APIVersion:      gvk.Version,
-				Namespace:       impersonationRequest.Namespace,
-				Name:            impersonationRequest.Name,
-				ResourceRequest: true,
-			}
-
-			switch gvk.GroupKind() {
-			case v1.SchemeGroupVersion.WithKind("ServiceAccount").GroupKind():
-				actingAsAttributes.Resource = "serviceaccounts"
-				actingAsAttributes.Verb = "impersonate:serviceaccount"
-				username = serviceaccount.MakeUsername(impersonationRequest.Namespace, impersonationRequest.Name)
-				if !groupsSpecified {
-					// if groups aren't specified for a service account, we know the groups because its a fixed mapping.  Add them
-					groups = serviceaccount.MakeGroupNames(impersonationRequest.Namespace)
-				}
-
-			case v1.SchemeGroupVersion.WithKind("User").GroupKind():
-				actingAsAttributes.Resource = "users"
-				actingAsAttributes.Verb = "impersonate:user-info"
-				username = impersonationRequest.Name
-
-			case v1.SchemeGroupVersion.WithKind("Group").GroupKind():
-				actingAsAttributes.Resource = "groups"
-				actingAsAttributes.Verb = "impersonate:user-info"
-				groups = append(groups, impersonationRequest.Name)
-
-			case authenticationv1.SchemeGroupVersion.WithKind("UserExtra").GroupKind():
-				extraKey := impersonationRequest.FieldPath
-				extraValue := impersonationRequest.Name
-				actingAsAttributes.Resource = "userextras"
-				actingAsAttributes.Verb = "impersonate:user-info"
-				actingAsAttributes.Subresource = extraKey
-				userExtra[extraKey] = append(userExtra[extraKey], extraValue)
-
-			case authenticationv1.SchemeGroupVersion.WithKind("UID").GroupKind():
-				uid = impersonationRequest.Name
-				actingAsAttributes.Resource = "uids"
-				actingAsAttributes.Verb = "impersonate:user-info"
-
-			default:
-				klog.V(4).InfoS("unknown impersonation request type", "request", impersonationRequest)
-				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
-				return
-			}
-
-			actingAsAttrsList = append(actingAsAttrsList, actingAsAttributes)
+		actingAsAttrsList, newUser, err := buildImpersonationAttributes(req.Header, requestor)
+		if err != nil {
+			responsewriters.InternalError(w, req, err)
+			return
+		}
+		if len(actingAsAttrsList) == 0 {
+			handler.ServeHTTP(w, req)
+			return
 		}
 
-		decision, reason, actingAsAttributes, err := authorizeConstrainedImpersonation(ctx, requestorAttrs, actingAsAttrsList, a)
+		decision, reason, actingAsAttributes, err := authorizeConstrainedImpersonation(ctx, actingAsAttrsList, a)
 		if err != nil || decision != authorizer.DecisionAllow {
 			klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
 			// fallback to use legacy impersonation
@@ -138,49 +66,8 @@ func WithContrainedImpersonation(handler http.Handler, a authorizer.Authorizer, 
 			}
 		}
 
-		if username != user.Anonymous {
-			// When impersonating a non-anonymous user, include the 'system:authenticated' group
-			// in the impersonated user info:
-			// - if no groups were specified
-			// - if a group has been specified other than 'system:authenticated'
-			//
-			// If 'system:unauthenticated' group has been specified we should not include
-			// the 'system:authenticated' group.
-			addAuthenticated := true
-			for _, group := range groups {
-				if group == user.AllAuthenticated || group == user.AllUnauthenticated {
-					addAuthenticated = false
-					break
-				}
-			}
-
-			if addAuthenticated {
-				groups = append(groups, user.AllAuthenticated)
-			}
-		} else {
-			addUnauthenticated := true
-			for _, group := range groups {
-				if group == user.AllUnauthenticated {
-					addUnauthenticated = false
-					break
-				}
-			}
-
-			if addUnauthenticated {
-				groups = append(groups, user.AllUnauthenticated)
-			}
-		}
-
-		newUser := &user.DefaultInfo{
-			Name:   username,
-			Groups: groups,
-			Extra:  userExtra,
-			UID:    uid,
-		}
 		req = req.WithContext(request.WithUser(ctx, newUser))
-
-		oldUser, _ := request.UserFrom(ctx)
-		httplog.LogOf(req, w).Addf("%v is impersonating %v", userString(oldUser), userString(newUser))
+		httplog.LogOf(req, w).Addf("%v is impersonating %v", userString(requestor), userString(newUser))
 
 		audit.LogImpersonatedUser(audit.WithAuditContext(ctx), newUser)
 
@@ -198,57 +85,194 @@ func WithContrainedImpersonation(handler http.Handler, a authorizer.Authorizer, 
 	})
 }
 
-func authorizeConstrainedImpersonation(ctx context.Context, requestorAttrs *authorizer.AttributesRecord, targetAttributesList []*authorizer.AttributesRecord, a authorizer.Authorizer) (authorizer.Decision, string, authorizer.Attributes, error) {
-	for _, actingAsAttributes := range targetAttributesList {
-		// group and version are always authentication/v1 with constrained impersonation.
-		actingAsAttributesCopy := *actingAsAttributes
-		actingAsAttributesCopy.APIGroup = authenticationv1.SchemeGroupVersion.Group
-		actingAsAttributesCopy.APIVersion = authenticationv1.SchemeGroupVersion.Version
+func buildImpersonationAttributes(headers http.Header, requestor user.Info) ([]*authorizer.AttributesRecord, user.Info, error) {
+	attrsList := []*authorizer.AttributesRecord{}
+	requestedUser := headers.Get(authenticationv1.ImpersonateUserHeader)
+	groups := headers[authenticationv1.ImpersonateGroupHeader]
+	userExtra := map[string][]string{}
+	uid := headers.Get(authenticationv1.ImpersonateUIDHeader)
 
-		// authorize node verb if the impersonated user is node
-		if actingAsAttributes.Resource == "users" && strings.HasPrefix(actingAsAttributesCopy.Name, "system:node:") {
-			decision, reason, attrs, err := authorizeNodeImperonsation(ctx, requestorAttrs.User, &actingAsAttributesCopy, a)
-			if err != nil || decision != authorizer.DecisionAllow {
-				return decision, reason, attrs, err
-			}
+	hasUser := len(requestedUser) > 0
+	if hasUser {
+		attrs := newAttributeRecord(requestor)
+		if namespace, name, err := serviceaccount.SplitUsername(requestedUser); err == nil {
+			attrs.Resource = "serviceaccounts"
+			attrs.Verb = "impersonate:serviceaccount"
+			attrs.Namespace = namespace
+			attrs.Name = name
+			attrsList = append(attrsList, attrs)
+		} else if isScheduledNode(requestor, requestedUser) {
+			attrs.Verb = "impersonate:scheduled-node"
+			attrs.Name = strings.TrimPrefix(requestedUser, "system:node:")
+			attrs.Resource = "nodes"
+			attrsList = append(attrsList, attrs)
+		} else if strings.HasPrefix(requestedUser, "system:node:") {
+			attrs.Verb = "impersonate:node"
+			attrs.Name = strings.TrimPrefix(requestedUser, "system:node:")
+			attrs.Resource = "nodes"
+			attrsList = append(attrsList, attrs)
+		} else {
+			attrs.Verb = "impersonate:user-info"
+			attrs.Name = requestedUser
+			attrs.Resource = "users"
+			attrsList = append(attrsList, attrs)
+		}
+	}
+
+	// if groups are not specified, then we need to look them up differently depending on the type of user
+	// if they are specified, then they are the authority (including the inclusion of system:authenticated/system:unauthenticated groups)
+	hasGroups := len(groups) > 0
+	for _, group := range groups {
+		attrs := newAttributeRecord(requestor)
+		attrs.Resource = "groups"
+		attrs.Name = group
+		attrs.Verb = "impersonate:user-info"
+		attrsList = append(attrsList, attrs)
+	}
+
+	hasUserExtra := false
+	for headerName, values := range headers {
+		if !strings.HasPrefix(headerName, authenticationv1.ImpersonateUserExtraHeaderPrefix) {
 			continue
 		}
 
-		decision, reason, err := a.Authorize(ctx, &actingAsAttributesCopy)
+		hasUserExtra = true
+		extraKey := unescapeExtraKey(strings.ToLower(headerName[len(authenticationv1.ImpersonateUserExtraHeaderPrefix):]))
+
+		// make a separate request for each extra value they're trying to set
+		for _, value := range values {
+			attrs := newAttributeRecord(requestor)
+			attrs.Verb = "impersonate:user-info"
+			attrs.Name = value
+			attrs.Subresource = extraKey
+			attrs.Resource = "userextras"
+			attrsList = append(attrsList, attrs)
+			userExtra[extraKey] = append(userExtra[extraKey], value)
+		}
+	}
+
+	hasUID := len(uid) > 0
+	if hasUID {
+		attrs := newAttributeRecord(requestor)
+		attrs.Verb = "impersonate:user-info"
+		attrs.Resource = "uids"
+		attrs.Name = uid
+		attrsList = append(attrsList, attrs)
+	}
+
+	if (hasGroups || hasUserExtra || hasUID) && !hasUser {
+		return nil, nil, fmt.Errorf("requested %v without impersonating a user", attrsList)
+	}
+
+	// If the user is service account and groups is empty, set default service account groups.
+	if namespace, _, err := serviceaccount.SplitUsername(requestedUser); err == nil {
+		if !hasGroups {
+			groups = serviceaccount.MakeGroupNames(namespace)
+		}
+	}
+
+	if requestedUser != user.Anonymous {
+		// When impersonating a non-anonymous user, include the 'system:authenticated' group
+		// in the impersonated user info:
+		// - if no groups were specified
+		// - if a group has been specified other than 'system:authenticated'
+		//
+		// If 'system:unauthenticated' group has been specified we should not include
+		// the 'system:authenticated' group.
+		addAuthenticated := true
+		for _, group := range groups {
+			if group == user.AllAuthenticated || group == user.AllUnauthenticated {
+				addAuthenticated = false
+				break
+			}
+		}
+
+		if addAuthenticated {
+			groups = append(groups, user.AllAuthenticated)
+		}
+	} else {
+		addUnauthenticated := true
+		for _, group := range groups {
+			if group == user.AllUnauthenticated {
+				addUnauthenticated = false
+				break
+			}
+		}
+
+		if addUnauthenticated {
+			groups = append(groups, user.AllUnauthenticated)
+		}
+	}
+
+	newUser := &user.DefaultInfo{
+		Name:   requestedUser,
+		Groups: groups,
+		Extra:  userExtra,
+		UID:    uid,
+	}
+
+	return attrsList, newUser, nil
+}
+
+func newAttributeRecord(requestor user.Info) *authorizer.AttributesRecord {
+	return &authorizer.AttributesRecord{
+		APIGroup:        authenticationv1.SchemeGroupVersion.Group,
+		APIVersion:      authenticationv1.SchemeGroupVersion.Version,
+		User:            requestor,
+		ResourceRequest: true,
+	}
+}
+
+func authorizeConstrainedImpersonation(ctx context.Context, targetAttributesList []*authorizer.AttributesRecord, a authorizer.Authorizer) (authorizer.Decision, string, authorizer.Attributes, error) {
+	// Get request attributes from the context.
+	requestorAttrs, err := GetAuthorizerAttributes(ctx)
+	if err != nil {
+		return authorizer.DecisionNoOpinion, "", &authorizer.AttributesRecord{}, err
+	}
+
+	for _, actingAsAttributes := range targetAttributesList {
+		decision, reason, err := a.Authorize(ctx, actingAsAttributes)
+
+		if decision == authorizer.DecisionAllow {
+			continue
+		}
+
+		// Fallback to authorize impersonate:node
+		if actingAsAttributes.Verb == "impersonate:scheduled-node" {
+			attrCopy := copyAuthorizerAttr(actingAsAttributes)
+			attrCopy.Verb = "impersonate:node"
+			decision, reason, err = a.Authorize(ctx, attrCopy)
+		}
+
 		if err != nil || decision != authorizer.DecisionAllow {
-			return decision, reason, &actingAsAttributesCopy, err
+			return decision, reason, actingAsAttributes, err
 		}
 	}
 
 	// Prepend the impersonate-on prefix to the actual verb.
-	requestorAttrs.Verb = "impersonate-on:" + requestorAttrs.Verb
-	decision, reason, err := a.Authorize(ctx, requestorAttrs)
-	return decision, reason, requestorAttrs, err
+	impersonateOnAttrs := copyAuthorizerAttr(requestorAttrs)
+	impersonateOnAttrs.Verb = fmt.Sprintf("impersonate-on:%s", impersonateOnAttrs.Verb)
+	decision, reason, err := a.Authorize(ctx, impersonateOnAttrs)
+	return decision, reason, impersonateOnAttrs, err
 }
 
-// authorizeNodeImperonsation authorizes the request impersonating node.
-func authorizeNodeImperonsation(ctx context.Context, requestor user.Info, attr *authorizer.AttributesRecord, a authorizer.Authorizer) (authorizer.Decision, string, authorizer.Attributes, error) {
-	attr.Name = strings.TrimPrefix(attr.Name, "system:node:")
-	attr.Resource = "nodes"
-	attr.Verb = "impersonate:node"
-
-	// if the requestor is using a service account to impersonate the node it is running on,
-	// 1. check the permission with verb impersonate:scheduled-node.
-	// 2. If fails, fallback to check the permission with verb impersonate:node.
-	if isScheduledNode(requestor, attr) {
-		attr.Verb = "impersonate:scheduled-node"
-		decision, reason, err := a.Authorize(ctx, attr)
-
-		// if impersonate:scheduled-node check fails, fallback to check impersonate:node.
-		if decision != authorizer.DecisionAllow {
-			klog.V(4).InfoS("Forbidden", "reason", reason, "err", err)
-		} else {
-			return decision, reason, attr, nil
-		}
+func copyAuthorizerAttr(attr authorizer.Attributes) *authorizer.AttributesRecord {
+	out := &authorizer.AttributesRecord{
+		APIGroup:        attr.GetAPIGroup(),
+		APIVersion:      attr.GetAPIVersion(),
+		User:            attr.GetUser(),
+		Verb:            attr.GetVerb(),
+		Resource:        attr.GetResource(),
+		Subresource:     attr.GetSubresource(),
+		Name:            attr.GetName(),
+		Namespace:       attr.GetNamespace(),
+		ResourceRequest: attr.IsResourceRequest(),
+		Path:            attr.GetPath(),
 	}
 
-	decision, reason, err := a.Authorize(ctx, attr)
-	return decision, reason, attr, err
+	out.LabelSelectorRequirements, out.LabelSelectorParsingErr = attr.GetLabelSelector()
+	out.FieldSelectorRequirements, out.FieldSelectorParsingErr = attr.GetFieldSelector()
+	return out
 }
 
 func authorizeLegacyImpersonation(req *http.Request, targetAttributesList []*authorizer.AttributesRecord, a authorizer.Authorizer) (authorizer.Decision, string, error) {
@@ -256,9 +280,22 @@ func authorizeLegacyImpersonation(req *http.Request, targetAttributesList []*aut
 
 	for _, actingAsAttributes := range targetAttributesList {
 		// verb is always impersonate with legacy impersonation.
-		actingAsAttributesCopy := *actingAsAttributes
+		actingAsAttributesCopy := copyAuthorizerAttr(actingAsAttributes)
 		actingAsAttributesCopy.Verb = "impersonate"
-		decision, reason, err := a.Authorize(ctx, &actingAsAttributesCopy)
+
+		// legacy impersonation does not recognize nodes, change back to users
+		if actingAsAttributesCopy.Resource == "nodes" {
+			actingAsAttributesCopy.Resource = "users"
+			actingAsAttributesCopy.Name = fmt.Sprintf("system:node:%s", actingAsAttributesCopy.Name)
+		}
+
+		// group and version is empty for users/groups/serviceaccounts
+		if actingAsAttributesCopy.Resource == "users" || actingAsAttributesCopy.Resource == "groups" || actingAsAttributesCopy.Resource == "serviceaccounts" {
+			actingAsAttributesCopy.APIGroup = ""
+			actingAsAttributesCopy.APIVersion = ""
+		}
+
+		decision, reason, err := a.Authorize(ctx, actingAsAttributesCopy)
 		if err != nil || decision != authorizer.DecisionAllow {
 			return decision, reason, err
 		}
@@ -271,10 +308,11 @@ func authorizeLegacyImpersonation(req *http.Request, targetAttributesList []*aut
 // 1. the requestor is impersonating a node.
 // 2. the requestor must be using a service account.
 // 3. the requestor must run on the same node it is impersonating.
-func isScheduledNode(requestor user.Info, attr *authorizer.AttributesRecord) bool {
-	if attr.Resource != "nodes" {
+func isScheduledNode(requestor user.Info, impersonatedUser string) bool {
+	if !strings.HasPrefix(impersonatedUser, "system:node:") {
 		return false
 	}
+	nodeName := strings.TrimPrefix(impersonatedUser, "system:node:")
 
 	if _, _, err := serviceaccount.SplitUsername(requestor.GetName()); err != nil {
 		return false
@@ -284,7 +322,7 @@ func isScheduledNode(requestor user.Info, attr *authorizer.AttributesRecord) boo
 		return false
 	}
 
-	if len(requestor.GetExtra()[serviceaccount.NodeNameKey]) != 1 || requestor.GetExtra()[serviceaccount.NodeNameKey][0] != attr.GetName() {
+	if len(requestor.GetExtra()[serviceaccount.NodeNameKey]) != 1 || requestor.GetExtra()[serviceaccount.NodeNameKey][0] != nodeName {
 		return false
 	}
 
