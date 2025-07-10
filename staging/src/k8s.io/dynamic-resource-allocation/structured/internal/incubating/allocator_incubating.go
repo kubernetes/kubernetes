@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package stable
+package incubating
 
 import (
 	"context"
@@ -44,14 +44,15 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 	return internal.MakeDeviceID(driver, pool, device)
 }
 
-// SupportedFeatures does not include any additional features.
-// The "stable" implementation can only be used if all of those
-// are off.
-//
-// At least that's its purpose conceptually: in practice, all
-// code supporting the additional features is still there.
-// It could get removed.
-var SupportedFeatures = internal.Features{}
+// SupportedFeatures includes all additional features,
+// making this the variant that is used when any of those
+// are enabled.
+var SupportedFeatures = internal.Features{
+	AdminAccess:          true,
+	PrioritizedList:      true,
+	PartitionableDevices: true,
+	DeviceTaints:         true,
+}
 
 type Allocator struct {
 	features         Features

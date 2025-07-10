@@ -44,6 +44,15 @@ type Features struct {
 	DeviceTaints         bool
 }
 
+func FeaturesAnd(a, b Features) Features {
+	return Features{
+		AdminAccess:          a.AdminAccess && b.AdminAccess,
+		PrioritizedList:      a.PrioritizedList && b.PrioritizedList,
+		PartitionableDevices: a.PartitionableDevices && b.PartitionableDevices,
+		DeviceTaints:         a.DeviceTaints && b.DeviceTaints,
+	}
+}
+
 type DeviceID struct {
 	Driver, Pool, Device draapi.UniqueString
 }

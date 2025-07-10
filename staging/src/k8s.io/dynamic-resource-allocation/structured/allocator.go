@@ -18,12 +18,14 @@ package structured
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
+	"k8s.io/dynamic-resource-allocation/structured/internal/incubating"
 	"k8s.io/dynamic-resource-allocation/structured/internal/stable"
 )
 
@@ -111,5 +113,52 @@ func NewAllocator(ctx context.Context,
 	// file name!) into "stable", or individual chunks can be copied over.
 	//
 	// Unit tests are shared between all implementations.
-	return stable.NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+	for _, allocator := range availableAllocators {
+		// All required features supported?
+		if internal.FeaturesAnd(features, allocator.supportedFeatures) == features {
+			// Use it!
+			return allocator.newAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+		}
+	}
+	return nil, fmt.Errorf("internal error: no allocator available for feature set %v", features)
+}
+
+var availableAllocators = []struct {
+	supportedFeatures Features
+	newAllocator      func(ctx context.Context,
+		features Features,
+		claimsToAllocate []*resourceapi.ResourceClaim,
+		allocatedDevices sets.Set[DeviceID],
+		classLister DeviceClassLister,
+		slices []*resourceapi.ResourceSlice,
+		celCache *cel.Cache,
+	) (Allocator, error)
+}{
+	// Most stable first.
+	{
+		supportedFeatures: stable.SupportedFeatures,
+		newAllocator: func(ctx context.Context,
+			features Features,
+			claimsToAllocate []*resourceapi.ResourceClaim,
+			allocatedDevices sets.Set[DeviceID],
+			classLister DeviceClassLister,
+			slices []*resourceapi.ResourceSlice,
+			celCache *cel.Cache,
+		) (Allocator, error) {
+			return stable.NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+		},
+	},
+	{
+		supportedFeatures: incubating.SupportedFeatures,
+		newAllocator: func(ctx context.Context,
+			features Features,
+			claimsToAllocate []*resourceapi.ResourceClaim,
+			allocatedDevices sets.Set[DeviceID],
+			classLister DeviceClassLister,
+			slices []*resourceapi.ResourceSlice,
+			celCache *cel.Cache,
+		) (Allocator, error) {
+			return incubating.NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+		},
+	},
 }
