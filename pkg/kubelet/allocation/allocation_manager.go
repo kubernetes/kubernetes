@@ -27,7 +27,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -280,15 +279,15 @@ func (m *manager) PushPendingResize(uid types.UID) {
 
 	// Add the pod to the pending resizes list and sort by priority.
 	m.podsWithPendingResizes = append(m.podsWithPendingResizes, uid)
-	m.sortPendingPodsByPriority()
+	m.sortPendingResizes()
 }
 
-// sortPendingPodsByPriority sorts the list of pending resizes:
+// sortPendingResizes sorts the list of pending resizes:
 // - First, prioritizing resizes that do not increase requests.
 // - Second, based on the pod's PriorityClass.
 // - Third, based on the pod's QoS class.
 // - Last, prioritizing resizes that have been in the deferred state the longest.
-func (m *manager) sortPendingPodsByPriority() {
+func (m *manager) sortPendingResizes() {
 	sort.Slice(m.podsWithPendingResizes, func(i, j int) bool {
 		firstPod, found := m.getPodByUID(m.podsWithPendingResizes[i])
 		if !found {
@@ -303,10 +302,10 @@ func (m *manager) sortPendingPodsByPriority() {
 		// These resizes are expected to always succeed.
 		firstPodIncreasing := m.isResizeIncreasingAnyRequests(firstPod)
 		secondPodIncreasing := m.isResizeIncreasingAnyRequests(secondPod)
-		if !firstPodIncreasing && secondPodIncreasing {
+		if !firstPodIncreasing {
 			return true
 		}
-		if !secondPodIncreasing && firstPodIncreasing {
+		if !secondPodIncreasing {
 			return false
 		}
 
@@ -370,12 +369,18 @@ func (m *manager) isResizeIncreasingAnyRequests(pod *v1.Pod) bool {
 		return false
 	}
 
-	if isResizeIncreasingAnyRequestsForContainer(allocatedPod.Spec.Resources, pod.Spec.Resources) {
-		return true
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+		if isResizeIncreasingAnyRequestsForContainer(allocatedPod.Spec.Resources, pod.Spec.Resources) {
+			return true
+		}
 	}
 
-	for i, c := range pod.Spec.Containers {
-		if isResizeIncreasingAnyRequestsForContainer(&allocatedPod.Spec.Containers[i].Resources, &c.Resources) {
+	for c, cType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if !isResizableContainer(c, cType) {
+			continue
+		}
+		allocatedContainer, found := m.GetContainerResourceAllocation(pod.UID, c.Name)
+		if !found || isResizeIncreasingAnyRequestsForContainer(&allocatedContainer, &c.Resources) {
 			return true
 		}
 	}
@@ -386,51 +391,7 @@ func (m *manager) isResizeIncreasingAnyRequests(pod *v1.Pod) bool {
 // isResizeNonIncreasingForContainer returns true only if none of the resources requests are increasing.
 // Resource limits are not considered for pod admission, so they are left out of the check here.
 func isResizeIncreasingAnyRequestsForContainer(old *v1.ResourceRequirements, new *v1.ResourceRequirements) bool {
-	if old == nil && new == nil {
-		return false
-	}
-
-	var oldCPURequests, newCPURequests, oldMemRequests, newMemRequests *apiresource.Quantity
-
-	if old != nil && old.Requests != nil {
-		oldCPURequests = old.Requests.Cpu()
-		oldMemRequests = old.Requests.Memory()
-	}
-	if new != nil && new.Requests != nil {
-		newCPURequests = new.Requests.Cpu()
-		newMemRequests = new.Requests.Memory()
-	}
-
-	oldCPURequestsEmpty := oldCPURequests == nil || oldCPURequests.IsZero()
-	newCPURequestsEmpty := newCPURequests == nil || newCPURequests.IsZero()
-	oldMemRequestsEmpty := oldMemRequests == nil || oldMemRequests.IsZero()
-	newMemRequestsEmpty := newMemRequests == nil || newMemRequests.IsZero()
-
-	if oldCPURequestsEmpty && !newCPURequestsEmpty {
-		// CPU Requests have been added, which is considered a resource increase.
-		return true
-	}
-
-	if oldMemRequestsEmpty && !newMemRequestsEmpty {
-		// Memory Requests have been added, which is considered a resource increase.
-		return true
-	}
-
-	if !oldCPURequestsEmpty && !newCPURequestsEmpty {
-		if newCPURequests.Cmp(*oldCPURequests) > 0 {
-			// CPU Requests are being increased.
-			return true
-		}
-	}
-
-	if !oldMemRequestsEmpty && !newMemRequestsEmpty {
-		if newMemRequests.Cmp(*oldMemRequests) > 0 {
-			// Memory Requests are being increased.
-			return true
-		}
-	}
-
-	return false
+	return new.Requests.Cpu().Cmp(*old.Requests.Cpu()) > 0 || new.Requests.Memory().Cmp(*old.Requests.Memory()) > 0
 }
 
 // GetContainerResourceAllocation returns the last checkpointed AllocatedResources values
