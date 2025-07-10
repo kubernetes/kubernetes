@@ -386,7 +386,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 
 	for _, vfn := range validations.Functions {
 		// matchArg is the function that is used to lookup the correlated element in the old list.
-		var matchArg any
+		var matchArg any = Literal("nil")
 		// equivArg is the function that is used to compare the correlated elements in the old and new lists.
 		// It would be "nil" if the matchArg is a full comparison function.
 		var equivArg any = Literal("nil")
