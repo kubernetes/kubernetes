@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package structured
+package allocatortesting
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"slices"
@@ -36,9 +37,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
+
+type Allocator = internal.Allocator
+type DeviceClassLister = internal.DeviceClassLister
+type Features = internal.Features
+type DeviceID = internal.DeviceID
+
+func MakeDeviceID(driver, pool, device string) DeviceID {
+	return internal.MakeDeviceID(driver, pool, device)
+}
 
 const (
 	region1     = "region-1"
@@ -574,7 +585,15 @@ func toCounters(counters map[string]resource.Quantity) map[string]resourceapi.Co
 	return out
 }
 
-func TestAllocator(t *testing.T) {
+func TestAllocator(t *testing.T, newAllocator func(
+	ctx context.Context,
+	features Features,
+	claimsToAllocate []*resourceapi.ResourceClaim,
+	allocatedDevices sets.Set[DeviceID],
+	classLister DeviceClassLister,
+	slices []*resourceapi.ResourceSlice,
+	celCache *cel.Cache,
+) (Allocator, error)) {
 	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
 	boolAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "boolAttribute")
 	stringAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "stringAttribute")
@@ -3482,7 +3501,7 @@ func TestAllocator(t *testing.T) {
 			allocatedDevices := slices.Clone(tc.allocatedDevices)
 			slices := slices.Clone(tc.slices)
 
-			allocator, err := NewAllocator(ctx, tc.features, unwrap(claimsToAllocate...), sets.New(allocatedDevices...), classLister, slices, cel.NewCache(1))
+			allocator, err := newAllocator(ctx, tc.features, unwrap(claimsToAllocate...), sets.New(allocatedDevices...), classLister, slices, cel.NewCache(1))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			results, err := allocator.Allocate(ctx, tc.node)

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package structured
+package stable
 
 import (
 	"context"
@@ -178,20 +178,4 @@ type PoolID struct {
 
 func (p PoolID) String() string {
 	return p.Driver.String() + "/" + p.Pool.String()
-}
-
-type DeviceID struct {
-	Driver, Pool, Device draapi.UniqueString
-}
-
-func (d DeviceID) String() string {
-	return d.Driver.String() + "/" + d.Pool.String() + "/" + d.Device.String()
-}
-
-func MakeDeviceID(driver, pool, device string) DeviceID {
-	return DeviceID{
-		Driver: draapi.MakeUniqueString(driver),
-		Pool:   draapi.MakeUniqueString(pool),
-		Device: draapi.MakeUniqueString(device),
-	}
 }
