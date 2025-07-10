@@ -63,10 +63,11 @@ var listTagsValidScopes = sets.New(ScopeAny)
 // listMetadata collects information about a single list with map or set semantics.
 type listMetadata struct {
 	// These will be checked for correctness elsewhere.
-	declaredAsSet bool
-	declaredAsMap bool
-	keyFields     []string // iff declaredAsMap
-	keyNames      []string // iff declaredAsMap
+	declaredAsAtomic bool
+	declaredAsSet    bool
+	declaredAsMap    bool
+	keyFields        []string // iff declaredAsMap
+	keyNames         []string // iff declaredAsMap
 }
 
 // makeListMapMatchFunc generates a function that compares two list-map
@@ -118,7 +119,13 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 
 	switch tag.Value {
 	case "atomic":
-		// Allowed but no special handling.
+		// We don't do much with atomic, but this ensures no conflicts between
+		// tags on typedefs and tags on fields which use those typedefs.
+		if lttv.byPath[context.Path.String()] == nil {
+			lttv.byPath[context.Path.String()] = &listMetadata{}
+		}
+		lm := lttv.byPath[context.Path.String()]
+		lm.declaredAsAtomic = true
 	case "set":
 		if lttv.byPath[context.Path.String()] == nil {
 			lttv.byPath[context.Path.String()] = &listMetadata{}
@@ -304,8 +311,18 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 func (lv listValidator) check(lm *listMetadata) error {
 	if lm != nil {
 		// Check some fundamental constraints on list tags.
-		if lm.declaredAsSet && lm.declaredAsMap {
-			return fmt.Errorf("listType cannot be both set and map")
+		decls := []string{}
+		if lm.declaredAsAtomic {
+			decls = append(decls, "atomic")
+		}
+		if lm.declaredAsSet {
+			decls = append(decls, "set")
+		}
+		if lm.declaredAsMap {
+			decls = append(decls, "map")
+		}
+		if len(decls) > 1 {
+			return fmt.Errorf("listType cannot have multiple types (%s)", strings.Join(decls, ", "))
 		}
 		if lm.declaredAsMap && len(lm.keyFields) == 0 {
 			return fmt.Errorf("found listType=map without listMapKey")
@@ -314,7 +331,7 @@ func (lv listValidator) check(lm *listMetadata) error {
 			return fmt.Errorf("found listMapKey without listType=map")
 		}
 		// Check for missing listType (after the other checks so the more specific errors take priority)
-		if !lm.declaredAsSet && !lm.declaredAsMap {
+		if len(decls) == 0 {
 			return fmt.Errorf("found list metadata without a listType")
 		}
 	}
