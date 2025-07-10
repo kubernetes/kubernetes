@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	jsoniter "github.com/json-iterator/go"
-	"sigs.k8s.io/structured-merge-diff/v4/value"
+	"sigs.k8s.io/structured-merge-diff/v6/value"
 )
 
 var ErrUnknownPathElementType = errors.New("unknown path element type")
@@ -54,6 +54,24 @@ var (
 	peSepBytes      = []byte(peSeparator)
 )
 
+// readJSONIter reads a Value from a JSON iterator.
+// DO NOT EXPORT
+// TODO: eliminate this https://github.com/kubernetes-sigs/structured-merge-diff/issues/202
+func readJSONIter(iter *jsoniter.Iterator) (value.Value, error) {
+	v := iter.Read()
+	if iter.Error != nil && iter.Error != io.EOF {
+		return nil, iter.Error
+	}
+	return value.NewValueInterface(v), nil
+}
+
+// writeJSONStream writes a value into a JSON stream.
+// DO NOT EXPORT
+// TODO: eliminate this https://github.com/kubernetes-sigs/structured-merge-diff/issues/202
+func writeJSONStream(v value.Value, stream *jsoniter.Stream) {
+	stream.WriteVal(v.Unstructured())
+}
+
 // DeserializePathElement parses a serialized path element
 func DeserializePathElement(s string) (PathElement, error) {
 	b := []byte(s)
@@ -75,7 +93,7 @@ func DeserializePathElement(s string) (PathElement, error) {
 	case peValueSepBytes[0]:
 		iter := readPool.BorrowIterator(b)
 		defer readPool.ReturnIterator(iter)
-		v, err := value.ReadJSONIter(iter)
+		v, err := readJSONIter(iter)
 		if err != nil {
 			return PathElement{}, err
 		}
@@ -86,7 +104,7 @@ func DeserializePathElement(s string) (PathElement, error) {
 		fields := value.FieldList{}
 
 		iter.ReadObjectCB(func(iter *jsoniter.Iterator, key string) bool {
-			v, err := value.ReadJSONIter(iter)
+			v, err := readJSONIter(iter)
 			if err != nil {
 				iter.Error = err
 				return false
@@ -141,14 +159,14 @@ func serializePathElementToWriter(w io.Writer, pe PathElement) error {
 				stream.WriteMore()
 			}
 			stream.WriteObjectField(field.Name)
-			value.WriteJSONStream(field.Value, stream)
+			writeJSONStream(field.Value, stream)
 		}
 		stream.WriteObjectEnd()
 	case pe.Value != nil:
 		if _, err := stream.Write(peValueSepBytes); err != nil {
 			return err
 		}
-		value.WriteJSONStream(*pe.Value, stream)
+		writeJSONStream(*pe.Value, stream)
 	case pe.Index != nil:
 		if _, err := stream.Write(peIndexSepBytes); err != nil {
 			return err

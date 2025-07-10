@@ -23,7 +23,8 @@ import (
 	"strings"
 
 	jsoniter "github.com/json-iterator/go"
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
+
+	yaml "go.yaml.in/yaml/v2"
 )
 
 var (
@@ -90,7 +91,7 @@ func FromJSON(input []byte) (Value, error) {
 func FromJSONFast(input []byte) (Value, error) {
 	iter := readPool.BorrowIterator(input)
 	defer readPool.ReturnIterator(iter)
-	return ReadJSONIter(iter)
+	return readJSONIter(iter)
 }
 
 // ToJSON is a helper function for producing a JSon document.
@@ -98,7 +99,7 @@ func ToJSON(v Value) ([]byte, error) {
 	buf := bytes.Buffer{}
 	stream := writePool.BorrowStream(&buf)
 	defer writePool.ReturnStream(stream)
-	WriteJSONStream(v, stream)
+	writeJSONStream(v, stream)
 	b := stream.Buffer()
 	err := stream.Flush()
 	// Help jsoniter manage its buffers--without this, the next
@@ -109,8 +110,10 @@ func ToJSON(v Value) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-// ReadJSONIter reads a Value from a JSON iterator.
-func ReadJSONIter(iter *jsoniter.Iterator) (Value, error) {
+// readJSONIter reads a Value from a JSON iterator.
+// DO NOT EXPORT
+// TODO: eliminate this https://github.com/kubernetes-sigs/structured-merge-diff/issues/202
+func readJSONIter(iter *jsoniter.Iterator) (Value, error) {
 	v := iter.Read()
 	if iter.Error != nil && iter.Error != io.EOF {
 		return nil, iter.Error
@@ -118,8 +121,10 @@ func ReadJSONIter(iter *jsoniter.Iterator) (Value, error) {
 	return NewValueInterface(v), nil
 }
 
-// WriteJSONStream writes a value into a JSON stream.
-func WriteJSONStream(v Value, stream *jsoniter.Stream) {
+// writeJSONStream writes a value into a JSON stream.
+// DO NOT EXPORT
+// TODO: eliminate this https://github.com/kubernetes-sigs/structured-merge-diff/issues/202
+func writeJSONStream(v Value, stream *jsoniter.Stream) {
 	stream.WriteVal(v.Unstructured())
 }
 
