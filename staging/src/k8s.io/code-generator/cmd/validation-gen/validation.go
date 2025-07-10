@@ -346,6 +346,9 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	// are called in emitted code, just how we evaluate what to emit.
 	switch t.Kind {
 	case types.Alias, types.Struct:
+		if fldPath.String() != t.String() {
+			panic(fmt.Sprintf("path for type != the type name: %s, %s", t.String(), fldPath.String()))
+		}
 		context := validators.Context{
 			Scope:  validators.ScopeType,
 			Type:   t,
@@ -402,7 +405,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 						//
 						// Note: the first argument to Function() is really
 						// only for debugging.
-						v, err := validators.ForEachVal(fldPath, underlying.childType,
+						v, err := validators.ForEachVal(fldPath, thisNode.valueType,
 							validators.Function("iterateListValues", validators.DefaultFlags, funcName))
 						if err != nil {
 							return nil, fmt.Errorf("generating list iteration: %w", err)
