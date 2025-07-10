@@ -301,63 +301,6 @@ func (_c *MockRuntime_GeneratePodStatus_Call) RunAndReturn(run func(*v1.Containe
 	return _c
 }
 
-// GetActuatedResources provides a mock function with given fields: podUID, containerName
-func (_m *MockRuntime) GetActuatedResources(podUID types.UID, containerName string) (corev1.ResourceRequirements, bool) {
-	ret := _m.Called(podUID, containerName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetActuatedResources")
-	}
-
-	var r0 corev1.ResourceRequirements
-	var r1 bool
-	if rf, ok := ret.Get(0).(func(types.UID, string) (corev1.ResourceRequirements, bool)); ok {
-		return rf(podUID, containerName)
-	}
-	if rf, ok := ret.Get(0).(func(types.UID, string) corev1.ResourceRequirements); ok {
-		r0 = rf(podUID, containerName)
-	} else {
-		r0 = ret.Get(0).(corev1.ResourceRequirements)
-	}
-
-	if rf, ok := ret.Get(1).(func(types.UID, string) bool); ok {
-		r1 = rf(podUID, containerName)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
-}
-
-// MockRuntime_GetActuatedResources_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetActuatedResources'
-type MockRuntime_GetActuatedResources_Call struct {
-	*mock.Call
-}
-
-// GetActuatedResources is a helper method to define mock.On call
-//   - podUID types.UID
-//   - containerName string
-func (_e *MockRuntime_Expecter) GetActuatedResources(podUID interface{}, containerName interface{}) *MockRuntime_GetActuatedResources_Call {
-	return &MockRuntime_GetActuatedResources_Call{Call: _e.mock.On("GetActuatedResources", podUID, containerName)}
-}
-
-func (_c *MockRuntime_GetActuatedResources_Call) Run(run func(podUID types.UID, containerName string)) *MockRuntime_GetActuatedResources_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(types.UID), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *MockRuntime_GetActuatedResources_Call) Return(_a0 corev1.ResourceRequirements, _a1 bool) *MockRuntime_GetActuatedResources_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockRuntime_GetActuatedResources_Call) RunAndReturn(run func(types.UID, string) (corev1.ResourceRequirements, bool)) *MockRuntime_GetActuatedResources_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetContainerLogs provides a mock function with given fields: ctx, pod, containerID, logOptions, stdout, stderr
 func (_m *MockRuntime) GetContainerLogs(ctx context.Context, pod *corev1.Pod, containerID container.ContainerID, logOptions *corev1.PodLogOptions, stdout io.Writer, stderr io.Writer) error {
 	ret := _m.Called(ctx, pod, containerID, logOptions, stdout, stderr)
@@ -409,9 +352,9 @@ func (_c *MockRuntime_GetContainerLogs_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
-// GetContainerStatus provides a mock function with given fields: ctx, id
-func (_m *MockRuntime) GetContainerStatus(ctx context.Context, id container.ContainerID) (*container.Status, error) {
-	ret := _m.Called(ctx, id)
+// GetContainerStatus provides a mock function with given fields: ctx, podUID, id
+func (_m *MockRuntime) GetContainerStatus(ctx context.Context, podUID types.UID, id container.ContainerID) (*container.Status, error) {
+	ret := _m.Called(ctx, podUID, id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetContainerStatus")
@@ -419,19 +362,19 @@ func (_m *MockRuntime) GetContainerStatus(ctx context.Context, id container.Cont
 
 	var r0 *container.Status
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, container.ContainerID) (*container.Status, error)); ok {
-		return rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, types.UID, container.ContainerID) (*container.Status, error)); ok {
+		return rf(ctx, podUID, id)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, container.ContainerID) *container.Status); ok {
-		r0 = rf(ctx, id)
+	if rf, ok := ret.Get(0).(func(context.Context, types.UID, container.ContainerID) *container.Status); ok {
+		r0 = rf(ctx, podUID, id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*container.Status)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, container.ContainerID) error); ok {
-		r1 = rf(ctx, id)
+	if rf, ok := ret.Get(1).(func(context.Context, types.UID, container.ContainerID) error); ok {
+		r1 = rf(ctx, podUID, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -446,14 +389,15 @@ type MockRuntime_GetContainerStatus_Call struct {
 
 // GetContainerStatus is a helper method to define mock.On call
 //   - ctx context.Context
+//   - podUID types.UID
 //   - id container.ContainerID
-func (_e *MockRuntime_Expecter) GetContainerStatus(ctx interface{}, id interface{}) *MockRuntime_GetContainerStatus_Call {
-	return &MockRuntime_GetContainerStatus_Call{Call: _e.mock.On("GetContainerStatus", ctx, id)}
+func (_e *MockRuntime_Expecter) GetContainerStatus(ctx interface{}, podUID interface{}, id interface{}) *MockRuntime_GetContainerStatus_Call {
+	return &MockRuntime_GetContainerStatus_Call{Call: _e.mock.On("GetContainerStatus", ctx, podUID, id)}
 }
 
-func (_c *MockRuntime_GetContainerStatus_Call) Run(run func(ctx context.Context, id container.ContainerID)) *MockRuntime_GetContainerStatus_Call {
+func (_c *MockRuntime_GetContainerStatus_Call) Run(run func(ctx context.Context, podUID types.UID, id container.ContainerID)) *MockRuntime_GetContainerStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(container.ContainerID))
+		run(args[0].(context.Context), args[1].(types.UID), args[2].(container.ContainerID))
 	})
 	return _c
 }
@@ -463,7 +407,7 @@ func (_c *MockRuntime_GetContainerStatus_Call) Return(_a0 *container.Status, _a1
 	return _c
 }
 
-func (_c *MockRuntime_GetContainerStatus_Call) RunAndReturn(run func(context.Context, container.ContainerID) (*container.Status, error)) *MockRuntime_GetContainerStatus_Call {
+func (_c *MockRuntime_GetContainerStatus_Call) RunAndReturn(run func(context.Context, types.UID, container.ContainerID) (*container.Status, error)) *MockRuntime_GetContainerStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
