@@ -18,10 +18,11 @@ package fieldpath
 
 import (
 	"fmt"
+	"iter"
 	"sort"
 	"strings"
 
-	"sigs.k8s.io/structured-merge-diff/v4/value"
+	"sigs.k8s.io/structured-merge-diff/v6/value"
 )
 
 // PathElement describes how to select a child field given a containing object.
@@ -45,6 +46,36 @@ type PathElement struct {
 	// Index selects a list element by its index number. The containing
 	// object must be an atomic list.
 	Index *int
+}
+
+// FieldNameElement creates a new FieldName PathElement.
+func FieldNameElement(name string) PathElement {
+	return PathElement{FieldName: &name}
+}
+
+// KeyElement creates a new Key PathElement with the key fields.
+func KeyElement(fields ...value.Field) PathElement {
+	l := value.FieldList(fields)
+	return PathElement{Key: &l}
+}
+
+// KeyElementByFields creates a new Key PathElement from names and values.
+// `nameValues` must have an even number of entries, alternating
+// names (type must be string) with values (type must be value.Value). If these
+// conditions are not met, KeyByFields will panic--it's intended for static
+// construction and shouldn't have user-produced values passed to it.
+func KeyElementByFields(nameValues ...any) PathElement {
+	return PathElement{Key: KeyByFields(nameValues...)}
+}
+
+// ValueElement creates a new Value PathElement.
+func ValueElement(value value.Value) PathElement {
+	return PathElement{Value: &value}
+}
+
+// IndexElement creates a new Index PathElement.
+func IndexElement(index int) PathElement {
+	return PathElement{Index: &index}
 }
 
 // Less provides an order for path elements.
@@ -156,6 +187,25 @@ func (e PathElement) String() string {
 	}
 }
 
+// Copy returns a copy of the PathElement.
+// This is not a full deep copy as any contained value.Value is not copied.
+func (e PathElement) Copy() PathElement {
+	if e.FieldName != nil {
+		return PathElement{FieldName: e.FieldName}
+	}
+	if e.Key != nil {
+		c := e.Key.Copy()
+		return PathElement{Key: &c}
+	}
+	if e.Value != nil {
+		return PathElement{Value: e.Value}
+	}
+	if e.Index != nil {
+		return PathElement{Index: e.Index}
+	}
+	return e // zero value
+}
+
 // KeyByFields is a helper function which constructs a key for an associative
 // list type. `nameValues` must have an even number of entries, alternating
 // names (type must be string) with values (type must be value.Value). If these
@@ -192,6 +242,16 @@ type sortedPathElements []PathElement
 func (spe sortedPathElements) Len() int           { return len(spe) }
 func (spe sortedPathElements) Less(i, j int) bool { return spe[i].Less(spe[j]) }
 func (spe sortedPathElements) Swap(i, j int)      { spe[i], spe[j] = spe[j], spe[i] }
+
+// Copy returns a copy of the PathElementSet.
+// This is not a full deep copy as any contained value.Value is not copied.
+func (s PathElementSet) Copy() PathElementSet {
+	out := make(sortedPathElements, len(s.members))
+	for i := range s.members {
+		out[i] = s.members[i].Copy()
+	}
+	return PathElementSet{members: out}
+}
 
 // Insert adds pe to the set.
 func (s *PathElementSet) Insert(pe PathElement) {
@@ -313,5 +373,16 @@ func (s *PathElementSet) Equals(s2 *PathElementSet) bool {
 func (s *PathElementSet) Iterate(f func(PathElement)) {
 	for _, pe := range s.members {
 		f(pe)
+	}
+}
+
+// All iterates over each PathElement in the set. The order is deterministic.
+func (s *PathElementSet) All() iter.Seq[PathElement] {
+	return func(yield func(element PathElement) bool) {
+		for _, pe := range s.members {
+			if !yield(pe) {
+				return
+			}
+		}
 	}
 }
