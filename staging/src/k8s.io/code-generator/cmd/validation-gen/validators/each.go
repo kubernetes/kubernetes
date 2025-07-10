@@ -43,14 +43,14 @@ var globalEachKey *eachKeyTagValidator
 func init() {
 	// Lists with list-map semantics are comprised of multiple tags, which need
 	// to share information between them.
-	shared := map[string]*listMetadata{} // keyed by the fieldpath
-	RegisterTagValidator(listTypeTagValidator{byFieldPath: shared})
-	RegisterTagValidator(listMapKeyTagValidator{byFieldPath: shared})
+	shared := map[string]*listMetadata{} // keyed by the field or type path
+	RegisterTagValidator(listTypeTagValidator{byPath: shared})
+	RegisterTagValidator(listMapKeyTagValidator{byPath: shared})
 
-	RegisterFieldValidator(listValidator{byFieldPath: shared})
-	RegisterTypeValidator(listValidator{byFieldPath: shared})
+	RegisterFieldValidator(listValidator{byPath: shared})
+	RegisterTypeValidator(listValidator{byPath: shared})
 
-	globalEachVal = &eachValTagValidator{byFieldPath: shared, validator: nil}
+	globalEachVal = &eachValTagValidator{byPath: shared, validator: nil}
 	RegisterTagValidator(globalEachVal)
 
 	globalEachKey = &eachKeyTagValidator{validator: nil}
@@ -96,7 +96,7 @@ func (lm *listMetadata) makeListMapMatchFunc(t *types.Type) FunctionLiteral {
 }
 
 type listTypeTagValidator struct {
-	byFieldPath map[string]*listMetadata
+	byPath map[string]*listMetadata
 }
 
 func (listTypeTagValidator) Init(Config) {}
@@ -120,10 +120,10 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 	case "atomic":
 		// Allowed but no special handling.
 	case "set":
-		if lttv.byFieldPath[context.Path.String()] == nil {
-			lttv.byFieldPath[context.Path.String()] = &listMetadata{}
+		if lttv.byPath[context.Path.String()] == nil {
+			lttv.byPath[context.Path.String()] = &listMetadata{}
 		}
-		lm := lttv.byFieldPath[context.Path.String()]
+		lm := lttv.byPath[context.Path.String()]
 		lm.declaredAsSet = true
 		// NOTE: we validate uniqueness in the listValidator.
 	case "map":
@@ -133,10 +133,10 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		}
 
 		// Save the fact that this list is a map.
-		if lttv.byFieldPath[context.Path.String()] == nil {
-			lttv.byFieldPath[context.Path.String()] = &listMetadata{}
+		if lttv.byPath[context.Path.String()] == nil {
+			lttv.byPath[context.Path.String()] = &listMetadata{}
 		}
-		lm := lttv.byFieldPath[context.Path.String()]
+		lm := lttv.byPath[context.Path.String()]
 		lm.declaredAsMap = true
 		// NOTE: we validate uniqueness of the keys in the listValidator.
 	default:
@@ -164,7 +164,7 @@ func (lttv listTypeTagValidator) Docs() TagDoc {
 }
 
 type listMapKeyTagValidator struct {
-	byFieldPath map[string]*listMetadata
+	byPath map[string]*listMetadata
 }
 
 func (listMapKeyTagValidator) Init(Config) {}
@@ -197,10 +197,10 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 		fieldName = memb.Name
 	}
 
-	if lmktv.byFieldPath[context.Path.String()] == nil {
-		lmktv.byFieldPath[context.Path.String()] = &listMetadata{}
+	if lmktv.byPath[context.Path.String()] == nil {
+		lmktv.byPath[context.Path.String()] = &listMetadata{}
 	}
-	lm := lmktv.byFieldPath[context.Path.String()]
+	lm := lmktv.byPath[context.Path.String()]
 	lm.keyFields = append(lm.keyFields, fieldName)
 	lm.keyNames = append(lm.keyNames, tag.Value)
 
@@ -225,7 +225,7 @@ func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 }
 
 type listValidator struct {
-	byFieldPath map[string]*listMetadata
+	byPath map[string]*listMetadata
 }
 
 func (listValidator) Init(_ Config) {}
@@ -239,7 +239,7 @@ var (
 )
 
 func (lv listValidator) GetValidations(context Context) (Validations, error) {
-	lm := lv.byFieldPath[context.Path.String()]
+	lm := lv.byPath[context.Path.String()]
 	if err := lv.check(lm); err != nil {
 		return Validations{}, err
 	}
@@ -248,7 +248,7 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 	// support those, we need to look at this and make sure the paths work the
 	// way we need.
 	if context.Scope == ScopeField {
-		tm := lv.byFieldPath[context.Type.String()]
+		tm := lv.byPath[context.Type.String()]
 		if lm != nil && tm != nil {
 			return Validations{}, fmt.Errorf("found list metadata for both a field and its type: %s", context.Path)
 		}
@@ -322,8 +322,8 @@ func (lv listValidator) check(lm *listMetadata) error {
 }
 
 type eachValTagValidator struct {
-	byFieldPath map[string]*listMetadata
-	validator   Validator
+	byPath    map[string]*listMetadata
+	validator Validator
 }
 
 func (evtv *eachValTagValidator) Init(cfg Config) {
@@ -416,11 +416,11 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 
 	// This type is a "late" validator, so it runs after all the keys are
 	// registered.  See LateTagValidator() above.
-	listMetadata := evtv.byFieldPath[fldPath.String()]
+	listMetadata := evtv.byPath[fldPath.String()]
 	if listMetadata == nil {
 		// If we don't have metadata for this field, we might have it for the
 		// field's type.
-		listMetadata = evtv.byFieldPath[t.String()]
+		listMetadata = evtv.byPath[t.String()]
 	}
 
 	nt := util.NativeType(t)
