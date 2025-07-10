@@ -554,7 +554,7 @@ func (f *FakeContainerCommandRunner) RunInContainer(_ context.Context, container
 	return []byte(f.Stdout), f.Err
 }
 
-func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ kubecontainer.ContainerID) (status *kubecontainer.Status, err error) {
+func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ types.UID, _ kubecontainer.ContainerID) (status *kubecontainer.Status, err error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -571,8 +571,4 @@ func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Contai
 
 func (f *FakeRuntime) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	return false
-}
-
-func (f *FakeRuntime) GetActuatedResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
-	return v1.ResourceRequirements{}, false
 }
