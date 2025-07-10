@@ -427,6 +427,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		OldPodViolatesMatchLabelKeysValidation:              false,
 		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 		AllowContainerRestartPolicyRules:                    utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules),
+		AllowUserNamespacesWithVolumeDevices:                false,
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -473,6 +474,10 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
 
 		opts.AllowContainerRestartPolicyRules = opts.AllowContainerRestartPolicyRules || containerRestartRulesInUse(oldPodSpec)
+
+		// if old spec has userns and volume devices (doesn't work), we still allow
+		// modifications to it.
+		opts.AllowUserNamespacesWithVolumeDevices = hasUserNamespacesWithVolumeDevices(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -1582,6 +1587,13 @@ func useOnlyRecursiveSELinuxChangePolicy(oldPodSpec *api.PodSpec) bool {
 	}
 	// No feature gate + no value in the old object -> only Recursive is allowed
 	return true
+}
+
+func hasUserNamespacesWithVolumeDevices(podSpec *api.PodSpec) bool {
+	if errs := apivalidation.ValidateHostUsersVolumeDevices(podSpec, nil); len(errs) > 0 {
+		return true
+	}
+	return false
 }
 
 // hasRestartableInitContainerResizePolicy returns true if the pod spec is non-nil and
