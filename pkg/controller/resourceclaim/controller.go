@@ -351,6 +351,10 @@ func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj in
 		return
 	}
 
+	// Check if both the old and new claim are nil in case DeletedFinalStateUnknown.Obj can be nil.
+	if oldClaim == nil && newClaim == nil {
+		return
+	}
 	// Maintain metrics based on what was observed.
 	switch {
 	case oldClaim == nil:
@@ -965,6 +969,9 @@ func owningPod(claim *resourceapi.ResourceClaim) (string, types.UID) {
 }
 
 func hasAdminAccess(claim *resourceapi.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
 	for _, request := range claim.Spec.Devices.Requests {
 		if ptr.Deref(request.AdminAccess, false) {
 			return true

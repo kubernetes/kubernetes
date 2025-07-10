@@ -696,6 +696,11 @@ func TestHasAdminAccess(t *testing.T) {
 		want  bool
 	}{
 		{
+			name:  "nil claim",
+			claim: nil,
+			want:  false,
+		},
+		{
 			name: "no requests",
 			claim: &resourceapi.ResourceClaim{
 				Spec: resourceapi.ResourceClaimSpec{
