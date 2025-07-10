@@ -568,3 +568,11 @@ func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Contai
 	}
 	return kubetypes.NoSwap
 }
+
+func (f *FakeRuntime) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	return false
+}
+
+func (f *FakeRuntime) GetActuatedResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
+	return v1.ResourceRequirements{}, false
+}
