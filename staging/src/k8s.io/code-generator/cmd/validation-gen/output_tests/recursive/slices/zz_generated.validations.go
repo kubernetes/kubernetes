@@ -94,7 +94,7 @@ func Validate_T2(ctx context.Context, op operation.Operation, fldPath *field.Pat
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, Validate_T1)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T1)...)
 			return
 		}(fldPath.Child("st1"), obj.ST1, safe.Field(oldObj, func(oldObj *T2) []T1 { return oldObj.ST1 }))...)
 
@@ -125,7 +125,7 @@ func Validate_T4(ctx context.Context, op operation.Operation, fldPath *field.Pat
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, Validate_T3)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_T3)...)
 			return
 		}(fldPath.Child("st3"), obj.ST3, safe.Field(oldObj, func(oldObj *T4) []T3 { return oldObj.ST3 }))...)
 

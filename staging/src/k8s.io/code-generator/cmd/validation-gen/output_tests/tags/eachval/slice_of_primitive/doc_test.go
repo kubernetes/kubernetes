@@ -18,6 +18,8 @@ package sliceofprimitive
 
 import (
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
@@ -45,5 +47,18 @@ func Test(t *testing.T) {
 		// Same data, different order.
 		ListField:        []string{"one", "zero"},
 		ListTypedefField: []StringType{StringType("one"), StringType("zero")},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Invalid(field.NewPath("listField[0]"), "", ""),
+		field.Invalid(field.NewPath("listField[1]"), "", ""),
+		field.Invalid(field.NewPath("listTypedefField[0]"), "", ""),
+		field.Invalid(field.NewPath("listTypedefField[1]"), "", ""),
+	})
+
+	st.Value(&Struct{
+		ListField:        []string{"zero", "one"},
+		ListTypedefField: []StringType{StringType("zero"), StringType("one")},
+	}).OldValue(&Struct{
+		ListField:        []string{"zero", "one"},
+		ListTypedefField: []StringType{StringType("zero"), StringType("one")},
 	}).ExpectValid()
 }
