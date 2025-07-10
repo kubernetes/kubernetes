@@ -357,8 +357,8 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client,
 
 type runningCompactor struct {
 	interval time.Duration
-	cancel   context.CancelFunc
 	client   *clientv3.Client
+	cancel   DestroyFunc
 	refs     int
 }
 
@@ -393,20 +393,16 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 		if foundBefore {
 			// replace compactor
 			compactor.cancel()
-			compactor.client.Close()
 		} else {
 			// start new compactor
 			compactor = &runningCompactor{}
 			compactors[key] = compactor
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-
 		compactor.interval = interval
-		compactor.cancel = cancel
 		compactor.client = compactorClient
-
-		etcd3.StartCompactor(ctx, compactorClient, interval)
+		c := etcd3.StartCompactor(compactorClient, interval)
+		compactor.cancel = c.Stop
 	}
 
 	compactors[key].refs++
