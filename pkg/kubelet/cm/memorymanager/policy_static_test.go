@@ -28,7 +28,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
@@ -43,6 +46,17 @@ const (
 
 var (
 	containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
+
+	podLevelRequirementsGuaranteed = &v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1000Mi"),
+			v1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1000Mi"),
+			v1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+	}
 
 	requirementsGuaranteed = &v1.ResourceRequirements{
 		Limits: v1.ResourceList{
@@ -133,6 +147,7 @@ type testStaticPolicy struct {
 	topologyHint                 *topologymanager.TopologyHint
 	expectedTopologyHints        map[string][]topologymanager.TopologyHint
 	initContainersReusableMemory reusableMemory
+	podLevelResourcesEnabled     bool
 }
 
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
@@ -2005,10 +2020,67 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			topologyHint:  &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
 			expectedError: fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation"),
 		},
+		{
+			description:         "should do nothing for guaranteed pod with pod level resources",
+			expectedAssignments: state.ContainerMemoryAssignments{},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1536 * mb,
+							Free:           1536 * mb,
+							Reserved:       0,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells: []int{},
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+			},
+			pod:                      getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
+			expectedTopologyHints:    nil,
+			topologyHint:             &topologymanager.TopologyHint{},
+			podLevelResourcesEnabled: true,
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+
 			t.Logf("TestStaticPolicyAllocate %s", testCase.description)
 			p, s, err := initTests(t, &testCase, testCase.topologyHint, nil)
 			if err != nil {
@@ -3727,16 +3799,61 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "should not provide topology hints for guaranteed pod with pod level resources",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			expectedTopologyHints:    nil,
+			podLevelResourcesEnabled: true,
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+
 			p, s, err := initTests(t, &testCase, nil, nil)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
 			topologyHints := p.GetTopologyHints(s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
+				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
+			}
+		})
+	}
+}
+
+func TestStaticPolicyGetPodTopologyHints(t *testing.T) {
+	testCases := []testStaticPolicy{
+		{
+			description: "should not provide pod topology hints for guaranteed pod with pod level resources",
+			pod:         getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 1024 * mb,
+				},
+			},
+			expectedTopologyHints:    nil,
+			podLevelResourcesEnabled: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, testCase.podLevelResourcesEnabled)
+
+			p, s, err := initTests(t, &testCase, nil, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			topologyHints := p.GetPodTopologyHints(s, testCase.pod)
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
 			}
