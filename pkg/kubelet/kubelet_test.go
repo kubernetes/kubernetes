@@ -338,7 +338,6 @@ func newTestKubeletWithImageList(
 		kubelet.cadvisor,
 		kubelet.resourceAnalyzer,
 		kubelet.podManager,
-		kubelet.runtimeCache,
 		fakeRuntime,
 		kubelet.statusManager,
 		fakeHostStatsProvider,

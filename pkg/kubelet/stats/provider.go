@@ -47,13 +47,12 @@ func NewCRIStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	podManager PodManager,
-	runtimeCache kubecontainer.RuntimeCache,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	hostStatsProvider HostStatsProvider,
 	podAndContainerStatsFromCRI bool,
 ) *Provider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
+	return newStatsProvider(cadvisor, podManager, newCRIStatsProvider(cadvisor, resourceAnalyzer,
 		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI))
 }
 
@@ -63,12 +62,11 @@ func NewCadvisorStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	podManager PodManager,
-	runtimeCache kubecontainer.RuntimeCache,
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
 	hostStatsProvider HostStatsProvider,
 ) *Provider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider, hostStatsProvider))
+	return newStatsProvider(cadvisor, podManager, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider, hostStatsProvider))
 }
 
 // newStatsProvider returns a new Provider that provides node stats from
@@ -76,22 +74,19 @@ func NewCadvisorStatsProvider(
 func newStatsProvider(
 	cadvisor cadvisor.Interface,
 	podManager PodManager,
-	runtimeCache kubecontainer.RuntimeCache,
 	containerStatsProvider containerStatsProvider,
 ) *Provider {
 	return &Provider{
 		cadvisor:               cadvisor,
 		podManager:             podManager,
-		runtimeCache:           runtimeCache,
 		containerStatsProvider: containerStatsProvider,
 	}
 }
 
 // Provider provides the stats of the node and the pod-managed containers.
 type Provider struct {
-	cadvisor     cadvisor.Interface
-	podManager   PodManager
-	runtimeCache kubecontainer.RuntimeCache
+	cadvisor   cadvisor.Interface
+	podManager PodManager
 	containerStatsProvider
 }
 
