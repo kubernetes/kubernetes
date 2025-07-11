@@ -66,7 +66,7 @@ type unlockedActiveQueuer interface {
 	// add adds a new pod to the activeQ.
 	// The event should show which event triggered this addition and is used for the metric recording.
 	// This method should be called in activeQueue.underLock().
-	add(pInfo *framework.QueuedPodInfo, event string)
+	add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string)
 }
 
 // unlockedActiveQueueReader defines activeQ read-only methods that are not protected by the lock itself.
@@ -96,9 +96,10 @@ func newUnlockedActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo]) *unlocke
 // add adds a new pod to the activeQ.
 // The event should show which event triggered this addition and is used for the metric recording.
 // This method should be called in activeQueue.underLock().
-func (uaq *unlockedActiveQueue) add(pInfo *framework.QueuedPodInfo, event string) {
+func (uaq *unlockedActiveQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) {
 	uaq.queue.AddOrUpdate(pInfo)
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
+	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
 }
 
 // get returns the pod matching pInfo inside the activeQ.
