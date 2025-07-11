@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	goruntime "runtime"
 	"sort"
 	"strconv"
@@ -35,6 +36,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
+	"k8s.io/component-base/metrics/legacyregistry"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -3580,6 +3582,645 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 				c.LastTransitionTime = metav1.Time{}
 			}
 			require.Equal(t, tc.expectedResizeConditions, gotResizeConditions)
+		})
+	}
+}
+
+func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
+	metrics.Register()
+	metrics.ContainerRequestedResizes.Reset()
+
+	type expectedMetricsStruct struct {
+		memoryLimitsCounter   map[string]int
+		memoryRequestsCounter map[string]int
+		cpuLimitsCounter      map[string]int
+		cpuRequestsCounter    map[string]int
+	}
+	expectedMetrics := expectedMetricsStruct{
+		memoryLimitsCounter:   make(map[string]int),
+		memoryRequestsCounter: make(map[string]int),
+		cpuLimitsCounter:      make(map[string]int),
+		cpuRequestsCounter:    make(map[string]int),
+	}
+
+	for _, tc := range []struct {
+		name               string
+		initialAllocation  *v1.Pod
+		updatedPod         *v1.Pod
+		updateExpectedFunc func(*expectedMetricsStruct)
+	}{
+		// Memory requests
+		{
+			name: "add memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryRequestsCounter["add"]++
+			},
+		},
+		{
+			name: "remove memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryRequestsCounter["remove"]++
+			},
+		},
+		{
+			name: "increase memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						}},
+					},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryRequestsCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryRequestsCounter["decrease"]++
+			},
+		},
+
+		// Memory limits
+		{
+			name: "add memory limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryLimitsCounter["add"]++
+			},
+		},
+		{
+			name: "remove memory limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryLimitsCounter["remove"]++
+			},
+		},
+		{
+			name: "increase memory limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryLimitsCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease memory limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryLimitsCounter["decrease"]++
+			},
+		},
+
+		// CPU requests
+		{
+			name: "add cpu requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["add"]++
+			},
+		},
+		{
+			name: "remove cpu requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["remove"]++
+			},
+		},
+		{
+			name: "increase cpu requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease cpu requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["decrease"]++
+			},
+		},
+
+		// CPU limits
+		{
+			name: "add cpu limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["add"]++
+			},
+		},
+		{
+			name: "remove cpu limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["remove"]++
+			},
+		},
+		{
+			name: "increase cpu limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease cpu limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["decrease"]++
+			},
+		},
+
+		// Some combinations of things
+		{
+			name: "add cpu limits + increase memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["add"]++
+				e.memoryRequestsCounter["increase"]++
+			},
+		},
+		{
+			name: "remove memory limits + decrease cpu requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryLimitsCounter["remove"]++
+				e.cpuRequestsCounter["decrease"]++
+			},
+		},
+		{
+			name: "increase cpu requests + memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("90"),
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("110"),
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["increase"]++
+				e.memoryRequestsCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease all possible values",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("110"),
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("110"),
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("90"),
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("90"),
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["decrease"]++
+				e.cpuRequestsCounter["decrease"]++
+				e.memoryLimitsCounter["decrease"]++
+				e.memoryRequestsCounter["decrease"]++
+			},
+		},
+		{
+			name: "no resize request",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  "12345",
+				},
+			}
+			initialPod := testPod.DeepCopy()
+			updatedPod := testPod.DeepCopy()
+
+			initialPod.Spec = tc.initialAllocation.Spec
+			updatedPod.Spec = tc.updatedPod.Spec
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			t.Cleanup(func() { testKubelet.Cleanup() })
+			kubelet := testKubelet.kubelet
+
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(initialPod))
+			kubelet.HandlePodUpdates([]*v1.Pod{updatedPod})
+
+			tc.updateExpectedFunc(&expectedMetrics)
+
+			expectedFormat := `
+				# HELP kubelet_container_requested_resizes_total [ALPHA] Number of requested resizes, counted at the container level. Different resources on the same container are counted separately. The 'requirement' label refers to 'memory' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.
+				# TYPE kubelet_container_requested_resizes_total counter
+				kubelet_container_requested_resizes_total{operation="add",requirement="requests",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="add",requirement="requests",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="add",requirement="limits",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="add",requirement="limits",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="decrease",requirement="requests",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="decrease",requirement="requests",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="decrease",requirement="limits",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="decrease",requirement="limits",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="increase",requirement="requests",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="increase",requirement="requests",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="increase",requirement="limits",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="increase",requirement="limits",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="remove",requirement="requests",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="remove",requirement="requests",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="remove",requirement="limits",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="remove",requirement="limits",resource="cpu"} %d
+			`
+
+			expected := fmt.Sprintf(expectedFormat,
+				expectedMetrics.memoryRequestsCounter["add"],
+				expectedMetrics.cpuRequestsCounter["add"],
+				expectedMetrics.memoryLimitsCounter["add"],
+				expectedMetrics.cpuLimitsCounter["add"],
+
+				expectedMetrics.memoryRequestsCounter["decrease"],
+				expectedMetrics.cpuRequestsCounter["decrease"],
+				expectedMetrics.memoryLimitsCounter["decrease"],
+				expectedMetrics.cpuLimitsCounter["decrease"],
+
+				expectedMetrics.memoryRequestsCounter["increase"],
+				expectedMetrics.cpuRequestsCounter["increase"],
+				expectedMetrics.memoryLimitsCounter["increase"],
+				expectedMetrics.cpuLimitsCounter["increase"],
+
+				expectedMetrics.memoryRequestsCounter["remove"],
+				expectedMetrics.cpuRequestsCounter["remove"],
+				expectedMetrics.memoryLimitsCounter["remove"],
+				expectedMetrics.cpuLimitsCounter["remove"],
+			)
+
+			// Omit lines from the expected metrics string where the count is "0"
+			re := regexp.MustCompile("(?m)[\r\n]+^.*} 0.*$")
+			expected = re.ReplaceAllString(expected, "")
+
+			require.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer, strings.NewReader(expected), "kubelet_container_requested_resizes_total",
+			))
 		})
 	}
 }

@@ -105,7 +105,8 @@ type Manager interface {
 	Run(ctx context.Context)
 
 	// PushPendingResize queues a pod with a pending resize request for later reevaluation.
-	PushPendingResize(uid types.UID)
+	// Returns true if the pending resize was added to the queue, false if it was already present.
+	PushPendingResize(uid types.UID) bool
 
 	// RetryPendingResizes retries all pending resizes. It returns a list of successful resizes.
 	RetryPendingResizes() []*v1.Pod
@@ -311,20 +312,21 @@ func (m *manager) RetryPendingResizes() []*v1.Pod {
 
 }
 
-func (m *manager) PushPendingResize(uid types.UID) {
+func (m *manager) PushPendingResize(uid types.UID) bool {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
 	for _, p := range m.podsWithPendingResizes {
 		if p == uid {
 			// Pod is already in the pending resizes queue.
-			return
+			return false
 		}
 	}
 
 	// Add the pod to the pending resizes list and sort by priority.
 	m.podsWithPendingResizes = append(m.podsWithPendingResizes, uid)
 	m.sortPendingResizes()
+	return true
 }
 
 // sortPendingResizes sorts the list of pending resizes:
@@ -772,7 +774,7 @@ func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kube
 func (m *manager) isPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	return !podutil.VisitContainers(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers,
 		func(allocatedContainer *v1.Container, containerType podutil.ContainerType) (shouldContinue bool) {
-			if !isResizableContainer(allocatedContainer, containerType) {
+			if !IsResizableContainer(allocatedContainer, containerType) {
 				return true
 			}
 
@@ -804,7 +806,7 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 	return allocatedPods
 }
 
-func isResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
+func IsResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
 	switch containerType {
 	case podutil.InitContainers:
 		return podutil.IsRestartableInitContainer(container)
