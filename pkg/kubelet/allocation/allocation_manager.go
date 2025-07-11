@@ -706,7 +706,6 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 				msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
 				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
 				return false, v1.PodReasonInfeasible, msg
-
 			}
 		}
 	}

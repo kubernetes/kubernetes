@@ -40,11 +40,14 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -2231,6 +2234,130 @@ func TestPodResizeConditions(t *testing.T) {
 			}
 			require.Equal(t, tc.expectedIsPodResizeDeferred, m.IsPodResizeDeferred(podUID))
 			require.Equal(t, tc.expectedIsPodResizeInfeasible, m.IsPodResizeInfeasible(podUID))
+		})
+	}
+}
+
+func TestClearPodResizeInProgressCondition(t *testing.T) {
+	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
+	podUID := types.UID("12345")
+
+	testCases := []struct {
+		name               string
+		existingConditions podResizeConditions
+		expectedConditions []*v1.PodCondition
+		expected           bool
+	}{
+		{
+			name:     "no existing conditions",
+			expected: false,
+		},
+		{
+			name: "existing pod resize in progress condition",
+			existingConditions: podResizeConditions{
+				PodResizeInProgress: &v1.PodCondition{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m.(*manager).podResizeConditions[podUID] = tc.existingConditions
+			assert.Equal(t, tc.expected, m.ClearPodResizeInProgressCondition(podUID))
+			resizeConditions := m.GetPodResizeConditions(podUID)
+			if tc.expectedConditions == nil {
+				require.Nil(t, resizeConditions)
+			} else {
+				// ignore the last probe and transition times
+				for _, c := range resizeConditions {
+					c.LastProbeTime = metav1.Time{}
+					c.LastTransitionTime = metav1.Time{}
+				}
+				require.Equal(t, tc.expectedConditions, resizeConditions)
+			}
+		})
+	}
+}
+
+func TestRecordInProgressResizeCount(t *testing.T) {
+	metrics.Register()
+
+	for _, tc := range []struct {
+		name               string
+		existingConditions map[types.UID]podResizeConditions
+		expected           int
+	}{
+		{
+			name:               "no pods",
+			existingConditions: make(map[types.UID]podResizeConditions),
+		},
+		{
+			name: "one pod, no resize status",
+			existingConditions: map[types.UID]podResizeConditions{
+				"test-pod": {},
+			},
+		},
+		{
+			name: "no pods in progress, one pending",
+			existingConditions: map[types.UID]podResizeConditions{
+				"test-pod": {
+					PodResizePending: &v1.PodCondition{
+						Type:   v1.PodResizePending,
+						Status: v1.ConditionTrue,
+					},
+				},
+			},
+		},
+		{
+			name: "one pod in progress",
+			existingConditions: map[types.UID]podResizeConditions{
+				"test-pod": {
+					PodResizeInProgress: &v1.PodCondition{
+						Type:   v1.PodResizeInProgress,
+						Status: v1.ConditionTrue,
+					},
+				},
+			},
+			expected: 1,
+		},
+		{
+			name: "two pods in progress (one with error)",
+			existingConditions: map[types.UID]podResizeConditions{
+				"test-pod": {
+					PodResizeInProgress: &v1.PodCondition{
+						Type:   v1.PodResizeInProgress,
+						Status: v1.ConditionTrue,
+					},
+				},
+				"test-pod-2": {
+					PodResizeInProgress: &v1.PodCondition{
+						Type:    v1.PodResizeInProgress,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonError,
+						Message: "some error",
+					},
+				},
+			},
+			expected: 2,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			manager := newTestManager(&fake.Clientset{})
+			manager.podResizeConditions = tc.existingConditions
+			manager.recordInProgressResizeCount()
+			expectedFormat := `
+				# HELP kubelet_pod_in_progress_resizes [ALPHA] Number of in-progress resizes for pods.
+				# TYPE kubelet_pod_in_progress_resizes gauge
+				kubelet_pod_in_progress_resizes %d
+			`
+			expected := fmt.Sprintf(expectedFormat, tc.expected)
+			require.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer, strings.NewReader(expected), "kubelet_pod_in_progress_resizes",
+			))
 		})
 	}
 }

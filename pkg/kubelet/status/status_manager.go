@@ -281,8 +281,9 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	c := m.podResizeConditions[podUID].PodResizeInProgress
-	if c != nil {
+	alreadyInProgress := m.podResizeConditions[podUID].PodResizeInProgress != nil
+
+	if c := m.podResizeConditions[podUID].PodResizeInProgress; c != nil {
 		// Preserve the old reason, message if they exist.
 		if reason == "" && message == "" {
 			reason = c.Reason
@@ -297,6 +298,10 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message, observedGeneration),
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 	}
+
+	if !alreadyInProgress {
+		m.recordInProgressResizeCount()
+	}
 }
 
 // ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
@@ -304,8 +309,8 @@ func (m *manager) ClearPodResizePendingCondition(podUID types.UID) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizePending:    nil,
 		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
+		PodResizePending:    nil,
 	}
 }
 
@@ -323,6 +328,8 @@ func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID) bool {
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 		PodResizeInProgress: nil,
 	}
+
+	m.recordInProgressResizeCount()
 	return true
 }
 
@@ -818,7 +825,10 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		delete(m.podResizeConditions, uid)
+		if _, exists := m.podResizeConditions[uid]; exists {
+			delete(m.podResizeConditions, uid)
+			m.recordInProgressResizeCount()
+		}
 	}
 }
 
@@ -831,7 +841,10 @@ func (m *manager) RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.U
 			logger.V(5).Info("Removing pod from status map", "podUID", key)
 			delete(m.podStatuses, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				delete(m.podResizeConditions, key)
+				if _, exists := m.podResizeConditions[key]; exists {
+					delete(m.podResizeConditions, key)
+					m.recordInProgressResizeCount()
+				}
 			}
 		}
 	}
@@ -1228,4 +1241,15 @@ func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *
 		Reason:             reason,
 		Message:            message,
 	}
+}
+
+// recordInProgressResize sets the in-progress resize metric.
+func (m *manager) recordInProgressResizeCount() {
+	inProgressResizeCount := 0
+	for _, conditions := range m.podResizeConditions {
+		if conditions.PodResizeInProgress != nil {
+			inProgressResizeCount++
+		}
+	}
+	metrics.PodInProgressResizes.Set(float64(inProgressResizeCount))
 }
