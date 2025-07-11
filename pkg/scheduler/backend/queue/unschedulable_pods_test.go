@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-func TestUnschedulablePodsMap(t *testing.T) {
+func TestUnschedulablePods(t *testing.T) {
 	var pods = []*v1.Pod{
 		st.MakePod().Name("p0").Namespace("ns1").Annotation("annot1", "val1").NominatedNodeName("node1").Obj(),
 		st.MakePod().Name("p1").Namespace("ns1").Annotation("annot", "val").Obj(),
@@ -109,7 +109,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			upm := newUnschedulablePods(nil, nil)
 			for _, p := range test.podsToAdd {
-				upm.addOrUpdate(newQueuedPodInfoForLookup(p), framework.EventUnscheduledPodAdd.Label())
+				upm.add(newQueuedPodInfoForLookup(p), framework.EventUnscheduledPodAdd.Label())
 			}
 			if diff := cmp.Diff(test.expectedMapAfterAdd, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected map after adding pods(-want, +got):\n%s", diff)
@@ -117,7 +117,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 
 			if len(test.podsToUpdate) > 0 {
 				for _, p := range test.podsToUpdate {
-					upm.addOrUpdate(newQueuedPodInfoForLookup(p), framework.EventUnscheduledPodUpdate.Label())
+					upm.update(newQueuedPodInfoForLookup(p))
 				}
 				if diff := cmp.Diff(test.expectedMapAfterUpdate, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 					t.Errorf("Unexpected map after updating pods (-want, +got):\n%s", diff)
