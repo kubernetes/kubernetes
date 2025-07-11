@@ -362,8 +362,8 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	return result, nil
 }
 
-func (a *allocator) validateDeviceRequest(request requestAccessor, parentRequest requestAccessor, requestKey requestIndices, pools []*Pool) (requestData, error) {
-	claim := a.claimsToAllocate[requestKey.claimIndex]
+func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentRequest requestAccessor, requestKey requestIndices, pools []*Pool) (requestData, error) {
+	claim := alloc.claimsToAllocate[requestKey.claimIndex]
 	requestData := requestData{
 		request:       request,
 		parentRequest: parentRequest,
@@ -375,7 +375,7 @@ func (a *allocator) validateDeviceRequest(request requestAccessor, parentRequest
 		}
 	}
 
-	if !a.features.AdminAccess && request.hasAdminAccess() {
+	if !alloc.features.AdminAccess && request.hasAdminAccess() {
 		return requestData, fmt.Errorf("claim %s, request %s: admin access is requested, but the feature is disabled", klog.KObj(claim), request.name())
 	}
 
@@ -383,7 +383,7 @@ func (a *allocator) validateDeviceRequest(request requestAccessor, parentRequest
 	if request.deviceClassName() == "" {
 		return requestData, fmt.Errorf("claim %s, request %s: missing device class name (unsupported request type?)", klog.KObj(claim), request.name())
 	}
-	class, err := a.classLister.Get(request.deviceClassName())
+	class, err := alloc.classLister.Get(request.deviceClassName())
 	if err != nil {
 		return requestData, fmt.Errorf("claim %s, request %s: could not retrieve device class %s: %w", klog.KObj(claim), request.name(), request.deviceClassName(), err)
 	}
@@ -419,7 +419,7 @@ func (a *allocator) validateDeviceRequest(request requestAccessor, parentRequest
 
 			for _, slice := range pool.Slices {
 				for deviceIndex := range slice.Spec.Devices {
-					selectable, err := a.isSelectable(requestKey, requestData, slice, deviceIndex)
+					selectable, err := alloc.isSelectable(requestKey, requestData, slice, deviceIndex)
 					if err != nil {
 						return requestData, err
 					}
@@ -435,7 +435,7 @@ func (a *allocator) validateDeviceRequest(request requestAccessor, parentRequest
 			}
 		}
 		requestData.numDevices = len(requestData.allDevices)
-		a.logger.V(6).Info("Request for 'all' devices", "claim", klog.KObj(claim), "request", request.name(), "numDevicesPerRequest", requestData.numDevices)
+		alloc.logger.V(6).Info("Request for 'all' devices", "claim", klog.KObj(claim), "request", request.name(), "numDevicesPerRequest", requestData.numDevices)
 	default:
 		return requestData, fmt.Errorf("claim %s, request %s: unsupported count mode %s", klog.KObj(claim), request.name(), request.allocationMode())
 	}
