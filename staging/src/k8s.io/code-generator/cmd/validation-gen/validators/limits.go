@@ -67,7 +67,7 @@ func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 
 	intVal, err := strconv.Atoi(tag.Value)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %v", err)
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
@@ -123,7 +123,7 @@ func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 
 	intVal, err := strconv.Atoi(tag.Value)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %v", err)
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")

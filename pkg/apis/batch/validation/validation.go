@@ -717,12 +717,12 @@ func ValidateCronJobCreate(cronJob *batch.CronJob, opts apivalidation.PodValidat
 	// CronJobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&cronJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateCronJobSpec(&cronJob.Spec, nil, field.NewPath("spec"), opts)...)
-	if max := apimachineryvalidation.DNS1035LabelMaxLength - 11; len(cronJob.ObjectMeta.Name) > max {
+	if max := apimachineryvalidation.DNS1035LabelMaxLength - 11; len(cronJob.Name) > max {
 		// The cronjob controller appends a 11-character suffix to the cronjob (`-$TIMESTAMP`) when
 		// creating a job. The job name length limit is 63 characters.
 		// Therefore cronjob names must have length <= 63-11=52. If we don't validate this here,
 		// then job creation will fail later.
-		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata").Child("name"), cronJob.ObjectMeta.Name, content.MaxLenError(max)))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata").Child("name"), cronJob.Name, content.MaxLenError(max)))
 	}
 	return allErrs
 }

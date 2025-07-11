@@ -330,7 +330,7 @@ func TestErrorFormatting(t *testing.T) {
 	}, {
 		name:   "too many func(2, -1)",
 		input:  TooMany(NewPath("path.to.field"), 2, -1),
-		expect: `path.to.field: Too many: 2: has too many items`,
+		expect: `path.to.field: Too many: 2: too many items`,
 	}, {
 		name:   "too many func(-1, 1)",
 		input:  TooMany(NewPath("path.to.field"), -1, 1),

@@ -271,9 +271,9 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 	if lm == nil {
 		// TODO(thockin): enable this once the whole codebase is converted or
 		// if we only run against fields which are opted-in.
-		//if context.Type.Kind == types.Slice || context.Type.Kind == types.Array {
-		//	return Validations{}, fmt.Errorf("found list field without a listType")
-		//}
+		// if context.Type.Kind == types.Slice || context.Type.Kind == types.Array {
+		// 	return Validations{}, fmt.Errorf("found list field without a listType")
+		// }
 		return Validations{}, nil
 	}
 

@@ -102,8 +102,8 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			tc.old.ObjectMeta.ResourceVersion = "1"
-			tc.update.ObjectMeta.ResourceVersion = "1"
+			tc.old.ResourceVersion = "1"
+			tc.update.ResourceVersion = "1"
 			var declarativeTakeoverErrs field.ErrorList
 			var imperativeErrs field.ErrorList
 			for _, gateVal := range []bool{true, false} {
