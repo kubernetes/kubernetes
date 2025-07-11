@@ -31,6 +31,13 @@ import (
 
 var (
 	delimiters = []string{":", ": ", "=", " "}
+	nonDebuggingEndpoints = map[string]bool{
+		"/apis": true,
+		"/api": true,
+		"/openid": true,
+		"/openapi": true,
+		"/.well-known": true,
+	}
 )
 
 const DefaultStatuszPath = "/statusz"
@@ -118,7 +125,7 @@ func aggregatePaths(listedPaths []string) string {
 	paths := make(map[string]bool)
 	for _, listedPath := range listedPaths {
 		folder := "/" + strings.Split(listedPath, "/")[1]
-		if !paths[folder] {
+		if !paths[folder] && !nonDebuggingEndpoints[folder] {
 			paths[folder] = true
 		}
 	}
