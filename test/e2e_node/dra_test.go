@@ -26,7 +26,9 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path"
 	"regexp"
@@ -458,6 +460,53 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				kubeletplugin.PluginDataDirectoryPath(kubeletplugin.KubeletRegistryDir),
 				kubeletplugin.PluginSocket(driverName+"-common.sock"),
 			),
+		)
+
+		failOnClosedListener := func(
+			ctx context.Context,
+			service func(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, datadir string, opts ...any) *testdriver.ExamplePlugin,
+			listenerOptionFun func(listen func(ctx context.Context, path string) (net.Listener, error)) kubeletplugin.Option,
+		) {
+			ginkgo.By("create a custom listener")
+			var listener net.Listener
+			errorMsg := "simulated listener failure"
+			getListener := func(ctx context.Context, socketPath string) (net.Listener, error) {
+				listener = newErrorOnCloseListener(errors.New(errorMsg))
+				return listener, nil
+			}
+
+			ginkgo.By("create a context with a cancel function")
+			tCtx, cancel := context.WithCancelCause(ctx)
+			defer cancel(nil)
+
+			ginkgo.By("start service")
+			service(
+				ctx,
+				f.ClientSet,
+				getNodeName(ctx, f),
+				driverName,
+				"",
+				listenerOptionFun(getListener),
+				testdriver.CancelMainContext(cancel),
+			)
+
+			ginkgo.By("close listener to make the grpc.Server.Serve() fail")
+			framework.ExpectNoError(listener.Close())
+
+			ginkgo.By("check that the context is canceled with an expected error and cause")
+			gomega.Eventually(tCtx.Err).Should(gomega.MatchError(gomega.ContainSubstring("context canceled")), "Context should be canceled by the error handler")
+			gomega.Expect(context.Cause(tCtx).Error()).To(gomega.ContainSubstring(errorMsg), "Context should be canceled with the expected cause")
+		}
+		// The wrappedNewRegistrar function is used to create a new registrar
+		// with the same signature as the newDRAService function, so that it can be
+		// used in the DescribeTable.
+		wrappedNewRegistrar := func(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, datadir string, opts ...any) *testdriver.ExamplePlugin {
+			return newRegistrar(ctx, clientSet, nodeName, driverName, opts...)
+		}
+		ginkgo.DescribeTable("must report gRPC serving error",
+			failOnClosedListener,
+			ginkgo.Entry("for registrar", wrappedNewRegistrar, kubeletplugin.RegistrarListener),
+			ginkgo.Entry("for DRA service", newDRAService, kubeletplugin.PluginListener),
 		)
 	})
 
