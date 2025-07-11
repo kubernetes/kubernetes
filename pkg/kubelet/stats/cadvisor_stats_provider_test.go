@@ -273,7 +273,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
-	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, mockRuntime, mockStatus, NewFakeHostStatsProvider(&containertest.FakeOS{}))
+	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, mockRuntime, mockStatus, NewFakeHostStatsProvider(&containertest.FakeOS{}))
 	pods, err := p.ListPodStats(ctx)
 	assert.NoError(t, err)
 
@@ -459,7 +459,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
-	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, nil, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}))
+	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, nil, NewFakeHostStatsProvider(&containertest.FakeOS{}))
 	pods, err := p.ListPodCPUAndMemoryStats(ctx)
 	assert.NoError(t, err)
 
@@ -899,7 +899,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
-	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, nil, mockRuntime, mockStatus, NewFakeHostStatsProviderWithData(fakeStats, fakeOS))
+	p := NewCadvisorStatsProvider(mockCadvisor, resourceAnalyzer, nil, mockRuntime, mockStatus, NewFakeHostStatsProviderWithData(fakeStats, fakeOS))
 	pods, err := p.ListPodStats(ctx)
 	assert.NoError(t, err)
 
