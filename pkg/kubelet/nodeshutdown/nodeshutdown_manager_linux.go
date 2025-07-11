@@ -51,7 +51,7 @@ type dbusInhibiter interface {
 	InhibitShutdown() (systemd.InhibitLock, error)
 	ReleaseInhibitLock(lock systemd.InhibitLock) error
 	ReloadLogindConf() error
-	MonitorShutdown() (<-chan bool, error)
+	MonitorShutdown(klog.Logger) (<-chan bool, error)
 	OverrideInhibitDelay(inhibitDelayMax time.Duration) error
 }
 
@@ -207,7 +207,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 		return nil, err
 	}
 
-	events, err := m.dbusCon.MonitorShutdown()
+	events, err := m.dbusCon.MonitorShutdown(m.logger)
 	if err != nil {
 		releaseErr := m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
 		if releaseErr != nil {
