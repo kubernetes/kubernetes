@@ -35,10 +35,12 @@ import (
 // TagValidators having been run already because users might specify tags in
 // the any order. The one exception to this rule is that some TagValidators may
 // be designated as "late" validators (see LateTagValidator), which means they
-// will be run after all non-late TagValidators. No other guarantees are made
-// about the order of execution of TagValidators or LateTagValidators. Instead
-// of relying on tag ordering , TagValidators can accumulate information
-// internally and use a TypeValidator and/or FieldValidator to finish the work.
+// will be run after all non-late TagValidators.
+//
+// No other guarantees are made about the order of execution of TagValidators
+// or LateTagValidators. Instead of relying on tag ordering, TagValidators can
+// accumulate information internally and use a TypeValidator and/or
+// FieldValidator to finish the work.
 type TagValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)
@@ -68,11 +70,13 @@ type LateTagValidator interface {
 // To be findable by validation-gen, a TypeValidator must be registered - see
 // RegisterTypeValidator.
 //
-// TypeValidators are always processed after TagValidators, which means that
-// they can "finish" work with data that was collected by TagValidators.
-// TypeValidators are evaluated after all TagValidators and after the type has
-// been fully processed (including all child fields). TypeValidators MUST NOT
-// depend on other TypeValidators having been run already.
+// TypeValidators are always processed after TagValidators, and after the type
+// has been fully processed (including all child fields and their types). This
+// means that they can "finish" work with data that was collected by
+// TagValidators.
+//
+// TypeValidators MUST NOT depend on other TypeValidators having been run
+// already.
 type TypeValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)
@@ -97,11 +101,13 @@ type TypeValidator interface {
 // To be findable by validation-gen, a FieldValidator must be registered - see
 // RegisterFieldValidator.
 //
-// FieldValidators are always processed after TagValidators, which means that
-// they can "finish" work with data that was collected by TagValidators.
-// FieldValidators are evaluated after all TagValidators and after the field has
-// been fully processed (including all child fields). FieldValidators MUST NOT
-// depend on other FieldValidators having been run already.
+// FieldValidators are always processed after TagValidators and TypeValidators,
+// and after the field has been fully processed (including all child fields).
+// This means that they can "finish" work with data that was collected by
+// TagValidators.
+//
+// FieldValidators MUST NOT depend on other FieldValidators having been run
+// already.
 type FieldValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)

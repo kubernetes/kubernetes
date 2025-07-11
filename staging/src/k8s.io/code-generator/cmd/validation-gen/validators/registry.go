@@ -146,6 +146,8 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 		panic("registry.init() was not called")
 	}
 	validations := Validations{}
+
+	// Run tag-validators first.
 	phases := reg.sortTagsIntoPhases(tags)
 	for _, tags := range phases {
 		for _, tag := range tags {
@@ -163,6 +165,7 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 			}
 		}
 	}
+
 	// Run type-validators after tag validators are done.
 	if context.Scope == ScopeType {
 		// Run all type-validators.
@@ -175,7 +178,7 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 		}
 	}
 
-	// Run field-validators after tag validators are done.
+	// Run field-validators after tag and type validators are done.
 	if context.Scope == ScopeField {
 		// Run all field-validators.
 		for _, fv := range reg.fieldValidators {

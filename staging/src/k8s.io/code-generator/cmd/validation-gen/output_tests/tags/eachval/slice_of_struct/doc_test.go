@@ -18,8 +18,6 @@ package sliceofstruct
 
 import (
 	"testing"
-
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
@@ -55,11 +53,11 @@ func Test(t *testing.T) {
 	}).ExpectValid()
 
 	st.Value(&Struct{
-		// New element exist in old value.
+		// New element exists in old value, but this is not a set.
 		ListNonComparableField: []NonComparableStruct{{SliceField: []string{"three", "four"}}},
 	}).OldValue(&Struct{
 		ListNonComparableField: []NonComparableStruct{{SliceField: []string{"zero", "one"}}, {SliceField: []string{"three", "four"}}},
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Invalid(field.NewPath("listNonComparableField[0]"), "", ""),
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"listNonComparableField[0]": {"field Struct.ListNonComparableField[*]"},
 	})
 }
