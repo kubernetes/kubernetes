@@ -271,7 +271,7 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1beta1.CapacitySharingPolicy": {
-        "description": "CapacitySharingPolicy defines how requests consume the available capacity. A policy must have a default value to be applied when no value is explicitly provided. Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range. If valid values are specified, the default must be included within them.",
+        "description": "CapacitySharingPolicy defines how requests consume the available capacity. A policy must have a default value to be applied when no value is explicitly provided in the ResourceClaim. Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range. If valid values are specified, the default must be included within them.",
         "properties": {
           "default": {
             "allOf": [
@@ -497,7 +497,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.CapacitySharingPolicy"
               }
             ],
-            "description": "SharingPolicy specifies that this device capacity must be consumed by each resource claim according to the defined sharing policy. The Device must allow multiple allocations.\n\nIf this field is unset, capacity sharing is unconstrained. All ResourceClaims or requests share the same capacity pool."
+            "description": "SharingPolicy specifies that this device capacity must be consumed by each resource claim according to the defined sharing policy. The Device must have AllowMultipleAllocations set to true.\n\nIf this field is unset, capacity sharing is unconstrained. All ResourceClaims or requests share the same capacity pool."
           },
           "value": {
             "allOf": [

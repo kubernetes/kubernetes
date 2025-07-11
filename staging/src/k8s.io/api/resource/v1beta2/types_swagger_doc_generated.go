@@ -70,7 +70,7 @@ func (CapacityRequirements) SwaggerDoc() map[string]string {
 }
 
 var map_CapacitySharingPolicy = map[string]string{
-	"":            "CapacitySharingPolicy defines how requests consume the available capacity. A policy must have a default value to be applied when no value is explicitly provided. Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range. If valid values are specified, the default must be included within them.",
+	"":            "CapacitySharingPolicy defines how requests consume the available capacity. A policy must have a default value to be applied when no value is explicitly provided in the ResourceClaim. Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range. If valid values are specified, the default must be included within them.",
 	"default":     "Default specifies the default capacity to be used for a consumption request.",
 	"validValues": "ValidValues defines a set of acceptable quantity values in consuming requests.\n\nMust not contain more than 10 entries.",
 	"validRange":  "ValidRange defines an acceptable quantity value range in consuming requests.",
@@ -162,7 +162,7 @@ func (DeviceAttribute) SwaggerDoc() map[string]string {
 var map_DeviceCapacity = map[string]string{
 	"":              "DeviceCapacity describes a quantity associated with a device.",
 	"value":         "Value defines how much of a certain device capacity is available.",
-	"sharingPolicy": "SharingPolicy specifies that this device capacity must be consumed by each resource claim according to the defined sharing policy. The Device must allow multiple allocations.\n\nIf this field is unset, capacity sharing is unconstrained. All ResourceClaims or requests share the same capacity pool.",
+	"sharingPolicy": "SharingPolicy specifies that this device capacity must be consumed by each resource claim according to the defined sharing policy. The Device must have AllowMultipleAllocations set to true.\n\nIf this field is unset, capacity sharing is unconstrained. All ResourceClaims or requests share the same capacity pool.",
 }
 
 func (DeviceCapacity) SwaggerDoc() map[string]string {

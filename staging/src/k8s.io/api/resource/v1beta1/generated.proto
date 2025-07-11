@@ -261,7 +261,7 @@ message CapacityRequirements {
 }
 
 // CapacitySharingPolicy defines how requests consume the available capacity.
-// A policy must have a default value to be applied when no value is explicitly provided.
+// A policy must have a default value to be applied when no value is explicitly provided in the ResourceClaim.
 // Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range.
 // If valid values are specified, the default must be included within them.
 message CapacitySharingPolicy {
@@ -451,7 +451,7 @@ message DeviceCapacity {
 
   // SharingPolicy specifies that this device capacity must be consumed
   // by each resource claim according to the defined sharing policy.
-  // The Device must allow multiple allocations.
+  // The Device must have AllowMultipleAllocations set to true.
   //
   // If this field is unset, capacity sharing is unconstrained.
   // All ResourceClaims or requests share the same capacity pool.

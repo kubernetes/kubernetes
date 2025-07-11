@@ -47370,7 +47370,7 @@ func schema_k8sio_api_resource_v1beta1_CapacitySharingPolicy(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CapacitySharingPolicy defines how requests consume the available capacity. A policy must have a default value to be applied when no value is explicitly provided. Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range. If valid values are specified, the default must be included within them.",
+				Description: "CapacitySharingPolicy defines how requests consume the available capacity. A policy must have a default value to be applied when no value is explicitly provided in the ResourceClaim. Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range. If valid values are specified, the default must be included within them.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"default": {
@@ -47696,7 +47696,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceCapacity(ref common.ReferenceCallba
 					},
 					"sharingPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SharingPolicy specifies that this device capacity must be consumed by each resource claim according to the defined sharing policy. The Device must allow multiple allocations.\n\nIf this field is unset, capacity sharing is unconstrained. All ResourceClaims or requests share the same capacity pool.",
+							Description: "SharingPolicy specifies that this device capacity must be consumed by each resource claim according to the defined sharing policy. The Device must have AllowMultipleAllocations set to true.\n\nIf this field is unset, capacity sharing is unconstrained. All ResourceClaims or requests share the same capacity pool.",
 							Ref:         ref("k8s.io/api/resource/v1beta1.CapacitySharingPolicy"),
 						},
 					},
@@ -49343,7 +49343,7 @@ func schema_k8sio_api_resource_v1beta2_CapacitySharingPolicy(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CapacitySharingPolicy defines how requests consume the available capacity. A policy must have a default value to be applied when no value is explicitly provided. Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range. If valid values are specified, the default must be included within them.",
+				Description: "CapacitySharingPolicy defines how requests consume the available capacity. A policy must have a default value to be applied when no value is explicitly provided in the ResourceClaim. Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range. If valid values are specified, the default must be included within them.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"default": {
@@ -49758,7 +49758,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceCapacity(ref common.ReferenceCallba
 					},
 					"sharingPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SharingPolicy specifies that this device capacity must be consumed by each resource claim according to the defined sharing policy. The Device must allow multiple allocations.\n\nIf this field is unset, capacity sharing is unconstrained. All ResourceClaims or requests share the same capacity pool.",
+							Description: "SharingPolicy specifies that this device capacity must be consumed by each resource claim according to the defined sharing policy. The Device must have AllowMultipleAllocations set to true.\n\nIf this field is unset, capacity sharing is unconstrained. All ResourceClaims or requests share the same capacity pool.",
 							Ref:         ref("k8s.io/api/resource/v1beta2.CapacitySharingPolicy"),
 						},
 					},
