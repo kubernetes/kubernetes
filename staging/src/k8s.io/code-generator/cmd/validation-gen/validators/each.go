@@ -314,7 +314,8 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 		if util.IsDirectComparable(util.NonPointer(util.NativeType(nt.Elem))) {
 			matchArg = validateDirectEqual
 		}
-		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg))
+		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg)).
+			WithComment("listType=set requires unique values")
 		result.AddFunction(f)
 	}
 	// TODO: enable the following once we have a way to either opt-out from this validation
@@ -503,7 +504,9 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		// The matchArg and equivArg are both nil.
 	}
 	for _, vfn := range validations.Functions {
-		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{vfn, nt.Elem})
+		comm := vfn.Comments
+		vfn.Comments = nil
+		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{vfn, nt.Elem}).WithComments(comm...)
 		result.AddFunction(f)
 	}
 
@@ -522,7 +525,9 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 		equivArg = Identifier(validateDirectEqual)
 	}
 	for _, vfn := range validations.Functions {
-		f := Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{vfn, nt.Elem})
+		comm := vfn.Comments
+		vfn.Comments = nil
+		f := Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{vfn, nt.Elem}).WithComments(comm...)
 		result.AddFunction(f)
 	}
 
@@ -593,7 +598,9 @@ func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Valida
 	result := Validations{}
 	result.OpaqueKeyType = validations.OpaqueType
 	for _, vfn := range validations.Functions {
-		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{vfn, t.Key})
+		comm := vfn.Comments
+		vfn.Comments = nil
+		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{vfn, t.Key}).WithComments(comm...)
 		result.AddFunction(f)
 	}
 	return result, nil
