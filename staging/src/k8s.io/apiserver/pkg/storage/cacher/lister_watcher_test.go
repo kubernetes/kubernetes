@@ -35,7 +35,7 @@ import (
 func TestCacherListerWatcher(t *testing.T) {
 	prefix := "pods"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix)
+	server, store := newEtcdTestStorage(t, prefix, nil)
 	defer server.Terminate(t)
 
 	objects := []*example.Pod{
@@ -51,7 +51,7 @@ func TestCacherListerWatcher(t *testing.T) {
 		}
 	}
 
-	lw := NewListerWatcher(store, prefix, fn, nil)
+	lw := NewListerWatcher(store, prefix, fn, nil, false)
 
 	obj, err := lw.List(metav1.ListOptions{})
 	if err != nil {
@@ -69,7 +69,7 @@ func TestCacherListerWatcher(t *testing.T) {
 func TestCacherListerWatcherPagination(t *testing.T) {
 	prefix := "pods"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix)
+	server, store := newEtcdTestStorage(t, prefix, nil)
 	defer server.Terminate(t)
 
 	// We need the list to be sorted by name to later check the alphabetical order of
@@ -87,7 +87,7 @@ func TestCacherListerWatcherPagination(t *testing.T) {
 		}
 	}
 
-	lw := NewListerWatcher(store, prefix, fn, nil)
+	lw := NewListerWatcher(store, prefix, fn, nil, false)
 
 	obj1, err := lw.List(metav1.ListOptions{Limit: 2})
 	if err != nil {
@@ -132,7 +132,7 @@ func TestCacherListerWatcherListWatch(t *testing.T) {
 
 	prefix := "pods"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix)
+	server, store := newEtcdTestStorage(t, prefix, nil)
 	defer server.Terminate(t)
 
 	makePodFn := func() *example.Pod {
@@ -148,7 +148,7 @@ func TestCacherListerWatcherListWatch(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	lw := NewListerWatcher(store, prefix, fn, nil)
+	lw := NewListerWatcher(store, prefix, fn, nil, false)
 	target := cache.ToListerWatcherWithContext(lw)
 	watchListOptions := metav1.ListOptions{
 		Watch:               true,
@@ -183,10 +183,10 @@ func TestCacherListerWatcherWhenListWatchDisabled(t *testing.T) {
 
 	prefix := "pods"
 	fn := func() runtime.Object { return &example.PodList{} }
-	server, store := newEtcdTestStorage(t, prefix)
+	server, store := newEtcdTestStorage(t, prefix, nil)
 	defer server.Terminate(t)
 
-	lw := NewListerWatcher(store, prefix, fn, nil)
+	lw := NewListerWatcher(store, prefix, fn, nil, false)
 	target := cache.ToListerWatcherWithContext(lw)
 	watchListOptions := metav1.ListOptions{
 		Watch:               true,
