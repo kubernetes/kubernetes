@@ -137,6 +137,10 @@ func (d *dummyStorage) getRequestWatchProgressCounter() int {
 	return d.requestWatchProgressCounter
 }
 
+func (d *dummyStorage) CompactRevision() int64 {
+	return 0
+}
+
 type dummyWatch struct {
 	ch chan watch.Event
 }

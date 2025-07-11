@@ -627,7 +627,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, compact Compaction, watchCacheEnabled bool, recorder *KubernetesRecorder) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compact Compaction, watchCacheEnabled bool, recorder *KubernetesRecorder) {
 	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -655,10 +655,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		pod := obj.(*example.Pod)
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
-	// Increase RV to test consistent List.
-	increaseRV(ctx, t)
-	currentRV := fmt.Sprintf("%d", continueRV+1)
+	// Compact and increase RV to test consistent List.
 	compact(ctx, t, createdPods[0].ResourceVersion)
+	currentRV := fmt.Sprintf("%d", continueRV+1)
 
 	tests := []struct {
 		name                       string
@@ -3735,5 +3734,46 @@ func RunTestNamespaceScopedList(ctx context.Context, t *testing.T, store storage
 
 			expectNoDiff(t, "incorrect list pods", tt.expectPods(namespace), listOut.Items)
 		})
+	}
+}
+
+func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, compact Compaction) {
+	listOut := &example.PodList{}
+	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+		Predicate: storage.Everything,
+		Recursive: true,
+	}, listOut); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	currentRV, err := store.Versioner().ParseResourceVersion(listOut.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	compactedRV := store.CompactRevision()
+	if compactedRV >= int64(currentRV) {
+		t.Fatalf("Expected current RV not be compacted, current: %d, compacted: %d", currentRV, compactedRV)
+	}
+	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+		Predicate:            storage.Everything,
+		Recursive:            true,
+		ResourceVersion:      listOut.ResourceVersion,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+	}, listOut); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	increaseRV(ctx, t)
+	expectCompactedRV := currentRV + 1
+	compact(ctx, t, fmt.Sprintf("%d", expectCompactedRV))
+	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+		Predicate:            storage.Everything,
+		Recursive:            true,
+		ResourceVersion:      listOut.ResourceVersion,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+	}, listOut); err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
+		t.Errorf(`Expected "The resourceVersion for the provided list is too old", but got error: %v`, err)
+	}
+	compactedRV = store.CompactRevision()
+	if compactedRV != int64(expectCompactedRV) {
+		t.Errorf("CompactRevision()=%d, expected: %d", store.CompactRevision(), expectCompactedRV)
 	}
 }

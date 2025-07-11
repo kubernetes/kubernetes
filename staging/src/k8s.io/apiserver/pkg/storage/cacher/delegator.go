@@ -276,6 +276,13 @@ func (c *CacheDelegator) RequestWatchProgress(ctx context.Context) error {
 	return c.storage.RequestWatchProgress(ctx)
 }
 
+func (c *CacheDelegator) CompactRevision() int64 {
+	if c.cacher.compactor == nil {
+		return c.storage.CompactRevision()
+	}
+	return c.cacher.compactor.Revision()
+}
+
 func (c *CacheDelegator) Stop() {
 	c.stopOnce.Do(func() {
 		close(c.stopCh)

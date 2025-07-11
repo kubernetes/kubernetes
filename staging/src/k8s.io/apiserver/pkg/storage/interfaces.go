@@ -271,6 +271,11 @@ type Interface interface {
 	// SetKeysFunc allows to override the function used to get keys from storage.
 	// This allows to replace default function that fetches keys from storage with one using cache.
 	SetKeysFunc(KeysFunc)
+
+	// CompactRevision returns latest observed revision that was compacted.
+	// Without ListFromCacheSnapshot enabled only locally executed compaction will be observed.
+	// Returns 0 if no compaction was yet observed.
+	CompactRevision() int64
 }
 
 // KeysFunc is a function prototype to fetch keys from storage.

@@ -37,7 +37,7 @@ func TestCompact(t *testing.T) {
 	client := testserver.RunEtcd(t, nil).Client
 	ctx := context.Background()
 	clock := testingclock.NewFakeClock(time.Now())
-	c := newCompactor(client, time.Minute, clock, nil)
+	c := NewCompactor(client, time.Minute, clock, nil)
 	t.Cleanup(c.Stop)
 	waitForClockWaiters(t, clock)
 
@@ -113,7 +113,7 @@ func assertNotCompacted(t *testing.T, ctx context.Context, client *clientv3.Clie
 func TestCompactIntervalZero(t *testing.T) {
 	client := testserver.RunEtcd(t, nil).Client
 	clock := testingclock.NewFakeClock(time.Now())
-	c := newCompactor(client, 0, clock, nil)
+	c := NewCompactor(client, 0, clock, nil)
 	t.Cleanup(c.Stop)
 
 	t.Log("Compact loop is disabled, no goroutine is waiting on clock")
@@ -162,7 +162,7 @@ func TestCompactConflict(t *testing.T) {
 
 	t.Log("First compact on time 0")
 	wantCompactRev := putResp.Header.Revision
-	curTime, curRev, compactRev, err := compact(ctx, client, 0, wantCompactRev)
+	curTime, curRev, compactRev, err := Compact(ctx, client, 0, wantCompactRev)
 	if err != nil {
 		t.Fatalf("compact failed: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestCompactConflict(t *testing.T) {
 	}
 
 	t.Log("Second compact on time 0")
-	curTime2, curRev2, compactRev2, err := compact(ctx, client, 0, wantCompactRev+1)
+	curTime2, curRev2, compactRev2, err := Compact(ctx, client, 0, wantCompactRev+1)
 	if err != nil {
 		t.Fatalf("compact failed: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestCompactConflict(t *testing.T) {
 	}
 
 	t.Log("Third compact on time 1")
-	curTime3, curRev3, compactRev3, err := compact(ctx, client, 1, wantCompactRev+1)
+	curTime3, curRev3, compactRev3, err := Compact(ctx, client, 1, wantCompactRev+1)
 	if err != nil {
 		t.Fatalf("compact failed: %v", err)
 	}
