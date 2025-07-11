@@ -297,9 +297,9 @@ func multiline(errs field.ErrorList) string {
 // ExpectValid validates the value and calls t.Errorf if any validation errors are returned.
 // Returns ValidationTester to support call chaining.
 func (v *ValidationTester) ExpectValid() *ValidationTester {
-	v.T.Helper()
+	v.Helper()
 
-	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
+	v.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
 
 		errs := v.validate()
@@ -316,9 +316,9 @@ func (v *ValidationTester) ExpectValid() *ValidationTester {
 // to prove that the validation logic itself (e.g. validation-gen) produces the
 // expected errors should use this method.
 func (v *ValidationTester) ExpectValidateFalseByPath(expectedByPath map[string][]string) *ValidationTester {
-	v.T.Helper()
+	v.Helper()
 
-	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
+	v.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
 
 		actualByPath := v.validateFalseArgsByPath()
