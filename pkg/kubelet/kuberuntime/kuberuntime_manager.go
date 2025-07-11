@@ -1406,7 +1406,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
 	if resizable, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
 		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources {
-			result.SyncResults = append(result.SyncResults, m.doPodResizeAction(pod, podContainerChanges))
+			now := time.Now()
+			resizeResults := m.doPodResizeAction(pod, podContainerChanges)
+			metrics.PodResizeDurationMilliSeconds.Observe(float64(time.Since(now).Truncate(time.Nanosecond).Milliseconds()))
+
+			result.SyncResults = append(result.SyncResults, resizeResults)
 		}
 	}
 
