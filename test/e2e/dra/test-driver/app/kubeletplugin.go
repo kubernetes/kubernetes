@@ -119,8 +119,9 @@ type FileOperations struct {
 	// file does not exist.
 	Remove func(name string) error
 
-	// ErrorHandler is an optional callback for ResourceSlice publishing problems.
-	ErrorHandler func(ctx context.Context, err error, msg string)
+	// HandleError is an optional callback for ResourceSlice publishing problems.
+	HandleError func(ctx context.Context, err error, msg string)
+
 	// DriverResources provides the information that the driver will use to
 	// construct the ResourceSlices that it will publish.
 	DriverResources *resourceslice.DriverResources
@@ -189,9 +190,9 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 	return status.PluginRegistered
 }
 
-func (ex *ExamplePlugin) ErrorHandler(ctx context.Context, err error, msg string) {
-	if ex.fileOps.ErrorHandler != nil {
-		ex.fileOps.ErrorHandler(ctx, err, msg)
+func (ex *ExamplePlugin) HandleError(ctx context.Context, err error, msg string) {
+	if ex.fileOps.HandleError != nil {
+		ex.fileOps.HandleError(ctx, err, msg)
 		return
 	}
 	utilruntime.HandleErrorWithContext(ctx, err, msg)

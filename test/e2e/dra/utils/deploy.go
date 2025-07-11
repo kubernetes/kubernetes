@@ -487,7 +487,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 				}
 				return d.removeFile(&pod, name)
 			},
-			ErrorHandler: func(ctx context.Context, err error, msg string) {
+			HandleError: func(ctx context.Context, err error, msg string) {
 				// Record a failure, but don't kill the background goroutine.
 				defer ginkgo.GinkgoRecover()
 				// During tests when canceling the context it is possible to get all kinds of
