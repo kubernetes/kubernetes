@@ -48,7 +48,7 @@ Up: %s
 Go version: %s
 Binary version: %v
 
-Useful Endpoints:  /readyz /livez
+Useful Endpoints:  /livez /readyz
 `
 
 const wantTmplWithKubeApiserverComp = `
@@ -72,7 +72,7 @@ func TestStatusz(t *testing.T) {
 	fakeEvStr := "1.30"
 	fakeBinaryVersion := parseVersion(t, fakeBvStr)
 	fakeEmulationVersion := parseVersion(t, fakeEvStr)
-	fakeListedPaths := []string{"/livez/poststarthook/peer-discovery-cache-sync", "/openid", "/livez/post", "/readyz/informer-sync", "/readyz/log", "/readyz/ping"}
+	fakeListedPaths := []string{"/livez/poststarthook/peer-discovery-cache-sync", "/livez/post", "/readyz/informer-sync", "/readyz/log", "/readyz/ping"}
 	tests := []struct {
 		name           string
 		componentName  string
