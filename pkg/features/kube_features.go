@@ -1865,6 +1865,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	genericfeatures.TokenRequestServiceAccountUIDValidation: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	genericfeatures.UnauthenticatedHTTP2DOSMitigation: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},

@@ -216,6 +216,16 @@ const (
 	// Enables Structured Authorization Configuration
 	StructuredAuthorizationConfiguration featuregate.Feature = "StructuredAuthorizationConfiguration"
 
+	// owner: @aramase
+	//
+	// Enables validation of service account UID in TokenRequest API.
+	//
+	// This feature gate is used to ensure that the UID provided in the TokenRequest
+	// matches the UID of the service account for which the token is being requested.
+	// It helps prevent misuse of the TokenRequest API by ensuring that tokens are only
+	// issued for the correct service account.
+	TokenRequestServiceAccountUIDValidation featuregate.Feature = "TokenRequestServiceAccountUIDValidation"
+
 	// owner: @enj
 	//
 	// Enables http2 DOS mitigations for unauthenticated clients.
@@ -409,6 +419,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	TokenRequestServiceAccountUIDValidation: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	UnauthenticatedHTTP2DOSMitigation: {
