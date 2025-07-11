@@ -404,7 +404,12 @@ func maxResourceList(list, newList v1.ResourceList) {
 // max returns the result of max(a, b...) for each named resource and is only used if we can't
 // accumulate into an existing resource list
 func max(a v1.ResourceList, b ...v1.ResourceList) v1.ResourceList {
-	result := a.DeepCopy()
+	var result v1.ResourceList
+	if a != nil {
+		result = a.DeepCopy()
+	} else {
+		result = v1.ResourceList{}
+	}
 	for _, other := range b {
 		maxResourceList(result, other)
 	}
