@@ -34,6 +34,28 @@ func nilPointerFor[T interface{}]() *T {
 	return nil
 }
 
+type RoundtrippableText struct{ Text string }
+
+func (rt RoundtrippableText) MarshalText() ([]byte, error) {
+	return []byte(rt.Text), nil
+}
+
+func (rt *RoundtrippableText) UnmarshalText(text []byte) error {
+	rt.Text = string(text)
+	return nil
+}
+
+type RoundtrippableJSON struct{ Raw string }
+
+func (rj RoundtrippableJSON) MarshalJSON() ([]byte, error) {
+	return []byte(rj.Raw), nil
+}
+
+func (rj *RoundtrippableJSON) UnmarshalJSON(raw []byte) error {
+	rj.Raw = string(raw)
+	return nil
+}
+
 // TestRoundtrip roundtrips object serialization to interface{} and back via CBOR.
 func TestRoundtrip(t *testing.T) {
 	type modePair struct {
@@ -263,6 +285,14 @@ func TestRoundtrip(t *testing.T) {
 			obj: struct {
 				V *map[string]interface{} `json:"v,omitempty"`
 			}{},
+		},
+		{
+			name: "textmarshaler and textunmarshaler",
+			obj:  RoundtrippableText{Text: "foo"},
+		},
+		{
+			name: "json marshaler and unmarshaler",
+			obj:  RoundtrippableJSON{Raw: `{"foo":[42,3.1,true,false,null]}`},
 		},
 	} {
 		modePairs := tc.modePairs
