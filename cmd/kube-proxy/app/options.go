@@ -303,6 +303,22 @@ func (o *Options) initWatcher() error {
 }
 
 func (o *Options) eventHandler(ent fsnotify.Event) {
+	// If the config file is embedded inside a configmap object, config map update
+	// triggers fsnotify.Chmod + fsnotify.Remove event on deletion of the actual target.
+	// Watch ends with fsnotify.Remove event and prevents hot-reload in this case.
+	// We can still do a hot-reload by checking if the configuration file exists and is
+	// a valid configuration on observing fsnotify.Remove
+	if ent.Has(fsnotify.Remove) {
+		if _, err := os.Stat(o.ConfigFile); err != nil {
+			return
+		}
+		if _, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
+			return
+		}
+		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
+		return
+	}
+
 	if ent.Has(fsnotify.Write) || ent.Has(fsnotify.Rename) {
 		// error out when ConfigFile is updated
 		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
