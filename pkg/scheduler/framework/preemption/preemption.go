@@ -33,6 +33,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
@@ -140,7 +141,7 @@ type Evaluator struct {
 
 	// PreemptPod is a function that actually makes API calls to preempt a specific Pod.
 	// This is exposed to be replaced during tests.
-	PreemptPod func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) error
+	PreemptPod func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) (<-chan error, error)
 
 	Interface
 }
@@ -163,7 +164,7 @@ func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsy
 	//
 	// We implement it here directly, rather than creating a separate method like ev.preemptPod(...)
 	// to prevent the misuse of the PreemptPod function.
-	ev.PreemptPod = func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) error {
+	ev.PreemptPod = func(ctx context.Context, c Candidate, preemptor, victim *v1.Pod, pluginName string) (<-chan error, error) {
 		logger := klog.FromContext(ctx)
 
 		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
@@ -179,28 +180,38 @@ func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsy
 				Reason:             v1.PodReasonPreemptionByScheduler,
 				Message:            fmt.Sprintf("%s: preempting to accommodate a higher priority pod", preemptor.Spec.SchedulerName),
 			}
+			if fh.APICacher() != nil {
+				// When API cacher is available, use it to initiate preemption.
+				onFinish, err := fh.APICacher().PreemptPod(victim, preemptor, condition)
+				if err != nil {
+					logger.Error(err, "Tried to preempted pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
+					return nil, err
+				}
+				// Return now, as the event recording should be delayed.
+				return onFinish, nil
+			}
 			newStatus := victim.Status.DeepCopy()
 			updated := apipod.UpdatePodCondition(newStatus, condition)
 			if updated {
-				if err := util.PatchPodStatus(ctx, ev.Handler.ClientSet(), victim, newStatus); err != nil {
+				if _, err := util.PatchPodStatus(ctx, ev.Handler.ClientSet(), victim.Name, victim.Namespace, &victim.Status, newStatus); err != nil {
 					logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
-					return err
+					return nil, err
 				}
 			}
 			if err := util.DeletePod(ctx, ev.Handler.ClientSet(), victim); err != nil {
 				if !apierrors.IsNotFound(err) {
 					logger.Error(err, "Tried to preempted pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
-					return err
+					return nil, err
 				}
 				logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
-				return nil
+				return nil, nil
 			}
 			logger.V(2).Info("Preemptor Pod preempted victim Pod", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
 		}
 
 		ev.Handler.EventRecorder().Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by pod %v on node %v", preemptor.UID, c.Name())
 
-		return nil
+		return nil, nil
 	}
 
 	return ev
@@ -422,6 +433,49 @@ func (ev *Evaluator) SelectCandidate(ctx context.Context, candidates []Candidate
 	return candidates[0]
 }
 
+// preemptVictims performs preemption and handles the onFinish channels appropriately.
+func (ev *Evaluator) preemptVictims(ctx context.Context, c Candidate, victims []*v1.Pod, pod *v1.Pod, pluginName string) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errCh := parallelize.NewErrorChannel()
+
+	onFinishChans := make(map[int]<-chan error)
+	var onFinishChansLock sync.Mutex
+	preemptPod := func(index int) {
+		victim := victims[index]
+		onFinish, err := ev.PreemptPod(ctx, c, pod, victim, pluginName)
+		if err != nil {
+			errCh.SendErrorWithCancel(err, cancel)
+			return
+		}
+		if onFinish != nil {
+			onFinishChansLock.Lock()
+			onFinishChans[index] = onFinish
+			onFinishChansLock.Unlock()
+		}
+	}
+
+	if len(victims) == 1 {
+		preemptPod(0)
+	} else {
+		ev.Handler.Parallelizer().Until(ctx, len(victims), preemptPod, ev.PluginName)
+	}
+	if err := errCh.ReceiveError(); err != nil {
+		return err
+	}
+	var errs []error
+	for index, onFinish := range onFinishChans {
+		err := ev.Handler.APICacher().WaitOnFinish(ctx, onFinish)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			victim := victims[index]
+			ev.Handler.EventRecorder().Eventf(victim, pod, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by pod %v on node %v", pod.UID, c.Name())
+		}
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
 // prepareCandidate does some preparation work before nominating the selected candidate:
 // - Evict the victim pods
 // - Reject the victim pods if they are in waitingPod map
@@ -430,16 +484,9 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	fh := ev.Handler
 	cs := ev.Handler.ClientSet()
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	logger := klog.FromContext(ctx)
-	errCh := parallelize.NewErrorChannel()
-	fh.Parallelizer().Until(ctx, len(c.Victims().Pods), func(index int) {
-		if err := ev.PreemptPod(ctx, c, pod, c.Victims().Pods[index], pluginName); err != nil {
-			errCh.SendErrorWithCancel(err, cancel)
-		}
-	}, ev.PluginName)
-	if err := errCh.ReceiveError(); err != nil {
+	err := ev.preemptVictims(ctx, c, c.Victims().Pods, pod, pluginName)
+	if err != nil {
 		return fwk.AsStatus(err)
 	}
 
@@ -450,12 +497,37 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them.
 	nominatedPods := getLowerPriorityNominatedPods(logger, fh, pod, c.Name())
-	if err := util.ClearNominatedNodeName(ctx, cs, nominatedPods...); err != nil {
+	if err := clearNominatedNodeName(ctx, cs, ev.Handler.APICacher(), nominatedPods...); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
 	}
 
 	return nil
+}
+
+// clearNominatedNodeName internally submit a patch request to API server
+// to set each pods[*].Status.NominatedNodeName> to "".
+func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCacher framework.APICacher, pods ...*v1.Pod) utilerrors.Aggregate {
+	var errs []error
+	for _, p := range pods {
+		if apiCacher != nil {
+			// When API cacher is available, use it to patch the status.
+			err := apiCacher.PatchPodStatus(p, nil, &framework.NominatingInfo{NominatedNodeName: "", NominatingMode: framework.ModeOverride})
+			if err != nil {
+				errs = append(errs, err)
+			}
+		} else {
+			if len(p.Status.NominatedNodeName) == 0 {
+				continue
+			}
+			podStatusCopy := p.Status.DeepCopy()
+			podStatusCopy.NominatedNodeName = ""
+			if _, err := util.PatchPodStatus(ctx, cs, p.Name, p.Namespace, &p.Status, podStatusCopy); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 // prepareCandidateAsync triggers a goroutine for some preparation work:
@@ -468,21 +540,13 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName string) {
 	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
 
-	// Intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
-	// because this process could continue even after this scheduling cycle finishes.
-	ctx, cancel := context.WithCancel(context.Background())
-	errCh := parallelize.NewErrorChannel()
-	preemptPod := func(index int) {
-		victim := c.Victims().Pods[index]
-		if err := ev.PreemptPod(ctx, c, pod, victim, pluginName); err != nil {
-			errCh.SendErrorWithCancel(err, cancel)
-		}
-	}
-
 	ev.mu.Lock()
 	ev.preempting.Insert(pod.UID)
 	ev.mu.Unlock()
 
+	// Intentionally create a new context, not using a ctx from the scheduling cycle, to create ctx,
+	// because this process could continue even after this scheduling cycle finishes.
+	ctx := context.Background()
 	logger := klog.FromContext(ctx)
 	go func() {
 		startTime := time.Now()
@@ -496,7 +560,6 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 				ev.Handler.Activate(logger, map[string]*v1.Pod{pod.Name: pod})
 			}
 		}()
-		defer cancel()
 		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(pod), "node", c.Name(), "numVictims", len(c.Victims().Pods))
 
 		// Lower priority pods nominated to run on this node, may no longer fit on
@@ -504,7 +567,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		// nomination updates these pods and moves them to the active queue. It
 		// lets scheduler find another place for them.
 		nominatedPods := getLowerPriorityNominatedPods(logger, ev.Handler, pod, c.Name())
-		if err := util.ClearNominatedNodeName(ctx, ev.Handler.ClientSet(), nominatedPods...); err != nil {
+		if err := clearNominatedNodeName(ctx, ev.Handler.ClientSet(), ev.Handler.APICacher(), nominatedPods...); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
 			result = metrics.GoroutineResultError
 			// We do not return as this error is not critical.
@@ -524,8 +587,8 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		// we remove this pod from the preempting map,
 		// and the pod could end up stucking at the unschedulable pod pool
 		// by all the pod removal events being ignored.
-		ev.Handler.Parallelizer().Until(ctx, len(c.Victims().Pods)-1, preemptPod, ev.PluginName)
-		if err := errCh.ReceiveError(); err != nil {
+		err := ev.preemptVictims(ctx, c, c.Victims().Pods[:len(c.Victims().Pods)-1], pod, pluginName)
+		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 			result = metrics.GoroutineResultError
 		}
@@ -534,7 +597,8 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		delete(ev.preempting, pod.UID)
 		ev.mu.Unlock()
 
-		if err := ev.PreemptPod(ctx, c, pod, c.Victims().Pods[len(c.Victims().Pods)-1], pluginName); err != nil {
+		err = ev.preemptVictims(ctx, c, c.Victims().Pods[len(c.Victims().Pods)-1:], pod, pluginName)
+		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 			result = metrics.GoroutineResultError
 		}
