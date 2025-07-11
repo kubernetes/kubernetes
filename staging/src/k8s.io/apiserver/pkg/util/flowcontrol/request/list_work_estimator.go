@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/storage/cacher/delegator"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/klog/v2"
 )
 
@@ -82,14 +82,6 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 			return WorkEstimate{InitialSeats: e.config.MinimumSeats}
 		}
 	}
-	// TODO: Check whether watchcache is enabled.
-	result, err := delegator.ShouldDelegateListMeta(&listOptions, delegator.CacheWithoutSnapshots{})
-	if err != nil {
-		return WorkEstimate{InitialSeats: maxSeats}
-	}
-	listFromStorage := result.ShouldDelegate
-	isListFromCache := requestInfo.Verb == "watch" || !listFromStorage
-
 	stats, err := e.statsGetterFn(key(requestInfo))
 	numStored := stats.ObjectCount
 	switch {
@@ -119,6 +111,8 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		klog.ErrorS(err, "Unexpected error from object count tracker")
 		return WorkEstimate{InitialSeats: maxSeats}
 	}
+	listFromStorage := ShouldDelegateListMeta(&listOptions, stats)
+	isListFromCache := requestInfo.Verb == "watch" || !listFromStorage
 
 	limit := numStored
 	if listOptions.Limit > 0 && listOptions.Limit < numStored {
@@ -160,4 +154,25 @@ func key(requestInfo *apirequest.RequestInfo) string {
 		Resource: requestInfo.Resource,
 	}
 	return groupResource.String()
+}
+
+func ShouldDelegateListMeta(opts *metav1.ListOptions, stats StatsDelegator) bool {
+	if stats.ShouldDelegateList == nil {
+		return true
+	}
+	result, err := stats.ShouldDelegateList(
+		storage.ListOptions{
+			ResourceVersionMatch: opts.ResourceVersionMatch,
+			ResourceVersion:      opts.ResourceVersion,
+			Predicate: storage.SelectionPredicate{
+				Continue: opts.Continue,
+				Limit:    opts.Limit,
+			},
+			Recursive: true,
+		})
+
+	if err != nil {
+		return true
+	}
+	return result
 }

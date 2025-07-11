@@ -24,19 +24,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
-func ShouldDelegateListMeta(opts *metav1.ListOptions, cache Helper) (Result, error) {
-	return ShouldDelegateList(
-		storage.ListOptions{
-			ResourceVersionMatch: opts.ResourceVersionMatch,
-			ResourceVersion:      opts.ResourceVersion,
-			Predicate: storage.SelectionPredicate{
-				Continue: opts.Continue,
-				Limit:    opts.Limit,
-			},
-			Recursive: true,
-		}, cache)
-}
-
 func ShouldDelegateList(opts storage.ListOptions, cache Helper) (Result, error) {
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
 	switch opts.ResourceVersionMatch {
@@ -76,32 +63,6 @@ type Result struct {
 	// Whether a request is a consistent read, used by delegator to decide if it should call GetCurrentResourceVersion to get RV.
 	// Included in interface as only cacher has keyPrefix needed to parse continue token.
 	ConsistentRead bool
-}
-
-type CacheWithoutSnapshots struct{}
-
-var _ Helper = CacheWithoutSnapshots{}
-
-func (c CacheWithoutSnapshots) ShouldDelegateContinue(continueToken string, recursive bool) (Result, error) {
-	return Result{
-		ShouldDelegate: true,
-		// Continue with negative RV is considered a consistent read, however token cannot be parsed without keyPrefix unavailable in staging/src/k8s.io/apiserver/pkg/util/flow_control/request/list_work_estimator.go.
-		ConsistentRead: false,
-	}, nil
-}
-
-func (c CacheWithoutSnapshots) ShouldDelegateExactRV(rv string, recursive bool) (Result, error) {
-	return Result{
-		ShouldDelegate: true,
-		ConsistentRead: false,
-	}, nil
-}
-
-func (c CacheWithoutSnapshots) ShouldDelegateConsistentRead() (Result, error) {
-	return Result{
-		ShouldDelegate: !ConsistentReadSupported(),
-		ConsistentRead: true,
-	}, nil
 }
 
 // ConsistentReadSupported returns whether cache can be used to serve reads with RV not yet observed by cache, including both consistent reads.

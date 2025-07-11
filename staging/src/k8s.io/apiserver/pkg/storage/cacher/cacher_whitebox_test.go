@@ -131,6 +131,10 @@ func (d *dummyStorage) RequestWatchProgress(ctx context.Context) error {
 	return nil
 }
 
+func (d *dummyStorage) ShouldDelegateList(storage.ListOptions) (bool, error) {
+	return false, nil
+}
+
 func (d *dummyStorage) getRequestWatchProgressCounter() int {
 	d.RLock()
 	defer d.RUnlock()

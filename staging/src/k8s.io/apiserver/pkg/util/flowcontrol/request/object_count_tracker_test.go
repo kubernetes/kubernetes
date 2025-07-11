@@ -76,7 +76,7 @@ func TestStorageObjectCountTracker(t *testing.T) {
 			key := "foo.bar.resource"
 			now := time.Now()
 			fakeClock.SetTime(now.Add(-test.lastUpdated))
-			tracker.Set(key, storage.Stats{ObjectCount: test.count})
+			tracker.Set(key, StatsDelegator{Stats: storage.Stats{ObjectCount: test.count}})
 
 			fakeClock.SetTime(now)
 			stats, err := tracker.Get(key)
@@ -102,19 +102,19 @@ func TestStorageObjectCountTrackerWithPrune(t *testing.T) {
 
 	now := time.Now()
 	fakeClock.SetTime(now.Add(-61 * time.Minute))
-	tracker.Set("k1", storage.Stats{ObjectCount: 61})
+	tracker.Set("k1", StatsDelegator{Stats: storage.Stats{ObjectCount: 61}})
 	fakeClock.SetTime(now.Add(-60 * time.Minute))
-	tracker.Set("k2", storage.Stats{ObjectCount: 60})
+	tracker.Set("k2", StatsDelegator{Stats: storage.Stats{ObjectCount: 60}})
 	// we are going to prune keys that are stale for >= 1h
 	// so the above keys are expected to be pruned and the
 	// key below should not be pruned.
 	mostRecent := now.Add(-59 * time.Minute)
 	fakeClock.SetTime(mostRecent)
-	tracker.Set("k3", storage.Stats{ObjectCount: 59})
+	tracker.Set("k3", StatsDelegator{Stats: storage.Stats{ObjectCount: 59}})
 	expected := map[string]*timestampedStats{
 		"k3": {
-			Stats:         storage.Stats{ObjectCount: 59},
-			lastUpdatedAt: mostRecent,
+			StatsDelegator: StatsDelegator{Stats: storage.Stats{ObjectCount: 59}},
+			lastUpdatedAt:  mostRecent,
 		},
 	}
 

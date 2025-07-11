@@ -276,6 +276,7 @@ type Interface interface {
 	// Without ListFromCacheSnapshot enabled only locally executed compaction will be observed.
 	// Returns 0 if no compaction was yet observed.
 	CompactRevision() int64
+	ShouldDelegateList(opts ListOptions) (bool, error)
 }
 
 // KeysFunc is a function prototype to fetch keys from storage.
