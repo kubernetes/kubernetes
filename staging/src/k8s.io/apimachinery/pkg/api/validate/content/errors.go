@@ -18,6 +18,7 @@ package content
 
 import (
 	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
 )
@@ -26,4 +27,40 @@ import (
 // validation failure.
 func MinError[T constraints.Integer](min T) string {
 	return fmt.Sprintf("must be greater than or equal to %d", min)
+}
+
+// MaxLenError returns a string explanation of a "string too long" validation
+// failure.
+func MaxLenError(length int) string {
+	return fmt.Sprintf("must be no more than %d bytes", length)
+}
+
+// EmptyError returns a string explanation of an "empty string" validation.
+func EmptyError() string {
+	return "must be non-empty"
+}
+
+// RegexError returns a string explanation of a regex validation failure.
+func RegexError(msg string, re string, examples ...string) string {
+	if len(examples) == 0 {
+		return msg + " (regex used for validation is '" + re + "')"
+	}
+	msg += " (e.g. "
+	for i := range examples {
+		if i > 0 {
+			msg += " or "
+		}
+		msg += "'" + examples[i] + "', "
+	}
+	msg += "regex used for validation is '" + re + "')"
+	return msg
+}
+
+// NEQError returns a string explanation of a "must not be equal to" validation failure.
+func NEQError[T any](disallowed T) string {
+	format := "%v"
+	if reflect.ValueOf(disallowed).Kind() == reflect.String {
+		format = "%q"
+	}
+	return fmt.Sprintf("must not be equal to "+format, disallowed)
 }

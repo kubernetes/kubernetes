@@ -38,6 +38,21 @@ type Struct struct {
 	// +k8s:listMapKey=key2Field
 	// +k8s:eachVal=+k8s:immutable
 	ListTypedefField []OtherTypedefStruct `json:"listTypedefField"`
+
+	// +k8s:eachVal=+k8s:immutable
+	TypedefField ListType `json:"typedefField"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=key1Field
+	// +k8s:listMapKey=key2Field
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListComparableField[*]"
+	ListComparableField []OtherStruct `json:"listComparableField"`
+
+	// +k8s:listType=map
+	// +k8s:listMapKey=key1Field
+	// +k8s:listMapKey=key2Field
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListNonComparableField[*]"
+	ListNonComparableField []NonComparableStruct `json:"listNonComparableField"`
 }
 
 type OtherStruct struct {
@@ -47,3 +62,14 @@ type OtherStruct struct {
 }
 
 type OtherTypedefStruct OtherStruct
+
+type NonComparableStruct struct {
+	Key1Field string   `json:"key1Field"`
+	Key2Field int      `json:"key2Field"`
+	DataField []string `json:"dataField"`
+}
+
+// +k8s:listType=map
+// +k8s:listMapKey=key1Field
+// +k8s:listMapKey=key2Field
+type ListType []OtherStruct
