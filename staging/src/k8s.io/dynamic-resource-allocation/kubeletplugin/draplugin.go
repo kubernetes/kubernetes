@@ -453,6 +453,20 @@ func DRAService(enabled bool) Option {
 	}
 }
 
+// ErrorHandler sets a custom error handler function for the plugin.
+// The provided handler will be invoked when error occurs in the
+// background, for example while serving gRPC calls or while
+// publishing ResourceSlices.
+func ErrorHandler(handler func(ctx context.Context, err error)) Option {
+	return func(o *options) error {
+		if handler == nil {
+			return errors.New("error handler must not be nil")
+		}
+		o.errorHandler = handler
+		return nil
+	}
+}
+
 type options struct {
 	logger                     klog.Logger
 	grpcVerbosity              int
@@ -472,6 +486,7 @@ type options struct {
 	nodeV1beta1                bool
 	registrationService        bool
 	draService                 bool
+	errorHandler               func(ctx context.Context, err error)
 }
 
 // Helper combines the kubelet registration service and the DRA node plugin
@@ -554,6 +569,12 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		o.pluginSocket = "dra" + uidPart + ".sock" // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
 	}
 
+	if o.errorHandler == nil {
+		o.errorHandler = func(ctx context.Context, err error) {
+			plugin.ErrorHandler(ctx, err, "DRA gRPC server failed")
+		}
+	}
+
 	d := &Helper{
 		driverName:     o.driverName,
 		nodeName:       o.nodeName,
@@ -616,9 +637,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 			o.unaryInterceptors,
 			o.streamInterceptors,
 			draEndpoint,
-			func(ctx context.Context, err error) {
-				plugin.ErrorHandler(ctx, err, "DRA gRPC server failed")
-			},
+			o.errorHandler,
 			func(grpcServer *grpc.Server) {
 				if o.nodeV1beta1 {
 					logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
@@ -643,9 +662,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 			supportedServices,
 			draEndpoint.path(),
 			o.pluginRegistrationEndpoint,
-			func(ctx context.Context, err error) {
-				plugin.ErrorHandler(ctx, err, "registrar gRPC server failed")
-			},
+			o.errorHandler,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("start registrar: %w", err)
