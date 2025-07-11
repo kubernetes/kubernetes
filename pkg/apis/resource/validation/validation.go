@@ -336,7 +336,7 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 	} else if constraint.DistinctAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute"))...)
 	} else if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
-		allErrs = append(allErrs, field.Required(fldPath, "require either one of `matchAttribute`, `distinctAttribute`"))
+		allErrs = append(allErrs, field.Required(fldPath, "`exactly one of `matchAttribute` or `distinctAttribute` is required, but multiple fields are set"))
 	} else {
 		allErrs = append(allErrs, field.Required(fldPath.Child("matchAttribute"), ""))
 	}

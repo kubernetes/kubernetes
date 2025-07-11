@@ -323,7 +323,7 @@ func TestValidateClaim(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), resource.FullyQualifiedName("missing-domain"), "must include a domain"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), "name required"),
-				field.Required(field.NewPath("spec", "devices", "constraints").Index(2), "require either one of `matchAttribute`, `distinctAttribute`")},
+				field.Required(field.NewPath("spec", "devices", "constraints").Index(2), "`exactly one of `matchAttribute` or `distinctAttribute` is required, but multiple fields are set")},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{

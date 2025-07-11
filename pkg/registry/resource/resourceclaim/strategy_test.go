@@ -647,9 +647,20 @@ func TestStrategyUpdate(t *testing.T) {
 			},
 		},
 		"keep-existing-fields-consumable-capacity": {
-			oldObj:             objWithCapacityRequests,
+			oldObj:             obj,
 			newObj:             objWithCapacityRequests,
 			consumableCapacity: true,
+			expectObj:          objWithCapacityRequests,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+		},
+		"keep-existing-fields-consumable-capacity-disabled-feature": {
+			oldObj:             objWithCapacityRequests,
+			newObj:             objWithCapacityRequests,
+			consumableCapacity: false,
 			expectObj:          objWithCapacityRequests,
 			verify: func(t *testing.T, as []testclient.Action) {
 				if len(as) != 0 {
