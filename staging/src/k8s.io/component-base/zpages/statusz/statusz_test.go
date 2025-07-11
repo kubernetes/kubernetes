@@ -48,7 +48,7 @@ Up: %s
 Go version: %s
 Binary version: %v
 
-Useful Endpoints:  /livez /readyz
+Useful Endpoints:  /readyz /livez
 `
 
 const wantTmplWithKubeApiserverComp = `
