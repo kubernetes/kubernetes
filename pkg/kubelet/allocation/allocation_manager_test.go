@@ -806,7 +806,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					return newPod, true
 				}
 				allocationManager.PushPendingResize(originalPod.UID)
-				allocationManager.RetryPendingResizes()
+				allocationManager.RetryPendingResizes(TriggerReasonEvent)
 				allocatedPod, _ := allocationManager.UpdatePodFromAllocation(newPod)
 				allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
 
@@ -988,7 +988,7 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 				return newPod, true
 			}
 			allocationManager.PushPendingResize(testPod.UID)
-			allocationManager.RetryPendingResizes()
+			allocationManager.RetryPendingResizes(TriggerReasonEvent)
 			allocatedPod, _ := allocationManager.UpdatePodFromAllocation(newPod)
 			allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
 

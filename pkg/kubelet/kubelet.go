@@ -2649,7 +2649,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			kl.allocationManager.PushPendingResize(uid)
 		}
 		if len(pendingResizes) > 0 {
-			kl.allocationManager.RetryPendingResizes()
+			kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonEvent)
 		}
 	}
 }
@@ -2677,7 +2677,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 				}
 				// TODO (natasha41575): If the resize is immediately actuated, it will trigger a pod sync
 				// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
-				kl.allocationManager.RetryPendingResizes()
+				kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonEvent)
 			} else {
 				// We can hit this case if a pending resize has been reverted,
 				// so we need to clear the pending resize condition.

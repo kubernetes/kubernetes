@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -53,6 +54,9 @@ const (
 
 	initialRetryDelay = 30 * time.Second
 	retryDelay        = 3 * time.Minute
+
+	TriggerReasonEvent    = "event_based"
+	TriggerReasonPeriodic = "periodic_retry"
 )
 
 // AllocationManager tracks pod resource allocations.
@@ -106,7 +110,7 @@ type Manager interface {
 	PushPendingResize(uid types.UID) bool
 
 	// RetryPendingResizes retries all pending resizes. It returns a list of successful resizes.
-	RetryPendingResizes() []*v1.Pod
+	RetryPendingResizes(trigger string) []*v1.Pod
 
 	// CheckPodResizeInProgress checks whether the actuated resizable resources differ from the allocated resources
 	// for any running containers.
@@ -203,7 +207,7 @@ func (m *manager) Run(ctx context.Context) {
 		for {
 			select {
 			case <-m.ticker.C:
-				successfulResizes := m.RetryPendingResizes()
+				successfulResizes := m.RetryPendingResizes(TriggerReasonPeriodic)
 				for _, po := range successfulResizes {
 					klog.InfoS("Successfully retried resize after timeout", "pod", klog.KObj(po))
 				}
@@ -215,7 +219,7 @@ func (m *manager) Run(ctx context.Context) {
 	}()
 }
 
-func (m *manager) RetryPendingResizes() []*v1.Pod {
+func (m *manager) RetryPendingResizes(trigger string) []*v1.Pod {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -253,6 +257,7 @@ func (m *manager) RetryPendingResizes() []*v1.Pod {
 		default:
 			klog.V(4).InfoS("Pod resize successfully allocated", "pod", klog.KObj(pod))
 			successfulResizes = append(successfulResizes, pod)
+			metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
 		}
 
 		// If the pod resize status has changed, we need to update the pod status.
@@ -265,7 +270,6 @@ func (m *manager) RetryPendingResizes() []*v1.Pod {
 	m.statusManager.RecordPendingResizeCount()
 	m.podsWithPendingResizes = newPendingResizes
 	return successfulResizes
-
 }
 
 func (m *manager) PushPendingResize(uid types.UID) bool {
@@ -544,6 +548,7 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
 		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, reasonDetail, msg)
 		return false, nil
+
 	} else if resizeNotAllowed, msg := disallowResizeForSwappableContainers(m.containerRuntime, pod, allocatedPod); resizeNotAllowed {
 		// If this resize involve swap recalculation, set as infeasible, as IPPR with swap is not supported for beta.
 		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, "swap_limitation", msg)
@@ -699,7 +704,7 @@ func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kube
 		conditionCleared := m.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
 		if conditionCleared {
 			// TODO(natasha41575): We only need to make this call if any of the resources were decreased.
-			m.RetryPendingResizes()
+			m.RetryPendingResizes(TriggerReasonEvent)
 		}
 	}
 	m.statusManager.RecordInProgressResizeCount()
