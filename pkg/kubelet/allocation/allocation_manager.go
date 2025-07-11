@@ -262,6 +262,7 @@ func (m *manager) RetryPendingResizes() []*v1.Pod {
 		}
 	}
 
+	m.statusManager.RecordPendingResizeCount()
 	m.podsWithPendingResizes = newPendingResizes
 	return successfulResizes
 
@@ -539,18 +540,18 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		m.statusManager.ClearPodResizePendingCondition(pod.UID)
 		return false, nil
 
-	} else if resizable, msg := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
+	} else if resizable, reasonDetail, msg := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
-		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg)
+		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, reasonDetail, msg)
 		return false, nil
 	} else if resizeNotAllowed, msg := disallowResizeForSwappableContainers(m.containerRuntime, pod, allocatedPod); resizeNotAllowed {
 		// If this resize involve swap recalculation, set as infeasible, as IPPR with swap is not supported for beta.
-		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg)
+		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, "swap_limitation", msg)
 		return false, nil
 	}
 
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, reason, message := m.canResizePod(m.getAllocatedPods(m.getActivePods()), pod)
+	fit, reason, reasonDetail, message := m.canResizePod(m.getAllocatedPods(m.getActivePods()), pod)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(pod); err != nil {
@@ -566,7 +567,7 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 	}
 
 	if reason != "" {
-		m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message)
+		m.statusManager.SetPodResizePendingCondition(pod.UID, reason, reasonDetail, message)
 	}
 
 	return false, nil
@@ -633,21 +634,20 @@ func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, strin
 // pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed; returns a reason and message
 // otherwise.
-func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string, string) {
 	// TODO: Move this logic into a PodAdmitHandler by introducing an operation field to
 	// lifecycle.PodAdmitAttributes, and combine canResizePod with canAdmitPod.
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		if m.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
 			msg := "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy"
 			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
-			return false, v1.PodReasonInfeasible, msg
+			return false, v1.PodReasonInfeasible, "guaranteed_pod_cpu_manager_static_policy", msg
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
 			if m.containerManager.GetNodeConfig().MemoryManagerPolicy == "Static" {
 				msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
 				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
-				return false, v1.PodReasonInfeasible, msg
-
+				return false, v1.PodReasonInfeasible, "guaranteed_pod_memory_manager_static_policy", msg
 			}
 		}
 	}
@@ -666,7 +666,7 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 		}
 		msg = "Node didn't have enough capacity: " + msg
 		klog.V(3).InfoS(msg, "pod", klog.KObj(pod))
-		return false, v1.PodReasonInfeasible, msg
+		return false, v1.PodReasonInfeasible, "insufficient_node_allocatable", msg
 	}
 
 	for i := range allocatedPods {
@@ -684,10 +684,10 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 	if ok, failReason, failMessage := m.canAdmitPod(allocatedPods, pod); !ok {
 		// Log reason and return.
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
-		return false, v1.PodReasonDeferred, failMessage
+		return false, v1.PodReasonDeferred, "insufficient_node_allocatable", failMessage
 	}
 
-	return true, "", ""
+	return true, "", "", ""
 }
 
 func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) {
@@ -702,6 +702,7 @@ func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kube
 			m.RetryPendingResizes()
 		}
 	}
+	m.statusManager.RecordInProgressResizeCount()
 }
 
 // isPodResizeInProgress checks whether the actuated resizable resources differ from the allocated resources
