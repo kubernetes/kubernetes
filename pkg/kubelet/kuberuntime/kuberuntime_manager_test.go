@@ -44,6 +44,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
@@ -3285,8 +3286,10 @@ func TestDoPodResizeAction(t *testing.T) {
 	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	metrics.Register()
+	metrics.PodResizeDurationMilliseconds.Reset()
 
-	for _, tc := range []struct {
+	for i, tc := range []struct {
 		testName                  string
 		currentResources          containerResources
 		desiredResources          containerResources
@@ -3511,8 +3514,11 @@ func TestDoPodResizeAction(t *testing.T) {
 			}
 
 			mock.AssertExpectationsForObjects(t, mockPCM)
+
+			testutil.AssertHistogramTotalCount(t, "kubelet_pod_resize_duration_milliseconds", map[string]string{}, i+1)
 		})
 	}
+	metrics.PodResizeDurationMilliseconds.Reset()
 }
 
 func TestCheckPodResize(t *testing.T) {
@@ -3771,7 +3777,9 @@ func TestCheckPodResize(t *testing.T) {
 
 func TestIncrementImageVolumeMetrics(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
-	metrics.Register()
+	legacyregistry.MustRegister(metrics.ImageVolumeRequestedTotal)
+	legacyregistry.MustRegister(metrics.ImageVolumeMountedSucceedTotal)
+	legacyregistry.MustRegister(metrics.ImageVolumeMountedErrorsTotal)
 
 	testCases := map[string]struct {
 		err          error
