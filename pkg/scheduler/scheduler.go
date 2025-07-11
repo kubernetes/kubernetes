@@ -101,6 +101,7 @@ type Scheduler struct {
 	nodeInfoSnapshot *internalcache.Snapshot
 
 	percentageOfNodesToScore int32
+	maxNodesToScore          *int32
 
 	nextStartNodeIndex int
 
@@ -124,6 +125,7 @@ type schedulerOptions struct {
 	kubeConfig             *restclient.Config
 	// Overridden by profile level percentageOfNodesToScore if set in v1.
 	percentageOfNodesToScore          int32
+	maxNodesToScore                   *int32
 	podInitialBackoffSeconds          int64
 	podMaxBackoffSeconds              int64
 	podMaxInUnschedulablePodsDuration time.Duration
@@ -191,6 +193,16 @@ func WithPercentageOfNodesToScore(percentageOfNodesToScore *int32) Option {
 	return func(o *schedulerOptions) {
 		if percentageOfNodesToScore != nil {
 			o.percentageOfNodesToScore = *percentageOfNodesToScore
+		}
+	}
+}
+
+// WithMaxNodesToScore sets percentageOfNodesToScore for Scheduler.
+// It won't apply a limit if the value is empty.
+func WithMaxNodesToScore(maxNodesToScore *int32) Option {
+	return func(o *schedulerOptions) {
+		if maxNodesToScore != nil {
+			o.maxNodesToScore = maxNodesToScore
 		}
 	}
 }
@@ -403,6 +415,7 @@ func New(ctx context.Context,
 		client:                   client,
 		nodeInfoSnapshot:         snapshot,
 		percentageOfNodesToScore: options.percentageOfNodesToScore,
+		maxNodesToScore:          options.maxNodesToScore,
 		Extenders:                extenders,
 		StopEverything:           stopEverything,
 		SchedulingQueue:          podQueue,

@@ -69,6 +69,11 @@ type KubeSchedulerConfiguration struct {
 	// nodes will be scored. It is overridden by profile level PercentageOfNodesToScore.
 	PercentageOfNodesToScore *int32
 
+	// MaxNodesToScore is the maximum number of nodes to score, the scheduler will stop searching
+	// for more feasible nodes when this limit is reached. This configuration will override the
+	// computed number from PercentageOfNodesToScore.
+	MaxNodesToScore *int32
+
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
 	// If specified, it must be greater than 0. If this value is null, the default value (1s)
 	// will be used.

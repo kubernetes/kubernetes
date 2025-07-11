@@ -182,6 +182,11 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 		*out = new(int32)
 		**out = **in
 	}
+	if in.MaxNodesToScore != nil {
+		in, out := &in.MaxNodesToScore, &out.MaxNodesToScore
+		*out = new(int32)
+		**out = **in
+	}
 	if in.PodInitialBackoffSeconds != nil {
 		in, out := &in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds
 		*out = new(int64)

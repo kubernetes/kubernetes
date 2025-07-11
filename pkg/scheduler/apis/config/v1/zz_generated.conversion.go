@@ -411,6 +411,7 @@ func autoConvert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfigurat
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
+	out.MaxNodesToScore = (*int32)(unsafe.Pointer(in.MaxNodesToScore))
 	if err := metav1.Convert_Pointer_int64_To_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
@@ -447,6 +448,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfigurat
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
+	out.MaxNodesToScore = (*int32)(unsafe.Pointer(in.MaxNodesToScore))
 	if err := metav1.Convert_int64_To_Pointer_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}

@@ -162,6 +162,11 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 		*out = new(int32)
 		**out = **in
 	}
+	if in.MaxNodesToScore != nil {
+		in, out := &in.MaxNodesToScore, &out.MaxNodesToScore
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Profiles != nil {
 		in, out := &in.Profiles, &out.Profiles
 		*out = make([]KubeSchedulerProfile, len(*in))

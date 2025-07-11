@@ -272,6 +272,18 @@ profiles:
 		t.Fatal(err)
 	}
 
+	// max number of nodes to score config
+	maxNodesToScoreConfig := filepath.Join(tmpDir, "max-nodes-to-score.yaml")
+	if err := os.WriteFile(maxNodesToScoreConfig, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: '%s'
+maxNodesToScore: 500
+`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	// Insulate this test from picking up in-cluster config when run inside a pod
 	// We can't assume we have permissions to write to /var/run/secrets/... from a unit test to mock in-cluster config for testing
 	if len(os.Getenv("KUBERNETES_SERVICE_HOST")) > 0 {
@@ -914,6 +926,52 @@ profiles:
 						},
 					},
 				},
+			},
+		},
+		{
+			name: "max number of nodes profile",
+			options: &Options{
+				ConfigFile:               maxNodesToScoreConfig,
+				Logs:                     logs.NewOptions(),
+				ComponentGlobalsRegistry: componentGlobalsRegistry,
+			},
+			expectedUsername: "config",
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: v1.SchemeGroupVersion.String(),
+				},
+				Parallelism:           16,
+				MaxNodesToScore:       ptr.To[int32](500),
+				DelayCacheUntilActive: false,
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           true,
+					EnableContentionProfiling: true,
+				},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       true,
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "leases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  configKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				Profiles: []kubeschedulerconfig.KubeSchedulerProfile{
+					{
+						SchedulerName: "default-scheduler",
+						Plugins:       defaults.PluginsV1,
+						PluginConfig:  defaults.PluginConfigsV1,
+					},
+				},
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 			},
 		},
 	}

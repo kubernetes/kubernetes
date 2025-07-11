@@ -686,6 +686,9 @@ func (sched *Scheduler) numFeasibleNodesToFind(percentageOfNodesToScore *int32, 
 	}
 
 	numNodes = numAllNodes * percentage / 100
+	if sched.maxNodesToScore != nil && numNodes > *sched.maxNodesToScore {
+		numNodes = *sched.maxNodesToScore
+	}
 	if numNodes < minFeasibleNodesToFind {
 		return minFeasibleNodesToFind
 	}

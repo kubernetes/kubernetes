@@ -64129,6 +64129,13 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 							Format:      "int32",
 						},
 					},
+					"maxNodesToScore": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MaxNodesToScore is the maximum number of nodes to score, the scheduler will stop searching for more feasible nodes when this limit is reached. This configuration will override the computed number from PercentageOfNodesToScore.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 					"podInitialBackoffSeconds": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PodInitialBackoffSeconds is the initial backoff for unschedulable pods. If specified, it must be greater than 0. If this value is null, the default value (1s) will be used.",
