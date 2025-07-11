@@ -306,6 +306,9 @@ func TestListContinuation(t *testing.T) {
 }
 
 func TestListPaginationRareObject(t *testing.T) {
+	// ListFromCacheSnapshots adds additional Get call to read compact key.
+	// TODO: Rewrite call validation to only count calls to pods.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
 	ctx, store, client := testSetup(t)
 	validation := checkStorageCallsInvariants(
 		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*storagetesting.KVRecorder))
