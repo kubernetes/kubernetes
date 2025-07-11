@@ -1032,37 +1032,6 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 	})
 })
 
-// Helper function to validate a token using the TokenReview API
-func validateToken(ctx context.Context, c clientset.Interface, token, description string) {
-	ginkgo.By(fmt.Sprintf("validating %s token", description))
-	tokenReview := &authenticationv1.TokenReview{
-		Spec: authenticationv1.TokenReviewSpec{Token: token},
-	}
-	result, err := c.AuthenticationV1().TokenReviews().Create(ctx, tokenReview, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "failed to create TokenReview for %s token", description)
-	gomega.Expect(result.Status.Authenticated).To(gomega.BeTrue(), "%s token should be authenticated", description)
-	gomega.Expect(result.Status.Error).To(gomega.BeEmpty(), "TokenReview status should have no error for %s token", description)
-}
-
-// Helper function to decode a JWT and extract its expiration time
-func getExpirationFromToken(token string) (time.Time, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return time.Time{}, fmt.Errorf("invalid JWT format: expected 3 parts, got %d", len(parts))
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to decode JWT payload: %w", err)
-	}
-	var claims struct {
-		Exp int64 `json:"exp"`
-	}
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return time.Time{}, fmt.Errorf("failed to unmarshal JWT claims: %w", err)
-	}
-	return time.Unix(claims.Exp, 0), nil
-}
-
 var reportLogsParser = regexp.MustCompile("([a-zA-Z0-9-_]*)=([a-zA-Z0-9-_]*)$")
 
 // ParseInClusterClientLogs parses logs of pods using inclusterclient.
