@@ -28,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -40,9 +42,9 @@ var (
 // It automatically starts a go routine that manages expiration of assumed pods.
 // "ttl" is how long the assumed pod will get expired.
 // "ctx" is the context that would close the background goroutine.
-func New(ctx context.Context, ttl time.Duration) Cache {
+func New(ctx context.Context, ttl time.Duration, apiDispatcher fwk.APIDispatcher) Cache {
 	logger := klog.FromContext(ctx)
-	cache := newCache(ctx, ttl, cleanAssumedPeriod)
+	cache := newCache(ctx, ttl, cleanAssumedPeriod, apiDispatcher)
 	cache.run(logger)
 	return cache
 }
@@ -75,6 +77,10 @@ type cacheImpl struct {
 	nodeTree *nodeTree
 	// A map from image name to its ImageStateSummary.
 	imageStates map[string]*framework.ImageStateSummary
+
+	// apiDispatcher is used for the methods that are expected to send API calls.
+	// It's non-nil only if the SchedulerAsyncAPICalls feature gate is enabled.
+	apiDispatcher fwk.APIDispatcher
 }
 
 type podState struct {
@@ -86,18 +92,19 @@ type podState struct {
 	bindingFinished bool
 }
 
-func newCache(ctx context.Context, ttl, period time.Duration) *cacheImpl {
+func newCache(ctx context.Context, ttl, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
 	logger := klog.FromContext(ctx)
 	return &cacheImpl{
 		ttl:    ttl,
 		period: period,
 		stop:   ctx.Done(),
 
-		nodes:       make(map[string]*nodeInfoListItem),
-		nodeTree:    newNodeTree(logger, nil),
-		assumedPods: sets.New[string](),
-		podStates:   make(map[string]*podState),
-		imageStates: make(map[string]*framework.ImageStateSummary),
+		nodes:         make(map[string]*nodeInfoListItem),
+		nodeTree:      newNodeTree(logger, nil),
+		assumedPods:   sets.New[string](),
+		podStates:     make(map[string]*podState),
+		imageStates:   make(map[string]*framework.ImageStateSummary),
+		apiDispatcher: apiDispatcher,
 	}
 }
 
@@ -757,4 +764,31 @@ func (cache *cacheImpl) updateMetrics() {
 	metrics.CacheSize.WithLabelValues("assumed_pods").Set(float64(len(cache.assumedPods)))
 	metrics.CacheSize.WithLabelValues("pods").Set(float64(len(cache.podStates)))
 	metrics.CacheSize.WithLabelValues("nodes").Set(float64(len(cache.nodes)))
+}
+
+// BindPod handles the pod binding by adding a bind API call to the dispatcher.
+func (cache *cacheImpl) BindPod(binding *v1.Binding) (<-chan error, error) {
+	// Don't store anything in the cache, as the pod is already assumed, and in case of a binding failure, it will be forgotten.
+	onFinish := make(chan error, 1)
+	err := cache.apiDispatcher.Add(apicalls.NewPodBindingCall(binding), fwk.APICallOptions{
+		OnFinish: onFinish,
+	})
+	if fwk.IsUnexpectedError(err) {
+		return onFinish, err
+	}
+	return onFinish, nil
+}
+
+// PreemptPod handles the pod preemption by adding a preemption API call to the dispatcher and changing the pod in the cache accordingly.
+func (cache *cacheImpl) PreemptPod(victim *v1.Pod, preemptor *v1.Pod, condition *v1.PodCondition) (<-chan error, error) {
+	// Don't store anything in the cache, as we don't know how long will the preemption take
+	// and it's more reliable to wait for the result on the event handler.
+	onFinish := make(chan error, 1)
+	err := cache.apiDispatcher.Add(apicalls.NewPodPreemptionCall(victim, preemptor, condition), fwk.APICallOptions{
+		OnFinish: onFinish,
+	})
+	if fwk.IsUnexpectedError(err) {
+		return onFinish, err
+	}
+	return onFinish, nil
 }

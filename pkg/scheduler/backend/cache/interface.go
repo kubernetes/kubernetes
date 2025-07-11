@@ -114,6 +114,14 @@ type Cache interface {
 
 	// Dump produces a dump of the current cache.
 	Dump() *Dump
+
+	// BindPod handles the pod binding by adding a bind API call to the dispatcher.
+	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+	BindPod(binding *v1.Binding) (<-chan error, error)
+
+	// PreemptPod handles the pod preemption by adding a preemption API call to the dispatcher and changing the pod in the cache accordingly.
+	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+	PreemptPod(victim *v1.Pod, preemptor *v1.Pod, condition *v1.PodCondition) (<-chan error, error)
 }
 
 // Dump is a dump of the cache state.

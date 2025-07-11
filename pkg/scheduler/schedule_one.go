@@ -1063,6 +1063,10 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 			// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
 		} else {
+			if sched.APIDispatcher != nil {
+				// If the API dispatcher is available, sync the obtained pod with the details.
+				_ = sched.syncPodWithDispatcher(cachedPod)
+			}
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 			// ignore this err since apiserver doesn't properly validate affinity terms
 			// and we can't fix the validation for backwards compatibility.
@@ -1078,7 +1082,8 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	// this, there would be a race condition between the next scheduling cycle
 	// and the time the scheduler receives a Pod Update for the nominated pod.
 	// Here we check for nil only for tests.
-	if sched.SchedulingQueue != nil {
+	// When API cacher is available, the pod nomination will be added through it.
+	if sched.SchedulingQueue != nil && fwk.APICacher() == nil {
 		sched.SchedulingQueue.AddNominatedPod(logger, podInfo.PodInfo, nominatingInfo)
 	}
 
@@ -1089,7 +1094,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 
 	msg := truncateMessage(errMsg)
 	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
-	if err := updatePod(ctx, sched.client, pod, &v1.PodCondition{
+	if err := updatePod(ctx, sched.client, fwk.APICacher(), pod, &v1.PodCondition{
 		Type:               v1.PodScheduled,
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionFalse,
@@ -1110,7 +1115,11 @@ func truncateMessage(message string) string {
 	return message[:max-len(suffix)] + suffix
 }
 
-func updatePod(ctx context.Context, client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) error {
+func updatePod(ctx context.Context, client clientset.Interface, apiCacher framework.APICacher, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) error {
+	if apiCacher != nil {
+		// When API cacher is available, use it to patch the status.
+		return apiCacher.PatchPodStatus(pod, condition, nominatingInfo)
+	}
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Updating pod condition", "pod", klog.KObj(pod), "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
 	podStatusCopy := pod.Status.DeepCopy()
@@ -1123,5 +1132,6 @@ func updatePod(ctx context.Context, client clientset.Interface, pod *v1.Pod, con
 	if nnnNeedsUpdate {
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
-	return util.PatchPodStatus(ctx, client, pod, podStatusCopy)
+	_, err := util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+	return err
 }
