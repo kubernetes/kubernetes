@@ -37,20 +37,30 @@ type Allocator interface {
 	Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error)
 }
 
+// Features contains all feature gates that may influence the behavior of ResourceClaim allocation.
 type Features struct {
+	// Sorted alphabetically. When adding a new entry, also extend FeaturesAnd and FeaturesAll.
+
 	AdminAccess          bool
-	PrioritizedList      bool
-	PartitionableDevices bool
 	DeviceTaints         bool
+	PartitionableDevices bool
+	PrioritizedList      bool
 }
 
 func FeaturesAnd(a, b Features) Features {
 	return Features{
 		AdminAccess:          a.AdminAccess && b.AdminAccess,
-		PrioritizedList:      a.PrioritizedList && b.PrioritizedList,
-		PartitionableDevices: a.PartitionableDevices && b.PartitionableDevices,
 		DeviceTaints:         a.DeviceTaints && b.DeviceTaints,
+		PartitionableDevices: a.PartitionableDevices && b.PartitionableDevices,
+		PrioritizedList:      a.PrioritizedList && b.PrioritizedList,
 	}
+}
+
+var FeaturesAll = Features{
+	AdminAccess:          true,
+	DeviceTaints:         true,
+	PartitionableDevices: true,
+	PrioritizedList:      true,
 }
 
 type DeviceID struct {

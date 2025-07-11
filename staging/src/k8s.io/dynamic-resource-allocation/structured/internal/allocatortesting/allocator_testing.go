@@ -585,15 +585,19 @@ func toCounters(counters map[string]resource.Quantity) map[string]resourceapi.Co
 	return out
 }
 
-func TestAllocator(t *testing.T, newAllocator func(
-	ctx context.Context,
-	features Features,
-	claimsToAllocate []*resourceapi.ResourceClaim,
-	allocatedDevices sets.Set[DeviceID],
-	classLister DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
-	celCache *cel.Cache,
-) (Allocator, error)) {
+// TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
+// Test cases which depend on features that are not supported by the implementation are silently skipped.
+func TestAllocator(t *testing.T,
+	supportedFeatures Features,
+	newAllocator func(
+		ctx context.Context,
+		features Features,
+		claimsToAllocate []*resourceapi.ResourceClaim,
+		allocatedDevices sets.Set[DeviceID],
+		classLister DeviceClassLister,
+		slices []*resourceapi.ResourceSlice,
+		celCache *cel.Cache,
+	) (Allocator, error)) {
 	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
 	boolAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "boolAttribute")
 	stringAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "stringAttribute")
@@ -3486,6 +3490,11 @@ func TestAllocator(t *testing.T, newAllocator func(
 	}
 
 	for name, tc := range testcases {
+		if internal.FeaturesAnd(tc.features, supportedFeatures) != tc.features {
+			// Skip the test, at least one of its required features isn't supported
+			// and the test would fail.
+			continue
+		}
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			g := gomega.NewWithT(t)
