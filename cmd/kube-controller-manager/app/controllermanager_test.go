@@ -26,11 +26,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	controllermanagercontroller "k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/features"
@@ -205,19 +205,21 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 			initFuncCalled := false
 
 			taintEvictionControllerDescriptor := NewControllerDescriptors()[names.TaintEvictionController]
-			taintEvictionControllerDescriptor.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller controllermanagercontroller.Interface, enabled bool, err error) {
+			taintEvictionControllerDescriptor.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 				initFuncCalled = true
-				return nil, true, nil
+				return newNamedRunnableFunc(func(ctx context.Context) {}, controllerName), nil
 			}
 
-			healthCheck, err := StartController(ctx, controllerCtx, taintEvictionControllerDescriptor, nil)
-			if err != nil {
+			var healthChecks mockHealthCheckAdder
+			if err := startControllers(ctx, controllerCtx, map[string]*ControllerDescriptor{
+				names.TaintEvictionController: taintEvictionControllerDescriptor,
+			}, &healthChecks); err != nil {
 				t.Errorf("starting a TaintEvictionController controller should not return an error")
 			}
 			if test.expectInitFuncCall != initFuncCalled {
 				t.Errorf("TaintEvictionController init call check failed: expected=%v, got=%v", test.expectInitFuncCall, initFuncCalled)
 			}
-			hasHealthCheck := healthCheck != nil
+			hasHealthCheck := len(healthChecks.Checks) > 0
 			expectHealthCheck := test.expectInitFuncCall
 			if expectHealthCheck != hasHealthCheck {
 				t.Errorf("TaintEvictionController healthCheck check failed: expected=%v, got=%v", expectHealthCheck, hasHealthCheck)
@@ -228,23 +230,45 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 
 func TestNoCloudProviderControllerStarted(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	controllerCtx := ControllerContext{}
 	controllerCtx.ComponentConfig.Generic.Controllers = []string{"*"}
-	for _, controller := range NewControllerDescriptors() {
+	cpControllerDescriptors := make(map[string]*ControllerDescriptor)
+	for controllerName, controller := range NewControllerDescriptors() {
 		if !controller.IsCloudProviderController() {
 			continue
 		}
 
-		controllerName := controller.Name()
-		checker, err := StartController(ctx, controllerCtx, controller, nil)
-		if err != nil {
-			t.Errorf("Error starting controller %q: %v", controllerName, err)
+		controller.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+			return newNamedRunnableFunc(func(ctx context.Context) {
+				t.Error("Controller should not be started:", controllerName)
+			}, controllerName), nil
 		}
-		if checker != nil {
-			t.Errorf("Controller %q should not be started", controllerName)
-		}
+
+		cpControllerDescriptors[controllerName] = controller
 	}
+
+	var healthChecks mockHealthCheckAdder
+	if err := startControllers(ctx, controllerCtx, cpControllerDescriptors, &healthChecks); err != nil {
+		t.Error("Failed to start controllers:", err)
+	}
+}
+
+type mockHealthCheckAdder struct {
+	Checks []healthz.HealthChecker
+}
+
+func (m *mockHealthCheckAdder) AddHealthChecker(checks ...healthz.HealthChecker) {
+	m.Checks = append(m.Checks, checks...)
+}
+
+func startControllers(
+	ctx context.Context, controllerCtx ControllerContext,
+	controllerDescriptors map[string]*ControllerDescriptor, healthzChecks HealthCheckAdder,
+) error {
+	controllers, err := BuildControllers(ctx, controllerCtx, controllerDescriptors, nil, healthzChecks)
+	if err != nil {
+		return err
+	}
+	StartControllers(ctx, controllerCtx, controllers)
+	return nil
 }

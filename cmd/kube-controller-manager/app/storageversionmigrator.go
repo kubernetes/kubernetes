@@ -19,69 +19,68 @@ package app
 import (
 	"context"
 	"fmt"
-
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/metadata"
-	"k8s.io/controller-manager/controller"
-	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
-	"k8s.io/kubernetes/pkg/features"
+	"sync"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	clientgofeaturegate "k8s.io/client-go/features"
+	"k8s.io/client-go/metadata"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	svm "k8s.io/kubernetes/pkg/controller/storageversionmigrator"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func newStorageVersionMigratorControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.StorageVersionMigratorController,
 		aliases:  []string{"svm"},
-		initFunc: startSVMController,
+		initFunc: newSVMController,
 	}
 }
 
-func startSVMController(
-	ctx context.Context,
-	controllerContext ControllerContext,
-	controllerName string,
-) (controller.Interface, bool, error) {
+func newSVMController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionMigrator) ||
 		!clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerResourceVersion) {
-		return nil, false, nil
+		return nil, nil
 	}
 
 	if !controllerContext.ComponentConfig.GarbageCollectorController.EnableGarbageCollector {
-		return nil, true, fmt.Errorf("storage version migrator requires garbage collector")
+		return nil, fmt.Errorf("storage version migrator requires garbage collector")
 	}
 
 	// svm controller can make a lot of requests during migration, keep it fast
-	config := controllerContext.ClientBuilder.ConfigOrDie(controllerName)
+	config, err := controllerContext.NewClientConfig(controllerName)
+	if err != nil {
+		return nil, err
+	}
+
 	config.QPS *= 20
 	config.Burst *= 100
 
-	client := controllerContext.ClientBuilder.ClientOrDie(controllerName)
+	client, err := controllerContext.NewClient(controllerName)
+	if err != nil {
+		return nil, err
+	}
+
 	informer := controllerContext.InformerFactory.Storagemigration().V1alpha1().StorageVersionMigrations()
 
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
-	go svm.NewResourceVersionController(
-		ctx,
-		client,
-		discoveryClient,
-		metadata.NewForConfigOrDie(config),
-		informer,
-		controllerContext.RESTMapper,
-	).Run(ctx)
+	metaClient, err := metadata.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create metadata client for %s: %w", controllerName, err)
+	}
 
-	svmController := svm.NewSVMController(
+	svmc := svm.NewSVMController(
 		ctx,
 		client,
 		dynamicClient,
@@ -90,7 +89,26 @@ func startSVMController(
 		controllerContext.RESTMapper,
 		controllerContext.GraphBuilder,
 	)
-	go svmController.Run(ctx)
+	return newNamedRunnableFunc(func(ctx context.Context) {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			svm.NewResourceVersionController(
+				ctx,
+				client,
+				discoveryClient,
+				metaClient,
+				informer,
+				controllerContext.RESTMapper,
+			).Run(ctx)
+		}()
 
-	return svmController, true, nil
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			svmc.Run(ctx)
+		}()
+		wg.Wait()
+	}, controllerName), nil
 }
