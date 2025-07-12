@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -103,8 +104,9 @@ func TestValidateClaim(t *testing.T) {
 	badValue := "spaces not allowed"
 
 	scenarios := map[string]struct {
-		claim        *resource.ResourceClaim
-		wantFailures field.ErrorList
+		claim                         *resource.ResourceClaim
+		wantFailures                  field.ErrorList
+		consumableCapacityFeatureGate bool
 	}{
 		"good-claim": {
 			claim: testClaim(goodName, goodNS, validClaimSpec),
@@ -315,6 +317,31 @@ func TestValidateClaim(t *testing.T) {
 				}
 				return claim
 			}(),
+		},
+		"invalid-distinct-constraint": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), resource.FullyQualifiedName("missing-domain"), "must include a domain"),
+				field.Required(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), "name required"),
+				field.Required(field.NewPath("spec", "devices", "constraints").Index(2), "`exactly one of `matchAttribute` or `distinctAttribute` is required, but multiple fields are set")},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpec)
+				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
+					{
+						Requests:          []string{claim.Spec.Devices.Requests[0].Name},
+						DistinctAttribute: ptr.To(resource.FullyQualifiedName("missing-domain")),
+					},
+					{
+						DistinctAttribute: ptr.To(resource.FullyQualifiedName("")),
+					},
+					{
+						MatchAttribute:    nil,
+						DistinctAttribute: nil,
+					},
+				}
+				return claim
+			}(),
+			consumableCapacityFeatureGate: true,
 		},
 		"valid-request": {
 			claim: func() *resource.ResourceClaim {
@@ -805,6 +832,7 @@ func TestValidateClaim(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
 			errs := ValidateResourceClaim(scenario.claim)
 			assertFailures(t, scenario.wantFailures, errs)
 		})
@@ -863,6 +891,9 @@ func TestValidateClaimUpdate(t *testing.T) {
 }
 
 func TestValidateClaimStatusUpdate(t *testing.T) {
+	goodShareID := "000001"
+	goodShareID2 := "000002"
+	badShareID := "x"
 	validAllocatedClaim := validClaim.DeepCopy()
 	validAllocatedClaim.Status = resource.ResourceClaimStatus{
 		Allocation: &resource.AllocationResult{
@@ -881,12 +912,13 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 	validAllocatedClaimOld.Status.Allocation.Devices.Results[0].AdminAccess = nil // Not required in 1.31.
 
 	scenarios := map[string]struct {
-		adminAccess                bool
-		deviceStatusFeatureGate    bool
-		prioritizedListFeatureGate bool
-		oldClaim                   *resource.ResourceClaim
-		update                     func(claim *resource.ResourceClaim) *resource.ResourceClaim
-		wantFailures               field.ErrorList
+		adminAccess                   bool
+		deviceStatusFeatureGate       bool
+		prioritizedListFeatureGate    bool
+		consumableCapacityFeatureGate bool
+		oldClaim                      *resource.ResourceClaim
+		update                        func(claim *resource.ResourceClaim) *resource.ResourceClaim
+		wantFailures                  field.ErrorList
 	}{
 		"valid-no-op-update": {
 			oldClaim: validClaim,
@@ -1701,6 +1733,228 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 			prioritizedListFeatureGate: false,
 		},
+		"valid-add-allocation-with-consumable-capacity-feature-on": {
+			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:     goodName,
+							Driver:      goodName,
+							Pool:        goodName,
+							Device:      goodName,
+							AdminAccess: ptr.To(false),
+						}},
+					},
+				}
+				return claim
+			},
+			consumableCapacityFeatureGate: true,
+		},
+		"valid-add-multi-alloc-devices": {
+			oldClaim: testClaim(goodName, goodNS, func() resource.ResourceClaimSpec {
+				spec := validClaimSpec.DeepCopy()
+				spec.Devices.Requests[0].Exactly.Count = 2
+				return *spec
+			}()),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								ShareID:     ptr.To(goodShareID),
+								AdminAccess: ptr.To(false),
+							},
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								ShareID:     ptr.To(goodShareID2),
+								AdminAccess: ptr.To(false),
+							},
+						},
+					},
+				}
+				return claim
+			},
+			consumableCapacityFeatureGate: true,
+		},
+		"valid-add-multi-alloc-devices-with-consumed-capacity": {
+			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								ShareID:     ptr.To(goodShareID),
+								AdminAccess: ptr.To(false),
+								ConsumedCapacities: map[resource.QualifiedName]apiresource.Quantity{
+									goodName: apiresource.MustParse("1"),
+								},
+							},
+						},
+					},
+				}
+				return claim
+			},
+			consumableCapacityFeatureGate: true,
+		},
+		"invalid-add-bad-share-id": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), badShareID, "must have length: 6"),
+				field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("shareID"), badShareID, "must be a hex string: encoding/hex: invalid byte: U+0078 'x'"),
+			},
+			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								ShareID:     ptr.To(badShareID),
+								AdminAccess: ptr.To(false),
+							},
+						},
+					},
+				}
+				return claim
+			},
+			consumableCapacityFeatureGate: true,
+		},
+		"valid-add-enable-both-device-status-and-consumable-capacity-features": {
+			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								ShareID:     ptr.To(goodShareID),
+								AdminAccess: ptr.To(false),
+							},
+						},
+					},
+				}
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: "foo/000001",
+					},
+				}
+				return claim
+			},
+			consumableCapacityFeatureGate: true,
+			deviceStatusFeatureGate:       true,
+		},
+		"invalid-add-allocated-status-no-share-id": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeDeviceID(goodName, goodName, goodName), "must be an allocated device in the claim"),
+			},
+			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								ShareID:     ptr.To(goodShareID),
+								AdminAccess: ptr.To(false),
+							},
+						},
+					},
+				}
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName,
+					},
+				}
+				return claim
+			},
+			consumableCapacityFeatureGate: true,
+			deviceStatusFeatureGate:       true,
+		},
+		"invalid-add-allocated-status-wrong-share-id": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeDeviceID(goodName, goodName, goodName+"/"+goodShareID2), "must be an allocated device in the claim"),
+			},
+			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								ShareID:     ptr.To(goodShareID),
+								AdminAccess: ptr.To(false),
+							},
+						},
+					},
+				}
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: goodName + "/" + goodShareID2,
+					},
+				}
+				return claim
+			},
+			consumableCapacityFeatureGate: true,
+			deviceStatusFeatureGate:       true,
+		},
+		"valid-add-allocated-status-with-share-id-disabled-feature-gate": {
+			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{
+							{
+								Request:     goodName,
+								Driver:      goodName,
+								Pool:        goodName,
+								Device:      goodName,
+								ShareID:     ptr.To(goodShareID),
+								AdminAccess: ptr.To(false),
+							},
+						},
+					},
+				}
+				claim.Status.Devices = []resource.AllocatedDeviceStatus{
+					{
+						Driver: goodName,
+						Pool:   goodName,
+						Device: "foo/000001",
+					},
+				}
+				return claim
+			},
+			consumableCapacityFeatureGate: false,
+			deviceStatusFeatureGate:       true,
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -1708,6 +1962,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, scenario.adminAccess)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, scenario.deviceStatusFeatureGate)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, scenario.prioritizedListFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, scenario.consumableCapacityFeatureGate)
 
 			scenario.oldClaim.ResourceVersion = "1"
 			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)

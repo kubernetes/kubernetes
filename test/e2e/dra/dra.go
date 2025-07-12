@@ -1802,6 +1802,87 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		})
 	}
 
+	consumableCapacityTests := func() {
+		nodes := NewNodes(f, 1, 1)
+		// single device which allows multiple allocations and has 80Gi consumable memory.
+		driver := NewDriver(f, nodes, toDriverResources(
+			[]resourceapi.CounterSet{},
+			[]resourceapi.Device{
+				{
+					Name:                     "consumable-device-1",
+					AllowMultipleAllocations: ptr.To(true),
+					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+						"memory": {
+							Value: resource.MustParse("8Gi"),
+							SharingPolicy: &resourceapi.CapacitySharingPolicy{
+								Default: resource.MustParse("1Gi"),
+								ValidRange: &resourceapi.CapacitySharingPolicyRange{
+									Minimum: resource.MustParse("1Gi"),
+								},
+							},
+						},
+					},
+				},
+			}...,
+		))
+		b := newBuilder(f, driver)
+
+		f.It("must allow multiple allocations and consume capacity", func(ctx context.Context) {
+			// The first pod will use 4Gi of the device.
+			claim := b.externalClaim()
+			claim.Spec.Devices.Requests[0].Exactly.CapacityRequests = &resourceapi.CapacityRequirements{
+				Minimum: map[resourceapi.QualifiedName]resource.Quantity{
+					"memory": resource.MustParse("4Gi"),
+				},
+			}
+			pod := b.podExternal()
+			pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+			b.create(ctx, claim, pod)
+			b.testPod(ctx, f, pod)
+
+			// The second pod will be failed to request 8Gi capacity.
+			claim2 := b.externalClaim()
+			claim2.Spec.Devices.Requests[0].Exactly.CapacityRequests = &resourceapi.CapacityRequirements{
+				Minimum: map[resourceapi.QualifiedName]resource.Quantity{
+					"memory": resource.MustParse("8Gi"),
+				},
+			}
+			pod2 := b.podExternal()
+			pod2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+			b.create(ctx, claim2, pod2)
+
+			// The third pod should be able to use the rest 4Gi of the device.
+			claim3 := b.externalClaim()
+			claim3.Spec.Devices.Requests[0].Exactly.CapacityRequests = &resourceapi.CapacityRequirements{
+				Minimum: map[resourceapi.QualifiedName]resource.Quantity{
+					"memory": resource.MustParse("4Gi"),
+				},
+			}
+			pod3 := b.podExternal()
+			pod3.Spec.ResourceClaims[0].ResourceClaimName = &claim3.Name
+			b.create(ctx, claim3, pod3)
+			b.testPod(ctx, f, pod3)
+
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				testPod2, err := b.f.ClientSet.CoreV1().Pods(pod2.Namespace).Get(ctx, pod2.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("expected the test pod %s to exist: %w", pod2.Name, err)
+				}
+				if testPod2.Status.Phase != v1.PodPending {
+					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod2.Name, testPod2.Status.Phase, v1.PodPending)
+				}
+				return nil
+			}, 20*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
+
+			// Delete the first and third pod
+			b.deletePodAndWaitForNotFound(ctx, pod)
+			b.deletePodAndWaitForNotFound(ctx, pod3)
+
+			// There should be available capacity for pod2 now.
+			b.testPod(ctx, f, pod2)
+		})
+	}
+
 	// Deleting a pending pod that cannot start because there is no driver was fixed in
 	// in https://github.com/kubernetes/kubernetes/pull/131968 for 1.34. Older kubelets
 	// cause tests to get stuck because the pod cannot be deleted.
@@ -1817,6 +1898,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on multiple nodes", func() { multiNodeTests(true) })
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPrioritizedList), prioritizedListTests)
+
+	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAConsumableCapacity), consumableCapacityTests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta2 API", v1beta2Tests)
 

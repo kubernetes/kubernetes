@@ -61,6 +61,7 @@ func NewInTreeRegistry() runtime.Registry {
 		EnablePodLevelResources:                      feature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		EnablePartitionableDevices:                   feature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
 		EnableStorageCapacityScoring:                 feature.DefaultFeatureGate.Enabled(features.StorageCapacityScoring),
+		EnableConsumableCapacity:                     feature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
 	}
 
 	registry := runtime.Registry{

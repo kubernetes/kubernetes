@@ -28,13 +28,14 @@ import (
 )
 
 var testcases = map[string]struct {
-	expression         string
-	driver             string
-	attributes         map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	capacity           map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
-	expectCompileError string
-	expectMatchError   string
-	expectMatch        bool
+	expression               string
+	driver                   string
+	allowMultipleAllocations *bool
+	attributes               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+	capacity                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+	expectCompileError       string
+	expectMatchError         string
+	expectMatch              bool
 
 	// There's no good way to verify that the cost of an expression
 	// really is what it should be other than eye-balling it. The
@@ -269,6 +270,13 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 		expectMatchError: "actual cost limit exceeded",
 		expectCost:       85555551, // Exceed limit!
 	},
+	"allow_multiple_allocations": {
+		expression:               `device.allowMultipleAllocations == true`,
+		allowMultipleAllocations: ptr.To(true),
+		driver:                   "dra.example.com",
+		expectMatch:              true,
+		expectCost:               3,
+	},
 }
 
 func TestCEL(t *testing.T) {
@@ -295,7 +303,9 @@ func TestCEL(t *testing.T) {
 				t.Errorf("ERROR: expected CEL cost %d, got %d instead (%.0f%% of limit %d)", expect, actual, float64(actual)*100.0/float64(resourceapi.CELSelectorExpressionMaxCost), resourceapi.CELSelectorExpressionMaxCost)
 			}
 
-			match, details, err := result.DeviceMatches(ctx, Device{Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver})
+			match, details, err := result.DeviceMatches(ctx, Device{
+				AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
+			})
 			// details.ActualCost can be called for nil details, no need to check.
 			actualCost := ptr.Deref(details.ActualCost(), 0)
 			if scenario.expectCost > 0 {
@@ -344,7 +354,9 @@ func BenchmarkDeviceMatches(b *testing.B) {
 				// here also includes additional preparations
 				// in result.DeviceMatches and thus cannot be
 				// used.
-				match, _, err := result.DeviceMatches(ctx, Device{Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver})
+				match, _, err := result.DeviceMatches(ctx, Device{
+					AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
+				})
 				if err != nil {
 					if scenario.expectMatchError == "" {
 						b.Fatalf("unexpected evaluation error: %v", err)

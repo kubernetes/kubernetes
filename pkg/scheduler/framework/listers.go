@@ -19,7 +19,6 @@ package framework
 import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
 )
 
@@ -80,10 +79,9 @@ type ResourceClaimTracker interface {
 	List() ([]*resourceapi.ResourceClaim, error)
 	// Get works like List(), but for a single claim.
 	Get(namespace, claimName string) (*resourceapi.ResourceClaim, error)
-	// ListAllAllocatedDevices lists all allocated Devices from allocated ResourceClaims. The result is guaranteed to immediately include
+	// GatherAllocatedState gathers information about allocated devices from allocated ResourceClaims. The result is guaranteed to immediately include
 	// any changes made via AssumeClaimAfterAPICall(), and SignalClaimPendingAllocation().
-	ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error)
-
+	GatherAllocatedState() (*structured.AllocatedState, error)
 	// SignalClaimPendingAllocation signals to the tracker that the given ResourceClaim will be allocated via an API call in the
 	// binding phase. This change is immediately reflected in the result of List() and the other accessors.
 	SignalClaimPendingAllocation(claimUID types.UID, allocatedClaim *resourceapi.ResourceClaim) error

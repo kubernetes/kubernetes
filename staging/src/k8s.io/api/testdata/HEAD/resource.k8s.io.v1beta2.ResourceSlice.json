@@ -89,7 +89,18 @@
         },
         "capacity": {
           "capacityKey": {
-            "value": "0"
+            "value": "0",
+            "sharingPolicy": {
+              "default": "0",
+              "validValues": [
+                "0"
+              ],
+              "validRange": {
+                "minimum": "0",
+                "maximum": "0",
+                "chunkSize": "0"
+              }
+            }
           }
         },
         "consumesCounters": [
@@ -135,7 +146,8 @@
             "effect": "effectValue",
             "timeAdded": "2004-01-01T01:01:01Z"
           }
-        ]
+        ],
+        "allowMultipleAllocations": true
       }
     ],
     "perDeviceNodeSelection": true,

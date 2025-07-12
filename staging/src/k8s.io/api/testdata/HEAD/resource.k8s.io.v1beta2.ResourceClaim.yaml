@@ -47,13 +47,17 @@ spec:
       requests:
       - requestsValue
     constraints:
-    - matchAttribute: matchAttributeValue
+    - distinctAttribute: distinctAttributeValue
+      matchAttribute: matchAttributeValue
       requests:
       - requestsValue
     requests:
     - exactly:
         adminAccess: true
         allocationMode: allocationModeValue
+        capacityRequests:
+          minimum:
+            minimumKey: "0"
         count: 4
         deviceClassName: deviceClassNameValue
         selectors:
@@ -67,6 +71,9 @@ spec:
           value: valueValue
       firstAvailable:
       - allocationMode: allocationModeValue
+        capacityRequests:
+          minimum:
+            minimumKey: "0"
         count: 5
         deviceClassName: deviceClassNameValue
         name: nameValue
@@ -98,10 +105,13 @@ status:
         source: sourceValue
       results:
       - adminAccess: true
+        consumedCapacities:
+          consumedCapacitiesKey: "0"
         device: deviceValue
         driver: driverValue
         pool: poolValue
         request: requestValue
+        shareID: shareIDValue
         tolerations:
         - effect: effectValue
           key: keyValue

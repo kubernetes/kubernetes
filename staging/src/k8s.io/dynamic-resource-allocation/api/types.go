@@ -56,13 +56,14 @@ type Device struct {
 }
 
 type BasicDevice struct {
-	Attributes       map[QualifiedName]DeviceAttribute
-	Capacity         map[QualifiedName]DeviceCapacity
-	ConsumesCounters []DeviceCounterConsumption
-	NodeName         *string
-	NodeSelector     *v1.NodeSelector
-	AllNodes         *bool
-	Taints           []resourceapi.DeviceTaint
+	Attributes               map[QualifiedName]DeviceAttribute
+	Capacity                 map[QualifiedName]DeviceCapacity
+	ConsumesCounters         []DeviceCounterConsumption
+	NodeName                 *string
+	NodeSelector             *v1.NodeSelector
+	AllNodes                 *bool
+	Taints                   []resourceapi.DeviceTaint
+	AllowMultipleAllocations *bool
 }
 
 type DeviceCounterConsumption struct {
@@ -82,7 +83,20 @@ type DeviceAttribute struct {
 }
 
 type DeviceCapacity struct {
-	Value resource.Quantity
+	Value         resource.Quantity
+	SharingPolicy *CapacitySharingPolicy
+}
+
+type CapacitySharingPolicy struct {
+	Default     resource.Quantity
+	ValidValues []resource.Quantity
+	ValidRange  *CapacitySharingPolicyRange
+}
+
+type CapacitySharingPolicyRange struct {
+	Minimum   resource.Quantity
+	Maximum   *resource.Quantity
+	ChunkSize *resource.Quantity
 }
 
 type Counter struct {

@@ -322,6 +322,24 @@ type Device struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Taints []DeviceTaint
+
+	// AllowMultipleAllocations marks whether the device is allowed to be allocated multiple times.
+	//
+	// A device with allowMultipleAllocations="true" can be allocated more than once,
+	// and its capacity is shared, regardless of whether the CapacitySharingPolicy is defined or not.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	AllowMultipleAllocations *bool
+
+	// ^^^
+	// The alternative names proposed were: `Shareable`, `Shared`, and `AllowShared`.
+	// Using an enum like `ClaimMode` or `Allocatable` with values such as `Once` and `MultipleTimes`
+	// was also discussed, following API conventions.
+	// There were also suggestions to distinguish between `Unlimited` and `CapacityControlled` variants
+	// of the `MultipleTimes` mode.
+	// However, because such strategy or mode variations can be introduced at the capacity level
+	// for finer-grained control, the flexibility of an enum is less relevant at the device level.
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -351,8 +369,16 @@ type DeviceCapacity struct {
 	// +required
 	Value resource.Quantity
 
-	// potential future addition: fields which define how to "consume"
-	// capacity (= share a single device between different consumers).
+	// SharingPolicy specifies that this device capacity must be consumed
+	// by each resource claim according to the defined sharing policy.
+	// The Device must have AllowMultipleAllocations set to true.
+	//
+	// If this field is unset, capacity sharing is unconstrained.
+	// All ResourceClaims or requests share the same capacity pool.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	SharingPolicy *CapacitySharingPolicy
 }
 
 // Counter describes a quantity associated with a device.
@@ -361,6 +387,96 @@ type Counter struct {
 	//
 	// +required
 	Value resource.Quantity
+}
+
+// CapacitySharingPolicyDiscreteMaxOptions limits the number of discrete capacity values allowed in a sharing policy.
+const CapacitySharingPolicyDiscreteMaxOptions = 10
+
+// CapacitySharingPolicy defines how requests consume the available capacity.
+// A policy must have a default value to be applied when no value is explicitly provided in the ResourceClaim.
+// Optionally, valid sharing values may additionally be defined as either a discrete set or a continuous range.
+// If valid values are specified, the default must be included within them.
+type CapacitySharingPolicy struct {
+	// Default specifies the default capacity to be used for a consumption request.
+	//
+	// +required
+	Default resource.Quantity
+
+	// ValidValues defines a set of acceptable quantity values in consuming requests.
+	//
+	// Must not contain more than 10 entries.
+	//
+	// +optional
+	// +listType=atomic
+	// +oneOf=ValidSharingValues
+	ValidValues []resource.Quantity
+
+	// ValidRange defines an acceptable quantity value range in consuming requests.
+	//
+	// +optional
+	// +oneOf=ValidSharingValues
+	ValidRange *CapacitySharingPolicyRange
+
+	// ^^^
+	// Alternatively, the range can be defined and validated using a LimitRange match.
+	// Enforcing min/max/default values via LimitRange is a generally useful mechanism.
+
+	// Potential extension: allow defining a `strategy` on a specific capacity
+	// to specify default scheduling behavior when it is not explicitly requested.
+	// Here are some strategies those were discussed:
+	//
+	// - AlwaysConsumed:
+	//   The default behavior. If no capacity is requested, a default value is always applied.
+	//
+	// - ConsumedOrNever:
+	//   If the first consumer specifies a capacity request, the capacity is marked as consumable.
+	//   If no request is made, the capacity remains non-consumable until the first consumer releases it.
+	//   This strategy is useful in network contexts, where the device is assumed to be shared by default.
+	//
+	// - BlockOrShare:
+	//   The inverse of ConsumedOrNever. If the first consumer does not request this capacity,
+	//   it exclusively occupies the entire device (i.e., the full capacity is blocked).
+	//   If a request is made, the device can be shared up to the guaranteed amount.
+	//   This strategy is useful in accelerator contexts, where devices are typically assumed to be dedicated.
+}
+
+// CapacitySharingPolicyRange defines a valid range for consumable capacity values.
+//
+//   - If the requested amount is less than Minimum, it is rounded up to the Minimum value.
+//   - If the requested amount is between Minimum and Maximum, ChunkSize is set,
+//     and the amount does not align with the ChunkSize,
+//     it will be rounded up to the next value matching Minimum + (n * ChunkSize).
+//   - If the requested or rounded amount exceeds Maximum (if set), the request does not satisfy the policy,
+//     and the device cannot be allocated.
+//
+// - If ChunkSize is not set, the requested amount is used as-is, provided it falls within the range.
+type CapacitySharingPolicyRange struct {
+	// Minimum specifies the minimum capacity allowed for a consumption request.
+	//
+	// Minimum must be less than or equal to the capacity value.
+	// Default must be more than or equal to the minimum.
+	//
+	// +required
+	Minimum resource.Quantity
+
+	// Maximum defines the upper limit for capacity that can be requested.
+	//
+	// Maximum must be less than or equal to the capacity value.
+	// Minimum and default must be less than or equal to the maximum.
+	//
+	// +optional
+	Maximum *resource.Quantity
+
+	// ChunkSize defines the step size between valid capacity amounts within the range.
+	//
+	// Maximum and default must be a multiple of the chunk size.
+	// Minimum + chunk size must be less than or equal to the capacity value.
+	//
+	// +optional
+	ChunkSize *resource.Quantity
+
+	// ^^^
+	// The alternative names proposed were: `StepSize`, `UnitSize`.
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
@@ -731,6 +847,15 @@ type ExactDeviceRequest struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration
+
+	// CapacityRequests define resource requirements against each capacity.
+	//
+	// If this field is unset and the device supports multiple allocations,
+	// the default value will be applied to each capacity with a defined sharing policy.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	CapacityRequests *CapacityRequirements
 }
 
 // DeviceSubRequest describes a request for device provided in the
@@ -825,6 +950,40 @@ type DeviceSubRequest struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration
+
+	// CapacityRequests define resource requirements against each capacity.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	CapacityRequests *CapacityRequirements
+}
+
+// CapacityRequirements defines the capacity requirements for a specific device request.
+type CapacityRequirements struct {
+	// Minimum defines the minimum amount of each device capacity required for the request.
+	//
+	// If the capacity has a sharing policy, this value is rounded up to the nearest valid amount
+	// according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.
+	//
+	// If the quantity does not have a sharing policy, this value is used as an additional filtering
+	// condition against the available capacity on the device.
+	// This is semantically equivalent to a CEL selector with
+	// `device.capacity[<domain>].<name>.compareTo(quantity(<minimum quantity>)) >= 0`
+	// For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0
+	//
+	// +optional
+	Minimum map[QualifiedName]resource.Quantity
+
+	// ^^^
+	// The alternative names proposed were: `Required`, `Reservation`, `Consumption`, and `Requests`.
+	// `Requests` was dropped since it's already used in the DRA API for device requests.
+	// `Minimum` was selected because the actual consumed capacity may be rounded up
+	// based on the sharing policy — for example, to match a defined chunk size or meet a minimum requirement.
+
+	// Potential extension:
+	// A `Maximum` or `Limit` field to describe burstable consumption.
+	// Handling burstability would be the responsibility of the individual device driver,
+	// similar to how the CPU manager handles CPU burst behavior.
 }
 
 const (
@@ -977,6 +1136,22 @@ type DeviceConstraint struct {
 	// criteria.
 	//
 	// MatchExpression string
+
+	// DistinctAttribute requires that all devices in question have this
+	// attribute and that its type and value are unique across those devices.
+	//
+	// This acts as the inverse of MatchAttribute.
+	//
+	// This constraint is used to avoid allocating multiple requests to the same device
+	// by ensuring attribute-level differentiation.
+	//
+	// This is useful for scenarios where resource requests must be fulfilled by separate physical devices.
+	// For example, a container requests two network interfaces that must be allocated from two different physical NICs.
+	//
+	// +optional
+	// +oneOf=ConstraintType
+	// +featureGate=DRAConsumableCapacity
+	DistinctAttribute *FullyQualifiedName
 }
 
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.
@@ -1140,6 +1315,10 @@ type ResourceClaimStatus struct {
 	// +listMapKey=pool
 	// +featureGate=DRAResourceClaimDeviceStatus
 	Devices []AllocatedDeviceStatus
+
+	// listType=map doesn’t support adding an optional map key (identifier) like shareID, which limits flexibility.
+	// However, this structure is useful because different DRA drivers own separate entries and can manage them using SSA.
+	// Current solution appends a new identifier to the device name using a slash-separated format.
 }
 
 // ResourceClaimReservedForMaxSize is the maximum number of entries in
@@ -1210,6 +1389,14 @@ type DeviceAllocationResult struct {
 // entries in allocation.devices.results.
 const AllocationResultsMaxSize = 32
 
+// Byte length of random ID for ShareUID; String length will be twice characters.
+const ShareIDNBytes = 3
+const ShareIDLength = ShareIDNBytes * 2
+
+// Max length for shared device name, accounting for suffix format "-[ShareUID]",
+// where ShareUID is 2 * ShareUIDNBytes characters.
+const SharedDeviceNameMaxLength = DeviceMaxDomainLength - ShareIDLength - 1 // 56
+
 // DeviceRequestAllocationResult contains the allocation result for one request.
 type DeviceRequestAllocationResult struct {
 	// Request is the name of the request in the claim which caused this
@@ -1272,6 +1459,45 @@ type DeviceRequestAllocationResult struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration
+
+	// ShareID uniquely identifies an individual allocation share of a device,
+	// used when the device supports multiple simultaneous allocations.
+	// It serves as an additional map key to differentiate concurrent shares
+	// of the same device.
+	//
+	// The ID is randomly generated as a hexadecimal (hex) string for each allocation share.
+	// It must be unique among all currently allocated shares for the same device
+	// (i.e., uniqueness is required only at the device level, not globally).
+	//
+	// Hex is chosen for its compact representation, ease of generation from binary,
+	// and suitability for identifiers in logs, APIs, and storage.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	ShareID *string
+
+	// ^^^
+	// Alternatively, SharedAllocationIndex could have been used as a reference to the allocation result.
+	// However, the index may become outdated if the allocation is reallocated (should that ever be supported),
+	// making it less reliable than ShareID.
+	// A UID-based approach was also considered to leverage the UID module’s format and integrity checks.
+	// This was used because the concatenated device name and share identifier would be too long,
+	// and shortening it is not acceptable.
+	// Please refer to https://github.com/kubernetes/kubernetes/issues/132524 for the need for concatenation.
+	// Also, note that ShareID must be unique only among currently allocated shares on the same device;
+	// it does not need to be globally unique.
+
+	// ConsumedCapacities tracks the amount of capacity consumed per device as part of the claim request.
+	// The consumed amount may differ from the requested amount: it is rounded up to the nearest valid
+	// value based on the device’s sharing policy if applicable (i.e., may not be less than the requested amount).
+	//
+	// The total consumed capacity for each device must not exceed its available capacity.
+	//
+	// This field references only consumable capacities of a device and is empty when there are none.
+	//
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	ConsumedCapacities map[QualifiedName]resource.Quantity
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1477,8 +1703,19 @@ type AllocatedDeviceStatus struct {
 	// Device references one device instance via its name in the driver's
 	// resource pool. It must be a DNS label.
 	//
+	// If the allocation result includes a ShareID, the Device field is extended with the ShareID,
+	// formatted as `<device name>/<share id>`.
+	//
 	// +required
 	Device string
+
+	// ^^^
+	// ShareID cannot be added here in the same way as in DeviceRequestAllocationResult,
+	// because it is intended to serve as part of a composite key for identifying devices.
+	// Making ShareID required is not an option, as the API feature gate should not introduce required fields.
+	// However, due to limitations with using `listType=map` in ResourceClaimStatus.Devices,
+	// fields used as map keys must be required.
+	// Reference issue: https://github.com/kubernetes/kubernetes/issues/132524
 
 	// Conditions contains the latest observation of the device's state.
 	// If the device has been configured according to the class and claim

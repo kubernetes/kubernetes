@@ -30,7 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -214,6 +214,7 @@ func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
 	dropDisabledDRAPrioritizedListFields(newClaim, oldClaim)
 	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
 	dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim)
+	dropDisabledDRAResourceClaimConsumableCapacityFields(newClaim, oldClaim)
 }
 
 func dropDisabledDRAPrioritizedListFields(newClaim, oldClaim *resource.ResourceClaim) {
@@ -294,10 +295,13 @@ func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
 	return false
 }
 
+func isDRAResourceClaimDeviceStatusInUse(claim *resource.ResourceClaim) bool {
+	return claim != nil && len(claim.Status.Devices) > 0
+}
+
 func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
-	isDRAResourceClaimDeviceStatusInUse := (oldClaim != nil && len(oldClaim.Status.Devices) > 0)
 	// drop resourceClaim.Status.Devices field if feature gate is not enabled and it was not in use
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse(oldClaim) {
 		newClaim.Status.Devices = nil
 	}
 }
@@ -305,8 +309,7 @@ func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource
 // dropDeallocatedStatusDevices removes the status.devices that were allocated
 // in the oldClaim and that have been removed in the newClaim.
 func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
-	isDRAResourceClaimDeviceStatusInUse := (oldClaim != nil && len(oldClaim.Status.Devices) > 0)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse(oldClaim) {
 		return
 	}
 
@@ -315,7 +318,12 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 	if oldClaim.Status.Allocation != nil {
 		// Get all devices in the oldClaim.
 		for _, result := range oldClaim.Status.Allocation.Devices.Results {
-			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			var deviceID structured.DeviceID
+			if result.ShareID != nil {
+				deviceID = structured.MakeDeviceID(result.Driver, result.Pool, structured.GetSharedDeviceName(result.Device, *result.ShareID))
+			} else {
+				deviceID = structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			}
 			deallocatedDevices.Insert(deviceID)
 		}
 	}
@@ -323,7 +331,12 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 	// Remove devices from deallocatedDevices that are still in newClaim.
 	if newClaim.Status.Allocation != nil {
 		for _, result := range newClaim.Status.Allocation.Devices.Results {
-			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			var deviceID structured.DeviceID
+			if result.ShareID != nil {
+				deviceID = structured.MakeDeviceID(result.Driver, result.Pool, structured.GetSharedDeviceName(result.Device, *result.ShareID))
+			} else {
+				deviceID = structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			}
 			deallocatedDevices.Delete(deviceID)
 		}
 	}
@@ -345,3 +358,55 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 }
 
 // TODO: add tests after partitionable devices is merged (code conflict!)
+
+func draConsumableCapacityFeatureInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+
+	for _, request := range claim.Spec.Devices.Requests {
+		if request.Exactly != nil && request.Exactly.CapacityRequests != nil {
+			return true
+		}
+		if len(request.FirstAvailable) > 0 {
+			for _, subRequest := range request.FirstAvailable {
+				if subRequest.CapacityRequests != nil {
+					return true
+				}
+			}
+		}
+	}
+
+	if allocation := claim.Status.Allocation; allocation != nil {
+		for _, result := range allocation.Devices.Results {
+			if result.ShareID != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// dropDisabledDRAResourceClaimConsumableCapacityFields drops any new CapacityRequests
+// fields from the new slice if they were not used in the old slice.
+func dropDisabledDRAResourceClaimConsumableCapacityFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) ||
+		draConsumableCapacityFeatureInUse(oldClaim) {
+		// No need to drop anything.
+		return
+	}
+
+	// Drop any CapacityRequests newly added.
+	for i := range newClaim.Spec.Devices.Requests {
+		if newClaim.Spec.Devices.Requests[i].Exactly != nil {
+			newClaim.Spec.Devices.Requests[i].Exactly.CapacityRequests = nil
+		}
+		request := newClaim.Spec.Devices.Requests[i]
+		if len(request.FirstAvailable) > 0 {
+			for j := range request.FirstAvailable {
+				newClaim.Spec.Devices.Requests[i].FirstAvailable[j].CapacityRequests = nil
+			}
+		}
+	}
+}

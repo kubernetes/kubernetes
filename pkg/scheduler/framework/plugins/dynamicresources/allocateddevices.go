@@ -36,7 +36,10 @@ import (
 // claims and are skipped without invoking the callback.
 //
 // foreachAllocatedDevice does nothing if the claim is not allocated.
-func foreachAllocatedDevice(claim *resourceapi.ResourceClaim, cb func(deviceID structured.DeviceID)) {
+func foreachAllocatedDevice(claim *resourceapi.ResourceClaim,
+	dedicatedDeviceCallback func(deviceID structured.DeviceID),
+	sharedDeviceCallback func(structured.SharedDeviceID),
+	consumedCapacityCallback func(structured.DeviceConsumedCapacity)) {
 	if claim.Status.Allocation == nil {
 		return
 	}
@@ -50,11 +53,21 @@ func foreachAllocatedDevice(claim *resourceapi.ResourceClaim, cb func(deviceID s
 			// Is not considered as allocated.
 			continue
 		}
-		deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
 
+		deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+		shared := result.ShareID != nil
 		// None of the users of this helper need to abort iterating,
 		// therefore it's not supported as it only would add overhead.
-		cb(deviceID)
+		if !shared {
+			dedicatedDeviceCallback(deviceID)
+		} else {
+			sharedDeviceID := structured.MakeSharedDeviceID(deviceID, *result.ShareID)
+			sharedDeviceCallback(sharedDeviceID)
+			if result.ConsumedCapacities != nil {
+				deviceConsumedCapacity := structured.NewDeviceConsumedCapacity(deviceID, result.ConsumedCapacities)
+				consumedCapacityCallback(deviceConsumedCapacity)
+			}
+		}
 	}
 }
 
@@ -66,14 +79,18 @@ func foreachAllocatedDevice(claim *resourceapi.ResourceClaim, cb func(deviceID s
 type allocatedDevices struct {
 	logger klog.Logger
 
-	mutex sync.RWMutex
-	ids   sets.Set[structured.DeviceID]
+	mutex      sync.RWMutex
+	ids        sets.Set[structured.DeviceID]
+	shareIDs   sets.Set[structured.SharedDeviceID]
+	capacities structured.ConsumedCapacityCollection
 }
 
 func newAllocatedDevices(logger klog.Logger) *allocatedDevices {
 	return &allocatedDevices{
-		logger: logger,
-		ids:    sets.New[structured.DeviceID](),
+		logger:     logger,
+		ids:        sets.New[structured.DeviceID](),
+		shareIDs:   sets.New[structured.SharedDeviceID](),
+		capacities: make(map[structured.DeviceID]structured.ConsumedCapacity),
 	}
 }
 
@@ -82,6 +99,20 @@ func (a *allocatedDevices) Get() sets.Set[structured.DeviceID] {
 	defer a.mutex.RUnlock()
 
 	return a.ids.Clone()
+}
+
+func (a *allocatedDevices) GetSharedDeviceIDList() sets.Set[structured.SharedDeviceID] {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
+	return a.shareIDs.Clone()
+}
+
+func (a *allocatedDevices) GetConsumedCapacityCollection() structured.ConsumedCapacityCollection {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
+	return a.capacities.Clone()
 }
 
 func (a *allocatedDevices) handlers() cache.ResourceEventHandler {
@@ -142,15 +173,38 @@ func (a *allocatedDevices) addDevices(claim *resourceapi.ResourceClaim) {
 	// Locking of the mutex gets minimized by pre-computing what needs to be done
 	// without holding the lock.
 	deviceIDs := make([]structured.DeviceID, 0, 20)
-	foreachAllocatedDevice(claim, func(deviceID structured.DeviceID) {
-		a.logger.V(6).Info("Observed device allocation", "device", deviceID, "claim", klog.KObj(claim))
-		deviceIDs = append(deviceIDs, deviceID)
-	})
+	shareIDs := make([]structured.SharedDeviceID, 0, 20)
+	deviceCapacities := make([]structured.DeviceConsumedCapacity, 0, 20)
+	foreachAllocatedDevice(claim,
+		func(deviceID structured.DeviceID) {
+			a.logger.V(6).Info("Observed device allocation", "device", deviceID, "claim", klog.KObj(claim))
+			deviceIDs = append(deviceIDs, deviceID)
+		},
+		func(sharedDeviceID structured.SharedDeviceID) {
+			a.logger.V(6).Info("Observed shared device allocation", "shared device", sharedDeviceID, "claim", klog.KObj(claim))
+			shareIDs = append(shareIDs, sharedDeviceID)
+		},
+		func(capacity structured.DeviceConsumedCapacity) {
+			a.logger.V(6).Info("Observed consumed capacity", "device id", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
+			deviceCapacities = append(deviceCapacities, capacity)
+		},
+	)
 
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	for _, deviceID := range deviceIDs {
 		a.ids.Insert(deviceID)
+	}
+	for _, shareID := range shareIDs {
+		a.shareIDs.Insert(shareID)
+	}
+	for _, capacity := range deviceCapacities {
+		deviceID := capacity.DeviceID
+		if _, found := a.capacities[deviceID]; found {
+			a.capacities[deviceID].Add(capacity.ConsumedCapacity)
+		} else {
+			a.capacities[deviceID] = capacity.ConsumedCapacity.Clone()
+		}
 	}
 }
 
@@ -162,14 +216,36 @@ func (a *allocatedDevices) removeDevices(claim *resourceapi.ResourceClaim) {
 	// Locking of the mutex gets minimized by pre-computing what needs to be done
 	// without holding the lock.
 	deviceIDs := make([]structured.DeviceID, 0, 20)
-	foreachAllocatedDevice(claim, func(deviceID structured.DeviceID) {
-		a.logger.V(6).Info("Observed device deallocation", "device", deviceID, "claim", klog.KObj(claim))
-		deviceIDs = append(deviceIDs, deviceID)
-	})
-
+	shareIDs := make([]structured.SharedDeviceID, 0, 20)
+	deviceCapacities := make([]structured.DeviceConsumedCapacity, 0, 20)
+	foreachAllocatedDevice(claim,
+		func(deviceID structured.DeviceID) {
+			a.logger.V(6).Info("Observed device deallocation", "device", deviceID, "claim", klog.KObj(claim))
+			deviceIDs = append(deviceIDs, deviceID)
+		},
+		func(sharedDeviceID structured.SharedDeviceID) {
+			a.logger.V(6).Info("Observed shared device deallocation", "shared device", sharedDeviceID, "claim", klog.KObj(claim))
+			shareIDs = append(shareIDs, sharedDeviceID)
+		},
+		func(capacity structured.DeviceConsumedCapacity) {
+			a.logger.V(6).Info("Observed consumed capacity release", "device id", capacity.DeviceID, "consumed capacity", capacity.ConsumedCapacity, "claim", klog.KObj(claim))
+			deviceCapacities = append(deviceCapacities, capacity)
+		})
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	for _, deviceID := range deviceIDs {
 		a.ids.Delete(deviceID)
+	}
+	for _, shareID := range shareIDs {
+		a.shareIDs.Delete(shareID)
+	}
+	for _, capacity := range deviceCapacities {
+		deviceID := capacity.DeviceID
+		if _, found := a.capacities[deviceID]; found {
+			a.capacities[deviceID].Sub(capacity.ConsumedCapacity)
+			if a.capacities[deviceID].Empty() {
+				delete(a.capacities, deviceID)
+			}
+		}
 	}
 }
