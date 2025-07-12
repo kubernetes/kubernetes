@@ -246,7 +246,7 @@ var _ = SIGDescribe("Secrets", func() {
 		Allows users to use envFrom to set prefixes with various printable ASCII characters excluding '=' as environment variable names.
 		This test verifies that different prefixes including digits, special characters, and letters can be correctly used.
 	*/
-	framework.It("should be consumable as environment variable names when secret keys start with a digit", func(ctx context.Context) {
+	framework.ConformanceIt("should be consumable as environment variable names variable names with various prefixes", func(ctx context.Context) {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
 
