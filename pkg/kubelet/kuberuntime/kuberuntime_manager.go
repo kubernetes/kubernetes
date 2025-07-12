@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
@@ -1032,6 +1033,16 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
+
+		// In some cases, after syncPod completes,
+		// there may be a delay in container events reported by the container runtime.
+		// This can result in the inability to obtain the latest pod status when entering syncPod again.
+		// This aims to prevent delayed states from interfering with the behavior of syncPod.
+		if containerStatus != nil && utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && pleg.IsEventedPLEGInUse() && kubecontainer.IsContainerPendingStart(containerStatus) {
+			klog.V(4).InfoS("The container's status is Created, but it did not enter the Running state within the grace period. Waiting for the next cycle.", "pod", klog.KObj(pod), "containerName", container.Name)
+			keepCount++
+			continue
+		}
 
 		// Call internal container post-stop lifecycle hook for any non-running container so that any
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
