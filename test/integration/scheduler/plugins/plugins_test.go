@@ -492,6 +492,11 @@ func (pp *PreBindPlugin) Name() string {
 	return preBindPluginName
 }
 
+// PreBindPreFlight is a test function that returns nil for testing.
+func (pp *PreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
 // PreBind is a test function that returns (true, nil) or errors for testing.
 func (pp *PreBindPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	pp.mutex.Lock()
