@@ -1189,6 +1189,7 @@ func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
 	wrapper.Name = nodeName + "-" + driverName
 	wrapper.Spec.NodeName = nodeName
 	wrapper.Spec.Pool.Name = nodeName
+	wrapper.Spec.Pool.ResourceSliceCount = 1
 	wrapper.Spec.Driver = driverName
 	return wrapper
 }
@@ -1227,6 +1228,11 @@ func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *Re
 		}
 	}
 	wrapper.Spec.Devices = append(wrapper.Spec.Devices, device)
+	return wrapper
+}
+
+func (wrapper *ResourceSliceWrapper) ResourceSliceCount(count int) *ResourceSliceWrapper {
+	wrapper.Spec.Pool.ResourceSliceCount = int64(count)
 	return wrapper
 }
 
