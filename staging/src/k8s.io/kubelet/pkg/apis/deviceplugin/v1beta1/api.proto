@@ -70,7 +70,7 @@ service DevicePlugin {
 	// of the steps to make the Device available in the container
 	rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
 
-	// PreStartContainer is called, if indicated by Device Plugin during registeration phase,
+	// PreStartContainer is called, if indicated by Device Plugin during registration phase,
 	// before each container start. Device plugin can run device specific operations
 	// such as resetting the device before making devices available to the container
 	rpc PreStartContainer(PreStartContainerRequest) returns (PreStartContainerResponse) {}
