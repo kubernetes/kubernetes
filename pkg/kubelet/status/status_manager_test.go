@@ -2078,6 +2078,7 @@ func TestPodResizeConditions(t *testing.T) {
 		name                          string
 		updateFunc                    func(types.UID)
 		expected                      []*v1.PodCondition
+		expectedReasonDetail          string
 		expectedIsPodResizeDeferred   bool
 		expectedIsPodResizeInfeasible bool
 	}{
@@ -2129,7 +2130,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize pending condition to deferred with message",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "some-message")
+				m.SetPodResizePendingCondition(podUID, v1.PodReasonDeferred, "reason-detail-deferred", "some-message")
 			},
 			expected: []*v1.PodCondition{
 				{
@@ -2143,12 +2144,13 @@ func TestPodResizeConditions(t *testing.T) {
 					Status: v1.ConditionTrue,
 				},
 			},
+			expectedReasonDetail:        "reason-detail-deferred",
 			expectedIsPodResizeDeferred: true,
 		},
 		{
 			name: "set pod resize pending condition to infeasible with message",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizePendingCondition(podUID, v1.PodReasonInfeasible, "some-message")
+				m.SetPodResizePendingCondition(podUID, v1.PodReasonInfeasible, "reason-detail-infeasible", "some-message")
 			},
 			expected: []*v1.PodCondition{
 				{
@@ -2162,6 +2164,7 @@ func TestPodResizeConditions(t *testing.T) {
 					Status: v1.ConditionTrue,
 				},
 			},
+			expectedReasonDetail:          "reason-detail-infeasible",
 			expectedIsPodResizeInfeasible: true,
 		},
 		{
@@ -2177,6 +2180,7 @@ func TestPodResizeConditions(t *testing.T) {
 					Message: "some-message",
 				},
 			},
+			expectedReasonDetail:          "reason-detail-infeasible",
 			expectedIsPodResizeInfeasible: true,
 		},
 		{
@@ -2206,6 +2210,10 @@ func TestPodResizeConditions(t *testing.T) {
 			}
 			require.Equal(t, tc.expectedIsPodResizeDeferred, m.IsPodResizeDeferred(podUID))
 			require.Equal(t, tc.expectedIsPodResizeInfeasible, m.IsPodResizeInfeasible(podUID))
+
+			if tc.expectedIsPodResizeDeferred || tc.expectedIsPodResizeInfeasible {
+				require.Equal(t, tc.expectedReasonDetail, m.(*manager).podResizeConditions[podUID].PodResizePending.reasonDetail)
+			}
 		})
 	}
 }

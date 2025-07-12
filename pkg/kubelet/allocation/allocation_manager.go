@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -53,6 +54,9 @@ const (
 
 	initialRetryDelay = 30 * time.Second
 	retryDelay        = 3 * time.Minute
+
+	TriggerReasonEvent    = "event_based"
+	TriggerReasonPeriodic = "periodic_retry"
 )
 
 // AllocationManager tracks pod resource allocations.
@@ -102,10 +106,11 @@ type Manager interface {
 	Run(ctx context.Context)
 
 	// PushPendingResize queues a pod with a pending resize request for later reevaluation.
-	PushPendingResize(uid types.UID)
+	// Returns true if the pod is queued, false if it was already queued.
+	PushPendingResize(uid types.UID) bool
 
 	// RetryPendingResizes retries all pending resizes. It returns a list of successful resizes.
-	RetryPendingResizes() []*v1.Pod
+	RetryPendingResizes(trigger string) []*v1.Pod
 
 	// CheckPodResizeInProgress checks whether the actuated resizable resources differ from the allocated resources
 	// for any running containers.
@@ -202,7 +207,7 @@ func (m *manager) Run(ctx context.Context) {
 		for {
 			select {
 			case <-m.ticker.C:
-				successfulResizes := m.RetryPendingResizes()
+				successfulResizes := m.RetryPendingResizes(TriggerReasonPeriodic)
 				for _, po := range successfulResizes {
 					klog.InfoS("Successfully retried resize after timeout", "pod", klog.KObj(po))
 				}
@@ -214,7 +219,7 @@ func (m *manager) Run(ctx context.Context) {
 	}()
 }
 
-func (m *manager) RetryPendingResizes() []*v1.Pod {
+func (m *manager) RetryPendingResizes(trigger string) []*v1.Pod {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -252,6 +257,7 @@ func (m *manager) RetryPendingResizes() []*v1.Pod {
 		default:
 			klog.V(4).InfoS("Pod resize successfully allocated", "pod", klog.KObj(pod))
 			successfulResizes = append(successfulResizes, pod)
+			metrics.PodDeferredAcceptedResizes.WithLabelValues(trigger).Inc()
 		}
 
 		// If the pod resize status has changed, we need to update the pod status.
@@ -261,25 +267,26 @@ func (m *manager) RetryPendingResizes() []*v1.Pod {
 		}
 	}
 
+	m.statusManager.RecordPendingResizeCount()
 	m.podsWithPendingResizes = newPendingResizes
 	return successfulResizes
-
 }
 
-func (m *manager) PushPendingResize(uid types.UID) {
+func (m *manager) PushPendingResize(uid types.UID) bool {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
 	for _, p := range m.podsWithPendingResizes {
 		if p == uid {
 			// Pod is already in the pending resizes queue.
-			return
+			return false
 		}
 	}
 
 	// Add the pod to the pending resizes list and sort by priority.
 	m.podsWithPendingResizes = append(m.podsWithPendingResizes, uid)
 	m.sortPendingResizes()
+	return true
 }
 
 // sortPendingResizes sorts the list of pending resizes:
@@ -537,18 +544,19 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		m.statusManager.ClearPodResizePendingCondition(pod.UID)
 		return false, nil
 
-	} else if resizable, msg := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
+	} else if resizable, reasonDetail, msg := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
-		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg)
+		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, reasonDetail, msg)
 		return false, nil
+
 	} else if resizeNotAllowed, msg := disallowResizeForSwappableContainers(m.containerRuntime, pod, allocatedPod); resizeNotAllowed {
 		// If this resize involve swap recalculation, set as infeasible, as IPPR with swap is not supported for beta.
-		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg)
+		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, "swap_limitation", msg)
 		return false, nil
 	}
 
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, reason, message := m.canResizePod(m.getAllocatedPods(m.getActivePods()), pod)
+	fit, reason, reasonDetail, message := m.canResizePod(m.getAllocatedPods(m.getActivePods()), pod)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(pod); err != nil {
@@ -564,7 +572,7 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 	}
 
 	if reason != "" {
-		m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message)
+		m.statusManager.SetPodResizePendingCondition(pod.UID, reason, reasonDetail, message)
 	}
 
 	return false, nil
@@ -631,21 +639,20 @@ func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, strin
 // pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed; returns a reason and message
 // otherwise.
-func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string, string) {
 	// TODO: Move this logic into a PodAdmitHandler by introducing an operation field to
 	// lifecycle.PodAdmitAttributes, and combine canResizePod with canAdmitPod.
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		if m.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
 			msg := "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy"
 			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
-			return false, v1.PodReasonInfeasible, msg
+			return false, v1.PodReasonInfeasible, "guaranteed_pod_cpu_manager_static_policy", msg
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
 			if m.containerManager.GetNodeConfig().MemoryManagerPolicy == "Static" {
 				msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
 				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
-				return false, v1.PodReasonInfeasible, msg
-
+				return false, v1.PodReasonInfeasible, "guaranteed_pod_memory_manager_static_policy", msg
 			}
 		}
 	}
@@ -664,7 +671,7 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 		}
 		msg = "Node didn't have enough capacity: " + msg
 		klog.V(3).InfoS(msg, "pod", klog.KObj(pod))
-		return false, v1.PodReasonInfeasible, msg
+		return false, v1.PodReasonInfeasible, "insufficient_node_allocatable", msg
 	}
 
 	for i := range allocatedPods {
@@ -682,10 +689,10 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 	if ok, failReason, failMessage := m.canAdmitPod(allocatedPods, pod); !ok {
 		// Log reason and return.
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
-		return false, v1.PodReasonDeferred, failMessage
+		return false, v1.PodReasonDeferred, "insufficient_node_allocatable", failMessage
 	}
 
-	return true, "", ""
+	return true, "", "", ""
 }
 
 func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) {
@@ -697,9 +704,10 @@ func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kube
 		conditionCleared := m.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
 		if conditionCleared {
 			// TODO(natasha41575): We only need to make this call if any of the resources were decreased.
-			m.RetryPendingResizes()
+			m.RetryPendingResizes(TriggerReasonEvent)
 		}
 	}
+	m.statusManager.RecordInProgressResizeCount()
 }
 
 // isPodResizeInProgress checks whether the actuated resizable resources differ from the allocated resources
@@ -710,7 +718,7 @@ func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kube
 func (m *manager) isPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	return !podutil.VisitContainers(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers,
 		func(allocatedContainer *v1.Container, containerType podutil.ContainerType) (shouldContinue bool) {
-			if !isResizableContainer(allocatedContainer, containerType) {
+			if !IsResizableContainer(allocatedContainer, containerType) {
 				return true
 			}
 
@@ -742,7 +750,7 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 	return allocatedPods
 }
 
-func isResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
+func IsResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
 	switch containerType {
 	case podutil.InitContainers:
 		return podutil.IsRestartableInitContainer(container)

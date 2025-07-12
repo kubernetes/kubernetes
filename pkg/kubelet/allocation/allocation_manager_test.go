@@ -806,7 +806,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					return newPod, true
 				}
 				allocationManager.PushPendingResize(originalPod.UID)
-				allocationManager.RetryPendingResizes()
+				allocationManager.RetryPendingResizes(TriggerReasonEvent)
 				allocatedPod, _ := allocationManager.UpdatePodFromAllocation(newPod)
 				allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
 
@@ -988,7 +988,7 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 				return newPod, true
 			}
 			allocationManager.PushPendingResize(testPod.UID)
-			allocationManager.RetryPendingResizes()
+			allocationManager.RetryPendingResizes(TriggerReasonEvent)
 			allocatedPod, _ := allocationManager.UpdatePodFromAllocation(newPod)
 			allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
 
@@ -1189,9 +1189,9 @@ func TestSortPendingResizes(t *testing.T) {
 
 	testPods[1].Spec.Priority = ptr.To(int32(100))
 	testPods[2].Status.QOSClass = v1.PodQOSGuaranteed
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[3].UID, v1.PodReasonDeferred, "some-message")
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[3].UID, v1.PodReasonDeferred, "reason-detail", "some-message")
 	time.Sleep(5 * time.Millisecond)
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[4].UID, v1.PodReasonDeferred, "some-message")
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[4].UID, v1.PodReasonDeferred, "reason-detail", "some-message")
 
 	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 		pods := map[types.UID]*v1.Pod{

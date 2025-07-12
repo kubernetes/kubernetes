@@ -26,12 +26,12 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg string) {
+func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) (allowed bool, reasonDetail, msg string) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return false, "InPlacePodVerticalScaling is disabled"
+		return false, "feature_gate_off", "InPlacePodVerticalScaling is disabled"
 	}
 	if kubetypes.IsStaticPod(pod) {
-		return false, "In-place resize of static-pods is not supported"
+		return false, "static_pod", "In-place resize of static-pods is not supported"
 	}
-	return true, ""
+	return true, "", ""
 }

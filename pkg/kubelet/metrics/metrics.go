@@ -163,6 +163,13 @@ const (
 
 	// Special label for [DRAResourceClaimsInUseDesc] which counts ResourceClaims regardless of the driver.
 	DRAResourceClaimsInUseAnyDriver = "<any>"
+
+	// Metric keys for in-place pod resize operations.
+	ContainerRequestedResizesKey     = "container_requested_resizes_total"
+	PodResizeDurationMillisecondsKey = "pod_resize_duration_milliseconds"
+	PodPendingResizesKey             = "pod_pending_resizes"
+	PodInProgressResizesKey          = "pod_in_progress_resizes"
+	PodDeferredAcceptedResizesKey    = "pod_deferred_accepted_resizes_total"
 )
 
 type imageSizeBucket struct {
@@ -194,10 +201,13 @@ var (
 	// The buckets max value 40 is based on the 45sec max gRPC timeout value defined
 	// for the DRA gRPC calls in the pkg/kubelet/cm/dra/plugin/registration.go
 	DRADurationBuckets = metrics.ExponentialBucketsRange(.1, 40, 15)
+
+	// podResizeDurationBuckets is the bucket boundaries for pod_resize_duration_milliseconds metrics.
+	podResizeDurationBuckets = []float64{1, 5, 10, 20, 30, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600}
 )
 
 var (
-	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
+	// NodeName is a Gauge that tracks the node's name. The count is always 1.
 	NodeName = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1079,6 +1089,60 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// ContainerRequestedResizes tracks the cumulative number of requested resizes at the container level.
+	ContainerRequestedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ContainerRequestedResizesKey,
+			Help:           "Number of requested resizes, counted at the container level.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource", "requirement", "operation"},
+	)
+
+	// PodResizeDurationMilliSeconds tracks the duration (in milliseconds) it takes to resize a pod.
+	PodResizeDurationMilliSeconds = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResizeDurationMillisecondsKey,
+			Help:           "Duration in milliseconds to resize a pod.",
+			Buckets:        podResizeDurationBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// PodPendingResizes tracks the number of pending resizes for pods.
+	PodPendingResizes = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodPendingResizesKey,
+			Help:           "Number of pending resizes for pods.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"reason", "reason_detail"},
+	)
+
+	// PodInProgressResizes tracks the number of in-progress resizes for pods.
+	PodInProgressResizes = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodInProgressResizesKey,
+			Help:           "Number of in-progress resizes for pods.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// PodDeferredAcceptedResizes tracks the cumulative number of deferred accepted resizes for pods.
+	PodDeferredAcceptedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodDeferredAcceptedResizesKey,
+			Help:           "Cumulative number of deferred accepted resizes for pods.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"accepted_reason"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1187,6 +1251,14 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(ImageVolumeRequestedTotal)
 			legacyregistry.MustRegister(ImageVolumeMountedSucceedTotal)
 			legacyregistry.MustRegister(ImageVolumeMountedErrorsTotal)
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			legacyregistry.MustRegister(ContainerRequestedResizes)
+			legacyregistry.MustRegister(PodResizeDurationMilliSeconds)
+			legacyregistry.MustRegister(PodPendingResizes)
+			legacyregistry.MustRegister(PodInProgressResizes)
+			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
 		}
 	})
 }
