@@ -53,7 +53,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 			template:     testClaimTemplate("", goodNS, validClaimSpec),
 		},
 		"bad-name": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')") /* no WithOrigin https://github.com/kubernetes/kubernetes/blob/6ed5b60f71930d51bfcf8bfa6f3506b099811318/staging/src/k8s.io/apimachinery/pkg/api/validation/objectmeta.go#L160 */},
 			template:     testClaimTemplate(badName, goodNS, validClaimSpec),
 		},
 		"missing-namespace": {
@@ -149,7 +149,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 			}(),
 		},
 		"bad-labels": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "labels"), badValue, "").WithOrigin("format=label-value")},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.Labels = map[string]string{
@@ -168,7 +168,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 			}(),
 		},
 		"bad-annotations": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations"), badName, "").WithOrigin("format=qualified-name")},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.Annotations = map[string]string{
@@ -178,7 +178,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 			}(),
 		},
 		"bad-classname": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "deviceClassName"), badName, "").WithOrigin("format=dns-subdomain")},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
 				template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName = badName
@@ -203,7 +203,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 			}(),
 		},
 		"prioritized-list-bad-class-name-on-subrequest": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), badName, "").WithOrigin("format=dns-subdomain")},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
 				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName = badName
