@@ -81,7 +81,7 @@ func Validate_ReplicationControllerList(ctx context.Context, op operation.Operat
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, Validate_ReplicationController)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ReplicationController)...)
 			return
 		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerList) []corev1.ReplicationController { return oldObj.Items }))...)
 
