@@ -87,7 +87,7 @@ const (
 var httpProbe = &v1.Probe{
 	ProbeHandler: v1.ProbeHandler{
 		HTTPGet: &v1.HTTPGetAction{
-			Path: "/index.html",
+			Path: "/localhost.crt",
 			Port: intstr.IntOrString{IntVal: 80},
 		},
 	},
@@ -365,7 +365,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 					currentRevision)
 			}
-			newImage := NewWebserverImage
+			newImage := AgnhostImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
@@ -612,7 +612,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 					currentRevision)
 			}
-			newImage := NewWebserverImage
+			newImage := AgnhostImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
@@ -823,8 +823,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "webserver",
-							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							Name:  "agnhost",
+							Image: imageutils.GetE2EImage(imageutils.Agnhost),
 							Ports: []v1.ContainerPort{conflictingPort},
 						},
 					},
@@ -986,7 +986,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			// Define StatefulSet Labels
 			ssPodLabels := map[string]string{
 				"name": "sample-pod",
-				"pod":  WebserverImageName,
+				"pod":  AgnhostImageName,
 			}
 			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
 			setHTTPProbe(ss)
@@ -1228,7 +1228,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Define StatefulSet Labels
 		ssPodLabels := map[string]string{
 			"name": "sample-pod",
-			"pod":  WebserverImageName,
+			"pod":  AgnhostImageName,
 		}
 		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, ssPodLabels)
 		setHTTPProbe(ss)
@@ -1243,7 +1243,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Define StatefulSet Labels
 		ssPodLabels := map[string]string{
 			"name": "sample-pod",
-			"pod":  WebserverImageName,
+			"pod":  AgnhostImageName,
 		}
 		ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 2, nil, nil, ssPodLabels)
 		ss.Spec.MinReadySeconds = 30
@@ -2203,7 +2203,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	err = breakPodHTTPProbe(ss, &pods.Items[1])
 	framework.ExpectNoError(err)
 	ss, _ = waitForPodNotReady(ctx, c, ss, pods.Items[1].Name)
-	newImage := NewWebserverImage
+	newImage := AgnhostImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 	ginkgo.By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
@@ -2327,7 +2327,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 	defer e2epod.NewPodClient(f).RemoveFinalizer(ctx, pod0.Name, testFinalizer)
 
 	ginkgo.By("Updating image on StatefulSet")
-	newImage := NewWebserverImage
+	newImage := AgnhostImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 	ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
 	gomega.Expect(oldImage).ToNot(gomega.Equal(newImage), "Incorrect test setup: should update to a different image")
@@ -2468,7 +2468,7 @@ func breakHTTPProbe(ctx context.Context, c clientset.Interface, ss *appsv1.State
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
+	cmd := fmt.Sprintf("mv -v %v /tmp/ || true", path)
 	return e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd)
 }
 
@@ -2478,8 +2478,7 @@ func breakPodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	if path == "" {
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
-	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
+	cmd := fmt.Sprintf("mv -v %v /tmp/ || true", path)
 	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
@@ -2492,7 +2491,7 @@ func restoreHTTPProbe(ctx context.Context, c clientset.Interface, ss *appsv1.Sta
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
+	cmd := fmt.Sprintf("mv -v /tmp%v / || true", path)
 	return e2estatefulset.ExecInStatefulPods(ctx, c, ss, cmd)
 }
 
@@ -2503,7 +2502,7 @@ func restorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 		return fmt.Errorf("path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
+	cmd := fmt.Sprintf("mv -v /tmp%v / || true", path)
 	stdout, err := e2eoutput.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, statefulSetPoll, statefulPodTimeout)
 	framework.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err

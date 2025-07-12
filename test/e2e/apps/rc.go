@@ -430,7 +430,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 		expectedRCReplicaCount := int32(2)
 
 		ginkgo.By(fmt.Sprintf("Creating ReplicationController %q", rcName))
-		rc := newRC(rcName, initialRCReplicaCount, map[string]string{"name": rcName}, WebserverImageName, WebserverImage, nil)
+		rc := newRC(rcName, initialRCReplicaCount, map[string]string{"name": rcName}, AgnhostImageName, AgnhostImage, nil)
 		_, err := rcClient.Create(ctx, rc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create ReplicationController: %v", err)
 
@@ -563,7 +563,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Creating rc %q that asks for more than the allowed pod quota", name))
-	rc := newRC(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage, nil)
+	rc := newRC(name, 3, map[string]string{"name": name}, AgnhostImageName, AgnhostImage, nil)
 	rc, err = c.CoreV1().ReplicationControllers(namespace).Create(ctx, rc, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
@@ -633,7 +633,7 @@ func testRCAdoptMatchingOrphans(ctx context.Context, f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: WebserverImage,
+					Image: AgnhostImage,
 				},
 			},
 		},
@@ -641,7 +641,7 @@ func testRCAdoptMatchingOrphans(ctx context.Context, f *framework.Framework) {
 
 	ginkgo.By("When a replication controller with a matching selector is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, AgnhostImage, nil)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(ctx, rcSt, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
@@ -671,7 +671,7 @@ func testRCReleaseControlledNotMatching(ctx context.Context, f *framework.Framew
 	rcLabels := map[string]string{"name": name}
 	ginkgo.By("Given a ReplicationController is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, rcLabels, name, WebserverImage, nil)
+	rcSt := newRC(name, replicas, rcLabels, name, AgnhostImage, nil)
 	rcSt.Spec.Selector = rcLabels
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(ctx, rcSt, metav1.CreateOptions{})
 	framework.ExpectNoError(err)

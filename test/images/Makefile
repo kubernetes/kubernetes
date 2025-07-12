@@ -30,7 +30,7 @@ endif
 #   WHAT: Directory names to build.
 #
 # Example:
-#   make all WHAT=httpd
+#   make all WHAT=agnhost
 all: all-container
 
 all-container:
