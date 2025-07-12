@@ -352,8 +352,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodReadyToStartContainersCondition = framework.WithFeature(framework.ValidFeatures.Add("PodReadyToStartContainersCondition"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	PodResources = framework.WithFeature(framework.ValidFeatures.Add("PodResources"))
+	// Owner: sig-node
+	// Marks tests which exercise or consume the kubelet-local Pod Resources API
+	// see: KEPs 606, 2043; see: pkg/kubelet/apis/podresources/
+	PodResourcesAPI = framework.WithFeature(framework.ValidFeatures.Add("PodResourcesAPI"))
 
 	// Owner: sig-node
 	// Verify ProcMount feature.
