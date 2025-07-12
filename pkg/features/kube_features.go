@@ -337,6 +337,12 @@ const (
 	// Enables the image volume source.
 	ImageVolume featuregate.Feature = "ImageVolume"
 
+	// owner: @iholder101
+	// kep: https://kep.k8s.io/4639
+	//
+	// Enables adding the ImageVolume's digest to the pod's status.
+	ImageVolumeWithDigest featuregate.Feature = "ImageVolumeWithDigest"
+
 	// owner: @vinaykul,@tallclair
 	// kep: http://kep.k8s.io/1287
 	//
@@ -1204,6 +1210,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ImageVolume: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	ImageVolumeWithDigest: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	InPlacePodVerticalScaling: {

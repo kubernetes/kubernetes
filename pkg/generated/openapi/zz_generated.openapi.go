@@ -33077,6 +33077,13 @@ func schema_k8sio_api_core_v1_VolumeMountStatus(ref common.ReferenceCallback) co
 							Format:      "",
 						},
 					},
+					"imageRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ImageRef is the digest of the image used for this volume. It should have a value that's similar to the pod's status.containerStatuses[i].imageID. If the volume source is not an ImageVolume, this field will be empty.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"name", "mountPath"},
 			},

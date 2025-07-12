@@ -3461,6 +3461,10 @@ type VolumeMountStatus struct {
 	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	RecursiveReadOnly *RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty" protobuf:"bytes,4,opt,name=recursiveReadOnly,casttype=RecursiveReadOnlyMode"`
+	// ImageRef is the digest of the image used for this volume.
+	// It should have a value that's similar to the pod's status.containerStatuses[i].imageID.
+	// If the volume source is not an ImageVolume, this field will be empty.
+	ImageRef *string `json:"imageRef,omitempty" protobuf:"bytes,5,opt,name=imageRef"`
 }
 
 // RestartPolicy describes how the container should be restarted.
