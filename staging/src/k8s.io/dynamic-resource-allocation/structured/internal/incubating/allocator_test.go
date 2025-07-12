@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package structured
+package incubating
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 
 func TestAllocator(t *testing.T) {
 	allocatortesting.TestAllocator(t,
-		internal.FeaturesAll,
+		SupportedFeatures,
 		func(
 			ctx context.Context,
 			features Features,
@@ -38,7 +38,8 @@ func TestAllocator(t *testing.T) {
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
-		) (allocatortesting.Allocator, error) {
+		) (internal.Allocator, error) {
 			return NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
-		})
+		},
+	)
 }
