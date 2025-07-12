@@ -17,11 +17,13 @@ limitations under the License.
 package benchmark
 
 import (
+	"context"
 	"fmt"
 	"math/rand/v2"
 	"path/filepath"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -32,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
@@ -235,6 +238,13 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
 						"memory": {Value: resource.MustParse("1Gi")},
 					},
+					// These fields are only used when the "BindingConditions" feature gate is enabled.
+					// When the feature gate is off, these fields are stripped, which ensures that other tests continue to work as before without them.
+					// Should DRABindingConditions become enabled unconditionally, a way of generating slices differently for different tests will be needed.
+					UsageRestrictedToNode:    ptr.To(true),
+					BindingConditions:        []string{"DeviceAttached"},
+					BindingFailureConditions: []string{"AttachmentFailed"},
+					BindingTimeoutSeconds:    ptr.To[int64](60),
 				},
 			},
 		)
@@ -343,6 +353,7 @@ claims:
 			AdminAccess:          utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
+			DeviceBinding:        utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions),
 		}, []*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
@@ -362,5 +373,205 @@ claims:
 			}
 		}
 		tCtx.Fatalf("Could not allocate claim %d out of %d", i, len(claims))
+	}
+}
+
+// updateDeviceConditionsOp defines an op where device conditions are updated.
+// This is used to test the device binding conditions.
+// The conditions are set on the device status of the resource claim.
+type updateDeviceConditionsOp struct {
+	// Must be updateDeviceConditionsOpcode.
+	Opcode operationCode
+	// Namespace where the claims are located.
+	Namespace string
+	// Count is the number of claims to update.
+	Count int
+	// CountParam is the parameter for the number of claims to update.
+	CountParam string
+	// Conditions to set on the devices.
+	ConditionTypeParam string
+	// ConditionStatusParam is the parameter for the condition status.
+	// The condition status must be one of "True", "False", or "Unknown".
+	ConditionStatusParam string
+	// Conditions to set on the devices. This is parameterized through
+	// ConditionTypeParam and ConditionStatusParam.
+	Conditions []metav1.Condition
+	// Duration for the test.
+	Duration metav1.Duration
+	// DurationParam is the parameter for the duration.
+	// If set, the duration is parameterized through this parameter.
+	// The duration is used to wait for the conditions to be set.
+	DurationParam string
+}
+
+func (op *updateDeviceConditionsOp) isValid(allowParameterization bool) error {
+	if op.Namespace == "" {
+		return fmt.Errorf("namespace must be set")
+	}
+	if op.Conditions == nil && (op.ConditionTypeParam == "" || op.ConditionStatusParam == "") {
+		return fmt.Errorf("conditions must be set")
+	}
+	if op.ConditionStatusParam != "" && op.ConditionTypeParam == "" {
+		return fmt.Errorf("conditionStatusParam must be set together with conditionTypeParam")
+	}
+	if op.ConditionTypeParam != "" && op.ConditionStatusParam == "" {
+		return fmt.Errorf("conditionTypeParam must be set together with conditionStatusParam")
+	}
+	if op.CountParam == "" {
+		if op.Count <= 0 {
+			return fmt.Errorf("count must be greater than 0 if countParam is not set")
+		}
+	}
+
+	return nil
+}
+
+func (op *updateDeviceConditionsOp) patchParams(w *workload) (realOp, error) {
+	op.Conditions = make([]metav1.Condition, 1)
+
+	var err error
+	if op.ConditionTypeParam != "" {
+		op.Conditions[0].Type, err = getParam[string](w.Params, op.ConditionTypeParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if op.ConditionStatusParam != "" {
+		status, err := getParam[string](w.Params, op.ConditionStatusParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		switch status {
+		case "True":
+			op.Conditions[0].Status = metav1.ConditionTrue
+		case "False":
+			op.Conditions[0].Status = metav1.ConditionFalse
+		case "Unknown":
+			op.Conditions[0].Status = metav1.ConditionUnknown
+		default:
+			return nil, fmt.Errorf("invalid condition status %q", status)
+		}
+	}
+
+	if op.DurationParam != "" {
+		durationStr, err := getParam[string](w.Params, op.DurationParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		if op.Duration.Duration, err = time.ParseDuration(durationStr); err != nil {
+			return nil, fmt.Errorf("parsing duration parameter %s: %w", op.DurationParam, err)
+		}
+	}
+
+	if op.CountParam != "" {
+		op.Count, err = w.Params.get(op.CountParam[1:])
+		if err != nil {
+			return nil, fmt.Errorf("parsing CountParam %s: %w", op.CountParam, err)
+		} else if op.Count <= 0 {
+			return nil, fmt.Errorf("count must be greater than 0 if CountParam is set")
+		}
+	} else if op.Count <= 0 {
+		return nil, fmt.Errorf("count must be greater than 0 if CountParam is not set")
+	}
+
+	return op, op.isValid(false)
+}
+
+func (op *updateDeviceConditionsOp) collectsMetrics() bool {
+	return false
+}
+
+func (op *updateDeviceConditionsOp) requiredNamespaces() []string {
+	return []string{op.Namespace}
+}
+
+func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
+	tCtx.Logf("updating device conditions in namespace %s with conditions %v", op.Namespace, op.Conditions)
+	var claimList *resourceapi.ResourceClaimList
+	var err error
+
+	ctx, cancel := context.WithTimeout(tCtx, op.Duration.Duration)
+	defer cancel()
+
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, op.Duration.Duration, true, func(ctx context.Context) (bool, error) {
+		claimList, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
+		if err != nil {
+			return false, nil
+		}
+		if len(claimList.Items) >= op.Count {
+			return true, nil
+		}
+		tCtx.Logf("Waiting for at least %d claims in namespace %s, found %d", op.Count, op.Namespace, len(claimList.Items))
+		return false, nil
+	})
+
+	if err != nil {
+		tCtx.Fatalf("No claims found in namespace %s within %v: %v", op.Namespace, op.Duration.Duration, err)
+	}
+
+	for _, item := range claimList.Items {
+		claimName := item.GetName()
+		var claim *resourceapi.ResourceClaim
+
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, op.Duration.Duration, true, func(ctx context.Context) (bool, error) {
+			claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).Get(tCtx, claimName, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if claim.Status.Allocation == nil || len(claim.Status.Allocation.Devices.Results) == 0 {
+				return false, nil
+			}
+			for _, dev := range claim.Status.Allocation.Devices.Results {
+				if dev.BindingConditions != nil {
+					return true, nil
+				}
+			}
+			return false, nil
+		})
+
+		if err != nil {
+			tCtx.Fatalf("No devices found in claim %s/%s within %v: %v", op.Namespace, claimName, op.Duration.Duration, err)
+		}
+
+		updatedClaim := claim.DeepCopy()
+		for _, dev := range claim.Status.Allocation.Devices.Results {
+			if dev.BindingConditions == nil && dev.BindingFailureConditions == nil {
+				continue
+			}
+			for _, cond := range op.Conditions {
+				ads := makeBindingConditions(
+					dev.Driver,
+					dev.Pool,
+					dev.Device,
+					cond.Type,
+					cond.Status,
+				)
+				updatedClaim.Status.Devices = append(updatedClaim.Status.Devices, ads)
+			}
+		}
+
+		_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).UpdateStatus(tCtx, updatedClaim, metav1.UpdateOptions{})
+		if err != nil {
+			tCtx.Fatalf("Update device conditions for claim %s/%s failed: %v", op.Namespace, claimName, err)
+		}
+		tCtx.Logf("Updated device conditions for claim %s/%s: %v", op.Namespace, claimName, op.Conditions)
+	}
+}
+
+func makeBindingConditions(driver, pool, device, condition string, status metav1.ConditionStatus) resourceapi.AllocatedDeviceStatus {
+	return resourceapi.AllocatedDeviceStatus{
+		Driver: driver,
+		Pool:   pool,
+		Device: device,
+		Conditions: []metav1.Condition{
+			{
+				Type:               condition,
+				Status:             status,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "Test",
+				Message:            "Test",
+			},
+		},
 	}
 }
