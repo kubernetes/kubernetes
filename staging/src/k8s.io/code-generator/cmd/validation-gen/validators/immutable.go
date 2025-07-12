@@ -54,7 +54,7 @@ var (
 func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	var result Validations
 
-	if util.NonPointer(util.NativeType(context.Type)).Kind == types.Builtin {
+	if util.IsDirectComparable(util.NonPointer(util.NativeType(context.Type))) {
 		// This is a minor optimization to just compare primitive values when
 		// possible. Slices and maps are not comparable, and structs might hold
 		// pointer fields, which are directly comparable but not what we need.
