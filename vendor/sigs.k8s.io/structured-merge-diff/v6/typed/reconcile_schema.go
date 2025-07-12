@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"sync"
 
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v4/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/schema"
 )
 
 var fmPool = sync.Pool{

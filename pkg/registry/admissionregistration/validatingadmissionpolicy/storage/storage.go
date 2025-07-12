@@ -31,7 +31,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/validatingadmissionpolicy"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // REST implements a RESTStorage for validatingAdmissionPolicy against etcd

@@ -31,6 +31,14 @@ type Field struct {
 // have a different name.
 type FieldList []Field
 
+// Copy returns a copy of the FieldList.
+// Values are not copied.
+func (f FieldList) Copy() FieldList {
+	c := make(FieldList, len(f))
+	copy(c, f)
+	return c
+}
+
 // Sort sorts the field list by Name.
 func (f FieldList) Sort() {
 	if len(f) < 2 {
