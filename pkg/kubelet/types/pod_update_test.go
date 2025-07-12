@@ -408,3 +408,104 @@ func TestIsNodeCriticalPod(t *testing.T) {
 		})
 	}
 }
+
+func TestHasRestartableInitContainer(t *testing.T) {
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
+	tests := []struct {
+		name     string
+		pod      *v1.Pod
+		expected bool
+	}{
+		{
+			name: "pod without init containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "pod with regular init containers only",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init1"},
+						{Name: "init2"},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "pod with one restartable init container",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "restartable-init", RestartPolicy: &containerRestartPolicyAlways},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "pod with mixed init containers (regular and restartable)",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init1"},
+						{Name: "restartable-init", RestartPolicy: &containerRestartPolicyAlways},
+						{Name: "init2"},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "pod with multiple restartable init containers",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "restartable-init1", RestartPolicy: &containerRestartPolicyAlways},
+						{Name: "restartable-init2", RestartPolicy: &containerRestartPolicyAlways},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "pod with init container having nil restart policy",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{Name: "init1", RestartPolicy: nil},
+					},
+					Containers: []v1.Container{
+						{Name: "container1"},
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			hasRestartableInitContainer := HasRestartableInitContainer(test.pod)
+			require.Equal(t, test.expected, hasRestartableInitContainer)
+		})
+	}
+}
