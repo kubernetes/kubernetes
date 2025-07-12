@@ -38,6 +38,11 @@ import (
 var (
 	serviceCIDRv4 = "10.0.0.0/16"
 	serviceCIDRv6 = "2001:db8::/64"
+
+	// testDefaultIPCreationTime is the default creation timestamp for the IPAddress objects.
+	testDefaultIPCreationTime = time.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)
+	// testDefaultSvcCreationTime is the default creation timestamp for the Service objects,
+	testDefaultSvcCreationTime = testDefaultIPCreationTime.Add(1 * time.Second)
 )
 
 type fakeRepair struct {
@@ -96,9 +101,11 @@ func TestRepairServiceIP(t *testing.T) {
 	}{
 		{
 			name: "no changes needed single stack",
-			svcs: []*v1.Service{newService("test-svc", []string{"10.0.1.1"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testDefaultSvcCreationTime),
+			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("10.0.1.1", newService("test-svc", []string{"10.0.1.1"})),
+				newIPAddressWithCreationTimestamp("10.0.1.1", newService("test-svc", []string{"10.0.1.1"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -109,10 +116,12 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "no changes needed dual stack",
-			svcs: []*v1.Service{newService("test-svc", []string{"10.0.1.1", "2001:db8::10"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1", "2001:db8::10"}, testDefaultSvcCreationTime),
+			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("10.0.1.1", newService("test-svc", []string{"10.0.1.1"})),
-				newIPAddress("2001:db8::10", newService("test-svc", []string{"2001:db8::10"})),
+				newIPAddressWithCreationTimestamp("10.0.1.1", newService("test-svc", []string{"10.0.1.1"}), testDefaultIPCreationTime),
+				newIPAddressWithCreationTimestamp("2001:db8::10", newService("test-svc", []string{"2001:db8::10"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -123,10 +132,12 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "no changes needed dual stack multiple cidrs",
-			svcs: []*v1.Service{newService("test-svc", []string{"192.168.0.1", "2001:db8:a:b::10"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"192.168.0.1", "2001:db8:a:b::10"}, testDefaultSvcCreationTime),
+			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("192.168.0.1", newService("test-svc", []string{"192.168.0.1"})),
-				newIPAddress("2001:db8:a:b::10", newService("test-svc", []string{"2001:db8:a:b::10"})),
+				newIPAddressWithCreationTimestamp("192.168.0.1", newService("test-svc", []string{"192.168.0.1"}), testDefaultIPCreationTime),
+				newIPAddressWithCreationTimestamp("2001:db8:a:b::10", newService("test-svc", []string{"2001:db8:a:b::10"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -139,7 +150,9 @@ func TestRepairServiceIP(t *testing.T) {
 		// these two cases simulate migrating from bitmaps to IPAddress objects
 		{
 			name: "create IPAddress single stack",
-			svcs: []*v1.Service{newService("test-svc", []string{"10.0.1.1"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testDefaultSvcCreationTime),
+			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
 			},
@@ -149,7 +162,9 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "create IPAddresses dual stack",
-			svcs: []*v1.Service{newService("test-svc", []string{"10.0.1.1", "2001:db8::10"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1", "2001:db8::10"}, testDefaultSvcCreationTime),
+			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
 			},
@@ -162,7 +177,9 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "create IPAddress single stack from secondary",
-			svcs: []*v1.Service{newService("test-svc", []string{"192.168.1.1"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"192.168.1.1"}, testDefaultSvcCreationTime),
+			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
 				newServiceCIDR("custom", "192.168.1.0/24", ""),
@@ -173,9 +190,11 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "reconcile IPAddress single stack wrong reference",
-			svcs: []*v1.Service{newService("test-svc", []string{"10.0.1.1"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testDefaultSvcCreationTime),
+			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("10.0.1.1", newService("test-svc2", []string{"10.0.1.1"})),
+				newIPAddressWithCreationTimestamp("10.0.1.1", newService("test-svc2", []string{"10.0.1.1"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -186,10 +205,11 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "reconcile IPAddresses dual stack",
-			svcs: []*v1.Service{newService("test-svc", []string{"10.0.1.1", "2001:db8::10"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1", "2001:db8::10"}, testDefaultIPCreationTime.Add(-1*time.Second))},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("10.0.1.1", newService("test-svc2", []string{"10.0.1.1"})),
-				newIPAddress("2001:db8::10", newService("test-svc2", []string{"2001:db8::10"})),
+				newIPAddressWithCreationTimestamp("10.0.1.1", newService("test-svc2", []string{"10.0.1.1"}), testDefaultIPCreationTime),
+				newIPAddressWithCreationTimestamp("2001:db8::10", newService("test-svc2", []string{"2001:db8::10"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -203,10 +223,12 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "one IP out of range",
-			svcs: []*v1.Service{newService("test-svc", []string{"192.168.1.1", "2001:db8::10"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"192.168.1.1", "2001:db8::10"}, testDefaultSvcCreationTime),
+			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("192.168.1.1", newService("test-svc", []string{"192.168.1.1"})),
-				newIPAddress("2001:db8::10", newService("test-svc", []string{"2001:db8::10"})),
+				newIPAddressWithCreationTimestamp("192.168.1.1", newService("test-svc", []string{"192.168.1.1"}), testDefaultIPCreationTime),
+				newIPAddressWithCreationTimestamp("2001:db8::10", newService("test-svc", []string{"2001:db8::10"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -218,7 +240,7 @@ func TestRepairServiceIP(t *testing.T) {
 		{
 			name: "one IP orphan",
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("10.0.1.1", newService("test-svc", []string{"10.0.1.1"})),
+				newIPAddressWithCreationTimestamp("10.0.1.1", newService("test-svc", []string{"10.0.1.1"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -228,9 +250,11 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "one IP out of range matching the network address",
-			svcs: []*v1.Service{newService("test-svc", []string{"10.0.0.0"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.0.0"}, testDefaultSvcCreationTime),
+			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("10.0.0.0", newService("test-svc", []string{"10.0.0.0"})),
+				newIPAddressWithCreationTimestamp("10.0.0.0", newService("test-svc", []string{"10.0.0.0"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -241,9 +265,11 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "one IP out of range matching the broadcast address",
-			svcs: []*v1.Service{newService("test-svc", []string{"10.0.255.255"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.255.255"}, testDefaultSvcCreationTime),
+			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("10.0.255.255", newService("test-svc", []string{"10.0.255.255"})),
+				newIPAddressWithCreationTimestamp("10.0.255.255", newService("test-svc", []string{"10.0.255.255"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -254,9 +280,11 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "one IPv6 out of range matching the subnet address",
-			svcs: []*v1.Service{newService("test-svc", []string{"2001:db8::"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"2001:db8::"}, testDefaultSvcCreationTime),
+			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("2001:db8::", newService("test-svc", []string{"2001:db8::"})),
+				newIPAddressWithCreationTimestamp("2001:db8::", newService("test-svc", []string{"2001:db8::"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -267,9 +295,11 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "one IPv6 matching the broadcast address",
-			svcs: []*v1.Service{newService("test-svc", []string{"2001:db8::ffff:ffff:ffff:ffff"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"2001:db8::ffff:ffff:ffff:ffff"}, testDefaultSvcCreationTime),
+			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("2001:db8::ffff:ffff:ffff:ffff", newService("test-svc", []string{"2001:db8::ffff:ffff:ffff:ffff"})),
+				newIPAddressWithCreationTimestamp("2001:db8::ffff:ffff:ffff:ffff", newService("test-svc", []string{"2001:db8::ffff:ffff:ffff:ffff"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -279,7 +309,7 @@ func TestRepairServiceIP(t *testing.T) {
 		{
 			name: "one IP orphan matching the broadcast address",
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("10.0.255.255", newService("test-svc", []string{"10.0.255.255"})),
+				newIPAddressWithCreationTimestamp("10.0.255.255", newService("test-svc", []string{"10.0.255.255"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -289,10 +319,12 @@ func TestRepairServiceIP(t *testing.T) {
 		},
 		{
 			name: "Two IPAddresses referencing the same service",
-			svcs: []*v1.Service{newService("test-svc", []string{"10.0.1.1"})},
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testDefaultSvcCreationTime),
+			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("10.0.1.1", newService("test-svc", []string{"10.0.1.1"})),
-				newIPAddress("10.0.1.2", newService("test-svc", []string{"10.0.1.1"})),
+				newIPAddressWithCreationTimestamp("10.0.1.1", newService("test-svc", []string{"10.0.1.1"}), testDefaultIPCreationTime),
+				newIPAddressWithCreationTimestamp("10.0.1.2", newService("test-svc", []string{"10.0.1.1"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -301,13 +333,31 @@ func TestRepairServiceIP(t *testing.T) {
 			events:  []string{"Warning IPAddressWrongReference IPAddress: 10.0.1.2 for Service bar/test-svc has a wrong reference; cleaning up"},
 		},
 		{
-			name: "Two Services with same ClusterIP",
+			name: "Two IPAddresses referencing the same service when service create is called again",
 			svcs: []*v1.Service{
-				newService("test-svc", []string{"10.0.1.1"}),
-				newService("test-svc2", []string{"10.0.1.1"}),
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testDefaultSvcCreationTime),
 			},
 			ipAddresses: []*networkingv1.IPAddress{
-				newIPAddress("10.0.1.1", newService("test-svc2", []string{"10.0.1.1"})),
+				newIPAddressWithCreationTimestamp("10.0.1.1", newService("test-svc", []string{"10.0.1.1"}), testDefaultIPCreationTime),
+				// this mimics the case when create on service is called again, the allocation logic will first create a new IP object, and then
+				// revert the transaction. The repairip loop should not emit warning if it tries to reconcile the new IP object before the service
+				// transaction is reverted.
+				newIPAddressWithCreationTimestamp("10.0.1.2", newService("test-svc", []string{"10.0.1.1"}), testDefaultIPCreationTime.Add(time.Minute)),
+			},
+			cidrs: []*networkingv1.ServiceCIDR{
+				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
+			},
+			actions: [][]string{},
+			events:  []string{},
+		},
+		{
+			name: "Two Services with same ClusterIP",
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testDefaultSvcCreationTime),
+				newServiceWithCreationTimestamp("test-svc2", []string{"10.0.1.1"}, testDefaultSvcCreationTime),
+			},
+			ipAddresses: []*networkingv1.IPAddress{
+				newIPAddressWithCreationTimestamp("10.0.1.1", newService("test-svc2", []string{"10.0.1.1"}), testDefaultIPCreationTime),
 			},
 			cidrs: []*networkingv1.ServiceCIDR{
 				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
@@ -342,7 +392,6 @@ func TestRepairServiceIP(t *testing.T) {
 			}
 
 			for _, ip := range test.ipAddresses {
-				ip.CreationTimestamp = metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)
 				err := r.ipAddressStore.Add(ip)
 				if err != nil {
 					t.Errorf("Unexpected error trying to add IPAddress %s object: %v", ip, err)
@@ -507,12 +556,27 @@ func TestRepairIPAddress_syncIPAddress(t *testing.T) {
 	}
 }
 
+func newIPAddressWithCreationTimestamp(name string, svc *v1.Service, timestamp time.Time) *networkingv1.IPAddress {
+	ipAddress := newIPAddress(name, svc)
+	ipAddress.CreationTimestamp = metav1.Time{Time: timestamp}
+	return ipAddress
+}
+
+func newServiceWithCreationTimestamp(name string, ips []string, timestamp time.Time) *v1.Service {
+	service := newService(name, ips)
+	service.CreationTimestamp = metav1.Time{Time: timestamp}
+	return service
+}
+
 func newService(name string, ips []string) *v1.Service {
 	if len(ips) == 0 {
 		return nil
 	}
 	svc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "bar", Name: name},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "bar",
+			Name:              name,
+			CreationTimestamp: metav1.Time{Time: time.Now()}},
 		Spec: v1.ServiceSpec{
 			ClusterIP:  ips[0],
 			ClusterIPs: ips,
