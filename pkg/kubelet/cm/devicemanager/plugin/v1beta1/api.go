@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
 	api "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
@@ -30,7 +32,7 @@ type RegistrationHandler interface {
 type ClientHandler interface {
 	PluginConnected(string, DevicePlugin) error
 	PluginDisconnected(string)
-	PluginListAndWatchReceiver(string, *api.ListAndWatchResponse)
+	PluginListAndWatchReceiver(context.Context, string, *api.ListAndWatchResponse)
 }
 
 // TODO: evaluate whether we need these error definitions.
