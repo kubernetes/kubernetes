@@ -67,13 +67,13 @@ type preFilterState struct {
 	conflictingPVCRefCount int
 }
 
-func (s *preFilterState) updateWithPod(podInfo *framework.PodInfo, multiplier int) {
+func (s *preFilterState) updateWithPod(podInfo fwk.PodInfo, multiplier int) {
 	s.conflictingPVCRefCount += multiplier * s.conflictingPVCRefCountForPod(podInfo)
 }
 
-func (s *preFilterState) conflictingPVCRefCountForPod(podInfo *framework.PodInfo) int {
+func (s *preFilterState) conflictingPVCRefCountForPod(podInfo fwk.PodInfo) int {
 	conflicts := 0
-	for _, volume := range podInfo.Pod.Spec.Volumes {
+	for _, volume := range podInfo.GetPod().Spec.Volumes {
 		if volume.PersistentVolumeClaim == nil {
 			continue
 		}
@@ -163,7 +163,7 @@ func needsRestrictionsCheck(v v1.Volume) bool {
 }
 
 // PreFilter computes and stores cycleState containing details for enforcing ReadWriteOncePod.
-func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	needsCheck := false
 	for i := range pod.Spec.Volumes {
 		if needsRestrictionsCheck(pod.Spec.Volumes[i]) {
@@ -193,7 +193,7 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState fwk.Cycl
 }
 
 // AddPod from pre-computed data in cycleState.
-func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
@@ -203,7 +203,7 @@ func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState fwk.CycleSt
 }
 
 // RemovePod from pre-computed data in cycleState.
-func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
@@ -265,14 +265,14 @@ func (pl *VolumeRestrictions) readWriteOncePodPVCsForPod(ctx context.Context, po
 
 // Checks if scheduling the pod onto this node would cause any conflicts with
 // existing volumes.
-func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
+func satisfyVolumeConflicts(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
 	for i := range pod.Spec.Volumes {
 		v := pod.Spec.Volumes[i]
 		if !needsRestrictionsCheck(v) {
 			continue
 		}
-		for _, ev := range nodeInfo.Pods {
-			if isVolumeConflict(&v, ev.Pod) {
+		for _, ev := range nodeInfo.GetPods() {
+			if isVolumeConflict(&v, ev.GetPod()) {
 				return false
 			}
 		}
@@ -307,7 +307,7 @@ func (pl *VolumeRestrictions) PreFilterExtensions() framework.PreFilterExtension
 // - ISCSI forbids if any two pods share at least same IQN and ISCSI volume is read-only
 // If the pod uses PVCs with the ReadWriteOncePod access mode, it evaluates if
 // these PVCs are already in-use and if preemption will help.
-func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if !satisfyVolumeConflicts(pod, nodeInfo) {
 		return fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	}

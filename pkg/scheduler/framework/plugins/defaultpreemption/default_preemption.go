@@ -52,7 +52,7 @@ const Name = names.DefaultPreemption
 // the internal requirement that the victim pod have lower priority than the preemptor pod.
 // Any customizations should always allow system services to preempt normal pods, to avoid
 // problems if system pods are unable to find space.
-type IsEligiblePodFunc func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool
+type IsEligiblePodFunc func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool
 
 // MoreImportantPodFunc is a function which may be assigned to the DefaultPreemption plugin.
 // Implementations should return true if the first pod is more important than the second pod
@@ -118,7 +118,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feat
 
 	// Default behavior: No additional filtering, beyond the internal requirement that the victim pod
 	// have lower priority than the preemptor pod.
-	pl.IsEligiblePod = func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+	pl.IsEligiblePod = func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool {
 		return true
 	}
 
@@ -219,12 +219,12 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	ctx context.Context,
 	state fwk.CycleState,
 	pod *v1.Pod,
-	nodeInfo *framework.NodeInfo,
+	nodeInfo fwk.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *fwk.Status) {
 	logger := klog.FromContext(ctx)
-	var potentialVictims []*framework.PodInfo
-	removePod := func(rpi *framework.PodInfo) error {
-		if err := nodeInfo.RemovePod(logger, rpi.Pod); err != nil {
+	var potentialVictims []fwk.PodInfo
+	removePod := func(rpi fwk.PodInfo) error {
+		if err := nodeInfo.RemovePod(logger, rpi.GetPod()); err != nil {
 			return err
 		}
 		status := pl.fh.RunPreFilterExtensionRemovePod(ctx, state, pod, rpi, nodeInfo)
@@ -233,7 +233,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		}
 		return nil
 	}
-	addPod := func(api *framework.PodInfo) error {
+	addPod := func(api fwk.PodInfo) error {
 		nodeInfo.AddPodInfo(api)
 		status := pl.fh.RunPreFilterExtensionAddPod(ctx, state, pod, api, nodeInfo)
 		if !status.IsSuccess() {
@@ -243,7 +243,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	}
 	// As the first step, remove all pods eligible for preemption from the node and
 	// check if the given pod can be scheduled without them present.
-	for _, pi := range nodeInfo.Pods {
+	for _, pi := range nodeInfo.GetPods() {
 		if pl.isPreemptionAllowed(nodeInfo, pi, pod) {
 			potentialVictims = append(potentialVictims, pi)
 			if err := removePod(pi); err != nil {
@@ -266,16 +266,18 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo); !status.IsSuccess() {
 		return nil, 0, status
 	}
-	var victims []*framework.PodInfo
+	var victims []fwk.PodInfo
 	numViolatingVictim := 0
 	// Sort potentialVictims by descending importance, which ensures reprieve of
 	// higher importance pods first.
-	sort.Slice(potentialVictims, func(i, j int) bool { return pl.MoreImportantPod(potentialVictims[i].Pod, potentialVictims[j].Pod) })
+	sort.Slice(potentialVictims, func(i, j int) bool {
+		return pl.MoreImportantPod(potentialVictims[i].GetPod(), potentialVictims[j].GetPod())
+	})
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
 	// from the highest importance victims.
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims, pdbs)
-	reprievePod := func(pi *framework.PodInfo) (bool, error) {
+	reprievePod := func(pi fwk.PodInfo) (bool, error) {
 		if err := addPod(pi); err != nil {
 			return false, err
 		}
@@ -286,7 +288,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 				return false, err
 			}
 			victims = append(victims, pi)
-			logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(pi.Pod), "node", klog.KObj(nodeInfo.Node()))
+			logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(pi.GetPod()), "node", klog.KObj(nodeInfo.Node()))
 		}
 		return fits, nil
 	}
@@ -306,11 +308,11 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 	// Sort victims after reprieving pods to keep the pods in the victims sorted in order of importance from high to low.
 	if len(violatingVictims) != 0 && len(nonViolatingVictims) != 0 {
-		sort.Slice(victims, func(i, j int) bool { return pl.MoreImportantPod(victims[i].Pod, victims[j].Pod) })
+		sort.Slice(victims, func(i, j int) bool { return pl.MoreImportantPod(victims[i].GetPod(), victims[j].GetPod()) })
 	}
 	var victimPods []*v1.Pod
 	for _, pi := range victims {
-		victimPods = append(victimPods, pi.Pod)
+		victimPods = append(victimPods, pi.GetPod())
 	}
 	return victimPods, numViolatingVictim, fwk.NewStatus(fwk.Success)
 }
@@ -338,8 +340,8 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 		}
 
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
-			for _, p := range nodeInfo.Pods {
-				if pl.isPreemptionAllowed(nodeInfo, p, pod) && podTerminatingByPreemption(p.Pod) {
+			for _, p := range nodeInfo.GetPods() {
+				if pl.isPreemptionAllowed(nodeInfo, p, pod) && podTerminatingByPreemption(p.GetPod()) {
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
 				}
@@ -355,9 +357,9 @@ func (pl *DefaultPreemption) OrderedScoreFuncs(ctx context.Context, nodesToVicti
 }
 
 // isPreemptionAllowed returns whether the victim residing on nodeInfo can be preempted by the preemptor
-func (pl *DefaultPreemption) isPreemptionAllowed(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+func (pl *DefaultPreemption) isPreemptionAllowed(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool {
 	// The victim must have lower priority than the preemptor, in addition to any filtering implemented by IsEligiblePod
-	return corev1helpers.PodPriority(victim.Pod) < corev1helpers.PodPriority(preemptor) && pl.IsEligiblePod(nodeInfo, victim, preemptor)
+	return corev1helpers.PodPriority(victim.GetPod()) < corev1helpers.PodPriority(preemptor) && pl.IsEligiblePod(nodeInfo, victim, preemptor)
 }
 
 // podTerminatingByPreemption returns true if the pod is in the termination state caused by scheduler preemption.
@@ -379,14 +381,14 @@ func podTerminatingByPreemption(p *v1.Pod) bool {
 // preempted.
 // This function is stable and does not change the order of received pods. So, if it
 // receives a sorted list, grouping will preserve the order of the input list.
-func filterPodsWithPDBViolation(podInfos []*framework.PodInfo, pdbs []*policy.PodDisruptionBudget) (violatingPodInfos, nonViolatingPodInfos []*framework.PodInfo) {
+func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisruptionBudget) (violatingPodInfos, nonViolatingPodInfos []fwk.PodInfo) {
 	pdbsAllowed := make([]int32, len(pdbs))
 	for i, pdb := range pdbs {
 		pdbsAllowed[i] = pdb.Status.DisruptionsAllowed
 	}
 
 	for _, podInfo := range podInfos {
-		pod := podInfo.Pod
+		pod := podInfo.GetPod()
 		pdbForPodIsViolated := false
 		// A pod with no labels will not match any PDB. So, no need to check.
 		if len(pod.Labels) != 0 {

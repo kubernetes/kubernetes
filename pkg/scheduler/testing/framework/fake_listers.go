@@ -28,7 +28,7 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
 var _ corelisters.ServiceLister = &ServiceLister{}
@@ -224,11 +224,11 @@ func (pvcs PersistentVolumeClaimLister) PersistentVolumeClaims(namespace string)
 	}
 }
 
-// NodeInfoLister declares a framework.NodeInfo type for testing.
-type NodeInfoLister []*framework.NodeInfo
+// NodeInfoLister declares a fwk.NodeInfo type for testing.
+type NodeInfoLister []fwk.NodeInfo
 
 // Get returns a fake node object in the fake nodes.
-func (nodes NodeInfoLister) Get(nodeName string) (*framework.NodeInfo, error) {
+func (nodes NodeInfoLister) Get(nodeName string) (fwk.NodeInfo, error) {
 	for _, node := range nodes {
 		if node != nil && node.Node().Name == nodeName {
 			return node, nil
@@ -238,19 +238,19 @@ func (nodes NodeInfoLister) Get(nodeName string) (*framework.NodeInfo, error) {
 }
 
 // List lists all nodes.
-func (nodes NodeInfoLister) List() ([]*framework.NodeInfo, error) {
+func (nodes NodeInfoLister) List() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
 // HavePodsWithAffinityList is supposed to list nodes with at least one pod with affinity. For the fake lister
 // we just return everything.
-func (nodes NodeInfoLister) HavePodsWithAffinityList() ([]*framework.NodeInfo, error) {
+func (nodes NodeInfoLister) HavePodsWithAffinityList() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
 // HavePodsWithRequiredAntiAffinityList is supposed to list nodes with at least one pod with
 // required anti-affinity. For the fake lister we just return everything.
-func (nodes NodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
+func (nodes NodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 

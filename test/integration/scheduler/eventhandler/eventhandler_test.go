@@ -55,7 +55,7 @@ func (pl *fooPlugin) Name() string {
 	return "foo"
 }
 
-func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	taints := nodeInfo.Node().Spec.Taints
 	if len(taints) == 0 {
 		return nil

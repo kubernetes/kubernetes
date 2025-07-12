@@ -318,7 +318,7 @@ func (aq *activeQueue) list() []*v1.Pod {
 	defer aq.lock.RUnlock()
 	var result []*v1.Pod
 	for _, pInfo := range aq.queue.List() {
-		result = append(result, pInfo.Pod)
+		result = append(result, pInfo.GetPod())
 	}
 	return result
 }

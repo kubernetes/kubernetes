@@ -334,6 +334,7 @@ func NewPriorityQueue(
 
 	isSchedulingQueueHintEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints)
 	isPopFromBackoffQEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPopFromBackoffQ)
+	lessConverted := convertLessFn(lessFn)
 
 	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessFn, isPopFromBackoffQEnabled)
 	pq := &PriorityQueue{
@@ -355,11 +356,18 @@ func NewPriorityQueue(
 	if isPopFromBackoffQEnabled {
 		backoffQPopper = backoffQ
 	}
-	pq.activeQ = newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessFn), metrics.NewActivePodsRecorder()), isSchedulingQueueHintEnabled, options.metricsRecorder, backoffQPopper)
+	pq.activeQ = newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessConverted), metrics.NewActivePodsRecorder()), isSchedulingQueueHintEnabled, options.metricsRecorder, backoffQPopper)
 	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
 	pq.nominator = newPodNominator(options.podLister)
 
 	return pq
+}
+
+// Helper function that wraps framework.LessFunc and converts it to take *framework.QueuedPodInfo as arguments.
+func convertLessFn(lessFn framework.LessFunc) func(podInfo1, podInfo2 *framework.QueuedPodInfo) bool {
+	return func(podInfo1, podInfo2 *framework.QueuedPodInfo) bool {
+		return lessFn(podInfo1, podInfo2)
+	}
 }
 
 func buildEventMap(qHintMap QueueingHintMapPerProfile) map[string][]fwk.ClusterEvent {
@@ -1334,12 +1342,12 @@ func (p *PriorityQueue) Close() {
 // NominatedPodsForNode returns a copy of pods that are nominated to run on the given node,
 // but they are waiting for other pods to be removed from the node.
 // CAUTION: Make sure you don't call this function while taking any queue's lock in any scenario.
-func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []*framework.PodInfo {
+func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []fwk.PodInfo {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	nominatedPods := p.nominator.nominatedPodsForNode(nodeName)
 
-	pods := make([]*framework.PodInfo, len(nominatedPods))
+	pods := make([]fwk.PodInfo, len(nominatedPods))
 	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
 		for i, np := range nominatedPods {
 			pods[i] = p.nominatedPodToInfo(np, unlockedActiveQ).DeepCopy()
