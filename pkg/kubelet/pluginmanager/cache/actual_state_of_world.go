@@ -21,6 +21,7 @@ keep track of registered plugins.
 package cache
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -47,7 +48,7 @@ type ActualStateOfWorld interface {
 	// because the plugin should have been unregistered in the reconciler and therefore
 	// removed from the actual state of world cache first before adding it back into
 	// the actual state of world cache again with the new timestamp
-	AddPlugin(pluginInfo PluginInfo) error
+	AddPlugin(ctx context.Context, pluginInfo PluginInfo) error
 
 	// RemovePlugin deletes the plugin with the given socket path from the actual
 	// state of world.
@@ -92,15 +93,17 @@ type PluginInfo struct {
 	Endpoint   string
 }
 
-func (asw *actualStateOfWorld) AddPlugin(pluginInfo PluginInfo) error {
+func (asw *actualStateOfWorld) AddPlugin(ctx context.Context, pluginInfo PluginInfo) error {
 	asw.Lock()
 	defer asw.Unlock()
+
+	logger := klog.FromContext(ctx)
 
 	if pluginInfo.SocketPath == "" {
 		return fmt.Errorf("socket path is empty")
 	}
 	if _, ok := asw.socketFileToInfo[pluginInfo.SocketPath]; ok {
-		klog.V(2).InfoS("Plugin exists in actual state cache", "path", pluginInfo.SocketPath)
+		logger.V(2).Info("Plugin exists in actual state cache", "path", pluginInfo.SocketPath)
 	}
 	asw.socketFileToInfo[pluginInfo.SocketPath] = pluginInfo
 	return nil
