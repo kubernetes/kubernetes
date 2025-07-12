@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 // ContainerType signifies container type
@@ -291,6 +292,23 @@ func IsPodAvailable(pod *v1.Pod, minReadySeconds int32, now metav1.Time) bool {
 		return true
 	}
 	return false
+}
+
+func NextPodAvailabilityCheck(pod *v1.Pod, minReadySeconds int32, now time.Time) *time.Duration {
+	if !IsPodReady(pod) || minReadySeconds <= 0 {
+		return nil
+	}
+
+	c := GetPodReadyCondition(pod.Status)
+	if c.LastTransitionTime.IsZero() {
+		return nil
+	}
+	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	nextCheck := c.LastTransitionTime.Add(minReadySecondsDuration).Sub(now)
+	if nextCheck > 0 {
+		return ptr.To(nextCheck)
+	}
+	return nil
 }
 
 // IsPodReady returns true if a pod is ready; false otherwise.

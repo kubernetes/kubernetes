@@ -1030,6 +1030,17 @@ func CountTerminatingPods(pods []*v1.Pod) int32 {
 	return int32(numberOfTerminatingPods)
 }
 
+func FindMinNextPodAvailabilityCheck(pods []*v1.Pod, minReadySeconds int32, now time.Time) *time.Duration {
+	var minAvailabilityCheck *time.Duration
+	for _, p := range pods {
+		nextCheck := podutil.NextPodAvailabilityCheck(p, minReadySeconds, now)
+		if nextCheck != nil && (minAvailabilityCheck == nil || *nextCheck < *minAvailabilityCheck) {
+			minAvailabilityCheck = nextCheck
+		}
+	}
+	return minAvailabilityCheck
+}
+
 func IsPodActive(p *v1.Pod) bool {
 	return v1.PodSucceeded != p.Status.Phase &&
 		v1.PodFailed != p.Status.Phase &&
