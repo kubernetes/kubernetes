@@ -773,18 +773,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Namespace: originalPod.Namespace,
 				}
 
-				setContainerStatus := func(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
-					podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
-						Name:  c.Name,
-						State: kubecontainer.ContainerStateRunning,
-						Resources: &kubecontainer.ContainerResources{
-							CPURequest:  c.Resources.Requests.Cpu(),
-							CPULimit:    c.Resources.Limits.Cpu(),
-							MemoryLimit: c.Resources.Limits.Memory(),
-						},
-					}
-				}
-
 				podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(originalPod.Spec.Containers)+len(originalPod.Spec.InitContainers))
 				for i, c := range originalPod.Spec.InitContainers {
 					setContainerStatus(podStatus, &c, i)
@@ -956,17 +944,7 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 				Name:      originalPod.Name,
 				Namespace: originalPod.Namespace,
 			}
-			setContainerStatus := func(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
-				podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
-					Name:  c.Name,
-					State: kubecontainer.ContainerStateRunning,
-					Resources: &kubecontainer.ContainerResources{
-						CPURequest:  c.Resources.Requests.Cpu(),
-						CPULimit:    c.Resources.Limits.Cpu(),
-						MemoryLimit: c.Resources.Limits.Memory(),
-					},
-				}
-			}
+
 			podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(originalPod.Spec.Containers))
 			for i, c := range originalPod.Spec.Containers {
 				setContainerStatus(podStatus, &c, i)
@@ -1016,6 +994,172 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 			}
 			assert.Equal(t, tt.expectedResize, resizeStatus)
 			assert.Equal(t, "true", newPod.Annotations["pod-sync-triggered"], "pod sync annotation should be set")
+		})
+	}
+}
+
+func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	cpu500m := resource.MustParse("500m")
+	cpu1000m := resource.MustParse("1")
+	cpu5000m := resource.MustParse("5000m")
+	mem500M := resource.MustParse("500Mi")
+	mem1000M := resource.MustParse("1Gi")
+	mem4500M := resource.MustParse("4500Mi")
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:        "1111",
+			Name:       "pod",
+			Namespace:  "ns",
+			Generation: 1,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
+	podStatus := &kubecontainer.PodStatus{
+		ID:        testPod.UID,
+		Name:      testPod.Name,
+		Namespace: testPod.Namespace,
+	}
+
+	podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(testPod.Spec.Containers)+len(testPod.Spec.InitContainers))
+	for i, c := range testPod.Spec.InitContainers {
+		setContainerStatus(podStatus, &c, i)
+	}
+	for i, c := range testPod.Spec.Containers {
+		setContainerStatus(podStatus, &c, i+len(testPod.Spec.InitContainers))
+	}
+
+	allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{PodStatus: *podStatus}, []*v1.Pod{testPod})
+	require.NoError(t, allocationManager.SetAllocatedResources(testPod))
+	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
+		return testPod, true
+	}
+
+	testCases := []struct {
+		name               string
+		cpu                resource.Quantity
+		mem                resource.Quantity
+		generation         int64
+		expectedConditions []*v1.PodCondition
+	}{
+		{
+			name:       "allocated != actuated, pod resize should be in progress",
+			cpu:        cpu1000m,
+			mem:        mem1000M,
+			generation: 1,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizeInProgress,
+				Status:             "True",
+				ObservedGeneration: 1,
+			}},
+		},
+		{
+			name:       "desired != allocated != actuated, both conditions should be present in the pod status",
+			cpu:        cpu5000m,
+			mem:        mem4500M,
+			generation: 2,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             "True",
+					Reason:             v1.PodReasonInfeasible,
+					Message:            "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
+					ObservedGeneration: 2,
+				},
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             "True",
+					ObservedGeneration: 1,
+				},
+			},
+		},
+		{
+			name:       "revert back to the original resize request",
+			cpu:        cpu1000m,
+			mem:        mem1000M,
+			generation: 3,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizeInProgress,
+				Status:             "True",
+				ObservedGeneration: 1,
+			}},
+		},
+
+		{
+			name:       "no changes except generation",
+			cpu:        cpu1000m,
+			mem:        mem1000M,
+			generation: 4,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizeInProgress,
+				Status:             "True",
+				ObservedGeneration: 1,
+			}},
+		},
+		{
+			name:       "allocate a new resize",
+			cpu:        cpu500m,
+			mem:        mem500M,
+			generation: 5,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizeInProgress,
+				Status:             "True",
+				ObservedGeneration: 5,
+			}},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testPod.Generation = tc.generation
+			testPod.Spec = v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: tc.cpu, v1.ResourceMemory: tc.mem},
+					}},
+				},
+			}
+
+			allocationManager.PushPendingResize(testPod.UID)
+			allocationManager.RetryPendingResizes()
+			allocatedPod, _ := allocationManager.UpdatePodFromAllocation(testPod)
+			allocationManager.CheckPodResizeInProgress(allocatedPod, podStatus)
+
+			conditions := allocationManager.(*manager).statusManager.GetPodResizeConditions(testPod.UID)
+			require.Len(t, conditions, len(tc.expectedConditions))
+			for _, c := range conditions {
+				c.LastProbeTime = metav1.Time{}
+				c.LastTransitionTime = metav1.Time{}
+			}
+			require.Equal(t, tc.expectedConditions, conditions)
 		})
 	}
 }
@@ -1436,9 +1580,9 @@ func TestSortPendingResizes(t *testing.T) {
 
 	testPods[1].Spec.Priority = ptr.To(int32(100))
 	testPods[2].Status.QOSClass = v1.PodQOSGuaranteed
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[3].UID, v1.PodReasonDeferred, "some-message")
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[3].UID, v1.PodReasonDeferred, "some-message", 1)
 	time.Sleep(5 * time.Millisecond)
-	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[4].UID, v1.PodReasonDeferred, "some-message")
+	allocationManager.(*manager).statusManager.SetPodResizePendingCondition(testPods[4].UID, v1.PodReasonDeferred, "some-message", 1)
 
 	allocationManager.(*manager).getPodByUID = func(uid types.UID) (*v1.Pod, bool) {
 		pods := map[types.UID]*v1.Pod{
@@ -1515,4 +1659,16 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 
 	return allocationManager
+}
+
+func setContainerStatus(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
+	podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
+		Name:  c.Name,
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  c.Resources.Requests.Cpu(),
+			CPULimit:    c.Resources.Limits.Cpu(),
+			MemoryLimit: c.Resources.Limits.Memory(),
+		},
+	}
 }

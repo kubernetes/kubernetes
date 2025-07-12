@@ -480,6 +480,16 @@ func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	defer m.allocationMutex.Unlock()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// Backfill any resize conditions that may already exist on the pod.
+		for _, c := range pod.Status.Conditions {
+			switch c.Type {
+			case v1.PodResizePending:
+				m.statusManager.SetPodResizePendingCondition(pod.UID, c.Reason, c.Message, c.ObservedGeneration)
+			case v1.PodResizeInProgress:
+				m.statusManager.SetPodResizeInProgressCondition(pod.UID, c.Reason, c.Message, c.ObservedGeneration)
+			}
+		}
+
 		// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 		// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
 		pod, _ = m.UpdatePodFromAllocation(pod)
@@ -539,11 +549,11 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 
 	} else if resizable, msg := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
-		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg)
+		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg, pod.Generation)
 		return false, nil
 	} else if resizeNotAllowed, msg := disallowResizeForSwappableContainers(m.containerRuntime, pod, allocatedPod); resizeNotAllowed {
 		// If this resize involve swap recalculation, set as infeasible, as IPPR with swap is not supported for beta.
-		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg)
+		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg, pod.Generation)
 		return false, nil
 	}
 
@@ -556,15 +566,16 @@ func (m *manager) handlePodResourcesResize(pod *v1.Pod) (bool, error) {
 		}
 		m.statusManager.ClearPodResizePendingCondition(pod.UID)
 
-		// Clear any errors that may have been surfaced from a previous resize. The condition will be
-		// re-assesssed in the sync loop but this prevents old errors from being preserved.
-		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", true)
+		// Clear any errors that may have been surfaced from a previous resize and update the
+		// generation of the resize in-progress condition.
+		m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
+		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 
 		return true, nil
 	}
 
 	if reason != "" {
-		m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message)
+		m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation)
 	}
 
 	return false, nil
@@ -691,14 +702,12 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) {
 	// If a resize is in progress, make sure the cache has the correct state in case the Kubelet restarted.
 	if m.isPodResizeInProgress(allocatedPod, podStatus) {
-		m.statusManager.SetPodResizeInProgressCondition(allocatedPod.UID, "", "", false)
-	} else {
+		// This is a no-op if the resize in progress condition is already set.
+		m.statusManager.SetPodResizeInProgressCondition(allocatedPod.UID, "", "", allocatedPod.Generation)
+	} else if m.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID) {
 		// (Allocated == Actual) => clear the resize in-progress status.
-		conditionCleared := m.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
-		if conditionCleared {
-			// TODO(natasha41575): We only need to make this call if any of the resources were decreased.
-			m.RetryPendingResizes()
-		}
+		// TODO(natasha41575): We only need to make this call if any of the resources were decreased.
+		m.RetryPendingResizes()
 	}
 }
 
