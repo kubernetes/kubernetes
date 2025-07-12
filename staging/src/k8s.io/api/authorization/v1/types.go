@@ -119,15 +119,9 @@ type ResourceAttributes struct {
 	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,7,opt,name=name"`
 	// fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.
-	//
-	// This field  is alpha-level. To use this field, you must enable the
-	// `AuthorizeWithSelectors` feature gate (disabled by default).
 	// +optional
 	FieldSelector *FieldSelectorAttributes `json:"fieldSelector,omitempty" protobuf:"bytes,8,opt,name=fieldSelector"`
 	// labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.
-	//
-	// This field  is alpha-level. To use this field, you must enable the
-	// `AuthorizeWithSelectors` feature gate (disabled by default).
 	// +optional
 	LabelSelector *LabelSelectorAttributes `json:"labelSelector,omitempty" protobuf:"bytes,9,opt,name=labelSelector"`
 }
