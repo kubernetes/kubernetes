@@ -814,3 +814,7 @@ func updateAllocationPerNUMAMetric(topo *topology.CPUTopology, allocatedCPUs cpu
 		metrics.CPUManagerAllocationPerNUMA.WithLabelValues(strconv.Itoa(numaNode)).Set(float64(count))
 	}
 }
+
+func (p *staticPolicy) CanAllocateExclusively() bool {
+	return true
+}

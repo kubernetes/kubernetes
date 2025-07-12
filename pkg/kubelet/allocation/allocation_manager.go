@@ -635,18 +635,15 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 	// TODO: Move this logic into a PodAdmitHandler by introducing an operation field to
 	// lifecycle.PodAdmitAttributes, and combine canResizePod with canAdmitPod.
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		if m.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
+		if kl.containerManager.CanAllocateExclusively(v1.ResourceCPU) {
 			msg := "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy"
 			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
 			return false, v1.PodReasonInfeasible, msg
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
-			if m.containerManager.GetNodeConfig().MemoryManagerPolicy == "Static" {
-				msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
-				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
-				return false, v1.PodReasonInfeasible, msg
-
-			}
+		if kl.containerManager.CanAllocateExclusively(v1.ResourceMemory) {
+			msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
+			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
+			return false, v1.PodReasonInfeasible, msg
 		}
 	}
 
