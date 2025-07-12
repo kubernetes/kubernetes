@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -813,9 +814,12 @@ func TestAsyncPreemption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// We need to use a custom preemption plugin to test async preemption behavior
 			delayedPreemptionPluginName := "delay-preemption"
+			var lock sync.Mutex
 			// keyed by the pod name
 			preemptionDoneChannels := make(map[string]chan struct{})
 			defer func() {
+				lock.Lock()
+				defer lock.Unlock()
 				for _, ch := range preemptionDoneChannels {
 					close(ch)
 				}
@@ -841,7 +845,10 @@ func TestAsyncPreemption(t *testing.T) {
 				preemptPodFn := preemptionPlugin.Evaluator.PreemptPod
 				preemptionPlugin.Evaluator.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor, victim *v1.Pod, pluginName string) error {
 					// block the preemption goroutine to complete until the test case allows it to proceed.
-					if ch, ok := preemptionDoneChannels[preemptor.Name]; ok {
+					lock.Lock()
+					ch, ok := preemptionDoneChannels[preemptor.Name]
+					lock.Unlock()
+					if ok {
 						<-ch
 					}
 					return preemptPodFn(ctx, c, preemptor, victim, pluginName)
@@ -941,7 +948,9 @@ func TestAsyncPreemption(t *testing.T) {
 						t.Fatal(lastFailure)
 					}
 
+					lock.Lock()
 					preemptionDoneChannels[scenario.schedulePod.podName] = make(chan struct{})
+					lock.Unlock()
 					testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
 					if scenario.schedulePod.expectSuccess {
 						if err := wait.PollUntilContextTimeout(testCtx.Ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, testCtx.NS.Name, scenario.schedulePod.podName)); err != nil {
@@ -953,12 +962,14 @@ func TestAsyncPreemption(t *testing.T) {
 						}
 					}
 				case scenario.completePreemption != "":
+					lock.Lock()
 					if _, ok := preemptionDoneChannels[scenario.completePreemption]; !ok {
 						t.Fatalf("The preemptor Pod %q is not running preemption", scenario.completePreemption)
 					}
 
 					close(preemptionDoneChannels[scenario.completePreemption])
 					delete(preemptionDoneChannels, scenario.completePreemption)
+					lock.Unlock()
 				case scenario.podGatedInQueue != "":
 					// make sure the Pod is in the queue in the first place.
 					if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.podGatedInQueue) {
