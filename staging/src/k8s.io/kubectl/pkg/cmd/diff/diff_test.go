@@ -747,7 +747,7 @@ func fatalNoExit(t *testing.T, ioStreams genericiooptions.IOStreams) func(msg st
 			if !strings.HasSuffix(msg, "\n") {
 				msg += "\n"
 			}
-			fmt.Fprint(ioStreams.ErrOut, msg)
+			_, _ = fmt.Fprint(ioStreams.ErrOut, msg)
 		}
 	}
 }
@@ -854,11 +854,10 @@ func TestDiffWithPruneV2(t *testing.T) {
 		ioStreams, _, outBuf, _ := genericiooptions.NewTestIOStreams()
 		cmdutil.BehaviorOnFatal(fatalNoExit(t, ioStreams))
 		defer cmdutil.DefaultBehaviorOnFatal()
-
 		cmd := NewCmdDiff(tf, ioStreams)
-		cmd.Flags().Set("filename", filepath.Join(testdir, "sample_manifest.yaml"))
-		cmd.Flags().Set("applyset", "simple")
-		cmd.Flags().Set("prune", "true")
+		cmdutil.CheckErr(cmd.Flags().Set("filename", filepath.Join(testdir, "sample_manifest.yaml")))
+		cmdutil.CheckErr(cmd.Flags().Set("applyset", "simple"))
+		cmdutil.CheckErr(cmd.Flags().Set("prune", "true"))
 
 		cmd.Run(cmd, []string{})
 
