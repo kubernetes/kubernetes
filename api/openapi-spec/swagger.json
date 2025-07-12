@@ -6511,6 +6511,29 @@
       ],
       "type": "object"
     },
+    "io.k8s.api.core.v1.ContainerExtendedResourceRequest": {
+      "description": "ContainerExtendedResourceRequest has the mapping of container name, extended resource name to the device request name.",
+      "properties": {
+        "containerName": {
+          "description": "ContainerName is the unique container name within the pod.",
+          "type": "string"
+        },
+        "extendedResourceName": {
+          "description": "ExtendedResourceName is the extended resource name backed by DRA inside the container's requests.",
+          "type": "string"
+        },
+        "requestName": {
+          "description": "RequestName is the device request name in the special resource claim created for extended resource requests backed by DRA.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "containerName",
+        "extendedResourceName",
+        "requestName"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.core.v1.ContainerImage": {
       "description": "Describe a container image",
       "properties": {
@@ -9574,6 +9597,33 @@
       },
       "type": "object"
     },
+    "io.k8s.api.core.v1.PodExtendedResourceClaimStatus": {
+      "description": "PodExtendedResourceClaimStatus is stored in the PodStatus for each extended resource requests backed by DRA. It stores the generated name for the corresponding special ResourceClaim created by scheduler.",
+      "properties": {
+        "requestMapping": {
+          "description": "RequestMapping identifies the mapping of <container, extended resource backed by DRA> to  device request.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.ContainerExtendedResourceRequest"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "requestName"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "requestName",
+          "x-kubernetes-patch-strategy": "merge,retainKeys"
+        },
+        "resourceClaimName": {
+          "description": "ResourceClaimName is the name of the ResourceClaim that was generated for the Pod in the namespace of the Pod.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestMapping",
+        "resourceClaimName"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.core.v1.PodIP": {
       "description": "PodIP represents a single IP address allocated to the pod.",
       "properties": {
@@ -10069,6 +10119,10 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "extendedResourceClaimStatus": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.PodExtendedResourceClaimStatus",
+          "description": "Status of extended resource claim backed by DRA."
         },
         "hostIP": {
           "description": "hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will not be updated even if there is a node is assigned to pod",
@@ -15494,6 +15548,10 @@
           "type": "array",
           "x-kubernetes-list-type": "atomic"
         },
+        "extendedResourceName": {
+          "description": "ExtendedResourceName is the extended resource name for the devices of this class. This is an alpha field.",
+          "type": "string"
+        },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",
           "items": {
@@ -16530,6 +16588,10 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "extendedResourceName": {
+          "description": "ExtendedResourceName is the extended resource name for the devices of this class. This is an alpha field.",
+          "type": "string"
         },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",

@@ -43,6 +43,7 @@ spec:
           replicas: 1
         status:
           available: 1
+  extendedResourceName: extendedResourceNameValue
   selectors:
   - cel:
       expression: expressionValue
