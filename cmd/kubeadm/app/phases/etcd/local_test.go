@@ -107,8 +107,7 @@ spec:
     - --cert-file=etcd/server.crt
     - --client-cert-auth=true
     - --data-dir=%s/etcd
-    - --experimental-initial-corrupt-check=true
-    - --experimental-watch-progress-notify-interval=5s
+    - --feature-gates=InitialCorruptCheck=true
     - --initial-advertise-peer-urls=https://:2380
     - --initial-cluster==https://:2380
     - --key-file=etcd/server.key
@@ -122,6 +121,7 @@ spec:
     - --peer-trusted-ca-file=etcd/ca.crt
     - --snapshot-count=10000
     - --trusted-ca-file=etcd/ca.crt
+    - --watch-progress-notify-interval=5s
     image: /etcd:%s
     imagePullPolicy: IfNotPresent
     livenessProbe:
@@ -295,8 +295,8 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
-				"--experimental-initial-corrupt-check=true",
-				"--experimental-watch-progress-notify-interval=5s",
+				"--feature-gates=InitialCorruptCheck=true",
+				"--watch-progress-notify-interval=5s",
 				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
 				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
@@ -326,8 +326,8 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
-				"--experimental-initial-corrupt-check=true",
-				"--experimental-watch-progress-notify-interval=5s",
+				"--feature-gates=InitialCorruptCheck=true",
+				"--watch-progress-notify-interval=5s",
 				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
 				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
@@ -358,8 +358,8 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=bar",
-				"--experimental-initial-corrupt-check=true",
-				"--experimental-watch-progress-notify-interval=5s",
+				"--feature-gates=InitialCorruptCheck=true",
+				"--watch-progress-notify-interval=5s",
 				"--listen-client-urls=https://10.0.1.10:2379",
 				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
 				"--advertise-client-urls=https://10.0.1.10:2379",
@@ -385,8 +385,8 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
-				"--experimental-initial-corrupt-check=true",
-				"--experimental-watch-progress-notify-interval=5s",
+				"--feature-gates=InitialCorruptCheck=true",
+				"--watch-progress-notify-interval=5s",
 				fmt.Sprintf("--listen-client-urls=https://[::1]:%d,https://[2001:db8::3]:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-metrics-urls=http://[::1]:%d", kubeadmconstants.EtcdMetricsPort),
 				fmt.Sprintf("--advertise-client-urls=https://[2001:db8::3]:%d", kubeadmconstants.EtcdListenClientPort),
