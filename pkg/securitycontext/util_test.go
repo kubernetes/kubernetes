@@ -73,11 +73,11 @@ func TestConvertToRuntimeMaskedPaths(t *testing.T) {
 	}{
 		"procMount nil": {
 			pm:     nil,
-			expect: defaultMaskedPaths,
+			expect: defaultMaskedPaths(),
 		},
 		"procMount default": {
 			pm:     &dPM,
-			expect: defaultMaskedPaths,
+			expect: defaultMaskedPaths(),
 		},
 		"procMount unmasked": {
 			pm:     &uPM,
