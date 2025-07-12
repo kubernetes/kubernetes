@@ -17,7 +17,6 @@ limitations under the License.
 package signer
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/x509"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/client-go/util/certificate/csr"
 	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1"
 	"k8s.io/kubernetes/pkg/controller/certificates"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -82,8 +82,8 @@ func ignoreUnset() cmp.Option {
 
 func TestSigner(t *testing.T) {
 	fakeClock := testingclock.FakeClock{}
-
-	s, err := newSigner("kubernetes.io/legacy-unknown", "./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
+	_, ctx := ktesting.NewTestContext(t)
+	s, err := newSigner(ctx, "kubernetes.io/legacy-unknown", "./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
@@ -372,7 +372,8 @@ func TestHandle(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			client := &fake.Clientset{}
-			s, err := newSigner(c.signerName, "./testdata/ca.crt", "./testdata/ca.key", client, 1*time.Hour)
+			_, ctx := ktesting.NewTestContext(t)
+			s, err := newSigner(ctx, c.signerName, "./testdata/ca.crt", "./testdata/ca.key", client, 1*time.Hour)
 			switch {
 			case c.constructionErr && err != nil:
 				return
@@ -386,7 +387,6 @@ func TestHandle(t *testing.T) {
 			}
 
 			csr := makeTestCSR(csrBuilder{cn: c.commonName, signerName: c.signerName, approved: c.approved, failed: c.failed, usages: c.usages, org: c.org, dnsNames: c.dnsNames})
-			ctx := context.TODO()
 			if err := s.handle(ctx, csr); err != nil && !c.err {
 				t.Errorf("unexpected err: %v", err)
 			}
