@@ -28,7 +28,6 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
-	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
@@ -229,11 +228,25 @@ func newString(s string) *string {
 	return &s
 }
 
-func addFile(fs utilfs.Filesystem, path string, file string) error {
-	if err := utilfiles.EnsureDir(fs, filepath.Dir(path)); err != nil {
-		return err
+func addFile(fs utilfs.Filesystem, path string, fileContent string) error {
+	dir := filepath.Dir(path)
+	tmpFile, err := fs.TempFile(dir, "tmp_"+filepath.Base(path))
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
 	}
-	return utilfiles.ReplaceFile(fs, path, []byte(file))
+	tmpPath := tmpFile.Name()
+
+	if _, err = tmpFile.Write([]byte(fileContent)); err != nil {
+		_ = tmpFile.Close()
+		_ = fs.Remove(tmpPath)
+		return fmt.Errorf("failed to write to temp file: %w", err)
+	}
+	if err = tmpFile.Close(); err != nil {
+		_ = fs.Remove(tmpPath)
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	return fs.Rename(tmpPath, path)
 }
 
 func newConfig(t *testing.T) *kubeletconfig.KubeletConfiguration {
