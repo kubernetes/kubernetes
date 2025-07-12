@@ -36,6 +36,14 @@ Up: %s
 Go version: %s
 Binary version: %v
 Emulation version: %v
+
+Useful Endpoints:
+----------------
+version: "/version"
+readyz: "/readyz"
+metrics: "/metrics"
+livez: "/livez"
+healthz: "/healthz"
 `
 
 const wantTmplWithoutEmulation = `
@@ -80,6 +88,13 @@ func TestStatusz(t *testing.T) {
 				goVer:        fakeGoVersion,
 				binaryVer:    fakeBinaryVersion,
 				emulationVer: fakeEmulationVersion,
+				endpoints: map[string]string{
+					"healthz": "/healthz",
+					"livez":   "/livez",
+					"readyz":  "/readyz",
+					"version": "/version",
+					"metrics": "/metrics",
+				},
 			},
 			wantStatusCode: http.StatusOK,
 			wantBody: fmt.Sprintf(
@@ -166,6 +181,7 @@ type fakeRegistry struct {
 	goVer        string
 	binaryVer    *version.Version
 	emulationVer *version.Version
+	endpoints    map[string]string
 }
 
 func (f fakeRegistry) processStartTime() time.Time {
@@ -182,4 +198,8 @@ func (f fakeRegistry) binaryVersion() *version.Version {
 
 func (f fakeRegistry) emulationVersion() *version.Version {
 	return f.emulationVer
+}
+
+func (f fakeRegistry) usefulEndpoints() map[string]string {
+	return f.endpoints
 }
