@@ -365,6 +365,81 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			gomega.Consistently(ctx, getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
 		})
 	})
+
+	ginkgo.Context("when querying /stats/summary under pressure", func() {
+		ginkgo.BeforeEach(func() {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+				ginkgo.Skip("KubeletPSI feature gate is not enabled")
+			}
+		})
+
+		ginkgo.It("should report CPU pressure in PSI metrics", func(ctx context.Context) {
+			podName := "cpu-pressure-pod"
+			ginkgo.By("Creating a pod to generate CPU pressure")
+			pod := e2epod.NewPodClient(f).Create(ctx, getStressTestPod(podName, "stress-ng", []string{"--cpu", "1", "--cpu-load", "90", "--timeout", "120s"}))
+
+			ginkgo.By("Waiting for the pod to start")
+			e2epod.NewPodClient(f).WaitForPodRunning(ctx, pod.Name)
+
+			ginkgo.By("Validating that CPU PSI metrics reflect pressure")
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				summary, err := getNodeSummary(ctx)
+				g.Expect(err).NotTo(gomega.HaveOccurred())
+				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"CPU": pressureDetected("some", 1.0),
+					}),
+				}))
+			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should report Memory pressure in PSI metrics", func(ctx context.Context) {
+			podName := "memory-pressure-pod"
+			ginkgo.By("Creating a pod to generate Memory pressure")
+			// Create a pod that allocates memory close to its limit to cause pressure.
+			podSpec := getStressTestPod(podName, "stress-ng", []string{"--vm", "1", "--vm-bytes", "150M", "--vm-hang", "0", "--timeout", "120s"})
+			podSpec.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("200M"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("200M"),
+				},
+			}
+			pod := e2epod.NewPodClient(f).Create(ctx, podSpec)
+
+			ginkgo.By("Waiting for the pod to start")
+			e2epod.NewPodClient(f).WaitForPodRunning(ctx, pod.Name)
+
+			ginkgo.By("Validating that Memory PSI metrics reflect pressure")
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				summary, err := getNodeSummary(ctx)
+				g.Expect(err).NotTo(gomega.HaveOccurred())
+				g.Expect(summary.Pods).To(gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, podName): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Memory": pressureDetected("full", 1.0),
+					}),
+				}))
+			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
+		})
+
+		ginkgo.It("should report I/O pressure in PSI metrics", func(ctx context.Context) {
+			podName := "io-pressure-pod"
+			ginkgo.By("Creating a pod to generate I/O pressure")
+			pod := e2epod.NewPodClient(f).Create(ctx, getStressTestPod(podName, "stress-ng", []string{"--hdd", "1", "--timeout", "120s"}))
+
+			ginkgo.By("Waiting for the pod to start")
+			e2epod.NewPodClient(f).WaitForPodRunning(ctx, pod.Name)
+
+			ginkgo.By("Validating that I/O PSI metrics reflect pressure")
+			gomega.Eventually(ctx, func(g gomega.Gomega) {
+				summary, err := getNodeSummary(ctx)
+				g.Expect(err).NotTo(gomega.HaveOccurred())
+				// I/O PSI is reported at the Node level in the current Summary API structure.
+				g.Expect(summary.Node.IO).To(pressureDetected("some", 1.0))
+			}, 2*time.Minute, 15*time.Second).Should(gomega.Succeed())
+		})
+	})
 })
 
 func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...string) []*v1.Pod {
@@ -539,4 +614,55 @@ func ioExpectation(maxStatsAge time.Duration) types.GomegaMatcher {
 			"Time": recent(maxStatsAge),
 			"PSI":  psiExpectation(),
 		}))
+}
+
+// getStressTestPod returns a pod definition for running a stress test.
+// This follows the test plan's strategy to use a configurable container to generate load.
+func getStressTestPod(name, containerName string, args []string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				{
+					Name:    containerName,
+					Image:   "docker.io/agazso/stress-ng",
+					Command: []string{"/usr/bin/stress-ng"},
+					Args:    args,
+				},
+			},
+		},
+	}
+}
+
+// pressureDetected is a matcher for verifying that PSI stats show pressure.
+// The test plan requires asserting that values are plausibly correlated with the load,
+// not just that the fields exist.
+func pressureDetected(level string, threshold float64) types.GomegaMatcher {
+	var fields gstruct.Fields
+	switch level {
+	case "some":
+		fields = gstruct.Fields{
+			"Some": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Avg10": gomega.BeNumerically(">", threshold),
+				"Total": gomega.BeNumerically(">", uint64(0)),
+			}),
+		}
+	case "full":
+		fields = gstruct.Fields{
+			"Full": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Avg10": gomega.BeNumerically(">", threshold),
+				"Total": gomega.BeNumerically(">", uint64(0)),
+			}),
+		}
+	default:
+		framework.Failf("Unknown pressure level: %s", level)
+		return nil
+	}
+
+	return gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+		"PSI": ptrMatchAllFields(fields),
+	}))
 }
