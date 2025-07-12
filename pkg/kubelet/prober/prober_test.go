@@ -21,9 +21,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,100 +44,45 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-func TestGetURLParts(t *testing.T) {
-	testCases := []struct {
-		probe *v1.HTTPGetAction
-		ok    bool
-		host  string
-		port  int
-		path  string
-	}{
-		{&v1.HTTPGetAction{Host: "", Port: intstr.FromInt32(-1), Path: ""}, false, "", -1, ""},
-		{&v1.HTTPGetAction{Host: "", Port: intstr.FromString(""), Path: ""}, false, "", -1, ""},
-		{&v1.HTTPGetAction{Host: "", Port: intstr.FromString("-1"), Path: ""}, false, "", -1, ""},
-		{&v1.HTTPGetAction{Host: "", Port: intstr.FromString("not-found"), Path: ""}, false, "", -1, ""},
-		{&v1.HTTPGetAction{Host: "", Port: intstr.FromString("found"), Path: ""}, true, "127.0.0.1", 93, ""},
-		{&v1.HTTPGetAction{Host: "", Port: intstr.FromInt32(76), Path: ""}, true, "127.0.0.1", 76, ""},
-		{&v1.HTTPGetAction{Host: "", Port: intstr.FromString("118"), Path: ""}, true, "127.0.0.1", 118, ""},
-		{&v1.HTTPGetAction{Host: "hostname", Port: intstr.FromInt32(76), Path: "path"}, true, "hostname", 76, "path"},
-	}
-
-	for _, test := range testCases {
-		state := v1.PodStatus{PodIP: "127.0.0.1"}
-		container := v1.Container{
-			Ports: []v1.ContainerPort{{Name: "found", ContainerPort: 93}},
-			LivenessProbe: &v1.Probe{
-				ProbeHandler: v1.ProbeHandler{
-					HTTPGet: test.probe,
-				},
-			},
-		}
-
-		scheme := test.probe.Scheme
-		if scheme == "" {
-			scheme = v1.URISchemeHTTP
-		}
-		host := test.probe.Host
-		if host == "" {
-			host = state.PodIP
-		}
-		port, err := probe.ResolveContainerPort(test.probe.Port, &container)
-		if test.ok && err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		path := test.probe.Path
-
-		if !test.ok && err == nil {
-			t.Errorf("Expected error for %+v, got %s%s:%d/%s", test, scheme, host, port, path)
-		}
-		if test.ok {
-			if host != test.host || port != test.port || path != test.path {
-				t.Errorf("Expected %s:%d/%s, got %s:%d/%s",
-					test.host, test.port, test.path, host, port, path)
-			}
-		}
-	}
+type fakeHTTPProber struct {
+	result probe.Result
+	err    error
 }
 
-func TestGetTCPAddrParts(t *testing.T) {
-	testCases := []struct {
-		probe *v1.TCPSocketAction
-		ok    bool
-		host  string
-		port  int
-	}{
-		{&v1.TCPSocketAction{Port: intstr.FromInt32(-1)}, false, "", -1},
-		{&v1.TCPSocketAction{Port: intstr.FromString("")}, false, "", -1},
-		{&v1.TCPSocketAction{Port: intstr.FromString("-1")}, false, "", -1},
-		{&v1.TCPSocketAction{Port: intstr.FromString("not-found")}, false, "", -1},
-		{&v1.TCPSocketAction{Port: intstr.FromString("found")}, true, "1.2.3.4", 93},
-		{&v1.TCPSocketAction{Port: intstr.FromInt32(76)}, true, "1.2.3.4", 76},
-		{&v1.TCPSocketAction{Port: intstr.FromString("118")}, true, "1.2.3.4", 118},
-	}
+func (p fakeHTTPProber) Probe(req *http.Request, timeout time.Duration) (probe.Result, string, error) {
+	return p.result, "", p.err
+}
 
-	for _, test := range testCases {
-		host := "1.2.3.4"
-		container := v1.Container{
-			Ports: []v1.ContainerPort{{Name: "found", ContainerPort: 93}},
-			LivenessProbe: &v1.Probe{
-				ProbeHandler: v1.ProbeHandler{
-					TCPSocket: test.probe,
-				},
-			},
-		}
-		port, err := probe.ResolveContainerPort(test.probe.Port, &container)
-		if !test.ok && err == nil {
-			t.Errorf("Expected error for %+v, got %s:%d", test, host, port)
-		}
-		if test.ok && err != nil {
-			t.Errorf("Unexpected error: %v", err)
-		}
-		if test.ok {
-			if host != test.host || port != test.port {
-				t.Errorf("Expected %s:%d, got %s:%d", test.host, test.port, host, port)
-			}
+type fakeTCPProber struct {
+	result probe.Result
+	err    error
+}
+
+func (p fakeTCPProber) Probe(host string, port int, timeout time.Duration) (probe.Result, string, error) {
+	return p.result, "", p.err
+}
+
+type fakeGRPCProber struct {
+	result probe.Result
+	err    error
+}
+
+func (p fakeGRPCProber) Probe(host, service string, port int, timeout time.Duration) (probe.Result, string, error) {
+	return p.result, "", p.err
+}
+
+func getFreePort() (port int, err error) {
+	var a *net.TCPAddr
+	if a, err = net.ResolveTCPAddr("tcp", "localhost:0"); err == nil {
+		var l *net.TCPListener
+		if l, err = net.ListenTCP("tcp", a); err == nil {
+			defer func() {
+				_ = l.Close()
+			}()
+			return l.Addr().(*net.TCPAddr).Port, nil
 		}
 	}
+	return
 }
 
 func TestProbe(t *testing.T) {
@@ -146,10 +94,43 @@ func TestProbe(t *testing.T) {
 			Exec: &v1.ExecAction{},
 		},
 	}
+	freePorts := []int{0, 0, 0}
+	for idx := range freePorts {
+		p, err := getFreePort()
+		if err != nil {
+			t.Fatalf("no available port for probe test: %v", err)
+		}
+		freePorts[idx] = p
+	}
+	httpProbe := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{
+				Path: "/healthz",
+				Port: intstr.FromInt(freePorts[0]),
+			},
+		},
+	}
+	sDefault := ""
+	grpcProbe := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			GRPC: &v1.GRPCAction{
+				Port:    int32(freePorts[1]),
+				Service: &sDefault,
+			},
+		},
+	}
+	tcpProbe := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			TCPSocket: &v1.TCPSocketAction{
+				Port: intstr.FromInt(freePorts[2]),
+			},
+		},
+	}
 
 	tests := []struct {
 		probe          *v1.Probe
 		env            []v1.EnvVar
+		scheme         string
 		execError      bool
 		expectError    bool
 		execResult     probe.Result
@@ -159,36 +140,43 @@ func TestProbe(t *testing.T) {
 	}{
 		{ // No probe
 			probe:          nil,
+			scheme:         "",
 			expectedResult: results.Success,
 		},
 		{ // No handler
 			probe:          &v1.Probe{},
+			scheme:         "",
 			expectError:    true,
 			expectedResult: results.Failure,
 		},
 		{ // Probe fails
 			probe:          execProbe,
+			scheme:         "exec",
 			execResult:     probe.Failure,
 			expectedResult: results.Failure,
 		},
 		{ // Probe succeeds
 			probe:          execProbe,
+			scheme:         "exec",
 			execResult:     probe.Success,
 			expectedResult: results.Success,
 		},
 		{ // Probe result is warning
 			probe:          execProbe,
+			scheme:         "exec",
 			execResult:     probe.Warning,
 			expectedResult: results.Success,
 		},
 		{ // Probe result is unknown with no error
 			probe:          execProbe,
+			scheme:         "exec",
 			execResult:     probe.Unknown,
 			expectError:    false,
 			expectedResult: results.Failure,
 		},
 		{ // Probe result is unknown with an error
 			probe:          execProbe,
+			scheme:         "exec",
 			execError:      true,
 			expectError:    true,
 			execResult:     probe.Unknown,
@@ -196,6 +184,7 @@ func TestProbe(t *testing.T) {
 		},
 		{ // Unsupported probe type
 			probe:          nil,
+			scheme:         "",
 			expectedResult: results.Failure,
 			expectError:    true,
 			unsupported:    true,
@@ -208,6 +197,7 @@ func TestProbe(t *testing.T) {
 					},
 				},
 			},
+			scheme:         "exec",
 			expectCommand:  []string{"/bin/bash", "-c", "some script"},
 			execResult:     probe.Success,
 			expectedResult: results.Success,
@@ -220,6 +210,7 @@ func TestProbe(t *testing.T) {
 					},
 				},
 			},
+			scheme: "exec",
 			env: []v1.EnvVar{
 				{Name: "A", Value: "script"},
 			},
@@ -227,11 +218,118 @@ func TestProbe(t *testing.T) {
 			execResult:     probe.Success,
 			expectedResult: results.Success,
 		},
+		{ // Probe result is unsupported custom value
+			probe:          execProbe,
+			scheme:         "exec",
+			execResult:     probe.Result("CustomUnsupportedResult"),
+			expectedResult: results.Failure,
+		},
+		{ // HTTP probe succeeds
+			probe:          httpProbe,
+			scheme:         "http",
+			execResult:     probe.Success,
+			expectedResult: results.Success,
+		},
+		{ // HTTP probe fails
+			probe:          httpProbe,
+			scheme:         "http",
+			execResult:     probe.Failure,
+			expectedResult: results.Failure,
+		},
+		{ // HTTP probe warning
+			probe:          httpProbe,
+			scheme:         "http",
+			execResult:     probe.Warning,
+			expectedResult: results.Success,
+		},
+		{ // HTTP probe unknown
+			probe:          httpProbe,
+			scheme:         "http",
+			execResult:     probe.Unknown,
+			expectedResult: results.Failure,
+		},
+		{ // HTTP probe request generation fail
+			probe: &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Path: "/healthz",
+						Port: intstr.FromString("abc"),
+					},
+				},
+			},
+			scheme:         "http",
+			execResult:     probe.Unknown,
+			expectError:    true,
+			expectedResult: results.Failure,
+		},
+		// Add new test cases for TCP probes
+		{ // TCP probe succeeds
+			probe:          tcpProbe,
+			scheme:         "tcp",
+			execResult:     probe.Success,
+			expectedResult: results.Success,
+		},
+		{ // TCP probe fails
+			probe:          tcpProbe,
+			scheme:         "tcp",
+			execResult:     probe.Failure,
+			expectedResult: results.Failure,
+		},
+		{ // TCP probe warning
+			probe:          tcpProbe,
+			scheme:         "tcp",
+			execResult:     probe.Warning,
+			expectedResult: results.Success,
+		},
+		{ // TCP probe unknown
+			probe:          tcpProbe,
+			scheme:         "tcp",
+			execResult:     probe.Unknown,
+			expectedResult: results.Failure,
+		},
+		{ // TCP probe resolution malformed
+			probe: &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					TCPSocket: &v1.TCPSocketAction{
+						Port: intstr.FromString("abc"),
+					},
+				},
+			},
+			scheme:         "tcp",
+			execResult:     probe.Unknown,
+			expectError:    true,
+			expectedResult: results.Failure,
+		},
+
+		// Add new test cases for GRPC probes
+		{ // GRPC probe succeeds
+			probe:          grpcProbe,
+			scheme:         "grpc",
+			execResult:     probe.Success,
+			expectedResult: results.Success,
+		},
+		{ // GRPC probe fails
+			probe:          grpcProbe,
+			scheme:         "grpc",
+			execResult:     probe.Failure,
+			expectedResult: results.Failure,
+		},
+		{ // GRPC probe warning
+			probe:          grpcProbe,
+			scheme:         "grpc",
+			execResult:     probe.Warning,
+			expectedResult: results.Success,
+		},
+		{ // GRPC probe unknown
+			probe:          grpcProbe,
+			scheme:         "grpc",
+			execResult:     probe.Unknown,
+			expectedResult: results.Failure,
+		},
 	}
 
 	for i, test := range tests {
 		for _, pType := range [...]probeType{liveness, readiness, startup} {
-
 			if test.unsupported {
 				pType = probeType(666)
 			}
@@ -248,10 +346,33 @@ func TestProbe(t *testing.T) {
 			case startup:
 				testContainer.StartupProbe = test.probe
 			}
-			if test.execError {
-				prober.exec = fakeExecProber{test.execResult, errors.New("exec error")}
-			} else {
-				prober.exec = fakeExecProber{test.execResult, nil}
+			switch test.scheme {
+			case "http":
+				if test.execError {
+					prober.http = fakeHTTPProber{test.execResult, errors.New("http error")}
+				} else {
+					prober.http = fakeHTTPProber{test.execResult, nil}
+				}
+			case "grpc":
+				if test.execError {
+					prober.grpc = fakeGRPCProber{test.execResult, errors.New("grpc error")}
+				} else {
+					prober.grpc = fakeGRPCProber{test.execResult, nil}
+				}
+			case "tcp":
+				if test.execError {
+					prober.tcp = fakeTCPProber{test.execResult, errors.New("tcp error")}
+				} else {
+					prober.tcp = fakeTCPProber{test.execResult, nil}
+				}
+			case "exec":
+				fallthrough
+			default:
+				if test.execError {
+					prober.exec = fakeExecProber{test.execResult, errors.New("exec error")}
+				} else {
+					prober.exec = fakeExecProber{test.execResult, nil}
+				}
 			}
 
 			result, err := prober.probe(ctx, pType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
