@@ -45,6 +45,27 @@ func MutatingAdmissionPolicyBinding(name string) *MutatingAdmissionPolicyBinding
 	return b
 }
 
+// ExtractMutatingAdmissionPolicyBindingFrom extracts the applied configuration owned by fieldManager from
+// mutatingAdmissionPolicyBinding for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// mutatingAdmissionPolicyBinding must be a unmodified MutatingAdmissionPolicyBinding API object that was retrieved from the Kubernetes API.
+// ExtractMutatingAdmissionPolicyBindingFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractMutatingAdmissionPolicyBindingFrom(mutatingAdmissionPolicyBinding *admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, fieldManager string, subresource string) (*MutatingAdmissionPolicyBindingApplyConfiguration, error) {
+	b := &MutatingAdmissionPolicyBindingApplyConfiguration{}
+	err := managedfields.ExtractInto(mutatingAdmissionPolicyBinding, internal.Parser().Type("io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(mutatingAdmissionPolicyBinding.Name)
+
+	b.WithKind("MutatingAdmissionPolicyBinding")
+	b.WithAPIVersion("admissionregistration.k8s.io/v1alpha1")
+	return b, nil
+}
+
 // ExtractMutatingAdmissionPolicyBinding extracts the applied configuration owned by fieldManager from
 // mutatingAdmissionPolicyBinding. If no managedFields are found in mutatingAdmissionPolicyBinding for fieldManager, a
 // MutatingAdmissionPolicyBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func MutatingAdmissionPolicyBinding(name string) *MutatingAdmissionPolicyBinding
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractMutatingAdmissionPolicyBinding(mutatingAdmissionPolicyBinding *admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, fieldManager string) (*MutatingAdmissionPolicyBindingApplyConfiguration, error) {
-	return extractMutatingAdmissionPolicyBinding(mutatingAdmissionPolicyBinding, fieldManager, "")
+	return ExtractMutatingAdmissionPolicyBindingFrom(mutatingAdmissionPolicyBinding, fieldManager, "")
 }
 
-// ExtractMutatingAdmissionPolicyBindingStatus is the same as ExtractMutatingAdmissionPolicyBinding except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractMutatingAdmissionPolicyBindingStatus(mutatingAdmissionPolicyBinding *admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, fieldManager string) (*MutatingAdmissionPolicyBindingApplyConfiguration, error) {
-	return extractMutatingAdmissionPolicyBinding(mutatingAdmissionPolicyBinding, fieldManager, "status")
-}
-
-func extractMutatingAdmissionPolicyBinding(mutatingAdmissionPolicyBinding *admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, fieldManager string, subresource string) (*MutatingAdmissionPolicyBindingApplyConfiguration, error) {
-	b := &MutatingAdmissionPolicyBindingApplyConfiguration{}
-	err := managedfields.ExtractInto(mutatingAdmissionPolicyBinding, internal.Parser().Type("io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(mutatingAdmissionPolicyBinding.Name)
-
-	b.WithKind("MutatingAdmissionPolicyBinding")
-	b.WithAPIVersion("admissionregistration.k8s.io/v1alpha1")
-	return b, nil
-}
 func (b MutatingAdmissionPolicyBindingApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
