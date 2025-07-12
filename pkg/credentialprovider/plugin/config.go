@@ -206,6 +206,19 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 			if duplicateAnnotationKeys.Len() > 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath, sets.List(duplicateAnnotationKeys), "annotation keys cannot be both required and optional"))
 			}
+
+			if len(provider.TokenAttributes.CacheType) == 0 {
+				allErrs = append(allErrs, field.Required(fldPath.Child("cacheType"), ""))
+			}
+
+			validCacheTypes := sets.New[string](
+				string(kubeletconfig.ServiceAccountServiceAccountTokenCacheType),
+				string(kubeletconfig.PodServiceAccountTokenCacheType),
+				string(kubeletconfig.TokenServiceAccountTokenCacheType),
+			)
+			if len(provider.TokenAttributes.CacheType) > 0 && !validCacheTypes.Has(string(provider.TokenAttributes.CacheType)) {
+				allErrs = append(allErrs, field.NotSupported(fldPath.Child("cacheType"), provider.TokenAttributes.CacheType, sets.List(validCacheTypes)))
+			}
 		}
 	}
 

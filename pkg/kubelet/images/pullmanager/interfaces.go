@@ -61,7 +61,7 @@ type ImagePullManager interface {
 	// was found in the cache.
 	//
 	// `image` is the content of the pod's container `image` field.
-	MustAttemptImagePull(image, imageRef string, credentials []kubeletconfiginternal.ImagePullSecret) bool
+	MustAttemptImagePull(image, imageRef string, secretCredentials []kubeletconfiginternal.ImagePullSecret, serviceAccountTokenCredentials []kubeletconfiginternal.ImagePullServiceAccountTokenSource) bool
 	// PruneUnknownRecords deletes all of the cache ImagePulledRecords for each of the images
 	// whose imageRef does not appear in the `imageList` iff such an record was last updated
 	// _before_ the `until` timestamp.

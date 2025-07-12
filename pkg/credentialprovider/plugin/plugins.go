@@ -27,6 +27,16 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// ServiceAccountTokenProvider is an optional interface for credential providers
+// that support service account token-based authentication (KEP-4412).
+// Providers that implement this interface can provide service account context
+// alongside their credentials.
+type ServiceAccountTokenProvider interface {
+	// GetServiceAccountTokenSource returns the service account token context
+	// for the last credential request, or nil if not applicable.
+	GetServiceAccountTokenSource() *credentialprovider.ServiceAccountTokenSource
+}
+
 type provider struct {
 	name string
 	impl *pluginProvider
@@ -91,8 +101,13 @@ func (k *externalCredentialProviderKeyring) Lookup(image string) ([]credentialpr
 	keyring := &credentialprovider.BasicDockerKeyring{}
 
 	for _, p := range k.providers {
-		// TODO: modify the credentialprovider.CredentialSource to contain the SA/pod information
-		keyring.Add(nil, p.Provide(image))
+		dockerConfig := p.Provide(image)
+
+		if saProvider, ok := p.(ServiceAccountTokenProvider); ok {
+			keyring.Add(&credentialprovider.CredentialSource{ServiceAccountToken: saProvider.GetServiceAccountTokenSource()}, dockerConfig)
+		} else {
+			keyring.Add(nil, dockerConfig)
+		}
 	}
 
 	return keyring.Lookup(image)

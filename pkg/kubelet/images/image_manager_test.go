@@ -520,7 +520,7 @@ type mockImagePullManager struct {
 	allowAll       bool
 }
 
-func (m *mockImagePullManager) MustAttemptImagePull(image, _ string, podSecrets []kubeletconfiginternal.ImagePullSecret) bool {
+func (m *mockImagePullManager) MustAttemptImagePull(image, _ string, podSecrets []kubeletconfiginternal.ImagePullSecret, serviceAccountTokenCredentials []kubeletconfiginternal.ImagePullServiceAccountTokenSource) bool {
 	if m.allowAll == true {
 		return false
 	}

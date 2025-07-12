@@ -622,6 +622,27 @@ type SerializedNodeConfigSource struct {
 	Source v1.NodeConfigSource
 }
 
+// ServiceAccountTokenCacheType is the type of cache key used for caching credentials returned by the plugin
+// when the service account token is used.
+type ServiceAccountTokenCacheType string
+
+const (
+	// TokenServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-pod basis. This should be set if the returned credential's lifetime is limited
+	// to the input serviceAccount+pod+serviceAccountToken's lifetime.
+	// For example, this must be used when returning the input serviceAccountToken directly as a pull credential.
+	TokenServiceAccountTokenCacheType ServiceAccountTokenCacheType = "Token"
+	// PodServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-pod basis. This should be set if the returned credential is only valid
+	// for the serviceAccount+pod which triggered the image pull attempt.
+	PodServiceAccountTokenCacheType ServiceAccountTokenCacheType = "Pod"
+	// ServiceAccountServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-serviceaccount basis. This should be set if the plugin's credential retrieval logic
+	// depends only on the service account and not on pod-specific claims.
+	// Use this when the returned credential is valid for all pods using the same service account.
+	ServiceAccountServiceAccountTokenCacheType ServiceAccountTokenCacheType = "ServiceAccount"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CredentialProviderConfig is the configuration containing information about
@@ -720,6 +741,11 @@ type ServiceAccountTokenAttributes struct {
 	// serviceAccountTokenAudience is the intended audience for the projected service account token.
 	// +required
 	ServiceAccountTokenAudience string
+
+	// cacheType indicates the type of cache key use for caching the credentials returned by the plugin
+	// when the service account token is used.
+	// +required
+	CacheType ServiceAccountTokenCacheType
 
 	// requireServiceAccount indicates whether the plugin requires the pod to have a service account.
 	// If set to true, kubelet will only invoke the plugin if the pod has a service account.
@@ -868,9 +894,15 @@ type ImagePullCredentials struct {
 	// NodePodsAccessible is a flag denoting the pull credentials are accessible
 	// by all the pods on the node, or that no credentials are needed for the pull.
 	//
-	// If true, it is mutually exclusive with the `kubernetesSecrets` field.
+	// If true, it is mutually exclusive with the `kubernetesSecrets` and `serviceAccountTokenSources` fields.
 	// +optional
 	NodePodsAccessible bool
+
+	// ServiceAccountTokenSources is an index of service account tokens
+	// that were provided to the credential provider plugin by the kubelet for the
+	// image that resulted in a valid credential for the image pull.
+	// +optional
+	ServiceAccountTokenSources []ImagePullServiceAccountTokenSource
 }
 
 // ImagePullSecret is a representation of a Kubernetes secret object coordinates along
@@ -883,6 +915,20 @@ type ImagePullSecret struct {
 	// CredentialHash is a SHA-256 retrieved by hashing the image pull credentials
 	// content of the secret specified by the UID/Namespace/Name coordinates.
 	CredentialHash string
+}
+
+// ImagePullServiceAccountTokenSource is a representation of a service account token
+// that was provided to the credential provider plugin by the kubelet.
+type ImagePullServiceAccountTokenSource struct {
+	Audience                  string
+	Namespace                 string
+	ServiceAccountName        string
+	ServiceAccountUID         string
+	ServiceAccountAnnotations map[string]string
+	PodName                   string
+	PodUID                    string
+	ServiceAccountTokenHash   string
+	CacheType                 string
 }
 
 // UserNamespaces contains User Namespace configurations.
