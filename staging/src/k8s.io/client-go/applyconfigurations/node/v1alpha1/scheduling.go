@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // SchedulingApplyConfiguration represents a declarative configuration of the Scheduling type for use

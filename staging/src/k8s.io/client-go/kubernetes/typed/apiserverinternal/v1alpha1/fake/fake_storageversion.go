@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
+	"k8s.io/api/apiserverinternal/v1alpha1"
 	apiserverinternalv1alpha1 "k8s.io/client-go/applyconfigurations/apiserverinternal/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedapiserverinternalv1alpha1 "k8s.io/client-go/kubernetes/typed/apiserverinternal/v1alpha1"
 )
 

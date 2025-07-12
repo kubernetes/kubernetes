@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ServiceCIDRStatusApplyConfiguration represents a declarative configuration of the ServiceCIDRStatus type for use

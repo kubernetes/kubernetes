@@ -19,15 +19,15 @@ limitations under the License.
 package v1
 
 import (
-	context "context"
+	"context"
 
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // ServiceCIDRsGetter has a method to return a ServiceCIDRInterface.

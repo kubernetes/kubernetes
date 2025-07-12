@@ -19,19 +19,19 @@ limitations under the License.
 package fake
 
 import (
-	context "context"
-	json "encoding/json"
-	fmt "fmt"
+	"context"
+	"encoding/json"
+	"fmt"
 
-	v1 "k8s.io/api/apps/v1"
+	"k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	appsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/testing"
 )
 
 // fakeReplicaSets implements ReplicaSetInterface

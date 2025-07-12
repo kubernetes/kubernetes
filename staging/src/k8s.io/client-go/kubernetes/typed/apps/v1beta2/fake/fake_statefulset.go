@@ -19,17 +19,17 @@ limitations under the License.
 package fake
 
 import (
-	context "context"
-	json "encoding/json"
-	fmt "fmt"
+	"context"
+	"encoding/json"
+	"fmt"
 
-	v1beta2 "k8s.io/api/apps/v1beta2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/api/apps/v1beta2"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedappsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/testing"
 )
 
 // fakeStatefulSets implements StatefulSetInterface

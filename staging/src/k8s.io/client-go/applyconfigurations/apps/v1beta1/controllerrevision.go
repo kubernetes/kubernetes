@@ -21,11 +21,11 @@ package v1beta1
 import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
-	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/client-go/applyconfigurations/internal"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ControllerRevisionApplyConfiguration represents a declarative configuration of the ControllerRevision type for use

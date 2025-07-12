@@ -19,10 +19,10 @@ limitations under the License.
 package fake
 
 import (
-	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+	"k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/applyconfiguration/cr/v1"
 	typedcrv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 )
 
 // fakeExamples implements ExampleInterface

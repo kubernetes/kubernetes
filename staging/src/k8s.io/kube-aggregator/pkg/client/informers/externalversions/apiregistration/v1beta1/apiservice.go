@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
-	context "context"
-	time "time"
+	"context"
+	"time"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	watch "k8s.io/apimachinery/pkg/watch"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	apisapiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
-	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	internalinterfaces "k8s.io/kube-aggregator/pkg/client/informers/externalversions/internalinterfaces"
+	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	"k8s.io/kube-aggregator/pkg/client/informers/externalversions/internalinterfaces"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1"
 )
 

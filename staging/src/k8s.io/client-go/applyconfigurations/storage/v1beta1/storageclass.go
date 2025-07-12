@@ -22,11 +22,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	internal "k8s.io/client-go/applyconfigurations/internal"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/applyconfigurations/internal"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // StorageClassApplyConfiguration represents a declarative configuration of the StorageClass type for use

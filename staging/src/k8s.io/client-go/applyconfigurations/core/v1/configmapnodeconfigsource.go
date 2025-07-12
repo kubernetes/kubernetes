@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // ConfigMapNodeConfigSourceApplyConfiguration represents a declarative configuration of the ConfigMapNodeConfigSource type for use

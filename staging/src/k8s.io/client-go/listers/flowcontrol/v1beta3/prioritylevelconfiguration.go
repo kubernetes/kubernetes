@@ -20,9 +20,9 @@ package v1beta3
 
 import (
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
-	labels "k8s.io/apimachinery/pkg/labels"
-	listers "k8s.io/client-go/listers"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
+	"k8s.io/client-go/tools/cache"
 )
 
 // PriorityLevelConfigurationLister helps list PriorityLevelConfigurations.

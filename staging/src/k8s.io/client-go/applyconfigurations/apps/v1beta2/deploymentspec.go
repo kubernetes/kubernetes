@@ -20,7 +20,7 @@ package v1beta2
 
 import (
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // DeploymentSpecApplyConfiguration represents a declarative configuration of the DeploymentSpec type for use

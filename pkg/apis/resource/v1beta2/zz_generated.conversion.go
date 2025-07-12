@@ -22,16 +22,16 @@ limitations under the License.
 package v1beta2
 
 import (
-	unsafe "unsafe"
+	"unsafe"
 
 	corev1 "k8s.io/api/core/v1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
-	core "k8s.io/kubernetes/pkg/apis/core"
-	resource "k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
 func init() {

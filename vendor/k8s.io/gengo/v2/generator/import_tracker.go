@@ -47,7 +47,13 @@ func NewImportTrackerForPackage(local string, typesToAdd ...*types.Type) *namer.
 	tracker := namer.NewDefaultImportTracker(types.Name{Package: local})
 	tracker.IsInvalidType = func(*types.Type) bool { return false }
 	tracker.LocalName = func(name types.Name) string { return goTrackerLocalName(&tracker, local, name) }
-	tracker.PrintImport = func(path, name string) string { return name + " \"" + path + "\"" }
+	tracker.PrintImport = func(path, name string) string {
+		dirs := strings.Split(path, namer.GoSeperator)
+		if len(dirs) > 0 && name == dirs[len(dirs)-1] {
+			return "\"" + path + "\""
+		}
+		return name + " \"" + path + "\""
+	}
 
 	tracker.AddTypes(typesToAdd...)
 	return &tracker

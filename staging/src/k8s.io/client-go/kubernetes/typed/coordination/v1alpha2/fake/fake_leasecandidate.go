@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha2 "k8s.io/api/coordination/v1alpha2"
+	"k8s.io/api/coordination/v1alpha2"
 	coordinationv1alpha2 "k8s.io/client-go/applyconfigurations/coordination/v1alpha2"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedcoordinationv1alpha2 "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2"
 )
 

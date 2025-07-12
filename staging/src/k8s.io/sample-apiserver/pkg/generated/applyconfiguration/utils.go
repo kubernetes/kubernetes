@@ -19,12 +19,12 @@ limitations under the License.
 package applyconfiguration
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
-	v1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
-	internal "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/internal"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	"k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
+	"k8s.io/sample-apiserver/pkg/generated/applyconfiguration/internal"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1alpha1"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1beta1"
 )

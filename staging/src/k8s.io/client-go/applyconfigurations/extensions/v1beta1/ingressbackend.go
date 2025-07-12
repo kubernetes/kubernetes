@@ -19,8 +19,8 @@ limitations under the License.
 package v1beta1
 
 import (
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
-	v1 "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // IngressBackendApplyConfiguration represents a declarative configuration of the IngressBackend type for use

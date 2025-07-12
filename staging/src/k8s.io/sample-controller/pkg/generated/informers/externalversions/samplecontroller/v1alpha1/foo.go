@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	context "context"
-	time "time"
+	"context"
+	"time"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	watch "k8s.io/apimachinery/pkg/watch"
-	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 	apissamplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
-	versioned "k8s.io/sample-controller/pkg/generated/clientset/versioned"
-	internalinterfaces "k8s.io/sample-controller/pkg/generated/informers/externalversions/internalinterfaces"
+	"k8s.io/sample-controller/pkg/generated/clientset/versioned"
+	"k8s.io/sample-controller/pkg/generated/informers/externalversions/internalinterfaces"
 	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/generated/listers/samplecontroller/v1alpha1"
 )
 

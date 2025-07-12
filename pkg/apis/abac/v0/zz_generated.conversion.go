@@ -22,9 +22,9 @@ limitations under the License.
 package v0
 
 import (
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	abac "k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/abac"
 )
 
 func init() {

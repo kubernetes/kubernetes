@@ -22,15 +22,15 @@ limitations under the License.
 package v1beta2
 
 import (
-	context "context"
-	fmt "fmt"
+	"context"
+	"fmt"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
-	operation "k8s.io/apimachinery/pkg/api/operation"
-	safe "k8s.io/apimachinery/pkg/api/safe"
-	validate "k8s.io/apimachinery/pkg/api/validate"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	field "k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/safe"
+	"k8s.io/apimachinery/pkg/api/validate"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }

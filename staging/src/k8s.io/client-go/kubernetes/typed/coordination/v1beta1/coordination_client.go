@@ -19,11 +19,11 @@ limitations under the License.
 package v1beta1
 
 import (
-	http "net/http"
+	"net/http"
 
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type CoordinationV1beta1Interface interface {

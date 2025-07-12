@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	context "context"
+	"context"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/gentype"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
-	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
+	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
 // PodMetricsesGetter has a method to return a PodMetricsInterface.

@@ -22,12 +22,12 @@ limitations under the License.
 package marker
 
 import (
-	json "encoding/json"
+	"encoding/json"
 
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	external "k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external"
 	externalexternal "k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external/external"
-	external2 "k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external2"
+	"k8s.io/code-generator/cmd/defaulter-gen/output_tests/marker/external2"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.

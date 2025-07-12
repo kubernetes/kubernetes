@@ -19,11 +19,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	http "net/http"
+	"net/http"
 
-	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest"
 	metricsv1alpha1 "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
-	scheme "k8s.io/metrics/pkg/client/clientset/versioned/scheme"
+	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 
 type MetricsV1alpha1Interface interface {

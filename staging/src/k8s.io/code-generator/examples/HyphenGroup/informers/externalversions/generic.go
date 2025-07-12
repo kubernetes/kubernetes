@@ -19,11 +19,11 @@ limitations under the License.
 package externalversions
 
 import (
-	fmt "fmt"
+	"fmt"
 
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	cache "k8s.io/client-go/tools/cache"
-	v1 "k8s.io/code-generator/examples/HyphenGroup/apis/example/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/code-generator/examples/HyphenGroup/apis/example/v1"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other

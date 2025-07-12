@@ -20,8 +20,8 @@ package v1
 
 import (
 	policyv1 "k8s.io/api/policy/v1"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // EvictionsGetter has a method to return a EvictionInterface.

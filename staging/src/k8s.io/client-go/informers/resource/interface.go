@@ -19,10 +19,10 @@ limitations under the License.
 package resource
 
 import (
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
-	v1alpha3 "k8s.io/client-go/informers/resource/v1alpha3"
-	v1beta1 "k8s.io/client-go/informers/resource/v1beta1"
-	v1beta2 "k8s.io/client-go/informers/resource/v1beta2"
+	"k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/informers/resource/v1alpha3"
+	"k8s.io/client-go/informers/resource/v1beta1"
+	"k8s.io/client-go/informers/resource/v1beta2"
 )
 
 // Interface provides access to each of this group's versions.

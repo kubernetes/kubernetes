@@ -19,15 +19,15 @@ limitations under the License.
 package v1beta2
 
 import (
-	context "context"
+	"context"
 
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsresourcev1beta2 "k8s.io/client-go/applyconfigurations/resource/v1beta2"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // ResourceSlicesGetter has a method to return a ResourceSliceInterface.

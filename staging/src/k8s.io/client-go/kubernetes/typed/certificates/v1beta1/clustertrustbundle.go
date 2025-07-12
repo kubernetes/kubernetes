@@ -19,15 +19,15 @@ limitations under the License.
 package v1beta1
 
 import (
-	context "context"
+	"context"
 
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	applyconfigurationscertificatesv1beta1 "k8s.io/client-go/applyconfigurations/certificates/v1beta1"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // ClusterTrustBundlesGetter has a method to return a ClusterTrustBundleInterface.

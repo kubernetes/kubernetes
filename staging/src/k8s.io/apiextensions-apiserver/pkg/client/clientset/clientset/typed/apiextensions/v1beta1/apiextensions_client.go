@@ -19,11 +19,11 @@ limitations under the License.
 package v1beta1
 
 import (
-	http "net/http"
+	"net/http"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	scheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
-	rest "k8s.io/client-go/rest"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type ApiextensionsV1beta1Interface interface {

@@ -19,15 +19,15 @@ limitations under the License.
 package v2
 
 import (
-	context "context"
+	"context"
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsautoscalingv2 "k8s.io/client-go/applyconfigurations/autoscaling/v2"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // HorizontalPodAutoscalersGetter has a method to return a HorizontalPodAutoscalerInterface.

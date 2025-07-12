@@ -19,8 +19,8 @@ limitations under the License.
 package apiserverinternal
 
 import (
-	v1alpha1 "k8s.io/client-go/informers/apiserverinternal/v1alpha1"
-	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/informers/apiserverinternal/v1alpha1"
+	"k8s.io/client-go/informers/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

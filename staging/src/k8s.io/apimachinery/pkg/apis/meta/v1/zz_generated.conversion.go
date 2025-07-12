@@ -22,16 +22,16 @@ limitations under the License.
 package v1
 
 import (
-	url "net/url"
-	unsafe "unsafe"
+	"net/url"
+	"unsafe"
 
-	resource "k8s.io/apimachinery/pkg/api/resource"
-	conversion "k8s.io/apimachinery/pkg/conversion"
-	fields "k8s.io/apimachinery/pkg/fields"
-	labels "k8s.io/apimachinery/pkg/labels"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	intstr "k8s.io/apimachinery/pkg/util/intstr"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 func init() {

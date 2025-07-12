@@ -114,5 +114,6 @@ replace (
 	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/gengo/v2 => github.com/brandond/gengo/v2 v2.0.0-20250701181758-a2d61268f2ac
 	k8s.io/kms => ../kms
 )

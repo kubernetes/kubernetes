@@ -19,8 +19,8 @@ limitations under the License.
 package fake
 
 import (
-	gentype "k8s.io/client-go/gentype"
-	v1 "k8s.io/code-generator/examples/apiserver/apis/example2/v1"
+	"k8s.io/client-go/gentype"
+	"k8s.io/code-generator/examples/apiserver/apis/example2/v1"
 	example2v1 "k8s.io/code-generator/examples/apiserver/clientset/versioned/typed/example2/v1"
 )
 

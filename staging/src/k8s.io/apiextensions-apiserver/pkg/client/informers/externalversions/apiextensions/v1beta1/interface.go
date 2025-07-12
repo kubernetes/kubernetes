@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	internalinterfaces "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/internalinterfaces"
+	"k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.

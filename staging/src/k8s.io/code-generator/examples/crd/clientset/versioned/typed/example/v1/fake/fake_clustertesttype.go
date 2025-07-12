@@ -19,13 +19,13 @@ limitations under the License.
 package fake
 
 import (
-	context "context"
+	"context"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gentype "k8s.io/client-go/gentype"
-	testing "k8s.io/client-go/testing"
-	v1 "k8s.io/code-generator/examples/crd/apis/example/v1"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/testing"
+	"k8s.io/code-generator/examples/crd/apis/example/v1"
 	examplev1 "k8s.io/code-generator/examples/crd/applyconfiguration/example/v1"
 	typedexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/example/v1"
 )

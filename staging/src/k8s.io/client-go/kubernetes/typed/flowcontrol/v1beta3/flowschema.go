@@ -19,15 +19,15 @@ limitations under the License.
 package v1beta3
 
 import (
-	context "context"
+	"context"
 
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsflowcontrolv1beta3 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // FlowSchemasGetter has a method to return a FlowSchemaInterface.

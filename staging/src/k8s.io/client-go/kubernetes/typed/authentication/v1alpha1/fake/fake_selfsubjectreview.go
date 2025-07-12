@@ -19,8 +19,8 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "k8s.io/api/authentication/v1alpha1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/api/authentication/v1alpha1"
+	"k8s.io/client-go/gentype"
 	authenticationv1alpha1 "k8s.io/client-go/kubernetes/typed/authentication/v1alpha1"
 )
 

@@ -20,8 +20,8 @@ package fake
 
 import (
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/typed/cr/v1"
-	rest "k8s.io/client-go/rest"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/testing"
 )
 
 type FakeCrV1 struct {

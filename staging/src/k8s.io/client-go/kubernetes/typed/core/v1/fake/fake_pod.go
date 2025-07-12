@@ -19,14 +19,14 @@ limitations under the License.
 package fake
 
 import (
-	context "context"
+	"context"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	testing "k8s.io/client-go/testing"
+	"k8s.io/client-go/testing"
 )
 
 // fakePods implements PodInterface

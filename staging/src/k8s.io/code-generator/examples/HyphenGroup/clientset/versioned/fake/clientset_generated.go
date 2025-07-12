@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/testing"
-	applyconfiguration "k8s.io/code-generator/examples/HyphenGroup/applyconfiguration"
+	"k8s.io/code-generator/examples/HyphenGroup/applyconfiguration"
 	clientset "k8s.io/code-generator/examples/HyphenGroup/clientset/versioned"
 	examplegroupv1 "k8s.io/code-generator/examples/HyphenGroup/clientset/versioned/typed/example/v1"
 	fakeexamplegroupv1 "k8s.io/code-generator/examples/HyphenGroup/clientset/versioned/typed/example/v1/fake"

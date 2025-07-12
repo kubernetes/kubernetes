@@ -19,19 +19,19 @@ limitations under the License.
 package v1
 
 import (
-	context "context"
-	fmt "fmt"
+	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 	applyconfigurationsappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
-	gentype "k8s.io/client-go/gentype"
-	scheme "k8s.io/client-go/kubernetes/scheme"
-	apply "k8s.io/client-go/util/apply"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/util/apply"
 )
 
 // DeploymentsGetter has a method to return a DeploymentInterface.

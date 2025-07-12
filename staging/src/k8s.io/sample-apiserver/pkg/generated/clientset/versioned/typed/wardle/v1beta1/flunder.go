@@ -19,15 +19,15 @@ limitations under the License.
 package v1beta1
 
 import (
-	context "context"
+	"context"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/gentype"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 	applyconfigurationwardlev1beta1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1beta1"
-	scheme "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
+	"k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
 )
 
 // FlundersGetter has a method to return a FlunderInterface.

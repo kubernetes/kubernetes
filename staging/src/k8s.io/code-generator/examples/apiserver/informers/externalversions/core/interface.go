@@ -19,8 +19,8 @@ limitations under the License.
 package core
 
 import (
-	v1 "k8s.io/code-generator/examples/apiserver/informers/externalversions/core/v1"
-	internalinterfaces "k8s.io/code-generator/examples/apiserver/informers/externalversions/internalinterfaces"
+	"k8s.io/code-generator/examples/apiserver/informers/externalversions/core/v1"
+	"k8s.io/code-generator/examples/apiserver/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

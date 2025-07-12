@@ -19,15 +19,15 @@ limitations under the License.
 package fake
 
 import (
-	context "context"
-	json "encoding/json"
-	fmt "fmt"
+	"context"
+	"encoding/json"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
-	gentype "k8s.io/client-go/gentype"
-	testing "k8s.io/client-go/testing"
-	v1 "k8s.io/code-generator/examples/crd/apis/extensions/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/gentype"
+	"k8s.io/client-go/testing"
+	"k8s.io/code-generator/examples/crd/apis/extensions/v1"
 	extensionsv1 "k8s.io/code-generator/examples/crd/applyconfiguration/extensions/v1"
 	typedextensionsv1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/extensions/v1"
 )

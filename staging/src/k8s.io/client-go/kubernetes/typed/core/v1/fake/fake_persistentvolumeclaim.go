@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
-	gentype "k8s.io/client-go/gentype"
+	"k8s.io/client-go/gentype"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 

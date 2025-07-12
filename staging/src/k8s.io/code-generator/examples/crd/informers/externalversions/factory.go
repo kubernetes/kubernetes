@@ -19,20 +19,20 @@ limitations under the License.
 package externalversions
 
 import (
-	reflect "reflect"
-	sync "sync"
-	time "time"
+	"reflect"
+	"sync"
+	"time"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	cache "k8s.io/client-go/tools/cache"
-	versioned "k8s.io/code-generator/examples/crd/clientset/versioned"
-	conflicting "k8s.io/code-generator/examples/crd/informers/externalversions/conflicting"
-	example "k8s.io/code-generator/examples/crd/informers/externalversions/example"
-	example2 "k8s.io/code-generator/examples/crd/informers/externalversions/example2"
-	extensions "k8s.io/code-generator/examples/crd/informers/externalversions/extensions"
-	internalinterfaces "k8s.io/code-generator/examples/crd/informers/externalversions/internalinterfaces"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/code-generator/examples/crd/clientset/versioned"
+	"k8s.io/code-generator/examples/crd/informers/externalversions/conflicting"
+	"k8s.io/code-generator/examples/crd/informers/externalversions/example"
+	"k8s.io/code-generator/examples/crd/informers/externalversions/example2"
+	"k8s.io/code-generator/examples/crd/informers/externalversions/extensions"
+	"k8s.io/code-generator/examples/crd/informers/externalversions/internalinterfaces"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.
