@@ -889,7 +889,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 					},
 				},
 			},
-			expectErr: "providers.defaultCacheDuration: Invalid value: \"-1m0s\": defaultCacheDuration must be greater than or equal to 0",
+			expectErr: "providers.defaultCacheDuration: Invalid value: \"-1m0s\": must be greater than or equal to 0",
 		},
 		{
 			name: "invalid match image",

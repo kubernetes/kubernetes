@@ -514,7 +514,7 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 	}
 	if opts.RejectCompletionTimeBeforeStartTime {
 		if status.StartTime != nil && status.CompletionTime != nil && status.CompletionTime.Before(status.StartTime) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("completionTime"), status.CompletionTime, "completionTime cannot be set before startTime"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("completionTime"), status.CompletionTime, "must be equal to or after `startTime`"))
 		}
 	}
 	if opts.RejectFailedJobWithoutFailureTarget {
@@ -540,7 +540,7 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 	}
 	if opts.RejectFinishedJobWithUncountedTerminatedPods {
 		if isJobFinished && status.UncountedTerminatedPods != nil && len(status.UncountedTerminatedPods.Failed)+len(status.UncountedTerminatedPods.Succeeded) > 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("uncountedTerminatedPods"), status.UncountedTerminatedPods, "uncountedTerminatedPods needs to be empty for finished job"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("uncountedTerminatedPods"), status.UncountedTerminatedPods, "must be empty for finished job"))
 		}
 	}
 	if opts.RejectInvalidCompletedIndexes {
@@ -692,7 +692,7 @@ func ValidateJobStatusUpdate(job, oldJob *batch.Job, opts JobStatusValidationOpt
 		// we don't want to block transitions to completionTime = nil when the job is not finished yet.
 		// Setting completionTime = nil for finished jobs is prevented in RejectCompleteJobWithoutCompletionTime.
 		if job.Status.CompletionTime != nil && oldJob.Status.CompletionTime != nil && !ptr.Equal(job.Status.CompletionTime, oldJob.Status.CompletionTime) {
-			allErrs = append(allErrs, field.Invalid(statusFld.Child("completionTime"), job.Status.CompletionTime, "completionTime cannot be mutated"))
+			allErrs = append(allErrs, field.Invalid(statusFld.Child("completionTime"), job.Status.CompletionTime, "field is immutable"))
 		}
 	}
 	if opts.RejectStartTimeUpdateForUnsuspendedJob {

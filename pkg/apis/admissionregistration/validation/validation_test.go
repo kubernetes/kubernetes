@@ -2904,7 +2904,7 @@ func TestValidateValidatingAdmissionPolicy(t *testing.T) {
 				},
 			},
 		},
-		expectedError: `spec.variables[0].name: Invalid value: "4ever": name is not a valid CEL identifier`,
+		expectedError: `spec.variables[0].name: Invalid value: "4ever": must be a valid CEL identifier`,
 	}, {
 		name: "variable composition cannot compile",
 		config: &admissionregistration.ValidatingAdmissionPolicy{
