@@ -1675,7 +1675,7 @@ func (e *Store) startObservingCount(period time.Duration, objectCountTracker flo
 
 		metrics.UpdateObjectCount(e.DefaultQualifiedResource, stats.ObjectCount)
 		if objectCountTracker != nil {
-			objectCountTracker.Set(resourceName, stats)
+			objectCountTracker.Set(resourceName, flowcontrolrequest.StatsDelegator{Stats: stats, ShouldDelegateList: e.Storage.Storage.ShouldDelegateList})
 		}
 	}, period, resourceCountPollPeriodJitter, true, stopCh)
 	return func() {

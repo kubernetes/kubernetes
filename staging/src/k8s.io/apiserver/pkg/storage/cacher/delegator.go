@@ -238,6 +238,14 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	return nil
 }
 
+func (c *CacheDelegator) ShouldDelegateList(opts storage.ListOptions) (bool, error) {
+	result, err := delegator.ShouldDelegateList(opts, c.cacher)
+	if err != nil {
+		return false, err
+	}
+	return result.ShouldDelegate, nil
+}
+
 func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 	pred := opts.Predicate
 	noLabelSelector := pred.Label == nil || pred.Label.Empty()

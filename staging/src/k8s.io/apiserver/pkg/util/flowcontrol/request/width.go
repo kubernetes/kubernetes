@@ -23,7 +23,6 @@ import (
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/klog/v2"
@@ -59,7 +58,7 @@ func (we *WorkEstimate) MaxSeats() int {
 
 // statsGetterFunc represents a function that gets the total
 // number of objects for a given resource.
-type statsGetterFunc func(string) (storage.Stats, error)
+type statsGetterFunc func(string) (StatsDelegator, error)
 
 // watchCountGetterFunc represents a function that gets the total
 // number of watchers potentially interested in a given request.
