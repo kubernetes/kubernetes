@@ -34,8 +34,8 @@ import (
 const (
 	hpaName = "consumer"
 
-	podCPURequest               = 500
-	targetCPUUtilizationPercent = 25
+	podCPURequest               = 200
+	targetCPUUtilizationPercent = 60
 
 	fullWindowOfNewUsage     = 30 * time.Second
 	windowWithOldUsagePasses = 30 * time.Second
@@ -504,7 +504,7 @@ var _ = SIGDescribe(feature.HPAConfigurableTolerance, framework.WithFeatureGate(
 		f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-		waitBuffer := 1 * time.Minute
+		waitBuffer := 2 * time.Minute
 
 		ginkgo.Describe("with large configurable tolerance", func() {
 			ginkgo.It("should not scale", func(ctx context.Context) {
@@ -543,6 +543,71 @@ var _ = SIGDescribe(feature.HPAConfigurableTolerance, framework.WithFeatureGate(
 				replicas, err := rc.GetReplicas(ctx)
 				framework.ExpectNoError(err)
 				gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
+			})
+		})
+
+		ginkgo.Describe("with small scale-up, large scale-down tolerances", func() {
+			ginkgo.It("should not scale", func(ctx context.Context) {
+				ginkgo.By("setting up resource consumer and HPA")
+				initPods := 10
+				initCPUUsageTotal := usageForReplicas(initPods)
+				waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
+
+				rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
+					hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+					initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
+					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+				)
+				ginkgo.DeferCleanup(rc.CleanUp)
+
+				scaleUpRule := e2eautoscaling.HPAScalingRuleWithToleranceMilli(20)    // 2%
+				scaleDownRule := e2eautoscaling.HPAScalingRuleWithToleranceMilli(300) // 30%
+				hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
+					rc, int32(targetCPUUtilizationPercent), int32(initPods), 12,
+					e2eautoscaling.HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule),
+				)
+				ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
+
+				ginkgo.By("waiting for deployment to start initial pods")
+				rc.WaitForReplicas(ctx, initPods, waitDeadline)
+
+				ginkgo.By("trying to trigger scale up to 11 replicas")
+				rc.ConsumeCPU(usageForReplicas(11))
+
+				ginkgo.By("waiting for replicas to scale up")
+				waitStart := time.Now()
+				rc.WaitForReplicas(ctx, 11, waitDeadline)
+				timeWaited := time.Since(waitStart)
+				framework.Logf("time waited for scale up: %s", timeWaited)
+				gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
+
+				// Increase resource usage to match 12 replicas. The difference is less
+				// than 10% (the default tolerance), but it should scale up anyway thanks
+				// to the small scale-up custom tolerance.
+
+				ginkgo.By("trying to trigger scale up to 12 replicas")
+				rc.ConsumeCPU(usageForReplicas(12))
+
+				ginkgo.By("waiting for replicas to scale up")
+				waitStart = time.Now()
+				rc.WaitForReplicas(ctx, 12, waitDeadline)
+				timeWaited = time.Since(waitStart)
+				framework.Logf("time waited for scale up: %s", timeWaited)
+				gomega.Expect(timeWaited).To(gomega.BeNumerically("<", waitDeadline), "waited %s, wanted less than %s", timeWaited, waitDeadline)
+
+				// Decrease resource usage to match 10 replicas. Should not scale down
+				// because of the large scale-down custom tolerance.
+
+				ginkgo.By("triggering scale down by lowering consumption")
+				waitStart = time.Now()
+				rc.ConsumeCPU(usageForReplicas(10))
+
+				rc.EnsureDesiredReplicasInRange(ctx, 12, 12, waitDeadline, hpa.Name)
+				timeWaited = time.Since(waitStart)
+
+				ginkgo.By("verifying time waited for a scale down")
+				framework.Logf("time waited for scale down: %s", timeWaited)
+				gomega.Expect(timeWaited).To(gomega.BeNumerically(">", waitDeadline), "waited %s, wanted to wait more than %s", timeWaited, waitDeadline)
 			})
 		})
 	})
