@@ -372,25 +372,11 @@ func ContainsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.Persi
 }
 
 func ClaimContainsAllocatedResources(pvc *core.PersistentVolumeClaim) bool {
-	if pvc == nil {
-		return false
-	}
-
-	if pvc.Status.AllocatedResources != nil {
-		return true
-	}
-	return false
+	return pvc != nil && pvc.Status.AllocatedResources != nil
 }
 
 func ClaimContainsAllocatedResourceStatus(pvc *core.PersistentVolumeClaim) bool {
-	if pvc == nil {
-		return false
-	}
-
-	if pvc.Status.AllocatedResourceStatuses != nil {
-		return true
-	}
-	return false
+	return pvc != nil && pvc.Status.AllocatedResourceStatuses != nil
 }
 
 // GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
@@ -449,24 +435,28 @@ func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]core.Taint, 
 
 // GetPersistentVolumeClass returns StorageClassName.
 func GetPersistentVolumeClass(volume *core.PersistentVolume) string {
-	// Use beta annotation first
+	// Use StorageClassName field first
+	if len(volume.Spec.StorageClassName) > 0 {
+		return volume.Spec.StorageClassName
+	}
+
 	if class, found := volume.Annotations[core.BetaStorageClassAnnotation]; found {
 		return class
 	}
 
-	return volume.Spec.StorageClassName
+	return ""
 }
 
 // GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
 // requested, it returns "".
 func GetPersistentVolumeClaimClass(claim *core.PersistentVolumeClaim) string {
-	// Use beta annotation first
-	if class, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
-		return class
-	}
-
+	// Use StorageClassName field first
 	if claim.Spec.StorageClassName != nil {
 		return *claim.Spec.StorageClassName
+	}
+
+	if class, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
+		return class
 	}
 
 	return ""
@@ -474,12 +464,12 @@ func GetPersistentVolumeClaimClass(claim *core.PersistentVolumeClaim) string {
 
 // PersistentVolumeClaimHasClass returns true if given claim has set StorageClassName field.
 func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
-	// Use beta annotation first
-	if _, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
+	// Use StorageClassName field first
+	if claim.Spec.StorageClassName != nil {
 		return true
 	}
 
-	if claim.Spec.StorageClassName != nil {
+	if _, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
 		return true
 	}
 
