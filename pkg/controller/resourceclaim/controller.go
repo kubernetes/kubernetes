@@ -351,27 +351,50 @@ func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj in
 		return
 	}
 
+	// Check if both the old and new claim are nil in case DeletedFinalStateUnknown.Obj can be nil.
+	if oldClaim == nil && newClaim == nil {
+		return
+	}
 	// Maintain metrics based on what was observed.
 	switch {
 	case oldClaim == nil:
 		// Added.
 		metrics.NumResourceClaims.Inc()
+		if hasAdminAccess(newClaim) {
+			metrics.NumResourceClaimsWithAdminAccess.Inc()
+		}
 		if newClaim.Status.Allocation != nil {
 			metrics.NumAllocatedResourceClaims.Inc()
+			if hasAdminAccess(newClaim) {
+				metrics.NumAllocatedResourceClaimsWithAdminAccess.Inc()
+			}
 		}
+
 	case newClaim == nil:
 		// Deleted.
 		metrics.NumResourceClaims.Dec()
+		if hasAdminAccess(oldClaim) {
+			metrics.NumResourceClaimsWithAdminAccess.Dec()
+		}
 		if oldClaim.Status.Allocation != nil {
 			metrics.NumAllocatedResourceClaims.Dec()
+			if hasAdminAccess(oldClaim) {
+				metrics.NumAllocatedResourceClaimsWithAdminAccess.Dec()
+			}
 		}
 	default:
 		// Updated.
 		switch {
 		case oldClaim.Status.Allocation == nil && newClaim.Status.Allocation != nil:
 			metrics.NumAllocatedResourceClaims.Inc()
+			if hasAdminAccess(newClaim) {
+				metrics.NumAllocatedResourceClaimsWithAdminAccess.Inc()
+			}
 		case oldClaim.Status.Allocation != nil && newClaim.Status.Allocation == nil:
 			metrics.NumAllocatedResourceClaims.Dec()
+			if hasAdminAccess(oldClaim) {
+				metrics.NumAllocatedResourceClaimsWithAdminAccess.Dec()
+			}
 		}
 	}
 
@@ -943,6 +966,18 @@ func owningPod(claim *resourceapi.ResourceClaim) (string, types.UID) {
 		}
 	}
 	return "", ""
+}
+
+func hasAdminAccess(claim *resourceapi.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+	for _, request := range claim.Spec.Devices.Requests {
+		if ptr.Deref(request.AdminAccess, false) {
+			return true
+		}
+	}
+	return false
 }
 
 // podResourceClaimIndexFunc is an index function that returns ResourceClaim keys (=
