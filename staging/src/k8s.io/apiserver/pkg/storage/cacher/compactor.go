@@ -72,7 +72,7 @@ func (c *compactor) compactIfNeeded() {
 	if rev <= c.compactRevision {
 		return
 	}
-	c.wc.Compact(rev)
+	c.wc.Compact(uint64(rev))
 	c.compactRevision = rev
 }
 

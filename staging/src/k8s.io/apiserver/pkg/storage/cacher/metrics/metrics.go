@@ -183,7 +183,7 @@ var (
 			Namespace:      namespace,
 			Name:           "storage_consistency_checks_total",
 			Help:           "Counter for status of consistency checks between etcd and watch cache",
-			StabilityLevel: compbasemetrics.INTERNAL,
+			StabilityLevel: compbasemetrics.ALPHA,
 		}, []string{"group", "resource", "status"})
 )
 
