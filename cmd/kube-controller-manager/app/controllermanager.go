@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/informers"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
@@ -157,6 +158,9 @@ controller, and serviceaccounts controller.`,
 			return nil
 		},
 	}
+
+	// Format controllers list so that it contains the associated feature gates.
+	s.SetControllerListFormatter(newControllerListFormatter(NewControllerDescriptors()))
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
@@ -434,13 +438,14 @@ func (c ControllerContext) IsControllerEnabled(controllerDescriptor *ControllerD
 type InitFunc func(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller controller.Interface, enabled bool, err error)
 
 type ControllerDescriptor struct {
-	name                      string
-	initFunc                  InitFunc
-	requiredFeatureGates      []featuregate.Feature
-	aliases                   []string
-	isDisabledByDefault       bool
-	isCloudProviderController bool
-	requiresSpecialHandling   bool
+	name                       string
+	initFunc                   InitFunc
+	requiredFeatureGates       []featuregate.Feature
+	requiredClientFeatureGates []clientgofeaturegate.Feature
+	aliases                    []string
+	isDisabledByDefault        bool
+	isCloudProviderController  bool
+	requiresSpecialHandling    bool
 }
 
 func (r *ControllerDescriptor) Name() string {
@@ -453,6 +458,22 @@ func (r *ControllerDescriptor) GetInitFunc() InitFunc {
 
 func (r *ControllerDescriptor) GetRequiredFeatureGates() []featuregate.Feature {
 	return append([]featuregate.Feature(nil), r.requiredFeatureGates...)
+}
+
+func (r *ControllerDescriptor) GetRequiredClientFeatureGates() []clientgofeaturegate.Feature {
+	return append([]clientgofeaturegate.Feature(nil), r.requiredClientFeatureGates...)
+}
+
+// GetAllRequiredFeatureGateStrings returns a string slice made by merging the required feature and client feature gates.
+func (c *ControllerDescriptor) GetAllRequiredFeatureGateStrings() []string {
+	var gates []string
+	for _, gate := range c.GetRequiredFeatureGates() {
+		gates = append(gates, string(gate))
+	}
+	for _, gate := range c.GetRequiredClientFeatureGates() {
+		gates = append(gates, string(gate))
+	}
+	return gates
 }
 
 // GetAliases returns aliases to ensure backwards compatibility and should never be removed!
@@ -729,7 +750,13 @@ func StartController(ctx context.Context, controllerCtx ControllerContext, contr
 
 	for _, featureGate := range controllerDescriptor.GetRequiredFeatureGates() {
 		if !utilfeature.DefaultFeatureGate.Enabled(featureGate) {
-			logger.Info("Controller is disabled by a feature gate", "controller", controllerName, "requiredFeatureGates", controllerDescriptor.GetRequiredFeatureGates())
+			logger.Info("Controller is disabled by a feature gate", "controller", controllerName, "requiredFeatureGates", controllerDescriptor.GetAllRequiredFeatureGateStrings())
+			return nil, nil
+		}
+	}
+	for _, featureGate := range controllerDescriptor.GetRequiredClientFeatureGates() {
+		if !clientgofeaturegate.FeatureGates().Enabled(featureGate) {
+			logger.Info("Controller is disabled by a feature gate", "controller", controllerName, "requiredFeatureGates", controllerDescriptor.GetAllRequiredFeatureGateStrings())
 			return nil, nil
 		}
 	}
