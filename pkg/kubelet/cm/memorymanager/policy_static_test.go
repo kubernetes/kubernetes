@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -28,6 +29,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
@@ -119,6 +124,38 @@ func areContainerMemoryAssignmentsEqual(t *testing.T, cma1, cma2 state.Container
 	return true
 }
 
+func getPodWithAllocatedResources(podUID string, containerName string, requirements *v1.ResourceRequirements, allocatedResources v1.ResourceList) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: types.UID(podUID),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:      containerName,
+					Resources: *requirements,
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               containerName,
+					AllocatedResources: allocatedResources,
+				},
+			},
+		},
+	}
+}
+
+type resizeRequest struct {
+	pod       string
+	container string
+	resource  v1.ResourceName
+	newSize   resource.Quantity
+	decrease  bool
+}
+
 type testStaticPolicy struct {
 	description                  string
 	assignments                  state.ContainerMemoryAssignments
@@ -132,6 +169,7 @@ type testStaticPolicy struct {
 	topologyHint                 *topologymanager.TopologyHint
 	expectedTopologyHints        map[string][]topologymanager.TopologyHint
 	initContainersReusableMemory reusableMemory
+	resizeRequests               []resizeRequest
 }
 
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
@@ -150,6 +188,37 @@ func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.T
 	s := state.NewMemoryState()
 	s.SetMachineState(testCase.machineState)
 	s.SetMemoryAssignments(testCase.assignments)
+	return p, s, nil
+}
+
+func initTestsPodResize(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingStaticMemoryPolicy, true)
+
+	manager := topologymanager.NewFakeManager()
+	if hint != nil {
+		manager = topologymanager.NewFakeManagerWithHint(hint)
+	}
+
+	p, err := NewPolicyStatic(testCase.machineInfo, testCase.systemReserved, manager)
+	if err != nil {
+		return nil, nil, err
+	}
+	if initContainersReusableMemory != nil {
+		p.(*staticPolicy).initContainersReusableMemory = initContainersReusableMemory
+	}
+	s := state.NewMemoryState()
+	s.SetMachineState(testCase.machineState)
+	s.SetMemoryAssignments(testCase.assignments)
+
+	for pod, assignments := range testCase.assignments {
+		for container, containerBlocks := range assignments {
+			s.SetMemoryBlocks(pod, container, containerBlocks)
+			s.SetPromisedMemoryBlocks(pod, container, containerBlocks)
+		}
+	}
+
 	return p, s, nil
 }
 
@@ -2650,7 +2719,7 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 						},
 					},
 					Cells:               []int{0},
-					NumberOfAssignments: 8,
+					NumberOfAssignments: 9,
 				},
 			},
 			systemReserved: systemReservedMemory{
@@ -3738,6 +3807,512 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 			topologyHints := p.GetTopologyHints(s, testCase.pod, &testCase.pod.Spec.Containers[0])
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
+			}
+		})
+	}
+}
+
+func TestStaticPolicyGetTopologyHintsPodResize(t *testing.T) {
+
+	cpu1000m := resource.MustParse("1000Mi")
+	mem1Gi := resource.MustParse("1Gi")
+	mem2Gi := resource.MustParse("2Gi")
+	mem2048Mi := resource.MustParse("2048Mi")
+	mem2560Mi := resource.MustParse("2560Mi")
+	mem4096i := resource.MustParse("4096Mi")
+	hugepages1GiResName := v1.ResourceName("hugepages-1Gi")
+	memZero := resource.Quantity{}
+
+	systemReserved := systemReservedMemory{
+		0: {v1.ResourceMemory: 512 * mb},
+		1: {v1.ResourceMemory: 512 * mb},
+	}
+
+	newMemTable := func(free, reserved uint64) map[v1.ResourceName]*state.MemoryTable {
+		return map[v1.ResourceName]*state.MemoryTable{
+			v1.ResourceMemory: {
+				Allocatable:    1536 * mb,
+				Free:           free,
+				Reserved:       reserved,
+				SystemReserved: 512 * mb,
+				TotalMemSize:   2 * gb,
+			},
+		}
+	}
+	newMemTableWithHugePages := func(memFree, memReserved, hugeFree, hugeReserved uint64) map[v1.ResourceName]*state.MemoryTable {
+		return map[v1.ResourceName]*state.MemoryTable{
+			v1.ResourceMemory:   {Allocatable: 1536 * mb, Free: memFree, Reserved: memReserved, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+			hugepages1GiResName: {Allocatable: 2 * gb, Free: hugeFree, Reserved: hugeReserved, SystemReserved: 0, TotalMemSize: 2 * gb},
+		}
+	}
+
+	newResourceRequirements := func(mem, hugepages resource.Quantity) *v1.ResourceRequirements {
+		limits := v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem}
+		if !hugepages.IsZero() {
+			limits[hugepages1GiResName] = hugepages
+		}
+		return &v1.ResourceRequirements{
+			Limits:   limits,
+			Requests: limits,
+		}
+	}
+
+	testCases := []testStaticPolicy{
+		{
+			description: "memory increase - existing NUMA assignment can accomodate",
+			assignments: state.ContainerMemoryAssignments{"pod1": {"container1": {{NUMAAffinity: []int{0, 1}, Type: v1.ResourceMemory, Size: 2 * gb}}}},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(gb, 1536*mb), Cells: []int{0, 1}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1024*mb, 512*mb), Cells: []int{0, 1}, NumberOfAssignments: 1},
+			},
+			pod:                   getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem2560Mi, memZero), v1.ResourceList{v1.ResourceMemory: mem2Gi}),
+			systemReserved:        systemReserved,
+			topologyHint:          &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{string(v1.ResourceMemory): {{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true}}},
+		},
+		{
+			description: "memory increase - extending NUMA assignment to accomodate",
+			assignments: state.ContainerMemoryAssignments{"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}}}},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1024*mb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{1}, NumberOfAssignments: 0},
+			},
+			pod:                   getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem2048Mi, memZero), v1.ResourceList{v1.ResourceMemory: mem1Gi}),
+			systemReserved:        systemReserved,
+			topologyHint:          &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{string(v1.ResourceMemory): {{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true}}},
+		},
+		{
+			description: "memory increase - no valid assignment due to insufficient memory",
+			assignments: state.ContainerMemoryAssignments{"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}}}},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1024*mb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{1}, NumberOfAssignments: 0},
+			},
+			pod:                   getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem4096i, memZero), v1.ResourceList{v1.ResourceMemory: mem1Gi}),
+			systemReserved:        systemReserved,
+			topologyHint:          &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{},
+		},
+		{
+			description: "memory increase - no valid assignment due to existing assignments on other node",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}}},
+				"pod2": {"container2": {{NUMAAffinity: []int{1}, Type: v1.ResourceMemory, Size: 1 * gb}}},
+			},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1024*mb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(512*mb, 1024*mb), Cells: []int{1}, NumberOfAssignments: 1},
+			},
+			pod:                   getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem2048Mi, memZero), v1.ResourceList{v1.ResourceMemory: mem1Gi}),
+			systemReserved:        systemReserved,
+			topologyHint:          &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{},
+		},
+		{
+			description: "memory increase - existing NUMA assignment can accomodate with container having memory and hugepages",
+			assignments: state.ContainerMemoryAssignments{"pod1": {"container1": {
+				{NUMAAffinity: []int{0, 1}, Type: v1.ResourceMemory, Size: 2 * gb},
+				{NUMAAffinity: []int{0, 1}, Type: hugepages1GiResName, Size: 2 * gb},
+			}}},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTableWithHugePages(gb, 1536*mb, 2*gb, 2*gb), Cells: []int{0, 1}, NumberOfAssignments: 2},
+				1: {MemoryMap: newMemTableWithHugePages(1024*mb, 512*mb, 4*gb, 0), Cells: []int{0, 1}, NumberOfAssignments: 2},
+			},
+			pod:            getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem2560Mi, mem2048Mi), v1.ResourceList{v1.ResourceMemory: mem2Gi, hugepages1GiResName: mem2Gi}),
+			systemReserved: systemReserved,
+			topologyHint:   &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory):   {{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true}},
+				string(hugepages1GiResName): {{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true}},
+			},
+		},
+		{
+			description: "memory increase - extending NUMA assignment to accomodate with container having memory and hugepages",
+			assignments: state.ContainerMemoryAssignments{"pod1": {"container1": {
+				{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb},
+				{NUMAAffinity: []int{0}, Type: hugepages1GiResName, Size: 1 * gb},
+			}}},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTableWithHugePages(512*mb, 1024*mb, 1*gb, 1*gb), Cells: []int{0}, NumberOfAssignments: 2},
+				1: {MemoryMap: newMemTableWithHugePages(1536*mb, 0, 2*gb, 0), Cells: []int{1}, NumberOfAssignments: 0},
+			},
+			pod:            getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem2048Mi, mem1Gi), v1.ResourceList{v1.ResourceMemory: mem1Gi, hugepages1GiResName: mem1Gi}),
+			systemReserved: systemReserved,
+			topologyHint:   &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expectedTopologyHints: map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceMemory):   {{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true}},
+				string(hugepages1GiResName): {{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true}},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			p, s, err := initTestsPodResize(t, &testCase, testCase.topologyHint, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			topologyHints := p.GetTopologyHints(s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
+				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
+			}
+		})
+	}
+}
+
+func TestStaticPolicyAllocateForResize(t *testing.T) {
+
+	cpu1000m := resource.MustParse("1000Mi")
+	mem1Gi := resource.MustParse("1Gi")
+	mem1536Mi := resource.MustParse("1536Mi")
+	mem2560Mi := resource.MustParse("2560Mi")
+	mem2Gi := resource.MustParse("2Gi")
+	hugepages1GiResName := v1.ResourceName("hugepages-1Gi")
+	memZero := resource.Quantity{}
+	mem512Mi := resource.MustParse("512Mi")
+
+	systemReserved := systemReservedMemory{
+		0: {v1.ResourceMemory: 512 * mb},
+		1: {v1.ResourceMemory: 512 * mb},
+	}
+
+	newMemTable := func(free, reserved uint64) map[v1.ResourceName]*state.MemoryTable {
+		return map[v1.ResourceName]*state.MemoryTable{
+			v1.ResourceMemory: {
+				Allocatable:    1536 * mb,
+				Free:           free,
+				Reserved:       reserved,
+				SystemReserved: 512 * mb,
+				TotalMemSize:   2 * gb,
+			},
+		}
+	}
+
+	newMemTableWithHugePages := func(memFree, memReserved, hugeFree, hugeReserved uint64) map[v1.ResourceName]*state.MemoryTable {
+		return map[v1.ResourceName]*state.MemoryTable{
+			v1.ResourceMemory:   {Allocatable: 1536 * mb, Free: memFree, Reserved: memReserved, SystemReserved: 512 * mb, TotalMemSize: 2 * gb},
+			hugepages1GiResName: {Allocatable: 2 * gb, Free: hugeFree, Reserved: hugeReserved, SystemReserved: 0, TotalMemSize: 2 * gb},
+		}
+	}
+
+	newResourceRequirements := func(mem, hugepages resource.Quantity) *v1.ResourceRequirements {
+		limits := v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem}
+		if !hugepages.IsZero() {
+			limits[hugepages1GiResName] = hugepages
+		}
+		return &v1.ResourceRequirements{
+			Limits:   limits,
+			Requests: limits,
+		}
+	}
+
+	testCases := []testStaticPolicy{
+		{
+			description: "memory increase - existing single NUMA assignment can accomodate",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}}},
+			},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{}, NumberOfAssignments: 0},
+			},
+			systemReserved: systemReserved,
+			pod:            getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem1536Mi, memZero), v1.ResourceList{v1.ResourceMemory: mem1Gi}),
+			topologyHint:   &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expectedMachineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(0, 1536*mb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{}, NumberOfAssignments: 0},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1536 * mb}}},
+			},
+			expectedError: nil,
+		},
+		{
+			description: "memory increase - existing multi NUMA assignment can accomodate",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0, 1}, Type: v1.ResourceMemory, Size: 2 * gb}}},
+			},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(0, 1536*mb), Cells: []int{0, 1}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1024*mb, 512*mb), Cells: []int{0, 1}, NumberOfAssignments: 1},
+			},
+			systemReserved: systemReserved,
+			pod:            getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem2560Mi, memZero), v1.ResourceList{v1.ResourceMemory: mem2Gi}),
+			topologyHint:   &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedMachineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(0, 1536*mb), Cells: []int{0, 1}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(512*mb, 1024*mb), Cells: []int{0, 1}, NumberOfAssignments: 1},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0, 1}, Type: v1.ResourceMemory, Size: 2560 * mb}}},
+			},
+			expectedError: nil,
+		},
+		{
+			description: "memory increase - error when requested memory is less than promised",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}}},
+			},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{}, NumberOfAssignments: 0},
+			},
+			systemReserved: systemReserved,
+			pod:            getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem512Mi, memZero), v1.ResourceList{v1.ResourceMemory: mem1Gi}),
+			topologyHint:   &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			// The machine state and assignments should not change because an error is expected
+			expectedMachineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{}, NumberOfAssignments: 0},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}}},
+			},
+			expectedError: fmt.Errorf("[memorymanager] requested memory cannot be less than original allocation"),
+		},
+		{
+			description: "huge page resize is ignored, no change in machine state and assignments",
+			assignments: state.ContainerMemoryAssignments{"pod1": {"container1": {
+				{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb},
+				{NUMAAffinity: []int{0}, Type: hugepages1GiResName, Size: 1 * gb},
+			}}},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTableWithHugePages(512*mb, 1*gb, 1*gb, 1*gb), Cells: []int{0}, NumberOfAssignments: 2},
+				1: {MemoryMap: newMemTableWithHugePages(1536*mb, 0, 2*gb, 0), Cells: []int{1}, NumberOfAssignments: 0},
+			},
+			systemReserved: systemReserved,
+			pod:            getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem1Gi, mem2Gi), v1.ResourceList{v1.ResourceMemory: mem1Gi, hugepages1GiResName: mem1Gi}),
+			topologyHint:   &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			expectedMachineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTableWithHugePages(512*mb, 1*gb, 1*gb, 1*gb), Cells: []int{0}, NumberOfAssignments: 2},
+				1: {MemoryMap: newMemTableWithHugePages(1536*mb, 0, 2*gb, 0), Cells: []int{1}, NumberOfAssignments: 0},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{"pod1": {"container1": {
+				{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb},
+				{NUMAAffinity: []int{0}, Type: hugepages1GiResName, Size: 1 * gb},
+			}}},
+			expectedError: nil,
+		},
+		{
+			description: "should calculate hint for resize when no NUMA affinity was provided by the topology manager hint",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}}},
+			},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{}, NumberOfAssignments: 0},
+			},
+			systemReserved: systemReserved,
+			pod:            getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem1536Mi, memZero), v1.ResourceList{v1.ResourceMemory: mem1Gi}),
+			topologyHint:   &topologymanager.TopologyHint{},
+			expectedMachineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(0, 1536*mb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{}, NumberOfAssignments: 0},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1536 * mb}}},
+			},
+			expectedError: nil,
+		},
+		{
+			description: "should fail when hint calculation fails and no NUMA affinity was provided by the topology manager hint",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}}},
+			},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{}, NumberOfAssignments: 0},
+			},
+			systemReserved: systemReserved,
+			pod:            getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(resource.MustParse("4Gi"), memZero), v1.ResourceList{v1.ResourceMemory: mem1Gi}),
+			topologyHint:   &topologymanager.TopologyHint{},
+			expectedMachineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(0, 1536*mb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{}, NumberOfAssignments: 0},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1536 * mb}}},
+			},
+			expectedError: fmt.Errorf("[memorymanager] failed to get NUMA affinity for resize, no NUMA nodes with enough memory is available"),
+		},
+		{
+			description: "topology manager hint violates NUMA affinity and memory manager cannot extend hint",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}}},
+			},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1024*mb, 512*mb), Cells: []int{}, NumberOfAssignments: 1},
+			},
+			systemReserved: systemReserved,
+			pod:            getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(resource.MustParse("3Gi"), memZero), v1.ResourceList{v1.ResourceMemory: mem1Gi}),
+			topologyHint:   &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedMachineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1024*mb, 512*mb), Cells: []int{}, NumberOfAssignments: 1},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1536 * mb}}},
+			},
+			expectedError: fmt.Errorf("[memorymanager] failed to find NUMA nodes to extend the current topology hint"),
+		},
+		{
+			description: "topology manager hint iolates existing NUMA allocation",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}}},
+			},
+			machineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1024*mb, 512*mb), Cells: []int{}, NumberOfAssignments: 1},
+			},
+			systemReserved: systemReserved,
+			pod:            getPodWithAllocatedResources("pod1", "container1", newResourceRequirements(mem2Gi, memZero), v1.ResourceList{v1.ResourceMemory: mem1Gi}),
+			topologyHint:   &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0, 1), Preferred: true},
+			expectedMachineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(512*mb, 1*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1024*mb, 512*mb), Cells: []int{}, NumberOfAssignments: 1},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": {"container1": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1536 * mb}}},
+			},
+			expectedError: fmt.Errorf("[memorymanager] preferred hint violates NUMA node allocation"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			t.Logf("TestStaticPolicyAllocate %s", testCase.description)
+			p, s, err := initTestsPodResize(t, &testCase, testCase.topologyHint, nil)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			err = p.Allocate(s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			if !reflect.DeepEqual(err, testCase.expectedError) {
+				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
+			}
+
+			if err != nil {
+				return
+			}
+
+			assignments := s.GetMemoryAssignments()
+			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
+				t.Fatalf("Actual assignments %v are different from the expected %v", assignments, testCase.expectedAssignments)
+			}
+
+			machineState := s.GetMachineState()
+			if !areMachineStatesEqual(machineState, testCase.expectedMachineState) {
+				t.Fatalf("The actual machine state %v is different from the expected %v", machineState, testCase.expectedMachineState)
+			}
+		})
+	}
+}
+
+func TestStaticPolicyAllocateForResizeWithInitContainers(t *testing.T) {
+
+	mem1536Mi := resource.MustParse("1536Mi")
+	mem1Gi := resource.MustParse("1Gi")
+	cpu1000m := resource.MustParse("1000Mi")
+	hugepages1GiResName := v1.ResourceName("hugepages-1Gi")
+	memZero := resource.Quantity{}
+
+	systemReserved := systemReservedMemory{
+		0: {v1.ResourceMemory: 512 * mb},
+		1: {v1.ResourceMemory: 512 * mb},
+	}
+
+	newMemTable := func(free, reserved uint64) map[v1.ResourceName]*state.MemoryTable {
+		return map[v1.ResourceName]*state.MemoryTable{
+			v1.ResourceMemory: {
+				Allocatable:    1536 * mb,
+				Free:           free,
+				Reserved:       reserved,
+				SystemReserved: 512 * mb,
+				TotalMemSize:   2 * gb,
+			},
+		}
+	}
+
+	newResourceRequirements := func(mem, hugepages resource.Quantity) *v1.ResourceRequirements {
+		limits := v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem}
+		if !hugepages.IsZero() {
+			limits[hugepages1GiResName] = hugepages
+		}
+		return &v1.ResourceRequirements{
+			Limits:   limits,
+			Requests: limits,
+		}
+	}
+
+	testCases := []testStaticPolicy{
+		{
+			description: "account for pod reusable memory during resize of regular container",
+			// init container requests 2GB and regular container requests 1GB. podreusable memory is 1GB after actual container is allocated.
+			// The machine state should ot change when the regualr contianer is resized from 1GB to 1.5GB.
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": {
+					"initcontainer": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 2 * gb}},
+					"container1":    {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1 * gb}},
+				},
+			},
+			initContainersReusableMemory: reusableMemory{
+				"pod1": {"01": {v1.ResourceMemory: 1 * gb}},
+			},
+			machineState: state.NUMANodeMap{
+				// NUMA 0 is fully reserved by the init container initially.
+				0: {MemoryMap: newMemTable(0, 2*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{}, NumberOfAssignments: 0},
+			},
+			systemReserved: systemReserved,
+			pod: getPodWithAllocatedResources(
+				"pod1", "container1",
+				newResourceRequirements(mem1536Mi, memZero), // New request is 1.5GiB
+				v1.ResourceList{v1.ResourceMemory: mem1Gi},  // Original allocation was 1GiB
+			),
+			topologyHint: &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(0), Preferred: true},
+			// Because 1GiB is reusable, the resize from 1GiB to 1.5GiB only needs 0.5GiB of *new*
+			// memory. The machine state's reserved memory should not change from the initial 2GiB.
+			expectedMachineState: state.NUMANodeMap{
+				0: {MemoryMap: newMemTable(0, 2*gb), Cells: []int{0}, NumberOfAssignments: 1},
+				1: {MemoryMap: newMemTable(1536*mb, 0), Cells: []int{}, NumberOfAssignments: 0},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": {
+					"initcontainer": {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 2 * gb}},
+					"container1":    {{NUMAAffinity: []int{0}, Type: v1.ResourceMemory, Size: 1536 * mb}},
+				},
+			},
+			expectedError: nil,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			t.Logf("TestStaticPolicyAllocate %s", testCase.description)
+			p, s, err := initTestsPodResize(t, &testCase, testCase.topologyHint, testCase.initContainersReusableMemory)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			err = p.Allocate(s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			if !reflect.DeepEqual(err, testCase.expectedError) {
+				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
+			}
+
+			if err != nil {
+				return
+			}
+
+			assignments := s.GetMemoryAssignments()
+			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
+				t.Fatalf("Actual assignments %v are different from the expected %v", assignments, testCase.expectedAssignments)
+			}
+
+			machineState := s.GetMachineState()
+			if !areMachineStatesEqual(machineState, testCase.expectedMachineState) {
+				t.Fatalf("The actual machine state %v is different from the expected %v", machineState, testCase.expectedMachineState)
 			}
 		})
 	}
