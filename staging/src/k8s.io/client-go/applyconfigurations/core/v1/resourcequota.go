@@ -29,11 +29,19 @@ import (
 
 // ResourceQuotaApplyConfiguration represents a declarative configuration of the ResourceQuota type for use
 // with apply.
+//
+// ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuotaApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ResourceQuotaSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *ResourceQuotaStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the desired quota.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ResourceQuotaSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status defines the actual enforced quota and its current usage.
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ResourceQuotaStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ResourceQuota constructs a declarative configuration of the ResourceQuota type for use with

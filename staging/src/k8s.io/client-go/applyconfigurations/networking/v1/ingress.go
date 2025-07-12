@@ -29,11 +29,22 @@ import (
 
 // IngressApplyConfiguration represents a declarative configuration of the Ingress type for use
 // with apply.
+//
+// Ingress is a collection of rules that allow inbound connections to reach the
+// endpoints defined by a backend. An Ingress can be configured to give services
+// externally-reachable urls, load balance traffic, terminate SSL, offer name
+// based virtual hosting etc.
 type IngressApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *IngressSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *IngressStatusApplyConfiguration `json:"status,omitempty"`
+	// spec is the desired state of the Ingress.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *IngressSpecApplyConfiguration `json:"spec,omitempty"`
+	// status is the current state of the Ingress.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *IngressStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Ingress constructs a declarative configuration of the Ingress type for use with

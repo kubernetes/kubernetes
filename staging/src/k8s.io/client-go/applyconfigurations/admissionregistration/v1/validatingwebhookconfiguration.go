@@ -29,10 +29,14 @@ import (
 
 // ValidatingWebhookConfigurationApplyConfiguration represents a declarative configuration of the ValidatingWebhookConfiguration type for use
 // with apply.
+//
+// ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.
 type ValidatingWebhookConfigurationApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Webhooks                             []ValidatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
+	// Webhooks is a list of webhooks and the affected resources and operations.
+	Webhooks []ValidatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
 }
 
 // ValidatingWebhookConfiguration constructs a declarative configuration of the ValidatingWebhookConfiguration type for use with

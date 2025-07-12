@@ -29,11 +29,20 @@ import (
 
 // PersistentVolumeClaimApplyConfiguration represents a declarative configuration of the PersistentVolumeClaim type for use
 // with apply.
+//
+// PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaimApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *PersistentVolumeClaimSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *PersistentVolumeClaimStatusApplyConfiguration `json:"status,omitempty"`
+	// spec defines the desired characteristics of a volume requested by a pod author.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+	Spec *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
+	// status represents the current information/status of a persistent volume claim.
+	// Read-only.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims
+	Status *PersistentVolumeClaimStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PersistentVolumeClaim constructs a declarative configuration of the PersistentVolumeClaim type for use with

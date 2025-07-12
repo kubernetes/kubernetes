@@ -29,11 +29,25 @@ import (
 
 // ReplicaSetApplyConfiguration represents a declarative configuration of the ReplicaSet type for use
 // with apply.
+//
+// DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1/ReplicaSet. See the release notes for
+// more information.
+// ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 type ReplicaSetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// If the Labels of a ReplicaSet are empty, they are defaulted to
+	// be the same as the Pod(s) that the ReplicaSet manages.
+	// Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ReplicaSetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ReplicaSetStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the specification of the desired behavior of the ReplicaSet.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ReplicaSetSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is the most recently observed status of the ReplicaSet.
+	// This data may be out of date by some window of time.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ReplicaSetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ReplicaSet constructs a declarative configuration of the ReplicaSet type for use with

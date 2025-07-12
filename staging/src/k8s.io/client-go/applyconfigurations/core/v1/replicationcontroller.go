@@ -29,11 +29,23 @@ import (
 
 // ReplicationControllerApplyConfiguration represents a declarative configuration of the ReplicationController type for use
 // with apply.
+//
+// ReplicationController represents the configuration of a replication controller.
 type ReplicationControllerApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// If the Labels of a ReplicationController are empty, they are defaulted to
+	// be the same as the Pod(s) that the replication controller manages.
+	// Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ReplicationControllerSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *ReplicationControllerStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec defines the specification of the desired behavior of the replication controller.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *ReplicationControllerSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is the most recently observed status of the replication controller.
+	// This data may be out of date by some window of time.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *ReplicationControllerStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ReplicationController constructs a declarative configuration of the ReplicationController type for use with

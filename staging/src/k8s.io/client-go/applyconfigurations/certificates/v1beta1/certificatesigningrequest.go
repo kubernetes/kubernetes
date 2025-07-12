@@ -29,11 +29,17 @@ import (
 
 // CertificateSigningRequestApplyConfiguration represents a declarative configuration of the CertificateSigningRequest type for use
 // with apply.
+//
+// Describes a certificate signing request
 type CertificateSigningRequestApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *CertificateSigningRequestSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *CertificateSigningRequestStatusApplyConfiguration `json:"status,omitempty"`
+	// spec contains the certificate request, and is immutable after creation.
+	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
+	// Other fields are derived by Kubernetes and cannot be modified by users.
+	Spec *CertificateSigningRequestSpecApplyConfiguration `json:"spec,omitempty"`
+	// Derived information about the request.
+	Status *CertificateSigningRequestStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // CertificateSigningRequest constructs a declarative configuration of the CertificateSigningRequest type for use with

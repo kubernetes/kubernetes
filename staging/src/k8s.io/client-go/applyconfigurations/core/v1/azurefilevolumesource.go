@@ -20,10 +20,16 @@ package v1
 
 // AzureFileVolumeSourceApplyConfiguration represents a declarative configuration of the AzureFileVolumeSource type for use
 // with apply.
+//
+// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 type AzureFileVolumeSourceApplyConfiguration struct {
+	// secretName is the  name of secret that contains Azure Storage Account Name and Key
 	SecretName *string `json:"secretName,omitempty"`
-	ShareName  *string `json:"shareName,omitempty"`
-	ReadOnly   *bool   `json:"readOnly,omitempty"`
+	// shareName is the azure share Name
+	ShareName *string `json:"shareName,omitempty"`
+	// readOnly defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // AzureFileVolumeSourceApplyConfiguration constructs a declarative configuration of the AzureFileVolumeSource type for use with

@@ -29,11 +29,19 @@ import (
 
 // ClusterRoleBindingApplyConfiguration represents a declarative configuration of the ClusterRoleBinding type for use
 // with apply.
+//
+// ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,
+// and adds who information via Subject.
+// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 ClusterRoleBinding, and will no longer be served in v1.22.
 type ClusterRoleBindingApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Subjects                         []SubjectApplyConfiguration `json:"subjects,omitempty"`
-	RoleRef                          *RoleRefApplyConfiguration  `json:"roleRef,omitempty"`
+	// Subjects holds references to the objects the role applies to.
+	Subjects []SubjectApplyConfiguration `json:"subjects,omitempty"`
+	// RoleRef can only reference a ClusterRole in the global namespace.
+	// If the RoleRef cannot be resolved, the Authorizer must return an error.
+	RoleRef *RoleRefApplyConfiguration `json:"roleRef,omitempty"`
 }
 
 // ClusterRoleBinding constructs a declarative configuration of the ClusterRoleBinding type for use with

@@ -31,16 +31,40 @@ import (
 
 // StorageClassApplyConfiguration represents a declarative configuration of the StorageClass type for use
 // with apply.
+//
+// StorageClass describes the parameters for a class of storage for
+// which PersistentVolumes can be dynamically provisioned.
+//
+// StorageClasses are non-namespaced; the name of the storage class
+// according to etcd is in ObjectMeta.Name.
 type StorageClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Provisioner                      *string                                                            `json:"provisioner,omitempty"`
-	Parameters                       map[string]string                                                  `json:"parameters,omitempty"`
-	ReclaimPolicy                    *corev1.PersistentVolumeReclaimPolicy                              `json:"reclaimPolicy,omitempty"`
-	MountOptions                     []string                                                           `json:"mountOptions,omitempty"`
-	AllowVolumeExpansion             *bool                                                              `json:"allowVolumeExpansion,omitempty"`
-	VolumeBindingMode                *storagev1beta1.VolumeBindingMode                                  `json:"volumeBindingMode,omitempty"`
-	AllowedTopologies                []applyconfigurationscorev1.TopologySelectorTermApplyConfiguration `json:"allowedTopologies,omitempty"`
+	// provisioner indicates the type of the provisioner.
+	Provisioner *string `json:"provisioner,omitempty"`
+	// parameters holds the parameters for the provisioner that should
+	// create volumes of this storage class.
+	Parameters map[string]string `json:"parameters,omitempty"`
+	// reclaimPolicy controls the reclaimPolicy for dynamically provisioned PersistentVolumes of this storage class.
+	// Defaults to Delete.
+	ReclaimPolicy *corev1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty"`
+	// mountOptions controls the mountOptions for dynamically provisioned PersistentVolumes of this storage class.
+	// e.g. ["ro", "soft"]. Not validated -
+	// mount of the PVs will simply fail if one is invalid.
+	MountOptions []string `json:"mountOptions,omitempty"`
+	// allowVolumeExpansion shows whether the storage class allow volume expand
+	AllowVolumeExpansion *bool `json:"allowVolumeExpansion,omitempty"`
+	// volumeBindingMode indicates how PersistentVolumeClaims should be
+	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
+	// This field is only honored by servers that enable the VolumeScheduling feature.
+	VolumeBindingMode *storagev1beta1.VolumeBindingMode `json:"volumeBindingMode,omitempty"`
+	// allowedTopologies restrict the node topologies where volumes can be dynamically provisioned.
+	// Each volume plugin defines its own supported topology specifications.
+	// An empty TopologySelectorTerm list means there is no topology restriction.
+	// This field is only honored by servers that enable the VolumeScheduling feature.
+	AllowedTopologies []applyconfigurationscorev1.TopologySelectorTermApplyConfiguration `json:"allowedTopologies,omitempty"`
 }
 
 // StorageClass constructs a declarative configuration of the StorageClass type for use with

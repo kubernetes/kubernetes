@@ -29,11 +29,17 @@ import (
 
 // ImageReviewApplyConfiguration represents a declarative configuration of the ImageReview type for use
 // with apply.
+//
+// ImageReview checks if the set of images in a pod are allowed.
 type ImageReviewApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ImageReviewSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`
+	// Spec holds information about the pod being evaluated
+	Spec *ImageReviewSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status is filled in by the backend and indicates whether the pod should be allowed.
+	Status *ImageReviewStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ImageReview constructs a declarative configuration of the ImageReview type for use with

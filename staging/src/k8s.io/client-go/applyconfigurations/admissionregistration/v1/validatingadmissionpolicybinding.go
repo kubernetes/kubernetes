@@ -29,10 +29,24 @@ import (
 
 // ValidatingAdmissionPolicyBindingApplyConfiguration represents a declarative configuration of the ValidatingAdmissionPolicyBinding type for use
 // with apply.
+//
+// ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources.
+// ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.
+//
+// For a given admission request, each binding will cause its policy to be
+// evaluated N times, where N is 1 for policies/bindings that don't use
+// params, otherwise N is the number of parameters selected by the binding.
+//
+// The CEL expressions of a policy must have a computed CEL cost below the maximum
+// CEL budget. Each evaluation of the policy is given an independent CEL cost budget.
+// Adding/removing policies, bindings, or params can not affect whether a
+// given (policy, binding, param) combination is within its own CEL budget.
 type ValidatingAdmissionPolicyBindingApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *ValidatingAdmissionPolicyBindingSpecApplyConfiguration `json:"spec,omitempty"`
+	// Specification of the desired behavior of the ValidatingAdmissionPolicyBinding.
+	Spec *ValidatingAdmissionPolicyBindingSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ValidatingAdmissionPolicyBinding constructs a declarative configuration of the ValidatingAdmissionPolicyBinding type for use with

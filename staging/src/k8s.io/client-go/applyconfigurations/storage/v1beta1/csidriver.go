@@ -29,10 +29,28 @@ import (
 
 // CSIDriverApplyConfiguration represents a declarative configuration of the CSIDriver type for use
 // with apply.
+//
+// CSIDriver captures information about a Container Storage Interface (CSI)
+// volume driver deployed on the cluster.
+// CSI drivers do not need to create the CSIDriver object directly. Instead they may use the
+// cluster-driver-registrar sidecar container. When deployed with a CSI driver it automatically
+// creates a CSIDriver object representing the driver.
+// Kubernetes attach detach controller uses this object to determine whether attach is required.
+// Kubelet uses this object to determine whether pod information needs to be passed on mount.
+// CSIDriver objects are non-namespaced.
 type CSIDriverApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata.
+	// metadata.Name indicates the name of the CSI driver that this object
+	// refers to; it MUST be the same name returned by the CSI GetPluginName()
+	// call for that driver.
+	// The driver name must be 63 characters or less, beginning and ending with
+	// an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and
+	// alphanumerics between.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *CSIDriverSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec represents the specification of the CSI Driver.
+	Spec *CSIDriverSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // CSIDriver constructs a declarative configuration of the CSIDriver type for use with

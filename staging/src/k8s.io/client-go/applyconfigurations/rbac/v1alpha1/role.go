@@ -29,10 +29,15 @@ import (
 
 // RoleApplyConfiguration represents a declarative configuration of the Role type for use
 // with apply.
+//
+// Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
+// Deprecated in v1.17 in favor of rbac.authorization.k8s.io/v1 Role, and will no longer be served in v1.22.
 type RoleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Rules                            []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
+	// Rules holds all the PolicyRules for this Role
+	Rules []PolicyRuleApplyConfiguration `json:"rules,omitempty"`
 }
 
 // Role constructs a declarative configuration of the Role type for use with

@@ -29,10 +29,15 @@ import (
 
 // LeaseApplyConfiguration represents a declarative configuration of the Lease type for use
 // with apply.
+//
+// Lease defines a lease concept.
 type LeaseApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *LeaseSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec contains the specification of the Lease.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *LeaseSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // Lease constructs a declarative configuration of the Lease type for use with
