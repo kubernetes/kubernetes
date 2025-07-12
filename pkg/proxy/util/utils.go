@@ -52,6 +52,18 @@ func IsZeroCIDR(cidr string) bool {
 	return false
 }
 
+// IsZeroMask returns true if the ip mask is zero.
+func IsZeroMask(ipNet *net.IPNet) bool {
+	zeroMask := true
+	for _, b := range ipNet.Mask {
+		if b != 0 {
+			zeroMask = false
+			break
+		}
+	}
+	return zeroMask
+}
+
 // ShouldSkipService checks if a given service should skip proxying
 func ShouldSkipService(service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
