@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -79,7 +80,7 @@ func returnPolicyByName(testCase testMemoryManager) Policy {
 			err: fmt.Errorf("fake reg error"),
 		}
 	case policyTypeStatic:
-		policy, _ := NewPolicyStatic(&testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager())
+		policy, _ := NewPolicyStatic(&testCase.machineInfo, testCase.reserved, topologymanager.NewFakeManager(), &record.FakeRecorder{})
 		return policy
 	case policyTypeNone:
 		return NewPolicyNone()
@@ -150,6 +151,13 @@ func getPod(podUID string, containerName string, requirements *v1.ResourceRequir
 			},
 		},
 	}
+}
+
+func getPodWithPodLevelResources(podUID string, podRequirements *v1.ResourceRequirements, containerName string, containerRequirements *v1.ResourceRequirements) *v1.Pod {
+	pod := getPod(podUID, containerName, containerRequirements)
+	pod.Spec.Resources = podRequirements
+
+	return pod
 }
 
 func getPodWithInitContainers(podUID string, containers []v1.Container, initContainers []v1.Container) *v1.Pod {
@@ -1996,7 +2004,7 @@ func TestNewManager(t *testing.T) {
 			}
 			defer os.RemoveAll(stateFileDirectory)
 
-			mgr, err := NewManager(string(testCase.policyName), &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity)
+			mgr, err := NewManager(string(testCase.policyName), &testCase.machineInfo, testCase.nodeAllocatableReservation, testCase.systemReservedMemory, stateFileDirectory, testCase.affinity, &record.FakeRecorder{})
 
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Errorf("Could not create the Memory Manager. Expected error: '%v', but got: '%v'",

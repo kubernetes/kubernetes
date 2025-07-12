@@ -25,7 +25,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -35,12 +37,13 @@ import (
 )
 
 type testCase struct {
-	name          string
-	pod           v1.Pod
-	container     v1.Container
-	assignments   state.ContainerCPUAssignments
-	defaultCPUSet cpuset.CPUSet
-	expectedHints []topologymanager.TopologyHint
+	name                     string
+	pod                      v1.Pod
+	container                v1.Container
+	assignments              state.ContainerCPUAssignments
+	defaultCPUSet            cpuset.CPUSet
+	expectedHints            []topologymanager.TopologyHint
+	podLevelResourcesEnabled bool
 }
 
 func returnMachineInfo() cadvisorapi.MachineInfo {
@@ -213,6 +216,8 @@ func TestGetTopologyHints(t *testing.T) {
 	tcases := returnTestCases()
 
 	for _, tc := range tcases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+
 		topology, _ := topology.Discover(&machineInfo)
 
 		var activePods []*v1.Pod
@@ -230,6 +235,7 @@ func TestGetTopologyHints(t *testing.T) {
 		m := manager{
 			policy: &staticPolicy{
 				topology: topology,
+				recorder: &record.FakeRecorder{},
 			},
 			state: &mockState{
 				assignments:   tc.assignments,
@@ -261,6 +267,8 @@ func TestGetPodTopologyHints(t *testing.T) {
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, tc.podLevelResourcesEnabled)
+
 		topology, _ := topology.Discover(&machineInfo)
 
 		var activePods []*v1.Pod
@@ -278,6 +286,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 		m := manager{
 			policy: &staticPolicy{
 				topology: topology,
+				recorder: &record.FakeRecorder{},
 			},
 			state: &mockState{
 				assignments:   tc.assignments,
@@ -460,6 +469,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				policy: &staticPolicy{
 					topology: testCase.topology,
 					options:  policyOpt,
+					recorder: &record.FakeRecorder{},
 				},
 				state: &mockState{
 					assignments:   testCase.assignments,
@@ -494,6 +504,9 @@ func returnTestCases() []testCase {
 	testContainer3 := &testPod3.Spec.Containers[0]
 	testPod4 := makePod("fakePod", "fakeContainer", "11", "11")
 	testContainer4 := &testPod4.Spec.Containers[0]
+
+	testPod5 := makePodWithPodLevelResources("fakePod", "5", "5", "fakeContainer", "4", "4")
+	testContainer5 := &testPod5.Spec.Containers[0]
 
 	firstSocketMask, _ := bitmask.NewBitMask(0)
 	secondSocketMask, _ := bitmask.NewBitMask(1)
@@ -656,6 +669,14 @@ func returnTestCases() []testCase {
 			},
 			defaultCPUSet: cpuset.New(),
 			expectedHints: []topologymanager.TopologyHint{},
+		},
+		{
+			name:                     "Pod has pod level resources, no hint generation",
+			pod:                      *testPod5,
+			container:                *testContainer5,
+			defaultCPUSet:            cpuset.New(0, 1, 2, 3),
+			expectedHints:            nil,
+			podLevelResourcesEnabled: true,
 		},
 	}
 }
