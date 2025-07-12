@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,29 +18,34 @@ limitations under the License.
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
-package sliceofstruct
+package eachval
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
 var localSchemeBuilder = testscheme.New()
 
-type Struct struct {
+type StructWithMaps struct {
 	TypeMeta int
 
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListField[*]"
-	ListField []OtherStruct `json:"listField"`
+	// +k8s:eachVal=+k8s:validateFalse="field MapTest.MapPrimitiveField[*]"
+	MapPrimitiveField map[string]string `json:"mapPrimitiveField"`
 
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListTypedefField[*]"
-	ListTypedefField []OtherTypedefStruct `json:"listTypedefField"`
+	// +k8s:eachVal=+k8s:validateFalse="field MapTest.MapTypedefField[*]"
+	MapTypedefField map[string]StringType `json:"mapTypedefField"`
 
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListNonComparableField[*]"
-	ListNonComparableField []NonComparableStruct `json:"listNonComparableField"`
+	// +k8s:eachVal=+k8s:validateFalse="field MapTest.MapComparableStructField[*]"
+	MapComparableStructField map[string]ComparableStruct `json:"mapComparableStructField"`
+
+	// +k8s:eachVal=+k8s:validateFalse="field MapTest.MapNonComparableStructField[*]"
+	MapNonComparableStructField map[string]NonComparableStruct `json:"mapNonComparableStructField"`
 }
 
-type OtherStruct struct{}
+type StringType string
 
-type OtherTypedefStruct OtherStruct
+type ComparableStruct struct {
+	IntField int `json:"intField"`
+}
 
 type NonComparableStruct struct {
-	SliceField []string `json:"sliceField"`
+	IntPtrField *int `json:"intPtrField"`
 }
