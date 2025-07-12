@@ -1232,35 +1232,6 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 	return inUse
 }
 
-// appArmorAnnotationsInUse returns true if the pod has apparmor annotations
-func appArmorAnnotationsInUse(podAnnotations map[string]string) bool {
-	for k := range podAnnotations {
-		if strings.HasPrefix(k, api.DeprecatedAppArmorAnnotationKeyPrefix) {
-			return true
-		}
-	}
-	return false
-}
-
-// appArmorFieldsInUse returns true if the pod has apparmor fields set
-func appArmorFieldsInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.SecurityContext != nil && podSpec.SecurityContext.AppArmorProfile != nil {
-		return true
-	}
-	hasAppArmorContainer := false
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
-		if c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != nil {
-			hasAppArmorContainer = true
-			return false
-		}
-		return true
-	})
-	return hasAppArmorContainer
-}
-
 // restartableInitContainersInUse returns true if the pod spec is non-nil and
 // it has any init container with ContainerRestartPolicyAlways.
 func restartableInitContainersInUse(podSpec *api.PodSpec) bool {

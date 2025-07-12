@@ -958,22 +958,8 @@ func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
 				containerProfile = ctr.SecurityContext.AppArmorProfile
 			}
 
-			// sync field and annotation
-			if !hasAnnotation {
-				newAnnotation := ""
-				if containerProfile != nil {
-					newAnnotation = appArmorAnnotationForField(containerProfile)
-				} else if podProfile != nil {
-					newAnnotation = appArmorAnnotationForField(podProfile)
-				}
-
-				if newAnnotation != "" {
-					if pod.Annotations == nil {
-						pod.Annotations = map[string]string{}
-					}
-					pod.Annotations[key] = newAnnotation
-				}
-			} else if containerProfile == nil {
+			// Sync deprecated AppArmor annotations to fields
+			if hasAnnotation && containerProfile == nil {
 				newField := apparmorFieldForAnnotation(annotation)
 				if errs := corevalidation.ValidateAppArmorProfileField(newField, &field.Path{}); len(errs) > 0 {
 					// Skip copying invalid value.
@@ -1004,31 +990,6 @@ func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
 
 			return true
 		})
-}
-
-// appArmorFieldForAnnotation takes a pod apparmor profile field and returns the
-// converted annotation value
-func appArmorAnnotationForField(field *api.AppArmorProfile) string {
-	// If only apparmor fields are specified, add the corresponding annotations.
-	// This ensures that the fields are enforced even if the node version
-	// trails the API version
-	switch field.Type {
-	case api.AppArmorProfileTypeUnconfined:
-		return api.DeprecatedAppArmorAnnotationValueUnconfined
-
-	case api.AppArmorProfileTypeRuntimeDefault:
-		return api.DeprecatedAppArmorAnnotationValueRuntimeDefault
-
-	case api.AppArmorProfileTypeLocalhost:
-		if field.LocalhostProfile != nil {
-			return api.DeprecatedAppArmorAnnotationValueLocalhostPrefix + *field.LocalhostProfile
-		}
-	}
-
-	// we can only reach this code path if the LocalhostProfile is nil but the
-	// provided field type is AppArmorProfileTypeLocalhost or if an unrecognized
-	// type is specified
-	return ""
 }
 
 // apparmorFieldForAnnotation takes a pod annotation and returns the converted

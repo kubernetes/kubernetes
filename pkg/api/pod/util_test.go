@@ -25,10 +25,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"k8s.io/component-base/featuregate"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -846,103 +844,6 @@ func TestDropProcMount(t *testing.T) {
 				})
 			}
 		}
-	}
-}
-
-func TestDropAppArmor(t *testing.T) {
-	tests := []struct {
-		description    string
-		hasAnnotations bool
-		hasFields      bool
-		pod            api.Pod
-	}{{
-		description:    "with AppArmor Annotations",
-		hasAnnotations: true,
-		pod: api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
-			Spec:       api.PodSpec{},
-		},
-	}, {
-		description:    "with AppArmor Annotations & fields",
-		hasAnnotations: true,
-		hasFields:      true,
-		pod: api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
-			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					AppArmorProfile: &api.AppArmorProfile{
-						Type: api.AppArmorProfileTypeRuntimeDefault,
-					},
-				},
-			},
-		},
-	}, {
-		description: "with pod AppArmor profile",
-		hasFields:   true,
-		pod: api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
-			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{
-					AppArmorProfile: &api.AppArmorProfile{
-						Type: api.AppArmorProfileTypeRuntimeDefault,
-					},
-				},
-			},
-		},
-	}, {
-		description: "with container AppArmor profile",
-		hasFields:   true,
-		pod: api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
-			Spec: api.PodSpec{
-				Containers: []api.Container{{
-					SecurityContext: &api.SecurityContext{
-						AppArmorProfile: &api.AppArmorProfile{
-							Type: api.AppArmorProfileTypeRuntimeDefault,
-						},
-					},
-				}},
-			},
-		},
-	}, {
-		description: "without AppArmor",
-		pod: api.Pod{
-			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1"}},
-			Spec:       api.PodSpec{},
-		},
-	}}
-
-	for _, test := range tests {
-
-		t.Run(fmt.Sprintf("%v", test.description), func(t *testing.T) {
-			newPod := test.pod.DeepCopy()
-
-			if hasAnnotations := appArmorAnnotationsInUse(newPod.Annotations); hasAnnotations != test.hasAnnotations {
-				t.Errorf("appArmorAnnotationsInUse does not match expectation: %t != %t", hasAnnotations, test.hasAnnotations)
-			}
-			if hasFields := appArmorFieldsInUse(&newPod.Spec); hasFields != test.hasFields {
-				t.Errorf("appArmorFieldsInUse does not match expectation: %t != %t", hasFields, test.hasFields)
-			}
-
-			DropDisabledPodFields(newPod, newPod)
-			require.Equal(t, &test.pod, newPod, "unchanged pod should never be mutated")
-
-			DropDisabledPodFields(newPod, nil)
-			assert.Equal(t, &test.pod, newPod, "pod should not be mutated when both feature gates are enabled")
-
-			expectAnnotations := test.hasAnnotations
-			assert.Equal(t, expectAnnotations, appArmorAnnotationsInUse(newPod.Annotations), "AppArmor annotations expectation")
-			if expectAnnotations == test.hasAnnotations {
-				assert.Equal(t, test.pod.Annotations, newPod.Annotations, "annotations should not be mutated")
-			}
-
-			expectFields := test.hasFields
-			assert.Equal(t, expectFields, appArmorFieldsInUse(&newPod.Spec), "AppArmor fields expectation")
-			if expectFields == test.hasFields {
-				assert.Equal(t, &test.pod.Spec, &newPod.Spec, "PodSpec should not be mutated")
-			}
-		})
-
 	}
 }
 
