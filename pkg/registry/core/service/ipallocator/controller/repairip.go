@@ -520,6 +520,19 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 			return nil
 		}
 	}
+	// Service storage implements transactions. It creates an IPAddress object first and then creates
+	// the Service object, and if the Service object already exists the complete transaction is
+	// reverted. There can be race conditions when the repair loop picks up the new IPAddress object
+	// for reconciliation before the transaction is reverted. This leads to spurious
+	// IPAddressWrongReference warnings, to suppress these warnings we delay the processing of the new
+	// IPAddress object by 5 seconds. The service allocation creates the IPAddress object before creating
+	// the Service object, we easily identify this scenario when Service object is created before the
+	// IPAddress object.
+	if svc.CreationTimestamp.Time.Before(ipAddress.CreationTimestamp.Time) {
+		r.ipQueue.AddAfter(key, 5*time.Second)
+		return nil
+	}
+
 	runtime.HandleError(fmt.Errorf("the IPAddress: %s for Service %s/%s has a wrong reference %#v; cleaning up", ipAddress.Name, svc.Name, svc.Namespace, ipAddress.Spec.ParentRef))
 	r.recorder.Eventf(ipAddress, nil, v1.EventTypeWarning, "IPAddressWrongReference", "IPAddressAllocation", "IPAddress: %s for Service %s/%s has a wrong reference; cleaning up", ipAddress.Name, svc.Namespace, svc.Name)
 	err = r.client.NetworkingV1().IPAddresses().Delete(context.Background(), ipAddress.Name, metav1.DeleteOptions{})
