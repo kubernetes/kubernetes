@@ -1207,6 +1207,25 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 		klog.V(4).InfoS("Creating PodSandbox for pod", "pod", klog.KObj(pod))
 		metrics.StartedPodsTotal.Inc()
+		if pod.Spec.HostUsers != nil && !*pod.Spec.HostUsers {
+			metrics.StartedUserNamespacedPodsTotal.Inc()
+			// Failures in user namespace creation could happen at any point in the pod lifecycle,
+			// but usually will be caught in container creation.
+			// To avoid specifically handling each error case, loop through the result after the sync finishes
+			defer func() {
+				// catch unhandled errors
+				for _, res := range result.SyncResults {
+					if res.Error != nil {
+						metrics.StartedUserNamespacedPodsErrorsTotal.Inc()
+						return
+					}
+				}
+				// catch handled error
+				if result.SyncError != nil {
+					metrics.StartedUserNamespacedPodsErrorsTotal.Inc()
+				}
+			}()
+		}
 		createSandboxResult := kubecontainer.NewSyncResult(kubecontainer.CreatePodSandbox, format.Pod(pod))
 		result.AddSyncResult(createSandboxResult)
 
