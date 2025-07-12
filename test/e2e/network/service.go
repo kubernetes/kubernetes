@@ -754,13 +754,15 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "endpoint-test2"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+		containerPort := int32(80)
+		servicePort := int32(80)
 
 		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		})
-		svc, err := jig.CreateTCPServiceWithPort(ctx, nil, 80)
+		svc, err := jig.CreateTCPServiceWithPort(ctx, nil, servicePort)
 		framework.ExpectNoError(err)
 
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{})
@@ -776,18 +778,18 @@ var _ = common.SIGDescribe("Services", func() {
 		name1 := "pod1"
 		name2 := "pod2"
 
-		createPodOrFail(ctx, f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}}, "netexec", "--http-port", "80")
+		createPodOrFail(ctx, f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: containerPort}}, "netexec", "--http-port", fmt.Sprint(containerPort))
 		names[name1] = true
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name1: {80}})
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name1: {int(servicePort)}})
 
 		ginkgo.By("Checking if the Service forwards traffic to pod1")
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
 		err = jig.CheckServiceReachability(ctx, svc, execPod)
 		framework.ExpectNoError(err)
 
-		createPodOrFail(ctx, f, ns, name2, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}}, "netexec", "--http-port", "80")
+		createPodOrFail(ctx, f, ns, name2, jig.Labels, []v1.ContainerPort{{ContainerPort: containerPort}}, "netexec", "--http-port", fmt.Sprint(containerPort))
 		names[name2] = true
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name1: {80}, name2: {80}})
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name1: {int(servicePort)}, name2: {int(servicePort)}})
 
 		ginkgo.By("Checking if the Service forwards traffic to pod1 and pod2")
 		err = jig.CheckServiceReachability(ctx, svc, execPod)
@@ -795,7 +797,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		e2epod.DeletePodOrFail(ctx, cs, ns, name1)
 		delete(names, name1)
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name2: {80}})
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name2: {int(servicePort)}})
 
 		ginkgo.By("Checking if the Service forwards traffic to pod2")
 		err = jig.CheckServiceReachability(ctx, svc, execPod)
@@ -1250,6 +1252,8 @@ var _ = common.SIGDescribe("Services", func() {
 	*/
 	framework.ConformanceIt("should be able to create a functioning NodePort service", func(ctx context.Context) {
 		serviceName := "nodeport-test"
+		servicePort := int32(80)
+		containerPort := int32(9376)
 		ns := f.Namespace.Name
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -1258,7 +1262,7 @@ var _ = common.SIGDescribe("Services", func() {
 		nodePortService, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(9376)},
+				{Port: servicePort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -1278,6 +1282,8 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "externalip-test"
 		ns := f.Namespace.Name
 		externalIP := "203.0.113.250"
+		servicePort := int32(80)
+		containerPort := int32(9376)
 		if framework.TestContext.ClusterIsIPv6() {
 			externalIP = "2001:DB8::cb00:71fa"
 		}
@@ -1290,7 +1296,7 @@ var _ = common.SIGDescribe("Services", func() {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.ExternalIPs = []string{externalIP}
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(9376)},
+				{Port: servicePort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 		})
 		if err != nil && strings.Contains(err.Error(), "Use of external IPs is denied by admission control") {
@@ -1316,6 +1322,8 @@ var _ = common.SIGDescribe("Services", func() {
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		jig.ExternalIPs = false
+		servicePort := int32(80)
+		containerPort := int32(9376)
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
 		tcpService, err := jig.CreateTCPService(ctx, nil)
@@ -1333,9 +1341,9 @@ var _ = common.SIGDescribe("Services", func() {
 			s.Spec.Ports = []v1.ServicePort{
 				{
 					Name:       "tcp-port",
-					Port:       80,
+					Port:       servicePort,
 					Protocol:   v1.ProtocolTCP,
-					TargetPort: intstr.FromInt32(9376),
+					TargetPort: intstr.FromInt32(containerPort),
 				},
 			}
 		})
@@ -1353,15 +1361,15 @@ var _ = common.SIGDescribe("Services", func() {
 			s.Spec.Ports = []v1.ServicePort{
 				{
 					Name:       "tcp-port",
-					Port:       80,
+					Port:       servicePort,
 					Protocol:   v1.ProtocolTCP,
-					TargetPort: intstr.FromInt32(9376),
+					TargetPort: intstr.FromInt32(containerPort),
 				},
 				{
 					Name:       "udp-port",
-					Port:       80,
+					Port:       servicePort,
 					Protocol:   v1.ProtocolUDP,
-					TargetPort: intstr.FromInt32(9376),
+					TargetPort: intstr.FromInt32(containerPort),
 				},
 			}
 		})
@@ -1388,6 +1396,8 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "externalname-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+		servicePort := int32(80)
+		containerPort := int32(9376)
 
 		ginkgo.By("creating a service " + serviceName + " with the type=ExternalName in namespace " + ns)
 		_, err := jig.CreateExternalNameService(ctx, nil)
@@ -1403,7 +1413,7 @@ var _ = common.SIGDescribe("Services", func() {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.ExternalName = ""
 			s.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(9376)},
+				{Port: servicePort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -1427,6 +1437,8 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "externalname-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+		servicePort := int32(80)
+		containerPort := int32(9376)
 
 		ginkgo.By("creating a service " + serviceName + " with the type=ExternalName in namespace " + ns)
 		_, err := jig.CreateExternalNameService(ctx, nil)
@@ -1442,7 +1454,7 @@ var _ = common.SIGDescribe("Services", func() {
 			s.Spec.Type = v1.ServiceTypeNodePort
 			s.Spec.ExternalName = ""
 			s.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(9376)},
+				{Port: servicePort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 		})
 		framework.ExpectNoError(err)
@@ -1788,7 +1800,7 @@ var _ = common.SIGDescribe("Services", func() {
 			t.Image,
 			appsv1.RecreateDeploymentStrategyType)
 		deploymentSpec.Spec.Template.Spec.Containers[0] = v1.Container{
-			Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
+			Args:  []string{"netexec", "--http-port", fmt.Sprint(port)},
 			Name:  t.Name,
 			Image: t.Image,
 			Ports: []v1.ContainerPort{{ContainerPort: port, Protocol: v1.ProtocolTCP}},
@@ -1915,13 +1927,14 @@ var _ = common.SIGDescribe("Services", func() {
 
 		serviceName := "svc-tolerate-unready"
 		ns := f.Namespace.Name
-		servicePort := 80
+		containerPort := int32(80)
+		servicePort := int32(80)
 
 		ginkgo.By("creating a NodePort TCP service " + serviceName + " that PublishNotReadyAddresses on" + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
+				{Port: servicePort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.PublishNotReadyAddresses = true
@@ -1929,7 +1942,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to create Service")
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		gracePeriod := int64(300)
+		gracePeriodSeconds := int64(300)
 		webserverPod0 := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "webserver-pod",
@@ -1939,10 +1952,10 @@ var _ = common.SIGDescribe("Services", func() {
 					{
 						Name:  "agnhost",
 						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"netexec", "--http-port=80", fmt.Sprintf("--delay-shutdown=%d", gracePeriod)},
+						Args:  []string{"netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds)},
 						Ports: []v1.ContainerPort{
 							{
-								ContainerPort: 80,
+								ContainerPort: containerPort,
 							},
 						},
 						ReadinessProbe: &v1.Probe{
@@ -1950,7 +1963,7 @@ var _ = common.SIGDescribe("Services", func() {
 								HTTPGet: &v1.HTTPGetAction{
 									Path: "/readyz",
 									Port: intstr.IntOrString{
-										IntVal: int32(80),
+										IntVal: containerPort,
 									},
 									Scheme: v1.URISchemeHTTP,
 								},
@@ -1961,7 +1974,7 @@ var _ = common.SIGDescribe("Services", func() {
 								HTTPGet: &v1.HTTPGetAction{
 									Path: "/healthz",
 									Port: intstr.IntOrString{
-										IntVal: int32(80),
+										IntVal: containerPort,
 									},
 									Scheme: v1.URISchemeHTTP,
 								},
@@ -1972,7 +1985,7 @@ var _ = common.SIGDescribe("Services", func() {
 			},
 		}
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To(gracePeriod)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -1981,7 +1994,7 @@ var _ = common.SIGDescribe("Services", func() {
 		if err != nil {
 			framework.Failf("error waiting for pod %s to be ready %v", webserverPod0.Name, err)
 		}
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {int(servicePort)}})
 
 		ginkgo.By("Creating 1 pause pods that will try to connect to the webservers")
 		pausePod1 := e2epod.NewAgnhostPod(ns, "pause-pod-1", nil, nil, nil)
@@ -2010,7 +2023,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// assert 5 times that the pause pod can connect to the Service
 		nodeIPs0 := e2enode.GetAddresses(&node0, v1.NodeInternalIP)
 		nodeIPs1 := e2enode.GetAddresses(&node1, v1.NodeInternalIP)
-		clusterIPAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
+		clusterIPAddress := net.JoinHostPort(svc.Spec.ClusterIP, fmt.Sprint(servicePort))
 		nodePortAddress0 := net.JoinHostPort(nodeIPs0[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
 		nodePortAddress1 := net.JoinHostPort(nodeIPs1[0], strconv.Itoa(int(svc.Spec.Ports[0].NodePort)))
 		// connect 3 times every 5 seconds to the Service with the unready and terminating endpoint
@@ -2034,13 +2047,14 @@ var _ = common.SIGDescribe("Services", func() {
 
 		serviceName := "svc-not-tolerate-unready"
 		ns := f.Namespace.Name
-		servicePort := 80
+		servicePort := int32(80)
+		containerPort := int32(80)
 
 		ginkgo.By("creating a NodePort TCP service " + serviceName + " that PublishNotReadyAddresses on" + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
+				{Port: servicePort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.PublishNotReadyAddresses = false
@@ -2048,7 +2062,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to create Service")
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		gracePeriod := int64(300)
+		gracePeriodSeconds := int64(300)
 		webserverPod0 := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "webserver-pod",
@@ -2058,10 +2072,10 @@ var _ = common.SIGDescribe("Services", func() {
 					{
 						Name:  "agnhost",
 						Image: imageutils.GetE2EImage(imageutils.Agnhost),
-						Args:  []string{"netexec", "--http-port=80", fmt.Sprintf("--delay-shutdown=%d", gracePeriod)},
+						Args:  []string{"netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds)},
 						Ports: []v1.ContainerPort{
 							{
-								ContainerPort: 80,
+								ContainerPort: containerPort,
 							},
 						},
 						ReadinessProbe: &v1.Probe{
@@ -2069,7 +2083,7 @@ var _ = common.SIGDescribe("Services", func() {
 								HTTPGet: &v1.HTTPGetAction{
 									Path: "/readyz",
 									Port: intstr.IntOrString{
-										IntVal: int32(80),
+										IntVal: containerPort,
 									},
 									Scheme: v1.URISchemeHTTP,
 								},
@@ -2080,7 +2094,7 @@ var _ = common.SIGDescribe("Services", func() {
 								HTTPGet: &v1.HTTPGetAction{
 									Path: "/healthz",
 									Port: intstr.IntOrString{
-										IntVal: int32(80),
+										IntVal: containerPort,
 									},
 									Scheme: v1.URISchemeHTTP,
 								},
@@ -2091,7 +2105,7 @@ var _ = common.SIGDescribe("Services", func() {
 			},
 		}
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To(gracePeriod)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2100,7 +2114,7 @@ var _ = common.SIGDescribe("Services", func() {
 		if err != nil {
 			framework.Failf("error waiting for pod %s to be ready %v", webserverPod0.Name, err)
 		}
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {int(servicePort)}})
 
 		ginkgo.By("Creating 1 pause pods that will try to connect to the webservers")
 		pausePod1 := e2epod.NewAgnhostPod(ns, "pause-pod-1", nil, nil, nil)
@@ -2154,7 +2168,7 @@ var _ = common.SIGDescribe("Services", func() {
 			framework.ExpectNoError(pollErr, "pod on node1 still serves traffic")
 		}
 
-		clusterIPAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
+		clusterIPAddress := net.JoinHostPort(svc.Spec.ClusterIP, fmt.Sprint(servicePort))
 		// connect 3 times every 5 seconds to the Service and expect a failure
 		for i := 0; i < 5; i++ {
 			cmd = fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, clusterIPAddress)
@@ -2501,21 +2515,22 @@ var _ = common.SIGDescribe("Services", func() {
 
 		serviceName := "svc-itp"
 		ns := f.Namespace.Name
-		servicePort := 80
+		servicePort := int32(80)
+		containerPort := int32(80)
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP and internalTrafficPolicy=Local in namespace " + ns)
 		local := v1.ServiceInternalTrafficPolicyLocal
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
+				{Port: servicePort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort))
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort))
 		webserverPod0.Labels = jig.Labels
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
@@ -2523,7 +2538,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {int(servicePort)}})
 
 		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
@@ -2541,7 +2556,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pausePod1.Name, f.Namespace.Name, framework.PodStartTimeout))
 
 		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
-		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
+		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, fmt.Sprint(servicePort))
 		for i := 0; i < 5; i++ {
 			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
 			execHostnameTest(*pausePod0, serviceAddress, webserverPod0.Name)
@@ -2569,21 +2584,22 @@ var _ = common.SIGDescribe("Services", func() {
 
 		serviceName := "svc-itp"
 		ns := f.Namespace.Name
-		servicePort := 8000
+		servicePort := int32(8000)
+		containerPort := int32(8000)
 
 		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP and internalTrafficPolicy=Local in namespace " + ns)
 		local := v1.ServiceInternalTrafficPolicyLocal
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 8000, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(8000)},
+				{Port: servicePort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort))
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort))
 		webserverPod0.Labels = jig.Labels
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
@@ -2591,7 +2607,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {int(servicePort)}})
 
 		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
@@ -2611,7 +2627,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pausePod1.Name, f.Namespace.Name, framework.PodStartTimeout))
 
 		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
-		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
+		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, fmt.Sprint(servicePort))
 		for i := 0; i < 5; i++ {
 			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
 			execHostnameTest(*pausePod0, serviceAddress, webserverPod0.Name)
@@ -2649,14 +2665,14 @@ var _ = common.SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(endpointPort)},
+				{Port: int32(servicePort), Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(endpointPort)},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(endpointPort), "--udp-port", strconv.Itoa(endpointPort))
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(endpointPort), "--udp-port", fmt.Sprint(endpointPort))
 		webserverPod0.Labels = jig.Labels
 		webserverPod0.Spec.HostNetwork = true
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
@@ -2792,12 +2808,14 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "svc-proxy-terminating"
 		ns := f.Namespace.Name
 		servicePort := 80
+		containerPort := int32(80)
+		gracePeriodSeconds := int64(100)
 
 		ginkgo.By("creating a TCP service " + serviceName + " where all pods are terminating" + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
+				{Port: int32(servicePort), Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
@@ -2805,9 +2823,9 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds))
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2889,20 +2907,22 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "svc-proxy-terminating"
 		ns := f.Namespace.Name
 		servicePort := 80
+		containerPort := int32(80)
+		gracePeriodSeconds := int64(100)
 
 		ginkgo.By("creating a TCP service " + serviceName + " where all pods are terminating" + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
+				{Port: int32(servicePort), Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds))
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2961,29 +2981,31 @@ var _ = common.SIGDescribe("Services", func() {
 
 		serviceName := "svc-proxy-terminating"
 		ns := f.Namespace.Name
-		servicePort := 80
+		servicePort := int32(80)
+		containerPort := int32(80)
+		gracePeriodSeconds := int64(100)
 
 		ginkgo.By("creating a TCP service " + serviceName + " where all pods are terminating" + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		local := v1.ServiceInternalTrafficPolicyLocal
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
+				{Port: servicePort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 			svc.Spec.InternalTrafficPolicy = &local
 		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds))
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {int(servicePort)}})
 
 		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
@@ -3007,7 +3029,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		// assert 5 times that the first pause pod can connect to the Service locally and the second one errors with a timeout
-		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, strconv.Itoa(servicePort))
+		serviceAddress := net.JoinHostPort(svc.Spec.ClusterIP, fmt.Sprint(servicePort))
 		for i := 0; i < 5; i++ {
 			// There's a Service with internalTrafficPolicy=Local,
 			// with a single endpoint (which is terminating) called webserver0 running on node0.
@@ -3040,21 +3062,23 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "svc-proxy-terminating"
 		ns := f.Namespace.Name
 		servicePort := 80
+		containerPort := int32(80)
+		gracePeriodSeconds := int64(100)
 
 		ginkgo.By("creating a TCP service " + serviceName + " where all pods are terminating" + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
+				{Port: int32(servicePort), Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 			svc.Spec.Type = v1.ServiceTypeNodePort
 		})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds))
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -3115,12 +3139,14 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "svc-proxy-terminating"
 		ns := f.Namespace.Name
 		servicePort := 80
+		containerPort := int32(80)
+		gracePeriodSeconds := int64(100)
 
 		ginkgo.By("creating a TCP service " + serviceName + " where all pods are terminating" + ns)
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
+				{Port: int32(servicePort), Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
@@ -3128,9 +3154,9 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
-		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
+		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds))
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -3410,6 +3436,8 @@ var _ = common.SIGDescribe("Services", func() {
 		testSvcName := "test-service-" + utilrand.String(5)
 		testSvcLabels := map[string]string{"test-service-static": "true"}
 		testSvcLabelsFlat := "test-service-static=true"
+		containerPort := int32(80)
+		servicePort := int32(80)
 
 		w := &cache.ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
@@ -3432,8 +3460,8 @@ var _ = common.SIGDescribe("Services", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "http",
 					Protocol:   v1.ProtocolTCP,
-					Port:       int32(80),
-					TargetPort: intstr.FromInt32(80),
+					Port:       servicePort,
+					TargetPort: intstr.FromInt32(containerPort),
 				}},
 				LoadBalancerClass: ptr.To("example.com/internal-vip"),
 			},
@@ -3715,17 +3743,18 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "multiprotocol-test"
 		testLabels := map[string]string{"app": "multiport"}
 		ns := f.Namespace.Name
+		servicePort := int32(80)
 		containerPort := 80
 
 		svcTCPport := v1.ServicePort{
 			Name:       "tcp-port",
-			Port:       80,
+			Port:       servicePort,
 			TargetPort: intstr.FromInt(containerPort),
 			Protocol:   v1.ProtocolTCP,
 		}
 		svcUDPport := v1.ServicePort{
 			Name:       "udp-port",
-			Port:       80,
+			Port:       servicePort,
 			TargetPort: intstr.FromInt(containerPort),
 			Protocol:   v1.ProtocolUDP,
 		}
@@ -3757,7 +3786,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}}
 		podname1 := "pod1"
 		ginkgo.By("creating pod " + podname1 + " in namespace " + ns)
-		createPodOrFail(ctx, f, ns, podname1, testLabels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
+		createPodOrFail(ctx, f, ns, podname1, testLabels, containerPorts, "netexec", "--http-port", fmt.Sprint(containerPort), "--udp-port", fmt.Sprint(containerPort))
 		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
 
 		ginkgo.By("Checking if the Service forwards traffic to the TCP and UDP port")
@@ -3880,7 +3909,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		podname1 := "pod1"
 
-		createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
+		createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts, "netexec", "--http-port", fmt.Sprint(containerPort), "--udp-port", fmt.Sprint(containerPort))
 		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
 
 		ginkgo.By("Checking if the Service forwards traffic to pods")
@@ -3896,6 +3925,7 @@ var _ = common.SIGDescribe("Services", func() {
 		serviceName := "sctp-endpoint-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+		port := int32(5060)
 
 		ginkgo.By("getting the state of the sctp module on nodes")
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
@@ -3903,7 +3933,7 @@ var _ = common.SIGDescribe("Services", func() {
 		sctpLoadedAtStart := CheckSCTPModuleLoadedOnNodes(ctx, f, nodes)
 
 		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
-		_, err = jig.CreateSCTPServiceWithPort(ctx, nil, 5060)
+		_, err = jig.CreateSCTPServiceWithPort(ctx, nil, port)
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			err := cs.CoreV1().Services(ns).Delete(ctx, serviceName, metav1.DeleteOptions{})
@@ -3921,7 +3951,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		name1 := "pod1"
 
-		createPodOrFail(ctx, f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 5060, Protocol: v1.ProtocolSCTP}})
+		createPodOrFail(ctx, f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: port, Protocol: v1.ProtocolSCTP}})
 		names[name1] = true
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			for name := range names {
@@ -3931,7 +3961,7 @@ var _ = common.SIGDescribe("Services", func() {
 		})
 
 		ginkgo.By("validating endpoints exists")
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name1: {5060}})
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name1: {int(port)}})
 
 		ginkgo.By("deleting the pod")
 		e2epod.DeletePodOrFail(ctx, cs, ns, name1)
@@ -4183,7 +4213,7 @@ var _ = common.SIGDescribe("Services", func() {
 			},
 		}
 		ports := []v1.ContainerPort{{Name: namedPort, ContainerPort: port, Protocol: v1.ProtocolTCP}}
-		args := []string{"netexec", fmt.Sprintf("--http-port=%d", port)}
+		args := []string{"netexec", "--http-port", fmt.Sprint(port)}
 		createPodWithRestartableInitContainerOrFail(ctx, f, ns, name, t.Labels, ports, args...)
 
 		ginkgo.By(fmt.Sprintf("creating Service %v with selectors %v", service.Name, service.Spec.Selector))
@@ -4219,7 +4249,7 @@ var _ = common.SIGDescribe("Services", func() {
 			},
 		}
 		ports := []v1.ContainerPort{{Name: namedPort, ContainerPort: port, Protocol: v1.ProtocolTCP}}
-		args := []string{"netexec", fmt.Sprintf("--http-port=%d", port)}
+		args := []string{"netexec", "--http-port", fmt.Sprint(port)}
 		createPodWithRestartableInitContainerOrFail(ctx, f, ns, name, t.Labels, ports, args...)
 
 		ginkgo.By(fmt.Sprintf("creating Service %v with selectors %v", service.Name, service.Spec.Selector))
