@@ -201,6 +201,13 @@ const (
 	// status from DRA drivers.
 	DRAResourceClaimDeviceStatus featuregate.Feature = "DRAResourceClaimDeviceStatus"
 
+	// owner: @mortent
+	// kep: http://kep.k8s.io/5234
+	//
+	// Enables support for using mixins to define devices and
+	// counter sets in ResourceSlices.
+	DRAResourceSliceMixins featuregate.Feature = "DRAResourceSliceMixins"
+
 	// owner: @jpbetz @aaron-prindle @yongruilin
 	// kep: http://kep.k8s.io/5073
 	// beta: v1.33
@@ -1113,6 +1120,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	DRAResourceClaimDeviceStatus: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	DRAResourceSliceMixins: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DeclarativeValidation: {

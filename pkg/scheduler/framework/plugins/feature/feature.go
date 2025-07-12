@@ -35,4 +35,5 @@ type Features struct {
 	EnablePodLevelResources                      bool
 	EnablePartitionableDevices                   bool
 	EnableStorageCapacityScoring                 bool
+	EnableResourceSliceMixins                    bool
 }
