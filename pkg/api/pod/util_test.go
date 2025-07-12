@@ -5052,6 +5052,14 @@ func TestHasAPIReferences(t *testing.T) {
 			resource:        "clustertrustbundles",
 		},
 		{
+			name: "Non empty volume list with Projected volume with podcertificates",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{PodCertificate: &api.PodCertificateProjection{}}}}}},
+			}}},
+			expectRejection: true,
+			resource:        "podcertificates",
+		},
+		{
 			name: "Non empty volume list with Projected volume with secrets",
 			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
 				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{Secret: &api.SecretProjection{}}}}}},

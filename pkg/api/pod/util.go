@@ -1590,6 +1590,8 @@ func HasAPIObjectReference(pod *api.Pod) (bool, string, error) {
 					return true, "serviceaccounts (via projected volumes)", nil
 				case s.ClusterTrustBundle != nil:
 					return true, "clustertrustbundles", nil
+				case s.PodCertificate != nil:
+					return true, "podcertificates", nil
 				case s.DownwardAPI != nil:
 					// Allow projected volume sources that don't require the Kubernetes API
 					continue
