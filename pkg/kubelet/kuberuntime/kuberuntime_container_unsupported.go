@@ -20,6 +20,8 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -28,12 +30,12 @@ import (
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
-func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
+func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx context.Context, config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
 	return nil
 }
 
 // generateContainerResources generates platform specific container resources config for runtime
-func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
+func (m *kubeGenericRuntimeManager) generateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
 	return nil
 }
 
@@ -52,4 +54,9 @@ func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.Co
 
 func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) types.SwapBehavior {
 	return types.NoSwap
+}
+
+// initSwapControllerAvailabilityCheck returns a function that always returns false on unsupported platforms
+func initSwapControllerAvailabilityCheck(ctx context.Context) func() bool {
+	return func() bool { return false }
 }
