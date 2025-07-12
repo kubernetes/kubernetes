@@ -991,6 +991,42 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					initialConfig.FeatureGates[string(kubefeatures.KubeletPodResourcesGet)] = true
 				})
 
+				ginkgo.Context("with KubeletPodResourcesGet feature gate enabled", func() {
+					ginkgo.BeforeEach(func() {
+						framework.SkipUnlessFeatureGateEnabled("KubeletPodResourcesGet")
+					})
+
+					ginkgo.It("should succeed when calling Get for a valid pod", func(ctx context.Context) {
+						endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+						framework.ExpectNoError(err, "LocalEndpoint() faild err: %v", err)
+
+						cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+						framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
+						defer conn.Close()
+
+						ginkgo.By("checking Get succeeds when the feature gate is enabled")
+						pd := podDesc{
+							podName:    "fg-enabled-pod",
+							cntName:    "fg-enabled-cnt",
+							cpuRequest: 1000,
+						}
+						pod := makePodResourcesTestPod(pd)
+						pod = e2epod.NewPodClient(f).Create(ctx, pod)
+						defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Running", 2*time.Minute, testutils.PodRunning)
+						framework.ExpectNoError(err)
+
+						res, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{
+							PodName:      pod.Name,
+							PodNamespace: pod.Namespace,
+						})
+
+						framework.Logf("Get result: %v, err: %v", res, err)
+						gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected Get to succeed with the feature gate enabled")
+						gomega.Expect(res.PodResources.Name).To(gomega.Equal(pod.Name))
+					})
+				})
+
 				ginkgo.It("should return the expected responses", func(ctx context.Context) {
 					onlineCPUs, err := getOnlineCPUs()
 					framework.ExpectNoError(err, "getOnlineCPUs() failed err: %v", err)
