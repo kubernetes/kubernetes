@@ -37,6 +37,53 @@ func (_m *MockPodsProvider) EXPECT() *MockPodsProvider_Expecter {
 	return &MockPodsProvider_Expecter{mock: &_m.Mock}
 }
 
+// GetActivePods provides a mock function with no fields
+func (_m *MockPodsProvider) GetActivePods() []*v1.Pod {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetActivePods")
+	}
+
+	var r0 []*v1.Pod
+	if rf, ok := ret.Get(0).(func() []*v1.Pod); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*v1.Pod)
+		}
+	}
+
+	return r0
+}
+
+// MockPodsProvider_GetActivePods_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetActivePods'
+type MockPodsProvider_GetActivePods_Call struct {
+	*mock.Call
+}
+
+// GetActivePods is a helper method to define mock.On call
+func (_e *MockPodsProvider_Expecter) GetActivePods() *MockPodsProvider_GetActivePods_Call {
+	return &MockPodsProvider_GetActivePods_Call{Call: _e.mock.On("GetActivePods")}
+}
+
+func (_c *MockPodsProvider_GetActivePods_Call) Run(run func()) *MockPodsProvider_GetActivePods_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockPodsProvider_GetActivePods_Call) Return(_a0 []*v1.Pod) *MockPodsProvider_GetActivePods_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockPodsProvider_GetActivePods_Call) RunAndReturn(run func() []*v1.Pod) *MockPodsProvider_GetActivePods_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetPodByName provides a mock function with given fields: namespace, name
 func (_m *MockPodsProvider) GetPodByName(namespace string, name string) (*v1.Pod, bool) {
 	ret := _m.Called(namespace, name)
