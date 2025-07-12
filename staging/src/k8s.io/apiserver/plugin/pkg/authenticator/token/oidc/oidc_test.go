@@ -25,21 +25,25 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
 
 	"gopkg.in/go-jose/go-jose.v2"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -3453,6 +3457,378 @@ func TestToken(t *testing.T) {
 				]
 			}`, valid.Unix()),
 			wantInitErr: `issuer.url: Invalid value: "https://auth.example.com": URL must not overlap with disallowed issuers: [https://auth.example.com]`,
+		},
+		{
+			name: "invalid egress type",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "etcd",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+					return nil, fmt.Errorf("should not be called")
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `issuer.egressSelectorType: Invalid value: "etcd": egress selector must be either controlplane or cluster`,
+		},
+		{
+			name: "valid egress type with error",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "cluster",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+					if networkContext.EgressSelectionName != egressselector.Cluster {
+						return nil, fmt.Errorf("unexpected egress type %q", networkContext.EgressSelectionName)
+					}
+					return nil, fmt.Errorf("always fail, saw type %q", networkContext.EgressSelectionName)
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `oidc: egress lookup for "cluster" failed: always fail, saw type "cluster"`,
+		},
+		{
+			name: "valid egress type with error - again",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "controlplane",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+					if networkContext.EgressSelectionName != egressselector.ControlPlane {
+						return nil, fmt.Errorf("unexpected egress type %q", networkContext.EgressSelectionName)
+					}
+					return nil, fmt.Errorf("always fail, saw type %q", networkContext.EgressSelectionName)
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `oidc: egress lookup for "controlplane" failed: always fail, saw type "controlplane"`,
+		},
+		{
+			name: "valid egress type with no egress config",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "controlplane",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: nil,
+				now:          func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `oidc: egress lookup required with egress selector type "controlplane"`,
+		},
+		{
+			name: "valid egress type with no egress config for the given type",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "controlplane",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+					return nil, nil
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"groups": ["team1", "team2"],
+				"exp": %d,
+				"uid": "1234",
+				"foo": "bar",
+				"bar": [
+					"baz",
+					"qux"
+				]
+			}`, valid.Unix()),
+			wantInitErr: `oidc: egress lookup for "controlplane" is not configured`,
+		},
+		{
+			name: "valid egress type with broken dialer",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "controlplane",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.username",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.groups",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.uid",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "example.org/foo",
+								ValueExpression: "claims.foo",
+							},
+							{
+								Key:             "example.org/bar",
+								ValueExpression: "claims.bar",
+							},
+						},
+					},
+				},
+				EgressLookup: func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+					return func(ctx context.Context, net, addr string) (net.Conn, error) {
+						return nil, fmt.Errorf("broken dialer")
+					}, nil
+				},
+				now: func() time.Time { return now },
+			},
+			fetchKeysFromRemote: true,
+			wantHealthErrPrefix: `oidc: authenticator for issuer "https://auth.example.com" is not healthy: Get "https://auth.example.com/.well-known/openid-configuration": broken dialer`,
+		},
+		{
+			name: "valid egress type with working dialer",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:                "https://auth.example.com",
+						DiscoveryURL:       "{{.URL}}/.well-known/openid-configuration",
+						Audiences:          []string{"my-client"},
+						EgressSelectorType: "cluster",
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Claim:  "username",
+							Prefix: ptr.To(""),
+						},
+					},
+				},
+				EgressLookup: func() egressselector.Lookup {
+					var called atomic.Bool
+					t.Cleanup(func() {
+						if !called.Load() {
+							t.Errorf("egress lookup was not called")
+						}
+					})
+					return func(networkContext egressselector.NetworkContext) (utilnet.DialFunc, error) {
+						return func(ctx context.Context, network, address string) (net.Conn, error) {
+							called.Store(true)
+							return (&net.Dialer{}).DialContext(ctx, network, address)
+						}, nil
+					}
+				}(),
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"exp": %d
+			}`, valid.Unix()),
+			openIDConfig: `{
+					"issuer": "https://auth.example.com",
+					"jwks_uri": "{{.URL}}/.testing/keys"
+			}`,
+			fetchKeysFromRemote: true,
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
 		},
 		{
 			name: "extra claim mapping, empty string value for key",

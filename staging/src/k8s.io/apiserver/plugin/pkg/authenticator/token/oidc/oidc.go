@@ -58,6 +58,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/lazy"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
 )
@@ -83,7 +84,10 @@ type Options struct {
 	// PEM encoded root certificate contents of the provider.  Mutually exclusive with Client.
 	CAContentProvider CAContentProvider
 
-	// Optional http.Client used to make all requests to the remote issuer.  Mutually exclusive with CAContentProvider.
+	// EgressLookup allows for optional opt-in egress configuration via a custom dialer.  Mutually exclusive with Client.
+	EgressLookup egressselector.Lookup
+
+	// Optional http.Client used to make all requests to the remote issuer.  Mutually exclusive with CAContentProvider and EgressLookup.
 	Client *http.Client
 
 	// Optional CEL compiler used to compile the CEL expressions. This is useful to use a shared instance
@@ -276,6 +280,10 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 		return nil, fmt.Errorf("oidc: Client and CAContentProvider are mutually exclusive")
 	}
 
+	if opts.Client != nil && opts.EgressLookup != nil {
+		return nil, fmt.Errorf("oidc: Client and EgressLookup are mutually exclusive")
+	}
+
 	client := opts.Client
 
 	if client == nil {
@@ -291,8 +299,25 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 			klog.Info("OIDC: No x509 certificates provided, will use host's root CA set")
 		}
 
+		var customDial net.DialFunc
+		switch et := opts.JWTAuthenticator.Issuer.EgressSelectorType; et {
+		case "":
+			// valid but nothing to do
+		case apiserver.EgressSelectorControlPlane:
+			customDial, err = egressLookupForType(opts.EgressLookup, egressselector.ControlPlane)
+		case apiserver.EgressSelectorCluster:
+			customDial, err = egressLookupForType(opts.EgressLookup, egressselector.Cluster)
+		default:
+			// this should be impossible as validation should catch this at an earlier point
+			return nil, fmt.Errorf("oidc: unknown egress selector type %q", et)
+		}
+		if err != nil {
+			return nil, err
+		}
+
 		// Copied from http.DefaultTransport.
 		tr := net.SetTransportDefaults(&http.Transport{
+			DialContext: customDial,
 			// According to golang's doc, if RootCAs is nil,
 			// TLS uses the host's root CA set.
 			TLSClientConfig: &tls.Config{RootCAs: roots},
@@ -404,6 +429,22 @@ func New(lifecycleCtx context.Context, opts Options) (AuthenticatorTokenWithHeal
 	}
 
 	return newInstrumentedAuthenticator(issuerURL, authn), nil
+}
+
+func egressLookupForType(egressLookup egressselector.Lookup, egressSelector egressselector.EgressType) (net.DialFunc, error) {
+	if egressLookup == nil {
+		return nil, fmt.Errorf("oidc: egress lookup required with egress selector type %q", egressSelector)
+	}
+	customDial, err := egressLookup(egressSelector.AsNetworkContext())
+	if err != nil {
+		return nil, fmt.Errorf("oidc: egress lookup for %q failed: %w", egressSelector, err)
+	}
+	// we are stricter than other egress lookups because this is opt-in config
+	// we expect the user who is configuring the JWT authenticator to keep it in sync with the egress configuration
+	if customDial == nil {
+		return nil, fmt.Errorf("oidc: egress lookup for %q is not configured", egressSelector)
+	}
+	return customDial, nil
 }
 
 type errorHolder struct {
