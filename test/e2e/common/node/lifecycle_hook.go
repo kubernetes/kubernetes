@@ -18,8 +18,6 @@ package node
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -50,7 +48,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	)
 	ginkgo.Context("when create a pod with lifecycle hook", func() {
 		var (
-			targetIP, targetURL, targetNode string
+			targetURL, targetNode string
 
 			httpPorts = []v1.ContainerPort{
 				{
@@ -88,13 +86,6 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			e2epod.SetNodeSelection(&podHandleHookRequest.Spec, nodeSelection)
 
 			podClient = e2epod.NewPodClient(f)
-			ginkgo.By("create the container to handle the HTTPGet hook request.")
-			newPod := podClient.CreateSync(ctx, podHandleHookRequest)
-			targetIP = newPod.Status.PodIP
-			targetURL = targetIP
-			if strings.Contains(targetIP, ":") {
-				targetURL = fmt.Sprintf("[%s]", targetIP)
-			}
 		})
 		testPodWithHook := func(ctx context.Context, podWithHook *v1.Pod) {
 			ginkgo.By("create the pod with lifecycle hook")
@@ -174,7 +165,6 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=poststart",
-						Host: targetIP,
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -197,7 +187,6 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=poststart",
-						Host:   targetIP,
 						Port:   intstr.FromInt32(9090),
 					},
 				},
@@ -219,7 +208,6 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=prestop",
-						Host: targetIP,
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -242,7 +230,6 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=prestop",
-						Host:   targetIP,
 						Port:   intstr.FromInt32(9090),
 					},
 				},
@@ -268,7 +255,7 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 	)
 	ginkgo.Context("when create a pod with lifecycle hook", func() {
 		var (
-			targetIP, targetURL, targetNode string
+			targetURL, targetNode string
 
 			httpPorts = []v1.ContainerPort{
 				{
@@ -306,13 +293,6 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 			e2epod.SetNodeSelection(&podHandleHookRequest.Spec, nodeSelection)
 
 			podClient = e2epod.NewPodClient(f)
-			ginkgo.By("create the container to handle the HTTPGet hook request.")
-			newPod := podClient.CreateSync(ctx, podHandleHookRequest)
-			targetIP = newPod.Status.PodIP
-			targetURL = targetIP
-			if strings.Contains(targetIP, ":") {
-				targetURL = fmt.Sprintf("[%s]", targetIP)
-			}
 		})
 		testPodWithHook := func(ctx context.Context, podWithHook *v1.Pod) {
 			ginkgo.By("create the pod with lifecycle hook")
@@ -407,7 +387,6 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 				PostStart: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=poststart",
-						Host: targetIP,
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -435,7 +414,6 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=poststart",
-						Host:   targetIP,
 						Port:   intstr.FromInt32(9090),
 					},
 				},
@@ -462,7 +440,6 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 				PreStop: &v1.LifecycleHandler{
 					HTTPGet: &v1.HTTPGetAction{
 						Path: "/echo?msg=prestop",
-						Host: targetIP,
 						Port: intstr.FromInt32(8080),
 					},
 				},
@@ -490,7 +467,6 @@ var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(feature
 					HTTPGet: &v1.HTTPGetAction{
 						Scheme: v1.URISchemeHTTPS,
 						Path:   "/echo?msg=prestop",
-						Host:   targetIP,
 						Port:   intstr.FromInt32(9090),
 					},
 				},
