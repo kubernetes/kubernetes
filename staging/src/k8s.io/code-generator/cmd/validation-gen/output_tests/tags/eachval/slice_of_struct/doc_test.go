@@ -36,4 +36,28 @@ func Test(t *testing.T) {
 		"listTypedefField[0]": {"field Struct.ListTypedefField[*]"},
 		"listTypedefField[1]": {"field Struct.ListTypedefField[*]"},
 	})
+	st.Value(&Struct{
+		ListNonComparableField: []NonComparableStruct{{SliceField: []string{"zero", "one"}}, {SliceField: []string{"three", "four"}}},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"listNonComparableField[0]": {"field Struct.ListNonComparableField[*]"},
+		"listNonComparableField[1]": {"field Struct.ListNonComparableField[*]"},
+	})
+
+	// Test validation ratcheting.
+	st.Value(&Struct{
+		ListField:        []OtherStruct{{}, {}},
+		ListTypedefField: []OtherTypedefStruct{{}, {}},
+	}).OldValue(&Struct{
+		ListField:        []OtherStruct{{}, {}},
+		ListTypedefField: []OtherTypedefStruct{{}, {}},
+	}).ExpectValid()
+
+	st.Value(&Struct{
+		// New element exists in old value, but this is not a set.
+		ListNonComparableField: []NonComparableStruct{{SliceField: []string{"three", "four"}}},
+	}).OldValue(&Struct{
+		ListNonComparableField: []NonComparableStruct{{SliceField: []string{"zero", "one"}}, {SliceField: []string{"three", "four"}}},
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"listNonComparableField[0]": {"field Struct.ListNonComparableField[*]"},
+	})
 }

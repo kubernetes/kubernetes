@@ -36,6 +36,11 @@ func Subfield[Tstruct any, Tfield any](ctx context.Context, op operation.Operati
 	if oldStruct != nil {
 		oldVal = getField(oldStruct)
 	}
+	// TODO: passing an equiv function to Subfield for direct comparison instead of
+	// SemanticDeepEqual if fields can be compared directly, to improve performance.
+	if op.Type == operation.Update && SemanticDeepEqual(newVal, oldVal) {
+		return nil
+	}
 	errs = append(errs, validator(ctx, op, fldPath.Child(fldName), newVal, oldVal)...)
 	return errs
 }
