@@ -108,6 +108,12 @@ const (
 	// Allow the API server to serve consistent lists from cache
 	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
 
+	// owner: @qiujian16
+	// kep: https://kep.k8s.io/5284
+	//
+	// Enables impersonation that is constrained to specific requests instead of being all or nothing.
+	ConstrainedImpersonation featuregate.Feature = "ConstrainedImpersonation"
+
 	// owner: @jefftree
 	// kep: https://kep.k8s.io/4355
 	//
@@ -329,6 +335,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ConsistentListFromCache: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ConstrainedImpersonation: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	CoordinatedLeaderElection: {
