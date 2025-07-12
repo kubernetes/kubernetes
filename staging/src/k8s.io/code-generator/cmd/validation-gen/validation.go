@@ -392,6 +392,9 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	// are called in emitted code, just how we evaluate what to emit.
 	switch t.Kind {
 	case types.Alias, types.Struct:
+		if fldPath.String() != t.String() {
+			panic(fmt.Sprintf("path for type != the type name: %s, %s", t.String(), fldPath.String()))
+		}
 		context := validators.Context{
 			Scope:  validators.ScopeType,
 			Type:   t,
@@ -452,7 +455,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 						//
 						// Note: the first argument to Function() is really
 						// only for debugging.
-						v, err := validators.ForEachVal(fldPath, underlying.childType,
+						v, err := validators.ForEachVal(fldPath, thisNode.valueType,
 							validators.Function("iterateListValues", validators.DefaultFlags, funcName))
 						if err != nil {
 							return nil, fmt.Errorf("generating list iteration: %w", err)
@@ -576,11 +579,11 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			Path:   childPath,
 		}
 
-		Tags, err := td.validator.ExtractTags(context, memb.CommentLines)
+		tags, err := td.validator.ExtractTags(context, memb.CommentLines)
 		if err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
 		}
-		if validations, err := td.validator.ExtractValidations(context, Tags...); err != nil {
+		if validations, err := td.validator.ExtractValidations(context, tags...); err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
 		} else if validations.Empty() {
 			klog.V(6).InfoS("no field-attached validations", "field", childPath)
