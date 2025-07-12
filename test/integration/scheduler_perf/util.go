@@ -24,6 +24,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -343,6 +344,10 @@ func (mc *metricsCollector) init() error {
 	return nil
 }
 
+func (tc *metricsCollector) stop() error {
+	return nil
+}
+
 func (*metricsCollector) run(tCtx ktesting.TContext) {
 	// metricCollector doesn't need to start before the tests, so nothing to do here.
 }
@@ -462,6 +467,10 @@ func newThroughputCollector(podInformer coreinformers.PodInformer, resultLabels 
 }
 
 func (tc *throughputCollector) init() error {
+	return nil
+}
+
+func (tc *throughputCollector) stop() error {
 	return nil
 }
 
@@ -639,4 +648,152 @@ func (tc *throughputCollector) collect() []DataItem {
 	}
 
 	return []DataItem{throughputSummary}
+}
+
+// memoryCollector collects memory usage metrics during the test
+type memoryCollector struct {
+	samples      []memorySample
+	resultLabels map[string]string
+	interval     time.Duration
+	stopCh       chan struct{}
+	mu           sync.RWMutex
+}
+
+type memorySample struct {
+	timestamp      time.Time
+	heapInuseMB    float64
+	goroutineCount float64
+}
+
+func newMemoryCollector(resultLabels map[string]string, interval time.Duration) *memoryCollector {
+	return &memoryCollector{
+		resultLabels: resultLabels,
+		interval:     interval,
+		stopCh:       make(chan struct{}),
+	}
+}
+
+func (mc *memoryCollector) init() error {
+	mc.samples = nil
+	return nil
+}
+
+func (mc *memoryCollector) run(tCtx ktesting.TContext) {
+	ticker := time.NewTicker(mc.interval)
+	defer ticker.Stop()
+
+	// Take initial sample
+	mc.collectSample()
+
+	for {
+		select {
+		case <-tCtx.Done():
+			return
+		case <-mc.stopCh:
+			return
+		case <-ticker.C:
+			mc.collectSample()
+		}
+	}
+}
+
+func (mc *memoryCollector) collectSample() {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	sample := memorySample{
+		timestamp:      time.Now(),
+		heapInuseMB:    float64(m.HeapInuse) / 1024 / 1024,
+		goroutineCount: float64(runtime.NumGoroutine()),
+	}
+
+	mc.mu.Lock()
+	mc.samples = append(mc.samples, sample)
+	mc.mu.Unlock()
+}
+
+func (mc *memoryCollector) stop() error {
+	close(mc.stopCh)
+	return nil
+}
+
+func (mc *memoryCollector) collect() []DataItem {
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
+
+	length := len(mc.samples)
+	if length == 0 {
+		return nil
+	}
+
+	// Calculate statistics for heap usage
+	heapValues := make([]float64, len(mc.samples))
+	goroutineValues := make([]float64, len(mc.samples))
+
+	for i, s := range mc.samples {
+		heapValues[i] = s.heapInuseMB
+		goroutineValues[i] = s.goroutineCount
+	}
+
+	dataItems := make([]DataItem, 0, 3)
+	for _, item := range []struct {
+		values []float64
+		unit   string
+		metric string
+	}{
+		{values: heapValues, unit: "MB", metric: "heap_memory_usage"},
+		{values: goroutineValues, unit: "count", metric: "goroutine_count"},
+	} {
+		sort.Float64s(item.values)
+
+		sum := 0.0
+		for _, v := range item.values {
+			sum += v
+		}
+		heapItem := DataItem{
+			Labels: copyLabels(mc.resultLabels),
+			Data: map[string]float64{
+				"Perc50":  item.values[int(math.Ceil(float64(len(item.values)*50)/100))-1],
+				"Perc90":  item.values[int(math.Ceil(float64(len(item.values)*90)/100))-1],
+				"Perc95":  item.values[int(math.Ceil(float64(len(item.values)*95)/100))-1],
+				"Perc99":  item.values[int(math.Ceil(float64(len(item.values)*99)/100))-1],
+				"Average": sum / float64(len(item.values)),
+				"Max":     item.values[len(item.values)-1],
+			},
+			Unit: item.unit,
+		}
+		heapItem.Labels["Metric"] = item.metric
+
+		dataItems = append(dataItems, heapItem)
+	}
+
+	firstSample := mc.samples[0]
+	var lastSample memorySample
+	if length < 2 {
+		lastSample = firstSample
+	} else {
+		lastSample = mc.samples[length-1]
+	}
+	durationSec := lastSample.timestamp.Sub(firstSample.timestamp).Seconds()
+	growthItem := DataItem{
+		Labels: copyLabels(mc.resultLabels),
+		Data: map[string]float64{
+			"DurationSec": durationSec,
+			"InitialMB":   firstSample.heapInuseMB,
+			"FinalMB":     lastSample.heapInuseMB,
+		},
+		Unit: "MB/min",
+	}
+	growthItem.Labels["Metric"] = "memory_growth_rate"
+	dataItems = append(dataItems, growthItem)
+
+	return dataItems
+}
+
+func copyLabels(labels map[string]string) map[string]string {
+	copied := make(map[string]string, len(labels))
+	for k, v := range labels {
+		copied[k] = v
+	}
+	return copied
 }
