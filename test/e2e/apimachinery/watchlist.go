@@ -52,7 +52,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(features.WatchList), framework.WithSerial(), func() {
+var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(features.WatchList), func() {
 	f := framework.NewDefaultFramework("watchlist")
 	ginkgo.It("should be requested by informers when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
