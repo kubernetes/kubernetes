@@ -1187,7 +1187,7 @@ func validateLabelValue(value string, fldPath *field.Path) field.ErrorList {
 
 	// There's no metav1validation.ValidateLabelValue.
 	for _, msg := range validation.IsValidLabelValue(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg)).WithOrigin("format=k8s-label-value")
 	}
 
 	return allErrs

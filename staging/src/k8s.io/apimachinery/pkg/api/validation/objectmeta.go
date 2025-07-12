@@ -46,11 +46,11 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	for k := range annotations {
 		// The rule is QualifiedName except that case doesn't matter, so convert to lowercase before checking.
 		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, k, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath, k, msg)).WithOrigin("format=k8s-qualified-name")
 		}
 	}
 	if err := ValidateAnnotationsSize(annotations); err != nil {
-		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, TotalAnnotationSizeLimitB))
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, TotalAnnotationSizeLimitB)).WithOrigin("")
 	}
 	return allErrs
 }
@@ -111,7 +111,7 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 func ValidateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(stringValue) {
-		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, msg)).WithOrigin("format=k8s-qualified-name")
 	}
 
 	return allErrs
