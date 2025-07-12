@@ -138,6 +138,11 @@ func (c *PodClient) CreateSync(ctx context.Context, pod *v1.Pod) *v1.Pod {
 	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
 	p, err := c.Get(ctx, p.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
+	// Wait for all pod containers to run.
+	for _, container := range pod.Spec.Containers {
+		err = WaitForContainerRunning(ctx, c.f.ClientSet, pod.Namespace, pod.Name, container.Name, framework.PodStartShortTimeout)
+		framework.ExpectNoError(err, "failed to wait for container %s to be running", container.Name)
+	}
 	return p
 }
 
