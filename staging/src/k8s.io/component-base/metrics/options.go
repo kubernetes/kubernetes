@@ -32,6 +32,7 @@ type Options struct {
 	DisabledMetrics             []string
 	AllowListMapping            map[string]string
 	AllowListMappingManifest    string
+	EnableInformerMetrics       bool
 }
 
 // NewOptions returns default metrics options
@@ -86,6 +87,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"The path to the manifest file that contains the allow-list mapping. "+
 			"The format of the file is the same as the flag --allow-metric-labels. "+
 			"Note that the flag --allow-metric-labels will override the manifest file.")
+	fs.BoolVar(&o.EnableInformerMetrics, "enable-informer-metrics", o.EnableInformerMetrics,
+		"Enable collection of shared informer metrics (disabled by default).")
 }
 
 // Apply applies parameters into global configuration of metrics.
