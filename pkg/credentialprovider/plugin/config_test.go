@@ -929,6 +929,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience: "audience",
+							CacheType:                   kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequireServiceAccount:       ptr.To(true),
 						},
 					},
@@ -946,6 +947,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						DefaultCacheDuration: &metav1.Duration{Duration: time.Minute},
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequiredServiceAccountAnnotationKeys: []string{"prefix.io/annotation-1", "prefix.io/annotation-2"},
 							RequireServiceAccount:                ptr.To(true),
 						},
@@ -954,6 +956,45 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 			},
 			saTokenForCredentialProviders: true,
 			expectErr:                     `providers.tokenAttributes.serviceAccountTokenAudience: Required value`,
+		},
+		{
+			name: "token attributes not nil but empty CacheType",
+			config: &kubeletconfig.CredentialProviderConfig{
+				Providers: []kubeletconfig.CredentialProvider{
+					{
+						Name:                 "foobar",
+						MatchImages:          []string{"foobar.registry.io"},
+						DefaultCacheDuration: &metav1.Duration{Duration: time.Minute},
+						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
+						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
+							ServiceAccountTokenAudience: "audience",
+							RequireServiceAccount:       ptr.To(true),
+						},
+					},
+				},
+			},
+			saTokenForCredentialProviders: true,
+			expectErr:                     `providers.tokenAttributes.cacheType: Required value: cacheType is required to be set when tokenAttributes is specified. Supported values are: ServiceAccount, Token`,
+		},
+		{
+			name: "token attributes not nil, invalid CacheType",
+			config: &kubeletconfig.CredentialProviderConfig{
+				Providers: []kubeletconfig.CredentialProvider{
+					{
+						Name:                 "foobar",
+						MatchImages:          []string{"foobar.registry.io"},
+						DefaultCacheDuration: &metav1.Duration{Duration: time.Minute},
+						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
+						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
+							ServiceAccountTokenAudience: "audience",
+							CacheType:                   "invalid-cache-type",
+							RequireServiceAccount:       ptr.To(true),
+						},
+					},
+				},
+			},
+			saTokenForCredentialProviders: true,
+			expectErr:                     `providers.tokenAttributes.cacheType: Unsupported value: "invalid-cache-type": supported values: "ServiceAccount", "Token"`,
 		},
 		{
 			name: "token attributes not nil but empty ServiceAccountTokenRequired",
@@ -966,6 +1007,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequiredServiceAccountAnnotationKeys: []string{"prefix.io/annotation-1", "prefix.io/annotation-2"},
 						},
 					},
@@ -985,6 +1027,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"cantendwithadash-", "now-with-dashes/simple"}, // first key is invalid
 						},
@@ -1005,6 +1048,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							OptionalServiceAccountAnnotationKeys: []string{"cantendwithadash-", "now-with-dashes/simple"}, // first key is invalid
 						},
@@ -1025,6 +1069,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple", "now-with-dashes/simple"},
 						},
@@ -1045,6 +1090,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							OptionalServiceAccountAnnotationKeys: []string{"now-with-dashes/simple", "now-with-dashes/simple"},
 						},
@@ -1065,6 +1111,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple-1", "now-with-dashes/simple-2"},
 							OptionalServiceAccountAnnotationKeys: []string{"now-with-dashes/simple-2", "now-with-dashes/simple-3"},
@@ -1086,6 +1133,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(false),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple-1", "now-with-dashes/simple-2"},
 						},
@@ -1106,6 +1154,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple-1", "now-with-dashes/simple-2"},
 							OptionalServiceAccountAnnotationKeys: []string{"now-with-dashes/simple-3"},
@@ -1126,6 +1175,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1alpha1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.TokenServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple"},
 						},
@@ -1146,6 +1196,7 @@ func Test_validateCredentialProviderConfig(t *testing.T) {
 						APIVersion:           "credentialprovider.kubelet.k8s.io/v1beta1",
 						TokenAttributes: &kubeletconfig.ServiceAccountTokenAttributes{
 							ServiceAccountTokenAudience:          "audience",
+							CacheType:                            kubeletconfig.ServiceAccountServiceAccountTokenCacheType,
 							RequireServiceAccount:                ptr.To(true),
 							RequiredServiceAccountAnnotationKeys: []string{"now-with-dashes/simple"},
 						},

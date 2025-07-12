@@ -622,6 +622,23 @@ type SerializedNodeConfigSource struct {
 	Source v1.NodeConfigSource
 }
 
+// ServiceAccountTokenCacheType is the type of cache key used for caching credentials returned by the plugin
+// when the service account token is used.
+type ServiceAccountTokenCacheType string
+
+const (
+	// TokenServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-token basis. This should be set if the returned credential's lifetime is limited
+	// to the input service account token's lifetime.
+	// For example, this must be used when returning the input service account token directly as a pull credential.
+	TokenServiceAccountTokenCacheType ServiceAccountTokenCacheType = "Token"
+	// ServiceAccountServiceAccountTokenCacheType means the kubelet will cache returned credentials
+	// on a per-serviceaccount basis. This should be set if the plugin's credential retrieval logic
+	// depends only on the service account and not on pod-specific claims.
+	// Use this when the returned credential is valid for all pods using the same service account.
+	ServiceAccountServiceAccountTokenCacheType ServiceAccountTokenCacheType = "ServiceAccount"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CredentialProviderConfig is the configuration containing information about
@@ -720,6 +737,17 @@ type ServiceAccountTokenAttributes struct {
 	// serviceAccountTokenAudience is the intended audience for the projected service account token.
 	// +required
 	ServiceAccountTokenAudience string
+
+	// cacheType indicates the type of cache key use for caching the credentials returned by the plugin
+	// when the service account token is used.
+	// The most conservative option is to set this to "Token", which means the kubelet will cache returned credentials
+	// on a per-token basis. This should be set if the returned credential's lifetime is limited to the service account
+	// token's lifetime.
+	// If the plugin's credential retrieval logic depends only on the service account and not on pod-specific claims,
+	// then the plugin can set this to "ServiceAccount". In this case, the kubelet will cache returned credentials
+	// on a per-serviceaccount basis. Use this when the returned credential is valid for all pods using the same service account.
+	// +required
+	CacheType ServiceAccountTokenCacheType
 
 	// requireServiceAccount indicates whether the plugin requires the pod to have a service account.
 	// If set to true, kubelet will only invoke the plugin if the pod has a service account.
