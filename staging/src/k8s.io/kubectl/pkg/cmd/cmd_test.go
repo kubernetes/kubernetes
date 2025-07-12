@@ -403,3 +403,96 @@ func TestKubectlCommandHeadersHooks(t *testing.T) {
 		})
 	}
 }
+
+func TestGetLogVerbosity(t *testing.T) {
+	tests := []struct {
+		name              string
+		args              []string
+		expectedVerbosity string
+	}{
+		{
+			name:              "no verbosity flag should return default 0",
+			args:              []string{"kubectl", "get", "pods"},
+			expectedVerbosity: "0",
+		},
+		{
+			name:              "empty args should return default 0",
+			args:              []string{},
+			expectedVerbosity: "0",
+		},
+		{
+			name:              "long form verbosity flag with equals",
+			args:              []string{"kubectl", "--v=3", "get", "pods"},
+			expectedVerbosity: "3",
+		},
+		{
+			name:              "short form verbosity flag with equals",
+			args:              []string{"kubectl", "-v=5", "get", "pods"},
+			expectedVerbosity: "5",
+		},
+		{
+			name:              "long form verbosity flag with space",
+			args:              []string{"kubectl", "--v", "4", "get", "pods"},
+			expectedVerbosity: "4",
+		},
+		{
+			name:              "short form verbosity flag with space",
+			args:              []string{"kubectl", "-v", "2", "get", "pods"},
+			expectedVerbosity: "2",
+		},
+		{
+			name:              "verbosity flag at the end with space",
+			args:              []string{"kubectl", "get", "pods", "--v", "6"},
+			expectedVerbosity: "6",
+		},
+		{
+			name:              "verbosity flag at the end with equals",
+			args:              []string{"kubectl", "get", "pods", "--v=7"},
+			expectedVerbosity: "7",
+		},
+		{
+			name:              "verbosity flag with empty value should return 0",
+			args:              []string{"kubectl", "--v=", "get", "pods"},
+			expectedVerbosity: "0",
+		},
+		{
+			name:              "verbosity flag at end of args with no value should return 0",
+			args:              []string{"kubectl", "get", "pods", "--v"},
+			expectedVerbosity: "0",
+		},
+		{
+			name:              "verbosity flag before double dash separator",
+			args:              []string{"kubectl", "--v=8", "--", "get", "pods"},
+			expectedVerbosity: "8",
+		},
+		{
+			name:              "verbosity flag after double dash separator should be ignored",
+			args:              []string{"kubectl", "get", "pods", "--", "--v=9"},
+			expectedVerbosity: "0",
+		},
+		{
+			name:              "multiple verbosity flags should return first one",
+			args:              []string{"kubectl", "--v=1", "get", "pods", "--v=2"},
+			expectedVerbosity: "1",
+		},
+		{
+			name:              "verbosity flag mixed with other flags",
+			args:              []string{"kubectl", "--kubeconfig=/path/to/config", "--v=10", "--namespace=default", "get", "pods"},
+			expectedVerbosity: "10",
+		},
+		{
+			name:              "verbosity zero explicitly set",
+			args:              []string{"kubectl", "--v=0", "get", "pods"},
+			expectedVerbosity: "0",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := GetLogVerbosity(test.args)
+			if result != test.expectedVerbosity {
+				t.Errorf("GetLogVerbosity(%v) = %q, expected %q", test.args, result, test.expectedVerbosity)
+			}
+		})
+	}
+}
