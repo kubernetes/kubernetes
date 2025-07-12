@@ -39,9 +39,11 @@ import (
 	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -1917,6 +1919,138 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(appContainerName, onlineCPUs))
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, reservedCPUs))
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, nonReusableCPUs))
+		})
+	})
+})
+
+var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", ginkgo.Ordered, ginkgo.ContinueOnFailure, framework.WithSerial(), feature.CPUManager, feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
+	f := framework.NewDefaultFramework("cpu-manager-incompatibility-pod-level-resources-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	// original kubeletconfig before the context start, to be restored
+	var oldCfg *kubeletconfig.KubeletConfiguration
+	var reservedCPUs cpuset.CPUSet
+	var onlineCPUs cpuset.CPUSet
+	var smtLevel int
+	var uncoreGroupSize int
+	// tracks all the pods created by a It() block. Best would be a namespace per It block
+	var podMap map[string]*v1.Pod
+
+	ginkgo.BeforeAll(func(ctx context.Context) {
+		var err error
+		oldCfg, err = getCurrentKubeletConfig(ctx)
+		framework.ExpectNoError(err)
+
+		onlineCPUs, err = getOnlineCPUs() // this should not change at all, at least during this suite lifetime
+		framework.ExpectNoError(err)
+		framework.Logf("Online CPUs: %s", onlineCPUs)
+
+		smtLevel = smtLevelFromSysFS() // this should not change at all, at least during this suite lifetime
+		framework.Logf("SMT level: %d", smtLevel)
+
+		uncoreGroupSize = getUncoreCPUGroupSize()
+		framework.Logf("Uncore Group Size: %d", uncoreGroupSize)
+
+		e2enodeCgroupV2Enabled = IsCgroup2UnifiedMode()
+		framework.Logf("cgroup V2 enabled: %v", e2enodeCgroupV2Enabled)
+
+		e2enodeCgroupDriver = oldCfg.CgroupDriver
+		framework.Logf("cgroup driver: %s", e2enodeCgroupDriver)
+
+		runtime, _, err := getCRIClient()
+		framework.ExpectNoError(err, "Failed to get CRI client")
+
+		version, err := runtime.Version(context.Background(), "")
+		framework.ExpectNoError(err, "Failed to get runtime version")
+
+		e2enodeRuntimeName = version.GetRuntimeName()
+		framework.Logf("runtime: %s", e2enodeRuntimeName)
+	})
+
+	ginkgo.AfterAll(func(ctx context.Context) {
+		updateKubeletConfig(ctx, f, oldCfg, true)
+	})
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		// note intentionally NOT set reservedCPUs -  this must be initialized on a test-by-test basis
+		podMap = make(map[string]*v1.Pod)
+	})
+
+	ginkgo.JustBeforeEach(func(ctx context.Context) {
+		if !e2enodeCgroupV2Enabled {
+			e2eskipper.Skipf("Skipping since CgroupV2 not used")
+		}
+	})
+
+	ginkgo.AfterEach(func(ctx context.Context) {
+		deletePodsAsync(ctx, f, podMap)
+	})
+
+	ginkgo.When("running guaranteed pod level resources tests", ginkgo.Label("guaranteed pod level resources", "reserved-cpus"), func() {
+		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: cpuset.CPUSet{},
+			}))
+
+			pod := makeCPUManagerPod("gu-pod-level-resources", []ctnAttribute{
+				{
+					ctnName:    "gu-container",
+					cpuRequest: "1",
+					cpuLimit:   "1",
+				},
+			})
+			pod.Spec.Resources = &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			}
+
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			ginkgo.By("checking if the expected cpuset was assigned")
+			gomega.Expect(pod).To(HaveContainerCPUsEqualTo("gu-container", onlineCPUs))
+		})
+
+		ginkgo.It("should let the container access all the online CPUs when using a reserved CPUs set", func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			pod := makeCPUManagerPod("gu-pod-level-resources", []ctnAttribute{
+				{
+					ctnName:    "gu-container",
+					cpuRequest: "1",
+					cpuLimit:   "1",
+				},
+			})
+			pod.Spec.Resources = &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				},
+			}
+
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			ginkgo.By("checking if the expected cpuset was assigned")
+			gomega.Expect(pod).To(HaveContainerCPUsEqualTo("gu-container", onlineCPUs))
 		})
 	})
 })
