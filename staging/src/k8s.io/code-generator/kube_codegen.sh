@@ -117,7 +117,10 @@ function kube::codegen::gen_helpers() {
         GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
     )
     # Go installs in $GOBIN if defined, and $GOPATH/bin otherwise
-    gobin="${GOBIN:-$(go env GOPATH)/bin}"
+    gobin="$(go env GOBIN)"
+    if [[ -z "${gobin}" ]]; then
+        gobin="$(go env GOPATH)/bin"
+    fi
 
     # Deepcopy
     #
@@ -368,7 +371,10 @@ function kube::codegen::gen_openapi() {
         GO111MODULE=on go install $(printf "k8s.io/kube-openapi/cmd/%s " "${BINS[@]}")
     )
     # Go installs in $GOBIN if defined, and $GOPATH/bin otherwise
-    gobin="${GOBIN:-$(go env GOPATH)/bin}"
+    gobin="$(go env GOBIN)"
+    if [[ -z "${gobin}" ]]; then
+        gobin="$(go env GOPATH)/bin"
+    fi
 
     local input_pkgs=( "${extra_pkgs[@]:+"${extra_pkgs[@]}"}")
     while read -r dir; do
@@ -601,7 +607,10 @@ function kube::codegen::gen_client() {
         GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
     )
     # Go installs in $GOBIN if defined, and $GOPATH/bin otherwise
-    gobin="${GOBIN:-$(go env GOPATH)/bin}"
+    gobin="$(go env GOBIN)"
+    if [[ -z "${gobin}" ]]; then
+        gobin="$(go env GOPATH)/bin"
+    fi
 
     local group_versions=()
     local input_pkgs=()
@@ -773,7 +782,10 @@ function kube::codegen::gen_register() {
         GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
     )
     # Go installs in $GOBIN if defined, and $GOPATH/bin otherwise
-    gobin="${GOBIN:-$(go env GOPATH)/bin}"
+    gobin="$(go env GOBIN)"
+    if [[ -z "${gobin}" ]]; then
+        gobin="$(go env GOPATH)/bin"
+    fi
 
     # Register
     #
