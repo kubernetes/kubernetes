@@ -424,7 +424,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	if errGen == nil && encObject.KeyID == statusKeyID {
 		h.state.Store(&envelopekmsv2.State{
 			Transformer:         transformer,
-			EncryptedObject:     *encObject,
+			EncryptedObject:     *encObject, //nolint:govet // copy lock works for this protobuf version
 			UID:                 uid,
 			ExpirationTimestamp: expirationTimestamp,
 			CacheKey:            cacheKey,
@@ -461,7 +461,7 @@ func (h *kmsv2PluginProbe) getCurrentState() (envelopekmsv2.State, error) {
 		return envelopekmsv2.State{}, fmt.Errorf("got unexpected nil transformer")
 	}
 
-	encryptedObjectCopy := state.EncryptedObject
+	encryptedObjectCopy := state.EncryptedObject //nolint:govet // copy lock works for this protobuf version
 	if len(encryptedObjectCopy.EncryptedData) != 0 {
 		return envelopekmsv2.State{}, fmt.Errorf("got unexpected non-empty EncryptedData")
 	}
@@ -478,7 +478,7 @@ func (h *kmsv2PluginProbe) getCurrentState() (envelopekmsv2.State, error) {
 		return envelopekmsv2.State{}, fmt.Errorf("got unexpected empty cacheKey")
 	}
 
-	return state, nil
+	return state, nil //nolint:govet // copy lock works for this protobuf version
 }
 
 func (h *kmsv2PluginProbe) isKMSv2ProviderHealthyAndMaybeRotateDEK(ctx context.Context, response *kmsservice.StatusResponse) error {
