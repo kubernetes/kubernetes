@@ -26,7 +26,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
@@ -99,59 +98,47 @@ func Retriable(err error) bool {
 		net.IsConnectionRefused(err)
 }
 
-// PatchPodStatus calculates the delta bytes change from <old.Status> to <newStatus>,
+// PatchPodStatus calculates the delta bytes change from <oldStatus> to <newStatus>,
 // and then submit a request to API server to patch the pod changes.
-func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, old *v1.Pod, newStatus *v1.PodStatus) error {
+func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, namespace string, oldStatus *v1.PodStatus, newStatus *v1.PodStatus) (*v1.Pod, error) {
 	if newStatus == nil {
-		return nil
+		return nil, nil
 	}
 
-	oldData, err := json.Marshal(v1.Pod{Status: old.Status})
+	oldData, err := json.Marshal(v1.Pod{Status: *oldStatus})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	newData, err := json.Marshal(v1.Pod{Status: *newStatus})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Pod{})
 	if err != nil {
-		return fmt.Errorf("failed to create merge patch for pod %q/%q: %v", old.Namespace, old.Name, err)
+		return nil, fmt.Errorf("failed to create merge patch for pod %q/%q: %v", namespace, name, err)
 	}
 
 	if "{}" == string(patchBytes) {
-		return nil
+		return nil, nil
 	}
 
+	var patchedPod *v1.Pod
 	patchFn := func() error {
-		_, err := cs.CoreV1().Pods(old.Namespace).Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+		patchedPod, err = cs.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 		return err
 	}
 
-	return retry.OnError(retry.DefaultBackoff, Retriable, patchFn)
+	err = retry.OnError(retry.DefaultBackoff, Retriable, patchFn)
+	if err != nil {
+		return nil, err
+	}
+	return patchedPod, nil
 }
 
 // DeletePod deletes the given <pod> from API server
 func DeletePod(ctx context.Context, cs kubernetes.Interface, pod *v1.Pod) error {
 	return cs.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-}
-
-// ClearNominatedNodeName internally submit a patch request to API server
-// to set each pods[*].Status.NominatedNodeName> to "".
-func ClearNominatedNodeName(ctx context.Context, cs kubernetes.Interface, pods ...*v1.Pod) utilerrors.Aggregate {
-	var errs []error
-	for _, p := range pods {
-		if len(p.Status.NominatedNodeName) == 0 {
-			continue
-		}
-		podStatusCopy := p.Status.DeepCopy()
-		podStatusCopy.NominatedNodeName = ""
-		if err := PatchPodStatus(ctx, cs, p, podStatusCopy); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return utilerrors.NewAggregate(errs)
 }
 
 // IsScalarResourceName validates the resource for Extended, Hugepages, Native and AttachableVolume resources

@@ -52,9 +52,12 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
+	"k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
@@ -281,94 +284,114 @@ func TestFailureHandler(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, asyncAPICallsEnabled := range []bool{true, false} {
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s (Async API calls enabled: %v)", tt.name, asyncAPICallsEnabled), func(t *testing.T) {
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+
+				client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+				informerFactory := informers.NewSharedInformerFactory(client, 0)
+				podInformer := informerFactory.Core().V1().Pods()
+				// Need to add/update/delete testPod to the store.
+				podInformer.Informer().GetStore().Add(testPod)
+
+				var apiDispatcher *apidispatcher.APIDispatcher
+				if asyncAPICallsEnabled {
+					apiDispatcher = apidispatcher.New(client, 16, apicalls.APICallRelevances)
+					apiDispatcher.Run(logger)
+					defer apiDispatcher.Close()
+				}
+
+				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+				queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(*recorder), internalqueue.WithAPIDispatcher(apiDispatcher))
+				schedulerCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
+
+				queue.Add(logger, testPod)
+
+				if _, err := queue.Pop(logger); err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+
+				if tt.podUpdatedDuringScheduling {
+					podInformer.Informer().GetStore().Update(testPodUpdated)
+					queue.Update(logger, testPod, testPodUpdated)
+				}
+				if tt.podDeletedDuringScheduling {
+					podInformer.Informer().GetStore().Delete(testPod)
+					queue.Delete(testPod)
+				}
+
+				s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
+				s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable), nil, time.Now())
+
+				var got *v1.Pod
+				if tt.podUpdatedDuringScheduling {
+					pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace)
+					if !ok {
+						t.Fatalf("Failed to get pod %s/%s from queue", testPod.Namespace, testPod.Name)
+					}
+					got = pInfo.Pod
+				} else {
+					got = getPodFromPriorityQueue(queue, testPod)
+				}
+
+				if diff := cmp.Diff(tt.expect, got); diff != "" {
+					t.Errorf("Unexpected pod (-want, +got): %s", diff)
+				}
+			})
+		}
+	}
+}
+
+func TestFailureHandler_PodAlreadyBound(t *testing.T) {
+	for _, asyncAPICallsEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("Async API calls enabled: %v", asyncAPICallsEnabled), func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+			nodeFoo := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+			testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Node("foo").Obj()
+
+			client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{nodeFoo}})
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods()
-			// Need to add/update/delete testPod to the store.
+			// Need to add testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(*recorder))
-			schedulerCache := internalcache.New(ctx, 30*time.Second)
-
-			queue.Add(logger, testPod)
-
-			if _, err := queue.Pop(logger); err != nil {
-				t.Fatalf("Pop failed: %v", err)
+			var apiDispatcher *apidispatcher.APIDispatcher
+			if asyncAPICallsEnabled {
+				apiDispatcher = apidispatcher.New(client, 16, apicalls.APICallRelevances)
+				apiDispatcher.Run(logger)
+				defer apiDispatcher.Close()
 			}
 
-			if tt.podUpdatedDuringScheduling {
-				podInformer.Informer().GetStore().Update(testPodUpdated)
-				queue.Update(logger, testPod, testPodUpdated)
-			}
-			if tt.podDeletedDuringScheduling {
-				podInformer.Informer().GetStore().Delete(testPod)
-				queue.Delete(testPod)
-			}
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithAPIDispatcher(apiDispatcher))
+			schedulerCache := internalcache.New(ctx, 30*time.Second, apiDispatcher)
 
-			s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
+			// Add node to schedulerCache no matter it's deleted in API server or not.
+			schedulerCache.AddNode(logger, &nodeFoo)
+
+			s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-			s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable), nil, time.Now())
+			s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
 
-			var got *v1.Pod
-			if tt.podUpdatedDuringScheduling {
-				pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace)
-				if !ok {
-					t.Fatalf("Failed to get pod %s/%s from queue", testPod.Namespace, testPod.Name)
-				}
-				got = pInfo.Pod
-			} else {
-				got = getPodFromPriorityQueue(queue, testPod)
-			}
-
-			if diff := cmp.Diff(tt.expect, got); diff != "" {
-				t.Errorf("Unexpected pod (-want, +got): %s", diff)
+			pod := getPodFromPriorityQueue(queue, testPod)
+			if pod != nil {
+				t.Fatalf("Unexpected pod: %v should not be in PriorityQueue when the NodeName of pod is not empty", pod.Name)
 			}
 		})
-	}
-}
-
-func TestFailureHandler_PodAlreadyBound(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	nodeFoo := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Node("foo").Obj()
-
-	client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{nodeFoo}})
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	podInformer := informerFactory.Core().V1().Pods()
-	// Need to add testPod to the store.
-	podInformer.Informer().GetStore().Add(testPod)
-
-	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-	schedulerCache := internalcache.New(ctx, 30*time.Second)
-
-	// Add node to schedulerCache no matter it's deleted in API server or not.
-	schedulerCache.AddNode(logger, &nodeFoo)
-
-	s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-	s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
-
-	pod := getPodFromPriorityQueue(queue, testPod)
-	if pod != nil {
-		t.Fatalf("Unexpected pod: %v should not be in PriorityQueue when the NodeName of pod is not empty", pod.Name)
 	}
 }
 
@@ -444,7 +467,7 @@ func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v
 	return nil
 }
 
-func initScheduler(ctx context.Context, cache internalcache.Cache, queue internalqueue.SchedulingQueue,
+func initScheduler(ctx context.Context, cache internalcache.Cache, queue internalqueue.SchedulingQueue, apiDispatcher *apidispatcher.APIDispatcher,
 	client kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Scheduler, framework.Framework, error) {
 	logger := klog.FromContext(ctx)
 	registerPluginFuncs := []tf.RegisterPluginFunc{
@@ -457,6 +480,7 @@ func initScheduler(ctx context.Context, cache internalcache.Cache, queue interna
 		registerPluginFuncs,
 		testSchedulerName,
 		frameworkruntime.WithClientSet(client),
+		frameworkruntime.WithAPIDispatcher(apiDispatcher),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
 		frameworkruntime.WithWaitingPods(waitingPods),
@@ -464,12 +488,16 @@ func initScheduler(ctx context.Context, cache internalcache.Cache, queue interna
 	if err != nil {
 		return nil, nil, err
 	}
+	if apiDispatcher != nil {
+		fwk.SetAPICacher(apicache.New(queue, cache))
+	}
 
 	s := &Scheduler{
 		Cache:           cache,
 		client:          client,
 		StopEverything:  ctx.Done(),
 		SchedulingQueue: queue,
+		APIDispatcher:   apiDispatcher,
 		Profiles:        profile.Map{testSchedulerName: fwk},
 		logger:          logger,
 	}
