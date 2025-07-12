@@ -17,9 +17,10 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -41,14 +42,14 @@ type podTopologyHints map[string]map[string]TopologyHint
 type Scope interface {
 	Name() string
 	GetPolicy() Policy
-	Admit(pod *v1.Pod) lifecycle.PodAdmitResult
+	Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consoluted with when making topology hints
 	AddHintProvider(h HintProvider)
 	// AddContainer adds pod to Manager for tracking
 	AddContainer(pod *v1.Pod, container *v1.Container, containerID string)
 	// RemoveContainer removes pod from Manager tracking
-	RemoveContainer(containerID string) error
+	RemoveContainer(ctx context.Context, containerID string) error
 	// Store is the interface for storing pod topology hints
 	Store
 }
@@ -110,11 +111,13 @@ func (s *scope) AddContainer(pod *v1.Pod, container *v1.Container, containerID s
 
 // It would be better to implement this function in topologymanager instead of scope
 // but topologymanager do not track mapping anymore
-func (s *scope) RemoveContainer(containerID string) error {
+func (s *scope) RemoveContainer(ctx context.Context, containerID string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	klog.InfoS("RemoveContainer", "containerID", containerID)
+	logger := klog.FromContext(ctx)
+	logger.Info("RemoveContainer", "containerID", containerID)
+
 	// Get the podUID and containerName associated with the containerID to be removed and remove it
 	podUIDString, containerName, err := s.podMap.GetContainerRef(containerID)
 	if err != nil {
