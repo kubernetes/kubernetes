@@ -43,6 +43,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 		"container_cpu_usage_seconds_total",
 		"container_memory_working_set_bytes",
 		"container_swap_usage_bytes",
+		"container_swap_limit_bytes",
 		"container_start_time_seconds",
 		"pod_cpu_usage_seconds_total",
 		"pod_memory_working_set_bytes",
@@ -151,8 +152,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 								Swap: &statsapi.SwapStats{
-									Time:           testTime,
-									SwapUsageBytes: ptr.To[uint64](1000),
+									Time:               testTime,
+									SwapUsageBytes:     ptr.To[uint64](1000),
+									SwapAvailableBytes: ptr.To[uint64](9000),
 								},
 							},
 							{
@@ -214,6 +216,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 				container_start_time_seconds{container="container_a",namespace="namespace_a",pod="pod_a"} 1.6243962483020916e+09
 				container_start_time_seconds{container="container_a",namespace="namespace_b",pod="pod_b"} 1.6243956783020916e+09
 				container_start_time_seconds{container="container_b",namespace="namespace_a",pod="pod_a"} 1.6243961583020916e+09
+				# HELP container_swap_limit_bytes [ALPHA] Current amount of the container swap limit in bytes. Reported only on non-windows systems
+				# TYPE container_swap_limit_bytes gauge
+				container_swap_limit_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 10000 1624396278302
         		# HELP container_swap_usage_bytes [ALPHA] Current amount of the container swap usage in bytes. Reported only on non-windows systems
         		# TYPE container_swap_usage_bytes gauge
         		container_swap_usage_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 1624396278302
