@@ -1938,6 +1938,7 @@ func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, n
 	return []testDataCollector{
 		newThroughputCollector(podInformer, map[string]string{"Name": name}, labelSelector, namespaces, throughputErrorMargin),
 		newMetricsCollector(mcc, map[string]string{"Name": name}),
+		newMemoryCollector(map[string]string{"Name": name}, 500*time.Millisecond),
 	}
 }
 
