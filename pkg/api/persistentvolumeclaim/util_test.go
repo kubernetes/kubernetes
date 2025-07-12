@@ -449,6 +449,7 @@ func TestDropDisabledVolumeAttributesClass(t *testing.T) {
 }
 
 func TestDropDisabledFieldsFromStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	tests := []struct {
 		name                                string
 		enableRecoverVolumeExpansionFailure bool
