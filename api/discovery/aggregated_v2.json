@@ -1411,29 +1411,14 @@
               "categories": [
                 "api-extensions"
               ],
-              "resource": "validatingadmissionpolicies",
+              "resource": "mutatingadmissionpolicies",
               "responseKind": {
                 "group": "",
-                "kind": "ValidatingAdmissionPolicy",
+                "kind": "MutatingAdmissionPolicy",
                 "version": ""
               },
               "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicy",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "ValidatingAdmissionPolicy",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
+              "singularResource": "mutatingadmissionpolicy",
               "verbs": [
                 "create",
                 "delete",
@@ -1449,14 +1434,14 @@
               "categories": [
                 "api-extensions"
               ],
-              "resource": "validatingadmissionpolicybindings",
+              "resource": "mutatingadmissionpolicybindings",
               "responseKind": {
                 "group": "",
-                "kind": "ValidatingAdmissionPolicyBinding",
+                "kind": "MutatingAdmissionPolicyBinding",
                 "version": ""
               },
               "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicybinding",
+              "singularResource": "mutatingadmissionpolicybinding",
               "verbs": [
                 "create",
                 "delete",
