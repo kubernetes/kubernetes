@@ -183,6 +183,40 @@ var _ = SIGDescribe("MemoryAllocatableEviction", framework.WithSlow(), framework
 	})
 })
 
+// MemoryAllocatableEviction tests that the node responds to node memory pressure by evicting only responsible pods when using pod level resources.
+// Node memory pressure is only encountered because we reserve the majority of the node's capacity via kube-reserved.
+var _ = SIGDescribe("MemoryAllocatableEvictionPodLevelResources", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.PodLevelResources, func() {
+	f := framework.NewDefaultFramework("memory-allocatable-eviction-test-pod-level-resources")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	expectedNodeCondition := v1.NodeMemoryPressure
+	expectedStarvedResource := v1.ResourceMemory
+	pressureTimeout := 10 * time.Minute
+	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			// Set large system and kube reserved values to trigger allocatable thresholds far before hard eviction thresholds.
+			kubeReserved := getNodeCPUAndMemoryCapacity(ctx, f)[v1.ResourceMemory]
+			// The default hard eviction threshold is 250Mb, so Allocatable = Capacity - Reserved - 250Mb
+			// We want Allocatable = 50Mb, so set Reserved = Capacity - Allocatable - 250Mb = Capacity - 300Mb
+			kubeReserved.Sub(resource.MustParse("300Mi"))
+			initialConfig.KubeReserved = map[string]string{
+				string(v1.ResourceMemory): kubeReserved.String(),
+			}
+			initialConfig.EnforceNodeAllocatable = []string{kubetypes.NodeAllocatableEnforcementKey}
+			initialConfig.CgroupsPerQOS = true
+		})
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logMemoryMetrics, []podEvictSpec{
+			{
+				evictionPriority: 1,
+				pod:              getMemhogPodWithPodLevelResources("memory-hog-pod", v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")}}, "memory-hog", v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 0,
+				pod:              innocentPod(),
+			},
+		})
+	})
+})
+
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space.
 var _ = SIGDescribe("LocalStorageEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
@@ -422,6 +456,73 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering", framework.WithSlow(), fram
 					},
 					Limits: v1.ResourceList{
 						v1.ResourceMemory: resource.MustParse("300Mi"),
+					},
+				}),
+			},
+		}
+		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logMemoryMetrics, specs)
+	})
+})
+
+// PriorityMemoryEvictionOrdering tests that the node responds to node memory pressure by evicting pods when using pod level resources.
+// This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
+// the higher priority pod.
+var _ = SIGDescribe("PriorityMemoryEvictionOrderingPodLevelResources", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.PodLevelResources, func() {
+	f := framework.NewDefaultFramework("priority-memory-eviction-ordering-test-pod-level-resources")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	expectedNodeCondition := v1.NodeMemoryPressure
+	expectedStarvedResource := v1.ResourceMemory
+	pressureTimeout := 10 * time.Minute
+
+	highPriorityClassName := f.BaseName + "-high-priority"
+	highPriority := int32(999999999)
+
+	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			memoryConsumed := resource.MustParse("600Mi")
+			summary := eventuallyGetSummary(ctx)
+			availableBytes := *(summary.Node.Memory.AvailableBytes)
+			if availableBytes <= uint64(memoryConsumed.Value()) {
+				e2eskipper.Skipf("Too little memory free on the host for the PriorityMemoryEvictionOrdering test to run")
+			}
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): fmt.Sprintf("%d", availableBytes-uint64(memoryConsumed.Value()))}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
+		})
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				framework.ExpectNoError(err, "failed to create priority class")
+			}
+		})
+		ginkgo.AfterEach(func(ctx context.Context) {
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		})
+		specs := []podEvictSpec{
+			{
+				evictionPriority: 2,
+				pod:              getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 1,
+				pod:              getMemhogPod("high-priority-memory-hog-pod", "high-priority-memory-hog", v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 0,
+				pod: getMemhogPodWithPodLevelResources("guaranteed-pod", v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("300Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("300Mi"),
+					},
+				}, "guaranteed-container", v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("250Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("250Mi"),
 					},
 				}),
 			},
@@ -1192,4 +1293,11 @@ func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *
 			},
 		},
 	}
+}
+
+func getMemhogPodWithPodLevelResources(podName string, podLevelRes v1.ResourceRequirements, ctnName string, res v1.ResourceRequirements) *v1.Pod {
+	pod := getMemhogPod(podName, ctnName, res)
+	pod.Spec.Resources = &podLevelRes
+
+	return pod
 }
