@@ -1644,6 +1644,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 	pendingRestartableInitContainers := 0
 	pendingRegularInitContainers := 0
 	failedInitialization := 0
+	failedInitializationNotRestartable := 0
 
 	// regular init containers
 	for _, container := range spec.InitContainers {
@@ -1664,13 +1665,25 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 		case containerStatus.State.Running != nil:
 			pendingRegularInitContainers++
 		case containerStatus.State.Terminated != nil:
-			if containerStatus.State.Terminated.ExitCode != 0 {
+			exitCode := containerStatus.State.Terminated.ExitCode
+			if exitCode != 0 {
 				failedInitialization++
+				if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+					if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+						failedInitializationNotRestartable++
+					}
+				}
 			}
 		case containerStatus.State.Waiting != nil:
 			if containerStatus.LastTerminationState.Terminated != nil {
-				if containerStatus.LastTerminationState.Terminated.ExitCode != 0 {
+				exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
+				if exitCode != 0 {
 					failedInitialization++
+					if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+						if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+							failedInitializationNotRestartable++
+						}
+					}
 				}
 			} else {
 				pendingRegularInitContainers++
@@ -1685,9 +1698,10 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 	running := 0
 	waiting := 0
 	stopped := 0
+	stoppedNotRestartable := 0
 	succeeded := 0
 
-	// restartable init containers
+	// sidecar init containers
 	for _, container := range spec.InitContainers {
 		if !podutil.IsRestartableInitContainer(&container) {
 			// Skip the regular init containers, as they have been handled above.
@@ -1734,12 +1748,24 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 			running++
 		case containerStatus.State.Terminated != nil:
 			stopped++
-			if containerStatus.State.Terminated.ExitCode == 0 {
+			exitCode := containerStatus.State.Terminated.ExitCode
+			if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+				if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+					stoppedNotRestartable++
+				}
+			}
+			if exitCode == 0 {
 				succeeded++
 			}
 		case containerStatus.State.Waiting != nil:
 			if containerStatus.LastTerminationState.Terminated != nil {
 				stopped++
+				if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+					exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
+					if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+						stoppedNotRestartable++
+					}
+				}
 			} else {
 				waiting++
 			}
@@ -1748,8 +1774,14 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 		}
 	}
 
-	if failedInitialization > 0 && spec.RestartPolicy == v1.RestartPolicyNever {
-		return v1.PodFailed
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+		if failedInitializationNotRestartable > 0 {
+			return v1.PodFailed
+		}
+	} else {
+		if failedInitialization > 0 && spec.RestartPolicy == v1.RestartPolicyNever {
+			return v1.PodFailed
+		}
 	}
 
 	switch {
@@ -1784,6 +1816,16 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 			}
 		}
 		// All containers are terminated
+		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+			if stopped != stoppedNotRestartable {
+				// At least one containers are in the process of restarting
+				return v1.PodRunning
+			}
+			if stopped == succeeded {
+				return v1.PodSucceeded
+			}
+			return v1.PodFailed
+		}
 		if spec.RestartPolicy == v1.RestartPolicyAlways {
 			// All containers are in the process of restarting
 			return v1.PodRunning
