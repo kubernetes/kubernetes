@@ -373,6 +373,40 @@ func TestRepairServiceIP(t *testing.T) {
 			events:   []string{"Warning IPAddressWrongReference IPAddress: 10.0.1.2 for Service bar/test-svc has a wrong reference; cleaning up"},
 		},
 		{
+			name: "Two IPAddresses referencing the same service when service create is called again and ip address is in grace period",
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testTimeNow.Add(1*time.Second)),
+			},
+			ipAddresses: []*networkingv1.IPAddress{
+				newIPAddressWithCreationTimestamp("10.0.1.1", newService("test-svc", []string{"10.0.1.1"}), testTimeNow),
+				// ensure the second IPAddress object has a creation timestamp greater than service creation timestamp
+				newIPAddressWithCreationTimestamp("10.0.1.2", newService("test-svc", []string{"10.0.1.1"}), testTimeNow.Add(2*time.Second)),
+			},
+			cidrs: []*networkingv1.ServiceCIDR{
+				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
+			},
+			// update the test time, ensuring 5 seconds have not passed after creation of the second IPAddress Object
+			testTime: testTimeNow.Add(3 * time.Second),
+		},
+		{
+			name: "Two IPAddresses referencing the same service when service create is called again and ip address is not in grace period",
+			svcs: []*v1.Service{
+				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testTimeNow.Add(1*time.Second)),
+			},
+			ipAddresses: []*networkingv1.IPAddress{
+				newIPAddressWithCreationTimestamp("10.0.1.1", newService("test-svc", []string{"10.0.1.1"}), testTimeNow),
+				// ensure the second IPAddress object has a creation timestamp greater than service creation timestamp
+				newIPAddressWithCreationTimestamp("10.0.1.2", newService("test-svc", []string{"10.0.1.1"}), testTimeNow.Add(2*time.Second)),
+			},
+			cidrs: []*networkingv1.ServiceCIDR{
+				newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6),
+			},
+			// update the test time, ensuring 5 seconds have passed after creation of the second IPAddress Object
+			testTime: testTimeNow.Add(10 * time.Second),
+			actions:  [][]string{{"delete", "ipaddresses"}},
+			events:   []string{"Warning IPAddressWrongReference IPAddress: 10.0.1.2 for Service bar/test-svc has a wrong reference; cleaning up"},
+		},
+		{
 			name: "Two Services with same ClusterIP",
 			svcs: []*v1.Service{
 				newServiceWithCreationTimestamp("test-svc", []string{"10.0.1.1"}, testTimeNow.Add(1*time.Second)),
