@@ -22,59 +22,53 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
-func TestGetLeafTypeAndPrefixes(t *testing.T) {
-	stringType := &types.Type{
+// gengo has `PointerTo()` but not the rest, so keep this here for consistency.
+func ptrTo(t *types.Type) *types.Type {
+	return &types.Type{
 		Name: types.Name{
 			Package: "",
-			Name:    "string",
+			Name:    "*" + t.Name.String(),
 		},
-		Kind: types.Builtin,
+		Kind: types.Pointer,
+		Elem: t,
 	}
+}
 
-	ptrTo := func(t *types.Type) *types.Type {
-		return &types.Type{
-			Name: types.Name{
-				Package: "",
-				Name:    "*" + t.Name.String(),
-			},
-			Kind: types.Pointer,
-			Elem: t,
-		}
+func sliceOf(t *types.Type) *types.Type {
+	return &types.Type{
+		Name: types.Name{
+			Package: "",
+			Name:    "[]" + t.Name.String(),
+		},
+		Kind: types.Slice,
+		Elem: t,
 	}
+}
 
-	sliceOf := func(t *types.Type) *types.Type {
-		return &types.Type{
-			Name: types.Name{
-				Package: "",
-				Name:    "[]" + t.Name.String(),
-			},
-			Kind: types.Slice,
-			Elem: t,
-		}
+func mapOf(t *types.Type) *types.Type {
+	return &types.Type{
+		Name: types.Name{
+			Package: "",
+			Name:    "map[string]" + t.Name.String(),
+		},
+		Kind: types.Map,
+		Key:  types.String,
+		Elem: t,
 	}
+}
 
-	mapOf := func(t *types.Type) *types.Type {
-		return &types.Type{
-			Name: types.Name{
-				Package: "",
-				Name:    "map[string]" + t.Name.String(),
-			},
-			Kind: types.Map,
-			Key:  stringType,
-			Elem: t,
-		}
+func aliasOf(name string, t *types.Type) *types.Type {
+	return &types.Type{
+		Name: types.Name{
+			Package: "",
+			Name:    "Alias_" + name,
+		},
+		Kind:       types.Alias,
+		Underlying: t,
 	}
+}
 
-	aliasOf := func(name string, t *types.Type) *types.Type {
-		return &types.Type{
-			Name: types.Name{
-				Package: "",
-				Name:    "Alias_" + name,
-			},
-			Kind:       types.Alias,
-			Underlying: t,
-		}
-	}
+func TestGetLeafTypeAndPrefixes(t *testing.T) {
 
 	cases := []struct {
 		in              *types.Type
@@ -83,278 +77,278 @@ func TestGetLeafTypeAndPrefixes(t *testing.T) {
 		expectedExprPfx string
 	}{{
 		// string
-		in:              stringType,
-		expectedType:    stringType,
+		in:              types.String,
+		expectedType:    types.String,
 		expectedTypePfx: "*",
 		expectedExprPfx: "&",
 	}, {
 		// *string
-		in:              ptrTo(stringType),
-		expectedType:    stringType,
+		in:              ptrTo(types.String),
+		expectedType:    types.String,
 		expectedTypePfx: "*",
 		expectedExprPfx: "",
 	}, {
 		// **string
-		in:              ptrTo(ptrTo(stringType)),
-		expectedType:    stringType,
+		in:              ptrTo(ptrTo(types.String)),
+		expectedType:    types.String,
 		expectedTypePfx: "*",
 		expectedExprPfx: "*",
 	}, {
 		// ***string
-		in:              ptrTo(ptrTo(ptrTo(stringType))),
-		expectedType:    stringType,
+		in:              ptrTo(ptrTo(ptrTo(types.String))),
+		expectedType:    types.String,
 		expectedTypePfx: "*",
 		expectedExprPfx: "**",
 	}, {
 		// []string
-		in:              sliceOf(stringType),
-		expectedType:    sliceOf(stringType),
+		in:              sliceOf(types.String),
+		expectedType:    sliceOf(types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// *[]string
-		in:              ptrTo(sliceOf(stringType)),
-		expectedType:    sliceOf(stringType),
+		in:              ptrTo(sliceOf(types.String)),
+		expectedType:    sliceOf(types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "*",
 	}, {
 		// **[]string
-		in:              ptrTo(ptrTo(sliceOf(stringType))),
-		expectedType:    sliceOf(stringType),
+		in:              ptrTo(ptrTo(sliceOf(types.String))),
+		expectedType:    sliceOf(types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "**",
 	}, {
 		// ***[]string
-		in:              ptrTo(ptrTo(ptrTo(sliceOf(stringType)))),
-		expectedType:    sliceOf(stringType),
+		in:              ptrTo(ptrTo(ptrTo(sliceOf(types.String)))),
+		expectedType:    sliceOf(types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "***",
 	}, {
 		// map[string]string
-		in:              mapOf(stringType),
-		expectedType:    mapOf(stringType),
+		in:              mapOf(types.String),
+		expectedType:    mapOf(types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// *map[string]string
-		in:              ptrTo(mapOf(stringType)),
-		expectedType:    mapOf(stringType),
+		in:              ptrTo(mapOf(types.String)),
+		expectedType:    mapOf(types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "*",
 	}, {
 		// **map[string]string
-		in:              ptrTo(ptrTo(mapOf(stringType))),
-		expectedType:    mapOf(stringType),
+		in:              ptrTo(ptrTo(mapOf(types.String))),
+		expectedType:    mapOf(types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "**",
 	}, {
 		// ***map[string]string
-		in:              ptrTo(ptrTo(ptrTo(mapOf(stringType)))),
-		expectedType:    mapOf(stringType),
+		in:              ptrTo(ptrTo(ptrTo(mapOf(types.String)))),
+		expectedType:    mapOf(types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "***",
 	}, {
 		// alias of string
-		in:              aliasOf("s", stringType),
-		expectedType:    aliasOf("s", stringType),
+		in:              aliasOf("s", types.String),
+		expectedType:    aliasOf("s", types.String),
 		expectedTypePfx: "*",
 		expectedExprPfx: "&",
 	}, {
 		// alias of *string
-		in:              aliasOf("ps", ptrTo(stringType)),
-		expectedType:    aliasOf("ps", stringType),
+		in:              aliasOf("ps", ptrTo(types.String)),
+		expectedType:    aliasOf("ps", types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// alias of **string
-		in:              aliasOf("pps", ptrTo(ptrTo(stringType))),
-		expectedType:    aliasOf("pps", stringType),
+		in:              aliasOf("pps", ptrTo(ptrTo(types.String))),
+		expectedType:    aliasOf("pps", types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// alias of ***string
-		in:              aliasOf("ppps", ptrTo(ptrTo(ptrTo(stringType)))),
-		expectedType:    aliasOf("ppps", stringType),
+		in:              aliasOf("ppps", ptrTo(ptrTo(ptrTo(types.String)))),
+		expectedType:    aliasOf("ppps", types.String),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// alias of []string
-		in:              aliasOf("ls", sliceOf(stringType)),
-		expectedType:    aliasOf("ls", sliceOf(stringType)),
+		in:              aliasOf("ls", sliceOf(types.String)),
+		expectedType:    aliasOf("ls", sliceOf(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// alias of *[]string
-		in:              aliasOf("pls", ptrTo(sliceOf(stringType))),
-		expectedType:    aliasOf("pls", sliceOf(stringType)),
+		in:              aliasOf("pls", ptrTo(sliceOf(types.String))),
+		expectedType:    aliasOf("pls", sliceOf(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// alias of **[]string
-		in:              aliasOf("ppls", ptrTo(ptrTo(sliceOf(stringType)))),
-		expectedType:    aliasOf("ppls", sliceOf(stringType)),
+		in:              aliasOf("ppls", ptrTo(ptrTo(sliceOf(types.String)))),
+		expectedType:    aliasOf("ppls", sliceOf(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// alias of ***[]string
-		in:              aliasOf("pppls", ptrTo(ptrTo(ptrTo(sliceOf(stringType))))),
-		expectedType:    aliasOf("pppls", sliceOf(stringType)),
+		in:              aliasOf("pppls", ptrTo(ptrTo(ptrTo(sliceOf(types.String))))),
+		expectedType:    aliasOf("pppls", sliceOf(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// alias of map[string]string
-		in:              aliasOf("ms", mapOf(stringType)),
-		expectedType:    aliasOf("ms", mapOf(stringType)),
+		in:              aliasOf("ms", mapOf(types.String)),
+		expectedType:    aliasOf("ms", mapOf(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// alias of *map[string]string
-		in:              aliasOf("pms", ptrTo(mapOf(stringType))),
-		expectedType:    aliasOf("pms", mapOf(stringType)),
+		in:              aliasOf("pms", ptrTo(mapOf(types.String))),
+		expectedType:    aliasOf("pms", mapOf(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// alias of **map[string]string
-		in:              aliasOf("ppms", ptrTo(ptrTo(mapOf(stringType)))),
-		expectedType:    aliasOf("ppms", mapOf(stringType)),
+		in:              aliasOf("ppms", ptrTo(ptrTo(mapOf(types.String)))),
+		expectedType:    aliasOf("ppms", mapOf(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// alias of ***map[string]string
-		in:              aliasOf("pppms", ptrTo(ptrTo(ptrTo(mapOf(stringType))))),
-		expectedType:    aliasOf("pppms", mapOf(stringType)),
+		in:              aliasOf("pppms", ptrTo(ptrTo(ptrTo(mapOf(types.String))))),
+		expectedType:    aliasOf("pppms", mapOf(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// *alias-of-string
-		in:              ptrTo(aliasOf("s", stringType)),
-		expectedType:    aliasOf("s", stringType),
+		in:              ptrTo(aliasOf("s", types.String)),
+		expectedType:    aliasOf("s", types.String),
 		expectedTypePfx: "*",
 		expectedExprPfx: "",
 	}, {
 		// **alias-of-string
-		in:              ptrTo(ptrTo(aliasOf("s", stringType))),
-		expectedType:    aliasOf("s", stringType),
+		in:              ptrTo(ptrTo(aliasOf("s", types.String))),
+		expectedType:    aliasOf("s", types.String),
 		expectedTypePfx: "*",
 		expectedExprPfx: "*",
 	}, {
 		// ***alias-of-string
-		in:              ptrTo(ptrTo(ptrTo(aliasOf("s", stringType)))),
-		expectedType:    aliasOf("s", stringType),
+		in:              ptrTo(ptrTo(ptrTo(aliasOf("s", types.String)))),
+		expectedType:    aliasOf("s", types.String),
 		expectedTypePfx: "*",
 		expectedExprPfx: "**",
 	}, {
 		// []alias-of-string
-		in:              sliceOf(aliasOf("s", stringType)),
-		expectedType:    sliceOf(aliasOf("s", stringType)),
+		in:              sliceOf(aliasOf("s", types.String)),
+		expectedType:    sliceOf(aliasOf("s", types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// *[]alias-of-string
-		in:              ptrTo(sliceOf(aliasOf("s", stringType))),
-		expectedType:    sliceOf(aliasOf("s", stringType)),
+		in:              ptrTo(sliceOf(aliasOf("s", types.String))),
+		expectedType:    sliceOf(aliasOf("s", types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "*",
 	}, {
 		// **[]alias-of-string
-		in:              ptrTo(ptrTo(sliceOf(aliasOf("s", stringType)))),
-		expectedType:    sliceOf(aliasOf("s", stringType)),
+		in:              ptrTo(ptrTo(sliceOf(aliasOf("s", types.String)))),
+		expectedType:    sliceOf(aliasOf("s", types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "**",
 	}, {
 		// ***[]alias-of-string
-		in:              ptrTo(ptrTo(ptrTo(sliceOf(aliasOf("s", stringType))))),
-		expectedType:    sliceOf(aliasOf("s", stringType)),
+		in:              ptrTo(ptrTo(ptrTo(sliceOf(aliasOf("s", types.String))))),
+		expectedType:    sliceOf(aliasOf("s", types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "***",
 	}, {
 		// map[string]alias-of-string
-		in:              mapOf(aliasOf("s", stringType)),
-		expectedType:    mapOf(aliasOf("s", stringType)),
+		in:              mapOf(aliasOf("s", types.String)),
+		expectedType:    mapOf(aliasOf("s", types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// *map[string]alias-of-string
-		in:              ptrTo(mapOf(aliasOf("s", stringType))),
-		expectedType:    mapOf(aliasOf("s", stringType)),
+		in:              ptrTo(mapOf(aliasOf("s", types.String))),
+		expectedType:    mapOf(aliasOf("s", types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "*",
 	}, {
 		// **map[string]alias-of-string
-		in:              ptrTo(ptrTo(mapOf(aliasOf("s", stringType)))),
-		expectedType:    mapOf(aliasOf("s", stringType)),
+		in:              ptrTo(ptrTo(mapOf(aliasOf("s", types.String)))),
+		expectedType:    mapOf(aliasOf("s", types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "**",
 	}, {
 		// ***map[string]alias-of-string
-		in:              ptrTo(ptrTo(ptrTo(mapOf(aliasOf("s", stringType))))),
-		expectedType:    mapOf(aliasOf("s", stringType)),
+		in:              ptrTo(ptrTo(ptrTo(mapOf(aliasOf("s", types.String))))),
+		expectedType:    mapOf(aliasOf("s", types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "***",
 	}, {
 		// *alias-of-*string
-		in:              ptrTo(aliasOf("ps", ptrTo(stringType))),
-		expectedType:    aliasOf("ps", ptrTo(stringType)),
+		in:              ptrTo(aliasOf("ps", ptrTo(types.String))),
+		expectedType:    aliasOf("ps", ptrTo(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "*",
 	}, {
 		// **alias-of-*string
-		in:              ptrTo(ptrTo(aliasOf("ps", ptrTo(stringType)))),
-		expectedType:    aliasOf("ps", ptrTo(stringType)),
+		in:              ptrTo(ptrTo(aliasOf("ps", ptrTo(types.String)))),
+		expectedType:    aliasOf("ps", ptrTo(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "**",
 	}, {
 		// ***alias-of-*string
-		in:              ptrTo(ptrTo(ptrTo(aliasOf("ps", ptrTo(stringType))))),
-		expectedType:    aliasOf("ps", ptrTo(stringType)),
+		in:              ptrTo(ptrTo(ptrTo(aliasOf("ps", ptrTo(types.String))))),
+		expectedType:    aliasOf("ps", ptrTo(types.String)),
 		expectedTypePfx: "",
 		expectedExprPfx: "***",
 	}, {
 		// []alias-of-*string
-		in:              sliceOf(aliasOf("ps", ptrTo(stringType))),
-		expectedType:    sliceOf(aliasOf("ps", ptrTo(stringType))),
+		in:              sliceOf(aliasOf("ps", ptrTo(types.String))),
+		expectedType:    sliceOf(aliasOf("ps", ptrTo(types.String))),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// *[]alias-of-*string
-		in:              ptrTo(sliceOf(aliasOf("ps", ptrTo(stringType)))),
-		expectedType:    sliceOf(aliasOf("ps", ptrTo(stringType))),
+		in:              ptrTo(sliceOf(aliasOf("ps", ptrTo(types.String)))),
+		expectedType:    sliceOf(aliasOf("ps", ptrTo(types.String))),
 		expectedTypePfx: "",
 		expectedExprPfx: "*",
 	}, {
 		// **[]alias-of-*string
-		in:              ptrTo(ptrTo(sliceOf(aliasOf("ps", ptrTo(stringType))))),
-		expectedType:    sliceOf(aliasOf("ps", ptrTo(stringType))),
+		in:              ptrTo(ptrTo(sliceOf(aliasOf("ps", ptrTo(types.String))))),
+		expectedType:    sliceOf(aliasOf("ps", ptrTo(types.String))),
 		expectedTypePfx: "",
 		expectedExprPfx: "**",
 	}, {
 		// ***[]alias-of-*string
-		in:              ptrTo(ptrTo(ptrTo(sliceOf(aliasOf("ps", ptrTo(stringType)))))),
-		expectedType:    sliceOf(aliasOf("ps", ptrTo(stringType))),
+		in:              ptrTo(ptrTo(ptrTo(sliceOf(aliasOf("ps", ptrTo(types.String)))))),
+		expectedType:    sliceOf(aliasOf("ps", ptrTo(types.String))),
 		expectedTypePfx: "",
 		expectedExprPfx: "***",
 	}, {
 		// map[string]alias-of-*string
-		in:              mapOf(aliasOf("ps", ptrTo(stringType))),
-		expectedType:    mapOf(aliasOf("ps", ptrTo(stringType))),
+		in:              mapOf(aliasOf("ps", ptrTo(types.String))),
+		expectedType:    mapOf(aliasOf("ps", ptrTo(types.String))),
 		expectedTypePfx: "",
 		expectedExprPfx: "",
 	}, {
 		// *map[string]alias-of-*string
-		in:              ptrTo(mapOf(aliasOf("ps", ptrTo(stringType)))),
-		expectedType:    mapOf(aliasOf("ps", ptrTo(stringType))),
+		in:              ptrTo(mapOf(aliasOf("ps", ptrTo(types.String)))),
+		expectedType:    mapOf(aliasOf("ps", ptrTo(types.String))),
 		expectedTypePfx: "",
 		expectedExprPfx: "*",
 	}, {
 		// **map[string]alias-of-*string
-		in:              ptrTo(ptrTo(mapOf(aliasOf("ps", ptrTo(stringType))))),
-		expectedType:    mapOf(aliasOf("ps", ptrTo(stringType))),
+		in:              ptrTo(ptrTo(mapOf(aliasOf("ps", ptrTo(types.String))))),
+		expectedType:    mapOf(aliasOf("ps", ptrTo(types.String))),
 		expectedTypePfx: "",
 		expectedExprPfx: "**",
 	}, {
 		// ***map[string]alias-of-*string
-		in:              ptrTo(ptrTo(ptrTo(mapOf(aliasOf("ps", ptrTo(stringType)))))),
-		expectedType:    mapOf(aliasOf("ps", ptrTo(stringType))),
+		in:              ptrTo(ptrTo(ptrTo(mapOf(aliasOf("ps", ptrTo(types.String)))))),
+		expectedType:    mapOf(aliasOf("ps", ptrTo(types.String))),
 		expectedTypePfx: "",
 		expectedExprPfx: "***",
 	}}
