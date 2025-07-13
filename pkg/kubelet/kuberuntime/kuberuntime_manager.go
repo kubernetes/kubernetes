@@ -574,6 +574,16 @@ func containerChanged(container *v1.Container, containerStatus *kubecontainer.St
 }
 
 func shouldRestartOnFailure(pod *v1.Pod) bool {
+	// With feature ContainerRestartRules enabled, the pod should be restarted
+	// on failure if any of its containers have container-level restart policy
+	// that is restartable.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+		for _, c := range pod.Spec.Containers {
+			if podutil.IsContainerRestartable(pod.Spec, c) {
+				return true
+			}
+		}
+	}
 	return pod.Spec.RestartPolicy != v1.RestartPolicyNever
 }
 
@@ -932,8 +942,19 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// Get the containers to start, excluding the ones that succeeded if RestartPolicy is OnFailure.
 		var containersToStart []int
 		for idx, c := range pod.Spec.Containers {
-			if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure && containerSucceeded(&c, podStatus) {
+			runOnce := pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure
+			if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+				if c.RestartPolicy != nil {
+					runOnce = *c.RestartPolicy == v1.ContainerRestartPolicyOnFailure
+				}
+			}
+			if runOnce && containerSucceeded(&c, podStatus) {
 				continue
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+				if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyOnFailure && containerSucceeded(&c, podStatus) {
+					continue
+				}
 			}
 			containersToStart = append(containersToStart, idx)
 		}
@@ -998,7 +1019,15 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		if !done {
 			if next != nil {
 				initFailed := initLastStatus != nil && isInitContainerFailed(initLastStatus)
-				if initFailed && !shouldRestartOnFailure(pod) {
+				shouldRestart := shouldRestartOnFailure(pod)
+				if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+					// Check if the container-level restart policy allows restart of this init container
+					// if it failed.
+					if initLastStatus != nil {
+						shouldRestart = kubecontainer.ShouldContainerBeRestarted(next, pod, podStatus)
+					}
+				}
+				if initFailed && !shouldRestart {
 					changes.KillPod = true
 				} else {
 					// Always try to stop containers in unknown state first.
@@ -1068,6 +1097,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		var message string
 		var reason containerKillReason
 		restart := shouldRestartOnFailure(pod)
+		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+			restart = kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus)
+		}
 		if _, _, changed := containerChanged(&container, containerStatus); changed {
 			message = fmt.Sprintf("Container %s definition changed", container.Name)
 			// Restart regardless of the restart policy because the container
