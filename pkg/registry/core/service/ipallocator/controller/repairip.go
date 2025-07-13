@@ -108,13 +108,23 @@ type RepairIPAddress struct {
 	clock       clock.Clock
 }
 
-// NewRepair creates a controller that periodically ensures that all clusterIPs are uniquely allocated across the cluster
+// NewRepairIPAddress creates a controller that periodically ensures that all clusterIPs are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
 func NewRepairIPAddress(interval time.Duration,
 	client kubernetes.Interface,
 	serviceInformer coreinformers.ServiceInformer,
 	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
 	ipAddressInformer networkinginformers.IPAddressInformer) *RepairIPAddress {
+	return newRepairIPAddress(interval, client, serviceInformer, serviceCIDRInformer, ipAddressInformer, clock.RealClock{})
+}
+
+// newRepairIPAddress implements NewRepairIPAddress by additionally consuming clock.Clock.
+func newRepairIPAddress(interval time.Duration,
+	client kubernetes.Interface,
+	serviceInformer coreinformers.ServiceInformer,
+	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
+	ipAddressInformer networkinginformers.IPAddressInformer,
+	c clock.Clock) *RepairIPAddress {
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "ipallocator-repair-controller")
 
@@ -138,7 +148,7 @@ func NewRepairIPAddress(interval time.Duration,
 		workerLoopPeriod: time.Second,
 		broadcaster:      eventBroadcaster,
 		recorder:         recorder,
-		clock:            clock.RealClock{},
+		clock:            c,
 	}
 
 	_, _ = serviceInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
