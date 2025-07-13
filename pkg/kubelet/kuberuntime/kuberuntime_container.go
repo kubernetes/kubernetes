@@ -1104,6 +1104,10 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 	// isPreviouslyInitialized indicates if the current init container is
 	// previously initialized.
 	isPreviouslyInitialized := podHasInitialized
+	// Feature gate ContainerRestartRules makes it possible for individual init
+	// containers to restart even if pod-level restart policy is Never, which is
+	// checked at container-level. This `restartOnFailure` is overriden if feature
+	// gate ContainerRestartRules is enabled.
 	restartOnFailure := shouldRestartOnFailure(pod)
 
 	// Note that we iterate through the init containers in reverse order to find
@@ -1229,6 +1233,10 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 			} else { // init container
 				if isInitContainerFailed(status) {
+					restartOnFailure := restartOnFailure
+					if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+						restartOnFailure = kubecontainer.ShouldContainerBeRestarted(container, pod, podStatus)
+					}
 					if !restartOnFailure {
 						changes.KillPod = true
 						changes.InitContainersToStart = nil
@@ -1263,6 +1271,10 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 					klog.V(4).InfoS("This should not happen, init container is in unknown state but not failed", "pod", klog.KObj(pod), "containerStatus", status)
 				}
 
+				restartOnFailure := restartOnFailure
+				if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+					restartOnFailure = kubecontainer.ShouldContainerBeRestarted(container, pod, podStatus)
+				}
 				if !restartOnFailure {
 					changes.KillPod = true
 					changes.InitContainersToStart = nil
