@@ -36,6 +36,7 @@ const (
 	NetworkNotReady                = "NetworkNotReady"
 	ResizeDeferred                 = "ResizeDeferred"
 	ResizeInfeasible               = "ResizeInfeasible"
+	ResizeCompleted                = "ResizeCompleted"
 )
 
 // Image event reason list

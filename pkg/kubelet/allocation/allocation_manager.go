@@ -24,12 +24,14 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -40,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -129,6 +132,8 @@ type manager struct {
 
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
+
+	recorder record.EventRecorder
 }
 
 func NewManager(checkpointDirectory string,
@@ -138,6 +143,7 @@ func NewManager(checkpointDirectory string,
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
+	recorder record.EventRecorder,
 ) Manager {
 	return &manager{
 		allocated: newStateImpl(checkpointDirectory, allocatedPodsStateFile),
@@ -152,7 +158,19 @@ func NewManager(checkpointDirectory string,
 		triggerPodSync: triggerPodSync,
 		getActivePods:  getActivePods,
 		getPodByUID:    getPodByUID,
+		recorder:       recorder,
 	}
+}
+
+type containerAllocation struct {
+	Name      string                  `json:"name"`
+	Resources v1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type podResourceSummary struct {
+	//TODO: resources v1.ResourceRequirements, add pod-level resources here once resizing pod-level resources is supported
+	InitContainers []containerAllocation `json:"initContainers,omitempty"`
+	Containers     []containerAllocation `json:"containers,omitempty"`
 }
 
 func newStateImpl(checkpointDirectory, checkpointName string) state.State {
@@ -212,6 +230,33 @@ func (m *manager) Run(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+// Gernerate pod resize completed event message
+func (m *manager) podResizeCompletionMsg(allocatedPod *v1.Pod) string {
+	podResizeSource := &podResourceSummary{}
+	podutil.VisitContainers(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers,
+		func(allocatedContainer *v1.Container, containerType podutil.ContainerType) bool {
+			allocation := containerAllocation{
+				Name:      allocatedContainer.Name,
+				Resources: allocatedContainer.Resources,
+			}
+			switch containerType {
+			case podutil.InitContainers:
+				podResizeSource.InitContainers = append(podResizeSource.InitContainers, allocation)
+			case podutil.Containers:
+				podResizeSource.Containers = append(podResizeSource.Containers, allocation)
+			}
+			return true
+		})
+
+	podResizeMsgDetailsJSON, err := json.Marshal(podResizeSource)
+	if err != nil {
+		klog.ErrorS(err, "Failed to serialize resource summary", "pod", format.Pod(allocatedPod))
+		return "Pod resize completed"
+	}
+	podResizeCompletedMsg := fmt.Sprintf("Pod resize completed: %s", string(podResizeMsgDetailsJSON))
+	return podResizeCompletedMsg
 }
 
 func (m *manager) RetryPendingResizes() []*v1.Pod {
@@ -709,6 +754,11 @@ func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kube
 		m.statusManager.SetPodResizeInProgressCondition(allocatedPod.UID, "", "", allocatedPod.Generation)
 	} else if m.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID) {
 		// (Allocated == Actual) => clear the resize in-progress status.
+		// Generate Pod resize completed event
+		podResizeCompletedEventMsg := m.podResizeCompletionMsg(allocatedPod)
+		if m.recorder != nil {
+			m.recorder.Eventf(allocatedPod, v1.EventTypeNormal, events.ResizeCompleted, podResizeCompletedEventMsg)
+		}
 		// TODO(natasha41575): We only need to make this call if any of the resources were decreased.
 		m.RetryPendingResizes()
 	}
