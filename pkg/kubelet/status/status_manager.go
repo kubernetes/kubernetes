@@ -692,6 +692,18 @@ func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSp
 		if oldStatus.State.Terminated.ExitCode != 0 && podSpec.RestartPolicy == v1.RestartPolicyOnFailure {
 			continue
 		}
+		// Skip any container that is allowed to restart by container restart policy
+		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+			restartable := false
+			for _, container := range podSpec.Containers {
+				if container.Name == oldStatus.Name && podutil.ContainerShouldRestart(container, *podSpec, oldStatus.State.Terminated.ExitCode) {
+					restartable = true
+				}
+			}
+			if restartable {
+				continue
+			}
+		}
 		for _, newStatus := range newStatuses.ContainerStatuses {
 			if oldStatus.Name == newStatus.Name && newStatus.State.Terminated == nil {
 				return fmt.Errorf("terminated container %v attempted illegal transition to non-terminated state", newStatus.Name)
@@ -715,6 +727,18 @@ func checkContainerStateTransition(oldStatuses, newStatuses *v1.PodStatus, podSp
 		// Skip any container that failed but is allowed to restart
 		if oldStatus.State.Terminated.ExitCode != 0 && podSpec.RestartPolicy == v1.RestartPolicyOnFailure {
 			continue
+		}
+		// Skip any container that is allowed to restart by container restart policy
+		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+			restartable := false
+			for _, container := range podSpec.InitContainers {
+				if container.Name == oldStatus.Name && podutil.ContainerShouldRestart(container, *podSpec, oldStatus.State.Terminated.ExitCode) {
+					restartable = true
+				}
+			}
+			if restartable {
+				continue
+			}
 		}
 		for _, newStatus := range newStatuses.InitContainerStatuses {
 			if oldStatus.Name == newStatus.Name && newStatus.State.Terminated == nil {
