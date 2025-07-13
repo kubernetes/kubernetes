@@ -105,7 +105,7 @@ func (s *Scheme) Test(t *testing.T) *ValidationTestBuilder {
 // ValidationTestBuilder provides convenience functions to build
 // validation tests.
 type ValidationTestBuilder struct {
-	*testing.T
+	t *testing.T
 	s *Scheme
 }
 
@@ -120,13 +120,13 @@ const fixtureEnvVar = "UPDATE_VALIDATION_GEN_FIXTURE_DATA"
 // Fixtures:
 //   - validate-false.json: defines a map of registered type to a map of field path to  +validateFalse validations args
 //     that are expected to be returned as errors when the type is validated.
-func (s *ValidationTestBuilder) ValidateFixtures() {
-	s.T.Helper()
+func (b *ValidationTestBuilder) ValidateFixtures() {
+	b.t.Helper()
 
 	flag := os.Getenv(fixtureEnvVar)
 	// Run validation
 	got := map[string]map[string][]string{}
-	for t := range s.s.validationFuncs {
+	for t := range b.s.validationFuncs {
 		var v any
 		// TODO: this should handle maps and slices
 		if t.Kind() == reflect.Ptr {
@@ -137,8 +137,8 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 		if reflect.TypeOf(v).Kind() != reflect.Ptr {
 			v = &v
 		}
-		s.ValueFuzzed(v)
-		vt := &ValidationTester{ValidationTestBuilder: s, value: v}
+		b.ValueFuzzed(v)
+		vt := &ValidationTester{ValidationTestBuilder: b, value: v}
 		byPath := vt.validateFalseArgsByPath()
 		got[t.String()] = byPath
 	}
@@ -147,40 +147,40 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 	if flag == "true" {
 		// Generate fixture file
 		if err := os.MkdirAll(path.Dir(testdataFilename), os.FileMode(0755)); err != nil {
-			s.Fatal("error making directory", err)
+			b.t.Fatal("error making directory", err)
 		}
 		data, err := json.MarshalIndent(got, "", "  ")
 		if err != nil {
-			s.Fatal(err)
+			b.t.Fatal(err)
 		}
 		err = os.WriteFile(testdataFilename, data, os.FileMode(0644))
 		if err != nil {
-			s.Fatal(err)
+			b.t.Fatal(err)
 		}
 	} else {
 		// Load fixture file
 		testdataFile, err := os.Open(testdataFilename)
 		if errors.Is(err, os.ErrNotExist) {
-			s.Fatalf("%s test fixture data not found. Run go test with the environment variable %s=true to create test fixture data.",
+			b.t.Fatalf("%s test fixture data not found. Run go test with the environment variable %s=true to create test fixture data.",
 				testdataFilename, fixtureEnvVar)
 		} else if err != nil {
-			s.Fatal(err)
+			b.t.Fatal(err)
 		}
 		defer func() {
 			err := testdataFile.Close()
 			if err != nil {
-				s.Fatal(err)
+				b.t.Fatal(err)
 			}
 		}()
 
 		byteValue, err := io.ReadAll(testdataFile)
 		if err != nil {
-			s.Fatal(err)
+			b.t.Fatal(err)
 		}
 		testdata := map[string]map[string][]string{}
 		err = json.Unmarshal(byteValue, &testdata)
 		if err != nil {
-			s.Fatal(err)
+			b.t.Fatal(err)
 		}
 		// Compare fixture with validation results
 		expectedKeys := sets.New[string]()
@@ -192,7 +192,7 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 		for k, expectedForType := range testdata {
 			expectedKeys.Insert(k)
 			gotForType, ok := got[k]
-			s.T.Run(k, func(t *testing.T) {
+			b.t.Run(k, func(t *testing.T) {
 				t.Helper()
 
 				if !ok {
@@ -206,7 +206,7 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 			})
 		}
 		for unexpectedType := range gotKeys.Difference(expectedKeys) {
-			s.T.Run(unexpectedType, func(t *testing.T) {
+			b.t.Run(unexpectedType, func(t *testing.T) {
 				t.Helper()
 
 				t.Errorf("%q got unexpected validateFalse args, grouped by field path:\n%s\n",
@@ -215,7 +215,7 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 			})
 		}
 		if hasErrors {
-			s.T.Logf("If the test expectations have changed, run go test with the environment variable %s=true", fixtureEnvVar)
+			b.t.Logf("If the test expectations have changed, run go test with the environment variable %s=true", fixtureEnvVar)
 		}
 	}
 }
@@ -228,15 +228,15 @@ func randfiller() *randfill.Filler {
 
 // ValueFuzzed automatically populates the given value using a deterministic filler.
 // The filler sets pointers to values and always includes a two map keys and slice elements.
-func (s *ValidationTestBuilder) ValueFuzzed(value any) *ValidationTester {
+func (b *ValidationTestBuilder) ValueFuzzed(value any) *ValidationTester {
 	randfiller().Fill(value)
-	return &ValidationTester{ValidationTestBuilder: s, value: value}
+	return &ValidationTester{ValidationTestBuilder: b, value: value}
 }
 
 // Value returns a ValidationTester for the given value. The value
 // must be a registered with the scheme for validation.
-func (s *ValidationTestBuilder) Value(value any) *ValidationTester {
-	return &ValidationTester{ValidationTestBuilder: s, value: value}
+func (b *ValidationTestBuilder) Value(value any) *ValidationTester {
+	return &ValidationTester{ValidationTestBuilder: b, value: value}
 }
 
 // ValidationTester provides convenience functions to define validation
@@ -297,9 +297,9 @@ func multiline(errs field.ErrorList) string {
 // ExpectValid validates the value and calls t.Errorf if any validation errors are returned.
 // Returns ValidationTester to support call chaining.
 func (v *ValidationTester) ExpectValid() *ValidationTester {
-	v.Helper()
+	v.t.Helper()
 
-	v.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
+	v.t.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
 
 		errs := v.validate()
@@ -316,9 +316,9 @@ func (v *ValidationTester) ExpectValid() *ValidationTester {
 // to prove that the validation logic itself (e.g. validation-gen) produces the
 // expected errors should use this method.
 func (v *ValidationTester) ExpectValidateFalseByPath(expectedByPath map[string][]string) *ValidationTester {
-	v.Helper()
+	v.t.Helper()
 
-	v.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
+	v.t.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
 
 		actualByPath := v.validateFalseArgsByPath()
@@ -359,9 +359,9 @@ func (v *ValidationTester) validateFalseArgsByPath() map[string][]string {
 // to prove that a use-case of validation (e.g. testing pod validation)
 // produces the expected errors should use this method.
 func (v *ValidationTester) ExpectMatches(matcher field.ErrorMatcher, expected field.ErrorList) *ValidationTester {
-	v.Helper()
+	v.t.Helper()
 
-	v.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
+	v.t.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
 		actual := v.validate()
 		matcher.Test(t, expected, actual)
