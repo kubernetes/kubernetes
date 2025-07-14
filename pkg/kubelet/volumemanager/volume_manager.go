@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -53,6 +54,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
+
+var ErrVolumeAttachLimitExceeded = errors.New("node has reached its volume attachment limit")
 
 const (
 	// reconcilerLoopSleepPeriod is the amount of time the reconciler loop waits
@@ -413,6 +416,29 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 		podAttachAndMountTimeout,
 		true,
 		vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
+
+	if err != nil && utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		volumesToMount := vm.desiredStateOfWorld.GetVolumesToMount()
+		// Iterate through the desired volumes to find the specific ones for this pod that failed.
+		for _, volumeToMount := range volumesToMount {
+			if volumeToMount.PodName != uniquePodName {
+				continue
+			}
+			// If the volume is already mounted, it wasn't the cause of the timeout.
+			if _, found := vm.actualStateOfWorld.GetMountedVolumeForPodByOuterVolumeSpecName(uniquePodName, volumeToMount.OuterVolumeSpecName); found {
+				continue
+			}
+			attachablePlugin, findErr := vm.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+			if findErr != nil || attachablePlugin == nil {
+				// This volume type doesn't support the attachable interface, so we can skip our check.
+				continue
+			}
+			if attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec) {
+				// Return error to the kubelet, which will then trigger the pod termination logic.
+				return ErrVolumeAttachLimitExceeded
+			}
+		}
+	}
 
 	if err != nil {
 		unmountedVolumes :=
