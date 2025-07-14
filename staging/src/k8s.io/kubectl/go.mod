@@ -44,7 +44,7 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.19.0
 	sigs.k8s.io/randfill v1.0.0
 	sigs.k8s.io/structured-merge-diff/v4 v4.7.0
-	sigs.k8s.io/yaml v1.4.0
+	sigs.k8s.io/yaml v1.5.0
 )
 
 require (
