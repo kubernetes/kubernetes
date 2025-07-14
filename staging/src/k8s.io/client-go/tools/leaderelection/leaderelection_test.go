@@ -557,7 +557,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 					verb:       "get",
 					objectType: objectType,
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
 					},
 				},
 				{
@@ -572,6 +572,13 @@ func testReleaseLease(t *testing.T, objectType string) {
 					objectType: objectType,
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
 						return true, action.(fakeclient.UpdateAction).GetObject(), nil
+					},
+				},
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
 					},
 				},
 			},
@@ -844,9 +851,11 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 						if lockObj != nil {
 							// Third and more get (first create, second renew) should return our canceled error
 							// FakeClient doesn't do anything with the context so we're doing this ourselves
-							if gets >= 3 {
-								close(onRenewCalled)
-								<-onRenewResume
+							if gets >= 4 {
+								if gets == 4 {
+									close(onRenewCalled)
+									<-onRenewResume
+								}
 								return true, nil, context.Canceled
 							}
 							return true, lockObj, nil
