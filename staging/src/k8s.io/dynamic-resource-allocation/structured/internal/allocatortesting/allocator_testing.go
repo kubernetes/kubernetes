@@ -3490,14 +3490,18 @@ func TestAllocator(t *testing.T,
 	}
 
 	for name, tc := range testcases {
-		if internal.FeaturesAnd(tc.features, supportedFeatures) != tc.features {
-			// Skip the test, at least one of its required features isn't supported
-			// and the test would fail.
-			continue
-		}
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			g := gomega.NewWithT(t)
+
+			required := tc.features.Set()
+			supported := supportedFeatures.Set()
+			missing := required.Difference(supported)
+			if missing.Len() > 0 {
+				// Skip the test, at least one of its required features isn't supported
+				// and the test would fail.
+				t.Skipf("SKIP: required feature(s) %v not supported by allocator", sets.List(missing))
+			}
 
 			// Listing objects is deterministic and returns them in the same
 			// order as in the test case. That makes the allocation result

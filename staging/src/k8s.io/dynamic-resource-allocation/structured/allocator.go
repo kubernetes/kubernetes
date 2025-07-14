@@ -115,7 +115,7 @@ func NewAllocator(ctx context.Context,
 	// Unit tests are shared between all implementations.
 	for _, allocator := range availableAllocators {
 		// All required features supported?
-		if internal.FeaturesAnd(features, allocator.supportedFeatures) == features {
+		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
 			// Use it!
 			return allocator.newAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
 		}

@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
@@ -39,7 +40,7 @@ type Allocator interface {
 
 // Features contains all feature gates that may influence the behavior of ResourceClaim allocation.
 type Features struct {
-	// Sorted alphabetically. When adding a new entry, also extend FeaturesAnd and FeaturesAll.
+	// Sorted alphabetically. When adding a new entry, also extend Set and FeaturesAll.
 
 	AdminAccess          bool
 	DeviceTaints         bool
@@ -47,13 +48,27 @@ type Features struct {
 	PrioritizedList      bool
 }
 
-func FeaturesAnd(a, b Features) Features {
-	return Features{
-		AdminAccess:          a.AdminAccess && b.AdminAccess,
-		DeviceTaints:         a.DeviceTaints && b.DeviceTaints,
-		PartitionableDevices: a.PartitionableDevices && b.PartitionableDevices,
-		PrioritizedList:      a.PrioritizedList && b.PrioritizedList,
+// Set returns all features which are set to true.
+// The names of the features happen to match the Kubernetes
+// feature gates where applicable. Plain strings are used
+// because not all allocator features necessarily have to
+// be Kubernetes feature gates and this package must not
+// depend on those definitions.
+func (f Features) Set() sets.Set[string] {
+	enabled := sets.New[string]()
+	if f.AdminAccess {
+		enabled.Insert("DRAAdminAccess")
 	}
+	if f.DeviceTaints {
+		enabled.Insert("DRADeviceTaints")
+	}
+	if f.PartitionableDevices {
+		enabled.Insert("DRAPartitionableDevices")
+	}
+	if f.PrioritizedList {
+		enabled.Insert("DRAPrioritizedList")
+	}
+	return enabled
 }
 
 var FeaturesAll = Features{
