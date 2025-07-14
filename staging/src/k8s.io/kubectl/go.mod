@@ -93,6 +93,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/kustomize/api v0.19.0 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.2.0
 )
 
 replace (
