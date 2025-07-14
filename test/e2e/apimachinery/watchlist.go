@@ -30,7 +30,6 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -214,9 +213,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByMetaClient))
 	})
 
-	// Validates unsupported Accept headers in WatchList.
-	// Sets AcceptContentType to "application/json;as=Table", which the API doesn't support, returning a 406 error.
-	ginkgo.It("doesn't support receiving resources as Tables", func(ctx context.Context) {
+	ginkgo.It("server supports sending resources in Table format", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 
 		modifiedClientConfig := dynamic.ConfigFor(f.ClientConfig())
@@ -232,20 +229,17 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		framework.ExpectNoError(err)
 		gomega.Expect(hasPreparedOptions).To(gomega.BeTrueBecause("it should be possible to prepare watchlist opts from an empty ListOptions"))
 
-		_, err = dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace("default").Watch(ctx, opts)
-		gomega.Expect(err).To(gomega.HaveOccurred())
-		gomega.Expect(err.(apierrors.APIStatus)).To(gomega.HaveField("Status().Code", gomega.Equal(int32(406))))
+		w, err := dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace("default").Watch(ctx, opts)
+		framework.ExpectNoError(err)
+		defer w.Stop()
 	})
 
-	// Sets AcceptContentType to both "application/json;as=Table" and "application/json".
-	// Unlike the previous test, no 406 error occurs, as the API falls back to "application/json" and returns a valid response.
-	ginkgo.It("falls backs to supported content type when when receiving resources as Tables was requested", func(ctx context.Context) {
+	ginkgo.It("reflector doesn't support receiving resources as Tables", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 
 		modifiedClientConfig := dynamic.ConfigFor(f.ClientConfig())
 		modifiedClientConfig.AcceptContentTypes = strings.Join([]string{
 			fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1.SchemeGroupVersion.Version, metav1.GroupName),
-			"application/json",
 		}, ",")
 		modifiedClientConfig.GroupVersion = &v1.SchemeGroupVersion
 		restClient, err := rest.RESTClientFor(modifiedClientConfig)
@@ -270,19 +264,17 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 			nil,
 		)
 
-		expectedSecrets := addWellKnownUnstructuredSecrets(ctx, f)
+		_ = addWellKnownUnstructuredSecrets(ctx, f)
 
 		ginkgo.By("Starting the secret informer")
 		go secretInformer.Run(stopCh)
 
-		ginkgo.By("Waiting until the secret informer is fully synchronised")
-		err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, false, func(context.Context) (done bool, err error) {
+		ginkgo.By("Checking if the secret informer hasn't been synced")
+		err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, false, func(context.Context) (done bool, err error) {
 			return secretInformer.HasSynced(), nil
 		})
-		framework.ExpectNoError(err, "Failed waiting for the secret informer in %s namespace to be synced", f.Namespace.Namespace)
-
-		ginkgo.By("Verifying if the secret informer was properly synchronised")
-		verifyStoreFor(ctx, verifyStoreForMetaObject[unstructured.Unstructured](expectedSecrets, secretInformer.GetStore()))
+		gomega.Expect(err).To(gomega.HaveOccurred())
+		gomega.Expect(secretInformer.GetStore().List()).To(gomega.BeEmpty(), "unsupported resources should not have been added to the store")
 	})
 })
 
