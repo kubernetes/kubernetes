@@ -225,6 +225,7 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 // dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
 	dropDisabledDRAPrioritizedListFields(newClaim, oldClaim)
+	dropDisabledDRADeviceTaintsFields(newClaim, oldClaim) // Intentionally after dropDisabledDRAPrioritizedListFields to avoid iterating over FirstAvailable slice which needs to be dropped.
 	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
 	dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim)
 	dropDisabledDRADeviceBindingConditionsFields(newClaim, oldClaim)
@@ -309,6 +310,41 @@ func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
 	return false
 }
 
+func dropDisabledDRADeviceTaintsFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) ||
+		draDeviceTaintsInUse(oldClaim) {
+		return
+	}
+
+	for i, req := range newClaim.Spec.Devices.Requests {
+		if exactly := req.Exactly; exactly != nil {
+			exactly.Tolerations = nil
+		}
+		for e := range req.FirstAvailable {
+			newClaim.Spec.Devices.Requests[i].FirstAvailable[e].Tolerations = nil
+		}
+	}
+}
+
+func draDeviceTaintsInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+
+	for _, req := range claim.Spec.Devices.Requests {
+		if exactly := req.Exactly; exactly != nil && len(exactly.Tolerations) > 0 {
+			return true
+		}
+		for _, sub := range req.FirstAvailable {
+			if len(sub.Tolerations) > 0 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func isDRAResourceClaimDeviceStatusInUse(claim *resource.ResourceClaim) bool {
 	return claim != nil && len(claim.Status.Devices) > 0
 }
@@ -367,8 +403,6 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 		newClaim.Status.Devices = nil
 	}
 }
-
-// TODO: add tests after partitionable devices is merged (code conflict!)
 
 // dropDisabledDRADeviceBindingConditionsFields removes fields which are covered by a feature gate.
 func dropDisabledDRADeviceBindingConditionsFields(newClaim, oldClaim *resource.ResourceClaim) {
