@@ -1288,8 +1288,9 @@ sigs.k8s.io/structured-merge-diff/v4/merge
 sigs.k8s.io/structured-merge-diff/v4/schema
 sigs.k8s.io/structured-merge-diff/v4/typed
 sigs.k8s.io/structured-merge-diff/v4/value
-# sigs.k8s.io/yaml v1.5.0
+# sigs.k8s.io/yaml v1.4.0 => github.com/thockin/k8s-yaml v0.0.0-20250714181324-43a7a4f2ba4f
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
+# sigs.k8s.io/yaml => github.com/thockin/k8s-yaml v0.0.0-20250714181324-43a7a4f2ba4f

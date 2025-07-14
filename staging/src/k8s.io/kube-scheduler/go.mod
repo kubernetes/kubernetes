@@ -12,7 +12,7 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.130.1
-	sigs.k8s.io/yaml v1.5.0
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
@@ -39,4 +39,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	sigs.k8s.io/yaml => github.com/thockin/k8s-yaml v0.0.0-20250714181324-43a7a4f2ba4f
 )
