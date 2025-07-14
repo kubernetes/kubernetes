@@ -18,6 +18,7 @@ require (
 	gotest.tools/gotestsum v1.12.0
 	honnef.co/go/tools v0.6.1
 	k8s.io/publishing-bot v0.5.0
+	sigs.k8s.io/yaml v1.5.0
 )
 
 require (
@@ -60,3 +61,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace sigs.k8s.io/yaml => github.com/thockin/k8s-yaml v0.0.0-20250714181324-43a7a4f2ba4f
