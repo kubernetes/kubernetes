@@ -1348,10 +1348,12 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	KubeletPodResourcesDynamicResources: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KubeletPodResourcesGet: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	KubeletPodResourcesListUseActivePods: {
