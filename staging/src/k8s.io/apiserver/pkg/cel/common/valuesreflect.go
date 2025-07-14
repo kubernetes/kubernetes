@@ -19,13 +19,14 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"sync"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"reflect"
-	"sigs.k8s.io/structured-merge-diff/v4/value"
-	"sync"
+	"sigs.k8s.io/structured-merge-diff/v6/value"
 
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
