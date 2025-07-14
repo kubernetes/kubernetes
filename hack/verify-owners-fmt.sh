@@ -15,9 +15,9 @@
 # limitations under the License.
 
 # This script checks whether the OWNERS files need to be formatted or not by
-# `yamlfmt`. Run `hack/update-yamlfmt.sh` to actually format sources.
+# `yamlfmt`. Run `hack/update-owners-fmt.sh` to actually format sources.
 #
-# Usage: `hack/verify-yamlfmt.sh`.
+# Usage: `hack/verify-owners-fmt.sh`.
 
 
 set -o errexit
@@ -27,4 +27,4 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/verify-generated.sh"
 
-kube::verify::generated "YAML files need to be formatted" "Please run 'hack/update-yamlfmt.sh'" hack/update-yamlfmt.sh
+kube::verify::generated "YAML files need to be formatted" "Please run 'hack/update-owners-fmt.sh'" hack/update-owners-fmt.sh
