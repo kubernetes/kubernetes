@@ -113,8 +113,44 @@ func toSelectableFields(template *resource.ResourceClaimTemplate) fields.Set {
 
 func dropDisabledFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
 	dropDisabledDRAPrioritizedListFields(newClaimTemplate, oldClaimTemplate)
+	dropDisabledDRADeviceTaintsFields(newClaimTemplate, oldClaimTemplate) // Intentionally after dropDisabledDRAPrioritizedListFields to avoid iterating over FirstAvailable slice which needs to be dropped.
 	dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate)
 	dropDisabledDRAResourceClaimConsumableCapacityFields(newClaimTemplate, oldClaimTemplate)
+}
+
+func dropDisabledDRADeviceTaintsFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) ||
+		draDeviceTaintsInUse(oldClaimTemplate) {
+		return
+	}
+
+	for i, req := range newClaimTemplate.Spec.Spec.Devices.Requests {
+		if exactly := req.Exactly; exactly != nil {
+			exactly.Tolerations = nil
+		}
+		for e := range req.FirstAvailable {
+			newClaimTemplate.Spec.Spec.Devices.Requests[i].FirstAvailable[e].Tolerations = nil
+		}
+	}
+}
+
+func draDeviceTaintsInUse(claimTemplate *resource.ResourceClaimTemplate) bool {
+	if claimTemplate == nil {
+		return false
+	}
+
+	for _, req := range claimTemplate.Spec.Spec.Devices.Requests {
+		if exactly := req.Exactly; exactly != nil && len(exactly.Tolerations) > 0 {
+			return true
+		}
+		for _, sub := range req.FirstAvailable {
+			if len(sub.Tolerations) > 0 {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func dropDisabledDRAPrioritizedListFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
