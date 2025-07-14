@@ -19,14 +19,12 @@ package dump
 import (
 	"fmt"
 	"testing"
+
+	"k8s.io/utils/ptr"
 )
 
 func ptrint(i int) *int {
 	return &i
-}
-
-func ptrstr(s string) *string {
-	return &s
 }
 
 // custom type to test Stringer interface on non-pointer receiver.
@@ -109,7 +107,7 @@ func TestPretty(t *testing.T) {
 		{bool(true), "(bool) true\n"},
 		{bool(false), "(bool) false\n"},
 		{string("test"), "(string) (len=4) \"test\"\n"},
-		{ptrstr("test"), "(*string)((len=4) \"test\")\n"},
+		{ptr.To("test"), "(*string)((len=4) \"test\")\n"},
 		{[1]string{"arr"}, "([1]string) (len=1) {\n  (string) (len=3) \"arr\"\n}\n"},
 		{[]string{"slice"}, "([]string) (len=1) {\n  (string) (len=5) \"slice\"\n}\n"},
 		{tcs, "(dump.customString) (len=4) \"test\"\n"},
@@ -188,7 +186,7 @@ func TestForHash(t *testing.T) {
 		{bool(true), "(bool)true"},
 		{bool(false), "(bool)false"},
 		{string("test"), "(string)test"},
-		{ptrstr("test"), "(*string)test"},
+		{ptr.To("test"), "(*string)test"},
 		{[1]string{"arr"}, "([1]string)[arr]"},
 		{[]string{"slice"}, "([]string)[slice]"},
 		{tcs, "(dump.customString)test"},
@@ -267,7 +265,7 @@ func TestOneLine(t *testing.T) {
 		{bool(true), "(bool)true"},
 		{bool(false), "(bool)false"},
 		{string("test"), "(string)test"},
-		{ptrstr("test"), "(*string)test"},
+		{ptr.To("test"), "(*string)test"},
 		{[1]string{"arr"}, "([1]string)[arr]"},
 		{[]string{"slice"}, "([]string)[slice]"},
 		{tcs, "(dump.customString)test"},

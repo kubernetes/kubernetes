@@ -30,6 +30,7 @@ import (
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
+	"k8s.io/utils/ptr"
 )
 
 const configDir = "/test-config-dir"
@@ -53,53 +54,53 @@ func TestLoad(t *testing.T) {
 		// empty file
 		{
 			desc: "empty file",
-			file: newString(``),
+			file: ptr.To(``),
 			err:  "was empty",
 		},
 		// invalid format
 		{
 			desc: "invalid yaml",
-			file: newString(`*`),
+			file: ptr.To(`*`),
 			err:  "failed to decode",
 		},
 		{
 			desc: "invalid json",
-			file: newString(`{*`),
+			file: ptr.To(`{*`),
 			err:  "failed to decode",
 		},
 		// invalid object
 		{
 			desc: "missing kind",
-			file: newString(`{"apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
+			file: ptr.To(`{"apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
 			err:  "failed to decode",
 		},
 		{
 			desc: "missing version",
-			file: newString(`{"kind":"KubeletConfiguration"}`),
+			file: ptr.To(`{"kind":"KubeletConfiguration"}`),
 			err:  "failed to decode",
 		},
 		{
 			desc: "unregistered kind",
-			file: newString(`{"kind":"BogusKind","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
+			file: ptr.To(`{"kind":"BogusKind","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
 			err:  "failed to decode",
 		},
 		{
 			desc: "unregistered version",
-			file: newString(`{"kind":"KubeletConfiguration","apiVersion":"bogusversion"}`),
+			file: ptr.To(`{"kind":"KubeletConfiguration","apiVersion":"bogusversion"}`),
 			err:  "failed to decode",
 		},
 
 		// empty object with correct kind and version should result in the defaults for that kind and version
 		{
 			desc: "default from yaml",
-			file: newString(`kind: KubeletConfiguration
+			file: ptr.To(`kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1`),
 			expect:        newConfig(t),
 			skipOnWindows: true,
 		},
 		{
 			desc:          "default from json",
-			file:          newString(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
+			file:          ptr.To(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1"}`),
 			expect:        newConfig(t),
 			skipOnWindows: true,
 		},
@@ -107,7 +108,7 @@ apiVersion: kubelet.config.k8s.io/v1beta1`),
 		// relative path
 		{
 			desc: "yaml, relative path is resolved",
-			file: newString(fmt.Sprintf(`kind: KubeletConfiguration
+			file: ptr.To(fmt.Sprintf(`kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1
 staticPodPath: %s`, relativePath)),
 			expect: func() *kubeletconfig.KubeletConfiguration {
@@ -119,7 +120,7 @@ staticPodPath: %s`, relativePath)),
 		},
 		{
 			desc: "json, relative path is resolved",
-			file: newString(fmt.Sprintf(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","staticPodPath":"%s"}`, relativePath)),
+			file: ptr.To(fmt.Sprintf(`{"kind":"KubeletConfiguration","apiVersion":"kubelet.config.k8s.io/v1beta1","staticPodPath":"%s"}`, relativePath)),
 			expect: func() *kubeletconfig.KubeletConfiguration {
 				kc := newConfig(t)
 				kc.StaticPodPath = filepath.Join(configDir, relativePath)
@@ -130,7 +131,7 @@ staticPodPath: %s`, relativePath)),
 		{
 			// This should fail from v1beta2+
 			desc: "duplicate field",
-			file: newString(fmt.Sprintf(`kind: KubeletConfiguration
+			file: ptr.To(fmt.Sprintf(`kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1
 staticPodPath: %s
 staticPodPath: %s/foo`, relativePath, relativePath)),
@@ -146,7 +147,7 @@ staticPodPath: %s/foo`, relativePath, relativePath)),
 		{
 			// This should fail from v1beta2+
 			desc: "unknown field",
-			file: newString(`kind: KubeletConfiguration
+			file: ptr.To(`kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1
 foo: bar`),
 			// err:       "found unknown field: foo",
@@ -222,10 +223,6 @@ func TestResolveRelativePaths(t *testing.T) {
 			}
 		})
 	}
-}
-
-func newString(s string) *string {
-	return &s
 }
 
 func addFile(fs utilfs.Filesystem, path string, fileContent string) error {
