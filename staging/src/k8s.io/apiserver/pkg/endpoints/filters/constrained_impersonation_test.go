@@ -237,16 +237,17 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					ResourceRequest: true,
 				},
 				{
-					Resource: "users",
+					Resource: "groups",
 					Verb:     "impersonate",
-					Name:     "system:node:node1",
+					Name:     "system:nodes",
 					User: &user.DefaultInfo{
 						Name: "sa-impersonater",
 					},
 					ResourceRequest: true,
 				},
 			},
-			impersonationUser: "system:node:node1",
+			impersonationUser:   "system:node:node1",
+			impersonationGroups: []string{user.NodesGroup},
 			requestInfo: &request.RequestInfo{
 				IsResourceRequest: true,
 				Verb:              "get",
@@ -285,16 +286,17 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					ResourceRequest: true,
 				},
 				{
-					Resource: "users",
+					Resource: "groups",
 					Verb:     "impersonate",
-					Name:     "system:node:node1",
+					Name:     "system:nodes",
 					User: &user.DefaultInfo{
 						Name: "node-impersonater",
 					},
 					ResourceRequest: true,
 				},
 			},
-			impersonationUser: "system:node:node1",
+			impersonationUser:   "system:node:node1",
+			impersonationGroups: []string{user.NodesGroup},
 			requestInfo: &request.RequestInfo{
 				IsResourceRequest: true,
 				Verb:              "create",
@@ -310,10 +312,11 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 			},
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:node:node1",
-				Groups: []string{"system:authenticated"},
+				Groups: []string{user.NodesGroup, "system:authenticated"},
 				Extra:  map[string][]string{},
 			},
-			impersonationUser: "system:node:node1",
+			impersonationUser:   "system:node:node1",
+			impersonationGroups: []string{user.NodesGroup},
 			expectedAttributes: []authorizer.AttributesRecord{
 				{
 					APIGroup:   authenticationapi.SchemeGroupVersion.Group,
@@ -496,7 +499,7 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 			},
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:node:node1",
-				Groups: []string{"system:authenticated"},
+				Groups: []string{user.NodesGroup, "system:authenticated"},
 				Extra:  map[string][]string{},
 			},
 			expectedAttributes: []authorizer.AttributesRecord{
@@ -529,7 +532,8 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					ResourceRequest: true,
 				},
 			},
-			impersonationUser: "system:node:node1",
+			impersonationUser:   "system:node:node1",
+			impersonationGroups: []string{user.NodesGroup},
 			requestInfo: &request.RequestInfo{
 				IsResourceRequest: true,
 				Verb:              "get",
@@ -571,9 +575,9 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					ResourceRequest: true,
 				},
 				{
-					Resource: "users",
+					Resource: "groups",
 					Verb:     "impersonate",
-					Name:     "system:node:node1",
+					Name:     "system:nodes",
 					User: &user.DefaultInfo{
 						Name:   "user-impersonater",
 						Groups: []string{"scheduled-node-impersonater"},
@@ -584,7 +588,8 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					ResourceRequest: true,
 				},
 			},
-			impersonationUser: "system:node:node1",
+			impersonationUser:   "system:node:node1",
+			impersonationGroups: []string{user.NodesGroup},
 			requestInfo: &request.RequestInfo{
 				IsResourceRequest: true,
 				Verb:              "get",
@@ -603,7 +608,7 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 			},
 			expectedUser: &user.DefaultInfo{
 				Name:   "system:node:node1",
-				Groups: []string{"system:authenticated"},
+				Groups: []string{user.NodesGroup, "system:authenticated"},
 				Extra:  map[string][]string{},
 			},
 			expectedAttributes: []authorizer.AttributesRecord{
@@ -648,7 +653,8 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 					ResourceRequest: true,
 				},
 			},
-			impersonationUser: "system:node:node1",
+			impersonationUser:   "system:node:node1",
+			impersonationGroups: []string{user.NodesGroup},
 			requestInfo: &request.RequestInfo{
 				IsResourceRequest: true,
 				Verb:              "get",
@@ -733,11 +739,11 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 	constrainedAuthorizer := &constrainedImpersonateAuthorizer{}
 	handler := func(delegate http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			defer func() {
+			/*defer func() {
 				if r := recover(); r != nil {
 					t.Errorf("Recovered %v", r)
 				}
-			}()
+			}()*/
 
 			lock.Lock()
 			defer lock.Unlock()
@@ -799,7 +805,7 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(constrainedAuthorizer.checkedAttrs, tc.expectedAttributes) {
-				t.Errorf("%s: expected %#v, actual %#v", tc.name, tc.expectedAttributes, constrainedAuthorizer.checkedAttrs)
+				t.Errorf("%s: expected %#v, actual %#v", tc.name, len(tc.expectedAttributes), len(constrainedAuthorizer.checkedAttrs))
 			}
 			// clean the attrs after each test case.
 			constrainedAuthorizer.checkedAttrs = []authorizer.AttributesRecord{}

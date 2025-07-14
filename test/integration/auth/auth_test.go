@@ -1066,7 +1066,7 @@ func TestConstrainedImpersonation(t *testing.T) {
 		superUser: {Name: "admin", Groups: []string{"system:masters"}},
 		"bob":     {Name: "bob"},
 		"alice":   {Name: "alice"},
-		"node1":   {Name: "system:node:node1"},
+		"node1":   {Name: "system:node:node1", Groups: []string{user.NodesGroup}},
 		"serviceaccount1": {Name: "system:serviceaccount:default:sa1", Extra: map[string][]string{
 			"authentication.kubernetes.io/node-name": {"node1"},
 		}},
@@ -1167,6 +1167,7 @@ func TestConstrainedImpersonation(t *testing.T) {
 		impersonatorClientConfig.BearerToken = "bob"
 		impersonatorClientConfig.Impersonate = rest.ImpersonationConfig{
 			UserName: "system:node:node1",
+			Groups:   []string{user.NodesGroup},
 		}
 
 		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
@@ -1226,6 +1227,7 @@ func TestConstrainedImpersonation(t *testing.T) {
 		impersonatorClientConfig.BearerToken = "serviceaccount2"
 		impersonatorClientConfig.Impersonate = rest.ImpersonationConfig{
 			UserName: "system:node:node1",
+			Groups:   []string{user.NodesGroup},
 		}
 
 		client := clientset.NewForConfigOrDie(impersonatorClientConfig)

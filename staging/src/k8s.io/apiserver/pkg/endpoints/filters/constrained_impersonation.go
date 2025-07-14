@@ -93,6 +93,7 @@ func buildImpersonationAttributes(headers http.Header, requestor user.Info) ([]*
 	uid := headers.Get(authenticationv1.ImpersonateUIDHeader)
 
 	hasUser := len(requestedUser) > 0
+	hasGroups := len(groups) > 0
 	if hasUser {
 		attrs := newAttributeRecord(requestor)
 		if namespace, name, err := serviceaccount.SplitUsername(requestedUser); err == nil {
@@ -100,29 +101,28 @@ func buildImpersonationAttributes(headers http.Header, requestor user.Info) ([]*
 			attrs.Verb = "impersonate:serviceaccount"
 			attrs.Namespace = namespace
 			attrs.Name = name
-			attrsList = append(attrsList, attrs)
-		} else if isScheduledNode(requestor, requestedUser) {
+		} else if nodeName, isImpersonating := isImpersonatingScheduledNode(requestor, requestedUser, groups); isImpersonating {
 			attrs.Verb = "impersonate:scheduled-node"
-			attrs.Name = strings.TrimPrefix(requestedUser, "system:node:")
+			attrs.Name = nodeName
 			attrs.Resource = "nodes"
-			attrsList = append(attrsList, attrs)
-		} else if strings.HasPrefix(requestedUser, "system:node:") {
+		} else if nodeName, isImpersonating := isImpersonatingNode(requestedUser, groups); isImpersonating {
 			attrs.Verb = "impersonate:node"
-			attrs.Name = strings.TrimPrefix(requestedUser, "system:node:")
+			attrs.Name = nodeName
 			attrs.Resource = "nodes"
-			attrsList = append(attrsList, attrs)
 		} else {
 			attrs.Verb = "impersonate:user-info"
 			attrs.Name = requestedUser
 			attrs.Resource = "users"
-			attrsList = append(attrsList, attrs)
 		}
+		attrsList = append(attrsList, attrs)
 	}
 
-	// if groups are not specified, then we need to look them up differently depending on the type of user
-	// if they are specified, then they are the authority (including the inclusion of system:authenticated/system:unauthenticated groups)
-	hasGroups := len(groups) > 0
+	// if the groups are specified, then they are the authority (including the inclusion of system:authenticated/system:unauthenticated groups)
 	for _, group := range groups {
+		// skip the node group of the user is impersonating a node.
+		if _, isNode := isImpersonatingNode(requestedUser, groups); isNode && group == user.NodesGroup {
+			continue
+		}
 		attrs := newAttributeRecord(requestor)
 		attrs.Resource = "groups"
 		attrs.Name = group
@@ -160,15 +160,15 @@ func buildImpersonationAttributes(headers http.Header, requestor user.Info) ([]*
 		attrsList = append(attrsList, attrs)
 	}
 
-	if (hasGroups || hasUserExtra || hasUID) && !hasUser {
-		return nil, nil, fmt.Errorf("requested %v without impersonating a user", attrsList)
-	}
-
 	// If the user is service account and groups is empty, set default service account groups.
 	if namespace, _, err := serviceaccount.SplitUsername(requestedUser); err == nil {
 		if !hasGroups {
 			groups = serviceaccount.MakeGroupNames(namespace)
 		}
+	}
+
+	if (hasGroups || hasUserExtra || hasUID) && !hasUser {
+		return nil, nil, fmt.Errorf("requested %v without impersonating a user", attrsList)
 	}
 
 	if requestedUser != user.Anonymous {
@@ -278,15 +278,25 @@ func copyAuthorizerAttr(attr authorizer.Attributes) *authorizer.AttributesRecord
 func authorizeLegacyImpersonation(req *http.Request, targetAttributesList []*authorizer.AttributesRecord, a authorizer.Authorizer) (authorizer.Decision, string, error) {
 	ctx := req.Context()
 
+	var legacyActingAsAttributes []*authorizer.AttributesRecord
 	for _, actingAsAttributes := range targetAttributesList {
 		// verb is always impersonate with legacy impersonation.
 		actingAsAttributesCopy := copyAuthorizerAttr(actingAsAttributes)
 		actingAsAttributesCopy.Verb = "impersonate"
 
 		// legacy impersonation does not recognize nodes, change back to users
+		// Also add node groups attr to be authorized.
 		if actingAsAttributesCopy.Resource == "nodes" {
 			actingAsAttributesCopy.Resource = "users"
 			actingAsAttributesCopy.Name = fmt.Sprintf("system:node:%s", actingAsAttributesCopy.Name)
+			nodeGroupAtrribute := &authorizer.AttributesRecord{
+				Resource:        "groups",
+				Verb:            "impersonate",
+				Name:            user.NodesGroup,
+				User:            actingAsAttributes.User,
+				ResourceRequest: true,
+			}
+			legacyActingAsAttributes = append(legacyActingAsAttributes, nodeGroupAtrribute)
 		}
 
 		// group and version is empty for users/groups/serviceaccounts
@@ -295,7 +305,11 @@ func authorizeLegacyImpersonation(req *http.Request, targetAttributesList []*aut
 			actingAsAttributesCopy.APIVersion = ""
 		}
 
-		decision, reason, err := a.Authorize(ctx, actingAsAttributesCopy)
+		legacyActingAsAttributes = append(legacyActingAsAttributes, actingAsAttributesCopy)
+	}
+
+	for _, actingAsAttributes := range legacyActingAsAttributes {
+		decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 		if err != nil || decision != authorizer.DecisionAllow {
 			return decision, reason, err
 		}
@@ -304,27 +318,46 @@ func authorizeLegacyImpersonation(req *http.Request, targetAttributesList []*aut
 	return authorizer.DecisionAllow, "", nil
 }
 
+func isImpersonatingNode(impersonatedUser string, groups []string) (string, bool) {
+	if !strings.HasPrefix(impersonatedUser, "system:node:") {
+		return "", false
+	}
+
+	var hasNodeGroup bool
+	for _, group := range groups {
+		if group == user.NodesGroup {
+			hasNodeGroup = true
+		}
+	}
+
+	if !hasNodeGroup {
+		return "", false
+	}
+
+	return strings.TrimPrefix(impersonatedUser, "system:node:"), true
+}
+
 // isScheduledNode checks if the requestor is from the scheduled node:
 // 1. the requestor is impersonating a node.
 // 2. the requestor must be using a service account.
 // 3. the requestor must run on the same node it is impersonating.
-func isScheduledNode(requestor user.Info, impersonatedUser string) bool {
-	if !strings.HasPrefix(impersonatedUser, "system:node:") {
-		return false
+func isImpersonatingScheduledNode(requestor user.Info, impersonatedUser string, groups []string) (string, bool) {
+	nodeName, isNode := isImpersonatingNode(impersonatedUser, groups)
+	if !isNode {
+		return "", false
 	}
-	nodeName := strings.TrimPrefix(impersonatedUser, "system:node:")
 
 	if _, _, err := serviceaccount.SplitUsername(requestor.GetName()); err != nil {
-		return false
+		return "", false
 	}
 
 	if len(requestor.GetExtra()) == 0 {
-		return false
+		return "", false
 	}
 
 	if len(requestor.GetExtra()[serviceaccount.NodeNameKey]) != 1 || requestor.GetExtra()[serviceaccount.NodeNameKey][0] != nodeName {
-		return false
+		return "", false
 	}
 
-	return true
+	return nodeName, true
 }
