@@ -2014,7 +2014,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			reasonStr := "VolumeAttachmentLimitExceeded"
 			kl.rejectPod(pod, reasonStr, "Node has insufficient volume attachment capacity")
 			recordAdmissionRejection(reasonStr)
-			return true, fmt.Errorf("Pod rejected due to insufficient volume attachment capacity")
+			return true, fmt.Errorf("pod rejected due to insufficient volume attachment capacity")
 		}
 		if !wait.Interrupted(err) {
 			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to attach or mount volumes: %v", err)
