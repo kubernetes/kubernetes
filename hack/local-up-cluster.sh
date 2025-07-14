@@ -20,6 +20,7 @@ if (( KUBE_VERBOSE > 4 )); then
 fi
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+cd "${KUBE_ROOT}"
 
 # This script builds and runs a local kubernetes cluster. You may need to run
 # this as root to allow kubelet to open containerd's socket, and to write the test
