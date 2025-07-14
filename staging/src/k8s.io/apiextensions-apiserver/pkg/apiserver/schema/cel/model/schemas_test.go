@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	apiservercel "k8s.io/apiserver/pkg/cel"
+	"k8s.io/utils/ptr"
 )
 
 func TestSchemaDeclType(t *testing.T) {
@@ -360,7 +361,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 		},
 		{
 			Name:        "arrayWithLength",
-			InputSchema: arraySchema("integer", "int64", maxPtr(10)),
+			InputSchema: arraySchema("integer", "int64", ptr.To[int64](10)),
 			// manually set by MaxItems
 			ExpectedMaxElements: 10,
 		},
@@ -371,7 +372,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 					Type: "string",
 				},
 				ValueValidation: &schema.ValueValidation{
-					MaxLength: maxPtr(20),
+					MaxLength: ptr.To[int64](20),
 				},
 			},
 			// manually set by MaxLength, but we expect a 4x multiplier compared to the original input
@@ -391,7 +392,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 				}},
 				ValueValidation: &schema.ValueValidation{
 					Format:        "string",
-					MaxProperties: maxPtr(15),
+					MaxProperties: ptr.To[int64](15),
 				},
 			},
 			// manually set by MaxProperties
@@ -493,7 +494,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 				},
 				ValueValidation: &schema.ValueValidation{
 					Format:    "byte",
-					MaxLength: maxPtr(20),
+					MaxLength: ptr.To[int64](20),
 				},
 			},
 			// note that unlike regular strings we don't have to take unicode into account,
@@ -557,10 +558,6 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			}
 		})
 	}
-}
-
-func maxPtr(max int64) *int64 {
-	return &max
 }
 
 func genNestedSchema(depth int) *schema.Structural {
