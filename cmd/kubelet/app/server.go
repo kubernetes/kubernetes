@@ -494,13 +494,9 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 	if err != nil {
 		return nil, err
 	}
-	var tp oteltrace.TracerProvider
-	tp = noopoteltrace.NewTracerProvider()
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		tp, err = newTracerProvider(s)
-		if err != nil {
-			return nil, err
-		}
+	tp, err := newTracerProvider(s)
+	if err != nil {
+		return nil, err
 	}
 	return &kubelet.Dependencies{
 		Auth:                nil, // default does not enforce auth[nz]
@@ -1048,9 +1044,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 			utilnet.CloseIdleConnectionsFor(clientConfig.Transport)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		clientConfig.Wrap(tracing.WrapperFor(tp))
-	}
+	clientConfig.Wrap(tracing.WrapperFor(tp))
 	return clientConfig, onHeartbeatFailure, nil
 }
 
