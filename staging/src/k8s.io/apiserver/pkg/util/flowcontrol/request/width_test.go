@@ -25,6 +25,7 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
@@ -548,8 +549,23 @@ func TestWorkEstimator(t *testing.T) {
 			if len(counts) == 0 {
 				counts = map[string]int64{}
 			}
-			countsFn := func(key string) (storage.Stats, error) {
-				return storage.Stats{ObjectCount: counts[key]}, test.countErr
+			countsFn := func(key string) (StatsDelegator, error) {
+				return StatsDelegator{Stats: storage.Stats{ObjectCount: counts[key]}, ShouldDelegateList: func(opts storage.ListOptions) (bool, error) {
+					result, err := delegator.ShouldDelegateList(
+						storage.ListOptions{
+							ResourceVersionMatch: opts.ResourceVersionMatch,
+							ResourceVersion:      opts.ResourceVersion,
+							Predicate: storage.SelectionPredicate{
+								Continue: opts.Predicate.Continue,
+								Limit:    opts.Predicate.Limit,
+							},
+							Recursive: true,
+						}, cacheWithoutSnapshots{})
+					if err != nil {
+						t.Fatal(err)
+					}
+					return result.ShouldDelegate, nil
+				}}, test.countErr
 			}
 			watchCountsFn := func(_ *apirequest.RequestInfo) int {
 				return test.watchCount
@@ -581,4 +597,29 @@ func TestWorkEstimator(t *testing.T) {
 			}
 		})
 	}
+}
+
+type cacheWithoutSnapshots struct{}
+
+var _ delegator.Helper = cacheWithoutSnapshots{}
+
+func (c cacheWithoutSnapshots) ShouldDelegateContinue(continueToken string, recursive bool) (delegator.Result, error) {
+	return delegator.Result{
+		ShouldDelegate: true,
+		ConsistentRead: false,
+	}, nil
+}
+
+func (c cacheWithoutSnapshots) ShouldDelegateExactRV(rv string, recursive bool) (delegator.Result, error) {
+	return delegator.Result{
+		ShouldDelegate: true,
+		ConsistentRead: false,
+	}, nil
+}
+
+func (c cacheWithoutSnapshots) ShouldDelegateConsistentRead() (delegator.Result, error) {
+	return delegator.Result{
+		ShouldDelegate: !delegator.ConsistentReadSupported(),
+		ConsistentRead: true,
+	}, nil
 }

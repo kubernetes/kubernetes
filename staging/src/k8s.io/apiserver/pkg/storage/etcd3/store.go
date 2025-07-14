@@ -644,6 +644,10 @@ func (s *store) Stats(ctx context.Context) (stats storage.Stats, err error) {
 	}, nil
 }
 
+func (s *store) ShouldDelegateList(opts storage.ListOptions) (bool, error) {
+	return true, nil
+}
+
 func (s *store) SetKeysFunc(keys storage.KeysFunc) {
 	if s.stats != nil {
 		s.stats.SetKeysFunc(keys)

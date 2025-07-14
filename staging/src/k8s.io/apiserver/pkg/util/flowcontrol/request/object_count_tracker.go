@@ -56,7 +56,7 @@ var (
 type StorageObjectCountTracker interface {
 	// Set is invoked to update the current number of total
 	// objects for the given resource
-	Set(string, storage.Stats)
+	Set(string, StatsDelegator)
 
 	// Get returns the total number of objects for the given resource.
 	// The following errors are returned:
@@ -64,10 +64,15 @@ type StorageObjectCountTracker interface {
 	//    failures ObjectCountStaleErr is returned.
 	//  - if the given resource is not being tracked then
 	//    ObjectCountNotFoundErr is returned.
-	Get(string) (storage.Stats, error)
+	Get(string) (StatsDelegator, error)
 
 	// RunUntil starts all the necessary maintenance.
 	RunUntil(stopCh <-chan struct{})
+}
+
+type StatsDelegator struct {
+	storage.Stats
+	ShouldDelegateList func(opts storage.ListOptions) (bool, error)
 }
 
 // NewStorageObjectCountTracker returns an instance of
@@ -83,7 +88,7 @@ func NewStorageObjectCountTracker() StorageObjectCountTracker {
 // timestampedStats stores the count of a given resource with a last updated
 // timestamp so we can prune it after it goes stale for certain threshold.
 type timestampedStats struct {
-	storage.Stats
+	StatsDelegator
 	lastUpdatedAt time.Time
 }
 
@@ -96,7 +101,7 @@ type objectCountTracker struct {
 	counts map[string]*timestampedStats
 }
 
-func (t *objectCountTracker) Set(groupResource string, stats storage.Stats) {
+func (t *objectCountTracker) Set(groupResource string, stats StatsDelegator) {
 	if stats.ObjectCount <= -1 {
 		// a value of -1 indicates that the 'Count' call failed to contact
 		// the storage layer, in most cases this error can be transient.
@@ -115,18 +120,18 @@ func (t *objectCountTracker) Set(groupResource string, stats storage.Stats) {
 	defer t.lock.Unlock()
 
 	if item, ok := t.counts[groupResource]; ok {
-		item.Stats = stats
+		item.StatsDelegator = stats
 		item.lastUpdatedAt = now
 		return
 	}
 
 	t.counts[groupResource] = &timestampedStats{
-		Stats:         stats,
-		lastUpdatedAt: now,
+		StatsDelegator: stats,
+		lastUpdatedAt:  now,
 	}
 }
 
-func (t *objectCountTracker) Get(groupResource string) (storage.Stats, error) {
+func (t *objectCountTracker) Get(groupResource string) (StatsDelegator, error) {
 	staleThreshold := t.clock.Now().Add(-staleTolerationThreshold)
 
 	t.lock.RLock()
@@ -134,11 +139,11 @@ func (t *objectCountTracker) Get(groupResource string) (storage.Stats, error) {
 
 	if item, ok := t.counts[groupResource]; ok {
 		if item.lastUpdatedAt.Before(staleThreshold) {
-			return item.Stats, ObjectCountStaleErr
+			return item.StatsDelegator, ObjectCountStaleErr
 		}
-		return item.Stats, nil
+		return item.StatsDelegator, nil
 	}
-	return storage.Stats{}, ObjectCountNotFoundErr
+	return StatsDelegator{}, ObjectCountNotFoundErr
 }
 
 // RunUntil runs all the necessary maintenance.
