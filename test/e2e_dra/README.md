@@ -23,19 +23,19 @@ To run it:
   Otherwise a test tmp directory is used.
 - Invoke as a Go test (no need for the ginkgo CLI), for example:
 
-        go test -v -count=1 ./test/integration/dra/cluster -args -ginkgo.v
-        dlv test ./test/integration/dra/cluster -- -ginkgo.v
-        make test WHAT=test/integration/dra/cluster FULL_LOG=true KUBE_TEST_ARGS="-count=1 -args -ginkgo.v"
+        go test -v -count=1 -timeout=1h ./test/e2e_dra -args -ginkgo.v
+        dlv test ./test/e2e_dra -- -ginkgo.v
+        make test KUBE_TIMEOUT=-timeout=1h WHAT=test/e2e_dra FULL_LOG=true KUBE_TEST_ARGS="-count=1 -args -ginkgo.v"
 
 `make test` instead of `make test-integration` is intentional: `local-up-cluster.sh`
 itself wants to start etcd. `-count=1` ensures that test runs each time it is invoked.
 `-v` and `-ginkgo.v` make the test output visible while the test runs.
 
-To simplify starting from scratch, ./test/integration/dra/cluster/run.sh cleans
+To simplify starting from scratch, `./test/e2e_dra/run.sh` cleans
 up, sets permissions, and then invokes whatever command is specified on the
 command line:
 
-     ./test/integration/dra/cluster/run.sh go test ./test/integration/dra/cluster
+     ./test/e2e_dra/run.sh go test ./test/e2e_dra
 
 The test is implemented as a Ginkgo suite because that allows reusing the same
 helper code as in E2E tests. Long-term the goal is to port that helper code to

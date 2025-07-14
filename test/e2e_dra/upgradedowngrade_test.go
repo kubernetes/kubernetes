@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package e2edra
 
 import (
 	"archive/tar"
@@ -81,9 +81,6 @@ func repoRootDefault() string {
 }
 
 func TestUpgradeDowngrade(t *testing.T) {
-	if envName, dir := currentBinDir(); dir == "" {
-		t.Skipf("%s must be set to test DRA upgrade/downgrade scenarios.", envName)
-	}
 	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
 	ginkgo.RunSpecs(t, "DRA", suiteConfig, reporterConfig)
 }
@@ -102,6 +99,11 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// TODO: replace with helper code from https://github.com/kubernetes/kubernetes/pull/122481 should that get merged.
 		tCtx := ktesting.Init(GinkgoContextTB())
 		tCtx = ktesting.WithContext(tCtx, ctx)
+
+		envName, dir := currentBinDir()
+		if dir == "" {
+			tCtx.Fatalf("%s must be set to test DRA upgrade/downgrade scenarios.", envName)
+		}
 
 		// Determine what we need to downgrade to.
 		tCtx = ktesting.Begin(tCtx, "get source code version")
@@ -214,7 +216,6 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// We could split this up into first updating the apiserver, then control plane components, then restarting kubelet.
 		// For the purpose of this test here we we primarily care about full before/after comparisons, so not done yet.
 		// TODO
-		_, dir := currentBinDir()
 		restoreOptions := cluster.Modify(tCtx, localupcluster.ModifyOptions{Upgrade: true, BinDir: dir})
 		tCtx = ktesting.End(tCtx)
 
