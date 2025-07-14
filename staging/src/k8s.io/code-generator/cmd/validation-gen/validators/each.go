@@ -379,6 +379,7 @@ var (
 	validateEachMapVal        = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
 	validateSemanticDeepEqual = types.Name{Package: libValidationPkg, Name: "SemanticDeepEqual"}
 	validateDirectEqual       = types.Name{Package: libValidationPkg, Name: "DirectEqual"}
+	validateDirectEqualPtr    = types.Name{Package: libValidationPkg, Name: "DirectEqualPtr"}
 )
 
 func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
