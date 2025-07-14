@@ -45,17 +45,17 @@ func TestNoUtils(t *testing.T) {
 			want: `
 			# HELP apiserver_mutating_admission_policy_check_duration_seconds [ALPHA] Mutation admission latency for individual mutation expressions in seconds, labeled by policy and binding.
             # TYPE apiserver_mutating_admission_policy_check_duration_seconds histogram
-			apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="pass",policy="policy.example.com",policy_binding="binding.example.com",le="0.0000005"} 0
-            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="pass",policy="policy.example.com",policy_binding="binding.example.com",le="0.001"} 0
-            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="pass",policy="policy.example.com",policy_binding="binding.example.com",le="0.01"} 0
-            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="pass",policy="policy.example.com",policy_binding="binding.example.com",le="0.1"} 0
-            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="pass",policy="policy.example.com",policy_binding="binding.example.com",le="1"} 0
-            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="pass",policy="policy.example.com",policy_binding="binding.example.com",le="+Inf"} 1
-            apiserver_mutating_admission_policy_check_duration_seconds_sum{error_type="invalid_error",mutation_action="pass",policy="policy.example.com",policy_binding="binding.example.com"} 10
-            apiserver_mutating_admission_policy_check_duration_seconds_count{error_type="invalid_error",mutation_action="pass",policy="policy.example.com",policy_binding="binding.example.com"} 1
+			apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.0000005"} 0
+            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.001"} 0
+            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.01"} 0
+            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.1"} 0
+            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="1"} 0
+            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="+Inf"} 1
+            apiserver_mutating_admission_policy_check_duration_seconds_sum{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 10
+            apiserver_mutating_admission_policy_check_duration_seconds_count{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 1
             # HELP apiserver_mutating_admission_policy_check_total [ALPHA] Mutation admission policy check total, labeled by policy and further identified by binding.
             # TYPE apiserver_mutating_admission_policy_check_total counter
-            apiserver_mutating_admission_policy_check_total{error_type="invalid_error",mutation_action="pass",policy="policy.example.com",policy_binding="binding.example.com"} 1
+            apiserver_mutating_admission_policy_check_total{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 1
 			`,
 			observer: func() {
 				Metrics.ObserveAdmission(context.TODO(), time.Duration(10)*time.Second, "policy.example.com", "binding.example.com", MutatingInvalidError)
@@ -66,17 +66,17 @@ func TestNoUtils(t *testing.T) {
 			want: `
 			# HELP apiserver_mutating_admission_policy_check_duration_seconds [ALPHA] Mutation admission latency for individual mutation expressions in seconds, labeled by policy and binding.
             # TYPE apiserver_mutating_admission_policy_check_duration_seconds histogram
-			apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="error",policy="policy.example.com",policy_binding="binding.example.com",le="0.0000005"} 0
-            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="error",policy="policy.example.com",policy_binding="binding.example.com",le="0.001"} 0
-            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="error",policy="policy.example.com",policy_binding="binding.example.com",le="0.01"} 0
-            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="error",policy="policy.example.com",policy_binding="binding.example.com",le="0.1"} 0
-            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="error",policy="policy.example.com",policy_binding="binding.example.com",le="1"} 0
-            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",mutation_action="error",policy="policy.example.com",policy_binding="binding.example.com",le="+Inf"} 1
-            apiserver_mutating_admission_policy_check_duration_seconds_sum{error_type="invalid_error",mutation_action="error",policy="policy.example.com",policy_binding="binding.example.com"} 10
-            apiserver_mutating_admission_policy_check_duration_seconds_count{error_type="invalid_error",mutation_action="error",policy="policy.example.com",policy_binding="binding.example.com"} 1
+			apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.0000005"} 0
+            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.001"} 0
+            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.01"} 0
+            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="0.1"} 0
+            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="1"} 0
+            apiserver_mutating_admission_policy_check_duration_seconds_bucket{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com",le="+Inf"} 1
+            apiserver_mutating_admission_policy_check_duration_seconds_sum{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 10
+            apiserver_mutating_admission_policy_check_duration_seconds_count{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 1
             # HELP apiserver_mutating_admission_policy_check_total [ALPHA] Mutation admission policy check total, labeled by policy and further identified by binding.
             # TYPE apiserver_mutating_admission_policy_check_total counter
-            apiserver_mutating_admission_policy_check_total{error_type="invalid_error",mutation_action="error",policy="policy.example.com",policy_binding="binding.example.com"} 1
+            apiserver_mutating_admission_policy_check_total{error_type="invalid_error",policy="policy.example.com",policy_binding="binding.example.com"} 1
 			`,
 			observer: func() {
 				Metrics.ObserveRejection(context.TODO(), time.Duration(10)*time.Second, "policy.example.com", "binding.example.com", MutatingInvalidError)
