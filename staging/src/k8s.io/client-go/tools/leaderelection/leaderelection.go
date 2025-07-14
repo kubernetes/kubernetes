@@ -308,8 +308,8 @@ func (le *LeaderElector) renew(ctx context.Context) {
 func (le *LeaderElector) release() bool {
 	ctx := context.Background()
 
-	// 1. obtain the electionRecord
-	oldLeaderElectionRecord, oldLeaderElectionRawRecord, err := le.config.Lock.Get(ctx)
+	// update the resourceVersion of lease
+	oldLeaderElectionRecord, _, err := le.config.Lock.Get(ctx)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
@@ -317,12 +317,6 @@ func (le *LeaderElector) release() bool {
 		}
 		klog.Infof("lease lock not found: %v", le.config.Lock.Describe())
 		return false
-	}
-	// 2. Record obtained, check the Identity & Time
-	if !bytes.Equal(le.observedRawRecord, oldLeaderElectionRawRecord) {
-		le.setObservedRecord(oldLeaderElectionRecord)
-
-		le.observedRawRecord = oldLeaderElectionRawRecord
 	}
 
 	if !le.IsLeader() {
