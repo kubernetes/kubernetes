@@ -30,8 +30,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/environment"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/ptr"
@@ -44,6 +47,10 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 		// If this check fails, uncomment the debug.PrintStack() when the authz selectors
 		// library is first initialized to find the culprit, and modify it to be lazily initialized on first use.
 		t.Fatalf("authz selector library was initialized before feature gates were finalized (possibly from an init() or package variable)")
+	}
+
+	if !featureEnabled {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	}
 
 	// Start the server with the desired feature enablement
