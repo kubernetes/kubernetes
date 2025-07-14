@@ -76,7 +76,7 @@ func NewWorkEstimator(objectCountFn statsGetterFunc, watchCountFn watchCountGett
 	estimator := &workEstimator{
 		minimumSeats:          config.MinimumSeats,
 		maximumSeatsLimit:     config.MaximumSeatsLimit,
-		listWorkEstimator:     newListWorkEstimator(objectCountFn, config, maxSeatsFn),
+		listWorkEstimator:     newListWorkEstimator(objectCountFn, config, maxSeatsFn).estimate,
 		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn, config, maxSeatsFn),
 	}
 	return estimator.estimate
