@@ -312,7 +312,7 @@ type consistencyChecker struct {
 type cacher interface {
 	getLister
 	Ready() bool
-	Compact(string) error
+	MarkConsistent(bool)
 }
 
 type getLister interface {
@@ -340,6 +340,7 @@ func (c *consistencyChecker) check(ctx context.Context) {
 	if digests.CacheDigest == digests.EtcdDigest {
 		klog.V(3).InfoS("Cache consistency check passed", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "resourceVersion", digests.ResourceVersion, "digest", digests.CacheDigest)
 		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.groupResource.Group, c.groupResource.Resource, "success").Inc()
+		c.cacher.MarkConsistent(true)
 		return
 	}
 	klog.ErrorS(nil, "Cache consistency check failed", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest)
@@ -347,10 +348,7 @@ func (c *consistencyChecker) check(ctx context.Context) {
 	if panicOnCacheInconsistency {
 		panic(fmt.Sprintf("Cache consistency check failed, group: %q, resource: %q, resourceVersion: %q, etcdDigest: %q, cacheDigest: %q", c.groupResource.Group, c.groupResource.Resource, digests.ResourceVersion, digests.EtcdDigest, digests.CacheDigest))
 	}
-	err = c.cacher.Compact(digests.ResourceVersion)
-	if err != nil {
-		klog.ErrorS(err, "Failed to compact cache", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "resourceVersion", digests.ResourceVersion)
-	}
+	c.cacher.MarkConsistent(false)
 }
 
 func (c *consistencyChecker) calculateDigests(ctx context.Context) (*storageDigest, error) {

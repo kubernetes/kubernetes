@@ -1140,6 +1140,10 @@ func (c *Cacher) Compact(resourceVersion string) error {
 	return nil
 }
 
+func (c *Cacher) MarkConsistent(consistent bool) {
+	c.watchCache.MarkConsistent(consistent)
+}
+
 // Stop implements the graceful termination.
 func (c *Cacher) Stop() {
 	c.stopLock.Lock()
