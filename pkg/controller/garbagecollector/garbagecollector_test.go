@@ -1456,9 +1456,9 @@ func TestConflictingData(t *testing.T) {
 				processAttemptToDelete(1),
 				assertState(state{
 					clientActions: []string{
-						"get /v1, Resource=pods ns=ns1 name=podname1",
-						"get apps/v1, Resource=deployments ns=ns1 name=deployment1",
-						"delete /v1, Resource=pods ns=ns1 name=podname1",
+						"get /v1, Resource=pods ns=ns1 name=podname1", // lookup of child pre-delete
+						"get apps/v1, Resource=deployments ns=ns1 name=deployment1", // lookup of parent
+						"delete /v1, Resource=pods ns=ns1 name=podname1", // delete child
 					},
 					graphNodes:             []*node{makeNode(pod1ns1, withOwners(deployment1apps)), makeNode(deployment1apps)},
 					pendingAttemptToDelete: []*node{makeNode(deployment1apps)},
@@ -1475,7 +1475,7 @@ func TestConflictingData(t *testing.T) {
 					clientActions: []string{
 						"get apps/v1, Resource=deployments ns=ns1 name=deployment1",
 						"get apps/v1, Resource=deployments ns=ns1 name=deployment1",
-						"patch apps/v1, Resource=deployments ns=ns1 name=deployment1",
+						"patch apps/v1, Resource=deployments ns=ns1 name=deployment1", // remove foreground finalizer
 					},
 					graphNodes: []*node{makeNode(deployment1apps)},
 				}),
@@ -2716,7 +2716,7 @@ func deleteObjectFromClient(group, version, resource, namespace, name string) st
 	}
 }
 
-func deleteForgroundObjectFromClient(group, version, resource, namespace, name string) step {
+func deleteForegroundObjectFromClient(group, version, resource, namespace, name string) step {
 	return step{
 		name: "deleteForgroundObjectFromClient",
 		check: func(ctx stepContext) {
@@ -2737,7 +2737,7 @@ func deleteForgroundObjectFromClient(group, version, resource, namespace, name s
 			}
 			now := metav1.Now()
 			obj.DeletionTimestamp = &now
-			obj.Finalizers = append(obj.Finalizers, "foregroundDeletion")
+			obj.Finalizers = append(obj.Finalizers, metav1.FinalizerDeleteDependents)
 			if _, err := c.UpdateFake(obj, metav1.UpdateOptions{}); err != nil {
 				ctx.t.Fatal(err)
 			}
