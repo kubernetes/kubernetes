@@ -25,7 +25,7 @@ kube::golang::setup_env
 
 cd "${KUBE_ROOT}"
 
-find_files() {
+find_owners_files() {
     git ls-files     \
         'OWNERS*'    \
         '**/OWNERS*' \
@@ -33,4 +33,4 @@ find_files() {
 }
 
 go -C "${KUBE_ROOT}/hack/tools" install sigs.k8s.io/yaml/yamlfmt
-find_files | xargs yamlfmt -o yaml -w
+find_owners_files | xargs yamlfmt -o yaml -w
