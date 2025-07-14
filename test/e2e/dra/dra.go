@@ -987,6 +987,21 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			gomega.Expect(getResourceClaim).ToNot(gomega.BeNil())
 			gomega.Expect(getResourceClaim.Status.Devices).To(gomega.Equal(updatedResourceClaim.Status.Devices))
 		})
+
+		if withKubelet {
+			// Serial because the example device plugin can only be deployed with one instance at a time.
+			f.It("supports extended resources together with ResourceClaim", f.WithSerial(), func(ctx context.Context) {
+				extendedResourceName := deployDevicePlugin(ctx, f, nodes.NodeNames[0:1])
+
+				pod := b.podExternal()
+				resources := v1.ResourceList{extendedResourceName: resource.MustParse("1")}
+				pod.Spec.Containers[0].Resources.Requests = resources
+				pod.Spec.Containers[0].Resources.Limits = resources
+				claim := b.externalClaim()
+				b.create(ctx, claim, pod)
+				b.testPod(ctx, f, pod)
+			})
+		}
 	}
 
 	// The following tests only make sense when there is more than one node.
