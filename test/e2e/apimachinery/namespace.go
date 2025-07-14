@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -481,7 +480,12 @@ var _ = SIGDescribe("OrderedNamespaceDeletion", func() {
 	f := framework.NewDefaultFramework("namespacedeletion")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	f.It("namespace deletion should delete pod first", framework.WithFeatureGate(features.OrderedNamespaceDeletion), func(ctx context.Context) {
+	/*
+		Release : v1.34
+		Testname: Ordered Namespace Deletion
+		Description: Pods must be deleted before other objects when deleting a namespace. See https://kep.k8s.io/5080
+	*/
+	f.It("namespace deletion should delete pod first", framework.WithConformance(), func(ctx context.Context) {
 		ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx, f)
 	})
 })
