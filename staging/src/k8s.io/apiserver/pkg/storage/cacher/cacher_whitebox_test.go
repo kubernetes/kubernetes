@@ -218,10 +218,17 @@ func (d *dummyStorage) GetCurrentResourceVersion(ctx context.Context) (uint64, e
 type dummyCacher struct {
 	dummyStorage
 	ready bool
+
+	lastCompactedResourceVersion string
 }
 
 func (d *dummyCacher) Ready() bool {
 	return d.ready
+}
+
+func (d *dummyCacher) Compact(resourceVersion string) error {
+	d.lastCompactedResourceVersion = resourceVersion
+	return nil
 }
 
 func TestShouldDelegateList(t *testing.T) {
