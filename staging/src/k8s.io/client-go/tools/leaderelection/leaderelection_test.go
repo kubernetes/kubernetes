@@ -677,6 +677,59 @@ func TestReleaseLeaseLeases(t *testing.T) {
 	testReleaseLease(t, "leases")
 }
 
+// TestReleaseMethodCallsGet test release method calls Get
+func TestReleaseMethodCallsGet(t *testing.T) {
+	objectType := "leases"
+	getCalled := false
+
+	lockMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+	recorder := record.NewFakeRecorder(100)
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+		EventRecorder: recorder,
+	}
+	c := &fake.Clientset{}
+	c.AddReactor("get", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		// flag to check if Get is called
+		getCalled = true
+		return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+			HolderIdentity:       "baz",
+			LeaseDurationSeconds: 10,
+		}), nil
+	})
+	c.AddReactor("update", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		return true, action.(fakeclient.UpdateAction).GetObject(), nil
+	})
+
+	lock := &rl.LeaseLock{
+		LeaseMeta:  lockMeta,
+		LockConfig: resourceLockConfig,
+		Client:     c.CoordinationV1(),
+	}
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 10 * time.Second,
+		Callbacks: LeaderCallbacks{
+			OnNewLeader: func(l string) {},
+		},
+	}
+	observedRawRecord := GetRawRecordOrDie(t, objectType, rl.LeaderElectionRecord{HolderIdentity: "baz"})
+	le := &LeaderElector{
+		config:            lec,
+		observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "baz"},
+		observedRawRecord: observedRawRecord,
+		observedTime:      time.Now(),
+		clock:             clock.RealClock{},
+		metrics:           globalMetricsFactory.newLeaderMetrics(),
+	}
+
+	le.release()
+
+	if !getCalled {
+		t.Errorf("release method does not call Get")
+	}
+}
+
 func TestReleaseOnCancellation_Leases(t *testing.T) {
 	testReleaseOnCancellation(t, "leases")
 }
