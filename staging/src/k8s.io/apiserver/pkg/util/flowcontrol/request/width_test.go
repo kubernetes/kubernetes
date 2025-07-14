@@ -88,7 +88,7 @@ func TestWorkEstimator(t *testing.T) {
 				"events.foo.bar": 699,
 			},
 			maxSeats:             10,
-			initialSeatsExpected: 8,
+			initialSeatsExpected: 4,
 		},
 		{
 			name:       "request verb is list, limit not set",
@@ -116,7 +116,7 @@ func TestWorkEstimator(t *testing.T) {
 				"events.foo.bar": 699,
 			},
 			maxSeats:             10,
-			initialSeatsExpected: 8,
+			initialSeatsExpected: 4,
 		},
 		{
 			name:       "request verb is list, no query parameters, count known",
@@ -130,7 +130,7 @@ func TestWorkEstimator(t *testing.T) {
 				"events.foo.bar": 399,
 			},
 			maxSeats:             10,
-			initialSeatsExpected: 8,
+			initialSeatsExpected: 4,
 		},
 		{
 			name:       "request verb is list, no query parameters, count not known",
@@ -156,7 +156,7 @@ func TestWorkEstimator(t *testing.T) {
 				"events.foo.bar": 699,
 			},
 			maxSeats:             10,
-			initialSeatsExpected: 8,
+			initialSeatsExpected: 4,
 		},
 		{
 			name:       "request verb is list, resource version is zero",
@@ -170,7 +170,7 @@ func TestWorkEstimator(t *testing.T) {
 				"events.foo.bar": 399,
 			},
 			maxSeats:             10,
-			initialSeatsExpected: 4,
+			initialSeatsExpected: 3,
 		},
 		{
 			name:       "request verb is list, resource version is zero, no limit",
@@ -197,7 +197,7 @@ func TestWorkEstimator(t *testing.T) {
 				"events.foo.bar": 699,
 			},
 			maxSeats:             10,
-			initialSeatsExpected: 8,
+			initialSeatsExpected: 4,
 		},
 		{
 			name:       "request verb is list, resource version match is NotOlderThan, limit not specified",
@@ -549,7 +549,7 @@ func TestWorkEstimator(t *testing.T) {
 				counts = map[string]int64{}
 			}
 			countsFn := func(key string) (storage.Stats, error) {
-				return storage.Stats{ObjectCount: counts[key]}, test.countErr
+				return storage.Stats{ObjectCount: counts[key], EstimatedAverageObjectSizeBytes: 1_000}, test.countErr
 			}
 			watchCountsFn := func(_ *apirequest.RequestInfo) int {
 				return test.watchCount
