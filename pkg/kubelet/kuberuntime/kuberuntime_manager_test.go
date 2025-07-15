@@ -48,6 +48,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	crierror "k8s.io/cri-api/pkg/errors"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -3465,6 +3466,26 @@ func TestDoPodResizeAction(t *testing.T) {
 				pod.Spec.Containers[2].Resources = resources
 			}
 
+			m.runtimeHelper = &containertest.FakeRuntimeHelper{
+				PodStats: map[types.UID]*statsapi.PodStats{
+					pod.UID: {
+						PodRef: statsapi.PodReference{
+							Name:      pod.Name,
+							Namespace: pod.Namespace,
+							UID:       string(pod.UID),
+						},
+						Memory: &statsapi.MemoryStats{
+							UsageBytes: ptr.To[uint64](20),
+						},
+						Containers: []statsapi.ContainerStats{{
+							Name: pod.Spec.Containers[0].Name,
+							Memory: &statsapi.MemoryStats{
+								UsageBytes: ptr.To[uint64](10),
+							},
+						}},
+					}},
+			}
+
 			updateInfo := containerToUpdateInfo{
 				container:                 &pod.Spec.Containers[0],
 				kubeContainerID:           kps.ContainerStatuses[0].ID,
@@ -3479,17 +3500,271 @@ func TestDoPodResizeAction(t *testing.T) {
 			actions := podActions{
 				ContainersToUpdate: containersToUpdate,
 			}
-			resizeResult := m.doPodResizeAction(pod, actions)
+			resizeResult := m.doPodResizeAction(t.Context(), pod, kps, actions)
 
 			if tc.expectedError != "" {
 				require.Error(t, resizeResult.Error)
 				require.EqualError(t, resizeResult.Error, tc.expectedError)
 				require.Equal(t, tc.expectedErrorMessage, resizeResult.Message)
 			} else {
-				require.NoError(t, resizeResult.Error)
+				require.NoError(t, resizeResult.Error, resizeResult.Message)
 			}
 
 			mock.AssertExpectationsForObjects(t, mockPCM)
+		})
+	}
+}
+
+func TestCheckPodResize(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+
+	for _, tc := range []struct {
+		testName                               string
+		currentResources, desiredResources     containerResources
+		currentPodMemLimit, desiredPodMemLimit *int64
+		containerMemoryUsage, podMemoryUsage   *uint64
+		expectedError                          bool
+	}{
+		{
+			testName: "Resize memory request no limits",
+			currentResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest:    100,
+				memoryRequest: 200,
+			},
+			expectedError: false,
+		},
+		{
+			testName: "Add container limits, low usage",
+			currentResources: containerResources{
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](10),
+			podMemoryUsage:       ptr.To[uint64](10),
+			expectedError:        false,
+		},
+		{
+			testName: "Add container limits, high usage",
+			currentResources: containerResources{
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](200),
+			podMemoryUsage:       ptr.To[uint64](200),
+			expectedError:        true,
+		},
+		{
+			testName: "Add container limits, missing container usage",
+			currentResources: containerResources{
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			podMemoryUsage: ptr.To[uint64](10),
+			expectedError:  true,
+		},
+		{
+			testName: "Add container limits, missing pod usage",
+			currentResources: containerResources{
+				memoryRequest: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](10),
+			expectedError:        false,
+		},
+		{
+			testName: "Increase container limits",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 200,
+			},
+			expectedError: false,
+		},
+		{
+			testName: "Decrease container limits, low usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 200,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](20),
+			expectedError:        false,
+		},
+		{
+			testName: "Decrease container limits, high usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 200,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			containerMemoryUsage: ptr.To[uint64](150),
+			podMemoryUsage:       ptr.To[uint64](150),
+			expectedError:        true,
+		},
+		{
+			testName: "Add pod limit, low usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](20),
+			expectedError:        false,
+		},
+		{
+			testName: "Add pod limit, high usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](200),
+			expectedError:        true,
+		},
+		{
+			testName: "Increase pod limits",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			currentPodMemLimit:   ptr.To[int64](100),
+			desiredPodMemLimit:   ptr.To[int64](200),
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](20),
+			expectedError:        false,
+		},
+		{
+			testName: "Decrease pod limits, low usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			currentPodMemLimit:   ptr.To[int64](200),
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](20),
+			podMemoryUsage:       ptr.To[uint64](20),
+			expectedError:        false,
+		},
+		{
+			testName: "Decrease pod limits, high usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			currentPodMemLimit:   ptr.To[int64](200),
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](50),
+			podMemoryUsage:       ptr.To[uint64](150),
+			expectedError:        true,
+		},
+		{
+			testName: "Decrease pod limits, missing usage",
+			currentResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			currentPodMemLimit:   ptr.To[int64](200),
+			desiredPodMemLimit:   ptr.To[int64](100),
+			containerMemoryUsage: ptr.To[uint64](50),
+			podMemoryUsage:       nil,
+			expectedError:        true,
+		},
+	} {
+		t.Run(tc.testName, func(t *testing.T) {
+			_, _, m, err := createTestRuntimeManager()
+			require.NoError(t, err)
+
+			pod, kps := makeBasePodAndStatus()
+			// pod spec and allocated resources are already updated as desired when doPodResizeAction() is called.
+			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuRequest, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryRequest, resource.DecimalSI),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(tc.desiredResources.cpuLimit, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(tc.desiredResources.memoryLimit, resource.DecimalSI),
+				},
+			}
+
+			updateInfo := containerToUpdateInfo{
+				container:                 &pod.Spec.Containers[0],
+				kubeContainerID:           kps.ContainerStatuses[0].ID,
+				desiredContainerResources: tc.desiredResources,
+				currentContainerResources: &tc.currentResources,
+			}
+			containersToUpdate := map[v1.ResourceName][]containerToUpdateInfo{
+				v1.ResourceMemory: {updateInfo},
+			}
+
+			actions := podActions{
+				ContainersToUpdate: containersToUpdate,
+			}
+
+			podStats := &statsapi.PodStats{
+				PodRef: statsapi.PodReference{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					UID:       string(pod.UID),
+				},
+				Memory: &statsapi.MemoryStats{
+					UsageBytes: tc.podMemoryUsage,
+				},
+			}
+			for _, container := range pod.Spec.Containers {
+				podStats.Containers = append(podStats.Containers, statsapi.ContainerStats{
+					Name: container.Name,
+					Memory: &statsapi.MemoryStats{
+						UsageBytes: tc.containerMemoryUsage,
+					},
+				})
+			}
+			m.runtimeHelper = &containertest.FakeRuntimeHelper{
+				PodStats: map[types.UID]*statsapi.PodStats{pod.UID: podStats},
+			}
+
+			currentPodResources := &cm.ResourceConfig{Memory: tc.currentPodMemLimit}
+			desiredPodResources := &cm.ResourceConfig{Memory: tc.desiredPodMemLimit}
+
+			err = m.validatePodResizeAction(t.Context(), pod, kps, currentPodResources, desiredPodResources, actions)
+
+			if tc.expectedError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
