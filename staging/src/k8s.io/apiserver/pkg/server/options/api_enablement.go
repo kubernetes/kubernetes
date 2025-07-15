@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
 )
 
 // APIEnablementOptions contains the options for which resources to turn on and off.
@@ -104,6 +105,14 @@ func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *
 	}
 
 	c.MergedResourceConfig = mergedResourceConfig
+
+	if c.EffectiveVersion.BinaryVersion() != c.EffectiveVersion.EmulationVersion() {
+		for _, version := range registry.PrioritizedVersionsAllGroups() {
+			if strings.Contains(version.Version, "alpha") {
+				klog.Warning("alpha api enabled with emulated groupVersion, this is unsupported, proceed at your own risk: api=", version.String())
+			}
+		}
+	}
 
 	return err
 }
