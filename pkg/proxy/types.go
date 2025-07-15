@@ -28,7 +28,7 @@ import (
 type Provider interface {
 	config.EndpointSliceHandler
 	config.ServiceHandler
-	config.NodeTopologyHandler
+	config.NodeHandler
 	config.ServiceCIDRHandler
 
 	// Sync immediately synchronizes the Provider's current state to proxy rules.
