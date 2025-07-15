@@ -131,9 +131,39 @@ func Convert_example_Conversion_To_v1_Conversion(in *example.Conversion, out *Co
 }
 
 func autoConvert_v1_MemoryDifferent_To_example_MemoryDifferent(in *MemoryDifferent, out *example.MemoryDifferent, s conversion.Scope) error {
-	out.Items = (*example.MemoryDifferent)(unsafe.Pointer(in.Items))
-	out.Properties = *(*map[string]example.MemoryDifferent)(unsafe.Pointer(&in.Properties))
-	out.AllOf = *(*[]example.MemoryDifferent)(unsafe.Pointer(&in.AllOf))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = new(example.MemoryDifferent)
+		if err := Convert_v1_MemoryDifferent_To_example_MemoryDifferent(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Items = nil
+	}
+	if in.Properties != nil {
+		in, out := &in.Properties, &out.Properties
+		*out = make(map[string]example.MemoryDifferent, len(*in))
+		for key, val := range *in {
+			newVal := new(example.MemoryDifferent)
+			if err := Convert_v1_MemoryDifferent_To_example_MemoryDifferent(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Properties = nil
+	}
+	if in.AllOf != nil {
+		in, out := &in.AllOf, &out.AllOf
+		*out = make([]example.MemoryDifferent, len(*in))
+		for i := range *in {
+			if err := Convert_v1_MemoryDifferent_To_example_MemoryDifferent(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.AllOf = nil
+	}
 	if err := metav1.Convert_Pointer_bool_To_bool(&in.Bool, &out.Bool, s); err != nil {
 		return err
 	}
@@ -146,9 +176,39 @@ func Convert_v1_MemoryDifferent_To_example_MemoryDifferent(in *MemoryDifferent, 
 }
 
 func autoConvert_example_MemoryDifferent_To_v1_MemoryDifferent(in *example.MemoryDifferent, out *MemoryDifferent, s conversion.Scope) error {
-	out.Items = (*MemoryDifferent)(unsafe.Pointer(in.Items))
-	out.Properties = *(*map[string]MemoryDifferent)(unsafe.Pointer(&in.Properties))
-	out.AllOf = *(*[]MemoryDifferent)(unsafe.Pointer(&in.AllOf))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = new(MemoryDifferent)
+		if err := Convert_example_MemoryDifferent_To_v1_MemoryDifferent(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Items = nil
+	}
+	if in.Properties != nil {
+		in, out := &in.Properties, &out.Properties
+		*out = make(map[string]MemoryDifferent, len(*in))
+		for key, val := range *in {
+			newVal := new(MemoryDifferent)
+			if err := Convert_example_MemoryDifferent_To_v1_MemoryDifferent(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Properties = nil
+	}
+	if in.AllOf != nil {
+		in, out := &in.AllOf, &out.AllOf
+		*out = make([]MemoryDifferent, len(*in))
+		for i := range *in {
+			if err := Convert_example_MemoryDifferent_To_v1_MemoryDifferent(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.AllOf = nil
+	}
 	if err := metav1.Convert_bool_To_Pointer_bool(&in.Bool, &out.Bool, s); err != nil {
 		return err
 	}
