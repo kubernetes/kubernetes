@@ -191,7 +191,7 @@
         "github.com/prometheus/client_golang",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
-        "sigs.k8s.io/structured-merge-diff/v4"
+        "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/klauspost/compress": [
         "github.com/prometheus/client_golang",
@@ -211,13 +211,14 @@
         "github.com/prometheus/client_golang",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
-        "sigs.k8s.io/structured-merge-diff/v4"
+        "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/modern-go/reflect2": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
-        "k8s.io/kube-openapi"
+        "k8s.io/kube-openapi",
+        "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/pkg/errors": [
         "github.com/Microsoft/hnslib",

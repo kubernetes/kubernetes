@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // priorityLevelConfigurationStrategy implements verification logic for priority level configurations.

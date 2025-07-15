@@ -17,7 +17,7 @@ limitations under the License.
 package managedfields
 
 import (
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/managedfields/internal"
