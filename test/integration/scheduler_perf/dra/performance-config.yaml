@@ -633,3 +633,158 @@
       measurePods: 2500
       measureClaims: 500 # must be measurePods / 5
       maxClaimsPerNode: 2
+
+# DRABindingConditionsTest validates DRA device binding condition handling mechanisms.
+# - Success scenario: DeviceAttached=True → Pod should schedule
+# - Failure scenario: AttachmentFailed=True → Pod should NOT schedule
+- name: DRABindingConditionsTest
+  featureGates:
+    DynamicResourceAllocation: true
+    DRADeviceBindingConditions: true
+    DRAResourceClaimDeviceStatus: true
+    SchedulerQueueingHints: true
+  workloadTemplate:
+    - opcode: createNodes
+      nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+      countParam: $nodesWithDRA
+    - opcode: createResourceDriver
+      driverName: test-driver.cdi.k8s.io
+      nodes: scheduler-perf-dra-*
+      maxClaimsPerNodeParam: $maxClaimsPerNode
+    - opcode: createAny
+      templatePath: templates/deviceclass.yaml
+    - opcode: createAny
+      namespace: test
+      templatePath: templates/resourceclaimtemplate.yaml
+    - opcode: startCollectingMetrics
+      name: binding_conditions
+      namespaces: [test]
+    - opcode: createPods
+      namespace: test
+      podTemplatePath: templates/pod-with-claim-template.yaml
+      countParam: $measurePods
+      skipWaitToCompletion: true
+    - opcode: updateDeviceConditions
+      namespace: test
+      conditionTypeParam: $conditionType
+      conditionStatusParam: $conditionStatus
+      countParam: $measurePods
+      durationParam: $updateDuration
+    - opcode: checkPodScheduled
+      namespace: test
+      scheduledParam: $scheduled
+      durationParam: $checkDuration
+    - opcode: stopCollectingMetrics
+  workloads:
+    - name: fast_AttachmentSuccess
+      labels: [integration-test, short]
+      params:
+        nodesWithDRA: 1
+        measurePods: 1
+        maxClaimsPerNode: 1
+        conditionType: DeviceAttached
+        conditionStatus: "True"
+        scheduled: true
+        updateDuration: 30s
+        checkDuration: 30s
+    - name: fast_AttachmentFailed
+      labels: [integration-test, short]
+      params:
+        nodesWithDRA: 1
+        measurePods: 1
+        maxClaimsPerNode: 1
+        conditionType: AttachmentFailed
+        conditionStatus: "True"
+        scheduled: false
+        updateDuration: 30s
+        checkDuration: 30s
+    - name: multiple_pods_AttachmentSuccess
+      labels: [integration-test, short]
+      params:
+        nodesWithDRA: 1
+        measurePods: 5
+        maxClaimsPerNode: 10
+        conditionType: DeviceAttached
+        conditionStatus: "True"
+        scheduled: true
+        updateDuration: 30s
+        checkDuration: 30s
+    - name: multiple_pods_AttachmentFailed
+      labels: [integration-test, short]
+      params:
+        nodesWithDRA: 1
+        measurePods: 5
+        maxClaimsPerNode: 10
+        conditionType: AttachmentFailed
+        conditionStatus: "True"
+        scheduled: false
+        updateDuration: 30s
+        checkDuration: 30s
+
+# DRABindingConditionsWithSharedResourceClaimClaimTest validates DRA device binding condition handling mechanisms
+# with a shared ResourceClaim. The test creates multiple pods that share the same ResourceClaim.
+# - Success scenario: DeviceAttached=True → All pods should schedule
+# - Failure scenario: AttachmentFailed=True → All pods should NOT schedule
+- name: DRABindingConditionsWithSharedResourceClaimTest
+  featureGates:
+    DynamicResourceAllocation: true
+    DRADeviceBindingConditions: true
+    DRAResourceClaimDeviceStatus: true
+    SchedulerQueueingHints: true
+  workloadTemplate:
+    - opcode: createNodes
+      nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+      countParam: $nodesWithDRA
+    - opcode: createResourceDriver
+      driverName: test-driver.cdi.k8s.io
+      nodes: scheduler-perf-dra-*
+      maxClaimsPerNodeParam: $maxClaimsPerNode
+    - opcode: createAny
+      templatePath: templates/deviceclass.yaml
+    - opcode: createAny
+      namespace: test
+      templatePath: templates/resourceclaim.yaml
+    - opcode: startCollectingMetrics
+      name: binding_conditions
+      namespaces: [test]
+    - opcode: createPods
+      namespace: test
+      podTemplatePath: templates/pod-with-claim-ref.yaml
+      countParam: $measurePods
+      skipWaitToCompletion: true
+    - opcode: updateDeviceConditions
+      namespace: test
+      conditionTypeParam: $conditionType
+      conditionStatusParam: $conditionStatus
+      countParam: $resourceClaimCount
+      durationParam: $updateDuration
+    - opcode: checkPodScheduled
+      namespace: test
+      scheduledParam: $scheduled
+      durationParam: $checkDuration
+    - opcode: stopCollectingMetrics
+  workloads:
+    - name: multiple_pods_AttachmentSuccess
+      labels: [integration-test, short]
+      params:
+        nodesWithDRA: 1
+        measurePods: 5
+        maxClaimsPerNode: 10
+        conditionType: DeviceAttached
+        conditionStatus: "True"
+        resourceClaimCount: 1
+        scheduled: true
+        updateDuration: 30s
+        checkDuration: 30s
+    - name: multiple_pods_AttachmentFailed
+      labels: [integration-test, short]
+      params:
+        nodesWithDRA: 1
+        measurePods: 5
+        maxClaimsPerNode: 10
+        conditionType: AttachmentFailed
+        conditionStatus: "True"
+        resourceClaimCount: 1
+        scheduled: false
+        updateDuration: 30s
+        checkDuration: 30s

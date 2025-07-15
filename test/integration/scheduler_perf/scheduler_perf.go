@@ -95,6 +95,8 @@ const (
 	sleepOpcode                  operationCode = "sleep"
 	startCollectingMetricsOpcode operationCode = "startCollectingMetrics"
 	stopCollectingMetricsOpcode  operationCode = "stopCollectingMetrics"
+	updateDeviceConditionsOpcode operationCode = "updateDeviceConditions"
+	checkPodScheduledOpcode      operationCode = "checkPodScheduled"
 )
 
 const (
@@ -498,6 +500,8 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		sleepOpcode:                  &sleepOp{},
 		startCollectingMetricsOpcode: &startCollectingMetricsOp{},
 		stopCollectingMetricsOpcode:  &stopCollectingMetricsOp{},
+		updateDeviceConditionsOpcode: &updateDeviceConditionsOp{},
+		checkPodScheduledOpcode:      &checkPodScheduledOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	// First determine the opcode using lenient decoding (= ignore extra fields).
@@ -986,6 +990,140 @@ func (*stopCollectingMetricsOp) collectsMetrics() bool {
 
 func (scm stopCollectingMetricsOp) patchParams(_ *workload) (realOp, error) {
 	return &scm, nil
+}
+
+// checkPodScheduledOp defines an op that checks if all pods in a namespace are scheduled
+// or unscheduled. This is used to test the device binding conditions.
+// The check is done by listing all pods in the namespace and checking their status.
+type checkPodScheduledOp struct {
+	// Must be checkPodScheduledOpcode.
+	Opcode operationCode
+	// Namespace where the pods are located.
+	Namespace string
+	// Duration for the test.
+	Duration metav1.Duration
+	// DurationParam is the parameter for the duration.
+	// If set, the duration is parameterized through this parameter.
+	DurationParam string
+	// ScheduledParam is the parameter for the expected scheduled state.
+	// If set, the expected scheduled state is parameterized through this parameter.
+	ScheduledParam string
+	// ExpectedScheduled is the expected scheduled state.
+	// If true, the op checks if all pods are scheduled.
+	// If false, the op checks if all pods are unscheduled.
+	// This is used to test the device binding conditions.
+	ExpectedScheduled bool
+}
+
+func (op *checkPodScheduledOp) isValid(allowParameterization bool) error {
+	if op.Namespace == "" {
+		return fmt.Errorf("namespace must be set")
+	}
+	return nil
+}
+
+func (op *checkPodScheduledOp) collectsMetrics() bool {
+	return false
+}
+
+func (op *checkPodScheduledOp) patchParams(w *workload) (realOp, error) {
+	if op.ScheduledParam != "" {
+		var err error
+		op.ExpectedScheduled, err = getParam[bool](w.Params, op.ScheduledParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if op.DurationParam != "" {
+		durationStr, err := getParam[string](w.Params, op.DurationParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		if op.Duration.Duration, err = time.ParseDuration(durationStr); err != nil {
+			return nil, fmt.Errorf("parsing duration parameter %s: %w", op.DurationParam, err)
+		}
+	}
+
+	return op, op.isValid(false)
+}
+
+func (op *checkPodScheduledOp) requiredNamespaces() []string {
+	if op.Namespace != "" {
+		return []string{op.Namespace}
+	}
+	return nil
+}
+
+func (op *checkPodScheduledOp) run(tCtx ktesting.TContext) {
+	ctx, cancel := context.WithTimeout(tCtx, op.Duration.Duration)
+	defer cancel()
+
+	var (
+		// lastViolation is used to track the last violation of the expected state.
+		lastViolation string
+		// Track the start time of the stable state.
+		stableStart *time.Time
+	)
+
+	validate := func(pod v1.Pod) bool {
+		isScheduled := pod.Spec.NodeName != ""
+		return (op.ExpectedScheduled && isScheduled) || (!op.ExpectedScheduled && !isScheduled)
+	}
+
+	tick := time.Tick(1 * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			if ctx.Err() != context.DeadlineExceeded {
+				tCtx.Fatalf("Context cancelled: %v. Last violation: %s", ctx.Err(), lastViolation)
+			}
+			if op.ExpectedScheduled {
+				tCtx.Fatalf("Timeout waiting for pods to be scheduled. Context error: %v. Last violation: %s", ctx.Err(), lastViolation)
+			}
+			if lastViolation != "" {
+				tCtx.Fatalf("Expected pods to remain unscheduled, but some pods were scheduled. Last violation: %s", lastViolation)
+			}
+			// If ExpectedScheduled is false (pods should be unscheduled), timeout means success.
+			tCtx.Logf("All pods remained unscheduled for the duration")
+			return
+		case <-tick:
+			pods, err := tCtx.Client().CoreV1().Pods(op.Namespace).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				tCtx.Logf("Failed to list pods: %v", err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			allValid := true
+			for _, pod := range pods.Items {
+				if !validate(pod) {
+					allValid = false
+					lastViolation = fmt.Sprintf("Pod %s: ExpectedScheduled=%v, ActualScheduled=%v (Node=%s)",
+						pod.Name, op.ExpectedScheduled, pod.Spec.NodeName != "", pod.Spec.NodeName)
+					break
+				}
+			}
+
+			if !allValid {
+				stableStart = nil
+			} else {
+				if op.ExpectedScheduled {
+					tCtx.Logf("All pods scheduled successfully")
+					return
+				} else {
+					if stableStart == nil {
+						now := time.Now()
+						stableStart = &now
+						tCtx.Logf("All pods are unscheduled, starting stability check")
+					} else if time.Since(*stableStart) >= 5*time.Second {
+						tCtx.Logf("All pods remain unscheduled for the duration")
+						return
+					}
+				}
+			}
+		}
+	}
 }
 
 func initTestOutput(tb testing.TB) io.Writer {
