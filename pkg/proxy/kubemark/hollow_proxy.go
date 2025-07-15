@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/utils/ptr"
 )
 
@@ -37,7 +38,9 @@ type HollowProxy struct {
 	ProxyServer *proxyapp.ProxyServer
 }
 
-type FakeProxier struct{}
+type FakeProxier struct {
+	proxyconfig.NoopNodeHandler
+}
 
 func (*FakeProxier) Sync() {}
 func (*FakeProxier) SyncLoop() {
@@ -52,7 +55,6 @@ func (*FakeProxier) OnEndpointSliceUpdate(oldSlice, slice *discoveryv1.EndpointS
 func (*FakeProxier) OnEndpointSliceDelete(slice *discoveryv1.EndpointSlice)           {}
 func (*FakeProxier) OnEndpointSlicesSynced()                                          {}
 func (*FakeProxier) OnServiceCIDRsChanged(_ []string)                                 {}
-func (*FakeProxier) OnTopologyChange(_ map[string]string)                             {}
 
 func NewHollowProxy(
 	nodeName string,
