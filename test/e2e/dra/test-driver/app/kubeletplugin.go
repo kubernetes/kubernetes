@@ -70,6 +70,10 @@ type ExamplePlugin struct {
 
 	unprepareResourcesFailure   error
 	failUnprepareResourcesMutex sync.Mutex
+
+	// cancelMainContext is used to cancel an upper-level context.
+	// It's called from HandleError if set.
+	cancelMainContext context.CancelCauseFunc
 }
 
 type GRPCCall struct {
@@ -166,14 +170,15 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 	}
 
 	ex := &ExamplePlugin{
-		stopCh:         ctx.Done(),
-		logger:         logger,
-		resourceClient: draclient.New(kubeClient),
-		fileOps:        fileOps,
-		cdiDir:         cdiDir,
-		driverName:     driverName,
-		nodeName:       nodeName,
-		prepared:       make(map[ClaimID][]kubeletplugin.Device),
+		stopCh:            ctx.Done(),
+		logger:            logger,
+		resourceClient:    draclient.New(kubeClient),
+		fileOps:           fileOps,
+		cdiDir:            cdiDir,
+		driverName:        driverName,
+		nodeName:          nodeName,
+		prepared:          make(map[ClaimID][]kubeletplugin.Device),
+		cancelMainContext: testOpts.cancelMainContext,
 	}
 
 	publicOpts = append(publicOpts,
@@ -214,6 +219,9 @@ func (ex *ExamplePlugin) HandleError(ctx context.Context, err error, msg string)
 		return
 	}
 	utilruntime.HandleErrorWithContext(ctx, err, msg)
+	if ex.cancelMainContext != nil {
+		ex.cancelMainContext(err)
+	}
 }
 
 // BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it

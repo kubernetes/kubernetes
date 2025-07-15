@@ -16,9 +16,25 @@ limitations under the License.
 
 package app
 
+import "context"
+
 type options struct {
+	// cancelMainContext is used to cancel upper level
+	// context when a background error occurs.
+	// It's called by HandleError if set.
+	cancelMainContext context.CancelCauseFunc
 }
 
 // TestOption implements the functional options pattern
 // dedicated for usage in testing code.
 type TestOption func(o *options) error
+
+// CancelMainContext sets a context cancellation function for
+// the plugin. This function is called by HandleError
+// when an error occurs in the background.
+func CancelMainContext(cancel context.CancelCauseFunc) TestOption {
+	return func(o *options) error {
+		o.cancelMainContext = cancel
+		return nil
+	}
+}
