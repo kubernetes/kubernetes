@@ -1163,6 +1163,12 @@ func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourceapi.Allocati
 	return wrapper
 }
 
+// AllocatedDeviceStatuses sets the AllocatedDeviceStatuses of the inner object.
+func (wrapper *ResourceClaimWrapper) AllocatedDeviceStatuses(ads []resourceapi.AllocatedDeviceStatus) *ResourceClaimWrapper {
+	wrapper.Status.Devices = ads
+	return wrapper
+}
+
 // Deleting sets the deletion timestamp of the inner object.
 func (wrapper *ResourceClaimWrapper) Deleting(time metav1.Time) *ResourceClaimWrapper {
 	wrapper.ResourceClaim.DeletionTimestamp = &time
