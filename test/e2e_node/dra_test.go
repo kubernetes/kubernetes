@@ -381,7 +381,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			}).WithTimeout(retryTestTimeout).Should(gomega.Equal(calls))
 		})
 
-		functionalListenAfterRegistration := func(ctx context.Context, datadir string, opts ...kubeletplugin.Option) {
+		functionalListenAfterRegistration := func(ctx context.Context, datadir string, opts ...any) {
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
@@ -413,7 +413,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			),
 		)
 
-		functionalAfterServiceReconnect := func(ctx context.Context, datadir string, opts ...kubeletplugin.Option) {
+		functionalAfterServiceReconnect := func(ctx context.Context, datadir string, opts ...any) {
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
@@ -674,7 +674,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Consistently(ctx, listResources(f.ClientSet)).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices with no plugin")
 		})
 
-		removedIfPluginStopsAfterRegistration := func(ctx context.Context, datadir string, opts ...kubeletplugin.Option) {
+		removedIfPluginStopsAfterRegistration := func(ctx context.Context, datadir string, opts ...any) {
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
@@ -726,7 +726,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Consistently(ctx, listResources(f.ClientSet)).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices without plugin")
 		})
 
-		testRemoveIfRestartsQuickly := func(ctx context.Context, datadir string, opts ...kubeletplugin.Option) {
+		testRemoveIfRestartsQuickly := func(ctx context.Context, datadir string, opts ...any) {
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
@@ -824,7 +824,7 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 }
 
 // newRegistrar starts a registrar for the specified DRA driver, without the DRA gRPC service.
-func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string, opts ...kubeletplugin.Option) *testdriver.ExamplePlugin {
+func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string, opts ...any) *testdriver.ExamplePlugin {
 	ginkgo.By("start only Kubelet plugin registrar")
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin registrar "+driverName))
 	ctx = klog.NewContext(ctx, logger)
@@ -857,7 +857,7 @@ func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName,
 //
 // Returns:
 //   - A pointer to the started ExamplePlugin instance.
-func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, datadir string, opts ...kubeletplugin.Option) *testdriver.ExamplePlugin {
+func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, datadir string, opts ...any) *testdriver.ExamplePlugin {
 	ginkgo.By("start only Kubelet plugin")
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin "+driverName), "node", nodeName)
 	ctx = klog.NewContext(ctx, logger)

@@ -128,7 +128,7 @@ type FileOperations struct {
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
-func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...any) (*ExamplePlugin, error) {
 	logger := klog.FromContext(ctx)
 
 	if fileOps.Create == nil {
@@ -144,6 +144,27 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 			return nil
 		}
 	}
+
+	publicOpts := []kubeletplugin.Option{
+		kubeletplugin.DriverName(driverName),
+		kubeletplugin.NodeName(nodeName),
+		kubeletplugin.KubeClient(kubeClient),
+	}
+
+	testOpts := &options{}
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case TestOption:
+			if err := typedOpt(testOpts); err != nil {
+				return nil, fmt.Errorf("apply test option: %w", err)
+			}
+		case kubeletplugin.Option:
+			publicOpts = append(publicOpts, typedOpt)
+		default:
+			return nil, fmt.Errorf("unexpected option type %T", opt)
+		}
+	}
+
 	ex := &ExamplePlugin{
 		stopCh:         ctx.Done(),
 		logger:         logger,
@@ -155,14 +176,11 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		prepared:       make(map[ClaimID][]kubeletplugin.Device),
 	}
 
-	opts = append(opts,
-		kubeletplugin.DriverName(driverName),
-		kubeletplugin.NodeName(nodeName),
-		kubeletplugin.KubeClient(kubeClient),
+	publicOpts = append(publicOpts,
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
 	)
-	d, err := kubeletplugin.Start(ctx, ex, opts...)
+	d, err := kubeletplugin.Start(ctx, ex, publicOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}
