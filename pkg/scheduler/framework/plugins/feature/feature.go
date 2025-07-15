@@ -50,6 +50,8 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableDRAAdminAccess:                         featureGate.Enabled(features.DRAAdminAccess),
 		EnableDRADeviceTaints:                        featureGate.Enabled(features.DRADeviceTaints),
 		EnableDRASchedulerFilterTimeout:              featureGate.Enabled(features.DRASchedulerFilterTimeout),
+		EnableDRAResourceClaimDeviceStatus:           featureGate.Enabled(features.DRAResourceClaimDeviceStatus),
+		EnableDRADeviceBindingConditions:             featureGate.Enabled(features.DRADeviceBindingConditions),
 		EnableDynamicResourceAllocation:              featureGate.Enabled(features.DynamicResourceAllocation),
 		EnableVolumeAttributesClass:                  featureGate.Enabled(features.VolumeAttributesClass),
 		EnableCSIMigrationPortworx:                   featureGate.Enabled(features.CSIMigrationPortworx),
