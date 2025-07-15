@@ -19,6 +19,7 @@ package allocation
 import (
 	"fmt"
 	goruntime "runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -40,6 +43,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
@@ -513,6 +517,9 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
+	metrics.Register()
+	metrics.PodInfeasibleResizes.Reset()
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 
@@ -900,12 +907,25 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			})
 		}
 	}
+
+	expectedMetrics := `
+		# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+        # TYPE kubelet_pod_infeasible_resizes_total counter
+        kubelet_pod_infeasible_resizes_total{reason_detail="insufficient_node_allocatable"} 4
+        kubelet_pod_infeasible_resizes_total{reason_detail="static_pod"} 2
+	`
+	assert.NoError(t, testutil.GatherAndCompare(
+		legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_infeasible_resizes_total",
+	))
 }
 
 func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
+	metrics.Register()
+	metrics.PodInfeasibleResizes.Reset()
+
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, true)
 	noSwapContainerName, swapContainerName := "test-container-noswap", "test-container-limitedswap"
@@ -950,6 +970,7 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 		resizePolicy          v1.ContainerResizePolicy
 		swapBehavior          kubetypes.SwapBehavior
 		expectedResize        []*v1.PodCondition
+		expectedMetrics       string
 	}{
 		{
 			name:                  "NoSwap Request Memory decrease ResizePolicy RestartContainer - expect InProgress",
@@ -991,6 +1012,11 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 					Message: "In-place resize of containers with swap is not supported",
 				},
 			},
+			expectedMetrics: `
+			    # HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
+				# TYPE kubelet_pod_infeasible_resizes_total counter
+				kubelet_pod_infeasible_resizes_total{reason_detail="swap_limitation"} 1
+			`,
 		},
 	}
 	for _, tt := range tests {
@@ -1060,6 +1086,10 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 			}
 			assert.Equal(t, tt.expectedResize, resizeStatus)
 			assert.Equal(t, "true", newPod.Annotations["pod-sync-triggered"], "pod sync annotation should be set")
+
+			assert.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer, strings.NewReader(tt.expectedMetrics), "kubelet_pod_infeasible_resizes_total",
+			))
 		})
 	}
 }
