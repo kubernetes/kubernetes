@@ -633,6 +633,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeStartupLatencyTracker:    kubeDeps.NodeStartupLatencyTracker,
 		healthChecker:                kubeDeps.HealthChecker,
 		flagz:                        kubeDeps.Flagz,
+		podCleanupTracker:            sync.Map{},
 	}
 
 	var secretManager secret.Manager
@@ -1428,6 +1429,10 @@ type Kubelet struct {
 
 	// flagz is the Reader interface to get flags for flagz page.
 	flagz flagz.Reader
+
+	// podCleanupTracker tracks pods that have already been processed for cleanup
+	// to avoid duplicate cleanup operations for the same pod
+	podCleanupTracker sync.Map
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -2933,11 +2938,25 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 			}
 		}
 
-		keepMinimContainers := true
-		if kl.podWorkers.ShouldPodContentBeRemoved(podID) {
-			keepMinimContainers = false
+		keepMinimContainers := !kl.podWorkers.ShouldPodContentBeRemoved(podID)
+
+		// When the pod is terminating, use tracking mechanism to ensure only one full cleanup
+		if !keepMinimContainers {
+			if _, alreadyCleaned := kl.podCleanupTracker.LoadOrStore(podID, struct{}{}); alreadyCleaned {
+				// If cleanup has already been performed, only clean the current exited container
+				klog.V(4).InfoS("Pod cleanup already in progress, only cleaning current container",
+					"pod", podID, "container", exitedContainerID)
+				kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, false)
+				return
+			}
+
+			// First time performing cleanup, clean all containers
+			klog.V(4).InfoS("Pod is terminating, cleaning up all containers", "pod", podID)
+			kl.containerDeletor.deleteContainersInPod("", podStatus, false)
+			return
 		}
 
+		// For non-terminating pods, only clean the current exited container
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, keepMinimContainers)
 	}
 }
