@@ -212,8 +212,24 @@ func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.Reso
 }
 
 func dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) ||
-		draBindingConditionsFeatureInUse(oldSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+		return
+	}
+	if draBindingConditionsFeatureInUse(oldSlice) && draBindingConditionsFeatureInUse(newSlice) {
+		// If the feature is disabled, but the old slice has binding conditions,
+		// existing binding conditions should be preserved.
+		// This is to ensure that the binding conditions are not lost when the feature is disabled
+		// and the slice is updated.
+		for i := range newSlice.Spec.Devices {
+			for j := range oldSlice.Spec.Devices {
+				if newSlice.Spec.Devices[i].Name == oldSlice.Spec.Devices[j].Name {
+					newSlice.Spec.Devices[i].BindingConditions = oldSlice.Spec.Devices[j].BindingConditions
+					newSlice.Spec.Devices[i].BindingFailureConditions = oldSlice.Spec.Devices[j].BindingFailureConditions
+					newSlice.Spec.Devices[i].BindingTimeoutSeconds = oldSlice.Spec.Devices[j].BindingTimeoutSeconds
+					newSlice.Spec.Devices[i].BindsToNode = oldSlice.Spec.Devices[j].BindsToNode
+				}
+			}
+		}
 		return
 	}
 

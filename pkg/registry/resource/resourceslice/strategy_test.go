@@ -510,6 +510,25 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			bindingConditions: true,
 			deviceStatus:      true,
 		},
+		"keep-existing-fields-binding-conditions": {
+			oldObj: sliceWithBindingConditions,
+			newObj: func() *resource.ResourceSlice {
+				obj := sliceWithBindingConditions.DeepCopy()
+				obj.Spec.Devices[0].BindingConditions = append(obj.Spec.Devices[0].BindingConditions, "cond2")
+				obj.Spec.Devices[0].BindingFailureConditions = append(obj.Spec.Devices[0].BindingFailureConditions, "fail2")
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+			expectObj: func() *resource.ResourceSlice {
+				obj := sliceWithBindingConditions.DeepCopy()
+				obj.ResourceVersion = "4"
+				obj.Generation = 1
+				return obj
+			}(),
+			bindingConditions: false,
+			deviceStatus:      true,
+		},
 	}
 
 	for name, tc := range testcases {
