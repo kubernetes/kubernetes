@@ -68,7 +68,8 @@ type stateData struct {
 	claims []*resourceapi.ResourceClaim
 
 	// Allocator handles claims with structured parameters.
-	allocator structured.Allocator
+	allocator        structured.Allocator
+	claimsToAllocate []*resourceapi.ResourceClaim
 
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
@@ -374,7 +375,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	}
 
 	// All claims which the scheduler needs to allocate itself.
-	allocateClaims := make([]*resourceapi.ResourceClaim, 0, len(claims))
+	claimsToAllocate := make([]*resourceapi.ResourceClaim, 0, len(claims))
 
 	s.informationsForClaim = make([]informationForClaim, len(claims))
 	for index, claim := range claims {
@@ -394,7 +395,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 				s.informationsForClaim[index].availableOnNodes = nodeSelector
 			}
 		} else {
-			allocateClaims = append(allocateClaims, claim)
+			claimsToAllocate = append(claimsToAllocate, claim)
 
 			// Allocation in flight? Better wait for that
 			// to finish, see inFlightAllocations
@@ -433,8 +434,8 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		}
 	}
 
-	if len(allocateClaims) > 0 {
-		logger.V(5).Info("Preparing allocation with structured parameters", "pod", klog.KObj(pod), "resourceclaims", klog.KObjSlice(allocateClaims))
+	if len(claimsToAllocate) > 0 {
+		logger.V(5).Info("Preparing allocation with structured parameters", "pod", klog.KObj(pod), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 
 		// Doing this over and over again for each pod could be avoided
 		// by setting the allocator up once and then keeping it up-to-date
@@ -462,11 +463,12 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			PartitionableDevices: pl.enablePartitionableDevices,
 			DeviceTaints:         pl.enableDeviceTaints,
 		}
-		allocator, err := structured.NewAllocator(ctx, features, allocateClaims, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
+		allocator, err := structured.NewAllocator(ctx, features, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
 		s.allocator = allocator
+		s.claimsToAllocate = claimsToAllocate
 		s.nodeAllocations = make(map[string][]resourceapi.AllocationResult)
 	}
 
@@ -551,7 +553,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "node", klog.KObj(node)))
 		}
 
-		a, err := state.allocator.Allocate(allocCtx, node)
+		a, err := state.allocator.Allocate(allocCtx, node, state.claimsToAllocate)
 		if err != nil {
 			// This should only fail if there is something wrong with the claim or class.
 			// Return an error to abort scheduling of it.
@@ -563,11 +565,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			// But we cannot do both. As this shouldn't occur often, aborting like this is
 			// better than the more complicated alternative (return Unschedulable here, remember
 			// the error, then later raise it again later if needed).
-			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.allocator.ClaimsToAllocate()))
+			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.claimsToAllocate))
 		}
 		// Check for exact length just to be sure. In practice this is all-or-nothing.
-		if len(a) != len(state.allocator.ClaimsToAllocate()) {
-			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.allocator.ClaimsToAllocate()))
+		if len(a) != len(state.claimsToAllocate) {
+			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.claimsToAllocate))
 		}
 		// Reserve uses this information.
 		allocations = a
@@ -678,7 +680,7 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 	// Prepare allocation of claims handled by the schedulder.
 	if state.allocator != nil {
 		// Entries in these two slices match each other.
-		claimsToAllocate := state.allocator.ClaimsToAllocate()
+		claimsToAllocate := state.claimsToAllocate
 		allocations, ok := state.nodeAllocations[nodeName]
 		if !ok {
 			// We checked before that the node is suitable. This shouldn't have failed,

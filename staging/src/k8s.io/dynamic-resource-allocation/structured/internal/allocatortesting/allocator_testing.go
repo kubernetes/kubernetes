@@ -592,7 +592,6 @@ func TestAllocator(t *testing.T,
 	newAllocator func(
 		ctx context.Context,
 		features Features,
-		claimsToAllocate []*resourceapi.ResourceClaim,
 		allocatedDevices sets.Set[DeviceID],
 		classLister DeviceClassLister,
 		slices []*resourceapi.ResourceSlice,
@@ -3579,14 +3578,14 @@ func TestAllocator(t *testing.T,
 			allocatedDevices := slices.Clone(tc.allocatedDevices)
 			slices := slices.Clone(tc.slices)
 
-			allocator, err := newAllocator(ctx, tc.features, unwrap(claimsToAllocate...), sets.New(allocatedDevices...), classLister, slices, cel.NewCache(1))
+			allocator, err := newAllocator(ctx, tc.features, sets.New(allocatedDevices...), classLister, slices, cel.NewCache(1))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			if _, ok := allocator.(internal.AllocatorExtended); tc.expectNumAllocateOneInvocations > 0 && !ok {
 				t.Skipf("%T does not support the AllocatorStats interface", allocator)
 			}
 
-			results, err := allocator.Allocate(ctx, tc.node)
+			results, err := allocator.Allocate(ctx, tc.node, unwrap(claimsToAllocate...))
 			matchError := tc.expectError
 			if matchError == nil {
 				matchError = gomega.Not(gomega.HaveOccurred())

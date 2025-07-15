@@ -89,7 +89,6 @@ var _ internal.AllocatorExtended = &Allocator{}
 // The returned Allocator can be used multiple times and is thread-safe.
 func NewAllocator(ctx context.Context,
 	features Features,
-	claimsToAllocate []*resourceapi.ResourceClaim,
 	allocatedDevices sets.Set[DeviceID],
 	classLister DeviceClassLister,
 	slices []*resourceapi.ResourceSlice,
@@ -97,7 +96,6 @@ func NewAllocator(ctx context.Context,
 ) (*Allocator, error) {
 	return &Allocator{
 		features:          features,
-		claimsToAllocate:  claimsToAllocate,
 		allocatedDevices:  allocatedDevices,
 		classLister:       classLister,
 		slices:            slices,
@@ -106,22 +104,19 @@ func NewAllocator(ctx context.Context,
 	}, nil
 }
 
-func (a *Allocator) ClaimsToAllocate() []*resourceapi.ResourceClaim {
-	return a.claimsToAllocate
-}
-
-func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error) {
+func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error) {
 	alloc := &allocator{
 		Allocator:            a,
 		ctx:                  ctx, // all methods share the same a and thus ctx
 		logger:               klog.FromContext(ctx),
 		node:                 node,
 		deviceMatchesRequest: make(map[matchKey]bool),
-		constraints:          make([][]constraint, len(a.claimsToAllocate)),
+		constraints:          make([][]constraint, len(claims)),
 		consumedCounters:     make(map[string]counterSets),
 		requestData:          make(map[requestIndices]requestData),
-		result:               make([]internalAllocationResult, len(a.claimsToAllocate)),
+		result:               make([]internalAllocationResult, len(claims)),
 	}
+	alloc.claimsToAllocate = claims
 	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate))
 	defer alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
 

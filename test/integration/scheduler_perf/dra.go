@@ -343,14 +343,14 @@ claims:
 			AdminAccess:          utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
-		}, []*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
+		}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {
 			nodes[i], nodes[j] = nodes[j], nodes[i]
 		})
 		for _, node := range nodes {
-			result, err := allocator.Allocate(tCtx, node)
+			result, err := allocator.Allocate(tCtx, node, []*resourceapi.ResourceClaim{claim})
 			tCtx.ExpectNoError(err, "allocate claim")
 			if result != nil {
 				claim = claim.DeepCopy()

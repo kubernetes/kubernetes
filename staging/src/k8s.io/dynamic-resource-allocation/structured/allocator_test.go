@@ -33,12 +33,11 @@ func TestAllocator(t *testing.T) {
 		func(
 			ctx context.Context,
 			features Features,
-			claimsToAllocate []*resourceapi.ResourceClaim,
 			allocatedDevices sets.Set[DeviceID],
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (allocatortesting.Allocator, error) {
-			return NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+			return NewAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
 		})
 }

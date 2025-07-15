@@ -36,8 +36,7 @@ type DeviceClassLister interface {
 //
 // This interface is also broader than the public one.
 type Allocator interface {
-	ClaimsToAllocate() []*resourceapi.ResourceClaim
-	Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error)
+	Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error)
 }
 
 // AllocatorExtended is an optional interface. Not all variants implement it.
