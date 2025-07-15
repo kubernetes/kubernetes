@@ -19,7 +19,6 @@ package phases
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 

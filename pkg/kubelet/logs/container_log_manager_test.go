@@ -17,10 +17,8 @@ limitations under the License.
 package logs
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -386,14 +384,6 @@ func TestCompressLog(t *testing.T) {
 	assert.Error(t, err, "temporary log should be renamed")
 	_, err = os.Stat(testLog)
 	assert.Error(t, err, "original log should be removed")
-
-	rc, err := UncompressLog(testLog + compressSuffix)
-	require.NoError(t, err)
-	defer rc.Close()
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, rc)
-	require.NoError(t, err)
-	assert.Equal(t, testContent, buf.String())
 }
 
 func TestRotateLatestLog(t *testing.T) {

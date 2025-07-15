@@ -193,3 +193,9 @@ func (b *JobTemplateSpecApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
 }
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *JobTemplateSpecApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
+}

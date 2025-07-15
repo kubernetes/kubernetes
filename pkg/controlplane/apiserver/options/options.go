@@ -92,6 +92,10 @@ type Options struct {
 	SystemNamespaces []string
 
 	ServiceAccountSigningEndpoint string
+
+	CoordinatedLeadershipLeaseDuration time.Duration
+	CoordinatedLeadershipRenewDeadline time.Duration
+	CoordinatedLeadershipRetryPeriod   time.Duration
 }
 
 // completedServerRunOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
@@ -125,6 +129,9 @@ func NewOptions() *Options {
 		EventTTL:                            1 * time.Hour,
 		AggregatorRejectForwardingRedirects: true,
 		SystemNamespaces:                    []string{metav1.NamespaceSystem, metav1.NamespacePublic, metav1.NamespaceDefault},
+		CoordinatedLeadershipLeaseDuration:  15 * time.Second,
+		CoordinatedLeadershipRenewDeadline:  10 * time.Second,
+		CoordinatedLeadershipRetryPeriod:    2 * time.Second,
 	}
 
 	// Overwrite the default for storage data format.
@@ -202,6 +209,13 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningEndpoint, "service-account-signing-endpoint", s.ServiceAccountSigningEndpoint, ""+
 		"Path to socket where a external JWT signer is listening. This flag is mutually exclusive with --service-account-signing-key-file and --service-account-key-file. Requires enabling feature gate (ExternalServiceAccountTokenSigner)")
+
+	fs.DurationVar(&s.CoordinatedLeadershipLeaseDuration, "coordinated-leadership-lease-duration", s.CoordinatedLeadershipLeaseDuration,
+		"The duration of the lease used for Coordinated Leader Election.")
+	fs.DurationVar(&s.CoordinatedLeadershipRenewDeadline, "coordinated-leadership-renew-deadline", s.CoordinatedLeadershipRenewDeadline,
+		"The deadline for renewing a coordinated leader election lease.")
+	fs.DurationVar(&s.CoordinatedLeadershipRetryPeriod, "coordinated-leadership-retry-period", s.CoordinatedLeadershipRetryPeriod,
+		"The period for retrying to renew a coordinated leader election lease.")
 }
 
 func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {

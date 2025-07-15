@@ -45,7 +45,6 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	networkingapiv1 "k8s.io/api/networking/v1"
-	networkingapiv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
 	policyapiv1 "k8s.io/api/policy/v1"
@@ -477,7 +476,6 @@ var (
 		coordinationv1alpha2.SchemeGroupVersion,
 		resourcev1alpha3.SchemeGroupVersion,
 		certificatesv1alpha1.SchemeGroupVersion,
-		networkingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 		svmv1alpha1.SchemeGroupVersion,
 	}

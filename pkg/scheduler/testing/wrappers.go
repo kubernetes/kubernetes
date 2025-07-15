@@ -340,6 +340,14 @@ func (p *PodWrapper) Resources(resources v1.ResourceRequirements) *PodWrapper {
 	return p
 }
 
+func (p *PodWrapper) NodeAffinity(nodeAffinity *v1.NodeAffinity) *PodWrapper {
+	if p.Spec.Affinity == nil {
+		p.Spec.Affinity = &v1.Affinity{}
+	}
+	p.Spec.Affinity.NodeAffinity = nodeAffinity
+	return p
+}
+
 // OwnerReference updates the owning controller of the pod.
 func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *PodWrapper {
 	p.OwnerReferences = []metav1.OwnerReference{
@@ -500,6 +508,20 @@ func (p *PodWrapper) HostPort(port int32) *PodWrapper {
 // and injects into the inner pod.
 func (p *PodWrapper) ContainerPort(ports []v1.ContainerPort) *PodWrapper {
 	p.Spec.Containers = append(p.Spec.Containers, MakeContainer().Name("container").Image("pause").ContainerPort(ports).Obj())
+	return p
+}
+
+// InitContainerPort creates an initContainer with ports valued `ports`,
+// and injects into the inner pod.
+func (p *PodWrapper) InitContainerPort(sidecar bool, ports []v1.ContainerPort) *PodWrapper {
+	c := MakeContainer().
+		Name("init-container").
+		Image("pause").
+		ContainerPort(ports)
+	if sidecar {
+		c.RestartPolicy(v1.ContainerRestartPolicyAlways)
+	}
+	p.Spec.InitContainers = append(p.Spec.InitContainers, c.Obj())
 	return p
 }
 

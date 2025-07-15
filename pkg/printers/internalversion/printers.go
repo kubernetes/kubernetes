@@ -1235,6 +1235,8 @@ func printJob(obj *batch.Job, options printers.GenerateOptions) ([]metav1.TableR
 		status = "Suspended"
 	} else if hasJobCondition(obj.Status.Conditions, batch.JobFailureTarget) {
 		status = "FailureTarget"
+	} else if hasJobCondition(obj.Status.Conditions, batch.JobSuccessCriteriaMet) {
+		status = "SuccessCriteriaMet"
 	} else {
 		status = "Running"
 	}
@@ -2618,12 +2620,7 @@ func printVolumeAttributesClass(obj *storage.VolumeAttributesClass, options prin
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	name := obj.Name
-	if storageutil.IsDefaultAnnotationForVolumeAttributesClass(obj.ObjectMeta) {
-		name += " (default)"
-	}
-
-	row.Cells = append(row.Cells, name, obj.DriverName, translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, obj.DriverName, translateTimestampSince(obj.CreationTimestamp))
 
 	return []metav1.TableRow{row}, nil
 }

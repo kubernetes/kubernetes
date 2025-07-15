@@ -311,7 +311,8 @@ type ResourceSpans struct {
 	// A list of ScopeSpans that originate from a resource.
 	ScopeSpans []*ScopeSpans `protobuf:"bytes,2,rep,name=scope_spans,json=scopeSpans,proto3" json:"scope_spans,omitempty"`
 	// The Schema URL, if known. This is the identifier of the Schema that the resource data
-	// is recorded in. To learn more about Schema URL see
+	// is recorded in. Notably, the last part of the URL path is the version number of the
+	// schema: http[s]://server[:port]/path/<version>. To learn more about Schema URL see
 	// https://opentelemetry.io/docs/specs/otel/schemas/#schema-url
 	// This schema_url applies to the data in the "resource" field. It does not apply
 	// to the data in the "scope_spans" field which have their own schema_url field.
@@ -384,7 +385,8 @@ type ScopeSpans struct {
 	// A list of Spans that originate from an instrumentation scope.
 	Spans []*Span `protobuf:"bytes,2,rep,name=spans,proto3" json:"spans,omitempty"`
 	// The Schema URL, if known. This is the identifier of the Schema that the span data
-	// is recorded in. To learn more about Schema URL see
+	// is recorded in. Notably, the last part of the URL path is the version number of the
+	// schema: http[s]://server[:port]/path/<version>. To learn more about Schema URL see
 	// https://opentelemetry.io/docs/specs/otel/schemas/#schema-url
 	// This schema_url applies to all spans and span events in the "spans" field.
 	SchemaUrl string `protobuf:"bytes,3,opt,name=schema_url,json=schemaUrl,proto3" json:"schema_url,omitempty"`

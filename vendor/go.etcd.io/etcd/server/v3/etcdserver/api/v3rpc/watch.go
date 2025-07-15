@@ -16,21 +16,23 @@ package v3rpc
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"math/rand"
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	"go.etcd.io/etcd/client/pkg/v3/verify"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/auth"
 	"go.etcd.io/etcd/server/v3/etcdserver"
-	"go.etcd.io/etcd/server/v3/mvcc"
-
-	"go.uber.org/zap"
+	"go.etcd.io/etcd/server/v3/etcdserver/apply"
+	"go.etcd.io/etcd/server/v3/storage/mvcc"
 )
 
 const minWatchProgressInterval = 100 * time.Millisecond
@@ -41,9 +43,9 @@ type watchServer struct {
 	clusterID int64
 	memberID  int64
 
-	maxRequestBytes int
+	maxRequestBytes uint
 
-	sg        etcdserver.RaftStatusGetter
+	sg        apply.RaftStatusGetter
 	watchable mvcc.WatchableKV
 	ag        AuthGetter
 }
@@ -54,9 +56,9 @@ func NewWatchServer(s *etcdserver.EtcdServer) pb.WatchServer {
 		lg: s.Cfg.Logger,
 
 		clusterID: int64(s.Cluster().ID()),
-		memberID:  int64(s.ID()),
+		memberID:  int64(s.MemberID()),
 
-		maxRequestBytes: int(s.Cfg.MaxRequestBytes + grpcOverheadBytes),
+		maxRequestBytes: s.Cfg.MaxRequestBytesWithOverhead(),
 
 		sg:        s,
 		watchable: s.Watchable(),
@@ -124,9 +126,9 @@ type serverWatchStream struct {
 	clusterID int64
 	memberID  int64
 
-	maxRequestBytes int
+	maxRequestBytes uint
 
-	sg        etcdserver.RaftStatusGetter
+	sg        apply.RaftStatusGetter
 	watchable mvcc.WatchableKV
 	ag        AuthGetter
 
@@ -210,13 +212,13 @@ func (ws *watchServer) Watch(stream pb.Watch_WatchServer) (err error) {
 	// revisited.
 	select {
 	case err = <-errc:
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			err = rpctypes.ErrGRPCWatchCanceled
 		}
 		close(sws.ctrlStream)
 	case <-stream.Context().Done():
 		err = stream.Context().Err()
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			err = rpctypes.ErrGRPCWatchCanceled
 		}
 	}
@@ -240,7 +242,7 @@ func (sws *serverWatchStream) isWatchPermitted(wcr *pb.WatchCreateRequest) error
 func (sws *serverWatchStream) recvLoop() error {
 	for {
 		req, err := sws.gRPCStream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {
@@ -271,15 +273,15 @@ func (sws *serverWatchStream) recvLoop() error {
 			err := sws.isWatchPermitted(creq)
 			if err != nil {
 				var cancelReason string
-				switch err {
-				case auth.ErrInvalidAuthToken:
+				switch {
+				case errors.Is(err, auth.ErrInvalidAuthToken):
 					cancelReason = rpctypes.ErrGRPCInvalidAuthToken.Error()
-				case auth.ErrAuthOldRevision:
+				case errors.Is(err, auth.ErrAuthOldRevision):
 					cancelReason = rpctypes.ErrGRPCAuthOldRevision.Error()
-				case auth.ErrUserEmpty:
+				case errors.Is(err, auth.ErrUserEmpty):
 					cancelReason = rpctypes.ErrGRPCUserEmpty.Error()
 				default:
-					if err != auth.ErrPermissionDenied {
+					if !errors.Is(err, auth.ErrPermissionDenied) {
 						sws.lg.Error("unexpected error code", zap.Error(err))
 					}
 					cancelReason = rpctypes.ErrGRPCPermissionDenied.Error()
@@ -371,8 +373,9 @@ func (sws *serverWatchStream) recvLoop() error {
 			}
 		default:
 			// we probably should not shutdown the entire stream when
-			// receive an valid command.
+			// receive an invalid command.
 			// so just do nothing instead.
+			sws.lg.Sugar().Infof("invalid watch request type %T received in gRPC stream", uv)
 			continue
 		}
 	}
@@ -495,9 +498,7 @@ func (sws *serverWatchStream) sendLoop() {
 			// track id creation
 			wid := mvcc.WatchID(c.WatchId)
 
-			if !(!(c.Canceled && c.Created) || wid == clientv3.InvalidWatchID) {
-				panic(fmt.Sprintf("unexpected watchId: %d, wanted: %d, since both 'Canceled' and 'Created' are true", wid, clientv3.InvalidWatchID))
-			}
+			verify.Assert(!(c.Canceled && c.Created) || wid == clientv3.InvalidWatchID, "unexpected watchId: %d, wanted: %d, since both 'Canceled' and 'Created' are true", wid, clientv3.InvalidWatchID)
 
 			if c.Canceled && wid != clientv3.InvalidWatchID {
 				delete(ids, wid)
@@ -543,11 +544,12 @@ func IsCreateEvent(e mvccpb.Event) bool {
 
 func sendFragments(
 	wr *pb.WatchResponse,
-	maxRequestBytes int,
-	sendFunc func(*pb.WatchResponse) error) error {
+	maxRequestBytes uint,
+	sendFunc func(*pb.WatchResponse) error,
+) error {
 	// no need to fragment if total request size is smaller
 	// than max request limit or response contains only one event
-	if wr.Size() < maxRequestBytes || len(wr.Events) < 2 {
+	if uint(wr.Size()) < maxRequestBytes || len(wr.Events) < 2 {
 		return sendFunc(wr)
 	}
 
@@ -560,7 +562,7 @@ func sendFragments(
 		cur := ow
 		for _, ev := range wr.Events[idx:] {
 			cur.Events = append(cur.Events, ev)
-			if len(cur.Events) > 1 && cur.Size() >= maxRequestBytes {
+			if len(cur.Events) > 1 && uint(cur.Size()) >= maxRequestBytes {
 				cur.Events = cur.Events[:len(cur.Events)-1]
 				break
 			}

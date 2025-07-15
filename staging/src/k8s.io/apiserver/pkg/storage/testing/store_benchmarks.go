@@ -220,3 +220,13 @@ type BenchmarkData struct {
 	NamespaceNames []string
 	NodeNames      []string
 }
+
+func RunBenchmarkStoreStats(ctx context.Context, b *testing.B, store storage.Interface) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := store.Stats(ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}

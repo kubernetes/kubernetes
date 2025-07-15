@@ -737,8 +737,8 @@ message Container {
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
-  // The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-  // will be reported as an event when the container is starting. When a key exists in multiple
+  // The keys defined within a source may consist of any printable ASCII characters except '='.
+  // When a key exists in multiple
   // sources, the value associated with the last source will take precedence.
   // Values defined by an Env with a duplicate key will take precedence.
   // Cannot be updated.
@@ -1344,7 +1344,8 @@ message EndpointsList {
 
 // EnvFromSource represents the source of a set of ConfigMaps or Secrets
 message EnvFromSource {
-  // Optional text to prepend to the name of each environment variable. Must be a C_IDENTIFIER.
+  // Optional text to prepend to the name of each environment variable.
+  // May consist of any printable ASCII characters except '='.
   // +optional
   optional string prefix = 1;
 
@@ -1359,7 +1360,8 @@ message EnvFromSource {
 
 // EnvVar represents an environment variable present in a Container.
 message EnvVar {
-  // Name of the environment variable. Must be a C_IDENTIFIER.
+  // Name of the environment variable.
+  // May consist of any printable ASCII characters except '='.
   optional string name = 1;
 
   // Variable references $(VAR_NAME) are expanded
@@ -1479,8 +1481,8 @@ message EphemeralContainerCommon {
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
-  // The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-  // will be reported as an event when the container is starting. When a key exists in multiple
+  // The keys defined within a source may consist of any printable ASCII characters except '='.
+  // When a key exists in multiple
   // sources, the value associated with the last source will take precedence.
   // Values defined by an Env with a duplicate key will take precedence.
   // Cannot be updated.
@@ -1949,7 +1951,6 @@ message GlusterfsPersistentVolumeSource {
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 message GlusterfsVolumeSource {
   // endpoints is the endpoint name that details Glusterfs topology.
-  // More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod
   optional string endpoints = 1;
 
   // path is the Glusterfs volume path.
@@ -3684,8 +3685,8 @@ message PodAntiAffinity {
   // most preferred is the one with the greatest sum of weights, i.e.
   // for each node that meets all of the scheduling requirements (resource
   // request, requiredDuringScheduling anti-affinity expressions, etc.),
-  // compute a sum by iterating through the elements of this field and adding
-  // "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+  // compute a sum by iterating through the elements of this field and subtracting
+  // "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
   // node(s) with the highest sum are the most preferred.
   // +optional
   // +listType=atomic
@@ -4269,7 +4270,9 @@ message PodSpec {
   optional string nodeName = 10;
 
   // Host networking requested for this pod. Use the host's network namespace.
-  // If this option is set, the ports that will be used must be specified.
+  // When using HostNetwork you should specify ports so the scheduler is aware.
+  // When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`,
+  // and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`.
   // Default to false.
   // +k8s:conversion-gen=false
   // +optional
@@ -6301,7 +6304,6 @@ message Taint {
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added.
-  // It is only written for NoExecute taints.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
 }
@@ -6753,13 +6755,12 @@ message VolumeSource {
 
   // iscsi represents an ISCSI Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod.
-  // More info: https://examples.k8s.io/volumes/iscsi/README.md
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes/#iscsi
   // +optional
   optional ISCSIVolumeSource iscsi = 8;
 
   // glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime.
   // Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported.
-  // More info: https://examples.k8s.io/volumes/glusterfs/README.md
   // +optional
   optional GlusterfsVolumeSource glusterfs = 9;
 
@@ -6771,7 +6772,6 @@ message VolumeSource {
 
   // rbd represents a Rados Block Device mount on the host that shares a pod's lifetime.
   // Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported.
-  // More info: https://examples.k8s.io/volumes/rbd/README.md
   // +optional
   optional RBDVolumeSource rbd = 11;
 

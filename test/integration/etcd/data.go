@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilversion "k8s.io/component-base/version"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	"k8s.io/kubernetes/test/utils/image"
 )
@@ -35,6 +36,7 @@ import (
 // Tests aiming for full coverage of versions should test fixtures of all supported versions.
 func GetSupportedEmulatedVersions() []string {
 	return []string{
+		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().SubtractMinor(3).String(),
 		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().SubtractMinor(2).String(),
 		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().SubtractMinor(1).String(),
 		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().String(),
@@ -51,8 +53,8 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 // GetEtcdStorageDataServedAt returns etcd data for all persisted objects at a particular release version.
 // It is exported so that it can be reused across multiple tests.
 // It returns a new map on every invocation to prevent different tests from mutating shared state.
-func GetEtcdStorageDataServedAt(version string, removeAlphas bool) map[schema.GroupVersionResource]StorageData {
-	return GetEtcdStorageDataForNamespaceServedAt("etcdstoragepathtestnamespace", version, removeAlphas)
+func GetEtcdStorageDataServedAt(version string, isEmulation bool) map[schema.GroupVersionResource]StorageData {
+	return GetEtcdStorageDataForNamespaceServedAt("etcdstoragepathtestnamespace", version, isEmulation)
 }
 
 // GetEtcdStorageDataForNamespace returns etcd data for all persisted objects at the latest release version.
@@ -67,7 +69,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 // It is exported so that it can be reused across multiple tests.
 // It returns a new map on every invocation to prevent different tests from mutating shared state.
 // Namespaced objects keys are computed for the specified namespace.
-func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAlphas bool) map[schema.GroupVersionResource]StorageData {
+func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulation bool) map[schema.GroupVersionResource]StorageData {
 	image := image.GetE2EImage(image.BusyBox)
 	etcdStorageData := map[schema.GroupVersionResource]StorageData{
 		// k8s.io/kubernetes/pkg/api/v1
@@ -160,7 +162,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 			IntroducedVersion: "1.9",
 		},
 		gvr("apps", "v1", "statefulsets"): {
-			Stub:              `{"metadata": {"name": "ss3"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}}}}`,
+			Stub:              `{"metadata": {"name": "ss3"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}, "spec": {"restartPolicy": "Always", "terminationGracePeriodSeconds": 30, "containers": [{"image": "` + image + `", "name": "container6", "terminationMessagePolicy": "File"}]}}}}`,
 			ExpectedEtcdPath:  "/registry/statefulsets/" + namespace + "/ss3",
 			IntroducedVersion: "1.9",
 		},
@@ -170,7 +172,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 			IntroducedVersion: "1.9",
 		},
 		gvr("apps", "v1", "controllerrevisions"): {
-			Stub:              `{"metadata":{"name":"crs3"},"data":{"name":"abc","namespace":"default","creationTimestamp":null,"Spec":{"Replicas":0,"Selector":{"matchLabels":{"foo":"bar"}},"Template":{"creationTimestamp":null,"labels":{"foo":"bar"},"Spec":{"Volumes":null,"InitContainers":null,"Containers":null,"RestartPolicy":"Always","TerminationGracePeriodSeconds":null,"ActiveDeadlineSeconds":null,"DNSPolicy":"ClusterFirst","NodeSelector":null,"ServiceAccountName":"","AutomountServiceAccountToken":null,"NodeName":"","SecurityContext":null,"ImagePullSecrets":null,"Hostname":"","Subdomain":"","Affinity":null,"SchedulerName":"","Tolerations":null,"HostAliases":null}},"VolumeClaimTemplates":null,"ServiceName":""},"Status":{"ObservedGeneration":null,"Replicas":0}},"revision":0}`,
+			Stub:              `{"metadata":{"name":"crs3"},"data":{"name":"abc","namespace":"default","Spec":{"Replicas":0,"Selector":{"matchLabels":{"foo":"bar"}},"Template":{"labels":{"foo":"bar"},"Spec":{"Volumes":null,"InitContainers":null,"Containers":null,"RestartPolicy":"Always","TerminationGracePeriodSeconds":null,"ActiveDeadlineSeconds":null,"DNSPolicy":"ClusterFirst","NodeSelector":null,"ServiceAccountName":"","AutomountServiceAccountToken":null,"NodeName":"","SecurityContext":null,"ImagePullSecrets":null,"Hostname":"","Subdomain":"","Affinity":null,"SchedulerName":"","Tolerations":null,"HostAliases":null}},"VolumeClaimTemplates":null,"ServiceName":""},"Status":{"ObservedGeneration":null,"Replicas":0}},"revision":0}`,
 			ExpectedEtcdPath:  "/registry/controllerrevisions/" + namespace + "/crs3",
 			IntroducedVersion: "1.9",
 		},
@@ -296,13 +298,13 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		gvr("networking.k8s.io", "v1", "ipaddresses"): {
 			Stub:              `{"metadata": {"name": "192.168.2.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
 			ExpectedEtcdPath:  "/registry/ipaddresses/192.168.2.3",
-			ExpectedGVK:       gvkP("networking.k8s.io", "v1beta1", "IPAddress"),
+			ExpectedGVK:       gvkP("networking.k8s.io", "v1", "IPAddress"),
 			IntroducedVersion: "1.33",
 		},
 		gvr("networking.k8s.io", "v1", "servicecidrs"): {
 			Stub:              `{"metadata": {"name": "range-b2"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
 			ExpectedEtcdPath:  "/registry/servicecidrs/range-b2",
-			ExpectedGVK:       gvkP("networking.k8s.io", "v1beta1", "ServiceCIDR"),
+			ExpectedGVK:       gvkP("networking.k8s.io", "v1", "ServiceCIDR"),
 			IntroducedVersion: "1.33",
 		},
 		// --
@@ -311,6 +313,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		gvr("networking.k8s.io", "v1beta1", "ipaddresses"): {
 			Stub:              `{"metadata": {"name": "192.168.1.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
 			ExpectedEtcdPath:  "/registry/ipaddresses/192.168.1.3",
+			ExpectedGVK:       gvkP("networking.k8s.io", "v1", "IPAddress"),
 			IntroducedVersion: "1.31",
 			RemovedVersion:    "1.37",
 		},
@@ -320,6 +323,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		gvr("networking.k8s.io", "v1beta1", "servicecidrs"): {
 			Stub:              `{"metadata": {"name": "range-b1"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
 			ExpectedEtcdPath:  "/registry/servicecidrs/range-b1",
+			ExpectedGVK:       gvkP("networking.k8s.io", "v1", "ServiceCIDR"),
 			IntroducedVersion: "1.31",
 			RemovedVersion:    "1.37",
 		},
@@ -443,22 +447,22 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 
 		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1
 		gvr("admissionregistration.k8s.io", "v1", "validatingwebhookconfigurations"): {
-			Stub:              `{"metadata":{"name":"hook2","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore","sideEffects":"None","admissionReviewVersions":["v1beta1"]}]}`,
+			Stub:              `{"metadata":{"name":"hook2"},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore","sideEffects":"None","admissionReviewVersions":["v1beta1"]}]}`,
 			ExpectedEtcdPath:  "/registry/validatingwebhookconfigurations/hook2",
 			IntroducedVersion: "1.16",
 		},
 		gvr("admissionregistration.k8s.io", "v1", "mutatingwebhookconfigurations"): {
-			Stub:              `{"metadata":{"name":"hook2","creationTimestamp":null},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore","sideEffects":"None","admissionReviewVersions":["v1beta1"]}]}`,
+			Stub:              `{"metadata":{"name":"hook2"},"webhooks":[{"name":"externaladmissionhook.k8s.io","clientConfig":{"service":{"namespace":"ns","name":"n"},"caBundle":null},"rules":[{"operations":["CREATE"],"apiGroups":["group"],"apiVersions":["version"],"resources":["resource"]}],"failurePolicy":"Ignore","sideEffects":"None","admissionReviewVersions":["v1beta1"]}]}`,
 			ExpectedEtcdPath:  "/registry/mutatingwebhookconfigurations/hook2",
 			IntroducedVersion: "1.16",
 		},
 		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"): {
-			Stub:              `{"metadata":{"name":"vap1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
+			Stub:              `{"metadata":{"name":"vap1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
 			ExpectedEtcdPath:  "/registry/validatingadmissionpolicies/vap1",
 			IntroducedVersion: "1.30",
 		},
 		gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicybindings"): {
-			Stub:              `{"metadata":{"name":"pb1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com","parameterNotFoundAction":"Deny"},"validationActions":["Deny"]}}`,
+			Stub:              `{"metadata":{"name":"pb1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com","parameterNotFoundAction":"Deny"},"validationActions":["Deny"]}}`,
 			ExpectedEtcdPath:  "/registry/validatingadmissionpolicybindings/pb1",
 			IntroducedVersion: "1.30",
 		},
@@ -466,14 +470,14 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 
 		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"): {
-			Stub:              `{"metadata":{"name":"vap1b1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
+			Stub:              `{"metadata":{"name":"vap1b1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
 			ExpectedEtcdPath:  "/registry/validatingadmissionpolicies/vap1b1",
 			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1", "ValidatingAdmissionPolicy"),
 			IntroducedVersion: "1.28",
 			RemovedVersion:    "1.34",
 		},
 		gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicybindings"): {
-			Stub:              `{"metadata":{"name":"pb1b1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com","parameterNotFoundAction":"Deny"},"validationActions":["Deny"]}}`,
+			Stub:              `{"metadata":{"name":"pb1b1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com","parameterNotFoundAction":"Deny"},"validationActions":["Deny"]}}`,
 			ExpectedEtcdPath:  "/registry/validatingadmissionpolicybindings/pb1b1",
 			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1", "ValidatingAdmissionPolicyBinding"),
 			IntroducedVersion: "1.28",
@@ -483,13 +487,13 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 
 		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicies"): {
-			Stub:              `{"metadata":{"name":"map1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
+			Stub:              `{"metadata":{"name":"map1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicies/map1",
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicybindings"): {
-			Stub:              `{"metadata":{"name":"mpb1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"}}}`,
+			Stub:              `{"metadata":{"name":"mpb1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"}}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1",
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
@@ -560,34 +564,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/resource/v1alpha3
-		gvr("resource.k8s.io", "v1alpha3", "deviceclasses"): {
-			Stub:              `{"metadata": {"name": "class1name"}}`,
-			ExpectedEtcdPath:  "/registry/deviceclasses/class1name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "DeviceClass"),
-			IntroducedVersion: "1.31",
-			RemovedVersion:    "1.37",
-		},
-		gvr("resource.k8s.io", "v1alpha3", "resourceclaims"): {
-			Stub:              `{"metadata": {"name": "claim1name"}, "spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}]}}}`,
-			ExpectedEtcdPath:  "/registry/resourceclaims/" + namespace + "/claim1name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "ResourceClaim"),
-			IntroducedVersion: "1.31",
-			RemovedVersion:    "1.37",
-		},
-		gvr("resource.k8s.io", "v1alpha3", "resourceclaimtemplates"): {
-			Stub:              `{"metadata": {"name": "claimtemplate1name"}, "spec": {"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}]}}}}`,
-			ExpectedEtcdPath:  "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate1name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "ResourceClaimTemplate"),
-			IntroducedVersion: "1.31",
-			RemovedVersion:    "1.37",
-		},
-		gvr("resource.k8s.io", "v1alpha3", "resourceslices"): {
-			Stub:              `{"metadata": {"name": "node1slice"}, "spec": {"nodeName": "worker1", "driver": "dra.example.com", "pool": {"name": "worker1", "resourceSliceCount": 1}}}`,
-			ExpectedEtcdPath:  "/registry/resourceslices/node1slice",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "ResourceSlice"),
-			IntroducedVersion: "1.31",
-			RemovedVersion:    "1.37",
-		},
 		gvr("resource.k8s.io", "v1alpha3", "devicetaintrules"): {
 			Stub:              `{"metadata": {"name": "taint1name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint1name",
@@ -709,11 +685,21 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		delete(etcdStorageData, key)
 	}
 
-	if removeAlphas {
+	if isEmulation {
 		for key := range etcdStorageData {
 			if strings.Contains(key.Version, "alpha") {
 				delete(etcdStorageData, key)
 			}
+		}
+	}
+	// match the resource to the correct storage version for emulated version
+	if isEmulation {
+		for key, data := range etcdStorageData {
+			storageVersion := storageVersionAtEmulationVersion(key, data.ExpectedGVK, v, etcdStorageData)
+			if storageVersion == "" {
+				continue
+			}
+			data.ExpectedGVK.Version = storageVersion
 		}
 	}
 	validateStorageData(etcdStorageData)
@@ -739,6 +725,33 @@ func validateStorageData(etcdStorageData map[schema.GroupVersionResource]Storage
 			panic(fmt.Sprintf("Error. Non-GA resource %s must have an introduced version", key.String()))
 		}
 	}
+}
+
+// storageVersionAtEmulationVersion tries to find the correct storage version at an emulation version.
+// If a GVK is introduced after the min compatibility version, we need to use an earlier version in storage.
+func storageVersionAtEmulationVersion(key schema.GroupVersionResource, expectedGVK *schema.GroupVersionKind, emuVer string, etcdStorageData map[schema.GroupVersionResource]StorageData) string {
+	// expectedGVK is needed to find the correct GVK with the correct storage version.
+	if expectedGVK == nil {
+		return ""
+	}
+	minCompatVer := version.MustParse(emuVer).SubtractMinor(1)
+	expectedGVR := gvr(expectedGVK.Group, expectedGVK.Version, key.Resource)
+	expectedGVRData, ok := etcdStorageData[expectedGVR]
+	// expectedGVK is introduced before the emulation version, no need to change.
+	if !ok || minCompatVer.AtLeast(version.MustParse(expectedGVRData.IntroducedVersion)) {
+		return ""
+	}
+	// go through the prioritized version list to find the first version introduced before the emulation version.
+	gvs := legacyscheme.Scheme.PrioritizedVersionsForGroup(key.Group)
+	for _, gv := range gvs {
+		expectedGVR := gv.WithResource(key.Resource)
+		if expectedGVRData, ok := etcdStorageData[expectedGVR]; ok {
+			if minCompatVer.AtLeast(version.MustParse(expectedGVRData.IntroducedVersion)) {
+				return gv.Version
+			}
+		}
+	}
+	return ""
 }
 
 // StorageData contains information required to create an object and verify its storage in etcd

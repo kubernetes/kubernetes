@@ -27,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {
@@ -547,14 +549,15 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 	}
 }
 
-func (m *manager) extractedReadinessHandling() {
+func (m *manager) extractedReadinessHandling(logger klog.Logger) {
 	update := <-m.readinessManager.Updates()
 	// This code corresponds to an extract from kubelet.syncLoopIteration()
 	ready := update.Result == results.Success
-	m.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
+	m.statusManager.SetContainerReadiness(logger, update.PodUID, update.ContainerID, ready)
 }
 
 func TestUpdateReadiness(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testPod := getTestPod()
 	setTestProbe(testPod, readiness, v1.Probe{})
 	m := newTestManager()
@@ -562,7 +565,7 @@ func TestUpdateReadiness(t *testing.T) {
 
 	// Start syncing readiness without leaking goroutine.
 	stopCh := make(chan struct{})
-	go wait.Until(m.extractedReadinessHandling, 0, stopCh)
+	go wait.Until(func() { m.extractedReadinessHandling(logger) }, 0, stopCh)
 	defer func() {
 		close(stopCh)
 		// Send an update to exit extractedReadinessHandling()
@@ -573,7 +576,7 @@ func TestUpdateReadiness(t *testing.T) {
 	exec.set(probe.Success, nil)
 	m.prober.exec = &exec
 
-	m.statusManager.SetPodStatus(testPod, getTestRunningStatus())
+	m.statusManager.SetPodStatus(logger, testPod, getTestRunningStatus())
 
 	m.AddPod(testPod)
 	probePaths := []probeKey{{testPodUID, testContainerName, readiness}}

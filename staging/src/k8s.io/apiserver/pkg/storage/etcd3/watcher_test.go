@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -64,7 +63,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client.Client))
+	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(store, client.Client))
 }
 
 // TestWatchFromNonZero tests that
@@ -106,10 +105,10 @@ func TestWatchInitializationSignal(t *testing.T) {
 
 func TestProgressNotify(t *testing.T) {
 	clusterConfig := testserver.NewTestConfig(t)
-	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
-	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
+	clusterConfig.WatchProgressNotifyInterval = time.Second
+	ctx, store, client := testSetup(t, withClientConfig(clusterConfig))
 
-	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
+	storagetesting.RunOptionalTestProgressNotify(ctx, t, store, increaseRV(client.Client))
 }
 
 func TestWatchWithUnsafeDelete(t *testing.T) {
@@ -123,7 +122,7 @@ func TestWatchWithUnsafeDelete(t *testing.T) {
 // etcd implementation doesn't have any effect.
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
 	clusterConfig := testserver.NewTestConfig(t)
-	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
+	clusterConfig.WatchProgressNotifyInterval = time.Second
 	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
 
 	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, store, false)
@@ -167,28 +166,6 @@ func TestWatchErrorEventIsBlockingFurtherEvent(t *testing.T) {
 // As such, they may focus e.g. on non-functional aspects like performance
 // impact.
 // =======================================================================
-
-func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
-	origCtx, store, _ := testSetup(t)
-	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, false, storage.Everything)
-	// make resultChan and errChan blocking to ensure ordering.
-	w.resultChan = make(chan watch.Event)
-	w.errChan = make(chan error)
-	// The event flow goes like:
-	// - first we send an error, it should block on resultChan.
-	// - Then we cancel ctx. The blocking on resultChan should be freed up
-	//   and run() goroutine should return.
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		w.run(false, true)
-		wg.Done()
-	}()
-	w.errChan <- fmt.Errorf("some error")
-	cancel()
-	wg.Wait()
-}
 
 // TestWatchErrorIncorrectConfiguration checks if an error
 // will be returned when the storage hasn't been properly

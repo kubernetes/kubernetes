@@ -32,6 +32,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -72,23 +73,33 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	nodeunregistered := &user.DefaultInfo{Name: "system:node:nodeunregistered", Groups: []string{"system:nodes"}}
 
-	selectorAuthzDisabled := utilfeature.DefaultFeatureGate.DeepCopy()
-	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzDisabled, genericfeatures.AuthorizeWithSelectors, false)
-	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzDisabled, features.AuthorizeNodeWithSelectors, false)
+	selectorAuthzDisabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, f, version.MustParse("1.33"))
+		featuregatetesting.SetFeatureGateDuringTest(t, f, genericfeatures.AuthorizeWithSelectors, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.AuthorizeNodeWithSelectors, false)
+		return f
+	}
 
-	selectorAuthzEnabled := utilfeature.DefaultFeatureGate.DeepCopy()
-	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzEnabled, genericfeatures.AuthorizeWithSelectors, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzEnabled, features.AuthorizeNodeWithSelectors, true)
+	selectorAuthzEnabled := func(t testing.TB) featuregate.FeatureGate {
+		return utilfeature.DefaultFeatureGate
+	}
 
-	serviceAccountTokenForCredentialProvidersDisabled := utilfeature.DefaultFeatureGate.DeepCopy()
-	featuregatetesting.SetFeatureGateDuringTest(t, serviceAccountTokenForCredentialProvidersDisabled, features.KubeletServiceAccountTokenForCredentialProviders, false)
+	serviceAccountTokenForCredentialProvidersDisabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.KubeletServiceAccountTokenForCredentialProviders, false)
+		return f
+	}
 
-	serviceAccountTokenForCredentialProvidersEnabled := utilfeature.DefaultFeatureGate.DeepCopy()
-	featuregatetesting.SetFeatureGateDuringTest(t, serviceAccountTokenForCredentialProvidersEnabled, features.KubeletServiceAccountTokenForCredentialProviders, true)
+	serviceAccountTokenForCredentialProvidersEnabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateDuringTest(t, f, features.KubeletServiceAccountTokenForCredentialProviders, true)
+		return f
+	}
 
 	featureVariants := []struct {
 		suffix   string
-		features featuregate.FeatureGate
+		features func(t testing.TB) featuregate.FeatureGate
 	}{
 		{suffix: "selector_disabled", features: selectorAuthzDisabled},
 		{suffix: "selector_enabled", features: selectorAuthzEnabled},
@@ -99,7 +110,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		attrs        authorizer.AttributesRecord
 		expect       authorizer.Decision
 		expectReason string
-		features     featuregate.FeatureGate
+		features     func(t testing.TB) featuregate.FeatureGate
 	}{
 		{
 			name:   "allowed configmap",
@@ -770,7 +781,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		if tc.features == nil {
 			for _, variant := range featureVariants {
 				t.Run(tc.name+"_"+variant.suffix, func(t *testing.T) {
-					authz.features = variant.features
+					authz.features = variant.features(t)
 					decision, reason, _ := authz.Authorize(context.Background(), tc.attrs)
 					if decision != tc.expect {
 						t.Errorf("expected %v, got %v (%s)", tc.expect, decision, reason)
@@ -779,7 +790,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			}
 		} else {
 			t.Run(tc.name, func(t *testing.T) {
-				authz.features = tc.features
+				authz.features = tc.features(t)
 				decision, reason, _ := authz.Authorize(context.Background(), tc.attrs)
 				if decision != tc.expect {
 					t.Errorf("expected %v, got %v (%s)", tc.expect, decision, reason)

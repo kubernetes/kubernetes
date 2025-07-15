@@ -57,7 +57,8 @@ type Struct struct {
 }
 
 type ComparableStruct struct {
-	StringField string `json:"stringField"`
+	StringField    string  `json:"stringField"`
+	StringPtrField *string `json:"stringPtrField"`
 }
 
 type NonComparableStruct struct {

@@ -28,9 +28,9 @@ type Preference struct {
 	// This is especially useful, when user doesn't want to explicitly
 	// set flags each time.
 	// +listType=atomic
-	Overrides []CommandOverride `json:"overrides"`
+	Defaults []CommandDefaults `json:"overrides"`
 
-	// aliases allows defining command aliases for existing kubectl commands, with optional default flag values.
+	// aliases allow defining command aliases for existing kubectl commands, with optional default flag values.
 	// If the alias name collides with a built-in command, built-in command always takes precedence.
 	// Flag overrides defined in the overrides section do NOT apply to aliases for the same command.
 	// kubectl [ALIAS NAME] [USER_FLAGS] [USER_EXPLICIT_ARGS] expands to
@@ -66,40 +66,40 @@ type Preference struct {
 
 // AliasOverride stores the alias definitions.
 type AliasOverride struct {
-	// Name is the name of alias that can only include alphabetical characters
+	// name is the name of alias that can only include alphabetical characters
 	// If the alias name conflicts with the built-in command,
 	// built-in command will be used.
 	Name string `json:"name"`
-	// Command is the single or set of commands to execute, such as "set env" or "create"
+	// command is the single or set of commands to execute, such as "set env" or "create"
 	Command string `json:"command"`
-	// PrependArgs stores the arguments such as resource names, etc.
+	// prependArgs stores the arguments such as resource names, etc.
 	// These arguments are inserted after the alias name.
 	// +listType=atomic
 	PrependArgs []string `json:"prependArgs,omitempty"`
-	// AppendArgs stores the arguments such as resource names, etc.
+	// appendArgs stores the arguments such as resource names, etc.
 	// These arguments are appended to the USER_ARGS.
 	// +listType=atomic
 	AppendArgs []string `json:"appendArgs,omitempty"`
-	// Flag is allocated to store the flag definitions of alias.
-	// Flag only modifies the default value of the flag and if
+	// flags is allocated to store the flag definitions of alias.
+	// flags only modifies the default value of the flag and if
 	// user explicitly passes a value, explicit one is used.
 	// +listType=atomic
-	Flags []CommandOverrideFlag `json:"flags,omitempty"`
+	Options []CommandOptionDefault `json:"flags,omitempty"`
 }
 
-// CommandOverride stores the commands and their associated flag's
+// CommandDefaults stores the commands and their associated option's
 // default values.
-type CommandOverride struct {
-	// Command refers to a command whose flag's default value is changed.
+type CommandDefaults struct {
+	// command refers to a command whose flag's default value is changed.
 	Command string `json:"command"`
-	// Flags is a list of flags storing different default values.
+	// flags is a list of flags storing different default values.
 	// +listType=atomic
-	Flags []CommandOverrideFlag `json:"flags"`
+	Options []CommandOptionDefault `json:"flags"`
 }
 
-// CommandOverrideFlag stores the name and the specified default
-// value of the flag.
-type CommandOverrideFlag struct {
+// CommandOptionDefault stores the name and the specified default
+// value of an option.
+type CommandOptionDefault struct {
 	// Flag name (long form, without dashes).
 	Name string `json:"name"`
 

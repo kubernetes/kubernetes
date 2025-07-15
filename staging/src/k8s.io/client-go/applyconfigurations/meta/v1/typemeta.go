@@ -46,3 +46,13 @@ func (b *TypeMetaApplyConfiguration) WithAPIVersion(value string) *TypeMetaApply
 	b.APIVersion = &value
 	return b
 }
+
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *TypeMetaApplyConfiguration) GetKind() *string {
+	return b.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *TypeMetaApplyConfiguration) GetAPIVersion() *string {
+	return b.APIVersion
+}

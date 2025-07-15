@@ -42,6 +42,7 @@ func DeleteOptions() *DeleteOptionsApplyConfiguration {
 	b.WithAPIVersion("meta.k8s.io/v1")
 	return b
 }
+func (b DeleteOptionsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -107,4 +108,14 @@ func (b *DeleteOptionsApplyConfiguration) WithDryRun(values ...string) *DeleteOp
 func (b *DeleteOptionsApplyConfiguration) WithIgnoreStoreReadErrorWithClusterBreakingPotential(value bool) *DeleteOptionsApplyConfiguration {
 	b.IgnoreStoreReadErrorWithClusterBreakingPotential = &value
 	return b
+}
+
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *DeleteOptionsApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *DeleteOptionsApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
 }

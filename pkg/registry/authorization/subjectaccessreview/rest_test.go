@@ -29,10 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
@@ -235,8 +232,6 @@ func TestCreate(t *testing.T) {
 			},
 		},
 	}
-
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
 
 	for k, tc := range testcases {
 		auth := &fakeAuthorizer{

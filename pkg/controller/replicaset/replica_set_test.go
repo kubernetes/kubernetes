@@ -54,7 +54,7 @@ import (
 	. "k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -105,7 +105,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *apps.ReplicaSet
 			ResourceVersion: "18",
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: pointer.Int32(int32(replicas)),
+			Replicas: ptr.To[int32](int32(replicas)),
 			Selector: &metav1.LabelSelector{MatchLabels: selectorMap},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -895,7 +895,10 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	numReplicas := int32(10)
 	newStatus := apps.ReplicaSetStatus{Replicas: numReplicas}
 	logger, _ := ktesting.NewTestContext(t)
-	updateReplicaSetStatus(logger, fakeRSClient, rs, newStatus)
+	_, err := updateReplicaSetStatus(logger, fakeRSClient, rs, newStatus, DefaultReplicaSetControllerFeatures())
+	if err == nil {
+		t.Errorf("Expected update err")
+	}
 	updates, gets := 0, 0
 	for _, a := range fakeClient.Actions() {
 		if a.GetResource().Resource != "replicasets" {

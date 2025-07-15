@@ -472,6 +472,9 @@ message Scale {
 message ScaleSpec {
   // replicas is the desired number of instances for the scaled object.
   // +optional
+  // +k8s:optional
+  // +default=0
+  // +k8s:minimum=0
   optional int32 replicas = 1;
 }
 

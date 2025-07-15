@@ -26,20 +26,19 @@ import (
 	"strings"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var (
@@ -424,16 +423,16 @@ func TestRunChecks(t *testing.T) {
 	}{
 		{[]Checker{}, true, ""},
 		{[]Checker{preflightCheckTest{"warning"}}, true, "\t[WARNING preflightCheckTest]: warning\n"}, // should just print warning
-		{[]Checker{preflightCheckTest{"error"}}, false, ""},
-		{[]Checker{preflightCheckTest{"test"}}, false, ""},
+		{[]Checker{preflightCheckTest{"error"}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR preflightCheckTest]: fake error\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
+		{[]Checker{preflightCheckTest{"test"}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR preflightCheckTest]: fake error\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
 		{[]Checker{DirAvailableCheck{Path: "/does/not/exist"}}, true, ""},
-		{[]Checker{DirAvailableCheck{Path: "/"}}, false, ""},
+		{[]Checker{DirAvailableCheck{Path: "/"}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR DirAvailable--]: / is not empty\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
 		{[]Checker{FileAvailableCheck{Path: "/does/not/exist"}}, true, ""},
-		{[]Checker{FileContentCheck{Path: "/does/not/exist"}}, false, ""},
+		{[]Checker{FileContentCheck{Path: "/does/not/exist"}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR FileContent--does-not-exist]: /does/not/exist does not exist\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
 		{[]Checker{FileContentCheck{Path: "/"}}, true, ""},
-		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
+		{[]Checker{FileContentCheck{Path: "/", Content: []byte("content can not be read")}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR FileContent--]: / could not be read\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
 		{[]Checker{InPathCheck{executable: "foobarbaz", exec: exec.New()}}, true, "\t[WARNING FileExisting-foobarbaz]: foobarbaz not found in system path\n"},
-		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true, exec: exec.New()}}, false, ""},
+		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true, exec: exec.New()}}, false, "[preflight] Some fatal errors occurred:\n\t[ERROR FileExisting-foobarbaz]: foobarbaz not found in system path\n[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`\n"},
 		{[]Checker{InPathCheck{executable: "foobar", mandatory: false, exec: exec.New(), suggestion: "install foobar"}}, true, "\t[WARNING FileExisting-foobar]: foobar not found in system path\nSuggestion: install foobar\n"},
 	}
 	for _, rt := range tokenTest {

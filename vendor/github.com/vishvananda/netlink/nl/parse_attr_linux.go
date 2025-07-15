@@ -17,7 +17,7 @@ func ParseAttributes(data []byte) <-chan Attribute {
 
 	go func() {
 		i := 0
-		for i+4 < len(data) {
+		for i+4 <= len(data) {
 			length := int(native.Uint16(data[i : i+2]))
 			attrType := native.Uint16(data[i+2 : i+4])
 

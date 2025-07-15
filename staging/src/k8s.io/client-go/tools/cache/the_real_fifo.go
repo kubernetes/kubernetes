@@ -18,11 +18,12 @@ package cache
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiltrace "k8s.io/utils/trace"
-	"sync"
-	"time"
 )
 
 // RealFIFO is a Queue in which every notification from the Reflector is passed
@@ -387,6 +388,11 @@ func (f *RealFIFO) Resync() error {
 	}
 
 	return nil
+}
+
+// Transformer implements the TransformingStore interface.
+func (f *RealFIFO) Transformer() TransformFunc {
+	return f.transformer
 }
 
 // NewRealFIFO returns a Store which can be used to queue up items to

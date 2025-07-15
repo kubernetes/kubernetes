@@ -249,7 +249,11 @@ func (cm *FakeContainerManager) GetDynamicResources(pod *v1.Pod, container *v1.C
 func (cm *FakeContainerManager) GetNodeAllocatableAbsolute() v1.ResourceList {
 	cm.Lock()
 	defer cm.Unlock()
-	return nil
+	return v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse("4"),
+		v1.ResourceMemory: resource.MustParse("4Gi"),
+		v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+	}
 }
 
 func (cm *FakeContainerManager) PrepareDynamicResources(ctx context.Context, pod *v1.Pod) error {

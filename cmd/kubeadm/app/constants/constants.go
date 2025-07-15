@@ -24,13 +24,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	componentversion "k8s.io/component-base/version"
 	netutils "k8s.io/utils/net"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 const (
@@ -323,10 +323,10 @@ const (
 	KubeletHealthzPort = 10248
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
-	MinExternalEtcdVersion = "3.5.11-0"
+	MinExternalEtcdVersion = "3.5.21-0"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.21-0"
+	DefaultEtcdVersion = "3.6.1-1"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -364,7 +364,7 @@ const (
 	CoreDNSImageName = "coredns"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "v1.12.0"
+	CoreDNSVersion = "v1.12.1"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -466,6 +466,9 @@ const (
 	EnvVarJoinDryRunDir = "KUBEADM_JOIN_DRYRUN_DIR"
 	// EnvVarUpgradeDryRunDir has the environment variable for upgrade dry run directory override.
 	EnvVarUpgradeDryRunDir = "KUBEADM_UPGRADE_DRYRUN_DIR"
+
+	// ProbePort is a general named port to be used in pod manifests.
+	ProbePort = "probe-port"
 )
 
 var (
@@ -495,10 +498,10 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		30: "3.5.21-0",
 		31: "3.5.21-0",
 		32: "3.5.21-0",
 		33: "3.5.21-0",
+		34: "3.6.1-1",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

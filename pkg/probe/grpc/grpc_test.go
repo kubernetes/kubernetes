@@ -44,6 +44,16 @@ func TestNew(t *testing.T) {
 type successServerMock struct {
 }
 
+func (s successServerMock) List(ctx context.Context, request *grpchealth.HealthListRequest) (*grpchealth.HealthListResponse, error) {
+	return &grpchealth.HealthListResponse{
+		Statuses: map[string]*grpchealth.HealthCheckResponse{
+			"grpc": {
+				Status: grpchealth.HealthCheckResponse_SERVING,
+			},
+		},
+	}, nil
+}
+
 func (s successServerMock) Check(context.Context, *grpchealth.HealthCheckRequest) (*grpchealth.HealthCheckResponse, error) {
 	return &grpchealth.HealthCheckResponse{
 		Status: grpchealth.HealthCheckResponse_SERVING,
@@ -57,6 +67,16 @@ func (s successServerMock) Watch(_ *grpchealth.HealthCheckRequest, stream grpche
 }
 
 type errorTimeoutServerMock struct {
+}
+
+func (e errorTimeoutServerMock) List(ctx context.Context, request *grpchealth.HealthListRequest) (*grpchealth.HealthListResponse, error) {
+	return &grpchealth.HealthListResponse{
+		Statuses: map[string]*grpchealth.HealthCheckResponse{
+			"grpc": {
+				Status: grpchealth.HealthCheckResponse_SERVING,
+			},
+		},
+	}, nil
 }
 
 func (e errorTimeoutServerMock) Check(context.Context, *grpchealth.HealthCheckRequest) (*grpchealth.HealthCheckResponse, error) {
@@ -74,6 +94,16 @@ func (e errorTimeoutServerMock) Watch(_ *grpchealth.HealthCheckRequest, stream g
 }
 
 type errorNotServeServerMock struct {
+}
+
+func (e errorNotServeServerMock) List(ctx context.Context, request *grpchealth.HealthListRequest) (*grpchealth.HealthListResponse, error) {
+	return &grpchealth.HealthListResponse{
+		Statuses: map[string]*grpchealth.HealthCheckResponse{
+			"grpc": {
+				Status: grpchealth.HealthCheckResponse_NOT_SERVING,
+			},
+		},
+	}, nil
 }
 
 func (e errorNotServeServerMock) Check(context.Context, *grpchealth.HealthCheckRequest) (*grpchealth.HealthCheckResponse, error) {

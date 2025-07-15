@@ -174,3 +174,8 @@ func (b *ObjectMetaApplyConfiguration) WithFinalizers(values ...string) *ObjectM
 func (b *ObjectMetaApplyConfiguration) GetName() *string {
 	return b.Name
 }
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ObjectMetaApplyConfiguration) GetNamespace() *string {
+	return b.Namespace
+}

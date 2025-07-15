@@ -37,7 +37,8 @@ type Config struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
-	Preferences Preferences `json:"preferences"`
+	// Deprecated: this field is deprecated in v1.34. It is not used by any of the Kubernetes components.
+	Preferences Preferences `json:"preferences,omitzero"`
 	// Clusters is a map of referencable names to cluster configs
 	Clusters []NamedCluster `json:"clusters"`
 	// AuthInfos is a map of referencable names to user configs
@@ -51,6 +52,7 @@ type Config struct {
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
 
+// Deprecated: this structure is deprecated in v1.34. It is not used by any of the Kubernetes components.
 type Preferences struct {
 	// +optional
 	Colors bool `json:"colors,omitempty"`
@@ -113,7 +115,8 @@ type AuthInfo struct {
 	// Token is the bearer token for authentication to the kubernetes cluster.
 	// +optional
 	Token string `json:"token,omitempty" datapolicy:"token"`
-	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present, Token takes precedence.
+	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present,
+	// the TokenFile will be periodically read and the last successfully read value takes precedence over Token.
 	// +optional
 	TokenFile string `json:"tokenFile,omitempty"`
 	// Impersonate is the username to impersonate.  The name matches the flag.

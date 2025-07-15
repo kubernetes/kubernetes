@@ -350,6 +350,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 	c.eventBroadcaster.StartStructuredLogging(3) // verbosity level 3 is used by the other KCM controllers
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.kubeClient.CoreV1().Events("")})
+	defer c.eventBroadcaster.Shutdown()
 
 	if !cache.WaitForNamedCacheSync("selinux_warning", ctx.Done(), c.podsSynced, c.pvcsSynced, c.pvsSynced, c.csiDriversSynced) {
 		return

@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"k8s.io/code-generator/cmd/defaulter-gen/args"
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -64,24 +65,40 @@ const tagName = "k8s:defaulter-gen"
 const inputTagName = "k8s:defaulter-gen-input"
 const defaultTagName = "default"
 
-func extractDefaultTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[defaultTagName]
-}
-
-func extractTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[tagName]
-}
-
-func extractInputTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[inputTagName]
-}
-
-func checkTag(comments []string, require ...string) bool {
-	values := gengo.ExtractCommentTags("+", comments)[tagName]
-	if len(require) == 0 {
-		return len(values) == 1 && values[0] == ""
+func extractDefaultTag(comments []string) ([]string, error) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{defaultTagName}, comments)
+	if err != nil {
+		return nil, err
 	}
-	return reflect.DeepEqual(values, require)
+	return tags[defaultTagName], nil
+}
+
+func extractTag(comments []string) ([]string, error) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagName}, comments)
+	if err != nil {
+		return nil, err
+	}
+	return tags[tagName], nil
+}
+
+func extractInputTag(comments []string) ([]string, error) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{inputTagName}, comments)
+	if err != nil {
+		return nil, err
+	}
+	return tags[inputTagName], nil
+}
+
+func checkTag(comments []string, require ...string) (bool, error) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagName}, comments)
+	if err != nil {
+		return false, err
+	}
+
+	if len(require) == 0 {
+		return len(tags[tagName]) == 1 && tags[tagName][0] == "", nil
+	}
+	return reflect.DeepEqual(tags[tagName], require), nil
 }
 
 func defaultFnNamer() *namer.NameStrategy {
@@ -246,7 +263,10 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		pkg := context.Universe[i]
 
 		// if the types are not in the same package where the defaulter functions to be generated
-		inputTags := extractInputTag(pkg.Comments)
+		inputTags, err := extractInputTag(pkg.Comments)
+		if err != nil {
+			panic(fmt.Sprintf("error extracting input tag: %v", err))
+		}
 		if len(inputTags) > 1 {
 			panic(fmt.Sprintf("there may only be one input tag, got %#v", inputTags))
 		}
@@ -310,7 +330,10 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			getManualDefaultingFunctions(context, context.Universe[pp], existingDefaulters)
 		}
 
-		typesWith := extractTag(pkg.Comments)
+		typesWith, err := extractTag(pkg.Comments)
+		if err != nil {
+			klog.Fatalf("Error extracting %s tag: %v", tagName, err)
+		}
 		shouldCreateObjectDefaulterFn := func(t *types.Type) bool {
 			if defaults, ok := existingDefaulters[t]; ok && defaults.object != nil {
 				// A default generator is defined
@@ -322,11 +345,19 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				return false
 			}
 			// opt-out
-			if checkTag(t.SecondClosestCommentLines, "false") {
+			optOut, err := checkTag(t.SecondClosestCommentLines, "false")
+			if err != nil {
+				klog.Fatalf("Error extracting %s tags: %v", tagName, err)
+			}
+			if optOut {
 				return false
 			}
 			// opt-in
-			if checkTag(t.SecondClosestCommentLines, "true") {
+			optIn, err := checkTag(t.SecondClosestCommentLines, "true")
+			if err != nil {
+				klog.Fatalf("Error extracting %s tags: %v", tagName, err)
+			}
+			if optIn {
 				return true
 			}
 			// For every k8s:defaulter-gen tag at the package level, interpret the value as a
@@ -497,13 +528,16 @@ func getPointerElementPath(t *types.Type) []*types.Type {
 }
 
 // getNestedDefault returns the first default value when resolving alias types
-func getNestedDefault(t *types.Type) string {
+func getNestedDefault(t *types.Type) (string, error) {
 	var prev *types.Type
 	for prev != t {
 		prev = t
-		defaultMap := extractDefaultTag(t.CommentLines)
+		defaultMap, err := extractDefaultTag(t.CommentLines)
+		if err != nil {
+			return "", err
+		}
 		if len(defaultMap) == 1 && defaultMap[0] != "" {
-			return defaultMap[0]
+			return defaultMap[0], nil
 		}
 		if t.Kind == types.Alias {
 			t = t.Underlying
@@ -511,7 +545,7 @@ func getNestedDefault(t *types.Type) string {
 			t = t.Elem
 		}
 	}
-	return ""
+	return "", nil
 }
 
 var refRE = regexp.MustCompile(`^ref\((?P<reference>[^"]+)\)$`)
@@ -538,7 +572,11 @@ func parseSymbolReference(s, sourcePackage string) (types.Name, bool) {
 }
 
 func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLines []string, commentPackage string) *callNode {
-	defaultMap := extractDefaultTag(commentLines)
+	defaultMap, err := extractDefaultTag(commentLines)
+	if err != nil {
+		klog.Fatalf("Error extracting default tag: %v", err)
+	}
+
 	var defaultString string
 	if len(defaultMap) == 1 {
 		defaultString = defaultMap[0]
@@ -548,7 +586,10 @@ func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLin
 
 	baseT, depth := resolveTypeAndDepth(t)
 	if depth > 0 && defaultString == "" {
-		defaultString = getNestedDefault(t)
+		defaultString, err = getNestedDefault(t)
+		if err != nil {
+			klog.Fatalf("Error extracting nested default tag: %v", err)
+		}
 	}
 
 	if len(defaultString) == 0 {
@@ -622,7 +663,11 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		parent.call = append(parent.call, defaults.base)
 		// if the base function indicates it "covers" (it already includes defaulters)
 		// we can halt recursion
-		if checkTag(defaults.base.CommentLines, "covers") {
+		isCovers, err := checkTag(defaults.base.CommentLines, "covers")
+		if err != nil {
+			klog.Fatalf("error extracting %s tag: %v", tagName, err)
+		}
+		if isCovers {
 			klog.V(6).Infof("the defaulter %s indicates it covers all sub generators", t.Name)
 			return parent
 		}

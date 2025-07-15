@@ -17,12 +17,11 @@ limitations under the License.
 package phases
 
 import (
-	"github.com/pkg/errors"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var (

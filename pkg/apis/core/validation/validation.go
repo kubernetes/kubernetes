@@ -31,7 +31,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
 	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,6 +41,7 @@ import (
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -2141,7 +2141,7 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 
 	// PersistentVolumeSource should be immutable after creation.
 	if !apiequality.Semantic.DeepEqual(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource) {
-		pvcSourceDiff := cmp.Diff(oldPv.Spec.PersistentVolumeSource, newPv.Spec.PersistentVolumeSource)
+		pvcSourceDiff := diff.Diff(oldPv.Spec.PersistentVolumeSource, newPv.Spec.PersistentVolumeSource)
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumesource"), fmt.Sprintf("spec.persistentvolumesource is immutable after creation\n%v", pvcSourceDiff)))
 	}
 	allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
@@ -2436,7 +2436,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	statusSize := oldPvc.Status.Capacity["storage"]
 
 	if !apiequality.Semantic.DeepEqual(newPvcClone.Spec, oldPvcClone.Spec) {
-		specDiff := cmp.Diff(oldPvcClone.Spec, newPvcClone.Spec)
+		specDiff := diff.Diff(oldPvcClone.Spec, newPvcClone.Spec)
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation except resources.requests and volumeAttributesClassName for bound claims\n%v", specDiff)))
 	}
 	if newSize.Cmp(oldSize) < 0 {
@@ -2539,7 +2539,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
 	}
 	if validationOpts.EnableRecoverFromExpansionFailure {
-		resizeStatusPath := field.NewPath("status", "allocatedResourceStatus")
+		resizeStatusPath := field.NewPath("status", "allocatedResourceStatuses")
 		if newPvc.Status.AllocatedResourceStatuses != nil {
 			resizeStatus := newPvc.Status.AllocatedResourceStatuses
 			for k, v := range resizeStatus {
@@ -3038,6 +3038,13 @@ func gatherPodResourceClaimNames(claims []core.PodResourceClaim) sets.Set[string
 }
 
 func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResourceClaim, podClaimNames *sets.Set[string], fldPath *field.Path) field.ErrorList {
+	// static pods don't support resource claims
+	if podMeta != nil {
+		if _, ok := podMeta.Annotations[core.MirrorPodAnnotationKey]; ok {
+			return field.ErrorList{field.Forbidden(field.NewPath(""), "static pods do not support resource claims")}
+		}
+	}
+
 	var allErrs field.ErrorList
 	if claim.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
@@ -4106,6 +4113,14 @@ type PodValidationOptions struct {
 	AllowSidecarResizePolicy bool
 	// Allow invalid label-value in RequiredNodeSelector
 	AllowInvalidLabelValueInRequiredNodeAffinity bool
+	// Allow feature of MatchLabelKeys in TopologySpreadConstraints
+	AllowMatchLabelKeysInPodTopologySpread bool
+	// Allow merging selectors built from MatchLabelKeys into LabelSelector of TopologySpreadConstraints
+	AllowMatchLabelKeysInPodTopologySpreadSelectorMerge bool
+	// OldPod has invalid MatchLabelKeys in TopologySpreadConstraints against current(>=v1.34) validation
+	OldPodViolatesMatchLabelKeysValidation bool
+	// OldPod has invalid MatchLabelKeys in TopologySpreadConstraints against legacy(<v1.34) validation
+	OldPodViolatesLegacyMatchLabelKeysValidation bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4384,10 +4399,13 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 
 	// Pod-level requests must be >= aggregate requests of all containers in a pod.
 	for resourceName, ctrReqs := range aggrContainerReqs {
-		key := resourceName.String()
-		podSpecRequests := spec.Resources.Requests[core.ResourceName(key)]
+		// Skip if the pod-level request of the resource is not set.
+		podSpecRequests, exists := spec.Resources.Requests[core.ResourceName(resourceName.String())]
+		if !exists {
+			continue
+		}
 
-		fldPath := reqPath.Key(key)
+		fldPath := reqPath.Key(resourceName.String())
 		if ctrReqs.Cmp(podSpecRequests) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, podSpecRequests.String(), fmt.Sprintf("must be greater than or equal to aggregate container requests of %s", ctrReqs.String())))
 		}
@@ -4396,6 +4414,7 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// Individual Container limits must be <= Pod-level limits.
 	for i, ctr := range spec.Containers {
 		for resourceName, ctrLimit := range ctr.Resources.Limits {
+			// Skip if the pod-level limit of the resource is not set.
 			podSpecLimits, exists := spec.Resources.Limits[core.ResourceName(resourceName.String())]
 			if !exists {
 				continue
@@ -4729,7 +4748,7 @@ func validatePodAffinityTerm(podAffinityTerm core.PodAffinityTerm, allowInvalidL
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
 		}
 	}
-	allErrs = append(allErrs, validateMatchLabelKeysAndMismatchLabelKeys(fldPath, podAffinityTerm.MatchLabelKeys, podAffinityTerm.MismatchLabelKeys, podAffinityTerm.LabelSelector)...)
+	allErrs = append(allErrs, ValidateMatchLabelKeysAndMismatchLabelKeys(fldPath, podAffinityTerm.MatchLabelKeys, podAffinityTerm.MismatchLabelKeys, podAffinityTerm.LabelSelector)...)
 	if len(podAffinityTerm.TopologyKey) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "can not be empty"))
 	}
@@ -5401,7 +5420,7 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	if !apiequality.Semantic.DeepEqual(mungedPodSpec, oldPod.Spec) {
 		// This diff isn't perfect, but it's a helluva lot better an "I'm not going to tell you what the difference is".
 		// TODO: Pinpoint the specific field that causes the invalid error after we have strategic merge diff
-		specDiff := cmp.Diff(oldPod.Spec, mungedPodSpec)
+		specDiff := diff.Diff(oldPod.Spec, mungedPodSpec)
 		errs := field.Forbidden(specPath, fmt.Sprintf("pod updates may not change fields other than %s\n%v", strings.Join(updatablePodSpecFields, ","), specDiff))
 		allErrs = append(allErrs, errs)
 	}
@@ -5614,7 +5633,7 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 		if new, ok := newContainerIndex[old.Name]; !ok {
 			allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("existing ephemeral containers %q may not be removed\n", old.Name)))
 		} else if !apiequality.Semantic.DeepEqual(old, *new) {
-			specDiff := cmp.Diff(old, *new)
+			specDiff := diff.Diff(old, *new)
 			allErrs = append(allErrs, field.Forbidden(specPath, fmt.Sprintf("existing ephemeral containers %q may not be changed\n%v", old.Name, specDiff)))
 		}
 	}
@@ -5909,9 +5928,12 @@ var supportedServiceIPFamilyPolicy = sets.New(
 	core.IPFamilyPolicyRequireDualStack)
 
 // ValidateService tests if required fields/annotations of a Service are valid.
-func ValidateService(service, oldService *core.Service) field.ErrorList {
+func validateService(service, oldService *core.Service) field.ErrorList {
 	metaPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, metaPath)
+
+	// Don't validate ObjectMeta here - that is handled in the ValidateServiceCreate/ValidateServiceUpdate
+	// functions which call ValidateObjectMeta and ValidateObjectMetaUpdate respectively.
+	var allErrs field.ErrorList
 
 	topologyHintsVal, topologyHintsSet := service.Annotations[core.DeprecatedAnnotationTopologyAwareHints]
 	topologyModeVal, topologyModeSet := service.Annotations[core.AnnotationTopologyMode]
@@ -6261,7 +6283,17 @@ func validateServiceTrafficDistribution(service *core.Service) field.ErrorList {
 
 // ValidateServiceCreate validates Services as they are created.
 func ValidateServiceCreate(service *core.Service) field.ErrorList {
-	return ValidateService(service, nil)
+	metaPath := field.NewPath("metadata")
+
+	// KEP-5311 Relaxed validation for Services names
+	validateServiceNameFunc := ValidateServiceName
+	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedServiceNameValidation) {
+		validateServiceNameFunc = apimachineryvalidation.NameIsDNSLabel
+	}
+
+	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, validateServiceNameFunc, metaPath)
+
+	return append(allErrs, validateService(service, nil)...)
 }
 
 // ValidateServiceUpdate tests if required fields in the service are set during an update
@@ -6284,7 +6316,7 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsUpdate(oldService, service)...)
 
-	return append(allErrs, ValidateService(service, oldService)...)
+	return append(allErrs, validateService(service, oldService)...)
 }
 
 // ValidateServiceStatusUpdate tests if required fields in the Service are set when updating status.
@@ -6667,10 +6699,10 @@ func validateConfigMapNodeConfigSourceStatus(source *core.ConfigMapNodeConfigSou
 	allErrs := field.ErrorList{}
 	// uid and resourceVersion must be set in status
 	if string(source.UID) == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("uid"), "uid must be set in status"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("uid"), ""))
 	}
 	if source.ResourceVersion == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("resourceVersion"), "resourceVersion must be set in status"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceVersion"), ""))
 	}
 	return append(allErrs, validateConfigMapNodeConfigSource(source, fldPath)...)
 }
@@ -6680,7 +6712,7 @@ func validateConfigMapNodeConfigSource(source *core.ConfigMapNodeConfigSource, f
 	allErrs := field.ErrorList{}
 	// validate target configmap namespace
 	if source.Namespace == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), "namespace must be set"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
 	} else {
 		for _, msg := range ValidateNameFunc(ValidateNamespaceName)(source.Namespace, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), source.Namespace, msg))
@@ -6688,7 +6720,7 @@ func validateConfigMapNodeConfigSource(source *core.ConfigMapNodeConfigSource, f
 	}
 	// validate target configmap name
 	if source.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "name must be set"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else {
 		for _, msg := range ValidateNameFunc(ValidateConfigMapName)(source.Name, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), source.Name, msg))
@@ -6696,7 +6728,7 @@ func validateConfigMapNodeConfigSource(source *core.ConfigMapNodeConfigSource, f
 	}
 	// validate kubeletConfigKey against rules for configMap key names
 	if source.KubeletConfigKey == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kubeletConfigKey"), "kubeletConfigKey must be set"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("kubeletConfigKey"), ""))
 	} else {
 		for _, msg := range validation.IsConfigMapKey(source.KubeletConfigKey) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kubeletConfigKey"), source.KubeletConfigKey, msg))
@@ -7889,7 +7921,7 @@ func validateOS(podSpec *core.PodSpec, fldPath *field.Path, opts PodValidationOp
 		return allErrs
 	}
 	if len(os.Name) == 0 {
-		return append(allErrs, field.Required(fldPath.Child("name"), "cannot be empty"))
+		return append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
 	if !validOS.Has(os.Name) {
 		allErrs = append(allErrs, field.NotSupported(fldPath, os.Name, sets.List(validOS)))
@@ -8055,7 +8087,33 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 		if err := validateNodeInclusionPolicy(subFldPath.Child("nodeTaintsPolicy"), constraint.NodeTaintsPolicy); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		allErrs = append(allErrs, validateMatchLabelKeysInTopologySpread(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
+		// legacyValidationFunction is ValidateMatchLabelKeysInTopologySpread
+		// preferredValidationFunction is ValidateMatchLabelKeysAndMismatchLabelKeys
+		// OldPodViolatesMatchLabelKeysValidation==true means ValidateMatchLabelKeysAndMismatchLabelKeys failed, which means preferredValidation failed
+		// OldPodViolatesLegacyMatchLabelKeysValidation==true means ValidateMatchLabelKeysInTopologySpread failed, which means legacyValidation failed
+		if opts.AllowMatchLabelKeysInPodTopologySpread {
+			switch {
+			case opts.AllowMatchLabelKeysInPodTopologySpreadSelectorMerge && opts.OldPodViolatesMatchLabelKeysValidation:
+				// This case means that we want to use the preferredValidationFunction, but the old pod doesn't pass the preferredValidationFunction, so it must continue using the legacyValidationFunction.
+				// This is because we don't allow the fields to change.
+				allErrs = append(allErrs, ValidateMatchLabelKeysInTopologySpread(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
+			case opts.AllowMatchLabelKeysInPodTopologySpreadSelectorMerge && !opts.OldPodViolatesMatchLabelKeysValidation:
+				// This case means we want to use the preferredValidationFunction and the old pod passes it, so we will continue requiring the preferredValidationFunction to pass.
+				allErrs = append(allErrs, ValidateMatchLabelKeysAndMismatchLabelKeys(subFldPath, constraint.MatchLabelKeys, nil, constraint.LabelSelector)...)
+			case !opts.AllowMatchLabelKeysInPodTopologySpreadSelectorMerge && opts.OldPodViolatesLegacyMatchLabelKeysValidation:
+				// This case means we want to use the legacyValidationFunction, but the old pod doesn't pass it, so it must continue using the preferredValidationFunction instead so that updates to other fields can happen.
+				// This allows us to enable the featuregate, then disable the featuregate and still be able to update the pod.
+				allErrs = append(allErrs, ValidateMatchLabelKeysAndMismatchLabelKeys(subFldPath, constraint.MatchLabelKeys, nil, constraint.LabelSelector)...)
+			case !opts.AllowMatchLabelKeysInPodTopologySpreadSelectorMerge && !opts.OldPodViolatesLegacyMatchLabelKeysValidation:
+				// This case means we want to use the legacyValidationFunction and the old pod passes it, so we will continue requiring the legacyValidationFunction to pass.
+				allErrs = append(allErrs, ValidateMatchLabelKeysInTopologySpread(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
+			default:
+				// If we fall through, then we use the legacyValidationFunction because that's what we did prior to the featuregate(MatchLabelKeysInPodTopologySpreadSelectorMerge).
+				allErrs = append(allErrs, ValidateMatchLabelKeysInTopologySpread(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
+			}
+		} else {
+			allErrs = append(allErrs, ValidateMatchLabelKeysInTopologySpread(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
+		}
 		if !opts.AllowInvalidTopologySpreadConstraintLabelSelector {
 			allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(constraint.LabelSelector, unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}, subFldPath.Child("labelSelector"))...)
 		}
@@ -8122,11 +8180,11 @@ func validateNodeInclusionPolicy(fldPath *field.Path, policy *core.NodeInclusion
 	return nil
 }
 
-// validateMatchLabelKeysAndMismatchLabelKeys checks if both matchLabelKeys and mismatchLabelKeys are valid.
+// ValidateMatchLabelKeysAndMismatchLabelKeys checks if both matchLabelKeys and mismatchLabelKeys are valid.
 // - validate that all matchLabelKeys and mismatchLabelKeys are valid label names.
 // - validate that the user doens't specify the same key in both matchLabelKeys and labelSelector.
 // - validate that any matchLabelKeys are not duplicated with mismatchLabelKeys.
-func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelKeys, mismatchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
+func ValidateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelKeys, mismatchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
 	var allErrs field.ErrorList
 	// 1. validate that all matchLabelKeys and mismatchLabelKeys are valid label names.
 	allErrs = append(allErrs, validateLabelKeys(fldPath.Child("matchLabelKeys"), matchLabelKeys, labelSelector)...)
@@ -8156,7 +8214,7 @@ func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelK
 				// Before validateLabelKeysWithSelector is called, the labelSelector has already got the selector created from matchLabelKeys.
 				// Here, we found the duplicate key in labelSelector and the key is specified in labelKeys.
 				// Meaning that the same key is specified in both labelSelector and matchLabelKeys/mismatchLabelKeys.
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector"))
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector").WithOrigin("duplicatedLabelKeys"))
 			}
 
 			labelSelectorKeys.Insert(key)
@@ -8167,15 +8225,15 @@ func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelK
 	mismatchLabelKeysSet := sets.New(mismatchLabelKeys...)
 	for i, k := range matchLabelKeys {
 		if mismatchLabelKeysSet.Has(k) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), k, "exists in both matchLabelKeys and mismatchLabelKeys"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), k, "exists in both matchLabelKeys and mismatchLabelKeys").WithOrigin("duplicatedMismatchLabelKeys"))
 		}
 	}
 
 	return allErrs
 }
 
-// validateMatchLabelKeysInTopologySpread tests that the elements are a valid label name and are not already included in labelSelector.
-func validateMatchLabelKeysInTopologySpread(fldPath *field.Path, matchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
+// ValidateMatchLabelKeysInTopologySpread tests that the elements are a valid label name and are not already included in labelSelector.
+func ValidateMatchLabelKeysInTopologySpread(fldPath *field.Path, matchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
 	if len(matchLabelKeys) == 0 {
 		return nil
 	}
@@ -8197,7 +8255,7 @@ func validateMatchLabelKeysInTopologySpread(fldPath *field.Path, matchLabelKeys 
 	for i, key := range matchLabelKeys {
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(key, fldPath.Index(i))...)
 		if labelSelectorKeys.Has(key) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector").WithOrigin("overlappingKeys"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector").WithOrigin("duplicatedLabelKeys"))
 		}
 	}
 

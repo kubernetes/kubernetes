@@ -22,25 +22,22 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"sync/atomic"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/version"
-	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-
-	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-
-	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
-	"k8s.io/apiserver/pkg/endpoints/metrics"
-
-	"sync/atomic"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/version"
+	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
+	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
@@ -163,7 +160,7 @@ func NewResourceManager(path string) ResourceManager {
 		serializer:        codecs,
 		versionPriorities: make(map[groupVersionKey]priorityInfo),
 	}
-	rdm.serveHTTPFunc = metrics.InstrumentHandlerFunc("GET",
+	rdm.serveHTTPFunc = metrics.InstrumentHandlerFunc(request.MethodGet,
 		/* group = */ "",
 		/* version = */ "",
 		/* resource = */ "",

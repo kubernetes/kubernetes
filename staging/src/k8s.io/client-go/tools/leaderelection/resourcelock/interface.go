@@ -99,8 +99,8 @@ type Interface interface {
 	Describe() string
 }
 
-// Manufacture will create a lock of a given type according to the input parameters
-func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig) (Interface, error) {
+// new will create a lock of a given type according to the input parameters
+func new(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig, labels map[string]string) (Interface, error) {
 	leaseLock := &LeaseLock{
 		LeaseMeta: metav1.ObjectMeta{
 			Namespace: ns,
@@ -108,6 +108,7 @@ func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interf
 		},
 		Client:     coordinationClient,
 		LockConfig: rlc,
+		Labels:     labels,
 	}
 	switch lockType {
 	case endpointsResourceLock:
@@ -123,6 +124,17 @@ func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interf
 	default:
 		return nil, fmt.Errorf("Invalid lock-type %s", lockType)
 	}
+}
+
+// New will create a lock of a given type according to the input parameters
+func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig) (Interface, error) {
+	return new(lockType, ns, name, coreClient, coordinationClient, rlc, nil)
+}
+
+// NewWithLabels will create a lock of a given type according to the input parameters
+// When the holder of the lock changes, that holder will apply their labels
+func NewWithLabels(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig, labels map[string]string) (Interface, error) {
+	return new(lockType, ns, name, coreClient, coordinationClient, rlc, labels)
 }
 
 // NewFromKubeconfig will create a lock of a given type according to the input parameters.

@@ -22,7 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -379,7 +378,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Description: Create a Pod with environment variables. Environment variables defined using previously defined environment variables MUST expand to proper values.
 		Allow almost all printable ASCII characters in environment variables.
 	*/
-	framework.It("allow almost all printable ASCII characters as environment variable names", feature.RelaxedEnvironmentVariableValidation, func(ctx context.Context) {
+	framework.It("allow almost all printable ASCII characters as environment variable names", func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "!\"#$%&'()",

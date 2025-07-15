@@ -21,7 +21,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // CreateRandBytes returns a cryptographically secure slice of random bytes with a given size

@@ -36,6 +36,7 @@ import (
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -84,7 +85,7 @@ type Scheduler struct {
 	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
 	// Return a struct of ScheduleResult with the name of suggested host on success,
 	// otherwise will return a FitError with reasons.
-	SchedulePod func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error)
+	SchedulePod func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, error)
 
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}
@@ -352,11 +353,16 @@ func New(ctx context.Context,
 		return nil, errors.New("at least one profile is required")
 	}
 
-	preEnqueuePluginMap := make(map[string][]framework.PreEnqueuePlugin)
+	preEnqueuePluginMap := make(map[string]map[string]framework.PreEnqueuePlugin)
 	queueingHintsPerProfile := make(internalqueue.QueueingHintMapPerProfile)
 	var returnErr error
 	for profileName, profile := range profiles {
-		preEnqueuePluginMap[profileName] = profile.PreEnqueuePlugins()
+		plugins := profile.PreEnqueuePlugins()
+		preEnqueuePluginMap[profileName] = make(map[string]framework.PreEnqueuePlugin, len(plugins))
+		for _, plugin := range plugins {
+			preEnqueuePluginMap[profileName][plugin.Name()] = plugin
+		}
+
 		queueingHintsPerProfile[profileName], err = buildQueueingHintMap(ctx, profile.EnqueueExtensions())
 		if err != nil {
 			returnErr = errors.Join(returnErr, err)
@@ -415,8 +421,8 @@ func New(ctx context.Context,
 
 // defaultQueueingHintFn is the default queueing hint function.
 // It always returns Queue as the queueing hint.
-var defaultQueueingHintFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (framework.QueueingHint, error) {
-	return framework.Queue, nil
+var defaultQueueingHintFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fwk.QueueingHint, error) {
+	return fwk.Queue, nil
 }
 
 func buildQueueingHintMap(ctx context.Context, es []framework.EnqueueExtensions) (internalqueue.QueueingHintMap, error) {
@@ -448,11 +454,11 @@ func buildQueueingHintMap(ctx context.Context, es []framework.EnqueueExtensions)
 				fn = defaultQueueingHintFn
 			}
 
-			if event.Event.Resource == framework.Node {
-				if event.Event.ActionType&framework.Add != 0 {
+			if event.Event.Resource == fwk.Node {
+				if event.Event.ActionType&fwk.Add != 0 {
 					registerNodeAdded = true
 				}
-				if event.Event.ActionType&framework.UpdateNodeTaint != 0 {
+				if event.Event.ActionType&fwk.UpdateNodeTaint != 0 {
 					registerNodeTaintUpdated = true
 				}
 			}
@@ -473,8 +479,8 @@ func buildQueueingHintMap(ctx context.Context, es []framework.EnqueueExtensions)
 			// unschedulable pod pool.
 			// This behavior will be removed when we remove the preCheck feature.
 			// See: https://github.com/kubernetes/kubernetes/issues/110175
-			queueingHintMap[framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}] =
-				append(queueingHintMap[framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}],
+			queueingHintMap[fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}] =
+				append(queueingHintMap[fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}],
 					&internalqueue.QueueingHintFunction{
 						PluginName:     e.Name(),
 						QueueingHintFn: defaultQueueingHintFn,
@@ -577,10 +583,10 @@ func buildExtenders(logger klog.Logger, extenders []schedulerapi.Extender, profi
 	return fExtenders, nil
 }
 
-type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time)
+type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *framework.NominatingInfo, start time.Time)
 
-func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[framework.EventResource]framework.ActionType {
-	gvkMap := make(map[framework.EventResource]framework.ActionType)
+func unionedGVKs(queueingHintsPerProfile internalqueue.QueueingHintMapPerProfile) map[fwk.EventResource]fwk.ActionType {
+	gvkMap := make(map[fwk.EventResource]fwk.ActionType)
 	for _, queueingHints := range queueingHintsPerProfile {
 		for evt := range queueingHints {
 			if _, ok := gvkMap[evt.Resource]; ok {

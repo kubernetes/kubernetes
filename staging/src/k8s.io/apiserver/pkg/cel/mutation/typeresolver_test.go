@@ -212,7 +212,7 @@ func TestTypeResolver(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, option := common.NewResolverTypeProviderAndEnvOption(&DynamicTypeResolver{})
+			option := common.ResolverEnvOption(&DynamicTypeResolver{})
 			env := mustCreateEnv(t, option)
 			ast, issues := env.Compile(tc.expression)
 			if len(tc.expectCompileError) > 0 {
@@ -307,7 +307,7 @@ func TestCELOptional(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, option := common.NewResolverTypeProviderAndEnvOption(&DynamicTypeResolver{})
+			option := common.ResolverEnvOption(&DynamicTypeResolver{})
 			env := mustCreateEnvWithOptional(t, option)
 			ast, issues := env.Compile(tc.expression)
 			if len(tc.expectedCompileError) > 0 {

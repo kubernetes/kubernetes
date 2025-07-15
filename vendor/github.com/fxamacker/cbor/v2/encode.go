@@ -58,8 +58,10 @@ import (
 //
 // Marshal supports format string stored under the "cbor" key in the struct
 // field's tag.  CBOR format string can specify the name of the field,
-// "omitempty" and "keyasint" options, and special case "-" for field omission.
-// If "cbor" key is absent, Marshal uses "json" key.
+// "omitempty", "omitzero" and "keyasint" options, and special case "-" for
+// field omission. If "cbor" key is absent, Marshal uses "json" key.
+// When using the "json" key, the "omitzero" option is honored when building
+// with Go 1.24+ to match stdlib encoding/json behavior.
 //
 // Struct field name is treated as integer if it has "keyasint" option in
 // its format string.  The format string must specify an integer as its
@@ -67,8 +69,8 @@ import (
 //
 // Special struct field "_" is used to specify struct level options, such as
 // "toarray". "toarray" option enables Go struct to be encoded as CBOR array.
-// "omitempty" is disabled by "toarray" to ensure that the same number
-// of elements are encoded every time.
+// "omitempty" and "omitzero" are disabled by "toarray" to ensure that the
+// same number of elements are encoded every time.
 //
 // Anonymous struct fields are marshaled as if their exported fields
 // were fields in the outer struct.  Marshal follows the same struct fields
@@ -92,7 +94,7 @@ import (
 //
 // Values of other types cannot be encoded in CBOR.  Attempting
 // to encode such a value causes Marshal to return an UnsupportedTypeError.
-func Marshal(v interface{}) ([]byte, error) {
+func Marshal(v any) ([]byte, error) {
 	return defaultEncMode.Marshal(v)
 }
 
@@ -103,7 +105,7 @@ func Marshal(v interface{}) ([]byte, error) {
 // partially encoded data if error is returned.
 //
 // See Marshal for more details.
-func MarshalToBuffer(v interface{}, buf *bytes.Buffer) error {
+func MarshalToBuffer(v any, buf *bytes.Buffer) error {
 	return defaultEncMode.MarshalToBuffer(v, buf)
 }
 
@@ -773,7 +775,7 @@ func (opts EncOptions) encMode() (*encMode, error) { //nolint:gocritic // ignore
 
 // EncMode is the main interface for CBOR encoding.
 type EncMode interface {
-	Marshal(v interface{}) ([]byte, error)
+	Marshal(v any) ([]byte, error)
 	NewEncoder(w io.Writer) *Encoder
 	EncOptions() EncOptions
 }
@@ -783,7 +785,7 @@ type EncMode interface {
 // into the built-in buffer pool.
 type UserBufferEncMode interface {
 	EncMode
-	MarshalToBuffer(v interface{}, buf *bytes.Buffer) error
+	MarshalToBuffer(v any, buf *bytes.Buffer) error
 
 	// This private method is to prevent users implementing
 	// this interface and so future additions to it will
@@ -921,7 +923,7 @@ func (em *encMode) encTagBytes(t reflect.Type) []byte {
 // Marshal returns the CBOR encoding of v using em encoding mode.
 //
 // See the documentation for Marshal for details.
-func (em *encMode) Marshal(v interface{}) ([]byte, error) {
+func (em *encMode) Marshal(v any) ([]byte, error) {
 	e := getEncodeBuffer()
 
 	if err := encode(e, em, reflect.ValueOf(v)); err != nil {
@@ -943,7 +945,7 @@ func (em *encMode) Marshal(v interface{}) ([]byte, error) {
 // partially encoded data if error is returned.
 //
 // See Marshal for more details.
-func (em *encMode) MarshalToBuffer(v interface{}, buf *bytes.Buffer) error {
+func (em *encMode) MarshalToBuffer(v any, buf *bytes.Buffer) error {
 	if buf == nil {
 		return fmt.Errorf("cbor: encoding buffer provided by user is nil")
 	}
@@ -957,7 +959,7 @@ func (em *encMode) NewEncoder(w io.Writer) *Encoder {
 
 // encodeBufferPool caches unused bytes.Buffer objects for later reuse.
 var encodeBufferPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		e := new(bytes.Buffer)
 		e.Grow(32) // TODO: make this configurable
 		return e
@@ -975,6 +977,7 @@ func putEncodeBuffer(e *bytes.Buffer) {
 
 type encodeFunc func(e *bytes.Buffer, em *encMode, v reflect.Value) error
 type isEmptyFunc func(em *encMode, v reflect.Value) (empty bool, err error)
+type isZeroFunc func(v reflect.Value) (zero bool, err error)
 
 func encode(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 	if !v.IsValid() {
@@ -983,7 +986,7 @@ func encode(e *bytes.Buffer, em *encMode, v reflect.Value) error {
 		return nil
 	}
 	vt := v.Type()
-	f, _ := getEncodeFunc(vt)
+	f, _, _ := getEncodeFunc(vt)
 	if f == nil {
 		return &UnsupportedTypeError{vt}
 	}
@@ -1483,6 +1486,15 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 				continue
 			}
 		}
+		if f.omitZero {
+			zero, err := f.izf(fv)
+			if err != nil {
+				return err
+			}
+			if zero {
+				continue
+			}
+		}
 
 		if !f.keyAsInt && em.fieldName == FieldNameToByteString {
 			e.Write(f.cborNameByteString)
@@ -1775,34 +1787,34 @@ var (
 	typeByteString      = reflect.TypeOf(ByteString(""))
 )
 
-func getEncodeFuncInternal(t reflect.Type) (ef encodeFunc, ief isEmptyFunc) {
+func getEncodeFuncInternal(t reflect.Type) (ef encodeFunc, ief isEmptyFunc, izf isZeroFunc) {
 	k := t.Kind()
-	if k == reflect.Ptr {
-		return getEncodeIndirectValueFunc(t), isEmptyPtr
+	if k == reflect.Pointer {
+		return getEncodeIndirectValueFunc(t), isEmptyPtr, getIsZeroFunc(t)
 	}
 	switch t {
 	case typeSimpleValue:
-		return encodeMarshalerType, isEmptyUint
+		return encodeMarshalerType, isEmptyUint, getIsZeroFunc(t)
 
 	case typeTag:
-		return encodeTag, alwaysNotEmpty
+		return encodeTag, alwaysNotEmpty, getIsZeroFunc(t)
 
 	case typeTime:
-		return encodeTime, alwaysNotEmpty
+		return encodeTime, alwaysNotEmpty, getIsZeroFunc(t)
 
 	case typeBigInt:
-		return encodeBigInt, alwaysNotEmpty
+		return encodeBigInt, alwaysNotEmpty, getIsZeroFunc(t)
 
 	case typeRawMessage:
-		return encodeMarshalerType, isEmptySlice
+		return encodeMarshalerType, isEmptySlice, getIsZeroFunc(t)
 
 	case typeByteString:
-		return encodeMarshalerType, isEmptyString
+		return encodeMarshalerType, isEmptyString, getIsZeroFunc(t)
 	}
-	if reflect.PtrTo(t).Implements(typeMarshaler) {
-		return encodeMarshalerType, alwaysNotEmpty
+	if reflect.PointerTo(t).Implements(typeMarshaler) {
+		return encodeMarshalerType, alwaysNotEmpty, getIsZeroFunc(t)
 	}
-	if reflect.PtrTo(t).Implements(typeBinaryMarshaler) {
+	if reflect.PointerTo(t).Implements(typeBinaryMarshaler) {
 		defer func() {
 			// capture encoding method used for modes that disable BinaryMarshaler
 			bme := binaryMarshalerEncoder{
@@ -1815,39 +1827,39 @@ func getEncodeFuncInternal(t reflect.Type) (ef encodeFunc, ief isEmptyFunc) {
 	}
 	switch k {
 	case reflect.Bool:
-		return encodeBool, isEmptyBool
+		return encodeBool, isEmptyBool, getIsZeroFunc(t)
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return encodeInt, isEmptyInt
+		return encodeInt, isEmptyInt, getIsZeroFunc(t)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return encodeUint, isEmptyUint
+		return encodeUint, isEmptyUint, getIsZeroFunc(t)
 
 	case reflect.Float32, reflect.Float64:
-		return encodeFloat, isEmptyFloat
+		return encodeFloat, isEmptyFloat, getIsZeroFunc(t)
 
 	case reflect.String:
-		return encodeString, isEmptyString
+		return encodeString, isEmptyString, getIsZeroFunc(t)
 
 	case reflect.Slice:
 		if t.Elem().Kind() == reflect.Uint8 {
-			return encodeByteString, isEmptySlice
+			return encodeByteString, isEmptySlice, getIsZeroFunc(t)
 		}
 		fallthrough
 
 	case reflect.Array:
-		f, _ := getEncodeFunc(t.Elem())
+		f, _, _ := getEncodeFunc(t.Elem())
 		if f == nil {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return arrayEncodeFunc{f: f}.encode, isEmptySlice
+		return arrayEncodeFunc{f: f}.encode, isEmptySlice, getIsZeroFunc(t)
 
 	case reflect.Map:
 		f := getEncodeMapFunc(t)
 		if f == nil {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return f, isEmptyMap
+		return f, isEmptyMap, getIsZeroFunc(t)
 
 	case reflect.Struct:
 		// Get struct's special field "_" tag options
@@ -1855,31 +1867,31 @@ func getEncodeFuncInternal(t reflect.Type) (ef encodeFunc, ief isEmptyFunc) {
 			tag := f.Tag.Get("cbor")
 			if tag != "-" {
 				if hasToArrayOption(tag) {
-					return encodeStructToArray, isEmptyStruct
+					return encodeStructToArray, isEmptyStruct, isZeroFieldStruct
 				}
 			}
 		}
-		return encodeStruct, isEmptyStruct
+		return encodeStruct, isEmptyStruct, getIsZeroFunc(t)
 
 	case reflect.Interface:
-		return encodeIntf, isEmptyIntf
+		return encodeIntf, isEmptyIntf, getIsZeroFunc(t)
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 func getEncodeIndirectValueFunc(t reflect.Type) encodeFunc {
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
-	f, _ := getEncodeFunc(t)
+	f, _, _ := getEncodeFunc(t)
 	if f == nil {
 		return nil
 	}
 	return func(e *bytes.Buffer, em *encMode, v reflect.Value) error {
-		for v.Kind() == reflect.Ptr && !v.IsNil() {
+		for v.Kind() == reflect.Pointer && !v.IsNil() {
 			v = v.Elem()
 		}
-		if v.Kind() == reflect.Ptr && v.IsNil() {
+		if v.Kind() == reflect.Pointer && v.IsNil() {
 			e.Write(cborNil)
 			return nil
 		}
@@ -1986,4 +1998,97 @@ func float32NaNFromReflectValue(v reflect.Value) float32 {
 	p.Elem().Set(v)
 	f32 := p.Convert(reflect.TypeOf((*float32)(nil))).Elem().Interface().(float32)
 	return f32
+}
+
+type isZeroer interface {
+	IsZero() bool
+}
+
+var isZeroerType = reflect.TypeOf((*isZeroer)(nil)).Elem()
+
+// getIsZeroFunc returns a function for the given type that can be called to determine if a given value is zero.
+// Types that implement `IsZero() bool` are delegated to for non-nil values.
+// Types that do not implement `IsZero() bool` use the reflect.Value#IsZero() implementation.
+// The returned function matches behavior of stdlib encoding/json behavior in Go 1.24+.
+func getIsZeroFunc(t reflect.Type) isZeroFunc {
+	// Provide a function that uses a type's IsZero method if defined.
+	switch {
+	case t == nil:
+		return isZeroDefault
+	case t.Kind() == reflect.Interface && t.Implements(isZeroerType):
+		return isZeroInterfaceCustom
+	case t.Kind() == reflect.Pointer && t.Implements(isZeroerType):
+		return isZeroPointerCustom
+	case t.Implements(isZeroerType):
+		return isZeroCustom
+	case reflect.PointerTo(t).Implements(isZeroerType):
+		return isZeroAddrCustom
+	default:
+		return isZeroDefault
+	}
+}
+
+// isZeroInterfaceCustom returns true for nil or pointer-to-nil values,
+// and delegates to the custom IsZero() implementation otherwise.
+func isZeroInterfaceCustom(v reflect.Value) (bool, error) {
+	kind := v.Kind()
+
+	switch kind {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Interface, reflect.Slice:
+		if v.IsNil() {
+			return true, nil
+		}
+	}
+
+	switch kind {
+	case reflect.Interface, reflect.Pointer:
+		if elem := v.Elem(); elem.Kind() == reflect.Pointer && elem.IsNil() {
+			return true, nil
+		}
+	}
+
+	return v.Interface().(isZeroer).IsZero(), nil
+}
+
+// isZeroPointerCustom returns true for nil values,
+// and delegates to the custom IsZero() implementation otherwise.
+func isZeroPointerCustom(v reflect.Value) (bool, error) {
+	if v.IsNil() {
+		return true, nil
+	}
+	return v.Interface().(isZeroer).IsZero(), nil
+}
+
+// isZeroCustom delegates to the custom IsZero() implementation.
+func isZeroCustom(v reflect.Value) (bool, error) {
+	return v.Interface().(isZeroer).IsZero(), nil
+}
+
+// isZeroAddrCustom delegates to the custom IsZero() implementation of the addr of the value.
+func isZeroAddrCustom(v reflect.Value) (bool, error) {
+	if !v.CanAddr() {
+		// Temporarily box v so we can take the address.
+		v2 := reflect.New(v.Type()).Elem()
+		v2.Set(v)
+		v = v2
+	}
+	return v.Addr().Interface().(isZeroer).IsZero(), nil
+}
+
+// isZeroDefault calls reflect.Value#IsZero()
+func isZeroDefault(v reflect.Value) (bool, error) {
+	if !v.IsValid() {
+		// v is zero value
+		return true, nil
+	}
+	return v.IsZero(), nil
+}
+
+// isZeroFieldStruct is used to determine whether to omit toarray structs
+func isZeroFieldStruct(v reflect.Value) (bool, error) {
+	structType, err := getEncodingStructType(v.Type())
+	if err != nil {
+		return false, err
+	}
+	return len(structType.fields) == 0, nil
 }

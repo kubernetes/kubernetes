@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -55,7 +56,7 @@ type preFilterState struct {
 }
 
 // Clone the prefilter state.
-func (s *preFilterState) Clone() framework.StateData {
+func (s *preFilterState) Clone() fwk.StateData {
 	if s == nil {
 		return nil
 	}
@@ -270,31 +271,27 @@ func (pl *InterPodAffinity) getIncomingAffinityAntiAffinityCounts(ctx context.Co
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	var allNodes []*framework.NodeInfo
+func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, allNodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	var nodesWithRequiredAntiAffinityPods []*framework.NodeInfo
 	var err error
-	if allNodes, err = pl.sharedLister.NodeInfos().List(); err != nil {
-		return nil, framework.AsStatus(fmt.Errorf("failed to list NodeInfos: %w", err))
-	}
 	if nodesWithRequiredAntiAffinityPods, err = pl.sharedLister.NodeInfos().HavePodsWithRequiredAntiAffinityList(); err != nil {
-		return nil, framework.AsStatus(fmt.Errorf("failed to list NodeInfos with pods with affinity: %w", err))
+		return nil, fwk.AsStatus(fmt.Errorf("failed to list NodeInfos with pods with affinity: %w", err))
 	}
 
 	s := &preFilterState{}
 
 	if s.podInfo, err = framework.NewPodInfo(pod); err != nil {
-		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("parsing pod: %+v", err))
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("parsing pod: %+v", err))
 	}
 
 	for i := range s.podInfo.RequiredAffinityTerms {
 		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&s.podInfo.RequiredAffinityTerms[i]); err != nil {
-			return nil, framework.AsStatus(err)
+			return nil, fwk.AsStatus(err)
 		}
 	}
 	for i := range s.podInfo.RequiredAntiAffinityTerms {
 		if err := pl.mergeAffinityTermNamespacesIfNotEmpty(&s.podInfo.RequiredAntiAffinityTerms[i]); err != nil {
-			return nil, framework.AsStatus(err)
+			return nil, fwk.AsStatus(err)
 		}
 	}
 	logger := klog.FromContext(ctx)
@@ -304,7 +301,7 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 	s.affinityCounts, s.antiAffinityCounts = pl.getIncomingAffinityAntiAffinityCounts(ctx, s.podInfo, allNodes)
 
 	if len(s.existingAntiAffinityCounts) == 0 && len(s.podInfo.RequiredAffinityTerms) == 0 && len(s.podInfo.RequiredAntiAffinityTerms) == 0 {
-		return nil, framework.NewStatus(framework.Skip)
+		return nil, fwk.NewStatus(fwk.Skip)
 	}
 
 	cycleState.Write(preFilterStateKey, s)
@@ -317,26 +314,26 @@ func (pl *InterPodAffinity) PreFilterExtensions() framework.PreFilterExtensions 
 }
 
 // AddPod from pre-computed data in cycleState.
-func (pl *InterPodAffinity) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *InterPodAffinity) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	state.updateWithPod(podInfoToAdd, nodeInfo.Node(), 1)
 	return nil
 }
 
 // RemovePod from pre-computed data in cycleState.
-func (pl *InterPodAffinity) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *InterPodAffinity) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	state.updateWithPod(podInfoToRemove, nodeInfo.Node(), -1)
 	return nil
 }
 
-func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
+func getPreFilterState(cycleState fwk.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
 		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
@@ -412,23 +409,23 @@ func satisfyPodAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) boo
 
 // Filter invoked at the filter extension point.
 // It checks if a pod can be scheduled on the specified node with pod affinity/anti-affinity configuration.
-func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 
 	if !satisfyPodAffinity(state, nodeInfo) {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonAffinityRulesNotMatch)
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonAffinityRulesNotMatch)
 	}
 
 	if !satisfyPodAntiAffinity(state, nodeInfo) {
-		return framework.NewStatus(framework.Unschedulable, ErrReasonAntiAffinityRulesNotMatch)
+		return fwk.NewStatus(fwk.Unschedulable, ErrReasonAntiAffinityRulesNotMatch)
 	}
 
 	if !satisfyExistingPodsAntiAffinity(state, nodeInfo) {
-		return framework.NewStatus(framework.Unschedulable, ErrReasonExistingAntiAffinityRulesNotMatch)
+		return fwk.NewStatus(fwk.Unschedulable, ErrReasonExistingAntiAffinityRulesNotMatch)
 	}
 
 	return nil

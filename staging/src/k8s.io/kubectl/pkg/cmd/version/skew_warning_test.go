@@ -17,14 +17,12 @@ limitations under the License.
 package version
 
 import (
-	"bytes"
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"testing"
+
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestPrintVersionSkewWarning(t *testing.T) {
-	output := &bytes.Buffer{}
-
 	testCases := []struct {
 		name              string
 		clientVersion     apimachineryversion.Info
@@ -82,14 +80,15 @@ func TestPrintVersionSkewWarning(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			output.Reset()
+			warningMessage, err := getVersionSkewWarning(tc.clientVersion, tc.serverVersion)
+			if err != nil {
+				t.Errorf("error: %s", err)
+			}
 
-			printVersionSkewWarning(output, tc.clientVersion, tc.serverVersion)
-
-			if tc.isWarningExpected && output.Len() == 0 {
-				t.Error("warning was expected, but not written to the output")
-			} else if !tc.isWarningExpected && output.Len() > 0 {
-				t.Errorf("warning was not expected, but was written to the output: %s", output.String())
+			if tc.isWarningExpected && warningMessage == "" {
+				t.Error("warning was expected")
+			} else if !tc.isWarningExpected && warningMessage != "" {
+				t.Errorf("warning was not expected. but got %s", warningMessage)
 			}
 		})
 	}

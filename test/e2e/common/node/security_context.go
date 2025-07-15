@@ -40,7 +40,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
@@ -90,7 +89,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		}
 
-		f.It("must create the user namespace if set to false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
+		f.It("must create the user namespace if set to false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// with hostUsers=false the pod must use a new user namespace
 			podClient := e2epod.PodClientNS(f, f.Namespace.Name)
 
@@ -102,7 +101,7 @@ var _ = SIGDescribe("Security Context", func() {
 				podClient.DeleteSync(ctx, createdPod2.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			})
 			getLogs := func(pod *v1.Pod) (string, error) {
-				err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod1.Name, f.Namespace.Name, f.Timeouts.PodStart)
+				err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart)
 				if err != nil {
 					return "", err
 				}
@@ -128,7 +127,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("must create the user namespace in the configured hostUID/hostGID range [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
+		f.It("must create the user namespace in the configured hostUID/hostGID range [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// We need to check with the binary "getsubuids" the mappings for the kubelet.
 			// If something is not present, we skip the test as the node wasn't configured to run this test.
 			id, length, err := kubeletUsernsMappings(getsubuidsBinary)
@@ -196,7 +195,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("must not create the user namespace if set to true [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
+		f.It("must not create the user namespace if set to true [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// with hostUsers=true the pod must use the host user namespace
 			pod := makePod(true)
 			// When running in the host's user namespace, the /proc/self/uid_map file content looks like:
@@ -207,7 +206,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		f.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
+		f.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -329,7 +328,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		f.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
+		f.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -460,7 +459,7 @@ var _ = SIGDescribe("Security Context", func() {
 							Name:    podName,
 							Command: []string{"id", "-u"}, // Print UID and exit
 							SecurityContext: &v1.SecurityContext{
-								RunAsNonRoot: pointer.BoolPtr(true),
+								RunAsNonRoot: ptr.To(true),
 								RunAsUser:    userid,
 							},
 						},
@@ -473,7 +472,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-nonroot-uid"
-			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(nonRootTestUserID))
+			pod := makeNonRootPod(name, rootImage, ptr.To[int64](nonRootTestUserID))
 			podClient.Create(ctx, pod)
 
 			podClient.WaitForSuccess(ctx, name, framework.PodStartTimeout)
@@ -483,7 +482,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-root-uid"
-			pod := makeNonRootPod(name, nonRootImage, pointer.Int64Ptr(0))
+			pod := makeNonRootPod(name, nonRootImage, ptr.To[int64](0))
 			pod = podClient.Create(ctx, pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
@@ -969,7 +968,7 @@ var _ = SIGDescribe("User Namespaces for Pod Security Standards [LinuxOnly]", fu
 	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 
 	ginkgo.Context("with UserNamespacesSupport and UserNamespacesPodSecurityStandards enabled", func() {
-		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, func(ctx context.Context) {
+		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, framework.WithFeatureGate(features.UserNamespacesSupport), framework.WithFeatureGate(features.UserNamespacesPodSecurityStandards), func(ctx context.Context) {
 			name := "pod-user-namespaces-pss-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: name},

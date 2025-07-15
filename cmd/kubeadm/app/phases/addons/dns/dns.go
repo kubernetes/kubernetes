@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/coredns/corefile-migration/migration"
-	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/image"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
 )

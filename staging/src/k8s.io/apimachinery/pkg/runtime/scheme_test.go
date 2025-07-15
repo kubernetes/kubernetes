@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,7 +35,6 @@ import (
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -1026,7 +1027,7 @@ func TestRegisterValidate(t *testing.T) {
 		object      runtime.Object
 		oldObject   runtime.Object
 		subresource []string
-		options     sets.Set[string]
+		options     []string
 		expected    field.ErrorList
 	}{
 		{
@@ -1048,7 +1049,7 @@ func TestRegisterValidate(t *testing.T) {
 		{
 			name:     "options error",
 			object:   &TestType1{},
-			options:  sets.New("option1"),
+			options:  []string{"option1"},
 			expected: field.ErrorList{invalidIfOptionErr},
 		},
 		{
@@ -1063,17 +1064,17 @@ func TestRegisterValidate(t *testing.T) {
 	ctx := context.Background()
 
 	// register multiple types for testing to ensure registration is working as expected
-	s.AddValidationFunc(&TestType1{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList {
-		if op.Options.Has("option1") {
+	s.AddValidationFunc(&TestType1{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
+		if op.HasOption("option1") {
 			return field.ErrorList{invalidIfOptionErr}
 		}
-		if len(subresources) == 1 && subresources[0] == "status" {
+		if slices.Equal(op.Request.Subresources, []string{"status"}) {
 			return field.ErrorList{invalidStatusErr}
 		}
 		return field.ErrorList{invalidValue}
 	})
 
-	s.AddValidationFunc(&TestType2{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList {
+	s.AddValidationFunc(&TestType2{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
 		if oldObject != nil {
 			return field.ErrorList{invalidLength}
 		}
@@ -1113,3 +1114,66 @@ type TestType2 struct {
 func (TestType2) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 func (TestType2) DeepCopyObject() runtime.Object { return nil }
+
+func TestToOpenAPIDefinitionName(t *testing.T) {
+	testCases := []struct {
+		name        string
+		registerGvk *schema.GroupVersionKind // defaults to gvk unless set
+		registerObj runtime.Object
+		gvk         schema.GroupVersionKind
+		out         string
+		wantErr     error
+	}{
+		{
+			name:        "unstructured type",
+			registerObj: &unstructured.Unstructured{},
+			gvk:         schema.GroupVersionKind{Group: "stable.example.com", Version: "v1", Kind: "CronTab"},
+			out:         "com.example.stable.v1.CronTab",
+		},
+		{
+			name:        "unregistered type: empty group",
+			registerObj: &unstructured.Unstructured{},
+			gvk:         schema.GroupVersionKind{Version: "v1", Kind: "CronTab"},
+			wantErr:     fmt.Errorf("unable to convert GroupVersionKind with empty fields to unstructured type to an OpenAPI definition name: %v", schema.GroupVersionKind{Version: "v1", Kind: "CronTab"}),
+		},
+		{
+			name:        "unregistered type: empty version",
+			registerObj: &unstructured.Unstructured{},
+			registerGvk: &schema.GroupVersionKind{Group: "stable.example.com", Version: "v1", Kind: "CronTab"},
+			gvk:         schema.GroupVersionKind{Group: "stable.example.com", Kind: "CronTab"},
+			wantErr:     fmt.Errorf("version is required on all types: %v", schema.GroupVersionKind{Group: "stable.example.com", Kind: "CronTab"}),
+		},
+		{
+			name:        "unregistered type: empty kind",
+			registerObj: &unstructured.Unstructured{},
+			gvk:         schema.GroupVersionKind{Group: "stable.example.com", Version: "v1"},
+			wantErr:     fmt.Errorf("unable to convert GroupVersionKind with empty fields to unstructured type to an OpenAPI definition name: %v", schema.GroupVersionKind{Group: "stable.example.com", Version: "v1"}),
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			if test.registerGvk == nil {
+				test.registerGvk = &test.gvk
+			}
+
+			scheme := runtime.NewScheme()
+			scheme.AddKnownTypeWithName(*test.registerGvk, test.registerObj)
+			utilruntime.Must(runtimetesting.RegisterConversions(scheme))
+
+			out, err := scheme.ToOpenAPIDefinitionName(test.gvk)
+			if test.wantErr != nil {
+				if err == nil || err.Error() != test.wantErr.Error() {
+					t.Errorf("expected error: %v but got %v", test.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if out != test.out {
+				t.Errorf("expected %s, got %s", test.out, out)
+			}
+		})
+	}
+}

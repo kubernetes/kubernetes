@@ -41,6 +41,7 @@ import (
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
@@ -103,34 +104,34 @@ func (fp *tokenFilter) Name() string {
 	return tokenFilterName
 }
 
-func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
-	nodeInfo *framework.NodeInfo) *framework.Status {
+func (fp *tokenFilter) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod,
+	nodeInfo *framework.NodeInfo) *fwk.Status {
 	if fp.Tokens > 0 {
 		fp.Tokens--
 		return nil
 	}
-	status := framework.Unschedulable
+	status := fwk.Unschedulable
 	if fp.Unresolvable {
-		status = framework.UnschedulableAndUnresolvable
+		status = fwk.UnschedulableAndUnresolvable
 	}
-	return framework.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
+	return fwk.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
 }
 
-func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (fp *tokenFilter) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	if !fp.EnablePreFilter || fp.Tokens > 0 {
 		return nil, nil
 	}
-	return nil, framework.NewStatus(framework.Unschedulable)
+	return nil, fwk.NewStatus(fwk.Unschedulable)
 }
 
-func (fp *tokenFilter) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
-	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (fp *tokenFilter) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod,
+	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
 	fp.Tokens--
 	return nil
 }
 
-func (fp *tokenFilter) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
-	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (fp *tokenFilter) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod,
+	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
 	fp.Tokens++
 	return nil
 }
@@ -1054,6 +1055,8 @@ func TestNonPreemption(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+
 				defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{preemptor, victim})
 				preemptor.Spec.PreemptionPolicy = test.PreemptionPolicy
 				victimPod, err := createPausePod(cs, victim)
@@ -1132,6 +1135,8 @@ func TestDisablePreemption(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+
 				pods := make([]*v1.Pod, len(test.existingPods))
 				// Create and run existingPods.
 				for i, p := range test.existingPods {
@@ -1240,6 +1245,8 @@ func TestPodPriorityResolution(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.Name, asyncPreemptionEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+
 				pod, err := runPausePod(cs, test.Pod)
 				if err != nil {
 					if test.ExpectedError == nil {
@@ -1328,6 +1335,8 @@ func TestPreemptionStarvation(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+
 				pendingPods := make([]*v1.Pod, test.numExpectedPending)
 				numRunningPods := test.numExistingPod - test.numExpectedPending
 				runningPods := make([]*v1.Pod, numRunningPods)
@@ -1430,6 +1439,8 @@ func TestPreemptionRaces(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+
 				if test.numRepetitions <= 0 {
 					test.numRepetitions = 1
 				}
@@ -1511,11 +1522,15 @@ func (af *alwaysFail) Name() string {
 	return alwaysFailPlugin
 }
 
-func (af *alwaysFail) PreBind(_ context.Context, _ *framework.CycleState, p *v1.Pod, _ string) *framework.Status {
+func (af *alwaysFail) PreBindPreFlight(_ context.Context, _ fwk.CycleState, p *v1.Pod, _ string) *fwk.Status {
+	return nil
+}
+
+func (af *alwaysFail) PreBind(_ context.Context, _ fwk.CycleState, p *v1.Pod, _ string) *fwk.Status {
 	if strings.Contains(p.Name, doNotFailMe) {
 		return nil
 	}
-	return framework.NewStatus(framework.Unschedulable)
+	return fwk.NewStatus(fwk.Unschedulable)
 }
 
 func newAlwaysFail(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
@@ -1526,14 +1541,16 @@ func newAlwaysFail(_ context.Context, _ runtime.Object, _ framework.Handle) (fra
 // properly in different scenarios.
 func TestNominatedNodeCleanUp(t *testing.T) {
 	tests := []struct {
-		name         string
+		name string
+		// Initial nodes to simulate special conditions.
+		initNodes    []*v1.Node
 		nodeCapacity map[v1.ResourceName]string
 		// A slice of pods to be created in batch.
 		podsToCreate [][]*v1.Pod
 		// Each postCheck function is run after each batch of pods' creation.
 		postChecks []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error
 		// Delete the fake node or not. Optional.
-		deleteNode bool
+		deleteFakeNode bool
 		// Pods to be deleted. Optional.
 		podNamesToDelete []string
 
@@ -1600,8 +1617,39 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 				testutils.WaitForPodToSchedule,
 				testutils.WaitForNominatedNodeName,
 			},
-			// Delete the node to simulate an ErrNoNodesAvailable error.
-			deleteNode:       true,
+			// Delete the fake node to simulate an ErrNoNodesAvailable error.
+			deleteFakeNode:   true,
+			podNamesToDelete: []string{"low"},
+		},
+		{
+			name: "mid-priority pod preempts low-priority pod at the beginning, but could not find candidates after the nominated node is deleted",
+			// Create a taint node to simulate the `UnschedulableAndUnresolvable` condition in `findCandidates` during preemption.
+			initNodes: []*v1.Node{
+				st.MakeNode().Name("taint-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).
+					Taints([]v1.Taint{
+						{
+							Key:    "taint-node",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).
+					Obj(),
+			},
+			nodeCapacity: map[v1.ResourceName]string{v1.ResourceCPU: "1"},
+			podsToCreate: [][]*v1.Pod{
+				{
+					st.MakePod().Name("low").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+				{
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+			},
+			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
+				testutils.WaitForPodToSchedule,
+				testutils.WaitForNominatedNodeName,
+			},
+			// Delete the fake node to trigger the `UnschedulableAndUnresolvable` condition in `findCandidates`.
+			deleteFakeNode:   true,
 			podNamesToDelete: []string{"low"},
 		},
 		{
@@ -1634,6 +1682,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, tt := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", tt.name, asyncPreemptionEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+
 				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 					Profiles: []configv1.KubeSchedulerProfile{{
 						SchedulerName: ptr.To(v1.DefaultSchedulerName),
@@ -1648,6 +1698,12 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 				)
 
 				cs, ns := testCtx.ClientSet, testCtx.NS.Name
+				for _, node := range tt.initNodes {
+					if _, err := createNode(cs, node); err != nil {
+						t.Fatalf("Error creating initial node %v: %v", node.Name, err)
+					}
+				}
+
 				// Create a node with the specified capacity.
 				nodeName := "fake-node"
 				if _, err := createNode(cs, st.MakeNode().Name(nodeName).Capacity(tt.nodeCapacity).Obj()); err != nil {
@@ -1672,8 +1728,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					}
 				}
 
-				// Delete the node if necessary.
-				if tt.deleteNode {
+				// Delete the fake node if necessary.
+				if tt.deleteFakeNode {
 					if err := cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, *metav1.NewDeleteOptions(0)); err != nil {
 						t.Fatalf("Node %v cannot be deleted: %v", nodeName, err)
 					}
@@ -1915,6 +1971,8 @@ func TestPDBInPreemption(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+
 				for i := 1; i <= test.nodeCnt; i++ {
 					nodeName := fmt.Sprintf("node-%v", i)
 					_, err := createNode(cs, st.MakeNode().Name(nodeName).Capacity(defaultNodeRes).Obj())
@@ -2075,6 +2133,8 @@ func TestPreferNominatedNode(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+
 				testCtx := initTestPreferNominatedNode(t, "perfer-nominated-node")
 				cs := testCtx.ClientSet
 				nsName := testCtx.NS.Name
@@ -2426,6 +2486,8 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", test.name, asyncPreemptionEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+
 				if err := test.init(); err != nil {
 					t.Fatalf("Error while initializing test: %v", err)
 				}

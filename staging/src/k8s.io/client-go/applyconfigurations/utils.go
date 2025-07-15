@@ -50,7 +50,6 @@ import (
 	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -73,6 +72,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	admissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
@@ -106,7 +106,6 @@ import (
 	internal "k8s.io/client-go/applyconfigurations/internal"
 	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
-	applyconfigurationsnetworkingv1alpha1 "k8s.io/client-go/applyconfigurations/networking/v1alpha1"
 	applyconfigurationsnetworkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
 	applyconfigurationsnodev1 "k8s.io/client-go/applyconfigurations/node/v1"
 	applyconfigurationsnodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
@@ -126,7 +125,6 @@ import (
 	applyconfigurationsstoragev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
 	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
 	applyconfigurationsstoragemigrationv1alpha1 "k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1"
-	testing "k8s.io/client-go/testing"
 )
 
 // ForKind returns an apply configuration type for the given GroupVersionKind, or nil if no
@@ -1451,20 +1449,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	case networkingv1.SchemeGroupVersion.WithKind("ServiceCIDRStatus"):
 		return &applyconfigurationsnetworkingv1.ServiceCIDRStatusApplyConfiguration{}
 
-		// Group=networking.k8s.io, Version=v1alpha1
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("IPAddress"):
-		return &applyconfigurationsnetworkingv1alpha1.IPAddressApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("IPAddressSpec"):
-		return &applyconfigurationsnetworkingv1alpha1.IPAddressSpecApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ParentReference"):
-		return &applyconfigurationsnetworkingv1alpha1.ParentReferenceApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ServiceCIDR"):
-		return &applyconfigurationsnetworkingv1alpha1.ServiceCIDRApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ServiceCIDRSpec"):
-		return &applyconfigurationsnetworkingv1alpha1.ServiceCIDRSpecApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ServiceCIDRStatus"):
-		return &applyconfigurationsnetworkingv1alpha1.ServiceCIDRStatusApplyConfiguration{}
-
 		// Group=networking.k8s.io, Version=v1beta1
 	case networkingv1beta1.SchemeGroupVersion.WithKind("HTTPIngressPath"):
 		return &applyconfigurationsnetworkingv1beta1.HTTPIngressPathApplyConfiguration{}
@@ -1610,50 +1594,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsrbacv1beta1.SubjectApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1alpha3
-	case v1alpha3.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):
-		return &resourcev1alpha3.AllocatedDeviceStatusApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("AllocationResult"):
-		return &resourcev1alpha3.AllocationResultApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("BasicDevice"):
-		return &resourcev1alpha3.BasicDeviceApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("CELDeviceSelector"):
 		return &resourcev1alpha3.CELDeviceSelectorApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("Counter"):
-		return &resourcev1alpha3.CounterApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("CounterSet"):
-		return &resourcev1alpha3.CounterSetApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("Device"):
-		return &resourcev1alpha3.DeviceApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):
-		return &resourcev1alpha3.DeviceAllocationConfigurationApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceAllocationResult"):
-		return &resourcev1alpha3.DeviceAllocationResultApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceAttribute"):
-		return &resourcev1alpha3.DeviceAttributeApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClaim"):
-		return &resourcev1alpha3.DeviceClaimApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClaimConfiguration"):
-		return &resourcev1alpha3.DeviceClaimConfigurationApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClass"):
-		return &resourcev1alpha3.DeviceClassApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClassConfiguration"):
-		return &resourcev1alpha3.DeviceClassConfigurationApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClassSpec"):
-		return &resourcev1alpha3.DeviceClassSpecApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceConfiguration"):
-		return &resourcev1alpha3.DeviceConfigurationApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceConstraint"):
-		return &resourcev1alpha3.DeviceConstraintApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceCounterConsumption"):
-		return &resourcev1alpha3.DeviceCounterConsumptionApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequest"):
-		return &resourcev1alpha3.DeviceRequestApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequestAllocationResult"):
-		return &resourcev1alpha3.DeviceRequestAllocationResultApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceSelector"):
 		return &resourcev1alpha3.DeviceSelectorApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceSubRequest"):
-		return &resourcev1alpha3.DeviceSubRequestApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaint"):
 		return &resourcev1alpha3.DeviceTaintApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRule"):
@@ -1662,30 +1606,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceTaintRuleSpecApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintSelector"):
 		return &resourcev1alpha3.DeviceTaintSelectorApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DeviceToleration"):
-		return &resourcev1alpha3.DeviceTolerationApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("NetworkDeviceData"):
-		return &resourcev1alpha3.NetworkDeviceDataApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
-		return &resourcev1alpha3.OpaqueDeviceConfigurationApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaim"):
-		return &resourcev1alpha3.ResourceClaimApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimConsumerReference"):
-		return &resourcev1alpha3.ResourceClaimConsumerReferenceApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimSpec"):
-		return &resourcev1alpha3.ResourceClaimSpecApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimStatus"):
-		return &resourcev1alpha3.ResourceClaimStatusApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimTemplate"):
-		return &resourcev1alpha3.ResourceClaimTemplateApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimTemplateSpec"):
-		return &resourcev1alpha3.ResourceClaimTemplateSpecApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePool"):
-		return &resourcev1alpha3.ResourcePoolApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSlice"):
-		return &resourcev1alpha3.ResourceSliceApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
-		return &resourcev1alpha3.ResourceSliceSpecApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1beta1
 	case resourcev1beta1.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):
@@ -1941,6 +1861,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	return nil
 }
 
-func NewTypeConverter(scheme *runtime.Scheme) *testing.TypeConverter {
-	return &testing.TypeConverter{Scheme: scheme, TypeResolver: internal.Parser()}
+func NewTypeConverter(scheme *runtime.Scheme) managedfields.TypeConverter {
+	return managedfields.NewSchemeTypeConverter(scheme, internal.Parser())
 }

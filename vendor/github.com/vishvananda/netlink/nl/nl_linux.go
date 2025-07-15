@@ -789,7 +789,7 @@ func executeInNetns(newNs, curNs netns.NsHandle) (func(), error) {
 // Returns the netlink socket on which Receive() method can be called
 // to retrieve the messages from the kernel.
 func Subscribe(protocol int, groups ...uint) (*NetlinkSocket, error) {
-	fd, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, protocol)
+	fd, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW|unix.SOCK_CLOEXEC, protocol)
 	if err != nil {
 		return nil, err
 	}

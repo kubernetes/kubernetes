@@ -59,20 +59,26 @@ func (h *serverHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) cont
 
 	name, attrs := internal.ParseFullMethod(info.FullMethodName)
 	attrs = append(attrs, RPCSystemGRPC)
-	ctx, _ = h.tracer.Start(
-		trace.ContextWithRemoteSpanContext(ctx, trace.SpanContextFromContext(ctx)),
-		name,
-		trace.WithSpanKind(trace.SpanKindServer),
-		trace.WithAttributes(append(attrs, h.config.SpanAttributes...)...),
-	)
+
+	record := true
+	if h.config.Filter != nil {
+		record = h.config.Filter(info)
+	}
+
+	if record {
+		ctx, _ = h.tracer.Start(
+			trace.ContextWithRemoteSpanContext(ctx, trace.SpanContextFromContext(ctx)),
+			name,
+			trace.WithSpanKind(trace.SpanKindServer),
+			trace.WithAttributes(append(attrs, h.config.SpanAttributes...)...),
+		)
+	}
 
 	gctx := gRPCContext{
 		metricAttrs: append(attrs, h.config.MetricAttributes...),
-		record:      true,
+		record:      record,
 	}
-	if h.config.Filter != nil {
-		gctx.record = h.config.Filter(info)
-	}
+
 	return context.WithValue(ctx, gRPCContextKey{}, &gctx)
 }
 
@@ -99,19 +105,24 @@ func NewClientHandler(opts ...Option) stats.Handler {
 func (h *clientHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context {
 	name, attrs := internal.ParseFullMethod(info.FullMethodName)
 	attrs = append(attrs, RPCSystemGRPC)
-	ctx, _ = h.tracer.Start(
-		ctx,
-		name,
-		trace.WithSpanKind(trace.SpanKindClient),
-		trace.WithAttributes(append(attrs, h.config.SpanAttributes...)...),
-	)
+
+	record := true
+	if h.config.Filter != nil {
+		record = h.config.Filter(info)
+	}
+
+	if record {
+		ctx, _ = h.tracer.Start(
+			ctx,
+			name,
+			trace.WithSpanKind(trace.SpanKindClient),
+			trace.WithAttributes(append(attrs, h.config.SpanAttributes...)...),
+		)
+	}
 
 	gctx := gRPCContext{
 		metricAttrs: append(attrs, h.config.MetricAttributes...),
-		record:      true,
-	}
-	if h.config.Filter != nil {
-		gctx.record = h.config.Filter(info)
+		record:      record,
 	}
 
 	return inject(context.WithValue(ctx, gRPCContextKey{}, &gctx), h.config.Propagators)

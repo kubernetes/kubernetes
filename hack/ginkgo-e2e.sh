@@ -233,7 +233,7 @@ EOF
     kill -TERM "-${GINKGO_CLI_PID}" || true
 
     echo "Waiting for Ginkgo with pid ${GINKGO_CLI_PID}..."
-    wait "{$GINKGO_CLI_PID}"
+    wait "${GINKGO_CLI_PID}"
     echo "Ginkgo terminated."
   fi
 }

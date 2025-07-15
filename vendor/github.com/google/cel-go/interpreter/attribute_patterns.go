@@ -358,7 +358,7 @@ func (m *attributeMatcher) AddQualifier(qual Qualifier) (Attribute, error) {
 func (m *attributeMatcher) Resolve(vars Activation) (any, error) {
 	id := m.NamespacedAttribute.ID()
 	// Bug in how partial activation is resolved, should search parents as well.
-	partial, isPartial := asPartialActivation(vars)
+	partial, isPartial := AsPartialActivation(vars)
 	if isPartial {
 		unk, err := m.fac.matchesUnknownPatterns(
 			partial,

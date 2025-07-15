@@ -49,5 +49,5 @@ else
   >&2 echo "See: test/images/agnhost/README.md"
   >&2 echo ""
   >&2 echo "You can reach out to https://git.k8s.io/community/sig-testing for help."
-  exit 1
 fi
+exit $ret

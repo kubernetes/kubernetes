@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -200,7 +200,7 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 
 		tr, inErr := ts.coreClient.ServiceAccounts(ts.namespace).CreateToken(context.TODO(), ts.serviceAccountName, &v1authenticationapi.TokenRequest{
 			Spec: v1authenticationapi.TokenRequestSpec{
-				ExpirationSeconds: utilpointer.Int64Ptr(ts.expirationSeconds),
+				ExpirationSeconds: ptr.To[int64](ts.expirationSeconds),
 			},
 		}, metav1.CreateOptions{})
 		if inErr != nil {

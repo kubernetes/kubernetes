@@ -2177,10 +2177,7 @@ type VolumeDevice struct {
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
 	// Required: Name of the environment variable.
-	// When the RelaxedEnvironmentVariableValidation feature gate is disabled, this must consist of alphabetic characters,
-	// digits, '_', '-', or '.', and must not start with a digit.
-	// When the RelaxedEnvironmentVariableValidation feature gate is enabled,
-	// this may contain any printable ASCII characters except '='.
+	// May consist of any printable ASCII characters except '='.
 	Name string
 	// Optional: no more than one of the following may be specified.
 	// Optional: Defaults to ""; variable references $(VAR_NAME) are expanded
@@ -3296,8 +3293,8 @@ type PodAntiAffinity struct {
 	// most preferred is the one with the greatest sum of weights, i.e.
 	// for each node that meets all of the scheduling requirements (resource
 	// request, requiredDuringScheduling anti-affinity expressions, etc.),
-	// compute a sum by iterating through the elements of this field and adding
-	// "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+	// compute a sum by iterating through the elements of this field and subtracting
+	// "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
 	// node(s) with the highest sum are the most preferred.
 	// +optional
 	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm
@@ -3423,7 +3420,6 @@ type Taint struct {
 	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
 	Effect TaintEffect
 	// TimeAdded represents the time at which the taint was added.
-	// It is only written for NoExecute taints.
 	// +optional
 	TimeAdded *metav1.Time
 }

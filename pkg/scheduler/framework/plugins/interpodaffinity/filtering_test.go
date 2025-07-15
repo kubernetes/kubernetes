@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -83,14 +84,14 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 		pods                []*v1.Pod
 		node                *v1.Node
 		name                string
-		wantPreFilterStatus *framework.Status
-		wantFilterStatus    *framework.Status
+		wantPreFilterStatus *fwk.Status
+		wantFilterStatus    *fwk.Status
 	}{
 		{
 			name:                "A pod that has no required pod affinity scheduling rules can schedule onto a node with no existing pods",
 			pod:                 new(v1.Pod),
 			node:                &node1,
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "satisfies with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using In operator that matches the existing pod",
@@ -123,8 +124,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				}, nil),
 			pods: []*v1.Pod{st.MakePod().Namespace("ns").Label("service", "securityscan").Node("node1").Obj()},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.UnschedulableAndUnresolvable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.UnschedulableAndUnresolvable,
 				ErrReasonAffinityRulesNotMatch,
 			),
 		},
@@ -133,8 +134,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			pod:  st.MakePod().Namespace(defaultNamespace).Labels(podLabel).PodAffinityIn("service", "", []string{"antivirusscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{pod},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.UnschedulableAndUnresolvable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.UnschedulableAndUnresolvable,
 				ErrReasonAffinityRulesNotMatch,
 			),
 		},
@@ -211,8 +212,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				}, nil),
 			pods: []*v1.Pod{pod},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.UnschedulableAndUnresolvable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.UnschedulableAndUnresolvable,
 				ErrReasonAffinityRulesNotMatch,
 			),
 		},
@@ -242,8 +243,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				PodAntiAffinityIn("service", "zone", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{pod},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.Unschedulable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.Unschedulable,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -256,8 +257,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				st.MakePod().Namespace(defaultNamespace).Labels(podLabel).Node("node1").PodAntiAffinityIn("service", "zone", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.Unschedulable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.Unschedulable,
 				ErrReasonExistingAntiAffinityRulesNotMatch,
 			),
 		},
@@ -267,8 +268,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				PodAffinityNotIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
 			pods: []*v1.Pod{st.MakePod().Label("service", "securityscan").Node("node2").Obj()},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.UnschedulableAndUnresolvable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.UnschedulableAndUnresolvable,
 				ErrReasonAffinityRulesNotMatch,
 			),
 		},
@@ -280,8 +281,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 					PodAntiAffinityIn("service", "zone", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.Unschedulable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.Unschedulable,
 				ErrReasonExistingAntiAffinityRulesNotMatch,
 			),
 		},
@@ -293,7 +294,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 					PodAntiAffinityNotIn("service", "zone", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			node:                &node1,
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "satisfies the PodAntiAffinity with existing pod but doesn't satisfy PodAntiAffinity symmetry with incoming pod",
@@ -305,8 +306,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 					PodAntiAffinityExists("security", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.Unschedulable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.Unschedulable,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -320,8 +321,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 					PodAntiAffinityExists("security", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.Unschedulable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.Unschedulable,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -335,8 +336,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 					PodAntiAffinityExists("security", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.Unschedulable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.Unschedulable,
 				ErrReasonExistingAntiAffinityRulesNotMatch,
 			),
 		},
@@ -351,8 +352,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 					PodAntiAffinityExists("def", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.Unschedulable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.Unschedulable,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -367,8 +368,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 					PodAntiAffinityExists("def", "zone", st.PodAntiAffinityWithRequiredReq).Obj(),
 			},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.Unschedulable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.Unschedulable,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -378,8 +379,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				PodAffinityIn("service", "region", []string{"{{.bad-value.}}"}, st.PodAffinityWithRequiredReq).
 				PodAffinityIn("service", "node", []string{"antivirusscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
 			node: &node1,
-			wantPreFilterStatus: framework.NewStatus(
-				framework.UnschedulableAndUnresolvable,
+			wantPreFilterStatus: fwk.NewStatus(
+				fwk.UnschedulableAndUnresolvable,
 				`parsing pod: requiredAffinityTerms: values[0][service]: Invalid value: "{{.bad-value.}}": a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')`,
 			),
 		},
@@ -389,8 +390,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				PodAffinityIn("service", "region", []string{"foo"}, st.PodAffinityWithRequiredReq).
 				PodAffinityIn("service", "node", []string{"{{.bad-value.}}"}, st.PodAffinityWithRequiredReq).Obj(),
 			node: &node1,
-			wantPreFilterStatus: framework.NewStatus(
-				framework.UnschedulableAndUnresolvable,
+			wantPreFilterStatus: fwk.NewStatus(
+				fwk.UnschedulableAndUnresolvable,
 				`parsing pod: requiredAffinityTerms: values[0][service]: Invalid value: "{{.bad-value.}}": a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')`,
 			),
 		},
@@ -451,8 +452,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				}, nil),
 			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam1.team2", Labels: podLabel}}},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.UnschedulableAndUnresolvable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.UnschedulableAndUnresolvable,
 				ErrReasonAffinityRulesNotMatch,
 			),
 		},
@@ -484,8 +485,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				}),
 			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam2.team1", Labels: podLabel}}},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.Unschedulable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.Unschedulable,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -509,8 +510,8 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 				}),
 			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "subteam2.team1", Labels: podLabel}}},
 			node: &node1,
-			wantFilterStatus: framework.NewStatus(
-				framework.Unschedulable,
+			wantFilterStatus: fwk.NewStatus(
+				fwk.Unschedulable,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -551,9 +552,13 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node})
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
 			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
 			state := framework.NewCycleState()
-			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod, nodeInfos)
 			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
@@ -589,8 +594,8 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 		pod                 *v1.Pod
 		pods                []*v1.Pod
 		nodes               []*v1.Node
-		wantFilterStatuses  []*framework.Status
-		wantPreFilterStatus *framework.Status
+		wantFilterStatuses  []*fwk.Status
+		wantPreFilterStatus *fwk.Status
 		name                string
 	}{
 		{
@@ -603,11 +608,11 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: labelRgIndia}},
 			},
-			wantFilterStatuses: []*framework.Status{
+			wantFilterStatuses: []*fwk.Status{
 				nil,
 				nil,
-				framework.NewStatus(
-					framework.UnschedulableAndUnresolvable,
+				fwk.NewStatus(
+					fwk.UnschedulableAndUnresolvable,
 					ErrReasonAffinityRulesNotMatch,
 				),
 			},
@@ -624,7 +629,7 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zone": "az1", "hostname": "h1"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zone": "az2", "hostname": "h2"}}},
 			},
-			wantFilterStatuses: []*framework.Status{nil, nil},
+			wantFilterStatuses: []*fwk.Status{nil, nil},
 			name: "The affinity rule is to schedule all of the pods of this collection to the same zone. The first pod of the collection " +
 				"should not be blocked from being scheduled onto any node, even there's no existing pod that matches the rule anywhere.",
 		},
@@ -639,13 +644,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zoneLabel": "az1", "hostname": "h1"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zoneLabel": "az2", "hostname": "h2"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.UnschedulableAndUnresolvable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.UnschedulableAndUnresolvable,
 					ErrReasonAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.UnschedulableAndUnresolvable,
+				fwk.NewStatus(
+					fwk.UnschedulableAndUnresolvable,
 					ErrReasonAffinityRulesNotMatch,
 				),
 			},
@@ -660,13 +665,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.Unschedulable,
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 			},
@@ -682,13 +687,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.Unschedulable,
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 			},
@@ -704,13 +709,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.Unschedulable,
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				nil,
@@ -728,13 +733,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.Unschedulable,
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				nil,
@@ -750,8 +755,8 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
 			},
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
-			wantFilterStatuses:  []*framework.Status{nil, nil},
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
+			wantFilterStatuses:  []*fwk.Status{nil, nil},
 			name:                "Test existing pod's anti-affinity: if an existing pod has a term with invalid topologyKey, labelSelector of the term is firstly checked, and then topologyKey of the term is also checked",
 		},
 		{
@@ -763,7 +768,7 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{nil, nil},
+			wantFilterStatuses: []*fwk.Status{nil, nil},
 			name:               "Test incoming pod's anti-affinity: even if labelSelector matches, we still check if topologyKey matches",
 		},
 		{
@@ -776,13 +781,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.Unschedulable,
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 			},
@@ -799,13 +804,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.Unschedulable,
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 			},
@@ -821,9 +826,9 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 				nil,
@@ -840,9 +845,9 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				nil,
@@ -859,13 +864,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.Unschedulable,
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 			},
@@ -881,13 +886,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.Unschedulable,
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 			},
@@ -906,13 +911,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: map[string]string{"region": "r1", "zone": "z3", "hostname": "nodeC"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.Unschedulable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.Unschedulable,
+				fwk.NewStatus(
+					fwk.Unschedulable,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 				nil,
@@ -929,7 +934,7 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{nil, nil},
+			wantFilterStatuses: []*fwk.Status{nil, nil},
 			name:               "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match",
 		},
 		{
@@ -943,13 +948,13 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
-			wantFilterStatuses: []*framework.Status{
-				framework.NewStatus(
-					framework.UnschedulableAndUnresolvable,
+			wantFilterStatuses: []*fwk.Status{
+				fwk.NewStatus(
+					fwk.UnschedulableAndUnresolvable,
 					ErrReasonAffinityRulesNotMatch,
 				),
-				framework.NewStatus(
-					framework.UnschedulableAndUnresolvable,
+				fwk.NewStatus(
+					fwk.UnschedulableAndUnresolvable,
 					ErrReasonAffinityRulesNotMatch,
 				),
 			},
@@ -963,12 +968,16 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
 			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot,
 				[]runtime.Object{
 					&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "NS1"}},
 				})
 			state := framework.NewCycleState()
-			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod, nodeInfos)
 			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
@@ -997,7 +1006,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, cache.NewEmptySnapshot(), nil)
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(framework.ErrNotFound)
+	wantStatus := fwk.AsStatus(fwk.ErrNotFound)
 	if diff := cmp.Diff(gotStatus, wantStatus); diff != "" {
 		t.Errorf("Status does not match (-want,+got):\n%s", diff)
 	}
@@ -1234,14 +1243,18 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// getMeta creates predicate meta data given the list of pods.
-			getState := func(pods []*v1.Pod) (*InterPodAffinity, *framework.CycleState, *preFilterState, *cache.Snapshot) {
+			getState := func(pods []*v1.Pod) (*InterPodAffinity, fwk.CycleState, *preFilterState, *cache.Snapshot) {
 				snapshot := cache.NewSnapshot(pods, test.nodes)
 				_, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
+				nodeInfos, err := snapshot.NodeInfos().List()
+				if err != nil {
+					t.Fatal(err)
+				}
 				p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, nil)
 				cycleState := framework.NewCycleState()
-				_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pendingPod)
+				_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pendingPod, nodeInfos)
 				if !preFilterStatus.IsSuccess() {
 					t.Errorf("prefilter failed with status: %v", preFilterStatus)
 				}

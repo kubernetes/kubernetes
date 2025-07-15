@@ -35,6 +35,8 @@ type RemoteRuntime struct {
 	RuntimeService *apitest.FakeRuntimeService
 	// Fake image service.
 	ImageService *apitest.FakeImageService
+	kubeapi.UnsafeImageServiceServer
+	kubeapi.UnsafeRuntimeServiceServer
 }
 
 // NewFakeRemoteRuntime creates a new RemoteRuntime.
@@ -112,7 +114,7 @@ func (f *RemoteRuntime) StopPodSandbox(ctx context.Context, req *kubeapi.StopPod
 // This call is idempotent, and must not return an error if the sandbox has
 // already been removed.
 func (f *RemoteRuntime) RemovePodSandbox(ctx context.Context, req *kubeapi.RemovePodSandboxRequest) (*kubeapi.RemovePodSandboxResponse, error) {
-	err := f.RuntimeService.StopPodSandbox(ctx, req.PodSandboxId)
+	err := f.RuntimeService.RemovePodSandbox(ctx, req.PodSandboxId)
 	if err != nil {
 		return nil, err
 	}

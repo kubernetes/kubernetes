@@ -19,10 +19,10 @@ package preflight
 import (
 	"testing"
 
-	"github.com/pkg/errors"
-
 	utilsexec "k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 func TestGetKubeletVersion(t *testing.T) {

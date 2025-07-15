@@ -20,8 +20,6 @@ package apply
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -32,6 +30,7 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // NewUploadConfigPhase returns a new upload-config phase.

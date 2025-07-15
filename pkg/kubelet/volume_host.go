@@ -18,12 +18,10 @@ package kubelet
 
 import (
 	"fmt"
-	"net"
 	"runtime"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -86,7 +84,6 @@ func NewInitializedVolumePluginMgr(
 		informerFactory:           informerFactory,
 		csiDriverLister:           csiDriverLister,
 		csiDriversSynced:          csiDriversSynced,
-		exec:                      utilexec.New(),
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
@@ -116,7 +113,6 @@ type kubeletVolumeHost struct {
 	informerFactory           informers.SharedInformerFactory
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriversSynced          cache.InformerSynced
-	exec                      utilexec.Interface
 }
 
 func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
@@ -215,20 +211,12 @@ func (kvh *kubeletVolumeHost) NewWrapperUnmounter(volName string, spec volume.Sp
 	return plugin.NewUnmounter(spec.Name(), podUID)
 }
 
-func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
+func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
 	return kvh.kubelet.mounter
 }
 
 func (kvh *kubeletVolumeHost) GetHostName() string {
 	return kvh.kubelet.hostname
-}
-
-func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
-	hostIPs, err := kvh.kubelet.GetHostIPs()
-	if err != nil {
-		return nil, err
-	}
-	return hostIPs[0], err
 }
 
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
@@ -301,8 +289,4 @@ func (kvh *kubeletVolumeHost) GetNodeName() types.NodeName {
 
 func (kvh *kubeletVolumeHost) GetEventRecorder() record.EventRecorder {
 	return kvh.kubelet.recorder
-}
-
-func (kvh *kubeletVolumeHost) GetExec(pluginName string) utilexec.Interface {
-	return kvh.exec
 }

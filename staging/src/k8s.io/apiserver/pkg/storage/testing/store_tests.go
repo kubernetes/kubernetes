@@ -29,9 +29,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/etcd/client/v3/kubernetes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -39,9 +40,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
-	utilpointer "k8s.io/utils/pointer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/utils/ptr"
 )
 
 type KeyValidation func(ctx context.Context, t *testing.T, key string)
@@ -624,7 +627,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, ignoreWatchCacheTests bool) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compact Compaction, watchCacheEnabled bool, recorder *KubernetesRecorder) {
 	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -646,12 +649,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		t.Fatal(err)
 	}
 
+	initialRV2, _ := strconv.Atoi(initialRV)
+
 	getAttrs := func(obj runtime.Object) (labels.Set, fields.Set, error) {
 		pod := obj.(*example.Pod)
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
-	// Increase RV to test consistent List.
-	increaseRV(ctx, t)
+	// Compact and increase RV to test consistent List.
+	compact(ctx, t, createdPods[0].ResourceVersion)
 	currentRV := fmt.Sprintf("%d", continueRV+1)
 
 	tests := []struct {
@@ -668,8 +673,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		expectedRemainingItemCount *int64
 		expectError                bool
 		expectRVTooLarge           bool
+		expectRVTooOld             bool
+		expectContinueTooOld       bool
 		expectRV                   string
 		expectRVFunc               func(string) error
+		expectEtcdRequest          func() []RecordedList
 	}{
 		{
 			name:        "rejects invalid resource version",
@@ -693,6 +701,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		{
 			name:             "rejects resource version set too high",
 			prefix:           "/pods",
+			pred:             storage.Everything,
 			rv:               strconv.FormatInt(math.MaxInt64, 10),
 			expectRVTooLarge: true,
 		},
@@ -710,13 +719,39 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:                   "0",
 		},
 		{
-			name:        "test List on existing key with resource version set before first write, match=Exact",
+			name:        "test List on existing key with resource version set before update, match=Exact",
 			prefix:      "/pods/first/",
 			pred:        storage.Everything,
-			expectedOut: []example.Pod{},
-			rv:          initialRV,
+			expectedOut: []example.Pod{*createdPods[0]},
+			rv:          createdPods[0].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    initialRV,
+			expectRV:    createdPods[0].ResourceVersion,
+		},
+		{
+			name:        "test List on existing key with resource version set before creation, match=Exact",
+			prefix:      "/pods/second/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{},
+			rv:          createdPods[0].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    createdPods[0].ResourceVersion,
+		},
+		{
+			name:        "test List on existing key with resource version set after creation, match=Exact",
+			prefix:      "/pods/second/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*createdPods[1]},
+			rv:          createdPods[1].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    createdPods[1].ResourceVersion,
+		},
+		{
+			name:           "test List on existing key with resource version set before first write, match=Exact",
+			prefix:         "/pods/first/",
+			pred:           storage.Everything,
+			rv:             initialRV,
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRVTooOld: true,
 		},
 		{
 			name:                 "test List on existing key with resource version set to 0, match=NotOlderThan",
@@ -812,7 +847,18 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   currentRV,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(currentRV))),
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
+			expectEtcdRequest: func() []RecordedList {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return nil
+				}
+				return []RecordedList{
+					{
+						Key:         "/registry/pods/second/",
+						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 1},
+					},
+				}
+			},
 		},
 		{
 			name:   "test List with limit at current resource version",
@@ -825,7 +871,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(list.ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         list.ResourceVersion,
 			expectRV:                   list.ResourceVersion,
 		},
@@ -840,7 +886,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(list.ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchExact,
 			expectRV:                   list.ResourceVersion,
@@ -855,7 +901,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
 			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
@@ -875,7 +921,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			ignoreForWatchCache:        true,
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         "0",
 			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
 		},
@@ -894,13 +940,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			ignoreForWatchCache:        true,
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 			rv:                         "0",
 			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
 			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
 		},
 		{
-			name:   "test List with limit at resource version before first write and match=Exact",
+			name:   "test List with limit at resource version before created and match=Exact",
 			prefix: "/pods/second/",
 			pred: storage.SelectionPredicate{
 				Label: labels.Everything(),
@@ -909,9 +955,23 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut:    []example.Pod{},
 			expectContinue: false,
-			rv:             initialRV,
+			rv:             createdPods[0].ResourceVersion,
 			rvMatch:        metav1.ResourceVersionMatchExact,
-			expectRV:       initialRV,
+			expectRV:       createdPods[0].ResourceVersion,
+		},
+		{
+			name:   "test List with limit at resource version after created and match=Exact",
+			prefix: "/pods/second/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:    []example.Pod{*createdPods[1]},
+			expectContinue: false,
+			rv:             createdPods[1].ResourceVersion,
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRV:       createdPods[1].ResourceVersion,
 		},
 		{
 			name:   "test List with pregenerated continue token",
@@ -1191,13 +1251,12 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		},
 		// match=Exact
 		{
-			name:        "test List with resource version set before first write, match=Exact",
-			prefix:      "/pods/",
-			pred:        storage.Everything,
-			expectedOut: []example.Pod{},
-			rv:          initialRV,
-			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectRV:    initialRV,
+			name:           "test List with resource version set before first write, match=Exact",
+			prefix:         "/pods/",
+			pred:           storage.Everything,
+			rv:             initialRV,
+			rvMatch:        metav1.ResourceVersionMatchExact,
+			expectRVTooOld: true,
 		},
 		{
 			name:        "test List with resource version of first write, match=Exact",
@@ -1303,7 +1362,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinueExact:        encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[1].ResourceVersion))),
 			rvMatch:                    metav1.ResourceVersionMatchExact,
 			expectRV:                   createdPods[1].ResourceVersion,
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 		},
 		{
 			name:   "test List with limit, resource version of third write, match=Exact",
@@ -1319,7 +1378,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[2].ResourceVersion))),
 			expectRV:                   createdPods[2].ResourceVersion,
-			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectedRemainingItemCount: ptr.To[int64](1),
 		},
 		{
 			name:   "test List with limit, resource version of fourth write, match=Exact",
@@ -1348,7 +1407,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   createdPods[4].ResourceVersion,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(4),
+			expectedRemainingItemCount: ptr.To[int64](4),
 		},
 		{
 			name:   "test List with limit, resource version of six write, match=Exact",
@@ -1364,7 +1423,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   createdPods[5].ResourceVersion,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(4),
+			expectedRemainingItemCount: ptr.To[int64](4),
 		},
 		{
 			name:   "test List with limit, resource version of seventh write, match=Exact",
@@ -1380,7 +1439,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   updatedPod.ResourceVersion,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(updatedPod.ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(2),
+			expectedRemainingItemCount: ptr.To[int64](2),
 		},
 		{
 			name:   "test List with limit, resource version of eight write, match=Exact",
@@ -1409,9 +1468,32 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   fmt.Sprint(continueRV + 1),
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(updatedPod.Namespace+"/"+updatedPod.Name+"\x00", int64(continueRV+1)),
-			expectedRemainingItemCount: utilpointer.Int64(4),
+			expectedRemainingItemCount: ptr.To[int64](4),
 		},
 		// Continue
+		{
+			name:   "test List with continue, resource version before first write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(initialRV2)),
+			},
+			expectContinueTooOld: true,
+		},
+		{
+			name:   "test List with continue, resource version of first write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[0].ResourceVersion))),
+			},
+			expectedOut: []example.Pod{},
+			expectRV:    createdPods[0].ResourceVersion,
+		},
 		{
 			name:   "test List with continue, resource version of second write",
 			prefix: "/pods/",
@@ -1449,7 +1531,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   createdPods[4].ResourceVersion,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(3),
+			expectedRemainingItemCount: ptr.To[int64](3),
 		},
 		{
 			name:   "test List with continue, resource version of six write",
@@ -1464,7 +1546,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   createdPods[5].ResourceVersion,
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
-			expectedRemainingItemCount: utilpointer.Int64(2),
+			expectedRemainingItemCount: ptr.To[int64](2),
 		},
 		{
 			name:   "test List with continue, resource version of seventh write",
@@ -1491,7 +1573,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectRV:                   fmt.Sprint(continueRV + 1),
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(continueRV+1)),
-			expectedRemainingItemCount: utilpointer.Int64(3),
+			expectedRemainingItemCount: ptr.To[int64](3),
 		},
 		{
 			name:   "test List with continue from second pod, negative resource version gives consistent read",
@@ -1517,7 +1599,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(continueRV+1)),
 			expectRV:                   currentRV,
-			expectedRemainingItemCount: utilpointer.Int64(2),
+			expectedRemainingItemCount: ptr.To[int64](2),
 		},
 		{
 			name:   "test List with continue from third pod, negative resource version gives consistent read",
@@ -1574,7 +1656,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			// doesn't automatically preclude some scenarios from happening.
 			t.Parallel()
 
-			if ignoreWatchCacheTests && tt.ignoreForWatchCache {
+			if watchCacheEnabled && tt.ignoreForWatchCache {
 				t.Skip()
 			}
 
@@ -1589,11 +1671,24 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Predicate:            tt.pred,
 				Recursive:            true,
 			}
-			err := store.GetList(ctx, tt.prefix, storageOpts, out)
+			recorderKey := t.Name()
+			listCtx := context.WithValue(ctx, recorderContextKey, recorderKey)
+			err := store.GetList(listCtx, tt.prefix, storageOpts, out)
 			if tt.expectRVTooLarge {
-				// TODO: Clasify etcd future revision error as TooLargeResourceVersion
-				if err == nil || !(storage.IsTooLargeResourceVersion(err) || strings.Contains(err.Error(), "etcdserver: mvcc: required revision is a future revision")) {
-					t.Fatalf("expecting resource version too high error, but get: %q", err)
+				if !storage.IsTooLargeResourceVersion(err) {
+					t.Fatalf("expecting resource version too high error, but get: %v", err)
+				}
+				return
+			}
+			if tt.expectRVTooOld {
+				if err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
+					t.Fatalf("expecting resource version too old error, but get: %v", err)
+				}
+				return
+			}
+			if tt.expectContinueTooOld {
+				if err == nil || !strings.Contains(err.Error(), "The provided continue parameter is too old to display a consistent list result") {
+					t.Fatalf("expecting continue too old error, but get: %v", err)
 				}
 				return
 			}
@@ -1635,6 +1730,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			}
 			if !cmp.Equal(tt.expectedRemainingItemCount, out.RemainingItemCount) {
 				t.Fatalf("unexpected remainingItemCount, diff: %s", cmp.Diff(tt.expectedRemainingItemCount, out.RemainingItemCount))
+			}
+			if watchCacheEnabled && tt.expectEtcdRequest != nil {
+				expectEtcdLists := tt.expectEtcdRequest()
+				etcdLists := recorder.ListRequestForKey(recorderKey)
+				if !cmp.Equal(expectEtcdLists, etcdLists) {
+					t.Fatalf("unexpected etcd requests, diff: %s", cmp.Diff(expectEtcdLists, etcdLists))
+				}
 			}
 		})
 	}
@@ -3103,43 +3205,84 @@ func RunTestTransformationFailure(ctx context.Context, t *testing.T, store Inter
 	}
 }
 
-func RunTestCount(ctx context.Context, t *testing.T, store storage.Interface) {
-	resourceA := "/foo.bar.io/abc"
+func RunTestStats(ctx context.Context, t *testing.T, store storage.Interface, codec runtime.Codec, transformer value.Transformer, sizeEnabled bool) {
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 0, EstimatedAverageObjectSizeBytes: 0})
 
-	// resourceA is intentionally a prefix of resourceB to ensure that the count
-	// for resourceA does not include any objects from resourceB.
-	resourceB := fmt.Sprintf("%sdef", resourceA)
-
-	resourceACountExpected := 5
-	for i := 1; i <= resourceACountExpected; i++ {
-		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i)}}
-
-		key := fmt.Sprintf("%s/%d", resourceA, i)
-		if err := store.Create(ctx, key, obj, nil, 0); err != nil {
-			t.Fatalf("Create failed: %v", err)
-		}
+	foo := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	fooKey := computePodKey(foo)
+	if err := store.Create(ctx, fooKey, foo, nil, 0); err != nil {
+		t.Fatalf("Create failed: %v", err)
 	}
+	fooSize := objectSize(t, codec, foo, transformer)
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 1, EstimatedAverageObjectSizeBytes: fooSize})
 
-	resourceBCount := 4
-	for i := 1; i <= resourceBCount; i++ {
-		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i)}}
-
-		key := fmt.Sprintf("%s/%d", resourceB, i)
-		if err := store.Create(ctx, key, obj, nil, 0); err != nil {
-			t.Fatalf("Create failed: %v", err)
-		}
+	bar := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+	barKey := computePodKey(bar)
+	if err := store.Create(ctx, barKey, bar, nil, 0); err != nil {
+		t.Fatalf("Create failed: %v", err)
 	}
+	barSize := objectSize(t, codec, bar, transformer)
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 2, EstimatedAverageObjectSizeBytes: (fooSize + barSize) / 2})
 
-	resourceACountGot, err := store.Count(resourceA)
+	if err := store.GuaranteedUpdate(ctx, barKey, bar, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			pod.Labels = map[string]string{"foo": "bar"}
+			return pod, nil
+		}), nil); err != nil {
+		t.Errorf("Update failed: %v", err)
+	}
+	// ResourceVerson is not stored.
+	bar.ResourceVersion = ""
+	barSize = objectSize(t, codec, bar, transformer)
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 2, EstimatedAverageObjectSizeBytes: (fooSize + barSize) / 2})
+
+	if err := store.Delete(ctx, fooKey, foo, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
+		t.Errorf("Delete failed: %v", err)
+	}
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 1, EstimatedAverageObjectSizeBytes: barSize})
+
+	if err := store.Delete(ctx, fooKey, foo, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err == nil {
+		t.Errorf("Delete expected to fail")
+	}
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 1, EstimatedAverageObjectSizeBytes: barSize})
+
+	if err := store.Delete(ctx, barKey, bar, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
+		t.Errorf("Delete failed: %v", err)
+	}
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 0, EstimatedAverageObjectSizeBytes: 0})
+}
+
+func assertStats(t *testing.T, store storage.Interface, sizeEnabled bool, expectStats storage.Stats) {
+	t.Helper()
+	// Execute consistent LIST to refresh state of cache.
+	err := store.GetList(t.Context(), "/pods", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, &example.PodList{})
 	if err != nil {
-		t.Fatalf("store.Count failed: %v", err)
+		t.Fatalf("GetList failed: %v", err)
+	}
+	stats, err := store.Stats(t.Context())
+	if err != nil {
+		t.Fatalf("store.Stats failed: %v", err)
 	}
 
-	// count for resourceA should not include the objects for resourceB
-	// even though resourceA is a prefix of resourceB.
-	if int64(resourceACountExpected) != resourceACountGot {
-		t.Fatalf("store.Count for resource %s: expected %d but got %d", resourceA, resourceACountExpected, resourceACountGot)
+	if !sizeEnabled {
+		expectStats.EstimatedAverageObjectSizeBytes = 0
 	}
+	if expectStats != stats {
+		t.Errorf("store.Stats: expected %+v but got %+v", expectStats, stats)
+	}
+}
+
+func objectSize(t *testing.T, codec runtime.Codec, obj runtime.Object, transformer value.Transformer) int64 {
+	data, err := runtime.Encode(codec, obj)
+	if err != nil {
+		t.Fatalf("Encode failed: %v", err)
+	}
+	data, err = transformer.TransformToStorage(t.Context(), data, value.DefaultContext{})
+	if err != nil {
+		t.Fatalf("Transform failed: %v", err)
+	}
+	return int64(len(data))
 }
 
 func RunTestListPaging(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -3591,5 +3734,46 @@ func RunTestNamespaceScopedList(ctx context.Context, t *testing.T, store storage
 
 			expectNoDiff(t, "incorrect list pods", tt.expectPods(namespace), listOut.Items)
 		})
+	}
+}
+
+func RunTestCompactRevision(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, compact Compaction) {
+	listOut := &example.PodList{}
+	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+		Predicate: storage.Everything,
+		Recursive: true,
+	}, listOut); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	currentRV, err := store.Versioner().ParseResourceVersion(listOut.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	compactedRV := store.CompactRevision()
+	if compactedRV >= int64(currentRV) {
+		t.Fatalf("Expected current RV not be compacted, current: %d, compacted: %d", currentRV, compactedRV)
+	}
+	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+		Predicate:            storage.Everything,
+		Recursive:            true,
+		ResourceVersion:      listOut.ResourceVersion,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+	}, listOut); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	increaseRV(ctx, t)
+	expectCompactedRV := currentRV + 1
+	compact(ctx, t, fmt.Sprintf("%d", expectCompactedRV))
+	if err := store.GetList(ctx, "/pods", storage.ListOptions{
+		Predicate:            storage.Everything,
+		Recursive:            true,
+		ResourceVersion:      listOut.ResourceVersion,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+	}, listOut); err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
+		t.Errorf(`Expected "The resourceVersion for the provided list is too old", but got error: %v`, err)
+	}
+	compactedRV = store.CompactRevision()
+	if compactedRV != int64(expectCompactedRV) {
+		t.Errorf("CompactRevision()=%d, expected: %d", store.CompactRevision(), expectCompactedRV)
 	}
 }

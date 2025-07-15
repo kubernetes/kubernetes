@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
@@ -79,11 +79,11 @@ var _ = SIGDescribe("Lease", func() {
 				Name: name,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity:       pointer.String("holder"),
-				LeaseDurationSeconds: pointer.Int32(30),
+				HolderIdentity:       ptr.To("holder"),
+				LeaseDurationSeconds: ptr.To[int32](30),
 				AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(2 * time.Second)},
 				RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(5 * time.Second)},
-				LeaseTransitions:     pointer.Int32(0),
+				LeaseTransitions:     ptr.To[int32](0),
 			},
 		}
 
@@ -97,11 +97,11 @@ var _ = SIGDescribe("Lease", func() {
 		}
 
 		createdLease.Spec = coordinationv1.LeaseSpec{
-			HolderIdentity:       pointer.String("holder2"),
-			LeaseDurationSeconds: pointer.Int32(30),
+			HolderIdentity:       ptr.To("holder2"),
+			LeaseDurationSeconds: ptr.To[int32](30),
 			AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(20 * time.Second)},
 			RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(50 * time.Second)},
-			LeaseTransitions:     pointer.Int32(1),
+			LeaseTransitions:     ptr.To[int32](1),
 		}
 
 		_, err = leaseClient.Update(ctx, createdLease, metav1.UpdateOptions{})
@@ -115,11 +115,11 @@ var _ = SIGDescribe("Lease", func() {
 
 		patchedLease := readLease.DeepCopy()
 		patchedLease.Spec = coordinationv1.LeaseSpec{
-			HolderIdentity:       pointer.String("holder3"),
-			LeaseDurationSeconds: pointer.Int32(60),
+			HolderIdentity:       ptr.To("holder3"),
+			LeaseDurationSeconds: ptr.To[int32](60),
 			AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(50 * time.Second)},
 			RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(70 * time.Second)},
-			LeaseTransitions:     pointer.Int32(2),
+			LeaseTransitions:     ptr.To[int32](2),
 		}
 		patchBytes, err := getPatchBytes(readLease, patchedLease)
 		framework.ExpectNoError(err, "creating patch failed")
@@ -140,11 +140,11 @@ var _ = SIGDescribe("Lease", func() {
 				Labels: map[string]string{"deletecollection": "true"},
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity:       pointer.String("holder"),
-				LeaseDurationSeconds: pointer.Int32(30),
+				HolderIdentity:       ptr.To("holder"),
+				LeaseDurationSeconds: ptr.To[int32](30),
 				AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(2 * time.Second)},
 				RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(5 * time.Second)},
-				LeaseTransitions:     pointer.Int32(0),
+				LeaseTransitions:     ptr.To[int32](0),
 			},
 		}
 		_, err = leaseClient.Create(ctx, lease2, metav1.CreateOptions{})

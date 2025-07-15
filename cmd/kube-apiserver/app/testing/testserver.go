@@ -22,6 +22,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -501,26 +502,9 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
 	}
 
-	tlsInfo := transport.TLSInfo{
-		CertFile:      storageConfig.Transport.CertFile,
-		KeyFile:       storageConfig.Transport.KeyFile,
-		TrustedCAFile: storageConfig.Transport.TrustedCAFile,
-	}
-	tlsConfig, err := tlsInfo.ClientConfig()
+	etcdClient, _, err := GetEtcdClients(storageConfig.Transport)
 	if err != nil {
-		return result, err
-	}
-	etcdConfig := clientv3.Config{
-		Endpoints:   storageConfig.Transport.ServerList,
-		DialTimeout: 20 * time.Second,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: tlsConfig,
-	}
-	etcdClient, err := clientv3.New(etcdConfig)
-	if err != nil {
-		return result, err
+		return result, fmt.Errorf("create etcd client: %w", err)
 	}
 
 	// from here the caller must call tearDown
@@ -536,6 +520,45 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	result.EtcdStoragePrefix = storageConfig.Prefix
 
 	return result, nil
+}
+
+// GetEtcdClients returns an initialized etcd clientv3.Client and clientv3.KV.
+func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, clientv3.KV, error) {
+	// clientv3.New ignores an invalid TLS config for http://, but not for unix:// (https://github.com/etcd-io/etcd/blob/5a8fba466087686fc15815f5bc041fb7eb1f23ea/client/v3/internal/endpoint/endpoint.go#L61-L66).
+	// To support unix://, we must not set Config.TLS unless we really have
+	// transport security.
+	var tlsConfig *tls.Config
+	if config.CertFile != "" ||
+		config.KeyFile != "" ||
+		config.TrustedCAFile != "" {
+		tlsInfo := transport.TLSInfo{
+			CertFile:      config.CertFile,
+			KeyFile:       config.KeyFile,
+			TrustedCAFile: config.TrustedCAFile,
+		}
+
+		var err error
+		tlsConfig, err = tlsInfo.ClientConfig()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	cfg := clientv3.Config{
+		Endpoints:   config.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
+	}
+
+	c, err := clientv3.New(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return c, clientv3.NewKV(c), nil
 }
 
 // StartTestServerOrDie calls StartTestServer t.Fatal if it does not succeed.

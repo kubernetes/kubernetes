@@ -82,4 +82,22 @@ func (noopSpan) AddLink(Link) {}
 func (noopSpan) SetName(string) {}
 
 // TracerProvider returns a no-op TracerProvider.
-func (noopSpan) TracerProvider() TracerProvider { return noopTracerProvider{} }
+func (s noopSpan) TracerProvider() TracerProvider {
+	return s.tracerProvider(autoInstEnabled)
+}
+
+// autoInstEnabled defines if the auto-instrumentation SDK is enabled.
+//
+// The auto-instrumentation is expected to overwrite this value to true when it
+// attaches to the process.
+var autoInstEnabled = new(bool)
+
+// tracerProvider return a noopTracerProvider if autoEnabled is false,
+// otherwise it will return a TracerProvider from the sdk package used in
+// auto-instrumentation.
+func (noopSpan) tracerProvider(autoEnabled *bool) TracerProvider {
+	if *autoEnabled {
+		return newAutoTracerProvider()
+	}
+	return noopTracerProvider{}
+}

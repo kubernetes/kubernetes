@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	goruntime "runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -34,6 +35,7 @@ import (
 	"github.com/spf13/pflag"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -50,8 +52,7 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestAuthenticationValidate(t *testing.T) {
@@ -64,6 +65,7 @@ func TestAuthenticationValidate(t *testing.T) {
 		testAuthenticationConfigFile      string
 		expectErr                         string
 		enabledFeatures, disabledFeatures []featuregate.Feature
+		emulationVersion                  *version.Version
 	}{
 		{
 			name: "test when OIDC and ServiceAccounts are nil",
@@ -250,6 +252,9 @@ func TestAuthenticationValidate(t *testing.T) {
 				Allow:    true,
 				FlagsSet: true,
 			},
+			// This allows us to disable the AnonymousAuthConfigurableEndpoints
+			// feature-gate, otherwise this feature-gate cannot be disabled.
+			emulationVersion: version.MustParse("1.33"),
 		},
 	}
 
@@ -261,6 +266,12 @@ func TestAuthenticationValidate(t *testing.T) {
 			options.ServiceAccounts = testcase.testSA
 			options.WebHook = testcase.testWebHook
 			options.AuthenticationConfigFile = testcase.testAuthenticationConfigFile
+
+			// SetFeatureGateEmulationVersionDuringTest needs to be called
+			// before any calls to SetFeatureGateDuringTest to work reliably.
+			if testcase.emulationVersion != nil {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
 			for _, f := range testcase.enabledFeatures {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
 			}
@@ -335,7 +346,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 					ClaimMappings: apiserver.ClaimMappings{
 						Username: apiserver.PrefixedClaimOrExpression{
 							Claim:  "sub",
-							Prefix: pointer.String("https://testIssuerURL#"),
+							Prefix: ptr.To("https://testIssuerURL#"),
 						},
 					},
 				},
@@ -507,7 +518,6 @@ func TestWithTokenGetterFunction(t *testing.T) {
 }
 
 func TestToAuthenticationConfig_Anonymous(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 	testCases := []struct {
 		name                     string
 		args                     []string
@@ -546,7 +556,7 @@ func TestToAuthenticationConfig_Anonymous(t *testing.T) {
 			name: "file-anonymous-disabled-AnonymousAuthConfigurableEndpoints-disabled",
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: false
@@ -559,7 +569,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: false
@@ -572,7 +582,7 @@ anonymous:
 					Anonymous: &apiserver.AnonymousAuthConfig{Enabled: false},
 				},
 				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: false
@@ -585,7 +595,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: true
@@ -598,7 +608,7 @@ anonymous:
 					Anonymous: &apiserver.AnonymousAuthConfig{Enabled: true},
 				},
 				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: true
@@ -611,7 +621,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: false
@@ -626,7 +636,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   conditions:
@@ -640,7 +650,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: true
@@ -669,7 +679,7 @@ anonymous:
 					},
 				},
 				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: true
@@ -684,20 +694,20 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{"--anonymous-auth=True",
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: true
 `),
 			},
-			expectErr: "--anonynous-auth flag cannot be set when anonymous field is configured in authentication configuration file",
+			expectErr: "--anonymous-auth flag cannot be set when anonymous field is configured in authentication configuration file",
 		},
 		{
 			name:                     "flag-anonymous-enabled-file-anonymous-notset-AnonymousAuthConfigurableEndpoints-enabled",
 			enableAnonymousEndpoints: true,
 			args: []string{"--anonymous-auth=True",
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -722,14 +732,14 @@ jwt:
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 						},
 					},
 				},
 				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -747,7 +757,11 @@ jwt:
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
+			if !testcase.enableAnonymousEndpoints {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnonymousAuthConfigurableEndpoints, testcase.enableAnonymousEndpoints)
+
 			opts := NewBuiltInAuthenticationOptions().WithAnonymous()
 			pf := pflag.NewFlagSet("test-builtin-authentication-opts", pflag.ContinueOnError)
 			opts.AddFlags(pf)
@@ -782,12 +796,11 @@ jwt:
 }
 
 func TestToAuthenticationConfig_OIDC(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-
 	testCases := []struct {
 		name         string
 		args         []string
 		expectConfig kubeauthenticator.Config
+		expectErr    string
 	}{
 		{
 			name: "username prefix is '-'",
@@ -811,7 +824,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -847,7 +860,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String("https://testIssuerURL#"),
+									Prefix: ptr.To("https://testIssuerURL#"),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -883,7 +896,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "email",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -920,7 +933,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String("k8s-"),
+									Prefix: ptr.To("k8s-"),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -959,11 +972,11 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 								Groups: apiserver.PrefixedClaimOrExpression{
 									Claim:  "groups",
-									Prefix: pointer.String("oidc:"),
+									Prefix: ptr.To("oidc:"),
 								},
 							},
 							ClaimValidationRules: []apiserver.ClaimValidationRule{
@@ -982,7 +995,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 			name: "basic authentication configuration",
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1006,14 +1019,14 @@ jwt:
 							ClaimMappings: apiserver.ClaimMappings{
 								Username: apiserver.PrefixedClaimOrExpression{
 									Claim:  "sub",
-									Prefix: pointer.String(""),
+									Prefix: ptr.To(""),
 								},
 							},
 						},
 					},
 				},
 				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1026,6 +1039,29 @@ jwt:
 `,
 				OIDCSigningAlgs: []string{"ES256", "ES384", "ES512", "PS256", "PS384", "PS512", "RS256", "RS384", "RS512"},
 			},
+		},
+		{
+			name: "authentication config file not found",
+			args: []string{
+				"--authentication-config=nonexistent-file",
+			},
+			expectErr:    fmt.Sprintf(`failed to load authentication configuration from file "nonexistent-file": open nonexistent-file: %s`, getFileNotFoundForOS()),
+			expectConfig: kubeauthenticator.Config{},
+		},
+		{
+			name: "authentication config validation error",
+			args: []string{
+				"--authentication-config=" + writeTempFile(t, `
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+    audiences: [ "🐼" ]
+`),
+			},
+			expectErr:    "invalid authentication configuration: jwt[0].claimMappings.username: Required value: claim or expression is required",
+			expectConfig: kubeauthenticator.Config{},
 		},
 	}
 
@@ -1040,9 +1076,13 @@ jwt:
 			}
 
 			resultConfig, err := opts.ToAuthenticationConfig()
-			if err != nil {
-				t.Fatal(err)
+			if (err != nil) != (testcase.expectErr != "") {
+				t.Fatalf("Got err: %v; Want err: %v", err, testcase.expectErr)
 			}
+			if len(testcase.expectErr) > 0 && !strings.Contains(err.Error(), testcase.expectErr) {
+				t.Fatalf("Got err: %v; Want err: %v", err, testcase.expectErr)
+			}
+
 			if !reflect.DeepEqual(resultConfig, testcase.expectConfig) {
 				t.Error(cmp.Diff(resultConfig, testcase.expectConfig))
 			}
@@ -1195,6 +1235,9 @@ func TestValidateOIDCOptions(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
+			if !tt.structuredAuthenticationConfigEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, tt.structuredAuthenticationConfigEnabled)
 
 			opts := NewBuiltInAuthenticationOptions().WithOIDC()
@@ -1356,7 +1399,7 @@ jwt:
 						ClaimMappings: apiserver.ClaimMappings{
 							Username: apiserver.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String(""),
+								Prefix: ptr.To(""),
 							},
 						},
 					},
@@ -1432,7 +1475,7 @@ jwt:
 						ClaimMappings: apiserver.ClaimMappings{
 							Username: apiserver.PrefixedClaimOrExpression{
 								Claim:  "sub",
-								Prefix: pointer.String(""),
+								Prefix: ptr.To(""),
 							},
 						},
 					},
@@ -1460,6 +1503,82 @@ jwt:
 			expectedConfig: &apiserver.AuthenticationConfiguration{},
 			expectedContentData: `{
 							"apiVersion":"apiserver.config.k8s.io/v1beta1",
+							"kind":"AuthenticationConfiguration"}`,
+		},
+		{
+			name: "v1 - json",
+			file: func() string {
+				return writeTempFile(t, `{
+							"apiVersion":"apiserver.config.k8s.io/v1",
+							"kind":"AuthenticationConfiguration",
+							"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`)
+			},
+			expectedConfig: &apiserver.AuthenticationConfiguration{
+				JWT: []apiserver.JWTAuthenticator{
+					{
+						Issuer: apiserver.Issuer{
+							URL: "https://test-issuer",
+						},
+					},
+				},
+			},
+			expectedContentData: `{
+							"apiVersion":"apiserver.config.k8s.io/v1",
+							"kind":"AuthenticationConfiguration",
+							"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`,
+		},
+		{
+			name: "v1 - yaml",
+			file: func() string {
+				return writeTempFile(t, `
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+  claimMappings:
+    username:
+      claim: sub
+      prefix: ""
+`)
+			},
+			expectedConfig: &apiserver.AuthenticationConfiguration{
+				JWT: []apiserver.JWTAuthenticator{
+					{
+						Issuer: apiserver.Issuer{
+							URL: "https://test-issuer",
+						},
+						ClaimMappings: apiserver.ClaimMappings{
+							Username: apiserver.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: ptr.To(""),
+							},
+						},
+					},
+				},
+			},
+			expectedContentData: `
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+  claimMappings:
+    username:
+      claim: sub
+      prefix: ""
+`,
+		},
+		{
+			name: "v1 - no jwt",
+			file: func() string {
+				return writeTempFile(t, `{
+							"apiVersion":"apiserver.config.k8s.io/v1",
+							"kind":"AuthenticationConfiguration"}`)
+			},
+			expectedConfig: &apiserver.AuthenticationConfiguration{},
+			expectedContentData: `{
+							"apiVersion":"apiserver.config.k8s.io/v1",
 							"kind":"AuthenticationConfiguration"}`,
 		},
 	}
@@ -1674,4 +1793,15 @@ func (d *dummyPublicKeyGetter) GetCacheAgeMaxSeconds() int {
 
 func (d *dummyPublicKeyGetter) GetPublicKeys(ctx context.Context, keyIDHint string) []serviceaccount.PublicKey {
 	return []serviceaccount.PublicKey{}
+}
+
+// getFileNotFoundForOS returns the expected error message for a file not found error on the current OS
+// - on Windows, the error message is "The system cannot find the file specified"
+// - on other, the error message is "no such file or directory"
+func getFileNotFoundForOS() string {
+	if goruntime.GOOS == "windows" {
+		return "The system cannot find the file specified"
+	} else {
+		return "no such file or directory"
+	}
 }

@@ -104,15 +104,17 @@ var (
 	timeoutSeconds = 10
 
 	externalMaxTries = 10
-	internalMaxTries = 1
+	internalMaxTries = 3
 )
 
 func assertConsistentConnectivity(ctx context.Context, f *framework.Framework, podName string, os string, cmd []string, maxTries int) {
 	connChecker := func() error {
 		var err error
+		var stdout string
+		var stderr string
 		for i := 0; i < maxTries; i++ {
 			ginkgo.By(fmt.Sprintf("checking connectivity of %s-container in %s", os, podName))
-			stdout, stderr, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, os+"-container", cmd...)
+			stdout, stderr, err = e2epod.ExecCommandInContainerWithFullOutput(f, podName, os+"-container", cmd...)
 			if err == nil {
 				break
 			}

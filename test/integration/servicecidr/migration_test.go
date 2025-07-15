@@ -35,7 +35,6 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -60,11 +59,9 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	s1 := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=" + cidr1,
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
-			fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 		},
 		etcdOptions)
 
@@ -195,7 +192,6 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	s2 := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=" + cidr2,
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
@@ -444,7 +440,6 @@ func TestServiceCIDRMigrationScenarios(t *testing.T) {
 				"--service-cluster-ip-range=" + strings.Join(tc.initialCIDRs, ","),
 				"--advertise-address=" + strings.Split(tc.initialCIDRs[0], "/")[0], // the advertise address MUST match the cluster primary ip family
 				"--disable-admission-plugins=ServiceAccount",
-				// fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 			}
 			t.Logf("Starting API server with CIDRs: %v", tc.initialCIDRs)
 			s1 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions, initialFlags, etcdOptions)
@@ -505,7 +500,6 @@ func TestServiceCIDRMigrationScenarios(t *testing.T) {
 				"--service-cluster-ip-range=" + strings.Join(tc.migratedCIDRs, ","),
 				"--advertise-address=" + strings.Split(tc.migratedCIDRs[0], "/")[0], // the advertise address MUST match the cluster configured primary ip family
 				"--disable-admission-plugins=ServiceAccount",
-				// fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 			}
 			s2 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions, migratedFlags, etcdOptions)
 			defer s2.TearDownFn() // Ensure cleanup even on test failure

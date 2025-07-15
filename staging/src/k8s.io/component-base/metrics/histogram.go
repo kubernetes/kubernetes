@@ -181,17 +181,19 @@ func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
+
+	// Initialize label allow lists if not already initialized
+	v.initializeLabelAllowListsOnce.Do(func() {
+		allowListLock.RLock()
+		if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+			v.LabelValueAllowLists = allowList
+		}
+		allowListLock.RUnlock()
+	})
+
+	// Constrain label values to allowed values
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
-	} else {
-		v.initializeLabelAllowListsOnce.Do(func() {
-			allowListLock.RLock()
-			if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
-				v.LabelValueAllowLists = allowList
-				allowList.ConstrainToAllowedList(v.originalLabels, lvs)
-			}
-			allowListLock.RUnlock()
-		})
 	}
 	return v.HistogramVec.WithLabelValues(lvs...)
 }
@@ -204,18 +206,21 @@ func (v *HistogramVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
+
+	// Initialize label allow lists if not already initialized
+	v.initializeLabelAllowListsOnce.Do(func() {
+		allowListLock.RLock()
+		if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
+			v.LabelValueAllowLists = allowList
+		}
+		allowListLock.RUnlock()
+	})
+
+	// Constrain label map to allowed values
 	if v.LabelValueAllowLists != nil {
 		v.LabelValueAllowLists.ConstrainLabelMap(labels)
-	} else {
-		v.initializeLabelAllowListsOnce.Do(func() {
-			allowListLock.RLock()
-			if allowList, ok := labelValueAllowLists[v.FQName()]; ok {
-				v.LabelValueAllowLists = allowList
-				allowList.ConstrainLabelMap(labels)
-			}
-			allowListLock.RUnlock()
-		})
 	}
+
 	return v.HistogramVec.With(labels)
 }
 

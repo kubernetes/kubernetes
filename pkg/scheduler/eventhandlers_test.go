@@ -33,6 +33,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
@@ -76,15 +78,15 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 	unschedulablePods := []*v1.Pod{highPriorityPod, medNominatedPriorityPod, medPriorityPod, lowPriorityPod}
 
 	// Make pods schedulable on Delete event when QHints are enabled, but not when nominated node appears.
-	queueHintForPodDelete := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	queueHintForPodDelete := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 		oldPod, _, err := util.As[*v1.Pod](oldObj, newObj)
 		if err != nil {
 			t.Errorf("Failed to convert objects to pods: %v", err)
 		}
 		if oldPod.Status.NominatedNodeName == "" {
-			return framework.QueueSkip, nil
+			return fwk.QueueSkip, nil
 		}
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 	queueingHintMap := internalqueue.QueueingHintMapPerProfile{
 		testSchedulerName: {
@@ -144,7 +146,10 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 	for _, tt := range tests {
 		for _, qHintEnabled := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s, with queuehint(%v)", tt.name, qHintEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, qHintEnabled)
+				if !qHintEnabled {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+				}
 
 				logger, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)
@@ -372,11 +377,34 @@ func TestPreCheckForNode(t *testing.T) {
 			},
 			want: []bool{false, true, false, false},
 		},
+		{
+			name: "tainted node with NoExecute effect, pods with tolerations",
+			nodeFn: func() *v1.Node {
+				node := st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+				node.Spec.Taints = []v1.Taint{
+					{Key: "foo", Effect: v1.TaintEffectPreferNoSchedule},
+					{Key: "baz", Effect: v1.TaintEffectNoExecute},
+				}
+				return node
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+				st.MakePod().Name("p3").Toleration("foo").Obj(),
+				st.MakePod().Name("p4").Toleration("baz").Obj(),
+				st.MakePod().Name("p5").Obj(),
+				st.MakePod().Name("p6").Toleration("bar").Toleration("baz").Obj(),
+			},
+			want: []bool{false, false, false, true, false, true},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, tt.qHintEnabled)
+			if !tt.qHintEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+			}
 
 			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
 			nodeInfo.SetNode(tt.nodeFn())
@@ -398,7 +426,7 @@ func TestPreCheckForNode(t *testing.T) {
 func TestAddAllEventHandlers(t *testing.T) {
 	tests := []struct {
 		name                   string
-		gvkMap                 map[framework.EventResource]framework.ActionType
+		gvkMap                 map[fwk.EventResource]fwk.ActionType
 		enableDRA              bool
 		enableDRADeviceTaints  bool
 		expectStaticInformers  map[reflect.Type]bool
@@ -406,7 +434,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 	}{
 		{
 			name:   "default handlers in framework",
-			gvkMap: map[framework.EventResource]framework.ActionType{},
+			gvkMap: map[fwk.EventResource]fwk.ActionType{},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
 				reflect.TypeOf(&v1.Node{}):      true,
@@ -416,10 +444,10 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "DRA events disabled",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				framework.ResourceClaim: framework.Add,
-				framework.ResourceSlice: framework.Add,
-				framework.DeviceClass:   framework.Add,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.ResourceClaim: fwk.Add,
+				fwk.ResourceSlice: fwk.Add,
+				fwk.DeviceClass:   fwk.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -430,10 +458,10 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "core DRA events enabled",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				framework.ResourceClaim: framework.Add,
-				framework.ResourceSlice: framework.Add,
-				framework.DeviceClass:   framework.Add,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.ResourceClaim: fwk.Add,
+				fwk.ResourceSlice: fwk.Add,
+				fwk.DeviceClass:   fwk.Add,
 			},
 			enableDRA: true,
 			expectStaticInformers: map[reflect.Type]bool{
@@ -448,10 +476,10 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "all DRA events enabled",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				framework.ResourceClaim: framework.Add,
-				framework.ResourceSlice: framework.Add,
-				framework.DeviceClass:   framework.Add,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				fwk.ResourceClaim: fwk.Add,
+				fwk.ResourceSlice: fwk.Add,
+				fwk.DeviceClass:   fwk.Add,
 			},
 			enableDRA:             true,
 			enableDRADeviceTaints: true,
@@ -468,10 +496,10 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "add GVKs handlers defined in framework dynamically",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				"Pod":                               framework.Add | framework.Delete,
-				"PersistentVolume":                  framework.Delete,
-				"storage.k8s.io/CSIStorageCapacity": framework.Update,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				"Pod":                               fwk.Add | fwk.Delete,
+				"PersistentVolume":                  fwk.Delete,
+				"storage.k8s.io/CSIStorageCapacity": fwk.Update,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):                       true,
@@ -484,9 +512,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "add GVKs handlers defined in plugins dynamically",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				"daemonsets.v1.apps": framework.Add | framework.Delete,
-				"cronjobs.v1.batch":  framework.Delete,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				"daemonsets.v1.apps": fwk.Add | fwk.Delete,
+				"cronjobs.v1.batch":  fwk.Delete,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -500,9 +528,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 		},
 		{
 			name: "add GVKs handlers defined in plugins dynamically, with one illegal GVK form",
-			gvkMap: map[framework.EventResource]framework.ActionType{
-				"daemonsets.v1.apps":    framework.Add | framework.Delete,
-				"custommetrics.v1beta1": framework.Update,
+			gvkMap: map[fwk.EventResource]fwk.ActionType{
+				"daemonsets.v1.apps":    fwk.Add | fwk.Delete,
+				"custommetrics.v1beta1": fwk.Update,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,

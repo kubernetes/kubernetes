@@ -81,6 +81,7 @@ func extractEviction(eviction *policyv1.Eviction, fieldManager string, subresour
 	b.WithAPIVersion("policy/v1")
 	return b, nil
 }
+func (b EvictionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -248,8 +249,24 @@ func (b *EvictionApplyConfiguration) WithDeleteOptions(value *metav1.DeleteOptio
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *EvictionApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *EvictionApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *EvictionApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *EvictionApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

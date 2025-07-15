@@ -82,9 +82,8 @@ func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 }
 
 // MoreImportantPod return true when priority of the first pod is higher than
-// the second one. If two pods' priorities are equal, compare their StartTime.
-// It takes arguments of the type "interface{}" to be used with SortableList,
-// but expects those arguments to be *v1.Pod.
+// the second one. If two pods' priorities are equal, compare their StartTime,
+// treating the older pod as more important.
 func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
 	p1 := corev1helpers.PodPriority(pod1)
 	p2 := corev1helpers.PodPriority(pod2)
@@ -187,4 +186,40 @@ func As[T any](oldObj, newobj interface{}) (T, T, error) {
 		}
 	}
 	return oldTyped, newTyped, nil
+}
+
+// GetHostPorts returns the used host ports of pod containers and
+// initContainers with restartPolicy: Always.
+func GetHostPorts(pod *v1.Pod) []v1.ContainerPort {
+	var ports []v1.ContainerPort
+	if pod == nil {
+		return ports
+	}
+
+	hostPort := func(p v1.ContainerPort) bool {
+		return p.HostPort > 0
+	}
+
+	for _, c := range pod.Spec.InitContainers {
+		// Only consider initContainers that will be running the entire
+		// duration of the Pod.
+		if c.RestartPolicy == nil || *c.RestartPolicy != v1.ContainerRestartPolicyAlways {
+			continue
+		}
+		for _, p := range c.Ports {
+			if !hostPort(p) {
+				continue
+			}
+			ports = append(ports, p)
+		}
+	}
+	for _, c := range pod.Spec.Containers {
+		for _, p := range c.Ports {
+			if !hostPort(p) {
+				continue
+			}
+			ports = append(ports, p)
+		}
+	}
+	return ports
 }

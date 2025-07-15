@@ -62,6 +62,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -87,7 +89,8 @@ type ReplicaSetController struct {
 
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
-
+	// podIndexer allows looking up pods by ControllerRef UID
+	podIndexer       cache.Indexer
 	eventBroadcaster record.EventBroadcaster
 
 	// A ReplicaSet is temporarily suspended after creating/deleting these many replicas.
@@ -114,6 +117,23 @@ type ReplicaSetController struct {
 
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
+
+	clock clock.PassiveClock
+
+	// Controller specific features; see ReplicaSetControllerFeatures for details.
+	controllerFeatures ReplicaSetControllerFeatures
+}
+
+// ReplicaSetControllerFeatures that can be set in accordance with the controller type (GVK).
+// These do not have to correspond to FeatureGates, or their stability, nor do they have to undergo graduation.
+type ReplicaSetControllerFeatures struct {
+	EnableStatusTerminatingReplicas bool
+}
+
+func DefaultReplicaSetControllerFeatures() ReplicaSetControllerFeatures {
+	return ReplicaSetControllerFeatures{
+		EnableStatusTerminatingReplicas: true,
+	}
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
@@ -132,13 +152,14 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
 		},
 		eventBroadcaster,
+		DefaultReplicaSetControllerFeatures(),
 	)
 }
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
 func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
-	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster) *ReplicaSetController {
+	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster, controllerFeatures ReplicaSetControllerFeatures) *ReplicaSetController {
 
 	rsc := &ReplicaSetController{
 		GroupVersionKind: gvk,
@@ -151,6 +172,8 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: queueName},
 		),
+		clock:              clock.RealClock{},
+		controllerFeatures: controllerFeatures,
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -197,7 +220,8 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 	})
 	rsc.podLister = podInformer.Lister()
 	rsc.podListerSynced = podInformer.Informer().HasSynced
-
+	controller.AddPodControllerUIDIndexer(podInformer.Informer()) //nolint:errcheck
+	rsc.podIndexer = podInformer.Informer().GetIndexer()
 	rsc.syncHandler = rsc.syncReplicaSet
 
 	return rsc
@@ -676,7 +700,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 // invoked concurrently with the same key.
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
 	logger := klog.FromContext(ctx)
-	startTime := time.Now()
+	startTime := rsc.clock.Now()
 	defer func() {
 		logger.V(4).Info("Finished syncing", "kind", rsc.Kind, "key", key, "duration", time.Since(startTime))
 	}()
@@ -702,49 +726,54 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		return nil
 	}
 
-	// list all pods to include the pods that don't match the rs`s selector
-	// anymore but has the stale controller ref.
-	// TODO: Do the List and Filter in a single pass, or use an index.
-	allPods, err := rsc.podLister.Pods(rs.Namespace).List(labels.Everything())
+	// List all pods indexed to RS UID and Orphan pods
+	allRSPods, err := controller.FilterPodsByOwner(rsc.podIndexer, &rs.ObjectMeta)
 	if err != nil {
 		return err
 	}
 
 	// NOTE: activePods and terminatingPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
-	allActivePods := controller.FilterActivePods(logger, allPods)
+	allActivePods := controller.FilterActivePods(logger, allRSPods)
 	activePods, err := rsc.claimPods(ctx, rs, selector, allActivePods)
 	if err != nil {
 		return err
 	}
 
 	var terminatingPods []*v1.Pod
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) {
-		allTerminatingPods := controller.FilterTerminatingPods(allPods)
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) && rsc.controllerFeatures.EnableStatusTerminatingReplicas {
+		allTerminatingPods := controller.FilterTerminatingPods(allRSPods)
 		terminatingPods = controller.FilterClaimedPods(rs, selector, allTerminatingPods)
 	}
 
 	var manageReplicasErr error
+	var nextSyncInSeconds *int
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
 	}
 	rs = rs.DeepCopy()
-	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr)
+	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr, rsc.controllerFeatures, rsc.clock)
 
 	// Always updates status as pods come up or die.
-	updatedRS, err := updateReplicaSetStatus(logger, rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus)
+	updatedRS, err := updateReplicaSetStatus(logger, rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus, rsc.controllerFeatures)
 	if err != nil {
 		// Multiple things could lead to this update failing. Requeuing the replica set ensures
 		// Returning an error causes a requeue without forcing a hotloop
 		return err
 	}
+	if manageReplicasErr != nil {
+		return manageReplicasErr
+	}
 	// Resync the ReplicaSet after MinReadySeconds as a last line of defense to guard against clock-skew.
-	if manageReplicasErr == nil && updatedRS.Spec.MinReadySeconds > 0 &&
+	if updatedRS.Spec.MinReadySeconds > 0 &&
 		updatedRS.Status.ReadyReplicas == *(updatedRS.Spec.Replicas) &&
 		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) {
-		rsc.queue.AddAfter(key, time.Duration(updatedRS.Spec.MinReadySeconds)*time.Second)
+		nextSyncInSeconds = ptr.To(int(updatedRS.Spec.MinReadySeconds))
 	}
-	return manageReplicasErr
+	if nextSyncInSeconds != nil {
+		rsc.queue.AddAfter(key, time.Duration(*nextSyncInSeconds)*time.Second)
+	}
+	return nil
 }
 
 func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.ReplicaSet, selector labels.Selector, filteredPods []*v1.Pod) ([]*v1.Pod, error) {

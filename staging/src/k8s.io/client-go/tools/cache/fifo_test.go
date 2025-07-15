@@ -117,6 +117,7 @@ func TestFIFO_basic(t *testing.T) {
 
 func TestFIFO_addUpdate(t *testing.T) {
 	f := NewFIFO(testFifoObjectKeyFunc)
+	defer f.Close()
 	f.Add(mkFifoObj("foo", 10))
 	f.Update(mkFifoObj("foo", 15))
 
@@ -130,7 +131,11 @@ func TestFIFO_addUpdate(t *testing.T) {
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			got <- Pop(f).(testFifoObject)
+			obj := Pop(f)
+			if obj == nil {
+				return
+			}
+			got <- obj.(testFifoObject)
 		}
 	}()
 
@@ -151,12 +156,17 @@ func TestFIFO_addUpdate(t *testing.T) {
 
 func TestFIFO_addReplace(t *testing.T) {
 	f := NewFIFO(testFifoObjectKeyFunc)
+	defer f.Close()
 	f.Add(mkFifoObj("foo", 10))
 	f.Replace([]interface{}{mkFifoObj("foo", 15)}, "15")
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			got <- Pop(f).(testFifoObject)
+			obj := Pop(f)
+			if obj == nil {
+				return
+			}
+			got <- obj.(testFifoObject)
 		}
 	}()
 

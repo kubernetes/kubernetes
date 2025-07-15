@@ -51,7 +51,6 @@ import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -319,12 +318,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case networkingv1.SchemeGroupVersion.WithResource("servicecidrs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().ServiceCIDRs().Informer()}, nil
 
-		// Group=networking.k8s.io, Version=v1alpha1
-	case networkingv1alpha1.SchemeGroupVersion.WithResource("ipaddresses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1alpha1().IPAddresses().Informer()}, nil
-	case networkingv1alpha1.SchemeGroupVersion.WithResource("servicecidrs"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1alpha1().ServiceCIDRs().Informer()}, nil
-
 		// Group=networking.k8s.io, Version=v1beta1
 	case networkingv1beta1.SchemeGroupVersion.WithResource("ipaddresses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1beta1().IPAddresses().Informer()}, nil
@@ -386,16 +379,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1beta1().RoleBindings().Informer()}, nil
 
 		// Group=resource.k8s.io, Version=v1alpha3
-	case v1alpha3.SchemeGroupVersion.WithResource("deviceclasses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().DeviceClasses().Informer()}, nil
 	case v1alpha3.SchemeGroupVersion.WithResource("devicetaintrules"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().DeviceTaintRules().Informer()}, nil
-	case v1alpha3.SchemeGroupVersion.WithResource("resourceclaims"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceClaims().Informer()}, nil
-	case v1alpha3.SchemeGroupVersion.WithResource("resourceclaimtemplates"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceClaimTemplates().Informer()}, nil
-	case v1alpha3.SchemeGroupVersion.WithResource("resourceslices"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceSlices().Informer()}, nil
 
 		// Group=resource.k8s.io, Version=v1beta1
 	case resourcev1beta1.SchemeGroupVersion.WithResource("deviceclasses"):

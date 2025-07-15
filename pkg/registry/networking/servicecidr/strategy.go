@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/networking/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // serviceCIDRStrategy implements verification logic for ServiceCIDR allocators.
@@ -58,9 +58,6 @@ func (serviceCIDRStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.
 			fieldpath.MakePathOrDie("status"),
 		),
 		"networking/v1beta1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("status"),
-		),
-		"networking/v1alpha1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -135,9 +132,6 @@ func (serviceCIDRStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fiel
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"networking/v1beta1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("spec"),
-		),
-		"networking/v1alpha1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}

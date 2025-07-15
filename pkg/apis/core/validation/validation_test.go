@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
@@ -2155,7 +2154,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"invaild-apigroup-in-data-source": {
+		"invalid-apigroup-in-data-source": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
@@ -2173,7 +2172,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"invaild-apigroup-in-data-source-ref": {
+		"invalid-apigroup-in-data-source-ref": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
@@ -2336,7 +2335,7 @@ func TestAlphaPVVolumeModeUpdate(t *testing.T) {
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
-	invaildAPIGroup := "^invalid"
+	invalidAPIGroup := "^invalid"
 
 	validClaim := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
@@ -2719,7 +2718,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 		DataSource: &core.TypedLocalObjectReference{
-			APIGroup: &invaildAPIGroup,
+			APIGroup: &invalidAPIGroup,
 			Kind:     "Foo",
 			Name:     "foo",
 		},
@@ -2737,7 +2736,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 		DataSourceRef: &core.TypedObjectReference{
-			APIGroup: &invaildAPIGroup,
+			APIGroup: &invalidAPIGroup,
 			Kind:     "Foo",
 			Name:     "foo",
 		},
@@ -3098,7 +3097,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 }
 
 func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
-	invaildAPIGroup := "^invalid"
+	invalidAPIGroup := "^invalid"
 
 	tests := map[string]struct {
 		oldPvc                      *core.PersistentVolumeClaim
@@ -3112,15 +3111,15 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 				EnableVolumeAttributesClass:       false,
 			},
 		},
-		"invaild apiGroup in dataSource allowed because the old pvc is used": {
-			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invaildAPIGroup}),
+		"invalid apiGroup in dataSource allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
-		"invaild apiGroup in dataSourceRef allowed because the old pvc is used": {
-			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invaildAPIGroup}),
+		"invalid apiGroup in dataSourceRef allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
@@ -15475,11 +15474,12 @@ func TestValidateServiceCreate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 
 	testCases := []struct {
-		name         string
-		tweakSvc     func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs      int
-		featureGates []featuregate.Feature
-		legacyIPs    bool
+		name                string
+		tweakSvc            func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs             int
+		legacyIPs           bool
+		newTrafficDist      bool
+		relaxedServiceNames bool
 	}{{
 		name:     "default",
 		tweakSvc: func(s *core.Service) {},
@@ -16738,15 +16738,15 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameZone")
 			},
-			featureGates: []featuregate.Feature{features.PreferSameTrafficDistribution},
-			numErrs:      0,
+			newTrafficDist: true,
+			numErrs:        0,
 		}, {
 			name: "valid: trafficDistribution field set to PreferSameNode with feature gate",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
-			featureGates: []featuregate.Feature{features.PreferSameTrafficDistribution},
-			numErrs:      0,
+			newTrafficDist: true,
+			numErrs:        0,
 		}, {
 			name: "invalid: trafficDistribution field set to Random",
 			tweakSvc: func(s *core.Service) {
@@ -16765,14 +16765,28 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
 			numErrs: 1,
+		}, {
+
+			name:                "valid: service name begins with a digit feature gate enabled",
+			relaxedServiceNames: true,
+			tweakSvc: func(s *core.Service) {
+				s.Name = "1-test-service"
+			},
+			numErrs: 0,
+		}, {
+			name:                "invalid: service name begins with a digit feature gate disabled",
+			relaxedServiceNames: false,
+			tweakSvc: func(s *core.Service) {
+				s.Name = "1-test-service"
+			},
+			numErrs: 1,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			for i := range tc.featureGates {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates[i], true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, tc.newTrafficDist)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, tc.relaxedServiceNames)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
@@ -18217,9 +18231,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 	singleStack := core.IPFamilyPolicySingleStack
 	testCases := []struct {
-		name     string
-		tweakSvc func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
-		numErrs  int
+		name                string
+		tweakSvc            func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
+		numErrs             int
+		relaxedServiceNames bool
 	}{{
 		name: "no change",
 		tweakSvc: func(oldSvc, newSvc *core.Service) {
@@ -19480,12 +19495,22 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8, 1.2.3.0/24"
 			},
 			numErrs: 1,
+		}, {
+			name: "can modify a pre-existing relaxed service name without error",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Name = "1-test-service"
+				newSvc.Name = "1-test-service"
+				newSvc.Labels["foo"] = "bar"
+			},
+			relaxedServiceNames: false,
+			numErrs:             0,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, tc.relaxedServiceNames)
 
 			oldSvc := makeValidService()
 			newSvc := makeValidService()
@@ -19581,6 +19606,33 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			},
 		},
 		expectedErrors: []string{"must be greater than or equal to aggregate container requests"},
+	}, {
+		name: "container requests with resources unsupported at pod-level",
+		podResources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:     resource.MustParse("6"),
+						core.ResourceMemory:  resource.MustParse("5Mi"),
+						core.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:     resource.MustParse("4"),
+						core.ResourceMemory:  resource.MustParse("3Mi"),
+						core.ResourceStorage: resource.MustParse("5Gi"),
+					},
+				},
+			},
+		},
 	}, {
 		name: "aggregate container limits less than pod limits",
 		podResources: core.ResourceRequirements{
@@ -22851,10 +22903,6 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 }
 
 func TestValidateWindowsSecurityContextOptions(t *testing.T) {
-	toPtr := func(s string) *string {
-		return &s
-	}
-
 	testCases := []struct {
 		testName string
 
@@ -22868,26 +22916,26 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 	}, {
 		testName: "a valid input",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			GMSACredentialSpecName: toPtr("dummy-gmsa-crep-spec-name"),
-			GMSACredentialSpec:     toPtr("dummy-gmsa-crep-spec-contents"),
+			GMSACredentialSpecName: ptr.To("dummy-gmsa-crep-spec-name"),
+			GMSACredentialSpec:     ptr.To("dummy-gmsa-crep-spec-contents"),
 		},
 	}, {
 		testName: "a GMSA cred spec name that is not a valid resource name",
 		windowsOptions: &core.WindowsSecurityContextOptions{
 			// invalid because of the underscore
-			GMSACredentialSpecName: toPtr("not_a-valid-gmsa-crep-spec-name"),
+			GMSACredentialSpecName: ptr.To("not_a-valid-gmsa-crep-spec-name"),
 		},
 		expectedErrorSubstring: dnsSubdomainLabelErrMsg,
 	}, {
 		testName: "empty GMSA cred spec contents",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			GMSACredentialSpec: toPtr(""),
+			GMSACredentialSpec: ptr.To(""),
 		},
 		expectedErrorSubstring: "gmsaCredentialSpec cannot be an empty string",
 	}, {
 		testName: "GMSA cred spec contents that are too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			GMSACredentialSpec: toPtr(strings.Repeat("a", maxGMSACredentialSpecLength+1)),
+			GMSACredentialSpec: ptr.To(strings.Repeat("a", maxGMSACredentialSpecLength+1)),
 		},
 		expectedErrorSubstring: "gmsaCredentialSpec size must be under",
 	}, {
@@ -22898,105 +22946,105 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 	}, {
 		testName: "a valid RunAsUserName",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container. User"),
+			RunAsUserName: ptr.To("Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with NetBios Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Network Service\\Container. User"),
+			RunAsUserName: ptr.To("Network Service\\Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with DNS Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("fOo", 20) + ".liSH\\Container. User"),
+			RunAsUserName: ptr.To(strings.Repeat("fOo", 20) + ".liSH\\Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with DNS Domain with a single character segment",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("fOo", 20) + ".l\\Container. User"),
+			RunAsUserName: ptr.To(strings.Repeat("fOo", 20) + ".l\\Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with a long single segment DNS Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("a", 42) + "\\Container. User"),
+			RunAsUserName: ptr.To(strings.Repeat("a", 42) + "\\Container. User"),
 		},
 	}, {
 		testName: "an empty RunAsUserName",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(""),
+			RunAsUserName: ptr.To(""),
 		},
 		expectedErrorSubstring: "runAsUserName cannot be an empty string",
 	}, {
 		testName: "RunAsUserName containing a control character",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container\tUser"),
+			RunAsUserName: ptr.To("Container\tUser"),
 		},
 		expectedErrorSubstring: "runAsUserName cannot contain control characters",
 	}, {
 		testName: "RunAsUserName containing too many backslashes",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container\\Foo\\Lish"),
+			RunAsUserName: ptr.To("Container\\Foo\\Lish"),
 		},
 		expectedErrorSubstring: "runAsUserName cannot contain more than one backslash",
 	}, {
 		testName: "RunAsUserName containing backslash but empty Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("\\User"),
+			RunAsUserName: ptr.To("\\User"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios nor the DNS format",
 	}, {
 		testName: "RunAsUserName containing backslash but empty User",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container\\"),
+			RunAsUserName: ptr.To("Container\\"),
 		},
 		expectedErrorSubstring: "runAsUserName's User cannot be empty",
 	}, {
 		testName: "RunAsUserName's NetBios Domain is too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("NetBios " + strings.Repeat("a", 8) + "\\user"),
+			RunAsUserName: ptr.To("NetBios " + strings.Repeat("a", 8) + "\\user"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios",
 	}, {
 		testName: "RunAsUserName's DNS Domain is too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
 			// even if this tests the max Domain length, the Domain should still be "valid".
-			RunAsUserName: toPtr(strings.Repeat(strings.Repeat("a", 63)+".", 4)[:253] + ".com\\user"),
+			RunAsUserName: ptr.To(strings.Repeat(strings.Repeat("a", 63)+".", 4)[:253] + ".com\\user"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain length must be under",
 	}, {
 		testName: "RunAsUserName's User is too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("a", maxRunAsUserNameUserLength+1)),
+			RunAsUserName: ptr.To(strings.Repeat("a", maxRunAsUserNameUserLength+1)),
 		},
 		expectedErrorSubstring: "runAsUserName's User length must not be longer than",
 	}, {
 		testName: "RunAsUserName's User cannot contain only spaces or periods",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("... ..."),
+			RunAsUserName: ptr.To("... ..."),
 		},
 		expectedErrorSubstring: "runAsUserName's User cannot contain only periods or spaces",
 	}, {
 		testName: "RunAsUserName's NetBios Domain cannot start with a dot",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(".FooLish\\User"),
+			RunAsUserName: ptr.To(".FooLish\\User"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios",
 	}, {
 		testName: "RunAsUserName's NetBios Domain cannot contain invalid characters",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Foo? Lish?\\User"),
+			RunAsUserName: ptr.To("Foo? Lish?\\User"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios",
 	}, {
 		testName: "RunAsUserName's DNS Domain cannot contain invalid characters",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("a", 32) + ".com-\\user"),
+			RunAsUserName: ptr.To(strings.Repeat("a", 32) + ".com-\\user"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios nor the DNS format",
 	}, {
 		testName: "RunAsUserName's User cannot contain invalid characters",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container/User"),
+			RunAsUserName: ptr.To("Container/User"),
 		},
 		expectedErrorSubstring: "runAsUserName's User cannot contain the following characters",
 	},
@@ -23497,8 +23545,57 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("labelKey"),
 		},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+		},
 	}, {
-		name: "key exists in both matchLabelKeys and labelSelector",
+		name: "key in MatchLabelKeys isn't correctly defined when AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			LabelSelector:     &metav1.LabelSelector{},
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"/simple"},
+		}},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("labelKey"),
+		},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+		},
+	}, {
+		name: "key exists in both MatchLabelKeys and LabelSelector",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					// This one should be created from MatchLabelKeys.
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value2", "value3"},
+					},
+				},
+			},
+		}},
+		// TODO: This expected message is not perfect, and will be fixed in #129900.
+		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+		},
+	}, {
+		name: "key exists in both MatchLabelKeys and LabelSelector when AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23515,10 +23612,14 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			},
 		}},
 		wantFieldErrors: field.ErrorList{
-			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("overlappingKeys"),
+			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("duplicatedLabelKeys"),
+		},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
 		},
 	}, {
-		name: "key in MatchLabelKeys is forbidden to be specified when labelSelector is not set",
+		name: "key in MatchLabelKeys is forbidden to be specified when LabelSelector is not set",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23528,8 +23629,27 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Forbidden(fieldPathMatchLabelKeys, ""),
 		},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+		},
 	}, {
-		name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
+		name: "key in MatchLabelKeys is forbidden to be specified when LabelSelector is not set and AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+		}},
+		wantFieldErrors: field.ErrorList{
+			field.Forbidden(fieldPathMatchLabelKeys, ""),
+		},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+		},
+	}, {
+		name: "invalid MatchLabels set on LabelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23540,9 +23660,13 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Invalid(labelSelectorField.Child("matchLabels"), nil, "").WithOrigin("labelKey"),
 		},
-		opts: PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			AllowInvalidTopologySpreadConstraintLabelSelector:   false,
+		},
 	}, {
-		name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is true",
+		name: "invalid MatchLabels set on LabelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is true",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23551,9 +23675,13 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "foo"}},
 		}},
 		wantFieldErrors: nil,
-		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: true},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			AllowInvalidTopologySpreadConstraintLabelSelector:   true,
+		},
 	}, {
-		name: "valid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
+		name: "valid MatchLabels set on LabelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23562,8 +23690,187 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "foo"}},
 		}},
 		wantFieldErrors: nil,
-		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
-	}}
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			AllowInvalidTopologySpreadConstraintLabelSelector:   false,
+		},
+	}, {
+		name: "invalid MatchLabelKeys when OldPodViolatesMatchLabelKeysValidation is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					// This one should be created from MatchLabelKeys.
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value2", "value3"},
+					},
+				},
+			},
+		}},
+		// TODO: This expected message is not perfect, and will be fixed in #129900.
+		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			OldPodViolatesMatchLabelKeysValidation:              false,
+		},
+	}, {
+		name: "invalid MatchLabelKeys when OldPodViolatesMatchLabelKeysValidation is true",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					// This one should be created from MatchLabelKeys.
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value2", "value3"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Child("matchLabelKeys").Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			OldPodViolatesMatchLabelKeysValidation:              true,
+		},
+	}, {
+		name: "valid MatchLabelKeys when OldPodViolatesMatchLabelKeysValidation is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					// This one should be created from MatchLabelKeys.
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: nil,
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			OldPodViolatesMatchLabelKeysValidation:              false,
+		},
+	}, {
+		name: "invalid MatchLabelKeys when AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false and OldPodViolatesLegacyMatchLabelKeysValidation is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: field.ErrorList{field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+			OldPodViolatesLegacyMatchLabelKeysValidation:        false,
+		},
+	}, {
+		name: "invalid MatchLabelKeys when AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false and OldPodViolatesLegacyMatchLabelKeysValidation is true",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					// This one should be created from MatchLabelKeys.
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: nil,
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+			OldPodViolatesLegacyMatchLabelKeysValidation:        true,
+		},
+	}, {
+		name: "valid MatchLabelKeys when AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false and OldPodViolatesLegacyMatchLabelKeysValidation is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{},
+			},
+		}},
+		wantFieldErrors: nil,
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+			OldPodViolatesLegacyMatchLabelKeysValidation:        false,
+		},
+	}, {
+		name: "invalid MatchLabelKeys when AllowMatchLabelKeysInPodTopologySpread is false and AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is true",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value2", "value3"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Child("matchLabelKeys").Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              false,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+		},
+	},
+	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -25321,6 +25628,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	}
 
 	failureCases := map[string]*core.Pod{
+		"static pod with resource claim reference": goodClaimReference,
+		"static pod with resource claim template":  goodClaimTemplate,
 		"pod claim name with prefix": podtest.MakePod("",
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "../my-claim",
@@ -25450,7 +25759,14 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		}(),
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+		podMeta := shortPodName
+		if strings.HasPrefix(k, "static pod") {
+			podMeta = podMeta.DeepCopy()
+			podMeta.Annotations = map[string]string{
+				core.MirrorPodAnnotationKey: "True",
+			}
+		}
+		if errs := ValidatePodSpec(&v.Spec, podMeta, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}

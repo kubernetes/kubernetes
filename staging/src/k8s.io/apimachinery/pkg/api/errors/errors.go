@@ -438,7 +438,7 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 	message := fmt.Sprintf("the server responded with the status code %d but did not return more information", code)
 	switch code {
 	case http.StatusConflict:
-		if verb == "POST" {
+		if verb == http.MethodPost {
 			reason = metav1.StatusReasonAlreadyExists
 		} else {
 			reason = metav1.StatusReasonConflict

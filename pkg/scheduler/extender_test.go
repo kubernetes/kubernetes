@@ -343,6 +343,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				runtime.WithInformerFactory(informerFactory),
 				runtime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				runtime.WithLogger(logger),
+				runtime.WithSnapshotSharedLister(emptySnapshot),
 			)
 			if err != nil {
 				t.Fatal(err)

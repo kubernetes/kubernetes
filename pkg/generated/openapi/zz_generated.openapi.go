@@ -825,14 +825,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/networking/v1.ServiceCIDRList":                                                              schema_k8sio_api_networking_v1_ServiceCIDRList(ref),
 		"k8s.io/api/networking/v1.ServiceCIDRSpec":                                                              schema_k8sio_api_networking_v1_ServiceCIDRSpec(ref),
 		"k8s.io/api/networking/v1.ServiceCIDRStatus":                                                            schema_k8sio_api_networking_v1_ServiceCIDRStatus(ref),
-		"k8s.io/api/networking/v1alpha1.IPAddress":                                                              schema_k8sio_api_networking_v1alpha1_IPAddress(ref),
-		"k8s.io/api/networking/v1alpha1.IPAddressList":                                                          schema_k8sio_api_networking_v1alpha1_IPAddressList(ref),
-		"k8s.io/api/networking/v1alpha1.IPAddressSpec":                                                          schema_k8sio_api_networking_v1alpha1_IPAddressSpec(ref),
-		"k8s.io/api/networking/v1alpha1.ParentReference":                                                        schema_k8sio_api_networking_v1alpha1_ParentReference(ref),
-		"k8s.io/api/networking/v1alpha1.ServiceCIDR":                                                            schema_k8sio_api_networking_v1alpha1_ServiceCIDR(ref),
-		"k8s.io/api/networking/v1alpha1.ServiceCIDRList":                                                        schema_k8sio_api_networking_v1alpha1_ServiceCIDRList(ref),
-		"k8s.io/api/networking/v1alpha1.ServiceCIDRSpec":                                                        schema_k8sio_api_networking_v1alpha1_ServiceCIDRSpec(ref),
-		"k8s.io/api/networking/v1alpha1.ServiceCIDRStatus":                                                      schema_k8sio_api_networking_v1alpha1_ServiceCIDRStatus(ref),
 		"k8s.io/api/networking/v1beta1.HTTPIngressPath":                                                         schema_k8sio_api_networking_v1beta1_HTTPIngressPath(ref),
 		"k8s.io/api/networking/v1beta1.HTTPIngressRuleValue":                                                    schema_k8sio_api_networking_v1beta1_HTTPIngressRuleValue(ref),
 		"k8s.io/api/networking/v1beta1.IPAddress":                                                               schema_k8sio_api_networking_v1beta1_IPAddress(ref),
@@ -917,49 +909,13 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/rbac/v1beta1.RoleList":                                                                      schema_k8sio_api_rbac_v1beta1_RoleList(ref),
 		"k8s.io/api/rbac/v1beta1.RoleRef":                                                                       schema_k8sio_api_rbac_v1beta1_RoleRef(ref),
 		"k8s.io/api/rbac/v1beta1.Subject":                                                                       schema_k8sio_api_rbac_v1beta1_Subject(ref),
-		"k8s.io/api/resource/v1alpha3.AllocatedDeviceStatus":                                                    schema_k8sio_api_resource_v1alpha3_AllocatedDeviceStatus(ref),
-		"k8s.io/api/resource/v1alpha3.AllocationResult":                                                         schema_k8sio_api_resource_v1alpha3_AllocationResult(ref),
-		"k8s.io/api/resource/v1alpha3.BasicDevice":                                                              schema_k8sio_api_resource_v1alpha3_BasicDevice(ref),
 		"k8s.io/api/resource/v1alpha3.CELDeviceSelector":                                                        schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref),
-		"k8s.io/api/resource/v1alpha3.Counter":                                                                  schema_k8sio_api_resource_v1alpha3_Counter(ref),
-		"k8s.io/api/resource/v1alpha3.CounterSet":                                                               schema_k8sio_api_resource_v1alpha3_CounterSet(ref),
-		"k8s.io/api/resource/v1alpha3.Device":                                                                   schema_k8sio_api_resource_v1alpha3_Device(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceAllocationConfiguration":                                            schema_k8sio_api_resource_v1alpha3_DeviceAllocationConfiguration(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceAllocationResult":                                                   schema_k8sio_api_resource_v1alpha3_DeviceAllocationResult(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceAttribute":                                                          schema_k8sio_api_resource_v1alpha3_DeviceAttribute(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceClaim":                                                              schema_k8sio_api_resource_v1alpha3_DeviceClaim(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceClaimConfiguration":                                                 schema_k8sio_api_resource_v1alpha3_DeviceClaimConfiguration(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceClass":                                                              schema_k8sio_api_resource_v1alpha3_DeviceClass(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceClassConfiguration":                                                 schema_k8sio_api_resource_v1alpha3_DeviceClassConfiguration(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceClassList":                                                          schema_k8sio_api_resource_v1alpha3_DeviceClassList(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceClassSpec":                                                          schema_k8sio_api_resource_v1alpha3_DeviceClassSpec(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceConfiguration":                                                      schema_k8sio_api_resource_v1alpha3_DeviceConfiguration(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceConstraint":                                                         schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceCounterConsumption":                                                 schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumption(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceRequest":                                                            schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceRequestAllocationResult":                                            schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceSelector":                                                           schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceSubRequest":                                                         schema_k8sio_api_resource_v1alpha3_DeviceSubRequest(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceTaint":                                                              schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceTaintRule":                                                          schema_k8sio_api_resource_v1alpha3_DeviceTaintRule(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceTaintRuleList":                                                      schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleList(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceTaintRuleSpec":                                                      schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleSpec(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceTaintSelector":                                                      schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceToleration":                                                         schema_k8sio_api_resource_v1alpha3_DeviceToleration(ref),
-		"k8s.io/api/resource/v1alpha3.NetworkDeviceData":                                                        schema_k8sio_api_resource_v1alpha3_NetworkDeviceData(ref),
-		"k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration":                                                schema_k8sio_api_resource_v1alpha3_OpaqueDeviceConfiguration(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceClaim":                                                            schema_k8sio_api_resource_v1alpha3_ResourceClaim(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceClaimConsumerReference":                                           schema_k8sio_api_resource_v1alpha3_ResourceClaimConsumerReference(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceClaimList":                                                        schema_k8sio_api_resource_v1alpha3_ResourceClaimList(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceClaimSpec":                                                        schema_k8sio_api_resource_v1alpha3_ResourceClaimSpec(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceClaimStatus":                                                      schema_k8sio_api_resource_v1alpha3_ResourceClaimStatus(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceClaimTemplate":                                                    schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplate(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceClaimTemplateList":                                                schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateList(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceClaimTemplateSpec":                                                schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateSpec(ref),
-		"k8s.io/api/resource/v1alpha3.ResourcePool":                                                             schema_k8sio_api_resource_v1alpha3_ResourcePool(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceSlice":                                                            schema_k8sio_api_resource_v1alpha3_ResourceSlice(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceSliceList":                                                        schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref),
-		"k8s.io/api/resource/v1alpha3.ResourceSliceSpec":                                                        schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref),
 		"k8s.io/api/resource/v1beta1.AllocatedDeviceStatus":                                                     schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref),
 		"k8s.io/api/resource/v1beta1.AllocationResult":                                                          schema_k8sio_api_resource_v1beta1_AllocationResult(ref),
 		"k8s.io/api/resource/v1beta1.BasicDevice":                                                               schema_k8sio_api_resource_v1beta1_BasicDevice(ref),
@@ -1307,9 +1263,13 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-scheduler/config/v1.UtilizationShapePoint":                                                 schema_k8sio_kube_scheduler_config_v1_UtilizationShapePoint(ref),
 		"k8s.io/kube-scheduler/config/v1.VolumeBindingArgs":                                                     schema_k8sio_kube_scheduler_config_v1_VolumeBindingArgs(ref),
 		"k8s.io/kubectl/pkg/config/v1alpha1.AliasOverride":                                                      schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref),
-		"k8s.io/kubectl/pkg/config/v1alpha1.CommandOverride":                                                    schema_kubectl_pkg_config_v1alpha1_CommandOverride(ref),
-		"k8s.io/kubectl/pkg/config/v1alpha1.CommandOverrideFlag":                                                schema_kubectl_pkg_config_v1alpha1_CommandOverrideFlag(ref),
+		"k8s.io/kubectl/pkg/config/v1alpha1.CommandDefaults":                                                    schema_kubectl_pkg_config_v1alpha1_CommandDefaults(ref),
+		"k8s.io/kubectl/pkg/config/v1alpha1.CommandOptionDefault":                                               schema_kubectl_pkg_config_v1alpha1_CommandOptionDefault(ref),
 		"k8s.io/kubectl/pkg/config/v1alpha1.Preference":                                                         schema_kubectl_pkg_config_v1alpha1_Preference(ref),
+		"k8s.io/kubectl/pkg/config/v1beta1.AliasOverride":                                                       schema_kubectl_pkg_config_v1beta1_AliasOverride(ref),
+		"k8s.io/kubectl/pkg/config/v1beta1.CommandDefaults":                                                     schema_kubectl_pkg_config_v1beta1_CommandDefaults(ref),
+		"k8s.io/kubectl/pkg/config/v1beta1.CommandOptionDefault":                                                schema_kubectl_pkg_config_v1beta1_CommandOptionDefault(ref),
+		"k8s.io/kubectl/pkg/config/v1beta1.Preference":                                                          schema_kubectl_pkg_config_v1beta1_Preference(ref),
 		"k8s.io/kubelet/config/v1.CredentialProvider":                                                           schema_k8sio_kubelet_config_v1_CredentialProvider(ref),
 		"k8s.io/kubelet/config/v1.CredentialProviderConfig":                                                     schema_k8sio_kubelet_config_v1_CredentialProviderConfig(ref),
 		"k8s.io/kubelet/config/v1.ExecEnvVar":                                                                   schema_k8sio_kubelet_config_v1_ExecEnvVar(ref),
@@ -7949,7 +7909,7 @@ func schema_k8sio_api_apps_v1_RollingUpdateDaemonSet(ref common.ReferenceCallbac
 					},
 					"maxSurge": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption.",
+							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediately created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -9117,6 +9077,7 @@ func schema_k8sio_api_apps_v1beta1_ScaleSpec(ref common.ReferenceCallback) commo
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "replicas is the number of observed instances of the scaled object.",
+							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -10698,7 +10659,7 @@ func schema_k8sio_api_apps_v1beta2_RollingUpdateDaemonSet(ref common.ReferenceCa
 					},
 					"maxSurge": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption.",
+							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediately created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -10825,6 +10786,7 @@ func schema_k8sio_api_apps_v1beta2_ScaleSpec(ref common.ReferenceCallback) commo
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "desired number of instances for the scaled object.",
+							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -12391,13 +12353,13 @@ func schema_k8sio_api_authorization_v1_ResourceAttributes(ref common.ReferenceCa
 					},
 					"fieldSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.\n\nThis field  is alpha-level. To use this field, you must enable the `AuthorizeWithSelectors` feature gate (disabled by default).",
+							Description: "fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.",
 							Ref:         ref("k8s.io/api/authorization/v1.FieldSelectorAttributes"),
 						},
 					},
 					"labelSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.\n\nThis field  is alpha-level. To use this field, you must enable the `AuthorizeWithSelectors` feature gate (disabled by default).",
+							Description: "labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.",
 							Ref:         ref("k8s.io/api/authorization/v1.LabelSelectorAttributes"),
 						},
 					},
@@ -14477,6 +14439,7 @@ func schema_k8sio_api_autoscaling_v1_ScaleSpec(ref common.ReferenceCallback) com
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "replicas is the desired number of instances for the scaled object.",
+							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -17798,7 +17761,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					},
 					"backoffLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the number of retries before marking this job failed. Defaults to 6",
+							Description: "Specifies the number of retries before marking this job failed. Defaults to 6, unless backoffLimitPerIndex (only Indexed Job) is specified. When backoffLimitPerIndex is specified, backoffLimit defaults to 2147483647.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -17861,7 +17824,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					},
 					"podReplacementPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use. This is an beta field. To use this, enable the JobPodReplacementPolicy feature toggle. This is on by default.\n\nPossible enum values:\n - `\"Failed\"` means to wait until a previously created Pod is fully terminated (has phase Failed or Succeeded) before creating a replacement Pod.\n - `\"TerminatingOrFailed\"` means that we recreate pods when they are terminating (has a metadata.deletionTimestamp) or failed.",
+							Description: "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.\n\nPossible enum values:\n - `\"Failed\"` means to wait until a previously created Pod is fully terminated (has phase Failed or Succeeded) before creating a replacement Pod.\n - `\"TerminatingOrFailed\"` means that we recreate pods when they are terminating (has a metadata.deletionTimestamp) or failed.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"Failed", "TerminatingOrFailed"},
@@ -18194,7 +18157,7 @@ func schema_k8sio_api_batch_v1_SuccessPolicy(ref common.ReferenceCallback) commo
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "rules represents the list of alternative rules for the declaring the Jobs as successful before `.status.succeeded >= .spec.completions`. Once any of the rules are met, the \"SucceededCriteriaMet\" condition is added, and the lingering pods are removed. The terminal state for such a Job has the \"Complete\" condition. Additionally, these rules are evaluated in order; Once the Job meets one of the rules, other rules are ignored. At most 20 elements are allowed.",
+							Description: "rules represents the list of alternative rules for the declaring the Jobs as successful before `.status.succeeded >= .spec.completions`. Once any of the rules are met, the \"SuccessCriteriaMet\" condition is added, and the lingering pods are removed. The terminal state for such a Job has the \"Complete\" condition. Additionally, these rules are evaluated in order; Once the Job meets one of the rules, other rules are ignored. At most 20 elements are allowed.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -21537,7 +21500,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+							Description: "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -22644,7 +22607,7 @@ func schema_k8sio_api_core_v1_EnvFromSource(ref common.ReferenceCallback) common
 				Properties: map[string]spec.Schema{
 					"prefix": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Optional text to prepend to the name of each environment variable. Must be a C_IDENTIFIER.",
+							Description: "Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -22678,7 +22641,7 @@ func schema_k8sio_api_core_v1_EnvVar(ref common.ReferenceCallback) common.OpenAP
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name of the environment variable. Must be a C_IDENTIFIER.",
+							Description: "Name of the environment variable. May consist of any printable ASCII characters except '='.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -22846,7 +22809,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+							Description: "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -23154,7 +23117,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+							Description: "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -24029,7 +23992,7 @@ func schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"endpoints": {
 						SchemaProps: spec.SchemaProps{
-							Description: "endpoints is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+							Description: "endpoints is the endpoint name that details Glusterfs topology.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -27693,7 +27656,7 @@ func schema_k8sio_api_core_v1_PodAntiAffinity(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
+							Description: "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and subtracting \"weight\" from the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -28741,7 +28704,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"hostNetwork": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Host networking requested for this pod. Use the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false.",
+							Description: "Host networking requested for this pod. Use the host's network namespace. When using HostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -32457,7 +32420,7 @@ func schema_k8sio_api_core_v1_Taint(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"timeAdded": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
+							Description: "TimeAdded represents the time at which the taint was added.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
@@ -32836,13 +32799,13 @@ func schema_k8sio_api_core_v1_Volume(ref common.ReferenceCallback) common.OpenAP
 					},
 					"iscsi": {
 						SchemaProps: spec.SchemaProps{
-							Description: "iscsi represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://examples.k8s.io/volumes/iscsi/README.md",
+							Description: "iscsi represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes/#iscsi",
 							Ref:         ref("k8s.io/api/core/v1.ISCSIVolumeSource"),
 						},
 					},
 					"glusterfs": {
 						SchemaProps: spec.SchemaProps{
-							Description: "glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported. More info: https://examples.k8s.io/volumes/glusterfs/README.md",
+							Description: "glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported.",
 							Ref:         ref("k8s.io/api/core/v1.GlusterfsVolumeSource"),
 						},
 					},
@@ -32854,7 +32817,7 @@ func schema_k8sio_api_core_v1_Volume(ref common.ReferenceCallback) common.OpenAP
 					},
 					"rbd": {
 						SchemaProps: spec.SchemaProps{
-							Description: "rbd represents a Rados Block Device mount on the host that shares a pod's lifetime. Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported. More info: https://examples.k8s.io/volumes/rbd/README.md",
+							Description: "rbd represents a Rados Block Device mount on the host that shares a pod's lifetime. Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported.",
 							Ref:         ref("k8s.io/api/core/v1.RBDVolumeSource"),
 						},
 					},
@@ -33281,13 +33244,13 @@ func schema_k8sio_api_core_v1_VolumeSource(ref common.ReferenceCallback) common.
 					},
 					"iscsi": {
 						SchemaProps: spec.SchemaProps{
-							Description: "iscsi represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://examples.k8s.io/volumes/iscsi/README.md",
+							Description: "iscsi represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes/#iscsi",
 							Ref:         ref("k8s.io/api/core/v1.ISCSIVolumeSource"),
 						},
 					},
 					"glusterfs": {
 						SchemaProps: spec.SchemaProps{
-							Description: "glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported. More info: https://examples.k8s.io/volumes/glusterfs/README.md",
+							Description: "glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported.",
 							Ref:         ref("k8s.io/api/core/v1.GlusterfsVolumeSource"),
 						},
 					},
@@ -33299,7 +33262,7 @@ func schema_k8sio_api_core_v1_VolumeSource(ref common.ReferenceCallback) common.
 					},
 					"rbd": {
 						SchemaProps: spec.SchemaProps{
-							Description: "rbd represents a Rados Block Device mount on the host that shares a pod's lifetime. Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported. More info: https://examples.k8s.io/volumes/rbd/README.md",
+							Description: "rbd represents a Rados Block Device mount on the host that shares a pod's lifetime. Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported.",
 							Ref:         ref("k8s.io/api/core/v1.RBDVolumeSource"),
 						},
 					},
@@ -36738,7 +36701,7 @@ func schema_k8sio_api_extensions_v1beta1_RollingUpdateDaemonSet(ref common.Refer
 					},
 					"maxSurge": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption. This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.",
+							Description: "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediately created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption. This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.",
 							Ref:         ref("k8s.io/apimachinery/pkg/util/intstr.IntOrString"),
 						},
 					},
@@ -36837,6 +36800,7 @@ func schema_k8sio_api_extensions_v1beta1_ScaleSpec(ref common.ReferenceCallback)
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "desired number of instances for the scaled object.",
+							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -42337,7 +42301,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicySpec(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"podSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.",
+							Description: "podSelector selects the pods to which this NetworkPolicy object applies. The array of rules is applied to any pods selected by this field. An empty selector matches all pods in the policy's namespace. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is optional. If it is not specified, it defaults to an empty selector.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"),
 						},
@@ -42402,7 +42366,6 @@ func schema_k8sio_api_networking_v1_NetworkPolicySpec(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"podSelector"},
 			},
 		},
 		Dependencies: []string{
@@ -42619,337 +42582,6 @@ func schema_k8sio_api_networking_v1_ServiceCIDRSpec(ref common.ReferenceCallback
 }
 
 func schema_k8sio_api_networking_v1_ServiceCIDRStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ServiceCIDRStatus describes the current state of the ServiceCIDR.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"conditions": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"type",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "type",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "conditions holds an array of metav1.Condition that describe the state of the ServiceCIDR. Current service state",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
-	}
-}
-
-func schema_k8sio_api_networking_v1alpha1_IPAddress(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "IPAddress represents a single IP of a single IP Family. The object is designed to be used by APIs that operate on IP addresses. The object is used by the Service core API for allocation of IP addresses. An IP address can be represented in different formats, to guarantee the uniqueness of the IP, the name of the object is the IP address in canonical format, four decimal digits separated by dots suppressing leading zeros for IPv4 and the representation defined by RFC 5952 for IPv6. Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1 Invalid: 10.01.2.3 or 2001:db8:0:0:0::1",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "spec is the desired state of the IPAddress. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/networking/v1alpha1.IPAddressSpec"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/networking/v1alpha1.IPAddressSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
-	}
-}
-
-func schema_k8sio_api_networking_v1alpha1_IPAddressList(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "IPAddressList contains a list of IPAddress.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "items is the list of IPAddresses.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/networking/v1alpha1.IPAddress"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/networking/v1alpha1.IPAddress", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
-	}
-}
-
-func schema_k8sio_api_networking_v1alpha1_IPAddressSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "IPAddressSpec describe the attributes in an IP Address.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"parentRef": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ParentRef references the resource that an IPAddress is attached to. An IPAddress must reference a parent object.",
-							Ref:         ref("k8s.io/api/networking/v1alpha1.ParentReference"),
-						},
-					},
-				},
-				Required: []string{"parentRef"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/networking/v1alpha1.ParentReference"},
-	}
-}
-
-func schema_k8sio_api_networking_v1alpha1_ParentReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ParentReference describes a reference to a parent object.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"group": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Group is the group of the object being referenced.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"resource": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Resource is the resource of the object being referenced.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"namespace": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Namespace is the namespace of the object being referenced.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name is the name of the object being referenced.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"resource", "name"},
-			},
-		},
-	}
-}
-
-func schema_k8sio_api_networking_v1alpha1_ServiceCIDR(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64). This range is used to allocate ClusterIPs to Service objects.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "spec is the desired state of the ServiceCIDR. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/networking/v1alpha1.ServiceCIDRSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "status represents the current state of the ServiceCIDR. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/networking/v1alpha1.ServiceCIDRStatus"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/networking/v1alpha1.ServiceCIDRSpec", "k8s.io/api/networking/v1alpha1.ServiceCIDRStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
-	}
-}
-
-func schema_k8sio_api_networking_v1alpha1_ServiceCIDRList(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ServiceCIDRList contains a list of ServiceCIDR objects.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "items is the list of ServiceCIDRs.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/networking/v1alpha1.ServiceCIDR"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/networking/v1alpha1.ServiceCIDR", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
-	}
-}
-
-func schema_k8sio_api_networking_v1alpha1_ServiceCIDRSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"cidrs": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. The network address of each CIDR, the address that identifies the subnet of a host, is reserved and will not be allocated. The broadcast address for IPv4 CIDRs is also reserved and will not be allocated. This field is immutable.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func schema_k8sio_api_networking_v1alpha1_ServiceCIDRStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -47190,210 +46822,6 @@ func schema_k8sio_api_rbac_v1beta1_Subject(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha3_AllocatedDeviceStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"driver": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"pool": {
-						SchemaProps: spec.SchemaProps{
-							Description: "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"device": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"conditions": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"type",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.\n\nMust not contain more than 8 entries.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
-									},
-								},
-							},
-						},
-					},
-					"data": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Data contains arbitrary driver-specific data.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
-						},
-					},
-					"networkData": {
-						SchemaProps: spec.SchemaProps{
-							Description: "NetworkData contains network-related information specific to the device.",
-							Ref:         ref("k8s.io/api/resource/v1alpha3.NetworkDeviceData"),
-						},
-					},
-				},
-				Required: []string{"driver", "pool", "device"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.NetworkDeviceData", "k8s.io/apimachinery/pkg/apis/meta/v1.Condition", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_AllocationResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "AllocationResult contains attributes of an allocated resource.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"devices": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Devices is the result of allocating devices.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha3.DeviceAllocationResult"),
-						},
-					},
-					"nodeSelector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "NodeSelector defines where the allocated resources are available. If unset, they are available everywhere.",
-							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.DeviceAllocationResult"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "BasicDevice defines one device instance.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"attributes": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceAttribute"),
-									},
-								},
-							},
-						},
-					},
-					"capacity": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
-									},
-								},
-							},
-						},
-					},
-					"consumesCounters": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe total number of device counter consumption entries must be <= 32. In addition, the total number in the entire ResourceSlice must be <= 1024 (for example, 64 devices with 16 counters each).",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceCounterConsumption"),
-									},
-								},
-							},
-						},
-					},
-					"nodeName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"nodeSelector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "NodeSelector defines the nodes where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
-							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
-						},
-					},
-					"allNodes": {
-						SchemaProps: spec.SchemaProps{
-							Description: "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"taints": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceTaint"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/api/resource/v1alpha3.DeviceCounterConsumption", "k8s.io/api/resource/v1alpha3.DeviceTaint", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
-	}
-}
-
 func schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -47416,807 +46844,6 @@ func schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha3_Counter(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Counter describes a quantity associated with a device.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"value": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Value defines how much of a certain device counter is available.",
-							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
-						},
-					},
-				},
-				Required: []string{"value"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_CounterSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "CounterSet defines a named set of counters that are available to be used by devices defined in the ResourceSlice.\n\nThe counters are not allocatable by themselves, but can be referenced by devices. When a device is allocated, the portion of counters it uses will no longer be available for use by other devices.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "CounterSet is the name of the set from which the counters defined will be consumed.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"counters": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Counters defines the counters that will be consumed by the device. The name of each counter must be unique in that set and must be a DNS label.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of counters is 32.",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.Counter"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"name", "counters"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.Counter"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_Device(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Device represents one individual hardware instance that can be selected based on its attributes. Besides the name, exactly one field must be set.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"basic": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Basic defines one device instance.",
-							Ref:         ref("k8s.io/api/resource/v1alpha3.BasicDevice"),
-						},
-					},
-				},
-				Required: []string{"name"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.BasicDevice"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceAllocationConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceAllocationConfiguration gets embedded in an AllocationResult.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"source": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"requests": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-					"opaque": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Opaque provides driver-specific configuration parameters.",
-							Ref:         ref("k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration"),
-						},
-					},
-				},
-				Required: []string{"source"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceAllocationResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceAllocationResult is the result of allocating devices.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"results": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Results lists all allocated devices.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceRequestAllocationResult"),
-									},
-								},
-							},
-						},
-					},
-					"config": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "This field is a combination of all the claim and class configuration parameters. Drivers can distinguish between those based on a flag.\n\nThis includes configuration parameters for drivers which have no allocated devices in the result because it is up to the drivers which configuration parameters they support. They can silently ignore unknown configuration parameters.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceAllocationConfiguration"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceAllocationConfiguration", "k8s.io/api/resource/v1alpha3.DeviceRequestAllocationResult"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceAttribute(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceAttribute must have exactly one field set.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"int": {
-						SchemaProps: spec.SchemaProps{
-							Description: "IntValue is a number.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"bool": {
-						SchemaProps: spec.SchemaProps{
-							Description: "BoolValue is a true/false value.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"string": {
-						SchemaProps: spec.SchemaProps{
-							Description: "StringValue is a string. Must not be longer than 64 characters.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"version": {
-						SchemaProps: spec.SchemaProps{
-							Description: "VersionValue is a semantic version according to semver.org spec 2.0.0. Must not be longer than 64 characters.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceClaim defines how to request devices with a ResourceClaim.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"requests": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Requests represent individual requests for distinct devices which must all be satisfied. If empty, nothing needs to be allocated.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceRequest"),
-									},
-								},
-							},
-						},
-					},
-					"constraints": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "These constraints must be satisfied by the set of devices that get allocated for the claim.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceConstraint"),
-									},
-								},
-							},
-						},
-					},
-					"config": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "This field holds configuration for multiple potential drivers which could satisfy requests in this claim. It is ignored while allocating the claim.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceClaimConfiguration"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceClaimConfiguration", "k8s.io/api/resource/v1alpha3.DeviceConstraint", "k8s.io/api/resource/v1alpha3.DeviceRequest"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceClaimConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"requests": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-					"opaque": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Opaque provides driver-specific configuration parameters.",
-							Ref:         ref("k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceClass is a vendor- or admin-provided resource that contains device configuration and selectors. It can be referenced in the device requests of a claim to apply these presets. Cluster scoped.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines what can be allocated and how to configure it.\n\nThis is mutable. Consumers have to be prepared for classes changing at any time, either because they get updated or replaced. Claim allocations are done once based on whatever was set in classes at the time of allocation.\n\nChanging the spec automatically increments the metadata.generation number.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha3.DeviceClassSpec"),
-						},
-					},
-				},
-				Required: []string{"spec"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceClassSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceClassConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceClassConfiguration is used in DeviceClass.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"opaque": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Opaque provides driver-specific configuration parameters.",
-							Ref:         ref("k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceClassList(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceClassList is a collection of classes.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of resource classes.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceClass"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceClass", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceClassSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceClassSpec is used in a [DeviceClass] to define what can be allocated and how to configure it.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"selectors": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Each selector must be satisfied by a device which is claimed via this class.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceSelector"),
-									},
-								},
-							},
-						},
-					},
-					"config": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceClassConfiguration"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceClassConfiguration", "k8s.io/api/resource/v1alpha3.DeviceSelector"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceConfiguration must have exactly one field set. It gets embedded inline in some other structs which have other fields, so field names must not conflict with those.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"opaque": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Opaque provides driver-specific configuration parameters.",
-							Ref:         ref("k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceConstraint must have exactly one field set besides Requests.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"requests": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the constraint applies to all subrequests.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-					"matchAttribute": {
-						SchemaProps: spec.SchemaProps{
-							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumption(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"counterSet": {
-						SchemaProps: spec.SchemaProps{
-							Description: "CounterSet defines the set from which the counters defined will be consumed.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"counters": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Counters defines the Counter that will be consumed by the device.\n\nThe maximum number counters in a device is 32. In addition, the maximum number of all counters in all devices is 1024 (for example, 64 devices with 16 counters each).",
-							Type:        []string{"object"},
-							AdditionalProperties: &spec.SchemaOrBool{
-								Allows: true,
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.Counter"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"counterSet", "counters"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.Counter"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name can be used to reference this request in a pod.spec.containers[].resources.claims entry and in a constraint of the claim.\n\nMust be a DNS label.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"deviceClassName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required if no subrequests are specified in the firstAvailable list and no class can be set if subrequests are specified in the firstAvailable list. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"selectors": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceSelector"),
-									},
-								},
-							},
-						},
-					},
-					"allocationMode": {
-						SchemaProps: spec.SchemaProps{
-							Description: "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  At least one device must exist on the node for the allocation to succeed.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AllocationMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"count": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"adminAccess": {
-						SchemaProps: spec.SchemaProps{
-							Description: "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"firstAvailable": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "FirstAvailable contains subrequests, of which exactly one will be satisfied by the scheduler to satisfy this request. It tries to satisfy them in the order in which they are listed here. So if there are two entries in the list, the scheduler will only check the second one if it determines that the first one cannot be used.\n\nThis field may only be set in the entries of DeviceClaim.Requests.\n\nDRA does not yet implement scoring, so the scheduler will select the first set of devices that satisfies all the requests in the claim. And if the requirements can be satisfied on more than one node, other scheduling features will determine which node is chosen. This means that the set of devices allocated to a claim might not be the optimal set available to the cluster. Scoring will be implemented later.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceSubRequest"),
-									},
-								},
-							},
-						},
-					},
-					"tolerations": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceToleration"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"name"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceSelector", "k8s.io/api/resource/v1alpha3.DeviceSubRequest", "k8s.io/api/resource/v1alpha3.DeviceToleration"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceRequestAllocationResult contains the allocation result for one request.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"request": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Request is the name of the request in the claim which caused this device to be allocated. If it references a subrequest in the firstAvailable list on a DeviceRequest, this field must include both the name of the main request and the subrequest using the format <main request>/<subrequest>.\n\nMultiple devices may have been allocated per request.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"driver": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"pool": {
-						SchemaProps: spec.SchemaProps{
-							Description: "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"device": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"adminAccess": {
-						SchemaProps: spec.SchemaProps{
-							Description: "AdminAccess indicates that this device was allocated for administrative access. See the corresponding request field for a definition of mode.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"tolerations": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceToleration"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"request", "driver", "pool", "device"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceToleration"},
-	}
-}
-
 func schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -48235,90 +46862,6 @@ func schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref common.ReferenceCallb
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1alpha3.CELDeviceSelector"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceSubRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceSubRequest describes a request for device provided in the claim.spec.devices.requests[].firstAvailable array. Each is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nDeviceSubRequest is similar to Request, but doesn't expose the AdminAccess or FirstAvailable fields, as those can only be set on the top-level request. AdminAccess is not supported for requests with a prioritized list, and recursive FirstAvailable fields are not supported.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name can be used to reference this subrequest in the list of constraints or the list of configurations for the claim. References must use the format <main request>/<subrequest>.\n\nMust be a DNS label.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"deviceClassName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this subrequest.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"selectors": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceSelector"),
-									},
-								},
-							},
-						},
-					},
-					"allocationMode": {
-						SchemaProps: spec.SchemaProps{
-							Description: "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AllocationMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"count": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"tolerations": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceToleration"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"name", "deviceClassName"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceSelector", "k8s.io/api/resource/v1alpha3.DeviceToleration"},
 	}
 }
 
@@ -48551,726 +47094,6 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref common.Reference
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1alpha3.DeviceSelector"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceToleration(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "The ResourceClaim this DeviceToleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"key": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys. Must be a label name.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"operator": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a ResourceClaim can tolerate all taints of a particular category.\n\n\nPossible enum values:\n - `\"Equal\"`\n - `\"Exists\"`",
-							Default:     "Equal",
-							Type:        []string{"string"},
-							Format:      "",
-							Enum:        []interface{}{"Equal", "Exists"},
-						},
-					},
-					"value": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Value is the taint value the toleration matches to. If the operator is Exists, the value must be empty, otherwise just a regular string. Must be a label value.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"effect": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
-							Type:        []string{"string"},
-							Format:      "",
-							Enum:        []interface{}{"NoExecute", "NoSchedule"},
-						},
-					},
-					"tolerationSeconds": {
-						SchemaProps: spec.SchemaProps{
-							Description: "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system. If larger than zero, the time when the pod needs to be evicted is calculated as <time when taint was adedd> + <toleration seconds>.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_NetworkDeviceData(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "NetworkDeviceData provides network-related details for the allocated device. This information may be filled by drivers or other components to configure or identify the device within a network context.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"interfaceName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "InterfaceName specifies the name of the network interface associated with the allocated device. This might be the name of a physical or virtual network interface being configured in the pod.\n\nMust not be longer than 256 characters.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"ips": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "IPs lists the network addresses assigned to the device's network interface. This can include both IPv4 and IPv6 addresses. The IPs are in the CIDR notation, which includes both the address and the associated subnet mask. e.g.: \"192.0.2.5/24\" for IPv4 and \"2001:db8::5/64\" for IPv6.\n\nMust not contain more than 16 entries.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-									},
-								},
-							},
-						},
-					},
-					"hardwareAddress": {
-						SchemaProps: spec.SchemaProps{
-							Description: "HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.\n\nMust not be longer than 128 characters.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_OpaqueDeviceConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "OpaqueDeviceConfiguration contains configuration parameters for a driver in a format defined by the driver vendor.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"driver": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Driver is used to determine which kubelet plugin needs to be passed these configuration parameters.\n\nAn admission policy provided by the driver developer could use this to decide whether it needs to validate them.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"parameters": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Parameters can contain arbitrary data. It is the responsibility of the driver developer to handle validation and versioning. Typically this includes self-identification and a version (\"kind\" + \"apiVersion\" for Kubernetes types), with conversion between different versions.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
-						},
-					},
-				},
-				Required: []string{"driver", "parameters"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.RawExtension"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaim describes a request for access to resources in the cluster, for use by workloads. For example, if a workload needs an accelerator device with specific properties, this is how that request is expressed. The status stanza tracks whether this claim has been satisfied and what specific resources have been allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec describes what is being requested and how to configure it. The spec is immutable.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimSpec"),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Status describes whether the claim is ready to use and what has been allocated.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimStatus"),
-						},
-					},
-				},
-				Required: []string{"spec"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.ResourceClaimSpec", "k8s.io/api/resource/v1alpha3.ResourceClaimStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceClaimConsumerReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaimConsumerReference contains enough information to let you locate the consumer of a ResourceClaim. The user must be a resource in the same namespace as the ResourceClaim.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"apiGroup": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIGroup is the group for the resource being referenced. It is empty for the core API. This matches the group in the APIVersion that is used when creating the resources.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"resource": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Resource is the type of resource being referenced, for example \"pods\".",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name is the name of resource being referenced.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"uid": {
-						SchemaProps: spec.SchemaProps{
-							Description: "UID identifies exactly one incarnation of the resource.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-				},
-				Required: []string{"resource", "name", "uid"},
-			},
-		},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceClaimList(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaimList is a collection of claims.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of resource claims.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceClaim"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.ResourceClaim", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceClaimSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaimSpec defines what is being requested in a ResourceClaim and how to configure it.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"devices": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Devices defines how to request devices.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha3.DeviceClaim"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceClaim"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaimStatus tracks whether the resource has been allocated and what the result of that was.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"allocation": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Allocation is set once the claim has been allocated successfully.",
-							Ref:         ref("k8s.io/api/resource/v1alpha3.AllocationResult"),
-						},
-					},
-					"reservedFor": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"uid",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "uid",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "ReservedFor indicates which entities are currently allowed to use the claim. A Pod which references a ResourceClaim which is not reserved for that Pod will not be started. A claim that is in use or might be in use because it has been reserved must not get deallocated.\n\nIn a cluster with multiple scheduler instances, two pods might get scheduled concurrently by different schedulers. When they reference the same ResourceClaim which already has reached its maximum number of consumers, only one pod can be scheduled.\n\nBoth schedulers try to add their pod to the claim.status.reservedFor field, but only the update that reaches the API server first gets stored. The other one fails with an error and the scheduler which issued it knows that it must put the pod back into the queue, waiting for the ResourceClaim to become usable again.\n\nThere can be at most 256 such reservations. This may get increased in the future, but not reduced.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceClaimConsumerReference"),
-									},
-								},
-							},
-						},
-					},
-					"devices": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"driver",
-									"device",
-									"pool",
-								},
-								"x-kubernetes-list-type": "map",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Devices contains the status of each device allocated for this claim, as reported by the driver. This can include driver-specific information. Entries are owned by their respective drivers.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.AllocatedDeviceStatus"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.AllocatedDeviceStatus", "k8s.io/api/resource/v1alpha3.AllocationResult", "k8s.io/api/resource/v1alpha3.ResourceClaimConsumerReference"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaimTemplate is used to produce ResourceClaim objects.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Describes the ResourceClaim that is to be generated.\n\nThis field is immutable. A ResourceClaim will get created by the control plane for a Pod when needed and then not get updated anymore.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimTemplateSpec"),
-						},
-					},
-				},
-				Required: []string{"spec"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.ResourceClaimTemplateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateList(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaimTemplateList is a collection of claim templates.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of resource claim templates.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceClaimTemplate"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.ResourceClaimTemplate", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ObjectMeta may contain labels and annotations that will be copied into the ResourceClaim when creating it. No other fields are allowed and will be rejected during validation.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Spec for the ResourceClaim. The entire content is copied unchanged into the ResourceClaim that gets created from this template. The same fields as in a ResourceClaim are also valid here.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimSpec"),
-						},
-					},
-				},
-				Required: []string{"spec"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.ResourceClaimSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourcePool(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourcePool describes the pool that ResourceSlices belong to.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name is used to identify the pool. For node-local devices, this is often the node name, but this is not required.\n\nIt must not be longer than 253 characters and must consist of one or more DNS sub-domains separated by slashes. This field is immutable.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"generation": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Generation tracks the change in a pool over time. Whenever a driver changes something about one or more of the resources in a pool, it must change the generation in all ResourceSlices which are part of that pool. Consumers of ResourceSlices should only consider resources from the pool with the highest generation number. The generation may be reset by drivers, which should be fine for consumers, assuming that all ResourceSlices in a pool are updated to match or deleted.\n\nCombined with ResourceSliceCount, this mechanism enables consumers to detect pools which are comprised of multiple ResourceSlices and are in an incomplete state.",
-							Default:     0,
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"resourceSliceCount": {
-						SchemaProps: spec.SchemaProps{
-							Description: "ResourceSliceCount is the total number of ResourceSlices in the pool at this generation number. Must be greater than zero.\n\nConsumers can use this to check whether they have seen all ResourceSlices belonging to the same pool.",
-							Default:     0,
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-				},
-				Required: []string{"name", "generation", "resourceSliceCount"},
-			},
-		},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceSlice(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceSlice represents one or more resources in a pool of similar resources, managed by a common driver. A pool may span more than one ResourceSlice, and exactly how many ResourceSlices comprise a pool is determined by the driver.\n\nAt the moment, the only supported resources are devices with attributes and capacities. Each device in a given pool, regardless of how many ResourceSlices, must have a unique name. The ResourceSlice in which a device gets published may change over time. The unique identifier for a device is the tuple <driver name>, <pool name>, <device name>.\n\nWhenever a driver needs to update a pool, it increments the pool.Spec.Pool.Generation number and updates all ResourceSlices with that new number and new resource definitions. A consumer must only use ResourceSlices with the highest generation number and ignore all others.\n\nWhen allocating all resources in a pool matching certain criteria or when looking for the best solution among several different alternatives, a consumer should check the number of ResourceSlices in a pool (included in each ResourceSlice) to determine whether its view of a pool is complete and if not, should wait until the driver has completed updating the pool.\n\nFor resources that are not local to a node, the node name is not set. Instead, the driver may use a node selector to specify where the devices are available.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
-						},
-					},
-					"spec": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Contains the information published by the driver.\n\nChanging the spec automatically increments the metadata.generation number.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceSliceSpec"),
-						},
-					},
-				},
-				Required: []string{"spec"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.ResourceSliceSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceSliceList is a collection of ResourceSlices.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"apiVersion": {
-						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard list metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
-						},
-					},
-					"items": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of resource ResourceSlices.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceSlice"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"items"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.ResourceSlice", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"driver": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"pool": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Pool describes the pool that this ResourceSlice belongs to.",
-							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourcePool"),
-						},
-					},
-					"nodeName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set. This field is immutable.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"nodeSelector": {
-						SchemaProps: spec.SchemaProps{
-							Description: "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
-							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
-						},
-					},
-					"allNodes": {
-						SchemaProps: spec.SchemaProps{
-							Description: "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"devices": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.Device"),
-									},
-								},
-							},
-						},
-					},
-					"perDeviceNodeSelection": {
-						SchemaProps: spec.SchemaProps{
-							Description: "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"sharedCounters": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of SharedCounters is 32.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha3.CounterSet"),
-									},
-								},
-							},
-						},
-					},
-				},
-				Required: []string{"driver", "pool"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.CounterSet", "k8s.io/api/resource/v1alpha3.Device", "k8s.io/api/resource/v1alpha3.ResourcePool"},
 	}
 }
 
@@ -53575,7 +51398,7 @@ func schema_k8sio_api_storage_v1_CSIDriverSpec(ref common.ReferenceCallback) com
 				Properties: map[string]spec.Schema{
 					"attachRequired": {
 						SchemaProps: spec.SchemaProps{
-							Description: "attachRequired indicates this CSI volume driver requires an attach operation (because it implements the CSI ControllerPublishVolume() method), and that the Kubernetes attach detach controller should call the attach volume interface which checks the volumeattachment status and waits until the volume is attached before proceeding to mounting. The CSI external-attacher coordinates with CSI volume driver and updates the volumeattachment status when the attach operation is complete. If the CSIDriverRegistry feature gate is enabled and the value is specified to false, the attach operation will be skipped. Otherwise the attach operation will be called.\n\nThis field is immutable.",
+							Description: "attachRequired indicates this CSI volume driver requires an attach operation (because it implements the CSI ControllerPublishVolume() method), and that the Kubernetes attach detach controller should call the attach volume interface which checks the volumeattachment status and waits until the volume is attached before proceeding to mounting. The CSI external-attacher coordinates with CSI volume driver and updates the volumeattachment status when the attach operation is complete. If the value is specified to false, the attach operation will be skipped. Otherwise the attach operation will be called.\n\nThis field is immutable.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -55041,7 +52864,7 @@ func schema_k8sio_api_storage_v1beta1_CSIDriverSpec(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"attachRequired": {
 						SchemaProps: spec.SchemaProps{
-							Description: "attachRequired indicates this CSI volume driver requires an attach operation (because it implements the CSI ControllerPublishVolume() method), and that the Kubernetes attach detach controller should call the attach volume interface which checks the volumeattachment status and waits until the volume is attached before proceeding to mounting. The CSI external-attacher coordinates with CSI volume driver and updates the volumeattachment status when the attach operation is complete. If the CSIDriverRegistry feature gate is enabled and the value is specified to false, the attach operation will be skipped. Otherwise the attach operation will be called.\n\nThis field is immutable.",
+							Description: "attachRequired indicates this CSI volume driver requires an attach operation (because it implements the CSI ControllerPublishVolume() method), and that the Kubernetes attach detach controller should call the attach volume interface which checks the volumeattachment status and waits until the volume is attached before proceeding to mounting. The CSI external-attacher coordinates with CSI volume driver and updates the volumeattachment status when the attach operation is complete. If the value is specified to false, the attach operation will be skipped. Otherwise the attach operation will be called.\n\nThis field is immutable.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -67078,7 +64901,7 @@ func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is the name of alias that can only include alphabetical characters If the alias name conflicts with the built-in command, built-in command will be used.",
+							Description: "name is the name of alias that can only include alphabetical characters If the alias name conflicts with the built-in command, built-in command will be used.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -67086,7 +64909,7 @@ func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallba
 					},
 					"command": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Command is the single or set of commands to execute, such as \"set env\" or \"create\"",
+							Description: "command is the single or set of commands to execute, such as \"set env\" or \"create\"",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -67099,7 +64922,7 @@ func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallba
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "PrependArgs stores the arguments such as resource names, etc. These arguments are inserted after the alias name.",
+							Description: "prependArgs stores the arguments such as resource names, etc. These arguments are inserted after the alias name.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -67119,7 +64942,7 @@ func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallba
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "AppendArgs stores the arguments such as resource names, etc. These arguments are appended to the USER_ARGS.",
+							Description: "appendArgs stores the arguments such as resource names, etc. These arguments are appended to the USER_ARGS.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -67139,13 +64962,13 @@ func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallba
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Flag is allocated to store the flag definitions of alias. Flag only modifies the default value of the flag and if user explicitly passes a value, explicit one is used.",
+							Description: "flags is allocated to store the flag definitions of alias. flags only modifies the default value of the flag and if user explicitly passes a value, explicit one is used.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.CommandOverrideFlag"),
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.CommandOptionDefault"),
 									},
 								},
 							},
@@ -67156,20 +64979,20 @@ func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallba
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kubectl/pkg/config/v1alpha1.CommandOverrideFlag"},
+			"k8s.io/kubectl/pkg/config/v1alpha1.CommandOptionDefault"},
 	}
 }
 
-func schema_kubectl_pkg_config_v1alpha1_CommandOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_kubectl_pkg_config_v1alpha1_CommandDefaults(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CommandOverride stores the commands and their associated flag's default values.",
+				Description: "CommandDefaults stores the commands and their associated option's default values.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"command": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Command refers to a command whose flag's default value is changed.",
+							Description: "command refers to a command whose flag's default value is changed.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -67182,13 +65005,13 @@ func schema_kubectl_pkg_config_v1alpha1_CommandOverride(ref common.ReferenceCall
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Flags is a list of flags storing different default values.",
+							Description: "flags is a list of flags storing different default values.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.CommandOverrideFlag"),
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.CommandOptionDefault"),
 									},
 								},
 							},
@@ -67199,15 +65022,15 @@ func schema_kubectl_pkg_config_v1alpha1_CommandOverride(ref common.ReferenceCall
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kubectl/pkg/config/v1alpha1.CommandOverrideFlag"},
+			"k8s.io/kubectl/pkg/config/v1alpha1.CommandOptionDefault"},
 	}
 }
 
-func schema_kubectl_pkg_config_v1alpha1_CommandOverrideFlag(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_kubectl_pkg_config_v1alpha1_CommandOptionDefault(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "CommandOverrideFlag stores the name and the specified default value of the flag.",
+				Description: "CommandOptionDefault stores the name and the specified default value of an option.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -67267,7 +65090,7 @@ func schema_kubectl_pkg_config_v1alpha1_Preference(ref common.ReferenceCallback)
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.CommandOverride"),
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1alpha1.CommandDefaults"),
 									},
 								},
 							},
@@ -67280,7 +65103,7 @@ func schema_kubectl_pkg_config_v1alpha1_Preference(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "aliases allows defining command aliases for existing kubectl commands, with optional default flag values. If the alias name collides with a built-in command, built-in command always takes precedence. Flag overrides defined in the overrides section do NOT apply to aliases for the same command. kubectl [ALIAS NAME] [USER_FLAGS] [USER_EXPLICIT_ARGS] expands to kubectl [COMMAND] # built-in command alias points to\n        [KUBERC_PREPEND_ARGS]\n        [USER_FLAGS]\n        [KUBERC_FLAGS] # rest of the flags that are not passed by user in [USER_FLAGS]\n        [USER_EXPLICIT_ARGS]\n        [KUBERC_APPEND_ARGS]\ne.g. - name: runx\n  command: run\n  flags:\n  - name: image\n    default: nginx\n  appendArgs:\n  - --\n  - custom-arg1\nFor example, if user invokes \"kubectl runx test-pod\" command, this will be expanded to \"kubectl run --image=nginx test-pod -- custom-arg1\" - name: getn\n  command: get\n  flags:\n  - name: output\n    default: wide\n  prependArgs:\n  - node\n\"kubectl getn control-plane-1\" expands to \"kubectl get node control-plane-1 --output=wide\" \"kubectl getn control-plane-1 --output=json\" expands to \"kubectl get node --output=json control-plane-1\"",
+							Description: "aliases allow defining command aliases for existing kubectl commands, with optional default flag values. If the alias name collides with a built-in command, built-in command always takes precedence. Flag overrides defined in the overrides section do NOT apply to aliases for the same command. kubectl [ALIAS NAME] [USER_FLAGS] [USER_EXPLICIT_ARGS] expands to kubectl [COMMAND] # built-in command alias points to\n        [KUBERC_PREPEND_ARGS]\n        [USER_FLAGS]\n        [KUBERC_FLAGS] # rest of the flags that are not passed by user in [USER_FLAGS]\n        [USER_EXPLICIT_ARGS]\n        [KUBERC_APPEND_ARGS]\ne.g. - name: runx\n  command: run\n  flags:\n  - name: image\n    default: nginx\n  appendArgs:\n  - --\n  - custom-arg1\nFor example, if user invokes \"kubectl runx test-pod\" command, this will be expanded to \"kubectl run --image=nginx test-pod -- custom-arg1\" - name: getn\n  command: get\n  flags:\n  - name: output\n    default: wide\n  prependArgs:\n  - node\n\"kubectl getn control-plane-1\" expands to \"kubectl get node control-plane-1 --output=wide\" \"kubectl getn control-plane-1 --output=json\" expands to \"kubectl get node --output=json control-plane-1\"",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -67297,7 +65120,239 @@ func schema_kubectl_pkg_config_v1alpha1_Preference(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kubectl/pkg/config/v1alpha1.AliasOverride", "k8s.io/kubectl/pkg/config/v1alpha1.CommandOverride"},
+			"k8s.io/kubectl/pkg/config/v1alpha1.AliasOverride", "k8s.io/kubectl/pkg/config/v1alpha1.CommandDefaults"},
+	}
+}
+
+func schema_kubectl_pkg_config_v1beta1_AliasOverride(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AliasOverride stores the alias definitions.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name is the name of alias that can only include alphabetical characters If the alias name conflicts with the built-in command, built-in command will be used.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "command is the single or set of commands to execute, such as \"set env\" or \"create\"",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"prependArgs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "prependArgs stores the arguments such as resource names, etc. These arguments are inserted after the alias name.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"appendArgs": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "appendArgs stores the arguments such as resource names, etc. These arguments are appended to the USER_ARGS.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "options is allocated to store the option definitions of alias. options only modify the default value of the option and if user explicitly passes a value, explicit one is used.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1beta1.CommandOptionDefault"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "command"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/kubectl/pkg/config/v1beta1.CommandOptionDefault"},
+	}
+}
+
+func schema_kubectl_pkg_config_v1beta1_CommandDefaults(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CommandDefaults stores the commands and their associated option's default values.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"command": {
+						SchemaProps: spec.SchemaProps{
+							Description: "command refers to a command whose option's default value is changed.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"options": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "options is a list of options storing different default values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1beta1.CommandOptionDefault"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"command", "options"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/kubectl/pkg/config/v1beta1.CommandOptionDefault"},
+	}
+}
+
+func schema_kubectl_pkg_config_v1beta1_CommandOptionDefault(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CommandOptionDefault stores the name and the specified default value of an option.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Option name (long form, without dashes).",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"default": {
+						SchemaProps: spec.SchemaProps{
+							Description: "In a string format of a default value. It will be parsed by kubectl to the compatible value of the option.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name", "default"},
+			},
+		},
+	}
+}
+
+func schema_kubectl_pkg_config_v1beta1_Preference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Preference stores elements of KubeRC configuration file",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"defaults": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "defaults allow changing default option values of commands. This is especially useful, when user doesn't want to explicitly set options each time.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1beta1.CommandDefaults"),
+									},
+								},
+							},
+						},
+					},
+					"aliases": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "aliases allow defining command aliases for existing kubectl commands, with optional default option values. If the alias name collides with a built-in command, built-in command always takes precedence. Option overrides defined in the defaults section do NOT apply to aliases for the same command. kubectl [ALIAS NAME] [USER_OPTIONS] [USER_EXPLICIT_ARGS] expands to kubectl [COMMAND] # built-in command alias points to\n        [KUBERC_PREPEND_ARGS]\n        [USER_OPTIONS]\n        [KUBERC_OPTIONS] # rest of the options that are not passed by user in [USER_OPTIONS]\n        [USER_EXPLICIT_ARGS]\n        [KUBERC_APPEND_ARGS]\ne.g. - name: runx\n  command: run\n  options:\n  - name: image\n    default: nginx\n  appendArgs:\n  - --\n  - custom-arg1\nFor example, if user invokes \"kubectl runx test-pod\" command, this will be expanded to \"kubectl run --image=nginx test-pod -- custom-arg1\" - name: getn\n  command: get\n  options:\n  - name: output\n    default: wide\n  prependArgs:\n  - node\n\"kubectl getn control-plane-1\" expands to \"kubectl get node control-plane-1 --output=wide\" \"kubectl getn control-plane-1 --output=json\" expands to \"kubectl get node --output=json control-plane-1\"",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubectl/pkg/config/v1beta1.AliasOverride"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"defaults", "aliases"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/kubectl/pkg/config/v1beta1.AliasOverride", "k8s.io/kubectl/pkg/config/v1beta1.CommandDefaults"},
 	}
 }
 
@@ -67490,7 +65545,7 @@ func schema_k8sio_kubelet_config_v1_ServiceAccountTokenAttributes(ref common.Ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "requiredServiceAccountAnnotationKeys is the list of annotation keys that the plugin is interested in and that are required to be present in the service account. The keys defined in this list will be extracted from the corresponding service account and passed to the plugin as part of the CredentialProviderRequest. If any of the keys defined in this list are not present in the service account, kubelet will not invoke the plugin and will return an error. This field is optional and may be empty. Plugins may use this field to extract additional information required to fetch credentials or allow workloads to opt in to using service account tokens for image pull. If non-empty, requireServiceAccount must be set to true.",
+							Description: "requiredServiceAccountAnnotationKeys is the list of annotation keys that the plugin is interested in and that are required to be present in the service account. The keys defined in this list will be extracted from the corresponding service account and passed to the plugin as part of the CredentialProviderRequest. If any of the keys defined in this list are not present in the service account, kubelet will not invoke the plugin and will return an error. This field is optional and may be empty. Plugins may use this field to extract additional information required to fetch credentials or allow workloads to opt in to using service account tokens for image pull. If non-empty, requireServiceAccount must be set to true. Keys in this list must be unique. This list needs to be mutually exclusive with optionalServiceAccountAnnotationKeys.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -67510,7 +65565,7 @@ func schema_k8sio_kubelet_config_v1_ServiceAccountTokenAttributes(ref common.Ref
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "optionalServiceAccountAnnotationKeys is the list of annotation keys that the plugin is interested in and that are optional to be present in the service account. The keys defined in this list will be extracted from the corresponding service account and passed to the plugin as part of the CredentialProviderRequest. The plugin is responsible for validating the existence of annotations and their values. This field is optional and may be empty. Plugins may use this field to extract additional information required to fetch credentials.",
+							Description: "optionalServiceAccountAnnotationKeys is the list of annotation keys that the plugin is interested in and that are optional to be present in the service account. The keys defined in this list will be extracted from the corresponding service account and passed to the plugin as part of the CredentialProviderRequest. The plugin is responsible for validating the existence of annotations and their values. This field is optional and may be empty. Plugins may use this field to extract additional information required to fetch credentials. Keys in this list must be unique.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -68408,7 +66463,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"streamingConnectionIdleTimeout": {
 						SchemaProps: spec.SchemaProps{
-							Description: "streamingConnectionIdleTimeout is the maximum time a streaming connection can be idle before the connection is automatically closed. Default: \"4h\"",
+							Description: "streamingConnectionIdleTimeout is the maximum time a streaming connection can be idle before the connection is automatically closed. Deprecated: no longer has any effect. Default: \"4h\"",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},

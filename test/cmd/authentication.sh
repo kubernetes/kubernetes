@@ -43,7 +43,6 @@ contexts:
   name: test
 current-context: test
 kind: Config
-preferences: {}
 users:
 - name: invalid_token_user
   user:
@@ -94,7 +93,6 @@ contexts:
   name: test
 current-context: test
 kind: Config
-preferences: {}
 users:
 - name: valid_token_user
   user:
@@ -214,7 +212,6 @@ contexts:
   name: test
 current-context: test
 kind: Config
-preferences: {}
 users:
 - name: always_interactive_token_user
   user:
@@ -287,7 +284,6 @@ contexts:
   name: test
 current-context: test
 kind: Config
-preferences: {}
 users:
 - name: missing_interactive_token_user
   user:

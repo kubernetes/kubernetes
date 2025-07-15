@@ -32,20 +32,20 @@ var localSchemeBuilder = testscheme.New()
 // Note: No validations.
 type E00 string
 
-// +k8s:validateFalse={"flags":[], "msg":"E01, no flags"}
+// +k8s:validateFalse="E01, no flags"
 type E01 string
 
-// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"E02, ShortCircuit"}
+// +k8s:validateFalse(flags: "ShortCircuit")="E02, ShortCircuit"
 type E02 string
 
-// +k8s:validateFalse={"flags":[], "msg":"E03, no flags"}
-// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"E03, ShortCircuit"}
+// +k8s:validateFalse="E03, no flags"
+// +k8s:validateFalse(flags: "ShortCircuit")="E03, ShortCircuit"
 type E03 string
 
 // Note: these are intentionally in the wrong final order.
-// +k8s:validateFalse={"flags":[], "msg":"EMultiple, no flags 1"}
-// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"EMultiple, ShortCircuit 1"}
+// +k8s:validateFalse="EMultiple, no flags 1"
+// +k8s:validateFalse(flags: "ShortCircuit")="EMultiple, ShortCircuit 1"
 // +k8s:validateFalse="E0, string payload"
-// +k8s:validateFalse={"flags":[], "msg":"EMultiple, no flags 2"}
-// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"EMultiple, ShortCircuit 2"}
+// +k8s:validateFalse="EMultiple, no flags 2"
+// +k8s:validateFalse(flags: "ShortCircuit")="EMultiple, ShortCircuit 2"
 type EMultiple string

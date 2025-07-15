@@ -23,12 +23,11 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
-
 	v1 "k8s.io/api/core/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
@@ -40,8 +39,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/dynamic-resource-allocation/cel"
-	"k8s.io/dynamic-resource-allocation/internal/queue"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/buffer"
 	"k8s.io/utils/ptr"
 )
 
@@ -97,7 +96,7 @@ type Tracker struct {
 	// which tries to lock the rwMutex). Writing into such a channel
 	// while not holding the rwMutex doesn't work because in-order delivery
 	// of events would no longer be guaranteed.
-	eventQueue queue.FIFO[func()]
+	eventQueue buffer.Ring[func()]
 }
 
 // Options configure a [Tracker].
@@ -157,6 +156,7 @@ func newTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr er
 		celCache:              cel.NewCache(10),
 		patchedResourceSlices: cache.NewStore(cache.MetaNamespaceKeyFunc),
 		handleError:           utilruntime.HandleErrorWithContext,
+		eventQueue:            *buffer.NewRing[func()](buffer.RingOptions{InitialSize: 0, NormalSize: 4}),
 	}
 	defer func() {
 		// If we don't return the tracker, stop the partially initialized instance.
@@ -282,7 +282,7 @@ func (t *Tracker) AddEventHandler(handler cache.ResourceEventHandler) (cache.Res
 	t.eventHandlers = append(t.eventHandlers, handler)
 	allObjs, _ := t.ListPatchedResourceSlices()
 	for _, obj := range allObjs {
-		t.eventQueue.Push(func() {
+		t.eventQueue.WriteOne(func() {
 			handler.OnAdd(obj, true)
 		})
 	}
@@ -298,7 +298,7 @@ func (t *Tracker) AddEventHandler(handler cache.ResourceEventHandler) (cache.Res
 func (t *Tracker) emitEvents() {
 	for {
 		t.rwMutex.Lock()
-		deliver, ok := t.eventQueue.Pop()
+		deliver, ok := t.eventQueue.ReadOne()
 		t.rwMutex.Unlock()
 
 		if !ok {
@@ -323,15 +323,15 @@ func (t *Tracker) pushEvent(oldObj, newObj any) {
 	for _, handler := range t.eventHandlers {
 		handler := handler
 		if oldObj == nil {
-			t.eventQueue.Push(func() {
+			t.eventQueue.WriteOne(func() {
 				handler.OnAdd(newObj, false)
 			})
 		} else if newObj == nil {
-			t.eventQueue.Push(func() {
+			t.eventQueue.WriteOne(func() {
 				handler.OnDelete(oldObj)
 			})
 		} else {
-			t.eventQueue.Push(func() {
+			t.eventQueue.WriteOne(func() {
 				handler.OnUpdate(oldObj, newObj)
 			})
 		}
@@ -404,7 +404,7 @@ func (t *Tracker) resourceSliceUpdate(ctx context.Context) func(oldObj, newObj a
 		if loggerV := logger.V(6); loggerV.Enabled() {
 			// While debugging, one needs a full dump of the objects for context *and*
 			// a diff because otherwise small changes would be hard to spot.
-			loggerV.Info("ResourceSlice update", "slice", klog.Format(oldSlice), "oldSlice", klog.Format(newSlice), "diff", cmp.Diff(oldSlice, newSlice))
+			loggerV.Info("ResourceSlice update", "slice", klog.Format(oldSlice), "oldSlice", klog.Format(newSlice), "diff", diff.Diff(oldSlice, newSlice))
 		} else {
 			logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
 		}
@@ -453,7 +453,7 @@ func (t *Tracker) deviceTaintUpdate(ctx context.Context) func(oldObj, newObj any
 			return
 		}
 		if loggerV := logger.V(6); loggerV.Enabled() {
-			loggerV.Info("DeviceTaintRule update", "patch", klog.KObj(newPatch), "diff", cmp.Diff(oldPatch, newPatch))
+			loggerV.Info("DeviceTaintRule update", "patch", klog.KObj(newPatch), "diff", diff.Diff(oldPatch, newPatch))
 		} else {
 			logger.V(5).Info("DeviceTaintRule update", "patch", klog.KObj(newPatch))
 		}
@@ -513,7 +513,7 @@ func (t *Tracker) deviceClassUpdate(ctx context.Context) func(oldObj, newObj any
 			return
 		}
 		if loggerV := logger.V(6); loggerV.Enabled() {
-			loggerV.Info("DeviceClass update", "class", klog.KObj(newClass), "diff", cmp.Diff(oldClass, newClass))
+			loggerV.Info("DeviceClass update", "class", klog.KObj(newClass), "diff", diff.Diff(oldClass, newClass))
 		} else {
 			logger.V(5).Info("DeviceClass update", "class", klog.KObj(newClass))
 		}
@@ -617,7 +617,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 	}
 
 	if loggerV := logger.V(6); loggerV.Enabled() {
-		loggerV.Info("ResourceSlice synced", "diff", cmp.Diff(oldPatchedObj, patchedSlice))
+		loggerV.Info("ResourceSlice synced", "diff", diff.Diff(oldPatchedObj, patchedSlice))
 	} else {
 		logger.V(5).Info("ResourceSlice synced")
 	}

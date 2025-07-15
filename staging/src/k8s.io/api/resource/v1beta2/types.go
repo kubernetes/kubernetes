@@ -596,7 +596,7 @@ const (
 // of adminAccess: true in any namespaced resource.k8s.io API types. Currently,
 // this permission applies to ResourceClaim and ResourceClaimTemplate objects.
 const (
-	DRAAdminNamespaceLabelKey = "resource.k8s.io/admin-access"
+	DRAAdminNamespaceLabelKey = "resource.kubernetes.io/admin-access"
 )
 
 // DeviceRequest is a request for devices required for a claim.
@@ -1266,7 +1266,7 @@ type DeviceRequestAllocationResult struct {
 	//
 	// +optional
 	// +featureGate=DRAAdminAccess
-	AdminAccess *bool `json:"adminAccess" protobuf:"bytes,5,name=adminAccess"`
+	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,5,opt,name=adminAccess"`
 
 	// A copy of all tolerations specified in the request at the time
 	// when the device got allocated.

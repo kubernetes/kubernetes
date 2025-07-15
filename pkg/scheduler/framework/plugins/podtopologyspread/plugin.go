@@ -28,6 +28,7 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -136,8 +137,8 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	podActionType := framework.Add | framework.UpdatePodLabel | framework.Delete
+func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	podActionType := fwk.Add | fwk.UpdatePodLabel | fwk.Delete
 	if pl.enableSchedulingQueueHint {
 		// When the QueueingHint feature is enabled, the scheduling queue uses Pod/Update Queueing Hint
 		// to determine whether a Pod's update makes the Pod schedulable or not.
@@ -147,10 +148,10 @@ func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]framework.Cl
 		// The Pod rejected by this plugin can be schedulable when the Pod has a spread constraint with NodeTaintsPolicy:Honor
 		// and has got a new toleration.
 		// So, we add UpdatePodToleration here only when QHint is enabled.
-		podActionType = framework.Add | framework.UpdatePodLabel | framework.UpdatePodToleration | framework.Delete
+		podActionType = fwk.Add | fwk.UpdatePodLabel | fwk.UpdatePodToleration | fwk.Delete
 	}
 
-	return []framework.ClusterEventWithHint{
+	return []fwk.ClusterEventWithHint{
 		// All ActionType includes the following events:
 		// - Add. An unschedulable Pod may fail due to violating topology spread constraints,
 		// adding an assigned Pod may make it schedulable.
@@ -158,10 +159,10 @@ func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]framework.Cl
 		// an unschedulable Pod schedulable.
 		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's topology spread constraints,
 		// deleting an existing Pod may make it schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: podActionType}, QueueingHintFn: pl.isSchedulableAfterPodChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: podActionType}, QueueingHintFn: pl.isSchedulableAfterPodChange},
 		// Node add|delete|update maybe lead an topology key changed,
 		// and make these pod in scheduling schedulable or unschedulable.
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Delete | framework.UpdateNodeLabel | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.Delete | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}, nil
 }
 
@@ -181,21 +182,21 @@ func hasConstraintWithNodeTaintsPolicyHonor(constraints []topologySpreadConstrai
 	return false
 }
 
-func (pl *PodTopologySpread) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *PodTopologySpread) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalPod, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	if (modifiedPod != nil && !involvedInTopologySpreading(modifiedPod, pod)) || (originalPod != nil && !involvedInTopologySpreading(originalPod, pod)) {
 		logger.V(5).Info("the added/updated/deleted pod is unscheduled or has different namespace with target pod, so it doesn't make the target pod schedulable",
 			"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	constraints, err := pl.getConstraints(pod)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	// Pod is modified. Return Queue when the label(s) matching topologySpread's selector is added, changed, or deleted.
@@ -204,13 +205,13 @@ func (pl *PodTopologySpread) isSchedulableAfterPodChange(logger klog.Logger, pod
 			// If any constraint has `NodeTaintsPolicy: Honor`, we can return Queue when the target Pod has got a new toleration.
 			logger.V(5).Info("the unschedulable pod has got a new toleration, which could make it schedulable",
 				"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-			return framework.Queue, nil
+			return fwk.Queue, nil
 		}
 
 		if equality.Semantic.DeepEqual(modifiedPod.Labels, originalPod.Labels) {
 			logger.V(5).Info("the pod's update doesn't include the label update, which doesn't make the target pod schedulable",
 				"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-			return framework.QueueSkip, nil
+			return fwk.QueueSkip, nil
 		}
 		for _, c := range constraints {
 			if c.Selector.Matches(labels.Set(originalPod.Labels)) != c.Selector.Matches(labels.Set(modifiedPod.Labels)) {
@@ -218,13 +219,13 @@ func (pl *PodTopologySpread) isSchedulableAfterPodChange(logger klog.Logger, pod
 				// Maybe now the scheduling result of topology spread gets changed by this change.
 				logger.V(5).Info("a scheduled pod's label was updated and it makes the updated pod match or unmatch the pod's topology spread constraints",
 					"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-				return framework.Queue, nil
+				return fwk.Queue, nil
 			}
 		}
 		// This modification of labels doesn't change whether this Pod would match selector or not in any constraints.
 		logger.V(5).Info("a scheduled pod's label was updated, but it's a change unrelated to the pod's topology spread constraints",
 			"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	// Pod is added. Return Queue when the added Pod has a label that matches with topologySpread's selector.
@@ -232,23 +233,23 @@ func (pl *PodTopologySpread) isSchedulableAfterPodChange(logger klog.Logger, pod
 		if podLabelsMatchSpreadConstraints(constraints, modifiedPod.Labels) {
 			logger.V(5).Info("a scheduled pod was created and it matches with the pod's topology spread constraints",
 				"pod", klog.KObj(pod), "createdPod", klog.KObj(modifiedPod))
-			return framework.Queue, nil
+			return fwk.Queue, nil
 		}
 		logger.V(5).Info("a scheduled pod was created, but it doesn't matches with the pod's topology spread constraints",
 			"pod", klog.KObj(pod), "createdPod", klog.KObj(modifiedPod))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	// Pod is deleted. Return Queue when the deleted Pod has a label that matches with topologySpread's selector.
 	if podLabelsMatchSpreadConstraints(constraints, originalPod.Labels) {
 		logger.V(5).Info("a scheduled pod which matches with the pod's topology spread constraints was deleted, and the pod may be schedulable now",
 			"pod", klog.KObj(pod), "deletedPod", klog.KObj(originalPod))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 	logger.V(5).Info("a scheduled pod was deleted, but it's unrelated to the pod's topology spread constraints",
 		"pod", klog.KObj(pod), "deletedPod", klog.KObj(originalPod))
 
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // getConstraints extracts topologySpreadConstraint(s) from the Pod spec.
@@ -277,15 +278,15 @@ func (pl *PodTopologySpread) getConstraints(pod *v1.Pod) ([]topologySpreadConstr
 }
 
 // isSchedulableAfterNodeChange returns Queue when node has topologyKey in its labels, else return QueueSkip.
-func (pl *PodTopologySpread) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *PodTopologySpread) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	constraints, err := pl.getConstraints(pod)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	var originalNodeMatching, modifiedNodeMatching bool
@@ -309,34 +310,34 @@ func (pl *PodTopologySpread) isSchedulableAfterNodeChange(logger klog.Logger, po
 		if originalNodeMatching != modifiedNodeMatching {
 			logger.V(5).Info("the node is updated and now pod topology spread constraints has changed, and the pod may be schedulable now",
 				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode), "originalMatching", originalNodeMatching, "newMatching", modifiedNodeMatching)
-			return framework.Queue, nil
+			return fwk.Queue, nil
 		}
 		if modifiedNodeMatching && (checkTopologyKeyLabelsChanged(originalNode.Labels, modifiedNode.Labels, constraints) || !equality.Semantic.DeepEqual(originalNode.Spec.Taints, modifiedNode.Spec.Taints)) {
 			logger.V(5).Info("the node is updated and now has different taints or labels, and the pod may be schedulable now",
 				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-			return framework.Queue, nil
+			return fwk.Queue, nil
 		}
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	if modifiedNode != nil {
 		if !modifiedNodeMatching {
 			logger.V(5).Info("the created node doesn't match pod topology spread constraints",
 				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-			return framework.QueueSkip, nil
+			return fwk.QueueSkip, nil
 		}
 		logger.V(5).Info("the created node matches topology spread constraints, and the pod may be schedulable now",
 			"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	if !originalNodeMatching {
 		logger.V(5).Info("the deleted node doesn't match pod topology spread constraints", "pod", klog.KObj(pod), "node", klog.KObj(originalNode))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 	logger.V(5).Info("the deleted node matches topology spread constraints, and the pod may be schedulable now",
 		"pod", klog.KObj(pod), "node", klog.KObj(originalNode))
-	return framework.Queue, nil
+	return fwk.Queue, nil
 }
 
 // checkTopologyKeyLabelsChanged checks if any of the labels specified as topologyKey in the constraints have changed.

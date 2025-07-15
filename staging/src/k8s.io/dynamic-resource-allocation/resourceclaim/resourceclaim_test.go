@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -358,48 +359,48 @@ func TestBaseRequestRef(t *testing.T) {
 
 func TestConfigForResult(t *testing.T) {
 	testcases := map[string]struct {
-		deviceConfigurations []resourceapi.DeviceAllocationConfiguration
-		result               resourceapi.DeviceRequestAllocationResult
-		expectedConfigs      []resourceapi.DeviceAllocationConfiguration
+		deviceConfigurations []resourcev1beta2.DeviceAllocationConfiguration
+		result               resourcev1beta2.DeviceRequestAllocationResult
+		expectedConfigs      []resourcev1beta2.DeviceAllocationConfiguration
 	}{
 		"opaque-nil": {
-			deviceConfigurations: []resourceapi.DeviceAllocationConfiguration{
+			deviceConfigurations: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source:   resourceapi.AllocationConfigSourceClass,
+					Source:   resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
 						Opaque: nil,
 					},
 				},
 			},
-			result: resourceapi.DeviceRequestAllocationResult{
+			result: resourcev1beta2.DeviceRequestAllocationResult{
 				Request: "foo",
 				Device:  "device-1",
 			},
 			expectedConfigs: nil,
 		},
 		"empty-requests-match-all": {
-			deviceConfigurations: []resourceapi.DeviceAllocationConfiguration{
+			deviceConfigurations: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source:   resourceapi.AllocationConfigSourceClass,
+					Source:   resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
 				},
 			},
-			result: resourceapi.DeviceRequestAllocationResult{
+			result: resourcev1beta2.DeviceRequestAllocationResult{
 				Request: "foo",
 				Device:  "device-1",
 			},
-			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
+			expectedConfigs: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source:   resourceapi.AllocationConfigSourceClass,
+					Source:   resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
@@ -407,31 +408,31 @@ func TestConfigForResult(t *testing.T) {
 			},
 		},
 		"match-regular-request": {
-			deviceConfigurations: []resourceapi.DeviceAllocationConfiguration{
+			deviceConfigurations: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source: resourceapi.AllocationConfigSourceClass,
+					Source: resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{
 						"foo",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
 				},
 			},
-			result: resourceapi.DeviceRequestAllocationResult{
+			result: resourcev1beta2.DeviceRequestAllocationResult{
 				Request: "foo",
 				Device:  "device-1",
 			},
-			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
+			expectedConfigs: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source: resourceapi.AllocationConfigSourceClass,
+					Source: resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{
 						"foo",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
@@ -439,31 +440,31 @@ func TestConfigForResult(t *testing.T) {
 			},
 		},
 		"match-parent-request-for-subrequest": {
-			deviceConfigurations: []resourceapi.DeviceAllocationConfiguration{
+			deviceConfigurations: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source: resourceapi.AllocationConfigSourceClass,
+					Source: resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{
 						"foo",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
 				},
 			},
-			result: resourceapi.DeviceRequestAllocationResult{
+			result: resourcev1beta2.DeviceRequestAllocationResult{
 				Request: "foo/bar",
 				Device:  "device-1",
 			},
-			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
+			expectedConfigs: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source: resourceapi.AllocationConfigSourceClass,
+					Source: resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{
 						"foo",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
@@ -471,42 +472,42 @@ func TestConfigForResult(t *testing.T) {
 			},
 		},
 		"match-subrequest": {
-			deviceConfigurations: []resourceapi.DeviceAllocationConfiguration{
+			deviceConfigurations: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source: resourceapi.AllocationConfigSourceClass,
+					Source: resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{
 						"foo/bar",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
 				},
 				{
-					Source: resourceapi.AllocationConfigSourceClass,
+					Source: resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{
 						"foo/not-bar",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
 				},
 			},
-			result: resourceapi.DeviceRequestAllocationResult{
+			result: resourcev1beta2.DeviceRequestAllocationResult{
 				Request: "foo/bar",
 				Device:  "device-1",
 			},
-			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
+			expectedConfigs: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source: resourceapi.AllocationConfigSourceClass,
+					Source: resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{
 						"foo/bar",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
@@ -514,53 +515,53 @@ func TestConfigForResult(t *testing.T) {
 			},
 		},
 		"match-both-source-class-and-claim": {
-			deviceConfigurations: []resourceapi.DeviceAllocationConfiguration{
+			deviceConfigurations: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source: resourceapi.AllocationConfigSourceClass,
+					Source: resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{
 						"foo",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
 				},
 				{
-					Source: resourceapi.AllocationConfigSourceClaim,
+					Source: resourcev1beta2.AllocationConfigSourceClaim,
 					Requests: []string{
 						"foo/bar",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
 				},
 			},
-			result: resourceapi.DeviceRequestAllocationResult{
+			result: resourcev1beta2.DeviceRequestAllocationResult{
 				Request: "foo/bar",
 				Device:  "device-1",
 			},
-			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
+			expectedConfigs: []resourcev1beta2.DeviceAllocationConfiguration{
 				{
-					Source: resourceapi.AllocationConfigSourceClass,
+					Source: resourcev1beta2.AllocationConfigSourceClass,
 					Requests: []string{
 						"foo",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},
 				},
 				{
-					Source: resourceapi.AllocationConfigSourceClaim,
+					Source: resourcev1beta2.AllocationConfigSourceClaim,
 					Requests: []string{
 						"foo/bar",
 					},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					DeviceConfiguration: resourcev1beta2.DeviceConfiguration{
+						Opaque: &resourcev1beta2.OpaqueDeviceConfiguration{
 							Driver: "driver-a",
 						},
 					},

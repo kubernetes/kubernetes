@@ -27,8 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-
 	authv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,6 +40,7 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
 )
 
@@ -90,7 +89,6 @@ contexts:
   name: system:node:mynode@kubernetes
 current-context: system:node:mynode@kubernetes
 kind: Config
-preferences: {}
 users:
 - name: system:node:mynode
   user:
@@ -108,7 +106,6 @@ contexts:
   name: system:node:mynode@kubernetes
 current-context: system:node:mynode@kubernetes
 kind: Config
-preferences: {}
 users:
 - name: system:node:mynode
   user:
@@ -127,7 +124,6 @@ contexts:
   name: system:node:mynode@kubernetes
 current-context: system:node:mynode@kubernetes
 kind: Config
-preferences: {}
 users:
 - name: system:node:mynode
   user:
@@ -146,7 +142,6 @@ contexts:
   name: system:node:mynode@kubernetes
 current-context: invalidContext
 kind: Config
-preferences: {}
 users:
 - name: system:node:mynode
   user:
@@ -165,7 +160,6 @@ contexts:
   name: system:node:mynode@kubernetes
 current-context: system:node:mynode@kubernetes
 kind: Config
-preferences: {}
 users:
 - name: system:node:mynode
   user:

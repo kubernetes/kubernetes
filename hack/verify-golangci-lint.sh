@@ -119,14 +119,25 @@ for arg; do
   fi
 done
 
-# Install golangci-lint
-echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
-GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install github.com/golangci/golangci-lint/cmd/golangci-lint
+kube::util::ensure-temp-dir
+
+# Install golangci-lint.
+#
+# hack/tools/golangci-lint uses the "tool" directive in a stand-alone
+# go.mod.
+#
+# Installing from source (https://golangci-lint.run/welcome/install/#install-from-sources)
+# is not recommended, but for Kubernetes we prefer it because it avoids the need for
+# pre-built binaries for different platforms and gives more insights on dependencies.
+echo "installing golangci-lint, logcheck kube-api-linter and sorted plugins from hack/tools/golangci-lint into ${GOBIN}"
+GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 if [ "${golangci_config}" ]; then
-  # This cannot be used without a config.
+  # Plugins cannot be used without a config.
   # This uses `go build` because `go install -buildmode=plugin` doesn't work
   # (on purpose: https://github.com/golang/go/issues/64964).
-  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" build -o "${GOBIN}/kube-api-linter.so" -buildmode=plugin sigs.k8s.io/kube-api-linter/pkg/plugin
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" build -o "${GOBIN}/sorted.so" -buildmode=plugin k8s.io/kubernetes/hack/tools/golangci-lint/sorted/plugin
 fi
 
 # Verify that the given config is valid. "golangci-lint run" does not
@@ -151,11 +162,10 @@ if [ "${golangci_config}" ]; then
   # replace the path with an absolute one. This could be done also
   # unconditionally, but the invocation that is printed below is nicer if we
   # don't to do it when not required.
-  if grep -q 'path: ../_output/local/bin/' "${golangci_config}" &&
+  if grep -q 'path: _output/local/bin/' "${golangci_config}" &&
      [ "${GOBIN}" != "${KUBE_ROOT}/_output/local/bin" ]; then
-    kube::util::ensure-temp-dir
     patched_golangci_config="${KUBE_TEMP}/$(basename "${golangci_config}")"
-    sed -e "s;path: ../_output/local/bin/;path: ${GOBIN}/;" "${golangci_config}" >"${patched_golangci_config}"
+    sed -e "s;path: _output/local/bin/;path: ${GOBIN}/;" "${golangci_config}" >"${patched_golangci_config}"
     golangci_config="${patched_golangci_config}"
   fi
   golangci+=(--config="${golangci_config}")
@@ -173,7 +183,17 @@ run () {
     )
   fi
   echo "running ${golangci[*]} ${targets[*]}" >&2
-  "${golangci[@]}" "${targets[@]}" 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
+  # Only output on stderr indicates a real error and gets the "ERROR: " prefix for
+  # highlighting in Spyglass. Stdout contains statistics and shouldn't get that prefix.
+  # To avoid interleaving, it gets collected and dumped separately at the end.
+  #
+  # This is done with some bash magic:
+  # - save original stdout in FD 3
+  # - redirect stdout to file
+  # - redirect stderr to original stdout in FD 3
+  # - pipe stderr via stdout into sed for on-the-fly processing, writing to stderr again
+  "${golangci[@]}" "${targets[@]}" 3>&1 >"${KUBE_TEMP}/golangci-stdout.log" 2>&3 | sed -e 's;^;ERROR: ;' >&2 || res=$?
+  cat "${KUBE_TEMP}/golangci-stdout.log"
 }
 # First run with normal output.
 run
@@ -220,7 +240,6 @@ else
     fi
     echo
   } >&2
-  exit 1
 fi
 
 # preserve the result

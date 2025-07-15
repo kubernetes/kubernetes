@@ -80,6 +80,7 @@ func extractVolumeAttachment(volumeAttachment *storagev1.VolumeAttachment, field
 	b.WithAPIVersion("storage.k8s.io/v1")
 	return b, nil
 }
+func (b VolumeAttachmentApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -255,8 +256,24 @@ func (b *VolumeAttachmentApplyConfiguration) WithStatus(value *VolumeAttachmentS
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *VolumeAttachmentApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *VolumeAttachmentApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *VolumeAttachmentApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *VolumeAttachmentApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

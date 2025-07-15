@@ -19,11 +19,11 @@ package testing
 import (
 	"fmt"
 	"reflect"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
-	"sigs.k8s.io/yaml"
 	"sort"
 	"strings"
 	"sync"
+
+	"sigs.k8s.io/yaml"
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
@@ -632,7 +632,7 @@ type managedFieldObjectTracker struct {
 	ObjectTracker
 	scheme          ObjectScheme
 	objectConverter runtime.ObjectConvertor
-	mapper          meta.RESTMapper
+	mapper          func() meta.RESTMapper
 	typeConverter   managedfields.TypeConverter
 }
 
@@ -645,8 +645,10 @@ func NewFieldManagedObjectTracker(scheme *runtime.Scheme, decoder runtime.Decode
 		ObjectTracker:   NewObjectTracker(scheme, decoder),
 		scheme:          scheme,
 		objectConverter: scheme,
-		mapper:          testrestmapper.TestOnlyStaticRESTMapper(scheme),
-		typeConverter:   typeConverter,
+		mapper: func() meta.RESTMapper {
+			return testrestmapper.TestOnlyStaticRESTMapper(scheme)
+		},
+		typeConverter: typeConverter,
 	}
 }
 
@@ -655,7 +657,7 @@ func (t *managedFieldObjectTracker) Create(gvr schema.GroupVersionResource, obj 
 	if err != nil {
 		return err
 	}
-	gvk, err := t.mapper.KindFor(gvr)
+	gvk, err := t.mapper().KindFor(gvr)
 	if err != nil {
 		return err
 	}
@@ -699,7 +701,7 @@ func (t *managedFieldObjectTracker) Update(gvr schema.GroupVersionResource, obj 
 	if err != nil {
 		return err
 	}
-	gvk, err := t.mapper.KindFor(gvr)
+	gvk, err := t.mapper().KindFor(gvr)
 	if err != nil {
 		return err
 	}
@@ -729,7 +731,7 @@ func (t *managedFieldObjectTracker) Patch(gvr schema.GroupVersionResource, patch
 	if err != nil {
 		return err
 	}
-	gvk, err := t.mapper.KindFor(gvr)
+	gvk, err := t.mapper().KindFor(gvr)
 	if err != nil {
 		return err
 	}
@@ -758,7 +760,7 @@ func (t *managedFieldObjectTracker) Apply(gvr schema.GroupVersionResource, apply
 	if err != nil {
 		return err
 	}
-	gvk, err := t.mapper.KindFor(gvr)
+	gvk, err := t.mapper().KindFor(gvr)
 	if err != nil {
 		return err
 	}
@@ -944,63 +946,4 @@ func assertOptionalSingleArgument[T any](arguments []T) (T, error) {
 	default:
 		return a, fmt.Errorf("expected only one option argument but got %d", len(arguments))
 	}
-}
-
-type TypeResolver interface {
-	Type(openAPIName string) typed.ParseableType
-}
-
-type TypeConverter struct {
-	Scheme       *runtime.Scheme
-	TypeResolver TypeResolver
-}
-
-func (tc TypeConverter) ObjectToTyped(obj runtime.Object, opts ...typed.ValidationOptions) (*typed.TypedValue, error) {
-	gvk := obj.GetObjectKind().GroupVersionKind()
-	name, err := tc.openAPIName(gvk)
-	if err != nil {
-		return nil, err
-	}
-	t := tc.TypeResolver.Type(name)
-	switch o := obj.(type) {
-	case *unstructured.Unstructured:
-		return t.FromUnstructured(o.UnstructuredContent(), opts...)
-	default:
-		return t.FromStructured(obj, opts...)
-	}
-}
-
-func (tc TypeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {
-	vu := value.AsValue().Unstructured()
-	switch o := vu.(type) {
-	case map[string]interface{}:
-		return &unstructured.Unstructured{Object: o}, nil
-	default:
-		return nil, fmt.Errorf("failed to convert value to unstructured for type %T", vu)
-	}
-}
-
-func (tc TypeConverter) openAPIName(kind schema.GroupVersionKind) (string, error) {
-	example, err := tc.Scheme.New(kind)
-	if err != nil {
-		return "", err
-	}
-	rtype := reflect.TypeOf(example).Elem()
-	name := friendlyName(rtype.PkgPath() + "." + rtype.Name())
-	return name, nil
-}
-
-// This is a copy of openapi.friendlyName.
-// TODO: consider introducing a shared version of this function in apimachinery.
-func friendlyName(name string) string {
-	nameParts := strings.Split(name, "/")
-	// Reverse first part. e.g., io.k8s... instead of k8s.io...
-	if len(nameParts) > 0 && strings.Contains(nameParts[0], ".") {
-		parts := strings.Split(nameParts[0], ".")
-		for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
-			parts[i], parts[j] = parts[j], parts[i]
-		}
-		nameParts[0] = strings.Join(parts, ".")
-	}
-	return strings.Join(nameParts, ".")
 }

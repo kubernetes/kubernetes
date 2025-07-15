@@ -75,6 +75,8 @@ type pausePodConfig struct {
 	DeletionGracePeriodSeconds        *int64
 	TopologySpreadConstraints         []v1.TopologySpreadConstraint
 	SchedulingGates                   []v1.PodSchedulingGate
+	TerminationGracePeriodSeconds     *int64
+	PreStopHookSleepSeconds           *int64
 }
 
 var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
@@ -1008,6 +1010,18 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	}
 	if conf.DeletionGracePeriodSeconds != nil {
 		pod.ObjectMeta.DeletionGracePeriodSeconds = conf.DeletionGracePeriodSeconds
+	}
+	if conf.TerminationGracePeriodSeconds != nil {
+		pod.Spec.TerminationGracePeriodSeconds = conf.TerminationGracePeriodSeconds
+	}
+	if conf.PreStopHookSleepSeconds != nil {
+		pod.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
+			PreStop: &v1.LifecycleHandler{
+				Sleep: &v1.SleepAction{
+					Seconds: *conf.PreStopHookSleepSeconds,
+				},
+			},
+		}
 	}
 	return pod
 }

@@ -30,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
@@ -97,7 +97,7 @@ type Interface interface {
 	HasRandomFully() bool
 
 	// Present checks if the kernel supports the iptable interface
-	Present() bool
+	Present() error
 }
 
 // Protocol defines the ip protocol either ipv4 or ipv6
@@ -177,9 +177,6 @@ var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
 // WaitMinVersion a minimum iptables versions supporting the -w and -w<seconds> flags
 var WaitMinVersion = utilversion.MustParseGeneric("1.4.20")
 
-// WaitIntervalMinVersion a minimum iptables versions supporting the wait interval useconds
-var WaitIntervalMinVersion = utilversion.MustParseGeneric("1.6.1")
-
 // WaitSecondsMinVersion a minimum iptables versions supporting the wait seconds
 var WaitSecondsMinVersion = utilversion.MustParseGeneric("1.4.22")
 
@@ -191,12 +188,6 @@ const WaitString = "-w"
 
 // WaitSecondsValue a constant for specifying the default wait seconds
 const WaitSecondsValue = "5"
-
-// WaitIntervalString a constant for specifying the wait interval flag
-const WaitIntervalString = "-W"
-
-// WaitIntervalUsecondsValue a constant for specifying the default wait interval useconds
-const WaitIntervalUsecondsValue = "100000"
 
 // LockfilePath16x is the iptables 1.6.x lock file acquired by any process that's making any change in the iptable rule
 const LockfilePath16x = "/run/xtables.lock"
@@ -250,30 +241,53 @@ func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath14x, lo
 }
 
 // New returns a new Interface which will exec iptables.
+// Note that this function will return a single iptables Interface *and* an error, if only
+// a single family is supported.
 func New(protocol Protocol) Interface {
 	return newInternal(utilexec.New(), protocol, "", "")
 }
 
-func newDualStackInternal(exec utilexec.Interface) map[v1.IPFamily]Interface {
+func newDualStackInternal(exec utilexec.Interface) (map[v1.IPFamily]Interface, error) {
+	var err error
 	interfaces := map[v1.IPFamily]Interface{}
 
 	iptv4 := newInternal(exec, ProtocolIPv4, "", "")
-	if iptv4.Present() {
+	if presentErr := iptv4.Present(); presentErr != nil {
+		err = presentErr
+	} else {
 		interfaces[v1.IPv4Protocol] = iptv4
 	}
 	iptv6 := newInternal(exec, ProtocolIPv6, "", "")
-	if iptv6.Present() {
+	if presentErr := iptv6.Present(); presentErr != nil {
+		// If we get an error for both IPv4 and IPv6 Present() calls, it's virtually guaranteed that
+		// they're going to be the same error. We ignore the error for IPv6 if IPv4 has already failed.
+		if err == nil {
+			err = presentErr
+		}
+	} else {
 		interfaces[v1.IPv6Protocol] = iptv6
 	}
 
-	return interfaces
+	return interfaces, err
 }
 
 // NewDualStack returns a map containing an IPv4 Interface (if IPv4 iptables is supported)
-// and an IPv6 Interface (if IPv6 iptables is supported). If either family is not
-// supported, no Interface will be returned for that family.
-func NewDualStack() map[v1.IPFamily]Interface {
+// and an IPv6 Interface (if IPv6 iptables is supported). If only one family is supported,
+// it will return a map with one Interface *and* an error (indicating the problem with the
+// other family). If neither family is supported, it will return an empty map and an
+// error.
+func NewDualStack() (map[v1.IPFamily]Interface, error) {
 	return newDualStackInternal(utilexec.New())
+}
+
+// NewBestEffort returns a map containing an IPv4 Interface (if IPv4 iptables is
+// supported) and an IPv6 Interface (if IPv6 iptables is supported). If iptables is not
+// supported, then it just returns an empty map. This function is intended to make things
+// simple for callers that just want "best-effort" iptables support, where neither partial
+// nor complete lack of iptables support is considered an error.
+func NewBestEffort() map[v1.IPFamily]Interface {
+	ipts, _ := newDualStackInternal(utilexec.New())
+	return ipts
 }
 
 // EnsureChain is part of Interface.
@@ -654,8 +668,11 @@ func (runner *runner) ChainExists(table Table, chain Chain) (bool, error) {
 	trace := utiltrace.New("iptables ChainExists")
 	defer trace.LogIfLong(2 * time.Second)
 
-	_, err := runner.run(opListChain, fullArgs)
-	return err == nil, err
+	out, err := runner.run(opListChain, fullArgs)
+	if err != nil {
+		return false, fmt.Errorf("error listing chain %q in table %q: %w: %s", chain, table, err, out)
+	}
+	return true, nil
 }
 
 type operation string
@@ -699,8 +716,6 @@ func getIPTablesVersion(exec utilexec.Interface, protocol Protocol) (*utilversio
 // Checks if iptables version has a "wait" flag
 func getIPTablesWaitFlag(version *utilversion.Version) []string {
 	switch {
-	case version.AtLeast(WaitIntervalMinVersion):
-		return []string{WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue}
 	case version.AtLeast(WaitSecondsMinVersion):
 		return []string{WaitString, WaitSecondsValue}
 	case version.AtLeast(WaitMinVersion):
@@ -713,7 +728,7 @@ func getIPTablesWaitFlag(version *utilversion.Version) []string {
 // Checks if iptables-restore has a "wait" flag
 func getIPTablesRestoreWaitFlag(version *utilversion.Version, exec utilexec.Interface, protocol Protocol) []string {
 	if version.AtLeast(WaitRestoreMinVersion) {
-		return []string{WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue}
+		return []string{WaitString, WaitSecondsValue}
 	}
 
 	// Older versions may have backported features; if iptables-restore supports
@@ -759,12 +774,11 @@ func (runner *runner) HasRandomFully() bool {
 
 // Present tests if iptable is supported on current kernel by checking the existence
 // of default table and chain
-func (runner *runner) Present() bool {
+func (runner *runner) Present() error {
 	if _, err := runner.ChainExists(TableNAT, ChainPostrouting); err != nil {
-		return false
+		return err
 	}
-
-	return true
+	return nil
 }
 
 var iptablesNotFoundStrings = []string{

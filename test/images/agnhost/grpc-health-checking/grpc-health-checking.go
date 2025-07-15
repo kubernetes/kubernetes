@@ -70,6 +70,10 @@ type HealthChecker struct {
 	started time.Time
 }
 
+func (s *HealthChecker) List(ctx context.Context, request *grpc_health_v1.HealthListRequest) (*grpc_health_v1.HealthListResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "unimplemented")
+}
+
 func (s *HealthChecker) Check(ctx context.Context, req *grpc_health_v1.HealthCheckRequest) (*grpc_health_v1.HealthCheckResponse, error) {
 	log.Printf("Serving the Check request for health check, started at %v", s.started)
 

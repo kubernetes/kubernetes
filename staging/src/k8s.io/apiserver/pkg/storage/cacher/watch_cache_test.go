@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
@@ -131,7 +132,10 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 	wc.stopCh = make(chan struct{})
 	pr := progress.NewConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
 	go pr.Run(wc.stopCh)
-	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr)
+	getCurrentRV := func(context.Context) (uint64, error) {
+		return wc.resourceVersion, nil
+	}
+	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.capacity = capacity
@@ -436,7 +440,7 @@ func TestMarker(t *testing.T) {
 	}
 }
 
-func TestWaitUntilFreshAndList(t *testing.T) {
+func TestWaitUntilFreshAndGetList(t *testing.T) {
 	ctx := context.Background()
 	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{
 		"l:label": func(obj interface{}) ([]string, error) {
@@ -466,7 +470,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	resp, indexUsed, err := store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{Predicate: storage.Everything})
+	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -481,7 +485,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}
 
 	// list by label index.
-	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{Predicate: storage.SelectionPredicate{
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"label": "value1",
 		}),
@@ -504,7 +508,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}
 
 	// list with spec.nodeName index.
-	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{Predicate: storage.SelectionPredicate{
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"not-exist-label": "whatever",
 		}),
@@ -527,7 +531,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}
 
 	// list with index not exists.
-	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{Predicate: storage.SelectionPredicate{
+	resp, indexUsed, err = store.WaitUntilFreshAndGetList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Recursive: true, Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"not-exist-label": "whatever",
 		}),
@@ -561,7 +565,7 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	}()
 
 	// list from future revision. Requires watch cache to request bookmark to get it.
-	resp, indexUsed, err := store.WaitUntilFreshAndList(ctx, 3, "prefix/", storage.ListOptions{Predicate: storage.Everything})
+	resp, indexUsed, err := store.WaitUntilFreshAndGetList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "3", Recursive: true, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -619,7 +623,10 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, tc.ConsistentListFromCache)
+			if !tc.ConsistentListFromCache {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, tc.ConsistentListFromCache)
+			}
 			ctx := context.Background()
 			store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
 			defer store.Stop()
@@ -641,7 +648,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 				store.Add(makeTestPod("bar", 4))
 			}()
 
-			_, _, err := store.WaitUntilFreshAndList(ctx, 4, "", storage.ListOptions{Predicate: storage.Everything})
+			_, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "4", Predicate: storage.Everything})
 			if !errors.IsTimeout(err) {
 				t.Errorf("expected timeout error but got: %v", err)
 			}
@@ -670,7 +677,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	defer store.Stop()
 
 	{
-		resp, _, err := store.WaitUntilFreshAndList(ctx, 0, "", storage.ListOptions{Predicate: storage.Everything})
+		resp, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "", Recursive: true, Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -693,7 +700,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		resp, _, err := store.WaitUntilFreshAndList(ctx, 10, "", storage.ListOptions{Predicate: storage.Everything})
+		resp, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "10", Recursive: true, Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1268,22 +1275,22 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			want: `
 		# HELP apiserver_watch_cache_read_wait_seconds [ALPHA] Histogram of time spent waiting for a watch cache to become fresh.
     # TYPE apiserver_watch_cache_read_wait_seconds histogram
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.005"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.025"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.05"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.1"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.2"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.4"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.6"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.8"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="1"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="1.25"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="1.5"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="2"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="3"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="+Inf"} 1
-      apiserver_watch_cache_read_wait_seconds_sum{resource="pods"} 0
-      apiserver_watch_cache_read_wait_seconds_count{resource="pods"} 1
+	    apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.005"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.025"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.05"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.1"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.2"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.4"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.6"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.8"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1.25"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1.5"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="2"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="3"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="+Inf"} 1
+        apiserver_watch_cache_read_wait_seconds_sum{group="",resource="pods"} 0
+        apiserver_watch_cache_read_wait_seconds_count{group="",resource="pods"} 1
 `,
 		},
 		{

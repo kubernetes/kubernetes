@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -528,7 +528,14 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		gomega.Expect(epsList.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 
-	ginkgo.It("should support a Service with multiple ports specified in multiple EndpointSlices", func(ctx context.Context) {
+	/*
+		Release: v1.34
+		Testname: EndpointSlice, single IP, multiple ports
+		Description: Given a selector-less Service with multiple manually-created
+		EndpointSlices (and no Endpoints) where the endpoints have the same IP
+		but different Ports, the service proxy MUST allow connections to both ports.
+	*/
+	framework.ConformanceIt("should support a Service with multiple ports specified in multiple EndpointSlices", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -602,8 +609,8 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("creating")
 		eps1 := epsTemplate.DeepCopy()
 		eps1.Ports = []discoveryv1.EndpointPort{{
-			Name:     pointer.String("port80"),
-			Port:     pointer.Int32(8090),
+			Name:     ptr.To("port80"),
+			Port:     ptr.To[int32](8090),
 			Protocol: &tcpProtocol,
 		}}
 
@@ -611,8 +618,8 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err)
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Ports = []discoveryv1.EndpointPort{{
-			Name:     pointer.String("port81"),
-			Port:     pointer.Int32(9090),
+			Name:     ptr.To("port81"),
+			Port:     ptr.To[int32](9090),
 			Protocol: &tcpProtocol,
 		}}
 
@@ -631,7 +638,14 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 	})
 
-	ginkgo.It("should support a Service with multiple endpoint IPs specified in multiple EndpointSlices", func(ctx context.Context) {
+	/*
+		Release: v1.34
+		Testname: EndpointSlice, multiple IPs, multiple ports
+		Description: Given a selector-less Service with multiple manually-created
+		EndpointSlices (and no Endpoints) where the endpoints have different IPs
+		and different Ports, the service proxy MUST allow connections to both ports.
+	*/
+	framework.ConformanceIt("should support a Service with multiple endpoint IPs specified in multiple EndpointSlices", func(ctx context.Context) {
 		ns := f.Namespace.Name
 		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -707,8 +721,8 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			},
 		}
 		eps1.Ports = []discoveryv1.EndpointPort{{
-			Name:     pointer.String("port80"),
-			Port:     pointer.Int32(8090),
+			Name:     ptr.To("port80"),
+			Port:     ptr.To[int32](8090),
 			Protocol: &tcpProtocol,
 		}}
 
@@ -722,8 +736,8 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			},
 		}
 		eps2.Ports = []discoveryv1.EndpointPort{{
-			Name:     pointer.String("port81"),
-			Port:     pointer.Int32(8090),
+			Name:     ptr.To("port81"),
+			Port:     ptr.To[int32](8090),
 			Protocol: &tcpProtocol,
 		}}
 		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps2, metav1.CreateOptions{})

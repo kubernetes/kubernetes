@@ -20,12 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,7 +56,7 @@ func init() {
 func decodeResponse(t *testing.T, resp *http.Response, obj interface{}) error {
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	t.Log(string(data))
 	if err != nil {
 		return err
@@ -67,7 +68,10 @@ func decodeResponse(t *testing.T, resp *http.Response, obj interface{}) error {
 }
 
 func getGroupList(t *testing.T, server *httptest.Server) (*metav1.APIGroupList, error) {
-	resp, err := http.Get(server.URL)
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, request.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

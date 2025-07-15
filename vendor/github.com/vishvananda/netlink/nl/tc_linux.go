@@ -78,6 +78,17 @@ const (
 )
 
 const (
+	TCA_ACT_SAMPLE_UNSPEC = iota
+	TCA_ACT_SAMPLE_TM
+	TCA_ACT_SAMPLE_PARMS
+	TCA_ACT_SAMPLE_RATE
+	TCA_ACT_SAMPLE_TRUNC_SIZE
+	TCA_ACT_SAMPLE_PSAMPLE_GROUP
+	TCA_ACT_SAMPLE_PAD
+	TCA_ACT_SAMPLE_MAX
+)
+
+const (
 	TCA_PRIO_UNSPEC = iota
 	TCA_PRIO_MQ
 	TCA_PRIO_MAX = TCA_PRIO_MQ
@@ -1112,6 +1123,13 @@ const (
 	TCA_FLOWER_KEY_ENC_OPTS
 	TCA_FLOWER_KEY_ENC_OPTS_MASK
 
+	TCA_FLOWER_IN_HW_COUNT
+
+	TCA_FLOWER_KEY_PORT_SRC_MIN /* be16 */
+	TCA_FLOWER_KEY_PORT_SRC_MAX /* be16 */
+	TCA_FLOWER_KEY_PORT_DST_MIN /* be16 */
+	TCA_FLOWER_KEY_PORT_DST_MAX /* be16 */
+
 	__TCA_FLOWER_MAX
 )
 
@@ -1127,11 +1145,11 @@ const TCA_CLS_FLAGS_SKIP_SW = 1 << 1 /* don't use filter in SW */
 // };
 
 type TcSfqQopt struct {
-	Quantum uint8
+	Quantum uint32
 	Perturb int32
 	Limit   uint32
-	Divisor uint8
-	Flows   uint8
+	Divisor uint32
+	Flows   uint32
 }
 
 func (x *TcSfqQopt) Len() int {
@@ -1569,7 +1587,7 @@ func (p *TcPedit) SetIPv6Dst(ip6 net.IP) {
 }
 
 func (p *TcPedit) SetIPv4Src(ip net.IP) {
-	u32 := NativeEndian().Uint32(ip[:4])
+	u32 := NativeEndian().Uint32(ip.To4())
 
 	tKey := TcPeditKey{}
 	tKeyEx := TcPeditKeyEx{}
@@ -1585,7 +1603,7 @@ func (p *TcPedit) SetIPv4Src(ip net.IP) {
 }
 
 func (p *TcPedit) SetIPv4Dst(ip net.IP) {
-	u32 := NativeEndian().Uint32(ip[:4])
+	u32 := NativeEndian().Uint32(ip.To4())
 
 	tKey := TcPeditKey{}
 	tKeyEx := TcPeditKeyEx{}

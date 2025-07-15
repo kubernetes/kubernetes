@@ -80,6 +80,9 @@ func (f *skipNonAppliedManager) Apply(liveObj, appliedObj runtime.Object, manage
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create empty object of type %v: %v", gvk, err)
 		}
+		if unstructured, isUnstructured := emptyObj.(runtime.Unstructured); isUnstructured {
+			unstructured.GetObjectKind().SetGroupVersionKind(gvk)
+		}
 		liveObj, managed, err = f.fieldManager.Update(emptyObj, liveObj, managed, f.beforeApplyManagerName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create manager for existing fields: %v", err)

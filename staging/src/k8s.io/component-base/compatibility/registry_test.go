@@ -26,6 +26,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 const (
@@ -441,6 +443,30 @@ func TestVersionMappingWithCyclicDependency(t *testing.T) {
 		})
 	if err == nil {
 		t.Errorf("expect cyclic version mapping error")
+	}
+}
+
+func TestAddMetrics(t *testing.T) {
+	r := NewComponentGlobalsRegistry()
+	ver1 := NewEffectiveVersionFromString("0.58", "", "")
+	ver2 := NewEffectiveVersionFromString("1.2", "1.1", "")
+
+	if err := r.Register("comp1", ver1, nil); err != nil {
+		t.Fatalf("expected no error to register new component, but got err: %v", err)
+	}
+	if err := r.Register("comp2", ver2, nil); err != nil {
+		t.Fatalf("expected no error to register new component, but got err: %v", err)
+	}
+	r.AddMetrics()
+
+	expectedOutput := `# HELP version_info [ALPHA] Provides the compatibility version info of the component. The component label is the name of the component, usually kube, but is relevant for aggregated-apiservers.
+    # TYPE version_info gauge
+    version_info{binary="0.58",component="comp1",emulation="0.58",min_compat="0.57"} 1
+    version_info{binary="1.2",component="comp2",emulation="1.2",min_compat="1.1"} 1
+`
+	testedMetrics := []string{"version_info"}
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedOutput), testedMetrics...); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -927,7 +927,7 @@ func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DeviceMaxIDLength))
 	}
 	for _, msg := range validation.IsCIdentifier(id) {
-		allErrs = append(allErrs, field.TypeInvalid(fldPath, id, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, id, msg))
 	}
 	return allErrs
 }
@@ -1047,7 +1047,7 @@ func validateRawExtension(rawExtension runtime.RawExtension, fldPath *field.Path
 	} else if v == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else if _, isObject := v.(map[string]any); !isObject {
-		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", "parameters must be a valid JSON object"))
+		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", "must be a valid JSON object"))
 	}
 	return allErrs
 }

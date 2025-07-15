@@ -154,7 +154,6 @@ func TestCRIListPodStats(t *testing.T) {
 
 	var (
 		mockCadvisor       = cadvisortest.NewMockInterface(t)
-		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
 		fakeRuntimeService = critest.NewFakeRuntimeService()
@@ -238,7 +237,6 @@ func TestCRIListPodStats(t *testing.T) {
 		mockCadvisor,
 		resourceAnalyzer,
 		mockPodManager,
-		mockRuntimeCache,
 		fakeRuntimeService,
 		fakeImageService,
 		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
@@ -388,7 +386,6 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 	)
 	var (
 		mockCadvisor       = cadvisortest.NewMockInterface(t)
-		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
 		fakeRuntimeService = critest.NewFakeRuntimeService()
@@ -474,7 +471,6 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		mockCadvisor,
 		resourceAnalyzer,
 		mockPodManager,
-		mockRuntimeCache,
 		fakeRuntimeService,
 		fakeImageService,
 		NewFakeHostStatsProviderWithData(fakeStats, fakeOS),
@@ -601,7 +597,6 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 
 	var (
 		mockCadvisor       = cadvisortest.NewMockInterface(t)
-		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
 		fakeRuntimeService = critest.NewFakeRuntimeService()
@@ -653,10 +648,9 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		mockCadvisor,
 		resourceAnalyzer,
 		mockPodManager,
-		mockRuntimeCache,
 		fakeRuntimeService,
 		nil,
-		NewFakeHostStatsProvider(),
+		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
 		false,
 	)
 
@@ -773,7 +767,6 @@ func TestCRIImagesFsStats(t *testing.T) {
 
 	var (
 		mockCadvisor       = cadvisortest.NewMockInterface(t)
-		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
 		fakeRuntimeService = critest.NewFakeRuntimeService()
@@ -788,10 +781,9 @@ func TestCRIImagesFsStats(t *testing.T) {
 		mockCadvisor,
 		resourceAnalyzer,
 		mockPodManager,
-		mockRuntimeCache,
 		fakeRuntimeService,
 		fakeImageService,
-		NewFakeHostStatsProvider(),
+		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
 		false,
 	)
 

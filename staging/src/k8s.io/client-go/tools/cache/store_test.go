@@ -18,6 +18,7 @@ package cache
 
 import (
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -141,6 +142,21 @@ type testStoreObject struct {
 
 func TestCache(t *testing.T) {
 	doTestStore(t, NewStore(testStoreKeyFunc))
+}
+
+func TestCacheWithTransformer(t *testing.T) {
+	transformerCalled := &atomic.Bool{}
+	doTestStore(t, NewStore(testStoreKeyFunc, WithTransformer(func(i interface{}) (interface{}, error) {
+		transformerCalled.Store(true)
+		obj, ok := i.(testStoreObject)
+		if !ok {
+			return nil, errors.New("wrong object type")
+		}
+		return obj, nil
+	})))
+	if !transformerCalled.Load() {
+		t.Error("informer was not called")
+	}
 }
 
 func TestFIFOCache(t *testing.T) {

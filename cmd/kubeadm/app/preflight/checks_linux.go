@@ -22,11 +22,11 @@ package preflight
 import (
 	"syscall"
 
-	"github.com/pkg/errors"
-
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	system "k8s.io/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // Check number of memory required by kubeadm

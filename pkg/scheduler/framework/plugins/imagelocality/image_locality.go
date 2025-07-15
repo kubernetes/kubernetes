@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -50,10 +51,10 @@ func (pl *ImageLocality) Name() string {
 }
 
 // Score invoked at the score extension point.
-func (pl *ImageLocality) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+func (pl *ImageLocality) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
 	nodeInfos, err := pl.handle.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
-		return 0, framework.AsStatus(err)
+		return 0, fwk.AsStatus(err)
 	}
 	totalNumNodes := len(nodeInfos)
 

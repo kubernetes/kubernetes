@@ -773,6 +773,10 @@ func TestStoreUpdate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "7"},
 		Spec:       example.PodSpec{NodeName: "machine"},
 	}
+	podAWithResourceAndUID := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "7", UID: "A"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
@@ -786,6 +790,12 @@ func TestStoreUpdate(t *testing.T) {
 
 	// try to update a non-existing node
 	_, _, err = registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// try to update a non-existing node that was created previously
+	_, _, err = registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podAWithResourceAndUID), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}

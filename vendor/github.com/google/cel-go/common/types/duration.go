@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/cel-go/common/overloads"
@@ -183,6 +184,10 @@ func (d Duration) Type() ref.Type {
 // Value implements ref.Val.Value.
 func (d Duration) Value() any {
 	return d.Duration
+}
+
+func (d Duration) format(sb *strings.Builder) {
+	fmt.Fprintf(sb, `duration("%ss")`, strconv.FormatFloat(d.Seconds(), 'f', -1, 64))
 }
 
 // DurationGetHours returns the duration in hours.

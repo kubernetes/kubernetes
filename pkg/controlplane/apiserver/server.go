@@ -190,6 +190,10 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 					go controller.Run(ctx, workers)
 					go gccontroller.Run(ctx)
 				}, err
+			}, leaderelection.LeaderElectionTimers{
+				LeaseDuration: c.CoordinatedLeadershipLeaseDuration,
+				RenewDeadline: c.CoordinatedLeadershipRenewDeadline,
+				RetryPeriod:   c.CoordinatedLeadershipRetryPeriod,
 			})
 			return nil
 		})

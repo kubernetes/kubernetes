@@ -23,7 +23,7 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestDefaults(t *testing.T) {
@@ -41,7 +41,7 @@ func TestDefaults(t *testing.T) {
 				Spec: CustomResourceDefinitionSpec{
 					Scope:                 NamespaceScoped,
 					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					PreserveUnknownFields: ptr.To(true),
 				},
 			},
 		},
@@ -56,7 +56,7 @@ func TestDefaults(t *testing.T) {
 							Service: &ServiceReference{},
 						},
 					},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					PreserveUnknownFields: ptr.To(true),
 				},
 			},
 			expected: &CustomResourceDefinition{
@@ -66,10 +66,10 @@ func TestDefaults(t *testing.T) {
 						Strategy:                 WebhookConverter,
 						ConversionReviewVersions: []string{"v1beta1"},
 						WebhookClientConfig: &WebhookClientConfig{
-							Service: &ServiceReference{Port: utilpointer.Int32Ptr(443)},
+							Service: &ServiceReference{Port: ptr.To[int32](443)},
 						},
 					},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					PreserveUnknownFields: ptr.To(true),
 				},
 			},
 		},
@@ -79,7 +79,7 @@ func TestDefaults(t *testing.T) {
 				Spec: CustomResourceDefinitionSpec{
 					Scope:                 NamespaceScoped,
 					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					PreserveUnknownFields: ptr.To(true),
 					Versions: []CustomResourceDefinitionVersion{
 						{Name: "v1", Storage: false, Served: true},
 						{Name: "v2", Storage: true, Served: true},
@@ -91,7 +91,7 @@ func TestDefaults(t *testing.T) {
 				Spec: CustomResourceDefinitionSpec{
 					Scope:                 NamespaceScoped,
 					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					PreserveUnknownFields: ptr.To(true),
 					Version:               "v1",
 					Versions: []CustomResourceDefinitionVersion{
 						{Name: "v1", Storage: false, Served: true},
@@ -110,7 +110,7 @@ func TestDefaults(t *testing.T) {
 				Spec: CustomResourceDefinitionSpec{
 					Scope:                 NamespaceScoped,
 					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					PreserveUnknownFields: ptr.To(true),
 					Version:               "v1",
 				},
 			},
@@ -118,7 +118,7 @@ func TestDefaults(t *testing.T) {
 				Spec: CustomResourceDefinitionSpec{
 					Scope:                 NamespaceScoped,
 					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
-					PreserveUnknownFields: utilpointer.BoolPtr(true),
+					PreserveUnknownFields: ptr.To(true),
 					Version:               "v1",
 					Versions: []CustomResourceDefinitionVersion{
 						{Name: "v1", Storage: true, Served: true},

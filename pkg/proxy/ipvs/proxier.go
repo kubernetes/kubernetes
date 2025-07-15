@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"reflect"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,8 +49,8 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/proxy/ipvs/util"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	netutils "k8s.io/utils/net"
@@ -170,10 +170,10 @@ type Proxier struct {
 	endpointsChanges *proxy.EndpointsChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
 
-	mu           sync.Mutex // protects the following fields
-	svcPortMap   proxy.ServicePortMap
-	endpointsMap proxy.EndpointsMap
-	nodeLabels   map[string]string
+	mu             sync.Mutex // protects the following fields
+	svcPortMap     proxy.ServicePortMap
+	endpointsMap   proxy.EndpointsMap
+	topologyLabels map[string]string
 	// initialSync is a bool indicating if the proxier is syncing for the first time.
 	// It is set to true when a new proxier is initialized and then set to false on all
 	// future syncs.
@@ -187,7 +187,7 @@ type Proxier struct {
 	endpointSlicesSynced bool
 	servicesSynced       bool
 	initialized          int32
-	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	syncRunner           *runner.BoundedFrequencyRunner // governs calls to syncProxyRules
 
 	// These are effectively const and do not need the mutex to be held.
 	syncPeriod    time.Duration
@@ -400,9 +400,10 @@ func NewProxier(
 	for _, is := range ipsetInfo {
 		proxier.ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, (ipFamily == v1.IPv6Protocol), is.comment)
 	}
-	burstSyncs := 2
-	logger.V(2).Info("ipvs sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
+
+	logger.V(2).Info("ipvs sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "maxSyncPeriod", proxyutil.FullSyncPeriod)
+	proxier.syncRunner = runner.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, proxyutil.FullSyncPeriod)
+
 	proxier.gracefuldeleteManager.Run()
 	return proxier, nil
 }
@@ -462,6 +463,7 @@ var iptablesCleanupChains = []struct {
 	{utiliptables.TableNAT, kubePostroutingChain},
 	{utiliptables.TableNAT, kubeNodePortChain},
 	{utiliptables.TableNAT, kubeLoadBalancerChain},
+	{utiliptables.TableNAT, kubeMarkMasqChain},
 	{utiliptables.TableFilter, kubeForwardChain},
 	{utiliptables.TableFilter, kubeNodePortChain},
 	{utiliptables.TableFilter, kubeProxyFirewallChain},
@@ -694,7 +696,24 @@ func cleanupIptablesLeftovers(ctx context.Context, ipt utiliptables.Interface) (
 }
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
-func CleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface) (encounteredError bool) {
+func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
+	// libipvs.New() will log errors if the "ip_vs" kernel module (or the "modprobe"
+	// binary) is not available. Logging an extra error is fine if we were actually
+	// trying to run the ipvs proxier, but it's confusing to see when just doing
+	// best-effort cleanup (eg, when starting the nftables proxier), so we do the same
+	// check libipvs does here, and bail out without calling libipvs if it fails.
+	if _, err := exec.Command("modprobe", "-va", "ip_vs").CombinedOutput(); err != nil {
+		return false
+	}
+
+	ipts, _ := utiliptables.NewDualStack()
+	ipsetInterface := utilipset.New()
+	ipvsInterface := utilipvs.New()
+
+	return cleanupLeftovers(ctx, ipvsInterface, ipts, ipsetInterface)
+}
+
+func cleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipts map[v1.IPFamily]utiliptables.Interface, ipset utilipset.Interface) (encounteredError bool) {
 	logger := klog.FromContext(ctx)
 	// Clear all ipvs rules
 	if ipvs != nil {
@@ -711,19 +730,26 @@ func CleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipt utilipta
 		logger.Error(err, "Error deleting dummy device created by ipvs proxier", "device", defaultDummyDevice)
 		encounteredError = true
 	}
+
 	// Clear iptables created by ipvs Proxier.
-	encounteredError = cleanupIptablesLeftovers(ctx, ipt) || encounteredError
+	for _, ipt := range ipts {
+		encounteredError = cleanupIptablesLeftovers(ctx, ipt) || encounteredError
+	}
+
 	// Destroy ip sets created by ipvs Proxier.  We should call it after cleaning up
 	// iptables since we can NOT delete ip set which is still referenced by iptables.
-	for _, set := range ipsetInfo {
-		err = ipset.DestroySet(set.name)
-		if err != nil {
-			if !utilipset.IsNotFoundError(err) {
-				logger.Error(err, "Error removing ipset", "ipset", set.name)
-				encounteredError = true
+	if _, err := ipset.GetVersion(); err == nil {
+		for _, set := range ipsetInfo {
+			err = ipset.DestroySet(set.name)
+			if err != nil {
+				if !utilipset.IsNotFoundError(err) {
+					logger.Error(err, "Error removing ipset", "ipset", set.name)
+					encounteredError = true
+				}
 			}
 		}
 	}
+
 	return encounteredError
 }
 
@@ -823,70 +849,13 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.syncProxyRules()
 }
 
-// OnNodeAdd is called whenever creation of new node object
-// is observed.
-func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
-	if node.Name != proxier.nodeName {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node", "eventNode", node.Name, "currentNode", proxier.nodeName)
-		return
-	}
-
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return
-	}
-
+// OnTopologyChange is called whenever this node's proxy relevant topology-related labels change.
+func (proxier *Proxier) OnTopologyChange(topologyLabels map[string]string) {
 	proxier.mu.Lock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
+	proxier.topologyLabels = topologyLabels
 	proxier.mu.Unlock()
-	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
-
+	proxier.logger.V(4).Info("Updated proxier node topology labels", "labels", topologyLabels)
 	proxier.Sync()
-}
-
-// OnNodeUpdate is called whenever modification of an existing
-// node object is observed.
-func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
-	if node.Name != proxier.nodeName {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node", "eventNode", node.Name, "currentNode", proxier.nodeName)
-		return
-	}
-
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return
-	}
-
-	proxier.mu.Lock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
-	proxier.mu.Unlock()
-	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
-
-	proxier.Sync()
-}
-
-// OnNodeDelete is called whenever deletion of an existing node
-// object is observed.
-func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
-	if node.Name != proxier.nodeName {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node", "eventNode", node.Name, "currentNode", proxier.nodeName)
-		return
-	}
-
-	proxier.mu.Lock()
-	proxier.nodeLabels = nil
-	proxier.mu.Unlock()
-
-	proxier.Sync()
-}
-
-// OnNodeSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnNodeSynced() {
 }
 
 // OnServiceCIDRsChanged is called whenever a change is observed
@@ -894,7 +863,7 @@ func (proxier *Proxier) OnNodeSynced() {
 func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
 
 // This is where all of the ipvs calls happen.
-func (proxier *Proxier) syncProxyRules() {
+func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
@@ -1489,6 +1458,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Finish housekeeping, clear stale conntrack entries for UDP Services
 		conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap)
 	}
+	return
 }
 
 // writeIptablesRules write all iptables rules to proxier.natRules or proxier.FilterRules that ipvs proxier needed
@@ -1843,7 +1813,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	if !ok {
 		proxier.logger.Info("Unable to filter endpoints due to missing service info", "servicePortName", svcPortName)
 	} else {
-		clusterEndpoints, localEndpoints, _, hasAnyEndpoints := proxy.CategorizeEndpoints(endpoints, svcInfo, proxier.nodeName, proxier.nodeLabels)
+		clusterEndpoints, localEndpoints, _, hasAnyEndpoints := proxy.CategorizeEndpoints(endpoints, svcInfo, proxier.nodeName, proxier.topologyLabels)
 		if onlyNodeLocalEndpoints {
 			if len(localEndpoints) > 0 {
 				endpoints = localEndpoints

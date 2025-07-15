@@ -877,7 +877,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.util.intstr.IntOrString"
               }
             ],
-            "description": "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediatedly created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption."
+            "description": "The maximum number of nodes with an existing available DaemonSet pod that can have an updated DaemonSet pod during during an update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up to a minimum of 1. Default value is 0. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their a new pod created before the old pod is marked as deleted. The update starts by launching new pods on 30% of nodes. Once an updated pod is available (Ready for at least minReadySeconds) the old DaemonSet pod on that node is marked deleted. If the old pod becomes unavailable for any reason (Ready transitions to false, is evicted, or is drained) an updated pod is immediately created on that node without considering surge limits. Allowing surge implies the possibility that the resources consumed by the daemonset on any given node can double if the readiness check fails, and so resource intensive daemonsets should take into account that they may cause evictions during disruption."
           },
           "maxUnavailable": {
             "allOf": [
@@ -1317,6 +1317,7 @@
         "description": "ScaleSpec describes the attributes of a scale subresource.",
         "properties": {
           "replicas": {
+            "default": 0,
             "description": "replicas is the desired number of instances for the scaled object.",
             "format": "int32",
             "type": "integer"
@@ -1798,7 +1799,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "envFrom": {
-            "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+            "description": "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
             "items": {
               "allOf": [
                 {
@@ -2135,7 +2136,7 @@
             "description": "The ConfigMap to select from"
           },
           "prefix": {
-            "description": "Optional text to prepend to the name of each environment variable. Must be a C_IDENTIFIER.",
+            "description": "Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.",
             "type": "string"
           },
           "secretRef": {
@@ -2154,7 +2155,7 @@
         "properties": {
           "name": {
             "default": "",
-            "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+            "description": "Name of the environment variable. May consist of any printable ASCII characters except '='.",
             "type": "string"
           },
           "value": {
@@ -2253,7 +2254,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "envFrom": {
-            "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+            "description": "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
             "items": {
               "allOf": [
                 {
@@ -2625,7 +2626,7 @@
         "properties": {
           "endpoints": {
             "default": "",
-            "description": "endpoints is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+            "description": "endpoints is the endpoint name that details Glusterfs topology.",
             "type": "string"
           },
           "path": {
@@ -3488,7 +3489,7 @@
         "description": "Pod anti affinity is a group of inter pod anti affinity scheduling rules.",
         "properties": {
           "preferredDuringSchedulingIgnoredDuringExecution": {
-            "description": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
+            "description": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and subtracting \"weight\" from the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
             "items": {
               "allOf": [
                 {
@@ -3818,7 +3819,7 @@
             "type": "boolean"
           },
           "hostNetwork": {
-            "description": "Host networking requested for this pod. Use the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false.",
+            "description": "Host networking requested for this pod. Use the host's network namespace. When using HostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false.",
             "type": "boolean"
           },
           "hostPID": {
@@ -5060,7 +5061,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.GlusterfsVolumeSource"
               }
             ],
-            "description": "glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported. More info: https://examples.k8s.io/volumes/glusterfs/README.md"
+            "description": "glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported."
           },
           "hostPath": {
             "allOf": [
@@ -5084,7 +5085,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ISCSIVolumeSource"
               }
             ],
-            "description": "iscsi represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://examples.k8s.io/volumes/iscsi/README.md"
+            "description": "iscsi represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes/#iscsi"
           },
           "name": {
             "default": "",
@@ -5145,7 +5146,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.RBDVolumeSource"
               }
             ],
-            "description": "rbd represents a Rados Block Device mount on the host that shares a pod's lifetime. Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported. More info: https://examples.k8s.io/volumes/rbd/README.md"
+            "description": "rbd represents a Rados Block Device mount on the host that shares a pod's lifetime. Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported."
           },
           "scaleIO": {
             "allOf": [
@@ -5766,11 +5767,6 @@
             "group": "networking.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
           },
           {
             "group": "networking.k8s.io",
@@ -6517,11 +6513,6 @@
             "group": "networking.k8s.io",
             "kind": "WatchEvent",
             "version": "v1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
           },
           {
             "group": "networking.k8s.io",

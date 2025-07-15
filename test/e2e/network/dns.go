@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -627,11 +626,6 @@ var _ = common.SIGDescribe("DNS", func() {
 		}
 		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
 	})
-})
-
-var _ = common.SIGDescribe("DNS", feature.RelaxedDNSSearchValidation, framework.WithFeatureGate(features.RelaxedDNSSearchValidation), func() {
-	f := framework.NewDefaultFramework("dns")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("should work with a search path containing an underscore and a search path with a single dot", func(ctx context.Context) {
 		// All the names we need to be able to resolve.
@@ -659,6 +653,35 @@ var _ = common.SIGDescribe("DNS", feature.RelaxedDNSSearchValidation, framework.
 		pod.Spec.DNSConfig = &v1.PodDNSConfig{
 			Searches: testSearchPaths,
 		}
+		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
+	})
+
+	framework.It("should work with a service name that starts with a digit", framework.WithFeatureGate(features.RelaxedServiceNameValidation), func(ctx context.Context) {
+		svcName := "1kubernetes"
+		svc := v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: svcName,
+			},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{Port: 443}},
+			},
+		}
+
+		createServiceReportErr(ctx, f.ClientSet, f.Namespace.Name, &svc)
+		namesToResolve := []string{
+			fmt.Sprintf("%s.%s.svc.%s", svcName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
+		}
+
+		agnhostProbeCmd, agnhostFileNames := createProbeCommand(namesToResolve, nil, "", "agnhost", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		agnhostProber := dnsQuerier{name: "agnhost", image: imageutils.Agnhost, cmd: agnhostProbeCmd}
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProber := dnsQuerier{name: "jessie", image: imageutils.JessieDnsutils, cmd: jessieProbeCmd}
+		ginkgo.By("Running these commands on agnhost: " + agnhostProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+
+		// Run a pod which probes DNS and exposes the results by HTTP.
+		ginkgo.By("creating a pod to probe DNS")
+		pod := createDNSPod(f.Namespace.Name, []dnsQuerier{agnhostProber, jessieProber}, dnsTestPodHostName, dnsTestServiceName)
 		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
 	})
 })

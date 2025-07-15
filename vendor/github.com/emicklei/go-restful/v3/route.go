@@ -111,6 +111,8 @@ func (r Route) matchesAccept(mimeTypesWithQuality string) bool {
 }
 
 // Return whether this Route can consume content with a type specified by mimeTypes (can be empty).
+// If the route does not specify Consumes then return true (*/*).
+// If no content type is set then return true for GET,HEAD,OPTIONS,DELETE and TRACE.
 func (r Route) matchesContentType(mimeTypes string) bool {
 
 	if len(r.Consumes) == 0 {

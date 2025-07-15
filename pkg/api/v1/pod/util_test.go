@@ -26,239 +26,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
-
-func TestFindPort(t *testing.T) {
-	restartAlways := v1.ContainerRestartPolicyAlways
-	testCases := []struct {
-		name           string
-		containers     []v1.Container
-		initContainers []v1.Container
-		port           intstr.IntOrString
-		expected       int
-		pass           bool
-	}{{
-		name:       "valid int, no ports",
-		containers: []v1.Container{{}},
-		port:       intstr.FromInt32(93),
-		expected:   93,
-		pass:       true,
-	}, {
-		name: "valid int, with ports",
-		containers: []v1.Container{{Ports: []v1.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "TCP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}}}},
-		port:     intstr.FromInt32(93),
-		expected: 93,
-		pass:     true,
-	}, {
-		name:       "valid str, no ports",
-		containers: []v1.Container{{}},
-		port:       intstr.FromString("p"),
-		expected:   0,
-		pass:       false,
-	}, {
-		name: "valid str, one ctr with ports",
-		containers: []v1.Container{{Ports: []v1.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}, {
-			Name:          "q",
-			ContainerPort: 33,
-			Protocol:      "TCP",
-		}}}},
-		port:     intstr.FromString("q"),
-		expected: 33,
-		pass:     true,
-	}, {
-		name: "valid str, two ctr with ports",
-		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}, {
-			Name:          "q",
-			ContainerPort: 33,
-			Protocol:      "TCP",
-		}}}},
-		port:     intstr.FromString("q"),
-		expected: 33,
-		pass:     true,
-	}, {
-		name: "valid str, two ctr with same port",
-		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}, {
-			Name:          "q",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}}}},
-		port:     intstr.FromString("q"),
-		expected: 22,
-		pass:     true,
-	}, {
-		name: "valid str, invalid protocol",
-		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-			Name:          "a",
-			ContainerPort: 11,
-			Protocol:      "snmp",
-		},
-		}}},
-		port:     intstr.FromString("a"),
-		expected: 0,
-		pass:     false,
-	}, {
-		name: "valid hostPort",
-		containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-			Name:          "a",
-			ContainerPort: 11,
-			HostPort:      81,
-			Protocol:      "TCP",
-		},
-		}}},
-		port:     intstr.FromString("a"),
-		expected: 11,
-		pass:     true,
-	},
-		{
-			name: "invalid hostPort",
-			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-				Name:          "a",
-				ContainerPort: 11,
-				HostPort:      -1,
-				Protocol:      "TCP",
-			},
-			}}},
-			port:     intstr.FromString("a"),
-			expected: 11,
-			pass:     true,
-			//this should fail but passes.
-		},
-		{
-			name: "invalid ContainerPort",
-			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-				Name:          "a",
-				ContainerPort: -1,
-				Protocol:      "TCP",
-			},
-			}}},
-			port:     intstr.FromString("a"),
-			expected: -1,
-			pass:     true,
-			//this should fail but passes
-		},
-		{
-			name: "HostIP Address",
-			containers: []v1.Container{{}, {Ports: []v1.ContainerPort{{
-				Name:          "a",
-				ContainerPort: 11,
-				HostIP:        "192.168.1.1",
-				Protocol:      "TCP",
-			},
-			}}},
-			port:     intstr.FromString("a"),
-			expected: 11,
-			pass:     true,
-		},
-		{
-			name: "Sidecar initContainer named port",
-			initContainers: []v1.Container{{
-				RestartPolicy: &restartAlways,
-				Ports: []v1.ContainerPort{{
-					Name:          "a",
-					ContainerPort: 80,
-					HostPort:      -1,
-					Protocol:      "TCP",
-				}},
-			}},
-			port:     intstr.FromString("a"),
-			expected: 80,
-			pass:     true,
-		},
-		{
-			name: "Invalid(restartPolicy != Always) initContainer named port",
-			initContainers: []v1.Container{{
-				Ports: []v1.ContainerPort{{
-					Name:          "a",
-					ContainerPort: 80,
-					HostPort:      -1,
-					Protocol:      "TCP",
-				}},
-			}},
-			port:     intstr.FromString("a"),
-			expected: 0,
-			pass:     false,
-		},
-		{
-			name: "App and sidecar containers have the same named port, first app container port will be used",
-			initContainers: []v1.Container{{
-				RestartPolicy: &restartAlways,
-				Ports: []v1.ContainerPort{{
-					Name:          "a",
-					ContainerPort: 80,
-					HostPort:      -1,
-					Protocol:      "TCP",
-				}},
-			}},
-			containers: []v1.Container{{
-				Ports: []v1.ContainerPort{{
-					Name:          "a",
-					ContainerPort: 81,
-					HostPort:      -1,
-					Protocol:      "TCP",
-				}},
-			}, {
-				Ports: []v1.ContainerPort{{
-					Name:          "a",
-					ContainerPort: 82,
-					HostPort:      -1,
-					Protocol:      "TCP",
-				}},
-			}},
-			port:     intstr.FromString("a"),
-			expected: 81,
-			pass:     true,
-		},
-	}
-
-	for _, tc := range testCases {
-		port, err := FindPort(&v1.Pod{Spec: v1.PodSpec{Containers: tc.containers, InitContainers: tc.initContainers}},
-			&v1.ServicePort{Protocol: "TCP", TargetPort: tc.port})
-		if err != nil && tc.pass {
-			t.Errorf("unexpected error for %s: %v", tc.name, err)
-		}
-		if err == nil && !tc.pass {
-			t.Errorf("unexpected non-error for %s: %d", tc.name, port)
-		}
-		if port != tc.expected {
-			t.Errorf("wrong result for %s: expected %d, got %d", tc.name, tc.expected, port)
-		}
-	}
-}
 
 func TestVisitContainers(t *testing.T) {
 	setAllFeatureEnabledContainersDuringTest := ContainerType(0)
@@ -421,6 +195,147 @@ func TestVisitContainers(t *testing.T) {
 				if c.SecurityContext != nil {
 					t.Errorf("VisitContainers() did not drop SecurityContext for ephemeral container %q", c.Name)
 				}
+			}
+		})
+	}
+}
+
+func TestContainerIter(t *testing.T) {
+	testCases := []struct {
+		desc           string
+		spec           *v1.PodSpec
+		wantContainers []string
+		mask           ContainerType
+	}{
+		{
+			desc:           "empty podspec",
+			spec:           &v1.PodSpec{},
+			wantContainers: []string{},
+			mask:           AllContainers,
+		},
+		{
+			desc: "regular containers",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"c1", "c2"},
+			mask:           Containers,
+		},
+		{
+			desc: "init containers",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2"},
+			mask:           InitContainers,
+		},
+		{
+			desc: "init + main containers",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2", "c1", "c2"},
+			mask:           InitContainers | Containers,
+		},
+		{
+			desc: "ephemeral containers",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"e1", "e2"},
+			mask:           EphemeralContainers,
+		},
+		{
+			desc: "all container types",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			mask:           AllContainers,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			gotContainers := []string{}
+			for c, containerType := range ContainerIter(tc.spec, tc.mask) {
+				gotContainers = append(gotContainers, c.Name)
+
+				switch containerType {
+				case InitContainers:
+					if c.Name[0] != 'i' {
+						t.Errorf("ContainerIter() yielded container type InitContainers for container %q", c.Name)
+					}
+				case Containers:
+					if c.Name[0] != 'c' {
+						t.Errorf("ContainerIter() yielded container type Containers for container %q", c.Name)
+					}
+				case EphemeralContainers:
+					if c.Name[0] != 'e' {
+						t.Errorf("ContainerIter() yielded container type EphemeralContainers for container %q", c.Name)
+					}
+				default:
+					t.Errorf("ContainerIter() yielded unknown container type %d", containerType)
+				}
+			}
+
+			if !cmp.Equal(gotContainers, tc.wantContainers) {
+				t.Errorf("ContainerIter() = %+v, want %+v", gotContainers, tc.wantContainers)
 			}
 		})
 	}
@@ -761,6 +676,15 @@ func TestIsPodAvailable(t *testing.T) {
 			expected:        false,
 		},
 		{
+			pod: func() *v1.Pod {
+				pod := newPod(now, true, 0)
+				pod.Status.Conditions[0].LastTransitionTime = metav1.Time{}
+				return pod
+			}(),
+			minReadySeconds: 1,
+			expected:        false,
+		},
+		{
 			pod:             newPod(now, true, 0),
 			minReadySeconds: 0,
 			expected:        true,
@@ -769,6 +693,16 @@ func TestIsPodAvailable(t *testing.T) {
 			pod:             newPod(now, true, 51),
 			minReadySeconds: 50,
 			expected:        true,
+		},
+		{
+			pod:             newPod(now, true, 51),
+			minReadySeconds: 51,
+			expected:        true,
+		},
+		{
+			pod:             newPod(now, true, 51),
+			minReadySeconds: 52,
+			expected:        false,
 		},
 	}
 
@@ -1074,5 +1008,155 @@ func TestIsContainersReadyConditionTrue(t *testing.T) {
 	for _, test := range tests {
 		isContainersReady := IsContainersReadyConditionTrue(test.podStatus)
 		assert.Equal(t, test.expected, isContainersReady, test.desc)
+	}
+}
+
+func TestCalculatePodStatusObservedGeneration(t *testing.T) {
+	tests := []struct {
+		name     string
+		pod      *v1.Pod
+		features map[featuregate.Feature]bool
+		expected int64
+	}{
+		{
+			name: "pod with no observedGeneration/PodObservedGenerationTracking=false",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 5,
+				},
+			},
+			expected: 0,
+		},
+		{
+			name: "pod with no observedGeneration/PodObservedGenerationTracking=true",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 5,
+				},
+			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: true,
+			},
+			expected: 5,
+		},
+		{
+			name: "pod with observedGeneration/PodObservedGenerationTracking=false",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 5,
+				},
+				Status: v1.PodStatus{
+					ObservedGeneration: 5,
+				},
+			},
+			expected: 5,
+		},
+		{
+			name: "pod with observedGeneration/PodObservedGenerationTracking=true",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 5,
+				},
+				Status: v1.PodStatus{
+					ObservedGeneration: 5,
+				},
+			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: true,
+			},
+			expected: 5,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for f, v := range tc.features {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, v)
+			}
+			assert.Equal(t, tc.expected, CalculatePodStatusObservedGeneration(tc.pod))
+		})
+	}
+}
+
+func TestCalculatePodConditionObservedGeneration(t *testing.T) {
+	tests := []struct {
+		name     string
+		pod      *v1.Pod
+		features map[featuregate.Feature]bool
+		expected int64
+	}{
+		{
+			name: "pod with no observedGeneration/PodObservedGenerationTracking=false",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 5,
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{{
+						Type: v1.PodReady,
+					}},
+				},
+			},
+			expected: 0,
+		},
+		{
+			name: "pod with no observedGeneration/PodObservedGenerationTracking=true",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 5,
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{{
+						Type: v1.PodReady,
+					}},
+				},
+			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: true,
+			},
+			expected: 5,
+		},
+		{
+			name: "pod with observedGeneration/PodObservedGenerationTracking=false",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 5,
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{{
+						Type:               v1.PodReady,
+						ObservedGeneration: 5,
+					}},
+				},
+			},
+			expected: 5,
+		},
+		{
+			name: "pod with observedGeneration/PodObservedGenerationTracking=true",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Generation: 5,
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{{
+						Type:               v1.PodReady,
+						ObservedGeneration: 5,
+					}},
+				},
+			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: true,
+			},
+			expected: 5,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for f, v := range tc.features {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, v)
+			}
+			assert.Equal(t, tc.expected, CalculatePodConditionObservedGeneration(&tc.pod.Status, tc.pod.Generation, v1.PodReady))
+		})
 	}
 }

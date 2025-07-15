@@ -30,7 +30,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func BenchmarkNoWarnings(b *testing.B) {
@@ -1009,7 +1009,7 @@ func TestWarnings(t *testing.T) {
 			template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: api.PodSpec{
-					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
+					TerminationGracePeriodSeconds: ptr.To[int64](-1),
 				},
 			},
 			expected: []string{

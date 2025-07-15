@@ -81,6 +81,7 @@ func extractEndpoints(endpoints *corev1.Endpoints, fieldManager string, subresou
 	b.WithAPIVersion("v1")
 	return b, nil
 }
+func (b EndpointsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -253,8 +254,24 @@ func (b *EndpointsApplyConfiguration) WithSubsets(values ...*EndpointSubsetApply
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *EndpointsApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *EndpointsApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *EndpointsApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *EndpointsApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

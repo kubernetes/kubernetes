@@ -398,6 +398,29 @@ func NewPoliceAction() *PoliceAction {
 	}
 }
 
+type SampleAction struct {
+	ActionAttrs
+	Group     uint32
+	Rate      uint32
+	TruncSize uint32
+}
+
+func (action *SampleAction) Type() string {
+	return "sample"
+}
+
+func (action *SampleAction) Attrs() *ActionAttrs {
+	return &action.ActionAttrs
+}
+
+func NewSampleAction() *SampleAction {
+	return &SampleAction{
+		ActionAttrs: ActionAttrs{
+			Action: TC_ACT_PIPE,
+		},
+	}
+}
+
 // MatchAll filters match all packets
 type MatchAll struct {
 	FilterAttrs

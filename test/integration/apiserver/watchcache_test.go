@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -38,12 +39,12 @@ import (
 // with one of them containing events and the other all other objects.
 func multiEtcdSetup(ctx context.Context, t *testing.T) (clientset.Interface, framework.TearDownFunc) {
 	etcdArgs := []string{"--experimental-watch-progress-notify-interval", "1s"}
-	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd("etcd_watchcache0", etcdArgs, nil)
+	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd(klog.FromContext(ctx).WithName("etcd0"), "etcd_watchcache0", etcdArgs)
 	if err != nil {
 		t.Fatalf("Couldn't start etcd: %v", err)
 	}
 
-	etcd1URL, stopEtcd1, err := framework.RunCustomEtcd("etcd_watchcache1", etcdArgs, nil)
+	etcd1URL, stopEtcd1, err := framework.RunCustomEtcd(klog.FromContext(ctx).WithName("etcd1"), "etcd_watchcache1", etcdArgs)
 	if err != nil {
 		t.Fatalf("Couldn't start etcd: %v", err)
 	}

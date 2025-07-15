@@ -42,12 +42,11 @@ const (
 	memResource             = v1.ResourceMemory
 )
 
-// These tests don't seem to be running properly in parallel: issue: #20338.
 var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CPU)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityLevel = api.LevelBaseline
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "Deployment (Pod Resource)", func() {
+	f.Describe("Deployment (Pod Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, false, f)
 		})
@@ -59,7 +58,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 		})
 	})
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "Deployment (Container Resource)", func() {
+	f.Describe("Deployment (Container Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUpContainerResource(ctx, "test-deployment", e2eautoscaling.KindDeployment, cpuResource, utilizationMetricType, f)
 		})
@@ -68,7 +67,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 		})
 	})
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "ReplicaSet", func() {
+	f.Describe("ReplicaSet", func() {
 		ginkgo.It(titleUp, func(ctx context.Context) {
 			scaleUp(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
 		})
@@ -78,7 +77,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 	})
 
 	// These tests take ~20 minutes each.
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "ReplicationController", func() {
+	f.Describe("ReplicationController", func() {
 		ginkgo.It(titleUp+" and verify decision stability", func(ctx context.Context) {
 			scaleUp(ctx, "rc", e2eautoscaling.KindRC, cpuResource, utilizationMetricType, true, f)
 		})
@@ -102,7 +101,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 			}
 			st.run(ctx, "rc-light", e2eautoscaling.KindRC, f)
 		})
-		f.It(f.WithSlow(), "Should scale from 2 pods to 1 pod", func(ctx context.Context) {
+		f.It("Should scale from 2 pods to 1 pod", func(ctx context.Context) {
 			st := &HPAScaleTest{
 				initPods:         2,
 				initCPUTotal:     50,
@@ -118,7 +117,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: CP
 		})
 	})
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "ReplicaSet with idle sidecar (ContainerResource use case)", func() {
+	f.Describe("ReplicaSet with idle sidecar (ContainerResource use case)", func() {
 		// ContainerResource CPU autoscaling on idle sidecar
 		ginkgo.It(titleUp+" on a busy application with an idle sidecar container", func(ctx context.Context) {
 			scaleOnIdleSideCar(ctx, "rs", e2eautoscaling.KindReplicaSet, cpuResource, utilizationMetricType, false, f)
@@ -152,7 +151,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: Me
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityLevel = api.LevelBaseline
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "Deployment (Pod Resource)", func() {
+	f.Describe("Deployment (Pod Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUp(ctx, "test-deployment", e2eautoscaling.KindDeployment, memResource, utilizationMetricType, false, f)
 		})
@@ -161,7 +160,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (scale resource: Me
 		})
 	})
 
-	f.Describe(framework.WithSerial(), framework.WithSlow(), "Deployment (Container Resource)", func() {
+	f.Describe("Deployment (Container Resource)", func() {
 		ginkgo.It(titleUp+titleAverageUtilization, func(ctx context.Context) {
 			scaleUpContainerResource(ctx, "test-deployment", e2eautoscaling.KindDeployment, memResource, utilizationMetricType, f)
 		})

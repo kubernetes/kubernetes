@@ -29,13 +29,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
 
+	yaml "go.yaml.in/yaml/v2"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"k8s.io/utils/pointer"
-	yaml "sigs.k8s.io/yaml/goyaml.v2"
+	"k8s.io/utils/ptr"
 )
 
 func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
@@ -646,7 +646,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 		{
 			name: "preserve-unknown-fields in arrays",
 			in: &apiextensions.JSONSchemaProps{
-				XPreserveUnknownFields: pointer.BoolPtr(true),
+				XPreserveUnknownFields: ptr.To(true),
 				Type:                   "array",
 				Items: &apiextensions.JSONSchemaPropsOrArray{Schema: &apiextensions.JSONSchemaProps{
 					Type: "string",
@@ -657,7 +657,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 		{
 			name: "preserve-unknown-fields in objects",
 			in: &apiextensions.JSONSchemaProps{
-				XPreserveUnknownFields: pointer.BoolPtr(true),
+				XPreserveUnknownFields: ptr.To(true),
 				Type:                   "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"foo": {

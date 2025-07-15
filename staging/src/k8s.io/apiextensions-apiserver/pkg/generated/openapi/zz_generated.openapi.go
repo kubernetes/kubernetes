@@ -1041,6 +1041,7 @@ func schema_k8sio_api_autoscaling_v1_ScaleSpec(ref common.ReferenceCallback) com
 					"replicas": {
 						SchemaProps: spec.SchemaProps{
 							Description: "replicas is the desired number of instances for the scaled object.",
+							Default:     0,
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

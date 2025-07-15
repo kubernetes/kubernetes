@@ -17,6 +17,8 @@ limitations under the License.
 package pod
 
 import (
+	"fmt"
+	"iter"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,28 +62,40 @@ type ContainerVisitor func(container *api.Container, containerType ContainerType
 // visiting is short-circuited. VisitContainers returns true if visiting completes,
 // false if visiting was short-circuited.
 func VisitContainers(podSpec *api.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
-	if mask&InitContainers != 0 {
-		for i := range podSpec.InitContainers {
-			if !visitor(&podSpec.InitContainers[i], InitContainers) {
-				return false
-			}
-		}
-	}
-	if mask&Containers != 0 {
-		for i := range podSpec.Containers {
-			if !visitor(&podSpec.Containers[i], Containers) {
-				return false
-			}
-		}
-	}
-	if mask&EphemeralContainers != 0 {
-		for i := range podSpec.EphemeralContainers {
-			if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
-				return false
-			}
+	for c, t := range ContainerIter(podSpec, mask) {
+		if !visitor(c, t) {
+			return false
 		}
 	}
 	return true
+}
+
+// ContainerIter returns an iterator over all containers in the given pod spec with a masked type.
+// The iteration order is InitContainers, then main Containers, then EphemeralContainers.
+func ContainerIter(podSpec *api.PodSpec, mask ContainerType) iter.Seq2[*api.Container, ContainerType] {
+	return func(yield func(*api.Container, ContainerType) bool) {
+		if mask&InitContainers != 0 {
+			for i := range podSpec.InitContainers {
+				if !yield(&podSpec.InitContainers[i], InitContainers) {
+					return
+				}
+			}
+		}
+		if mask&Containers != 0 {
+			for i := range podSpec.Containers {
+				if !yield(&podSpec.Containers[i], Containers) {
+					return
+				}
+			}
+		}
+		if mask&EphemeralContainers != 0 {
+			for i := range podSpec.EphemeralContainers {
+				if !yield((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
+					return
+				}
+			}
+		}
+	}
 }
 
 // Visitor is called with each object name, and returns true if visiting should continue
@@ -353,6 +367,28 @@ func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 	return false
 }
 
+// hasInvalidTopologySpreadConstrainMatchLabelKeys return true if spec.TopologySpreadConstraints have any entry with invalid MatchLabelKeys
+func hasInvalidTopologySpreadConstrainMatchLabelKeys(spec *api.PodSpec) bool {
+	for _, constraint := range spec.TopologySpreadConstraints {
+		errs := apivalidation.ValidateMatchLabelKeysAndMismatchLabelKeys(nil, constraint.MatchLabelKeys, nil, constraint.LabelSelector)
+		if len(errs) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// hasLegacyInvalidTopologySpreadConstrainMatchLabelKeys return true if spec.TopologySpreadConstraints have any entry with invalid MatchLabelKeys against legacy validation
+func hasLegacyInvalidTopologySpreadConstrainMatchLabelKeys(spec *api.PodSpec) bool {
+	for _, constraint := range spec.TopologySpreadConstraints {
+		errs := apivalidation.ValidateMatchLabelKeysInTopologySpread(nil, constraint.MatchLabelKeys, constraint.LabelSelector)
+		if len(errs) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // hasNonLocalProjectedTokenPath return true if spec.Volumes have any entry with non-local projected token path
 func hasNonLocalProjectedTokenPath(spec *api.PodSpec) bool {
 	for _, volume := range spec.Volumes {
@@ -377,15 +413,19 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts := apivalidation.PodValidationOptions{
 		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
-		AllowIndivisibleHugePagesValues:                   false,
-		AllowInvalidLabelValueInSelector:                  false,
-		AllowInvalidTopologySpreadConstraintLabelSelector: false,
-		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
-		AllowNonLocalProjectedTokenPath:                   false,
-		AllowPodLifecycleSleepActionZeroValue:             utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepActionAllowZero),
-		PodLevelResourcesEnabled:                          utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		AllowInvalidLabelValueInRequiredNodeAffinity:      false,
-		AllowSidecarResizePolicy:                          utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		AllowIndivisibleHugePagesValues:                     false,
+		AllowInvalidLabelValueInSelector:                    false,
+		AllowInvalidTopologySpreadConstraintLabelSelector:   false,
+		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
+		AllowNonLocalProjectedTokenPath:                     false,
+		AllowPodLifecycleSleepActionZeroValue:               utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepActionAllowZero),
+		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
+		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
+		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
+		OldPodViolatesMatchLabelKeysValidation:              false,
+		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -403,6 +443,15 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowInvalidLabelValueInRequiredNodeAffinity = hasInvalidLabelValueInRequiredNodeAffinity(oldPodSpec)
 		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
 		opts.AllowInvalidTopologySpreadConstraintLabelSelector = hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
+		if opts.AllowMatchLabelKeysInPodTopologySpread {
+			if opts.AllowMatchLabelKeysInPodTopologySpreadSelectorMerge {
+				// If old spec has invalid MatchLabelKeys, we must set true
+				opts.OldPodViolatesMatchLabelKeysValidation = hasInvalidTopologySpreadConstrainMatchLabelKeys(oldPodSpec)
+			} else {
+				// If old spec has invalid MatchLabelKeys against legacy validation, we must set true
+				opts.OldPodViolatesLegacyMatchLabelKeysValidation = hasLegacyInvalidTopologySpreadConstrainMatchLabelKeys(oldPodSpec)
+			}
+		}
 		// if old spec has an invalid projected token volume path, we must allow it
 		opts.AllowNonLocalProjectedTokenPath = hasNonLocalProjectedTokenPath(oldPodSpec)
 
@@ -1439,4 +1488,76 @@ func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+// HasAPIObjectReference returns true if a reference to an API object is found in the pod spec,
+// along with the plural resource of the referenced API type, or an error if an unknown field is encountered.
+func HasAPIObjectReference(pod *api.Pod) (bool, string, error) {
+	if pod.Spec.ServiceAccountName != "" {
+		return true, "serviceaccounts", nil
+	}
+
+	hasSecrets := false
+	VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false }, AllContainers)
+	if hasSecrets {
+		return true, "secrets", nil
+	}
+
+	hasConfigMaps := false
+	VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false }, AllContainers)
+	if hasConfigMaps {
+		return true, "configmaps", nil
+	}
+
+	if len(pod.Spec.ResourceClaims) > 0 {
+		return true, "resourceclaims", nil
+	}
+
+	for _, v := range pod.Spec.Volumes {
+		switch {
+		case v.AWSElasticBlockStore != nil, v.AzureDisk != nil, v.CephFS != nil, v.Cinder != nil,
+			v.DownwardAPI != nil, v.EmptyDir != nil, v.FC != nil, v.FlexVolume != nil, v.Flocker != nil, v.GCEPersistentDisk != nil,
+			v.GitRepo != nil, v.HostPath != nil, v.Image != nil, v.ISCSI != nil, v.NFS != nil, v.PhotonPersistentDisk != nil,
+			v.PortworxVolume != nil, v.Quobyte != nil, v.RBD != nil, v.ScaleIO != nil, v.StorageOS != nil, v.VsphereVolume != nil:
+			continue
+		case v.ConfigMap != nil:
+			return true, "configmaps (via configmap volumes)", nil
+		case v.Secret != nil:
+			return true, "secrets (via secret volumes)", nil
+		case v.CSI != nil:
+			return true, "csidrivers (via CSI volumes)", nil
+		case v.Glusterfs != nil:
+			return true, "endpoints (via glusterFS volumes)", nil
+		case v.PersistentVolumeClaim != nil:
+			return true, "persistentvolumeclaims", nil
+		case v.Ephemeral != nil:
+			return true, "persistentvolumeclaims (via ephemeral volumes)", nil
+		case v.AzureFile != nil:
+			return true, "secrets (via azureFile volumes)", nil
+		case v.Projected != nil:
+			for _, s := range v.Projected.Sources {
+				// Reject projected volume sources that require the Kubernetes API
+				switch {
+				case s.ConfigMap != nil:
+					return true, "configmaps (via projected volumes)", nil
+				case s.Secret != nil:
+					return true, "secrets (via projected volumes)", nil
+				case s.ServiceAccountToken != nil:
+					return true, "serviceaccounts (via projected volumes)", nil
+				case s.ClusterTrustBundle != nil:
+					return true, "clustertrustbundles", nil
+				case s.DownwardAPI != nil:
+					// Allow projected volume sources that don't require the Kubernetes API
+					continue
+				default:
+					// Reject unknown volume types
+					return true, "", fmt.Errorf("unknown source for projected volume %q", v.Name)
+				}
+			}
+		default:
+			return true, "", fmt.Errorf("unknown volume type for volume  %q", v.Name)
+		}
+	}
+
+	return false, "", nil
 }

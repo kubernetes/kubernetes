@@ -22,9 +22,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -123,7 +122,7 @@ func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile, f framework.Fra
 	if v.queueSort != queueSort {
 		return fmt.Errorf("different queue sort plugins for profile %q: %q, first: %q", cfg.SchedulerName, queueSort, v.queueSort)
 	}
-	if !cmp.Equal(v.queueSortArgs, queueSortArgs) {
+	if diff.Diff(v.queueSortArgs, queueSortArgs) != "" {
 		return fmt.Errorf("different queue sort plugin args for profile %q", cfg.SchedulerName)
 	}
 	return nil

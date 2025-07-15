@@ -28,10 +28,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -184,6 +188,119 @@ func TestCreate_Token_WithExpiryCap(t *testing.T) {
 	}
 }
 
+func TestTokenRequest_ServiceAccountUIDValidation(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		featureGateEnabled      bool
+		serviceAccountUID       types.UID
+		requestUID              types.UID
+		expectError             string
+		expectedRecordedWarning string
+		expectAuditAnnotations  map[string]string
+		expectedResultUID       types.UID
+	}{
+		{
+			name:               "feature gate enabled - matching UID",
+			featureGateEnabled: true,
+			serviceAccountUID:  "correct-sa-uid-123",
+			requestUID:         "correct-sa-uid-123",
+			expectedResultUID:  "correct-sa-uid-123",
+		},
+		{
+			name:               "feature gate enabled - mismatched UID",
+			featureGateEnabled: true,
+			serviceAccountUID:  "correct-sa-uid-123",
+			requestUID:         "wrong-sa-uid-456",
+			expectError:        `Operation cannot be fulfilled on TokenRequest.authentication.k8s.io "test-sa": the UID in the token request (wrong-sa-uid-456) does not match the UID of the service account (correct-sa-uid-123)`,
+		},
+		{
+			name:                    "feature gate disabled - mismatched UID",
+			featureGateEnabled:      false,
+			serviceAccountUID:       "correct-sa-uid-123",
+			requestUID:              "wrong-sa-uid-456",
+			expectedResultUID:       "wrong-sa-uid-456", // No validation, so request UID is used as-is (backwards compatibility)
+			expectedRecordedWarning: "the UID in the token request (wrong-sa-uid-456) does not match the UID of the service account (correct-sa-uid-123) but TokenRequestServiceAccountUIDValidation is not enabled. In the future, this will return a conflict error",
+			expectAuditAnnotations: map[string]string{
+				"authentication.k8s.io/token-request-uid-mismatch": "the UID in the token request (wrong-sa-uid-456) does not match the UID of the service account (correct-sa-uid-123)",
+			},
+		},
+		{
+			name:               "empty request UID",
+			featureGateEnabled: false,
+			serviceAccountUID:  "correct-sa-uid-123",
+			requestUID:         "",
+			expectedResultUID:  "correct-sa-uid-123",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.TokenRequestServiceAccountUIDValidation, tc.featureGateEnabled)
+
+			serviceAccount := validNewServiceAccount("test-sa")
+			serviceAccount.UID = tc.serviceAccountUID
+
+			serviceAccountGetter := &objectGetter{obj: serviceAccount}
+			aud := authenticator.Audiences{"test-audience"}
+
+			storage, server := newTokenStorage(t, testTokenGenerator{"fake"}, aud, panicGetter{}, panicGetter{}, nil)
+			defer server.Terminate(t)
+			defer storage.DestroyFunc()
+
+			storage.Token.svcaccts = serviceAccountGetter
+
+			dc := dummyRecorder{agent: "", text: ""}
+			ctx := context.Background()
+			ctx = request.WithNamespace(warning.WithWarningRecorder(ctx, &dc), serviceAccount.Namespace)
+			// create an audit context to allow recording audit information
+			ctx = audit.WithAuditContext(ctx)
+
+			tokenReq := &authenticationapi.TokenRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      serviceAccount.Name,
+					Namespace: serviceAccount.Namespace,
+					UID:       tc.requestUID,
+				},
+				Spec: authenticationapi.TokenRequestSpec{
+					Audiences:         aud,
+					ExpirationSeconds: 3600, // 1 hour
+				},
+			}
+
+			out, err := storage.Token.Create(ctx, serviceAccount.Name, tokenReq, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+
+			if len(tc.expectError) > 0 {
+				if err == nil {
+					t.Fatalf("expected error but got none")
+				}
+				if err.Error() != tc.expectError {
+					t.Errorf("expected error %q, got %q", tc.expectError, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("expected no error but got: %v", err)
+				}
+				result := out.(*authenticationapi.TokenRequest)
+				if result.UID != tc.expectedResultUID {
+					t.Errorf("expected result UID %q, got %q", tc.expectedResultUID, result.UID)
+				}
+			}
+
+			if len(tc.expectedRecordedWarning) > 0 && tc.expectedRecordedWarning != dc.getWarning() {
+				t.Errorf("expected recorded warning %q, got %q", tc.expectedRecordedWarning, dc.getWarning())
+			}
+
+			auditContext := audit.AuditContextFrom(ctx)
+			for key, expectedValue := range tc.expectAuditAnnotations {
+				actualValue, ok := auditContext.GetEventAnnotation(key)
+				if !ok || actualValue != expectedValue {
+					t.Errorf("expected audit annotation %q with value %q, got %v", key, expectedValue, actualValue)
+				}
+			}
+		})
+	}
+}
+
 type objectGetter struct {
 	obj runtime.Object
 	err error
@@ -209,3 +326,19 @@ func (f testTokenGenerator) GenerateToken(ctx context.Context, claims *jwt.Claim
 }
 
 var _ token.TokenGenerator = testTokenGenerator{}
+
+type dummyRecorder struct {
+	agent string
+	text  string
+}
+
+func (r *dummyRecorder) AddWarning(agent, text string) {
+	r.agent = agent
+	r.text = text
+}
+
+func (r *dummyRecorder) getWarning() string {
+	return r.text
+}
+
+var _ warning.Recorder = &dummyRecorder{}

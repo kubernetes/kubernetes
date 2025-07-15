@@ -206,9 +206,6 @@ func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 
 			expectedGVK := gvk
 			if testData.ExpectedGVK != nil {
-				if gvk == *testData.ExpectedGVK {
-					t.Errorf("GVK override %s for %s is unnecessary or something was changed incorrectly", testData.ExpectedGVK, gvk)
-				}
 				expectedGVK = *testData.ExpectedGVK
 			}
 

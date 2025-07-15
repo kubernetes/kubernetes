@@ -22,6 +22,7 @@ package conntrack
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"sort"
 	"testing"
 
@@ -55,12 +56,37 @@ const (
 	testNonServingEndpointIP = "10.240.1.5"
 	testDeletedEndpointIP    = "10.240.2.6"
 
+	// testOldEndpointPort is used to cover cases when endpoint changes port,
+	// but IP remains same.
+	testOldEndpointPort = 8080
+	testEndpointPort    = 9090
 	testServicePort     = 8000
 	testServiceNodePort = 32000
 	// testNonServicePort is used to mock conntrack flow entries which are not owned by
 	// kube-proxy and reconciler should not consider these for cleanup
 	testNonServicePort = 3000
 )
+
+// generateConntrackEntry generates *netlink.ConntrackFlow for unit-testing.
+func generateConntrackEntry(origDst string, origPortDst uint16, replySrc string, replyPortSrc uint16, proto uint8) *netlink.ConntrackFlow {
+	entry := &netlink.ConntrackFlow{
+		FamilyType: unix.AF_INET,
+		Forward: netlink.IPTuple{
+			DstPort:  origPortDst,
+			Protocol: proto,
+		},
+		Reverse: netlink.IPTuple{
+			Protocol: proto,
+			SrcIP:    netutils.ParseIPSloppy(replySrc),
+			SrcPort:  replyPortSrc,
+		},
+	}
+	// we don't match on --orig-dst for node port services (*:NodePort), --orig-dst is thus handled separately
+	if origDst != "" {
+		entry.Forward.DstIP = netutils.ParseIPSloppy(origDst)
+	}
+	return entry
+}
 
 func TestCleanStaleEntries(t *testing.T) {
 	// We need to construct proxy.ServicePortMap and proxy.EndpointsMap to pass to
@@ -134,17 +160,17 @@ func TestCleanStaleEntries(t *testing.T) {
 		Ports: []discovery.EndpointPort{
 			{
 				Name:     ptr.To("test-tcp"),
-				Port:     ptr.To(int32(testServicePort)),
+				Port:     ptr.To(int32(testEndpointPort)),
 				Protocol: ptr.To(v1.ProtocolTCP),
 			},
 			{
 				Name:     ptr.To("test-udp"),
-				Port:     ptr.To(int32(testServicePort)),
+				Port:     ptr.To(int32(testEndpointPort)),
 				Protocol: ptr.To(v1.ProtocolUDP),
 			},
 			{
 				Name:     ptr.To("test-sctp"),
-				Port:     ptr.To(int32(testServicePort)),
+				Port:     ptr.To(int32(testEndpointPort)),
 				Protocol: ptr.To(v1.ProtocolSCTP),
 			},
 		},
@@ -229,24 +255,19 @@ func TestCleanStaleEntries(t *testing.T) {
 	// entriesBeforeCleanup - entriesAfterCleanup = entries cleared by conntrack reconciler
 	var entriesAfterCleanup []*netlink.ConntrackFlow
 
+	// we create 6 fake flow entries with `testOldEndpointPort`, this simulates the case when
+	// endpoints change port without changing IP. These entries should be cleared by reconciler.
+	for _, origDest := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
+		entry := generateConntrackEntry(origDest, testServicePort, testServingEndpointIP, testOldEndpointPort, unix.IPPROTO_UDP)
+		entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
+	}
+
 	// we create 63 fake flow entries ( 3 Endpoints * 3 Protocols * ( 3 (ServiceIP:ServicePort) + 3 (ServiceIP:NonServicePort) + 1 (NodePort))
 	for _, dnatDest := range []string{testServingEndpointIP, testNonServingEndpointIP, testDeletedEndpointIP} {
 		for _, proto := range []uint8{unix.IPPROTO_TCP, unix.IPPROTO_UDP, unix.IPPROTO_SCTP} {
-
 			for _, origDest := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
 				for _, port := range []uint16{testServicePort, testNonServicePort} {
-					entry := &netlink.ConntrackFlow{
-						FamilyType: unix.AF_INET,
-						Forward: netlink.IPTuple{
-							DstIP:    netutils.ParseIPSloppy(origDest),
-							DstPort:  port,
-							Protocol: proto,
-						},
-						Reverse: netlink.IPTuple{
-							Protocol: proto,
-							SrcIP:    netutils.ParseIPSloppy(dnatDest),
-						},
-					}
+					entry := generateConntrackEntry(origDest, port, dnatDest, testEndpointPort, proto)
 					entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
 					if proto == unix.IPPROTO_UDP && port == testServicePort && dnatDest != testServingEndpointIP {
 						// we do not expect UDP entries with destination port `testServicePort` and DNATed destination
@@ -257,17 +278,7 @@ func TestCleanStaleEntries(t *testing.T) {
 				}
 			}
 
-			entry := &netlink.ConntrackFlow{
-				FamilyType: unix.AF_INET,
-				Forward: netlink.IPTuple{
-					DstPort:  testServiceNodePort,
-					Protocol: proto,
-				},
-				Reverse: netlink.IPTuple{
-					Protocol: proto,
-					SrcIP:    netutils.ParseIPSloppy(dnatDest),
-				},
-			}
+			entry := generateConntrackEntry("", testServiceNodePort, dnatDest, testEndpointPort, proto)
 			entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
 			if proto == unix.IPPROTO_UDP && dnatDest != testServingEndpointIP {
 				// we do not expect UDP entries with DNATed destination address not
@@ -387,7 +398,7 @@ func TestPerformanceCleanStaleEntries(t *testing.T) {
 		Ports: []discovery.EndpointPort{
 			{
 				Name:     ptr.To("test-udp"),
-				Port:     ptr.To(int32(testServicePort)),
+				Port:     ptr.To(int32(testEndpointPort)),
 				Protocol: ptr.To(v1.ProtocolUDP),
 			},
 		},
@@ -397,27 +408,12 @@ func TestPerformanceCleanStaleEntries(t *testing.T) {
 	endpointsMap := make(proxy.EndpointsMap)
 	_ = endpointsMap.Update(ect)
 
-	genConntrackEntry := func(dstPort uint16, revSrc string) *netlink.ConntrackFlow {
-		return &netlink.ConntrackFlow{
-			FamilyType: unix.AF_INET,
-			Forward: netlink.IPTuple{
-				DstIP:    netutils.ParseIPSloppy(testExternalIP),
-				DstPort:  dstPort,
-				Protocol: unix.IPPROTO_UDP,
-			},
-			Reverse: netlink.IPTuple{
-				Protocol: unix.IPPROTO_UDP,
-				SrcIP:    netutils.ParseIPSloppy(revSrc),
-			},
-		}
-	}
-
 	fake := NewFake()
 	// 1 valid entry
-	fake.entries = append(fake.entries, genConntrackEntry(uint16(testServicePort), testServingEndpointIP))
+	fake.entries = append(fake.entries, generateConntrackEntry(testExternalIP, testServicePort, testServingEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
 	expectedEntries := 1
 	// 1 stale entry
-	fake.entries = append(fake.entries, genConntrackEntry(uint16(testServicePort), testDeletedEndpointIP))
+	fake.entries = append(fake.entries, generateConntrackEntry(testExternalIP, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
 	expectedDeleted := 1
 	// 1 M to the Service IP with random ports
 	for i := 0; i < 1000*1000; i++ {
@@ -427,7 +423,7 @@ func TestPerformanceCleanStaleEntries(t *testing.T) {
 		} else {
 			expectedEntries++
 		}
-		fake.entries = append(fake.entries, genConntrackEntry(port, testDeletedEndpointIP))
+		fake.entries = append(fake.entries, generateConntrackEntry(testExternalIP, port, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
 	}
 
 	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
@@ -497,7 +493,7 @@ func TestServiceWithoutEndpoints(t *testing.T) {
 		Ports: []discovery.EndpointPort{
 			{
 				Name:     ptr.To("test-udp"),
-				Port:     ptr.To(int32(testServicePort)),
+				Port:     ptr.To(int32(testEndpointPort)),
 				Protocol: ptr.To(v1.ProtocolUDP),
 			},
 		},
@@ -507,26 +503,11 @@ func TestServiceWithoutEndpoints(t *testing.T) {
 	endpointsMap := make(proxy.EndpointsMap)
 	_ = endpointsMap.Update(ect)
 
-	genConntrackEntry := func(dstPort uint16, revSrc string) *netlink.ConntrackFlow {
-		return &netlink.ConntrackFlow{
-			FamilyType: unix.AF_INET,
-			Forward: netlink.IPTuple{
-				DstIP:    netutils.ParseIPSloppy(testExternalIP),
-				DstPort:  dstPort,
-				Protocol: unix.IPPROTO_UDP,
-			},
-			Reverse: netlink.IPTuple{
-				Protocol: unix.IPPROTO_UDP,
-				SrcIP:    netutils.ParseIPSloppy(revSrc),
-			},
-		}
-	}
-
 	fake := NewFake()
 	// 1 valid entry
-	fake.entries = append(fake.entries, genConntrackEntry(uint16(testServicePort), testServingEndpointIP))
+	fake.entries = append(fake.entries, generateConntrackEntry(testExternalIP, testServicePort, testServingEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
 	// 1 stale entry
-	fake.entries = append(fake.entries, genConntrackEntry(uint16(testServicePort), testDeletedEndpointIP))
+	fake.entries = append(fake.entries, generateConntrackEntry(testExternalIP, testServicePort, testDeletedEndpointIP, testEndpointPort, unix.IPPROTO_UDP))
 
 	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
 	actualEntries, _ := fake.ListEntries(ipFamilyMap[testIPFamily])
@@ -535,42 +516,47 @@ func TestServiceWithoutEndpoints(t *testing.T) {
 	}
 }
 
-func TestFilterForNAT(t *testing.T) {
+func TestFilterForIPPortNAT(t *testing.T) {
 	testCases := []struct {
 		name           string
-		orig           string
-		dest           string
-		dstPort        uint16
+		origDst        net.IP
+		origPortDst    uint16
+		replySrc       net.IP
+		replySrcPort   uint16
 		protocol       v1.Protocol
 		expectedFilter *conntrackFilter
 	}{
 		{
-			name:     "ipv4 + SCTP",
-			orig:     "10.96.0.10",
-			dest:     "10.244.0.3",
-			protocol: v1.ProtocolSCTP,
+			name:         "ipv4 + SCTP",
+			origDst:      netutils.ParseIPSloppy("10.96.0.10"),
+			origPortDst:  80,
+			replySrc:     netutils.ParseIPSloppy("10.244.0.3"),
+			replySrcPort: 3000,
+			protocol:     v1.ProtocolSCTP,
 			expectedFilter: &conntrackFilter{
 				protocol: 132,
-				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10")},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3")},
+				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("10.96.0.10"), dstPort: 80},
+				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3"), srcPort: 3000},
 			},
 		},
 		{
-			name:     "ipv6 + UDP",
-			orig:     "2001:db8:1::2",
-			dest:     "4001:ab8::2",
-			protocol: v1.ProtocolUDP,
+			name:         "ipv6 + UDP",
+			origDst:      netutils.ParseIPSloppy("2001:db8:1::2"),
+			origPortDst:  443,
+			replySrc:     netutils.ParseIPSloppy("4001:ab8::2"),
+			replySrcPort: 5000,
+			protocol:     v1.ProtocolUDP,
 			expectedFilter: &conntrackFilter{
 				protocol: 17,
-				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("2001:db8:1::2")},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("4001:ab8::2")},
+				original: &connectionTuple{dstIP: netutils.ParseIPSloppy("2001:db8:1::2"), dstPort: 443},
+				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("4001:ab8::2"), srcPort: 5000},
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedFilter, filterForIPPortNAT(tc.orig, tc.dest, tc.dstPort, tc.protocol))
+			require.Equal(t, tc.expectedFilter, filterForIPPortNAT(tc.origDst, tc.origPortDst, tc.replySrc, tc.replySrcPort, tc.protocol))
 		})
 	}
 }
@@ -578,39 +564,42 @@ func TestFilterForNAT(t *testing.T) {
 func TestFilterForPortNAT(t *testing.T) {
 	testCases := []struct {
 		name           string
-		dest           string
-		port           int
+		origPortDst    uint16
+		replySrc       net.IP
+		replySrcPort   uint16
 		protocol       v1.Protocol
 		expectedFamily netlink.InetFamily
 		expectedFilter *conntrackFilter
 	}{
 		{
-			name:     "ipv4 + TCP",
-			dest:     "10.96.0.10",
-			port:     80,
-			protocol: v1.ProtocolTCP,
+			name:         "ipv4 + TCP",
+			origPortDst:  80,
+			replySrc:     netutils.ParseIPSloppy("10.96.0.10"),
+			replySrcPort: 3000,
+			protocol:     v1.ProtocolTCP,
 			expectedFilter: &conntrackFilter{
 				protocol: 6,
 				original: &connectionTuple{dstPort: 80},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.96.0.10")},
+				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.96.0.10"), srcPort: 3000},
 			},
 		},
 		{
-			name:     "ipv6 + UDP",
-			dest:     "2001:db8:1::2",
-			port:     8000,
-			protocol: v1.ProtocolUDP,
+			name:         "ipv6 + UDP",
+			origPortDst:  8000,
+			replySrc:     netutils.ParseIPSloppy("2001:db8:1::2"),
+			replySrcPort: 5000,
+			protocol:     v1.ProtocolUDP,
 			expectedFilter: &conntrackFilter{
 				protocol: 17,
 				original: &connectionTuple{dstPort: 8000},
-				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("2001:db8:1::2")},
+				reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("2001:db8:1::2"), srcPort: 5000},
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedFilter, filterForPortNAT(tc.dest, tc.port, tc.protocol))
+			require.Equal(t, tc.expectedFilter, filterForPortNAT(tc.origPortDst, tc.replySrc, tc.replySrcPort, tc.protocol))
 		})
 	}
 }

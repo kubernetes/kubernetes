@@ -100,8 +100,8 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 	traceservice.RegisterTraceServiceServer(srv, fakeServer)
 
 	go func() {
-		if err := srv.Serve(listener); err != nil {
-			t.Error(err)
+		if serveErr := srv.Serve(listener); serveErr != nil {
+			t.Error(serveErr)
 			return
 		}
 	}()
@@ -354,8 +354,8 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 	traceservice.RegisterTraceServiceServer(srv, fakeServer)
 
 	go func() {
-		if err = srv.Serve(listener); err != nil {
-			t.Error(err)
+		if serveErr := srv.Serve(listener); serveErr != nil {
+			t.Error(serveErr)
 		}
 	}()
 	defer srv.Stop()
@@ -396,6 +396,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						},
 						"http.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "POST"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
 						},
 					},
 				},
@@ -513,6 +516,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"http.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "GET"
 						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
 					},
 				},
 				{
@@ -617,6 +623,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"http.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "GET"
 						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
 					},
 				},
 				{
@@ -708,6 +717,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						},
 						"http.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "PUT"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
 						},
 					},
 				},
@@ -850,6 +862,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						"http.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "PATCH"
 						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
+						},
 					},
 				},
 				{
@@ -967,6 +982,9 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 						},
 						"http.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "DELETE"
+						},
+						"audit-id": func(v *commonv1.AnyValue) bool {
+							return v.GetStringValue() != ""
 						},
 					},
 				},

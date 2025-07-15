@@ -26,6 +26,7 @@ import (
 	fmt "fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -38,20 +39,19 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
-	scheme.AddValidationFunc((*corev1.ReplicationController)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
+	scheme.AddValidationFunc((*corev1.ReplicationController)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/", "/scale":
 			return Validate_ReplicationController(ctx, op, nil /* fldPath */, obj.(*corev1.ReplicationController), safe.Cast[*corev1.ReplicationController](oldObj))
 		}
-		if len(subresources) == 1 && subresources[0] == "status" {
-			return nil // corev1.ReplicationControllerStatus has no validation
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	scheme.AddValidationFunc((*corev1.ReplicationControllerList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
+	scheme.AddValidationFunc((*corev1.ReplicationControllerList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
 			return Validate_ReplicationControllerList(ctx, op, nil /* fldPath */, obj.(*corev1.ReplicationControllerList), safe.Cast[*corev1.ReplicationControllerList](oldObj))
 		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
 }
@@ -78,7 +78,10 @@ func Validate_ReplicationControllerList(ctx context.Context, op operation.Operat
 	// field corev1.ReplicationControllerList.Items
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []corev1.ReplicationController) (errs field.ErrorList) {
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, Validate_ReplicationController)...)
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil // no changes
+			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ReplicationController)...)
 			return
 		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerList) []corev1.ReplicationController { return oldObj.Items }))...)
 
@@ -89,6 +92,9 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 	// field corev1.ReplicationControllerSpec.Replicas
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil // no changes
+			}
 			// optional fields with default values are effectively required
 			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
@@ -102,6 +108,9 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
 			// optional value-type fields with zero-value defaults are purely documentation
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil // no changes
+			}
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
 		}(fldPath.Child("minReadySeconds"), &obj.MinReadySeconds, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return &oldObj.MinReadySeconds }))...)

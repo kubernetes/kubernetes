@@ -45,7 +45,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // PodStorage includes storage for pods and all sub resources

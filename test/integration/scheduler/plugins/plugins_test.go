@@ -35,13 +35,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -217,7 +220,7 @@ type BindPlugin struct {
 	mutex                 sync.Mutex
 	name                  string
 	numBindCalled         int
-	bindStatus            *framework.Status
+	bindStatus            *fwk.Status
 	client                clientset.Interface
 	pluginInvokeEventChan chan pluginInvokeEvent
 }
@@ -345,12 +348,12 @@ func (ep *PreEnqueuePlugin) Name() string {
 	return enqueuePluginName
 }
 
-func (ep *PreEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+func (ep *PreEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
 	ep.called++
 	if ep.admit {
 		return nil
 	}
-	return framework.NewStatus(framework.UnschedulableAndUnresolvable, "not ready for scheduling")
+	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "not ready for scheduling")
 }
 
 // Name returns name of the score plugin.
@@ -359,13 +362,13 @@ func (sp *ScorePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+func (sp *ScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
 	sp.numScoreCalled++
 	if sp.failScore {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", p.Name))
+		return 0, fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", p.Name))
 	}
 
 	score := int64(1)
@@ -381,7 +384,7 @@ func (sp *ScorePlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (sp *ScorePlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (sp *ScorePlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 
@@ -391,7 +394,7 @@ func (sp *ScoreWithNormalizePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -400,7 +403,7 @@ func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.
 	return score, nil
 }
 
-func (sp *ScoreWithNormalizePlugin) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+func (sp *ScoreWithNormalizePlugin) NormalizeScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *fwk.Status {
 	sp.numNormalizeScoreCalled++
 	return nil
 }
@@ -416,7 +419,7 @@ func (fp *FilterPlugin) Name() string {
 
 // Filter is a test function that returns an error or nil, depending on the
 // value of "failFilter".
-func (fp *FilterPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (fp *FilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	fp.mutex.Lock()
 	defer fp.mutex.Unlock()
 
@@ -426,18 +429,18 @@ func (fp *FilterPlugin) Filter(ctx context.Context, state *framework.CycleState,
 	}
 
 	if fp.failFilter {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+		return fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 	if fp.rejectFilter {
-		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
 
 	return nil
 }
 
-func (fp *FilterPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+func (fp *FilterPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}},
 	}, nil
 }
 
@@ -448,10 +451,10 @@ func (rp *ReservePlugin) Name() string {
 
 // Reserve is a test function that increments an intenral counter and returns
 // an error or nil, depending on the value of "failReserve".
-func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (rp *ReservePlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	rp.numReserveCalled++
 	if rp.failReserve {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+		return fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 	return nil
 }
@@ -459,10 +462,13 @@ func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleStat
 // Unreserve is a test function that increments an internal counter and emits
 // an event to a channel. While Unreserve implementations should normally be
 // idempotent, we relax that requirement here for testing purposes.
-func (rp *ReservePlugin) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (rp *ReservePlugin) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
 	rp.numUnreserveCalled++
 	if rp.pluginInvokeEventChan != nil {
-		rp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: rp.Name(), val: rp.numUnreserveCalled}
+		select {
+		case <-ctx.Done():
+		case rp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: rp.Name(), val: rp.numUnreserveCalled}:
+		}
 	}
 }
 
@@ -472,10 +478,10 @@ func (*PreScorePlugin) Name() string {
 }
 
 // PreScore is a test function.
-func (pfp *PreScorePlugin) PreScore(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, _ []*framework.NodeInfo) *framework.Status {
+func (pfp *PreScorePlugin) PreScore(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []*framework.NodeInfo) *fwk.Status {
 	pfp.numPreScoreCalled++
 	if pfp.failPreScore {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+		return fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 
 	return nil
@@ -486,8 +492,13 @@ func (pp *PreBindPlugin) Name() string {
 	return preBindPluginName
 }
 
+// PreBindPreFlight is a test function that returns nil for testing.
+func (pp *PreBindPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
 // PreBind is a test function that returns (true, nil) or errors for testing.
-func (pp *PreBindPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (pp *PreBindPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	pp.mutex.Lock()
 	defer pp.mutex.Unlock()
 
@@ -497,15 +508,15 @@ func (pp *PreBindPlugin) PreBind(ctx context.Context, state *framework.CycleStat
 	}
 	pp.podUIDs[pod.UID] = struct{}{}
 	if pp.failPreBind {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+		return fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 	if pp.rejectPreBind {
-		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
 	return nil
 }
 
-func (pp *PreBindPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pp *PreBindPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 
@@ -515,13 +526,16 @@ func (bp *BindPlugin) Name() string {
 	return bp.name
 }
 
-func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+func (bp *BindPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
 	bp.numBindCalled++
 	if bp.pluginInvokeEventChan != nil {
-		bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}
+		select {
+		case <-ctx.Done():
+		case bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}:
+		}
 	}
 	if bp.bindStatus.IsSuccess() {
 		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(ctx, &v1.Binding{
@@ -531,7 +545,7 @@ func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *
 				Name: nodeName,
 			},
 		}, metav1.CreateOptions{}); err != nil {
-			return framework.NewStatus(framework.Error, fmt.Sprintf("bind failed: %v", err))
+			return fwk.NewStatus(fwk.Error, fmt.Sprintf("bind failed: %v", err))
 		}
 	}
 	return bp.bindStatus
@@ -543,13 +557,16 @@ func (pp *PostBindPlugin) Name() string {
 }
 
 // PostBind is a test function, which counts the number of times called.
-func (pp *PostBindPlugin) PostBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (pp *PostBindPlugin) PostBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
 	pp.mutex.Lock()
 	defer pp.mutex.Unlock()
 
 	pp.numPostBindCalled++
 	if pp.pluginInvokeEventChan != nil {
-		pp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: pp.Name(), val: pp.numPostBindCalled}
+		select {
+		case <-ctx.Done():
+		case pp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: pp.Name(), val: pp.numPostBindCalled}:
+		}
 	}
 }
 
@@ -564,13 +581,13 @@ func (pp *PreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 // PreFilter is a test function that returns (true, nil) or errors for testing.
-func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	pp.numPreFilterCalled++
 	if pp.failPreFilter {
-		return nil, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+		return nil, fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 	if pp.rejectPreFilter {
-		return nil, framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
+		return nil, fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
 	if len(pp.preFilterResultNodes) != 0 {
 		return &framework.PreFilterResult{NodeNames: pp.preFilterResultNodes}, nil
@@ -583,11 +600,11 @@ func (pp *PostFilterPlugin) Name() string {
 	return pp.name
 }
 
-func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, _ framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
+func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, _ framework.NodeToStatusReader) (*framework.PostFilterResult, *fwk.Status) {
 	pp.numPostFilterCalled++
 	nodeInfos, err := pp.fh.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
-		return nil, framework.NewStatus(framework.Error, err.Error())
+		return nil, fwk.NewStatus(fwk.Error, err.Error())
 	}
 
 	for _, nodeInfo := range nodeInfos {
@@ -596,16 +613,16 @@ func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.Cyc
 	pp.fh.RunScorePlugins(ctx, state, pod, nodeInfos)
 
 	if pp.failPostFilter {
-		return nil, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+		return nil, fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 	if pp.rejectPostFilter {
-		return nil, framework.NewStatus(framework.Unschedulable, fmt.Sprintf("injecting unschedulable for pod %v", pod.Name))
+		return nil, fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("injecting unschedulable for pod %v", pod.Name))
 	}
 	if pp.breakPostFilter {
-		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("injecting unresolvable for pod %v", pod.Name))
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("injecting unresolvable for pod %v", pod.Name))
 	}
 
-	return nil, framework.NewStatus(framework.Success, fmt.Sprintf("make room for pod %v to be schedulable", pod.Name))
+	return nil, fwk.NewStatus(fwk.Success, fmt.Sprintf("make room for pod %v to be schedulable", pod.Name))
 }
 
 // Name returns name of the plugin.
@@ -614,16 +631,16 @@ func (pp *PermitPlugin) Name() string {
 }
 
 // Permit implements the permit test plugin.
-func (pp *PermitPlugin) Permit(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
+func (pp *PermitPlugin) Permit(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
 	pp.mutex.Lock()
 	defer pp.mutex.Unlock()
 
 	pp.numPermitCalled++
 	if pp.failPermit {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name)), 0
+		return fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name)), 0
 	}
 	if pp.rejectPermit {
-		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name)), 0
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name)), 0
 	}
 	if pp.timeoutPermit {
 		go func() {
@@ -634,19 +651,19 @@ func (pp *PermitPlugin) Permit(ctx context.Context, state *framework.CycleState,
 				pp.cancelled = true
 			}
 		}()
-		return framework.NewStatus(framework.Wait, ""), 3 * time.Second
+		return fwk.NewStatus(fwk.Wait, ""), 3 * time.Second
 	}
 	if pp.waitAndRejectPermit || pp.waitAndAllowPermit {
 		if pp.waitingPod == "" || pp.waitingPod == pod.Name {
 			pp.waitingPod = pod.Name
-			return framework.NewStatus(framework.Wait, ""), 30 * time.Second
+			return fwk.NewStatus(fwk.Wait, ""), 30 * time.Second
 		}
 		if pp.waitAndRejectPermit {
 			pp.rejectingPod = pod.Name
 			pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) {
 				wp.Reject(pp.name, fmt.Sprintf("reject pod %v", wp.GetPod().Name))
 			})
-			return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name)), 0
+			return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name)), 0
 		}
 		if pp.waitAndAllowPermit {
 			pp.allowingPod = pod.Name
@@ -669,7 +686,7 @@ func (pp *PermitPlugin) rejectAllPods() {
 	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject(pp.name, "rejectAllPods") })
 }
 
-func (pp *PermitPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pp *PermitPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 
@@ -1705,7 +1722,7 @@ func TestBindPlugin(t *testing.T) {
 	tests := []struct {
 		name                   string
 		enabledBindPlugins     []configv1.Plugin
-		bindPluginStatuses     []*framework.Status
+		bindPluginStatuses     []*fwk.Status
 		expectBoundByScheduler bool   // true means this test case expecting scheduler would bind pods
 		expectBoundByPlugin    bool   // true means this test case expecting a plugin would bind pods
 		expectBindFailed       bool   // true means this test case expecting a plugin binding pods with error
@@ -1715,14 +1732,14 @@ func TestBindPlugin(t *testing.T) {
 		{
 			name:                   "bind plugins skipped to bind the pod and scheduler bond the pod",
 			enabledBindPlugins:     []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
-			bindPluginStatuses:     []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Skip, "")},
+			bindPluginStatuses:     []*fwk.Status{fwk.NewStatus(fwk.Skip, ""), fwk.NewStatus(fwk.Skip, "")},
 			expectBoundByScheduler: true,
 			expectInvokeEvents:     []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}, {pluginName: postBindPluginName, val: 1}},
 		},
 		{
 			name:                 "bindplugin2 succeeded to bind the pod",
 			enabledBindPlugins:   []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
-			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Success, "")},
+			bindPluginStatuses:   []*fwk.Status{fwk.NewStatus(fwk.Skip, ""), fwk.NewStatus(fwk.Success, "")},
 			expectBoundByPlugin:  true,
 			expectBindPluginName: bindPlugin2Name,
 			expectInvokeEvents:   []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}, {pluginName: postBindPluginName, val: 1}},
@@ -1730,7 +1747,7 @@ func TestBindPlugin(t *testing.T) {
 		{
 			name:                 "bindplugin1 succeeded to bind the pod",
 			enabledBindPlugins:   []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
-			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Success, ""), framework.NewStatus(framework.Success, "")},
+			bindPluginStatuses:   []*fwk.Status{fwk.NewStatus(fwk.Success, ""), fwk.NewStatus(fwk.Success, "")},
 			expectBoundByPlugin:  true,
 			expectBindPluginName: bindPlugin1Name,
 			expectInvokeEvents:   []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: postBindPluginName, val: 1}},
@@ -1739,13 +1756,13 @@ func TestBindPlugin(t *testing.T) {
 			name:               "bind plugin fails to bind the pod",
 			enabledBindPlugins: []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}, {Name: defaultbinder.Name}},
 			expectBindFailed:   true,
-			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Error, "failed to bind"), framework.NewStatus(framework.Success, "")},
+			bindPluginStatuses: []*fwk.Status{fwk.NewStatus(fwk.Error, "failed to bind"), fwk.NewStatus(fwk.Success, "")},
 			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: reservePluginName, val: 1}},
 		},
 		{
 			name:               "all bind plugins will be skipped(this should not happen for most of the cases)",
 			enabledBindPlugins: []configv1.Plugin{{Name: bindPlugin1Name}, {Name: bindPlugin2Name}},
-			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Skip, "")},
+			bindPluginStatuses: []*fwk.Status{fwk.NewStatus(fwk.Skip, ""), fwk.NewStatus(fwk.Skip, "")},
 			expectInvokeEvents: []pluginInvokeEvent{{pluginName: bindPlugin1Name, val: 1}, {pluginName: bindPlugin2Name, val: 1}},
 		},
 	}
@@ -2614,14 +2631,14 @@ func (j *JobPlugin) Name() string {
 	return jobPluginName
 }
 
-func (j *JobPlugin) PreFilter(_ context.Context, _ *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (j *JobPlugin) PreFilter(_ context.Context, _ fwk.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	labelSelector := labels.SelectorFromSet(labels.Set{"driver": ""})
 	driverPods, err := j.podLister.Pods(p.Namespace).List(labelSelector)
 	if err != nil {
-		return nil, framework.AsStatus(err)
+		return nil, fwk.AsStatus(err)
 	}
 	if len(driverPods) == 0 {
-		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "unable to find driver pod")
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unable to find driver pod")
 	}
 	return nil, nil
 }
@@ -2630,7 +2647,7 @@ func (j *JobPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
-func (j *JobPlugin) PostBind(_ context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) {
+func (j *JobPlugin) PostBind(_ context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
 	if _, ok := p.Labels["driver"]; !ok {
 		return
 	}
@@ -2751,14 +2768,15 @@ func (pl *SchedulingGatesPluginWithEvents) Name() string {
 	return schedulingGatesPluginWithEvents
 }
 
-func (pl *SchedulingGatesPluginWithEvents) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+func (pl *SchedulingGatesPluginWithEvents) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
 	pl.called++
+	klog.FromContext(ctx).Info("PreEnqueue is called", "pod", klog.KObj(p), "count", pl.called)
 	return pl.SchedulingGates.PreEnqueue(ctx, p)
 }
 
-func (pl *SchedulingGatesPluginWithEvents) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}},
+func (pl *SchedulingGatesPluginWithEvents) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Update}},
 	}, nil
 }
 
@@ -2771,19 +2789,18 @@ func (pl *SchedulingGatesPluginWOEvents) Name() string {
 	return schedulingGatesPluginWOEvents
 }
 
-func (pl *SchedulingGatesPluginWOEvents) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+func (pl *SchedulingGatesPluginWOEvents) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
 	pl.called++
+	klog.FromContext(ctx).Info("PreEnqueue is called", "pod", klog.KObj(p), "count", pl.called)
 	return pl.SchedulingGates.PreEnqueue(ctx, p)
 }
 
-func (pl *SchedulingGatesPluginWOEvents) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *SchedulingGatesPluginWOEvents) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return nil, nil
 }
 
 // This test helps to verify registering nil events for PreEnqueue plugin works as expected.
 func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
-
 	num := func(pl framework.Plugin) int {
 		switch item := pl.(type) {
 		case *SchedulingGatesPluginWithEvents:
@@ -2828,8 +2845,12 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 			expectedScheduled := tt.expectedScheduled[i]
 
 			t.Run(tt.name+fmt.Sprintf(" queueHint(%v)", queueHintEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, queueHintEnabled)
+				if !queueHintEnabled {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+				}
 
+				testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
 				// use new plugin every time to clear counts
 				var plugin framework.PreEnqueuePlugin
 				if tt.withEvents {
@@ -2865,6 +2886,8 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 				)
 				defer teardown()
 
+				t.Log("Create the gated pod")
+
 				// Create a pod with schedulingGates.
 				gatedPod := st.MakePod().Name("p").Namespace(testContext.NS.Name).
 					SchedulingGates([]string{"foo"}).
@@ -2885,6 +2908,8 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 					return
 				}
 
+				t.Log("Create the pause pod")
+
 				// Create a best effort pod.
 				pausePod, err := testutils.CreatePausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
 					Name:      "pause-pod",
@@ -2901,6 +2926,8 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 					t.Errorf("Expected the pod to be schedulable, but got: %v", err)
 					return
 				}
+
+				t.Log("Update the pause pod")
 
 				// Update the pod which will trigger the requeue logic if plugin registers the events.
 				pausePod, err = testCtx.ClientSet.CoreV1().Pods(pausePod.Namespace).Get(testCtx.Ctx, pausePod.Name, metav1.GetOptions{})
@@ -2924,6 +2951,8 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 					t.Errorf("Expected the preEnqueue plugin to be called %v, but got %v", tt.count, num(plugin))
 					return
 				}
+
+				t.Log("Remove the scheduling gate")
 
 				// Remove gated pod's scheduling gates.
 				gatedPod, err = testCtx.ClientSet.CoreV1().Pods(gatedPod.Namespace).Get(testCtx.Ctx, gatedPod.Name, metav1.GetOptions{})

@@ -188,7 +188,7 @@ func validateFunctionShape(shape []config.UtilizationShapePoint, path *field.Pat
 
 	for i := 1; i < len(shape); i++ {
 		if shape[i-1].Utilization >= shape[i].Utilization {
-			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("utilization"), shape[i].Utilization, "utilization values must be sorted in increasing order"))
+			allErrs = append(allErrs, field.Invalid(path.Index(i).Child("utilization"), shape[i].Utilization, "values must be sorted in increasing order"))
 			break
 		}
 	}

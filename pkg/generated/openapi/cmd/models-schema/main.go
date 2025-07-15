@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
@@ -38,7 +38,7 @@ func main() {
 
 func output() error {
 	refFunc := func(name string) spec.Ref {
-		return spec.MustCreateRef(fmt.Sprintf("#/definitions/%s", friendlyName(name)))
+		return spec.MustCreateRef(fmt.Sprintf("#/definitions/%s", util.ToRESTFriendlyName(name)))
 	}
 	defs := openapi.GetOpenAPIDefinitions(refFunc)
 	schemaDefs := make(map[string]spec.Schema, len(defs))
@@ -50,12 +50,12 @@ func output() error {
 		// the type.
 		if schema, ok := v.Schema.Extensions[common.ExtensionV2Schema]; ok {
 			if v2Schema, isOpenAPISchema := schema.(spec.Schema); isOpenAPISchema {
-				schemaDefs[friendlyName(k)] = v2Schema
+				schemaDefs[util.ToRESTFriendlyName(k)] = v2Schema
 				continue
 			}
 		}
 
-		schemaDefs[friendlyName(k)] = v.Schema
+		schemaDefs[util.ToRESTFriendlyName(k)] = v.Schema
 	}
 	data, err := json.Marshal(&spec.Swagger{
 		SwaggerProps: spec.SwaggerProps{
@@ -74,18 +74,4 @@ func output() error {
 	}
 	os.Stdout.Write(data)
 	return nil
-}
-
-// From k8s.io/apiserver/pkg/endpoints/openapi/openapi.go
-func friendlyName(name string) string {
-	nameParts := strings.Split(name, "/")
-	// Reverse first part. e.g., io.k8s... instead of k8s.io...
-	if len(nameParts) > 0 && strings.Contains(nameParts[0], ".") {
-		parts := strings.Split(nameParts[0], ".")
-		for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
-			parts[i], parts[j] = parts[j], parts[i]
-		}
-		nameParts[0] = strings.Join(parts, ".")
-	}
-	return strings.Join(nameParts, ".")
 }

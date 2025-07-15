@@ -29,6 +29,7 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -5405,4 +5406,111 @@ func TestMultipleHPAs(t *testing.T) {
 	}
 
 	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
+}
+
+func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 5, // On success, the desired count is updated.
+		CPUTarget:               50,
+		reportedLevels:          []uint64{600, 700, 800},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "SucceededRescale",
+		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
+	}
+
+	_, _, _, _, testScaleClient := tc.prepareTestClient(t)
+	tc.testScaleClient = testScaleClient
+
+	updateCallCount := 0
+	// Use PrependReactor to simulate a transient conflict.
+	testScaleClient.PrependReactor("update", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		updateCallCount++
+		// On the first call, simulate a conflict error.
+		if updateCallCount == 1 {
+			return true, nil, k8serrors.NewConflict(schema.GroupResource{Group: "", Resource: "replicationcontrollers"}, "test-rc", fmt.Errorf("simulated conflict"))
+		}
+		// On subsequent calls, let the default successful reactor handle it.
+		return false, nil, nil
+	})
+
+	tc.runTest(t)
+}
+
+func TestBuildQuantity(t *testing.T) {
+	tests := []struct {
+		name         string
+		resourceName v1.ResourceName
+		rawProposal  int64
+		expected     resource.Quantity
+	}{
+		{
+			name:         "Memory - 1000 bytes → 1Ki",
+			resourceName: v1.ResourceMemory,
+			rawProposal:  1000,
+			expected:     *resource.NewQuantity(1, resource.BinarySI), // 1Ki
+		},
+		{
+			name:         "Memory - 1000000 bytes → 1000Ki",
+			resourceName: v1.ResourceMemory,
+			rawProposal:  1000000,
+			expected:     *resource.NewQuantity(1000, resource.BinarySI), // 1000Ki
+		},
+		{
+			name:         "CPU - 100 milli-cores",
+			resourceName: v1.ResourceCPU,
+			rawProposal:  100,
+			expected:     *resource.NewMilliQuantity(100, resource.DecimalSI),
+		},
+		{
+			name:         "CPU - 500 milli-cores",
+			resourceName: v1.ResourceCPU,
+			rawProposal:  500,
+			expected:     *resource.NewMilliQuantity(500, resource.DecimalSI),
+		},
+		{
+			name:         "CPU - 1 milli-core",
+			resourceName: v1.ResourceCPU,
+			rawProposal:  1,
+			expected:     *resource.NewMilliQuantity(1, resource.DecimalSI),
+		},
+		{
+			name:         "CustomResource - 200 milli-units",
+			resourceName: v1.ResourceName("custom-resource"),
+			rawProposal:  200,
+			expected:     *resource.NewMilliQuantity(200, resource.DecimalSI),
+		},
+		{
+			name:         "CustomResource - 300 milli-units",
+			resourceName: v1.ResourceName("custom-resource"),
+			rawProposal:  300,
+			expected:     *resource.NewMilliQuantity(300, resource.DecimalSI),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q := buildQuantity(tt.resourceName, tt.rawProposal)
+			if !q.Equal(tt.expected) || (q.Format != tt.expected.Format) {
+				t.Errorf("expected quantity %v (Format: %v), got %v (Format: %v)",
+					tt.expected.String(), tt.expected.Format,
+					q.String(), q.Format)
+			}
+		})
+	}
 }

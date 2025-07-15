@@ -44,12 +44,11 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 )
 
@@ -535,6 +534,11 @@ func (ep *endpointInfo) DecrementRefCount() {
 	if !ep.IsLocal() && ep.refCount != nil && *ep.refCount > 0 {
 		*ep.refCount--
 	}
+	refCount := 0
+	if ep.refCount != nil {
+		refCount = int(*ep.refCount)
+	}
+	klog.V(5).InfoS("Endpoint RefCount after decrement.", "endpointInfo", ep, "refCount", refCount)
 }
 
 func (ep *endpointInfo) Cleanup() {
@@ -636,8 +640,6 @@ type endPointsReferenceCountMap map[string]*uint16
 type Proxier struct {
 	// ipFamily defines the IP family which this proxier is tracking.
 	ipFamily v1.IPFamily
-	// TODO(imroc): implement node handler for winkernel proxier.
-	proxyconfig.NoopNodeHandler
 
 	// endpointsChanges and serviceChanges contains all changes to endpoints and
 	// services that happened since policies were synced. For a single object,
@@ -655,7 +657,7 @@ type Proxier struct {
 	endpointSlicesSynced bool
 	servicesSynced       bool
 	initialized          int32
-	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	syncRunner           *runner.BoundedFrequencyRunner // governs calls to syncProxyRules
 	// These are effectively const and do not need the mutex to be held.
 	nodeName string
 	nodeIP   net.IP
@@ -748,9 +750,9 @@ func NewProxier(
 		return nil, err
 	}
 
-	burstSyncs := 2
-	klog.V(3).InfoS("Record sync param", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
+	klog.V(3).Info("Record sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "maxSyncPeriod", proxyutil.FullSyncPeriod)
+	proxier.syncRunner = runner.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, proxyutil.FullSyncPeriod)
+
 	return proxier, nil
 }
 
@@ -1093,6 +1095,13 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 // in any of the ServiceCIDRs, and provides complete list of service cidrs.
 func (proxier *Proxier) OnServiceCIDRsChanged(_ []string) {}
 
+// TODO(imroc): implement OnTopologyChanged for winkernel proxier.
+// OnTopologyChange is called whenever node topology labels are changed.
+// The informer is tweaked to listen for updates of the node where this
+// instance of kube-proxy is running, this guarantees the changed labels
+// are for this node.
+func (proxier *Proxier) OnTopologyChange(topologyLabels map[string]string) {}
+
 func (proxier *Proxier) cleanupAllPolicies() {
 	for svcName, svc := range proxier.svcPortMap {
 		svcInfo, ok := svc.(*serviceInfo)
@@ -1188,7 +1197,7 @@ func (proxier *Proxier) handleUpdateLoadbalancerFailure(err error, hnsID, svcIP 
 
 // This is where all of the hns save/restore calls happen.
 // assumes proxier.mu is held
-func (proxier *Proxier) syncProxyRules() {
+func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 
@@ -1351,7 +1360,9 @@ func (proxier *Proxier) syncProxyRules() {
 			// targetPort is zero if it is specified as a name in port.TargetPort, so the real port should be got from endpoints.
 			// Note that hnslib.AddLoadBalancer() doesn't support endpoints with different ports, so only port from first endpoint is used.
 			// TODO(feiskyer): add support of different endpoint ports after hnslib.AddLoadBalancer() add that.
-			if svcInfo.targetPort == 0 {
+			if svcInfo.targetPort == 0 || svcInfo.targetPort != int(ep.port) {
+				// Update the targetPort to the first endpoint's port if it is not specified or different from the endpoint's port.
+				klog.V(3).InfoS("Update targetPort", "oldTargetPort", svcInfo.targetPort, "newTargetPort", ep.port)
 				svcInfo.targetPort = int(ep.port)
 			}
 			// There is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address, so we need to check using endpoint ID first.
@@ -1770,16 +1781,21 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// remove stale endpoint refcount entries
 	for epIP := range proxier.terminatedEndpoints {
-		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" {
+		klog.V(5).InfoS("Terminated endpoints ready for deletion", "epIP", epIP)
+		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" && !epToDelete.IsLocal() {
 			if refCount := proxier.endPointsRefCount.getRefCount(epToDelete.hnsID); refCount == nil || *refCount == 0 {
-				klog.V(3).InfoS("Deleting unreferenced remote endpoint", "hnsID", epToDelete.hnsID)
-				proxier.hns.deleteEndpoint(epToDelete.hnsID)
+				klog.V(3).InfoS("Deleting unreferenced remote endpoint", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip)
+				err := proxier.hns.deleteEndpoint(epToDelete.hnsID)
+				if err != nil {
+					klog.ErrorS(err, "Deleting unreferenced remote endpoint failed", "hnsID", epToDelete.hnsID)
+				}
 			}
 		}
 	}
 	// This will cleanup stale load balancers which are pending delete
 	// in last iteration
 	proxier.cleanupStaleLoadbalancers()
+	return
 }
 
 // deleteExistingLoadBalancer checks whether loadbalancer delete is needed or not.

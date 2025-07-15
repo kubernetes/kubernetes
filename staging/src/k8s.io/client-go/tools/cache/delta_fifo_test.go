@@ -89,6 +89,15 @@ func testPop(f *DeltaFIFO) testFifoObject {
 	return Pop(f).(Deltas).Newest().Object.(testFifoObject)
 }
 
+// testPopIfAvailable returns `{}, false` if Pop returns a nil object
+func testPopIfAvailable(f *DeltaFIFO) (testFifoObject, bool) {
+	obj := Pop(f)
+	if obj == nil {
+		return testFifoObject{}, false
+	}
+	return obj.(Deltas).Newest().Object.(testFifoObject), true
+}
+
 // literalListerGetter is a KeyListerGetter that is based on a
 // function that returns a slice of objects to list and get.
 // The function must list the same objects every time.
@@ -306,6 +315,7 @@ func TestDeltaFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 
 func TestDeltaFIFO_addUpdate(t *testing.T) {
 	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: testFifoObjectKeyFunc})
+	defer f.Close()
 	f.Add(mkFifoObj("foo", 10))
 	f.Update(mkFifoObj("foo", 12))
 	f.Delete(mkFifoObj("foo", 15))
@@ -320,7 +330,10 @@ func TestDeltaFIFO_addUpdate(t *testing.T) {
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			obj := testPop(f)
+			obj, ok := testPopIfAvailable(f)
+			if !ok {
+				return
+			}
 			t.Logf("got a thing %#v", obj)
 			t.Logf("D len: %v", len(f.queue))
 			got <- obj
@@ -471,12 +484,17 @@ func TestDeltaFIFO_enqueueingWithLister(t *testing.T) {
 
 func TestDeltaFIFO_addReplace(t *testing.T) {
 	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: testFifoObjectKeyFunc})
+	defer f.Close()
 	f.Add(mkFifoObj("foo", 10))
 	f.Replace([]interface{}{mkFifoObj("foo", 15)}, "0")
 	got := make(chan testFifoObject, 2)
 	go func() {
 		for {
-			got <- testPop(f)
+			obj, ok := testPopIfAvailable(f)
+			if !ok {
+				return
+			}
+			got <- obj
 		}
 	}()
 

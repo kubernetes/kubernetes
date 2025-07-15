@@ -1,5 +1,5 @@
 steps:
-- name: 'gcr.io/cloud-builders/bazel:7.0.1'
+- name: 'gcr.io/cloud-builders/bazel:7.3.2'
   entrypoint: bazel
   args: ['build', '...']
   id: bazel-build

@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -479,7 +478,7 @@ func TestBuildOpenAPIV2(t *testing.T) {
 				}
 			}
 			if tt.preserveUnknownFields != nil && *tt.preserveUnknownFields {
-				validation.OpenAPIV3Schema.XPreserveUnknownFields = utilpointer.BoolPtr(true)
+				validation.OpenAPIV3Schema.XPreserveUnknownFields = ptr.To(true)
 			}
 
 			// TODO: mostly copied from the test above. reuse code to cleanup
@@ -589,7 +588,7 @@ func TestBuildOpenAPIV3(t *testing.T) {
 				}
 			}
 			if tt.preserveUnknownFields != nil && *tt.preserveUnknownFields {
-				validation.OpenAPIV3Schema.XPreserveUnknownFields = utilpointer.BoolPtr(true)
+				validation.OpenAPIV3Schema.XPreserveUnknownFields = ptr.To(true)
 			}
 
 			got, err := BuildOpenAPIV3(&apiextensionsv1.CustomResourceDefinition{

@@ -23,9 +23,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/ptr"
@@ -36,7 +36,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 		name             string
 		pod              *v1.Pod
 		oldNode, newNode *v1.Node
-		expectedHint     framework.QueueingHint
+		expectedHint     fwk.QueueingHint
 		expectedErr      bool
 	}{
 		{
@@ -45,7 +45,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone2").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "node that doesn't match topologySpreadConstraints updates non-related label",
@@ -53,7 +53,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("foo", "bar1").Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("foo", "bar2").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "node that match topologySpreadConstraints adds non-related label",
@@ -63,35 +63,35 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Label("foo", "bar").Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "create node with non-related labels",
 			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("foo", "bar").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "create node with related labels",
 			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "delete node with non-related labels",
 			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("foo", "bar").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "delete node with related labels",
 			pod: st.MakePod().Name("p").SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "add node with related labels that only match one of topologySpreadConstraints",
@@ -100,7 +100,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "add node with related labels that match all topologySpreadConstraints",
@@ -109,7 +109,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				SpreadConstraint(1, "node", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "update node with related labels that only match one of topologySpreadConstraints",
@@ -119,7 +119,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "update node with related labels that match all topologySpreadConstraints",
@@ -129,7 +129,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node2").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "update node with different taints that match all topologySpreadConstraints",
@@ -139,7 +139,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Taints([]v1.Taint{{Key: "aaa", Value: "bbb", Effect: v1.TaintEffectNoSchedule}}).Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node1").Taints([]v1.Taint{{Key: "ccc", Value: "bbb", Effect: v1.TaintEffectNoSchedule}}).Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "update node with different taints that only match one of topologySpreadConstraints",
@@ -149,7 +149,7 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 				Obj(),
 			oldNode:      st.MakeNode().Name("node-a").Label("node", "node1").Taints([]v1.Taint{{Key: "aaa", Value: "bbb", Effect: v1.TaintEffectNoSchedule}}).Obj(),
 			newNode:      st.MakeNode().Name("node-a").Label("node", "node1").Taints([]v1.Taint{{Key: "ccc", Value: "bbb", Effect: v1.TaintEffectNoSchedule}}).Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 	}
 
@@ -175,7 +175,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 		name                                         string
 		pod                                          *v1.Pod
 		oldPod, newPod                               *v1.Pod
-		expectedHint                                 framework.QueueingHint
+		expectedHint                                 fwk.QueueingHint
 		expectedErr                                  bool
 		enableNodeInclusionPolicyInPodTopologySpread bool
 	}{
@@ -185,7 +185,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "add un-scheduled pod",
@@ -193,7 +193,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			newPod:       st.MakePod().UID("p2").Label("foo", "").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "update un-scheduled pod",
@@ -202,7 +202,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			newPod:       st.MakePod().UID("p2").Label("foo", "").Obj(),
 			oldPod:       st.MakePod().UID("p2").Label("bar", "").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "delete un-scheduled pod",
@@ -210,7 +210,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Label("foo", "").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "add pod with different namespace",
@@ -218,7 +218,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Namespace("fake-namespace").Label("foo", "").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "add pod with labels don't match topologySpreadConstraints selector",
@@ -226,7 +226,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Label("bar", "").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "delete pod with labels that match topologySpreadConstraints selector",
@@ -234,7 +234,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "delete pod with labels that don't match topologySpreadConstraints selector",
@@ -242,7 +242,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil, nil).
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Node("fake-node").Label("bar", "").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "update pod's non-related label",
@@ -251,7 +251,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Label("bar", "bar1").Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Label("bar", "bar2").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "add pod's label that matches topologySpreadConstraints selector",
@@ -260,7 +260,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Node("fake-node").Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "delete pod label that matches topologySpreadConstraints selector",
@@ -269,7 +269,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "change pod's label that matches topologySpreadConstraints selector",
@@ -278,7 +278,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "foo1").Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "foo2").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "change pod's label that doesn't match topologySpreadConstraints selector",
@@ -287,7 +287,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Label("bar", "bar1").Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Label("bar", "bar2").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "add pod's label that matches topologySpreadConstraints selector with multi topologySpreadConstraints",
@@ -297,7 +297,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Label("bar", "bar2").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "change pod's label that doesn't match topologySpreadConstraints selector with multi topologySpreadConstraints",
@@ -307,7 +307,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Label("baz", "").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "change pod's label that match topologySpreadConstraints selector with multi topologySpreadConstraints",
@@ -317,7 +317,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Label("bar", "").Obj(),
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Label("bar", "bar2").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "the unschedulable Pod has topologySpreadConstraint with NodeTaintsPolicy:Honor and has got a new toleration",
@@ -327,7 +327,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p").Name("p").Label("foo", "").Obj(),
 			newPod:       st.MakePod().UID("p").Name("p").Label("foo", "").Toleration(v1.TaintNodeUnschedulable).Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			enableNodeInclusionPolicyInPodTopologySpread: true,
 		},
 		{
@@ -338,7 +338,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p").Name("p").Label("foo", "").Obj(),
 			newPod:       st.MakePod().UID("p").Name("p").Label("foo", "").Toleration(v1.TaintNodeUnschedulable).Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "the unschedulable Pod has topologySpreadConstraint and has got a new label matching the selector of the constraint",
@@ -348,7 +348,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p").Name("p").Obj(),
 			newPod:       st.MakePod().UID("p").Name("p").Label("foo", "").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name: "the unschedulable Pod has topologySpreadConstraint and has got a new unrelated label",
@@ -358,7 +358,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				Obj(),
 			oldPod:       st.MakePod().UID("p").Name("p").Obj(),
 			newPod:       st.MakePod().UID("p").Name("p").Label("unrelated", "").Obj(),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 	}
 	for _, tc := range testcases {

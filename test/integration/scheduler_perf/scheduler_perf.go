@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -1020,7 +1021,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
-func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, output io.Writer, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
+func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
 	tCtx := ktesting.Init(t, initoption.PerTestOutput(UseTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
 	if !UseTestingLog && doArtifacts {
@@ -1085,8 +1086,18 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 
 	// Now that we are ready to run, start
 	// a brand new etcd.
-	framework.StartEtcd(t, output, true)
+	logger := tCtx.Logger()
+	if !UseTestingLog {
+		// Associate output going to the global log with the current test.
+		logger = logger.WithName(tCtx.Name())
+	}
+	framework.StartEtcd(logger, t, true)
 
+	// We need to set emulation version for QueueingHints feature gate, which is locked at 1.34.
+	// Only emulate v1.33 when QueueingHints is explicitly disabled.
+	if qhEnabled, exists := featureGates[features.SchedulerQueueingHints]; exists && !qhEnabled {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	}
 	for feature, flag := range featureGates {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)
 	}
@@ -1147,7 +1158,13 @@ func fixJSONOutput(b *testing.B) {
 // You can pass your own scheduler plugins via outOfTreePluginRegistry.
 // Also, you may want to put your plugins in PluginNames variable in this package
 // to collect metrics for them.
-func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName string, outOfTreePluginRegistry frameworkruntime.Registry) {
+func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName string, outOfTreePluginRegistry frameworkruntime.Registry, options ...SchedulerPerfOption) {
+	opts := &schedulerPerfOptions{}
+
+	for _, option := range options {
+		option(opts)
+	}
+
 	testCases, err := getTestCases(configFile)
 	if err != nil {
 		b.Fatal(err)
@@ -1184,7 +1201,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					fixJSONOutput(b)
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
-					informerFactory, tCtx := setupTestCase(b, tc, featureGates, output, outOfTreePluginRegistry)
+					informerFactory, tCtx := setupTestCase(b, tc, featureGates, outOfTreePluginRegistry)
 
 					// TODO(#93795): make sure each workload within a test case has a unique
 					// name? The name is used to identify the stats in benchmark reports.
@@ -1192,6 +1209,13 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						b.Fatalf("workload %s is not valid: %v", w.Name, err)
+					}
+
+					if opts.prepareFn != nil {
+						err = opts.prepareFn(tCtx)
+						if err != nil {
+							b.Fatalf("failed to run prepareFn: %v", err)
+						}
 					}
 
 					results, err := runWorkload(tCtx, tc, w, informerFactory)
@@ -1289,7 +1313,7 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
 						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
-					informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil, nil)
+					informerFactory, tCtx := setupTestCase(t, tc, featureGates, nil)
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						t.Fatalf("workload %s is not valid: %v", w.Name, err)

@@ -3,12 +3,23 @@
 # Disable inheritance as this is owned by sig-node
 options:
   no_parent_owners: true
-approvers:
-  - sig-node-approvers
-  - api-approvers
-  - sig-node-cri-approvers
-reviewers:
-  - sig-node-reviewers
-labels:
-  - sig/node
-  - area/kubelet
+filters:
+  # to use filters all entries must be under filters https://go.k8s.io/owners/#filters
+  # use .* for approvers that should have all files
+  ".*":
+    approvers:
+      - sig-node-approvers
+      - api-approvers
+      - sig-node-cri-approvers
+    reviewers:
+      - sig-node-reviewers
+    labels:
+      - sig/node
+      - area/kubelet
+  # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
+  # dep-approvers
+  "go\\.(mod|sum)$":
+    approvers:
+      - dep-approvers
+    reviewers:
+      - dep-reviewers

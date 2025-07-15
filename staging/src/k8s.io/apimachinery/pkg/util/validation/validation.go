@@ -235,7 +235,7 @@ func IsDNS1123SubdomainWithUnderscore(value string) []string {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
 	}
 	if !dns1123SubdomainRegexpWithUnderscore.MatchString(value) {
-		errs = append(errs, RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmt, "example.com"))
+		errs = append(errs, RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com"))
 	}
 	return errs
 }

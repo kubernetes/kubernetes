@@ -176,7 +176,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
-		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.String()).Inc()
+		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely, we simply terminate it.
 
@@ -503,7 +503,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	}
 
 	if initEventCount > 0 {
-		metrics.InitCounter.WithLabelValues(c.groupResource.String()).Add(float64(initEventCount))
+		metrics.InitCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Add(float64(initEventCount))
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {

@@ -32,17 +32,20 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/replicationcontroller"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // ControllerStorage includes dummy storage for Replication Controllers and for Scale subresource.
@@ -200,7 +203,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	obj, _, err := r.store.Update(
 		ctx,
 		name,
-		&scaleUpdatedObjectInfo{name, objInfo},
+		&scaleUpdatedObjectInfo{name, objInfo, r},
 		toScaleCreateValidation(createValidation),
 		toScaleUpdateValidation(updateValidation),
 		false,
@@ -255,8 +258,9 @@ func scaleFromRC(rc *api.ReplicationController) *autoscaling.Scale {
 
 // scaleUpdatedObjectInfo transforms existing replication controller -> existing scale -> new scale -> new replication controller
 type scaleUpdatedObjectInfo struct {
-	name       string
-	reqObjInfo rest.UpdatedObjectInfo
+	name           string
+	reqObjInfo     rest.UpdatedObjectInfo
+	scaleGVKMapper rest.GroupVersionKindProvider
 }
 
 func (i *scaleUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
@@ -310,8 +314,27 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		return nil, errors.NewBadRequest(fmt.Sprintf("expected input object type to be Scale, but %T", newScaleObj))
 	}
 
-	// validate
-	if errs := validation.ValidateScale(scale); len(errs) > 0 {
+	errs := validation.ValidateScale(scale)
+
+	// If DeclarativeValidation feature gate is enabled, also run declarative validation
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+		// Determine if takeover is enabled
+		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+
+		// Run declarative validation with panic recovery
+		declarativeErrs := rest.ValidateUpdateDeclaratively(
+			ctx, legacyscheme.Scheme, scale, oldScale, rest.WithTakeover(takeover), rest.WithSubresourceMapper(i.scaleGVKMapper))
+
+		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
+
+		// Only apply declarative errors if takeover is enabled
+		if takeover {
+			errs = append(errs.RemoveCoveredByDeclarative(), declarativeErrs...)
+		}
+	}
+
+	if len(errs) > 0 {
 		return nil, errors.NewInvalid(autoscaling.Kind("Scale"), replicationcontroller.Name, errs)
 	}
 

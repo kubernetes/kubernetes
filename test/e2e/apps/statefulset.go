@@ -60,7 +60,6 @@ import (
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -345,7 +344,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 					return &appsv1.RollingUpdateStatefulSetStrategy{
-						Partition: pointer.Int32(3),
+						Partition: ptr.To[int32](3),
 					}
 				}(),
 			}
@@ -400,7 +399,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 					return &appsv1.RollingUpdateStatefulSetStrategy{
-						Partition: pointer.Int32(2),
+						Partition: ptr.To[int32](2),
 					}
 				}(),
 			}
@@ -409,7 +408,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Type: appsv1.RollingUpdateStatefulSetStrategyType,
 					RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 						return &appsv1.RollingUpdateStatefulSetStrategy{
-							Partition: pointer.Int32(2),
+							Partition: ptr.To[int32](2),
 						}
 					}(),
 				}
@@ -2295,7 +2294,7 @@ func deletingPodForRollingUpdatePartitionTest(ctx context.Context, f *framework.
 		Type: appsv1.RollingUpdateStatefulSetStrategyType,
 		RollingUpdate: func() *appsv1.RollingUpdateStatefulSetStrategy {
 			return &appsv1.RollingUpdateStatefulSetStrategy{
-				Partition: pointer.Int32(1),
+				Partition: ptr.To[int32](1),
 			}
 		}(),
 	}

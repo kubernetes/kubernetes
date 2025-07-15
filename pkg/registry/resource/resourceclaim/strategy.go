@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	"k8s.io/kubernetes/pkg/features"
 	resourceutils "k8s.io/kubernetes/pkg/registry/resource"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // resourceclaimStrategy implements behavior for ResourceClaim objects

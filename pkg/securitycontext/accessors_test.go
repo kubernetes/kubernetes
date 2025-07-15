@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodSecurityContextAccessor(t *testing.T) {
@@ -31,6 +31,7 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 	runAsGroup := int64(1)
 	runAsNonRoot := true
 	hostUsers := false
+	onRootMismatchPolicy := api.FSGroupChangeOnRootMismatch
 
 	testcases := []*api.PodSecurityContext{
 		nil,
@@ -46,6 +47,7 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 		{SELinuxOptions: &api.SELinuxOptions{User: "bob"}},
 		{SeccompProfile: &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}},
 		{SupplementalGroups: []int64{1, 2, 3}},
+		{FSGroupChangePolicy: &onRootMismatchPolicy},
 	}
 
 	for i, tc := range testcases {
@@ -89,6 +91,9 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 		if v := a.SupplementalGroups(); !reflect.DeepEqual(expected.SupplementalGroups, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.SupplementalGroups, v)
 		}
+		if v := a.FSGroupChangePolicy(); !reflect.DeepEqual(expected.FSGroupChangePolicy, v) {
+			t.Errorf("%d: expected %#v, got %#v", i, expected.FSGroupChangePolicy, v)
+		}
 	}
 }
 
@@ -105,17 +110,18 @@ func TestPodSecurityContextMutator(t *testing.T) {
 		"populated": {
 			newSC: func() *api.PodSecurityContext {
 				return &api.PodSecurityContext{
-					HostNetwork:        true,
-					HostIPC:            true,
-					HostPID:            true,
-					HostUsers:          nil,
-					SELinuxOptions:     &api.SELinuxOptions{},
-					RunAsUser:          nil,
-					RunAsGroup:         nil,
-					RunAsNonRoot:       nil,
-					SeccompProfile:     nil,
-					SupplementalGroups: nil,
-					FSGroup:            nil,
+					HostNetwork:         true,
+					HostIPC:             true,
+					HostPID:             true,
+					HostUsers:           nil,
+					SELinuxOptions:      &api.SELinuxOptions{},
+					RunAsUser:           nil,
+					RunAsGroup:          nil,
+					RunAsNonRoot:        nil,
+					SeccompProfile:      nil,
+					SupplementalGroups:  nil,
+					FSGroup:             nil,
+					FSGroupChangePolicy: nil,
 				}
 			},
 		},
@@ -146,6 +152,7 @@ func TestPodSecurityContextMutator(t *testing.T) {
 			m.SetSeccompProfile(m.SeccompProfile())
 			m.SetSELinuxOptions(m.SELinuxOptions())
 			m.SetSupplementalGroups(m.SupplementalGroups())
+			m.SetFSGroupChangePolicy(m.FSGroupChangePolicy())
 			if !reflect.DeepEqual(sc, originalSC) {
 				t.Errorf("%s: unexpected mutation: %#v, %#v", k, sc, originalSC)
 			}
@@ -271,8 +278,8 @@ func TestPodSecurityContextMutator(t *testing.T) {
 		{
 			modifiedSC := nonNilSC(tc.newSC())
 			m := NewPodSecurityContextMutator(tc.newSC())
-			modifiedSC.SeccompProfile = &api.SeccompProfile{Type: api.SeccompProfileTypeLocalhost, LocalhostProfile: pointer.String("verylocalhostey")}
-			m.SetSeccompProfile(&api.SeccompProfile{Type: api.SeccompProfileTypeLocalhost, LocalhostProfile: pointer.String("verylocalhostey")})
+			modifiedSC.SeccompProfile = &api.SeccompProfile{Type: api.SeccompProfileTypeLocalhost, LocalhostProfile: ptr.To("verylocalhostey")}
+			m.SetSeccompProfile(&api.SeccompProfile{Type: api.SeccompProfileTypeLocalhost, LocalhostProfile: ptr.To("verylocalhostey")})
 			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
 				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
 				continue
@@ -285,6 +292,19 @@ func TestPodSecurityContextMutator(t *testing.T) {
 			m := NewPodSecurityContextMutator(tc.newSC())
 			modifiedSC.SupplementalGroups = []int64{1, 1, 2, 3}
 			m.SetSupplementalGroups([]int64{1, 1, 2, 3})
+			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
+				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
+				continue
+			}
+		}
+
+		// FSGroupChangePolicy
+		{
+			onRootMismatchPolicy := api.FSGroupChangeOnRootMismatch
+			modifiedSC := nonNilSC(tc.newSC())
+			m := NewPodSecurityContextMutator(tc.newSC())
+			modifiedSC.FSGroupChangePolicy = &onRootMismatchPolicy
+			m.SetFSGroupChangePolicy(&onRootMismatchPolicy)
 			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
 				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
 				continue

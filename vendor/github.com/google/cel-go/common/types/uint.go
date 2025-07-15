@@ -19,6 +19,7 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/google/cel-go/common/types/ref"
 
@@ -248,6 +249,11 @@ func (i Uint) Type() ref.Type {
 // Value implements ref.Val.Value.
 func (i Uint) Value() any {
 	return uint64(i)
+}
+
+func (i Uint) format(sb *strings.Builder) {
+	sb.WriteString(strconv.FormatUint(uint64(i), 10))
+	sb.WriteString("u")
 }
 
 // isJSONSafe indicates whether the uint is safely representable as a floating point value in JSON.

@@ -326,7 +326,7 @@
             "type": "integer"
           },
           "backoffLimit": {
-            "description": "Specifies the number of retries before marking this job failed. Defaults to 6",
+            "description": "Specifies the number of retries before marking this job failed. Defaults to 6, unless backoffLimitPerIndex (only Indexed Job) is specified. When backoffLimitPerIndex is specified, backoffLimit defaults to 2147483647.",
             "format": "int32",
             "type": "integer"
           },
@@ -371,7 +371,7 @@
             "description": "Specifies the policy of handling failed pods. In particular, it allows to specify the set of actions and conditions which need to be satisfied to take the associated action. If empty, the default behaviour applies - the counter of failed pods, represented by the jobs's .status.failed field, is incremented and it is checked against the backoffLimit. This field cannot be used in combination with restartPolicy=OnFailure."
           },
           "podReplacementPolicy": {
-            "description": "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use. This is an beta field. To use this, enable the JobPodReplacementPolicy feature toggle. This is on by default.",
+            "description": "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use.",
             "type": "string"
           },
           "selector": {
@@ -626,7 +626,7 @@
         "description": "SuccessPolicy describes when a Job can be declared as succeeded based on the success of some indexes.",
         "properties": {
           "rules": {
-            "description": "rules represents the list of alternative rules for the declaring the Jobs as successful before `.status.succeeded >= .spec.completions`. Once any of the rules are met, the \"SucceededCriteriaMet\" condition is added, and the lingering pods are removed. The terminal state for such a Job has the \"Complete\" condition. Additionally, these rules are evaluated in order; Once the Job meets one of the rules, other rules are ignored. At most 20 elements are allowed.",
+            "description": "rules represents the list of alternative rules for the declaring the Jobs as successful before `.status.succeeded >= .spec.completions`. Once any of the rules are met, the \"SuccessCriteriaMet\" condition is added, and the lingering pods are removed. The terminal state for such a Job has the \"Complete\" condition. Additionally, these rules are evaluated in order; Once the Job meets one of the rules, other rules are ignored. At most 20 elements are allowed.",
             "items": {
               "allOf": [
                 {
@@ -1138,7 +1138,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "envFrom": {
-            "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+            "description": "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
             "items": {
               "allOf": [
                 {
@@ -1475,7 +1475,7 @@
             "description": "The ConfigMap to select from"
           },
           "prefix": {
-            "description": "Optional text to prepend to the name of each environment variable. Must be a C_IDENTIFIER.",
+            "description": "Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.",
             "type": "string"
           },
           "secretRef": {
@@ -1494,7 +1494,7 @@
         "properties": {
           "name": {
             "default": "",
-            "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+            "description": "Name of the environment variable. May consist of any printable ASCII characters except '='.",
             "type": "string"
           },
           "value": {
@@ -1593,7 +1593,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "envFrom": {
-            "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+            "description": "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
             "items": {
               "allOf": [
                 {
@@ -1965,7 +1965,7 @@
         "properties": {
           "endpoints": {
             "default": "",
-            "description": "endpoints is the endpoint name that details Glusterfs topology. More info: https://examples.k8s.io/volumes/glusterfs/README.md#create-a-pod",
+            "description": "endpoints is the endpoint name that details Glusterfs topology.",
             "type": "string"
           },
           "path": {
@@ -2681,7 +2681,7 @@
         "description": "Pod anti affinity is a group of inter pod anti affinity scheduling rules.",
         "properties": {
           "preferredDuringSchedulingIgnoredDuringExecution": {
-            "description": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding \"weight\" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
+            "description": "The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and subtracting \"weight\" from the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.",
             "items": {
               "allOf": [
                 {
@@ -3011,7 +3011,7 @@
             "type": "boolean"
           },
           "hostNetwork": {
-            "description": "Host networking requested for this pod. Use the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false.",
+            "description": "Host networking requested for this pod. Use the host's network namespace. When using HostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false.",
             "type": "boolean"
           },
           "hostPID": {
@@ -4253,7 +4253,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.GlusterfsVolumeSource"
               }
             ],
-            "description": "glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported. More info: https://examples.k8s.io/volumes/glusterfs/README.md"
+            "description": "glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. Deprecated: Glusterfs is deprecated and the in-tree glusterfs type is no longer supported."
           },
           "hostPath": {
             "allOf": [
@@ -4277,7 +4277,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ISCSIVolumeSource"
               }
             ],
-            "description": "iscsi represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://examples.k8s.io/volumes/iscsi/README.md"
+            "description": "iscsi represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes/#iscsi"
           },
           "name": {
             "default": "",
@@ -4338,7 +4338,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.RBDVolumeSource"
               }
             ],
-            "description": "rbd represents a Rados Block Device mount on the host that shares a pod's lifetime. Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported. More info: https://examples.k8s.io/volumes/rbd/README.md"
+            "description": "rbd represents a Rados Block Device mount on the host that shares a pod's lifetime. Deprecated: RBD is deprecated and the in-tree rbd type is no longer supported."
           },
           "scaleIO": {
             "allOf": [
@@ -4959,11 +4959,6 @@
             "group": "networking.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "DeleteOptions",
-            "version": "v1alpha1"
           },
           {
             "group": "networking.k8s.io",
@@ -5710,11 +5705,6 @@
             "group": "networking.k8s.io",
             "kind": "WatchEvent",
             "version": "v1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
           },
           {
             "group": "networking.k8s.io",

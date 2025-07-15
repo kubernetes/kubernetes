@@ -26,7 +26,6 @@ import (
 	"strings"
 
 	"github.com/distribution/reference"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
@@ -46,6 +45,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // ValidateInitConfiguration validates an InitConfiguration object and collects all encountered errors
@@ -347,6 +347,7 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 func ValidateEncryptionAlgorithm(algo kubeadm.EncryptionAlgorithmType, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	knownAlgorithms := sets.New(
+		kubeadm.EncryptionAlgorithmECDSAP384,
 		kubeadm.EncryptionAlgorithmECDSAP256,
 		kubeadm.EncryptionAlgorithmRSA2048,
 		kubeadm.EncryptionAlgorithmRSA3072,

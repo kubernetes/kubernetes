@@ -81,7 +81,7 @@ var (
 // the time that it is invoked.
 //
 // There is also the possibility to rename the fields of native structs by setting the `cel` tag
-// for fields you want to override. In order to enable this feature, pass in the `EnableStructTag`
+// for fields you want to override. In order to enable this feature, pass in the `ParseStructTags(true)`
 // option. Here is an example to see it in action:
 //
 // ```go

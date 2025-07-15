@@ -95,19 +95,18 @@ type testParameters struct {
 	enableResizing      bool   // enable resizing for both CSI mock driver and storageClass.
 	enableNodeExpansion bool   // enable node expansion for CSI mock driver
 	// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
-	disableResizingOnDriver       bool
-	disableControllerExpansion    bool
-	enableSnapshot                bool
-	enableVolumeMountGroup        bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
-	enableNodeVolumeCondition     bool
-	hooks                         *drivers.Hooks
-	tokenRequests                 []storagev1.TokenRequest
-	requiresRepublish             *bool
-	fsGroupPolicy                 *storagev1.FSGroupPolicy
-	enableSELinuxMount            *bool
-	enableRecoverExpansionFailure bool
-	enableCSINodeExpandSecret     bool
-	reclaimPolicy                 *v1.PersistentVolumeReclaimPolicy
+	disableResizingOnDriver    bool
+	disableControllerExpansion bool
+	enableSnapshot             bool
+	enableVolumeMountGroup     bool // enable the VOLUME_MOUNT_GROUP node capability in the CSI mock driver.
+	enableNodeVolumeCondition  bool
+	hooks                      *drivers.Hooks
+	tokenRequests              []storagev1.TokenRequest
+	requiresRepublish          *bool
+	fsGroupPolicy              *storagev1.FSGroupPolicy
+	enableSELinuxMount         *bool
+	enableCSINodeExpandSecret  bool
+	reclaimPolicy              *v1.PersistentVolumeReclaimPolicy
 }
 
 type mockDriverSetup struct {
@@ -116,6 +115,7 @@ type mockDriverSetup struct {
 	pods        []*v1.Pod
 	pvcs        []*v1.PersistentVolumeClaim
 	pvs         []*v1.PersistentVolume
+	quotas      []*v1.ResourceQuota
 	sc          map[string]*storagev1.StorageClass
 	vsc         map[string]*unstructured.Unstructured
 	driver      drivers.MockCSITestDriver
@@ -163,23 +163,22 @@ func (m *mockDriverSetup) init(ctx context.Context, tp testParameters) {
 
 	var err error
 	driverOpts := drivers.CSIMockDriverOpts{
-		RegisterDriver:                tp.registerDriver,
-		PodInfo:                       tp.podInfo,
-		StorageCapacity:               tp.storageCapacity,
-		EnableTopology:                tp.enableTopology,
-		AttachLimit:                   tp.attachLimit,
-		DisableAttach:                 tp.disableAttach,
-		EnableResizing:                tp.enableResizing,
-		EnableNodeExpansion:           tp.enableNodeExpansion,
-		EnableNodeVolumeCondition:     tp.enableNodeVolumeCondition,
-		DisableControllerExpansion:    tp.disableControllerExpansion,
-		EnableSnapshot:                tp.enableSnapshot,
-		EnableVolumeMountGroup:        tp.enableVolumeMountGroup,
-		TokenRequests:                 tp.tokenRequests,
-		RequiresRepublish:             tp.requiresRepublish,
-		FSGroupPolicy:                 tp.fsGroupPolicy,
-		EnableSELinuxMount:            tp.enableSELinuxMount,
-		EnableRecoverExpansionFailure: tp.enableRecoverExpansionFailure,
+		RegisterDriver:             tp.registerDriver,
+		PodInfo:                    tp.podInfo,
+		StorageCapacity:            tp.storageCapacity,
+		EnableTopology:             tp.enableTopology,
+		AttachLimit:                tp.attachLimit,
+		DisableAttach:              tp.disableAttach,
+		EnableResizing:             tp.enableResizing,
+		EnableNodeExpansion:        tp.enableNodeExpansion,
+		EnableNodeVolumeCondition:  tp.enableNodeVolumeCondition,
+		DisableControllerExpansion: tp.disableControllerExpansion,
+		EnableSnapshot:             tp.enableSnapshot,
+		EnableVolumeMountGroup:     tp.enableVolumeMountGroup,
+		TokenRequests:              tp.tokenRequests,
+		RequiresRepublish:          tp.requiresRepublish,
+		FSGroupPolicy:              tp.fsGroupPolicy,
+		EnableSELinuxMount:         tp.enableSELinuxMount,
 	}
 
 	// At the moment, only tests which need hooks are
@@ -257,6 +256,15 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 	for _, vsc := range m.vsc {
 		ginkgo.By(fmt.Sprintf("Deleting volumesnapshotclass %s", vsc.GetName()))
 		m.config.Framework.DynamicClient.Resource(utils.SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{})
+	}
+
+	for _, quota := range m.quotas {
+		ginkgo.By(fmt.Sprintf("Deleting quota %s", quota.Name))
+		if err := cs.CoreV1().ResourceQuotas(quota.Namespace).Delete(ctx, quota.Name, metav1.DeleteOptions{}); err != nil {
+			if !apierrors.IsNotFound(err) {
+				errs = append(errs, err)
+			}
+		}
 	}
 
 	err := utilerrors.NewAggregate(errs)
@@ -495,6 +503,22 @@ func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes 
 	}
 
 	return class, claim, pod
+}
+
+func (m *mockDriverSetup) createResourceQuota(ctx context.Context, quota *v1.ResourceQuota) *v1.ResourceQuota {
+	ginkgo.By("Creating Resource Quota")
+	f := m.f
+
+	quota.ObjectMeta = metav1.ObjectMeta{
+		Name:      f.UniqueName + "-quota",
+		Namespace: f.Namespace.Name,
+	}
+	var err error
+
+	quota, err = f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, quota, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Failed to create resourceQuota")
+	m.quotas = append(m.quotas, quota)
+	return quota
 }
 
 func waitForCSIDriver(cs clientset.Interface, driverName string) error {

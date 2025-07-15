@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -184,33 +185,46 @@ func (c *Controller) syncStatus(serviceCIDR *networkingapiv1.ServiceCIDR) {
 	// don't sync the status of the ServiceCIDR if is being deleted,
 	// deletion must be handled by the controller-manager
 	if !serviceCIDR.GetDeletionTimestamp().IsZero() {
+		klog.V(6).Infof("ServiceCIDR %s is being deleted, skipping status sync", serviceCIDR.Name)
 		return
 	}
 
 	// This controller will set the Ready condition to true if the Ready condition
 	// does not exist and the CIDR values match this controller CIDR values.
 	sameConfig := reflect.DeepEqual(c.cidrs, serviceCIDR.Spec.CIDRs)
-	for _, condition := range serviceCIDR.Status.Conditions {
-		if condition.Type == networkingapiv1.ServiceCIDRConditionReady {
-			if condition.Status == metav1.ConditionTrue {
-				// ServiceCIDR is Ready and config matches this apiserver
-				// nothing else is required
-				if sameConfig {
-					return
-				}
-			} else {
-				if !c.reportedNotReadyCondition {
-					klog.InfoS("default ServiceCIDR condition Ready is not True, please validate your cluster's network configuration for this ServiceCIDR", "status", condition.Status, "reason", condition.Reason, "message", condition.Message)
-					c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, condition.Reason, condition.Message)
-					c.reportedNotReadyCondition = true
-				}
-				return
-			}
+	currentReadyCondition := apimeta.FindStatusCondition(serviceCIDR.Status.Conditions, networkingapiv1.ServiceCIDRConditionReady)
+
+	// Handle inconsistent configuration
+	if !sameConfig {
+		if !c.reportedMismatchedCIDRs {
+			klog.Infof("Inconsistent ServiceCIDR status for %s, controller configuration: %v, ServiceCIDR configuration: %v. Configure the flags to match current ServiceCIDR or manually delete it.", serviceCIDR.Name, c.cidrs, serviceCIDR.Spec.CIDRs)
+			c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, "KubernetesDefaultServiceCIDRInconsistent", "The default ServiceCIDR %v does not match the controller flag configurations %s", serviceCIDR.Spec.CIDRs, c.cidrs)
+			c.reportedMismatchedCIDRs = true
 		}
+		// Regardless of the current Ready condition, inconsistent config is a problem.
+		// We don't try to change the Ready status in this case.
+		return
 	}
-	// No condition set, set status to ready if the ServiceCIDR matches this configuration
-	// otherwise, warn about it since the network configuration of the cluster is inconsistent
-	if sameConfig {
+
+	// Configuration is consistent (sameConfig)
+	switch {
+	// Current Ready=False, should not happen state.
+	// Don't try to overwrite Ready=False set by another component to avoid hotlooping.
+	// The default ServiceCIDR should never have this condition set to False, if this
+	// is the case, then it will require an intervention by the cluster administrator.
+	case currentReadyCondition != nil && currentReadyCondition.Status == metav1.ConditionFalse:
+		if !c.reportedNotReadyCondition {
+			klog.InfoS("Default ServiceCIDR condition Ready is False, but controller configuration matches. Please validate your cluster's network configuration.", "serviceCIDR", klog.KObj(serviceCIDR), "status", currentReadyCondition.Status, "reason", currentReadyCondition.Reason, "message", currentReadyCondition.Message)
+			c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, currentReadyCondition.Reason, "Configuration matches, but "+currentReadyCondition.Message)
+			c.reportedNotReadyCondition = true
+		}
+
+	// Current Ready=True and config matches, nothing to do.
+	case currentReadyCondition != nil && currentReadyCondition.Status == metav1.ConditionTrue:
+		klog.V(6).Infof("ServiceCIDR %s is Ready and configuration matches. No status update needed.", serviceCIDR.Name)
+
+	// No condition set and ServiceCIDR matches this apiserver configuration, set condition to True
+	case currentReadyCondition == nil || currentReadyCondition.Status == metav1.ConditionUnknown:
 		klog.Infof("Setting default ServiceCIDR condition Ready to True")
 		svcApplyStatus := networkingapiv1apply.ServiceCIDRStatus().WithConditions(
 			metav1apply.Condition().
@@ -223,9 +237,6 @@ func (c *Controller) syncStatus(serviceCIDR *networkingapiv1.ServiceCIDR) {
 			klog.Infof("error updating default ServiceCIDR status: %v", errApply)
 			c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, "KubernetesDefaultServiceCIDRError", "The default ServiceCIDR Status can not be set to Ready=True")
 		}
-	} else if !c.reportedMismatchedCIDRs {
-		klog.Infof("inconsistent ServiceCIDR status, global configuration: %v local configuration: %v, configure the flags to match current ServiceCIDR or manually delete the default ServiceCIDR", serviceCIDR.Spec.CIDRs, c.cidrs)
-		c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, "KubernetesDefaultServiceCIDRInconsistent", "The default ServiceCIDR %v does not match the flag configurations %s", serviceCIDR.Spec.CIDRs, c.cidrs)
-		c.reportedMismatchedCIDRs = true
+	default:
 	}
 }

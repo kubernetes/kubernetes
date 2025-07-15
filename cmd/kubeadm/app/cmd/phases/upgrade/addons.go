@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
-
 	clientset "k8s.io/client-go/kubernetes"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -31,6 +29,7 @@ import (
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // NewAddonPhase returns a new addon phase.

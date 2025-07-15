@@ -32,6 +32,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapialpha "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapiv1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -91,6 +92,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	var runtimeConfig []string
 	if enabledFeatures[features.DynamicResourceAllocation] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapi.SchemeGroupVersion))
+		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapiv1beta2.SchemeGroupVersion))
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapialpha.SchemeGroupVersion))
 	}
 	customFlags := []string{
@@ -237,6 +239,11 @@ func makeBaseNode(nodeNamePrefix string) *v1.Node {
 		},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
+				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("32Gi"),
+			},
+			Allocatable: v1.ResourceList{
 				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
 				v1.ResourceCPU:    resource.MustParse("4"),
 				v1.ResourceMemory: resource.MustParse("32Gi"),
@@ -620,23 +627,30 @@ func (tc *throughputCollector) collect() []DataItem {
 		progress: tc.progress,
 		start:    tc.start,
 	}
-	if length := len(tc.schedulingThroughputs); length > 0 {
-		sort.Float64s(tc.schedulingThroughputs)
-		sum := 0.0
-		for i := range tc.schedulingThroughputs {
-			sum += tc.schedulingThroughputs[i]
-		}
 
-		throughputSummary.Labels["Metric"] = "SchedulingThroughput"
-		throughputSummary.Data = map[string]float64{
-			"Average": sum / float64(length),
-			"Perc50":  tc.schedulingThroughputs[int(math.Ceil(float64(length*50)/100))-1],
-			"Perc90":  tc.schedulingThroughputs[int(math.Ceil(float64(length*90)/100))-1],
-			"Perc95":  tc.schedulingThroughputs[int(math.Ceil(float64(length*95)/100))-1],
-			"Perc99":  tc.schedulingThroughputs[int(math.Ceil(float64(length*99)/100))-1],
-		}
-		throughputSummary.Unit = "pods/s"
+	// tc.schedulingThroughputs can be empty if the scenario doesn't have
+	// enough number of pods and nodes to take more than throughputSampleInterval (i.e. 1 second).
+	length := len(tc.schedulingThroughputs)
+	if length == 0 {
+		klog.Warningf("Failed to measure SchedulingThroughput for %s. Increase pods and/or nodes to make scheduling take longer", tc.resultLabels["Name"])
+		return []DataItem{throughputSummary}
 	}
+
+	sort.Float64s(tc.schedulingThroughputs)
+	sum := 0.0
+	for i := range tc.schedulingThroughputs {
+		sum += tc.schedulingThroughputs[i]
+	}
+
+	throughputSummary.Labels["Metric"] = "SchedulingThroughput"
+	throughputSummary.Data = map[string]float64{
+		"Average": sum / float64(length),
+		"Perc50":  tc.schedulingThroughputs[int(math.Ceil(float64(length*50)/100))-1],
+		"Perc90":  tc.schedulingThroughputs[int(math.Ceil(float64(length*90)/100))-1],
+		"Perc95":  tc.schedulingThroughputs[int(math.Ceil(float64(length*95)/100))-1],
+		"Perc99":  tc.schedulingThroughputs[int(math.Ceil(float64(length*99)/100))-1],
+	}
+	throughputSummary.Unit = "pods/s"
 
 	return []DataItem{throughputSummary}
 }

@@ -53,8 +53,9 @@ var (
 
 // Options is a struct to support version command
 type Options struct {
-	ClientOnly bool
-	Output     string
+	ClientOnly       bool
+	Output           string
+	WarningsAsErrors bool
 
 	args []string
 
@@ -93,6 +94,9 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cob
 // Complete completes all the required options
 func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
+
+	o.WarningsAsErrors = cmd.Flags().Lookup("warnings-as-errors").Value.String() == "true"
+
 	if o.ClientOnly {
 		return nil
 	}
@@ -162,11 +166,17 @@ func (o *Options) Run() error {
 	}
 
 	if versionInfo.ServerVersion != nil {
-		if err := printVersionSkewWarning(o.ErrOut, *versionInfo.ClientVersion, *versionInfo.ServerVersion); err != nil {
+		warningMessage, err := getVersionSkewWarning(*versionInfo.ClientVersion, *versionInfo.ServerVersion)
+		if err != nil {
 			return err
 		}
+		if warningMessage != "" {
+			if o.WarningsAsErrors {
+				return errors.New(warningMessage)
+			}
+			fmt.Fprintf(o.ErrOut, "Warning: %s\n", warningMessage) //nolint:errcheck
+		}
 	}
-
 	return serverErr
 }
 

@@ -920,7 +920,10 @@ func TestCondition(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			environment.DisableBaseEnvSetCachingForTests()
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, tc.enableSelectors)
+			if !tc.enableSelectors {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, false)
+			}
 
 			if tc.testPerCallLimit == 0 {
 				tc.testPerCallLimit = celconfig.PerCallLimit

@@ -27,6 +27,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -82,7 +84,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	uexec "k8s.io/utils/exec"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -249,6 +251,23 @@ func runKubectlRetryOrDie(ns string, args ...string) string {
 	framework.Logf("stdout: %q", output)
 	framework.ExpectNoError(err)
 	return output
+}
+
+// matches localhost / loopback skip from
+// https://pkg.go.dev/golang.org/x/net/http/httpproxy#Config.ProxyFunc
+func hostIsLocal(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	nip, err := netip.ParseAddr(host)
+	var ip net.IP
+	if err == nil {
+		ip = net.IP(nip.AsSlice())
+		if ip.IsLoopback() {
+			return true
+		}
+	}
+	return false
 }
 
 var _ = SIGDescribe("Kubectl client", func() {
@@ -467,7 +486,19 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		ginkgo.It("should support exec through an HTTP proxy", func(ctx context.Context) {
+			// testContextHost is a KUBECONFIG URL
 			testContextHost := getTestContextHost()
+
+			// check if testContextHost is on localhost and skip the tests
+			// proxy env vars are always ignored on localhost and loopback IPs
+			// https://pkg.go.dev/golang.org/x/net/http/httpproxy#Config.ProxyFunc
+			// TODO: consider if we can test proxying some other way with local clusters
+			// https://github.com/kubernetes/kubectl/issues/1655#issuecomment-2829408755
+			u, err := url.Parse(testContextHost)
+			framework.ExpectNoError(err, "parsing test context host: %s", testContextHost)
+			if hostIsLocal(u.Hostname()) {
+				e2eskipper.Skipf("Test host %q is on localhost and would not be proxied by HTTP_PROXY, skipping test", testContextHost)
+			}
 
 			ginkgo.By("Starting http_proxy")
 			var proxyLogs bytes.Buffer
@@ -482,7 +513,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				proxyLogs.Reset()
 				ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
 				output := e2ekubectl.NewKubectlCommand(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
-					AppendEnv(append(os.Environ(), fmt.Sprintf("%s=%s", proxyVar, proxyAddr))).
+					AppendEnv([]string{fmt.Sprintf("%s=%s", proxyVar, proxyAddr)}).
 					ExecOrDie(ns)
 
 				// Verify we got the normal output captured by the exec server
@@ -573,9 +604,10 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 				ginkgo.By("adding rbac permissions")
 				// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
-				err := e2eauth.BindClusterRole(ctx, f.ClientSet.RbacV1(), "view", f.Namespace.Name,
+				cleanupFunc, err := e2eauth.BindClusterRole(ctx, f.ClientSet.RbacV1(), "view", f.Namespace.Name,
 					rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 				framework.ExpectNoError(err)
+				defer cleanupFunc(ctx)
 
 				err = e2eauth.WaitForAuthorizationUpdate(ctx, f.ClientSet.AuthorizationV1(),
 					serviceaccount.MakeUsername(f.Namespace.Name, "default"),
@@ -1205,7 +1237,7 @@ metadata:
 					framework.Failf("failed to unmarshal schema: %v", err)
 				}
 				// Allow for arbitrary-extra properties.
-				props.XPreserveUnknownFields = pointer.BoolPtr(true)
+				props.XPreserveUnknownFields = ptr.To(true)
 				for i := range crd.Spec.Versions {
 					crd.Spec.Versions[i].Schema = &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: props}
 				}

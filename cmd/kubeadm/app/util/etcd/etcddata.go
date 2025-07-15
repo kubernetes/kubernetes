@@ -19,7 +19,7 @@ package etcd
 import (
 	"os"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // CreateDataDirectory creates the etcd data directory (commonly /var/lib/etcd) with the right permissions.

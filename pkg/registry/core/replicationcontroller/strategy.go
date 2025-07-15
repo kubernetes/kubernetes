@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
@@ -44,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.
@@ -130,13 +131,12 @@ func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorL
 	allErrs := corevalidation.ValidateReplicationController(controller, opts)
 
 	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	// FIXME: isSpecRequest(ctx) limits Declarative validation to the spec until subresource support is introduced.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) && isSpecRequest(ctx) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
 		// Run declarative validation with panic recovery
-		declarativeErrs := rest.ValidateDeclarativelyWithRecovery(ctx, nil, legacyscheme.Scheme, controller, takeover)
+		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, controller, rest.WithTakeover(takeover))
 
 		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
 		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover)
@@ -199,13 +199,12 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	}
 
 	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	// FIXME: This limits Declarative validation to the spec until subresource support is introduced.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) && isSpecRequest(ctx) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
 		// Run declarative update validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclarativelyWithRecovery(ctx, nil, legacyscheme.Scheme, newRc, oldRc, takeover)
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newRc, oldRc, rest.WithTakeover(takeover))
 
 		// Compare imperative and declarative errors and emit metric if there's a mismatch
 		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
@@ -217,13 +216,6 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	}
 
 	return errs
-}
-
-func isSpecRequest(ctx context.Context) bool {
-	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		return len(requestInfo.Subresource) == 0
-	}
-	return false
 }
 
 // WarningsOnUpdate returns warnings for the given update.

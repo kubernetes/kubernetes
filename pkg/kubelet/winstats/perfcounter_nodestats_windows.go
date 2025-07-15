@@ -20,6 +20,8 @@ limitations under the License.
 package winstats
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"runtime"
 	"strconv"
@@ -33,7 +35,6 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -296,13 +297,13 @@ func (p *perfCounterNodeStatsClient) getCPUUsageNanoCores() uint64 {
 func getSystemUUID() (string, error) {
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\HardwareConfig`, registry.QUERY_VALUE)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to open registry key HKLM\\SYSTEM\\HardwareConfig")
+		return "", fmt.Errorf("failed to open registry key HKLM\\SYSTEM\\HardwareConfig: %w", err)
 	}
 	defer k.Close()
 
 	uuid, _, err := k.GetStringValue("LastConfig")
 	if err != nil {
-		return "", errors.Wrap(err, "failed to read registry value LastConfig from key HKLM\\SYSTEM\\HardwareConfig")
+		return "", fmt.Errorf("failed to read registry value LastConfig from key HKLM\\SYSTEM\\HardwareConfig: %w", err)
 	}
 
 	uuid = strings.Trim(uuid, "{")

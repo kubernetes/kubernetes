@@ -1256,6 +1256,9 @@ func TestControllerSyncJob(t *testing.T) {
 			} else if !tc.jobSuccessPolicy {
 				// TODO: this will be removed in 1.36.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			} else if !tc.jobPodReplacementPolicy {
+				// TODO: this will be removed in 1.37.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodIndexLabel, !tc.podIndexLabelDisabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.jobPodReplacementPolicy)
@@ -2697,6 +2700,10 @@ func TestSyncJobPastDeadline(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableJobPodReplacementPolicy {
+				// TODO: this will be removed in 1.37.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
 			// job manager setup
@@ -4169,6 +4176,10 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableJobPodReplacementPolicy {
+				// TODO: this will be removed in 1.37.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)
 
@@ -5863,6 +5874,9 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 			if !tc.enableJobBackoffLimitPerIndex {
 				// TODO: this will be removed in 1.36
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			} else if !tc.enableJobPodReplacementPolicy {
+				// TODO: this will be removed in 1.37.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
@@ -6248,7 +6262,7 @@ func TestGetPodsForJob(t *testing.T) {
 }
 
 func TestAddPod(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 
@@ -6294,7 +6308,7 @@ func TestAddPod(t *testing.T) {
 }
 
 func TestAddPodOrphan(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
@@ -6323,7 +6337,7 @@ func TestAddPodOrphan(t *testing.T) {
 }
 
 func TestUpdatePod(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -6372,7 +6386,7 @@ func TestUpdatePod(t *testing.T) {
 }
 
 func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
@@ -6400,7 +6414,7 @@ func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 }
 
 func TestUpdatePodChangeControllerRef(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -6428,7 +6442,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 }
 
 func TestUpdatePodRelease(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -6456,7 +6470,7 @@ func TestUpdatePodRelease(t *testing.T) {
 }
 
 func TestDeletePod(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
@@ -6501,7 +6515,7 @@ func TestDeletePod(t *testing.T) {
 
 func TestDeletePodOrphan(t *testing.T) {
 	// Disable batching of pod updates to show it does not get requeued at all
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, 0))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, 0))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	jm, informer := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
@@ -7023,7 +7037,7 @@ func TestJobBackoff(t *testing.T) {
 		"failure with pod updates batching": {
 			requeues:    0,
 			phase:       v1.PodFailed,
-			wantBackoff: syncJobBatchPeriod,
+			wantBackoff: SyncJobBatchPeriod,
 		},
 	}
 
@@ -7365,6 +7379,10 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			if !tc.enableJobPodReplacementPolicy {
+				// TODO: this will be removed in 1.37.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManagedBy)
 			// job manager setup

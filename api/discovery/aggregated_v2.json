@@ -3,7 +3,6 @@
   "items": [
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "apiregistration.k8s.io"
       },
       "versions": [
@@ -55,7 +54,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "apps"
       },
       "versions": [
@@ -292,7 +290,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "events.k8s.io"
       },
       "versions": [
@@ -329,7 +326,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "authentication.k8s.io"
       },
       "versions": [
@@ -369,7 +365,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "authorization.k8s.io"
       },
       "versions": [
@@ -435,7 +430,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "autoscaling"
       },
       "versions": [
@@ -537,7 +531,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "batch"
       },
       "versions": [
@@ -630,7 +623,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "certificates.k8s.io"
       },
       "versions": [
@@ -747,7 +739,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "networking.k8s.io"
       },
       "versions": [
@@ -964,7 +955,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "policy"
       },
       "versions": [
@@ -1016,7 +1006,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "rbac.authorization.k8s.io"
       },
       "versions": [
@@ -1110,7 +1099,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "storage.k8s.io"
       },
       "versions": [
@@ -1300,7 +1288,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "admissionregistration.k8s.io"
       },
       "versions": [
@@ -1424,73 +1411,6 @@
               "categories": [
                 "api-extensions"
               ],
-              "resource": "validatingadmissionpolicies",
-              "responseKind": {
-                "group": "",
-                "kind": "ValidatingAdmissionPolicy",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicy",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "ValidatingAdmissionPolicy",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "categories": [
-                "api-extensions"
-              ],
-              "resource": "validatingadmissionpolicybindings",
-              "responseKind": {
-                "group": "",
-                "kind": "ValidatingAdmissionPolicyBinding",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "validatingadmissionpolicybinding",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1beta1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "categories": [
-                "api-extensions"
-              ],
               "resource": "mutatingadmissionpolicies",
               "responseKind": {
                 "group": "",
@@ -1540,7 +1460,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "apiextensions.k8s.io"
       },
       "versions": [
@@ -1596,7 +1515,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "scheduling.k8s.io"
       },
       "versions": [
@@ -1633,7 +1551,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "coordination.k8s.io"
       },
       "versions": [
@@ -1719,7 +1636,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "node.k8s.io"
       },
       "versions": [
@@ -1753,7 +1669,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "discovery.k8s.io"
       },
       "versions": [
@@ -1787,7 +1702,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "resource.k8s.io"
       },
       "versions": [
@@ -1997,26 +1911,6 @@
           "freshness": "Current",
           "resources": [
             {
-              "resource": "deviceclasses",
-              "responseKind": {
-                "group": "",
-                "kind": "DeviceClass",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "deviceclass",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
               "resource": "devicetaintrules",
               "responseKind": {
                 "group": "",
@@ -2035,81 +1929,6 @@
                 "update",
                 "watch"
               ]
-            },
-            {
-              "resource": "resourceclaims",
-              "responseKind": {
-                "group": "",
-                "kind": "ResourceClaim",
-                "version": ""
-              },
-              "scope": "Namespaced",
-              "singularResource": "resourceclaim",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "ResourceClaim",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "resource": "resourceclaimtemplates",
-              "responseKind": {
-                "group": "",
-                "kind": "ResourceClaimTemplate",
-                "version": ""
-              },
-              "scope": "Namespaced",
-              "singularResource": "resourceclaimtemplate",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "resource": "resourceslices",
-              "responseKind": {
-                "group": "",
-                "kind": "ResourceSlice",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "resourceslice",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
             }
           ],
           "version": "v1alpha3"
@@ -2118,7 +1937,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "flowcontrol.apiserver.k8s.io"
       },
       "versions": [
@@ -2202,7 +2020,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "internal.apiserver.k8s.io"
       },
       "versions": [
@@ -2251,7 +2068,6 @@
     },
     {
       "metadata": {
-        "creationTimestamp": null,
         "name": "storagemigration.k8s.io"
       },
       "versions": [

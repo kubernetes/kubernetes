@@ -163,3 +163,36 @@ func TestFinalizationAndDeletion(t *testing.T) {
 		t.Fatalf("unable to delete crd: %v", err)
 	}
 }
+
+func TestApplyCRDuringCRDFinalization(t *testing.T) {
+	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
+	require.NoError(t, err)
+	defer tearDown()
+
+	// Create a CRD with a finalizer which will stall deletion
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	noxuDefinition.SetFinalizers([]string{"noxu.example.com/finalizer"})
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	require.NoError(t, err)
+
+	// Delete the CRD. Since it has a finalizer it will be stuck in terminating state
+	err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Delete(t.Context(), noxuDefinition.Name, metav1.DeleteOptions{})
+	require.NoError(t, err)
+
+	// Try to create a CR using SSA. This should fail due to the CRD validation
+	ns := "not-the-default"
+	name := "foo123"
+	noxuResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
+
+	err = wait.PollUntilContextTimeout(t.Context(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+		instance := fixtures.NewNoxuInstance(ns, name)
+		_, err := noxuResourceClient.Apply(ctx, name, instance, metav1.ApplyOptions{DryRun: []string{"All"}, FieldManager: "manager"})
+		if err == nil {
+			t.Log("apply was not blocked, retrying...")
+			return false, nil
+		}
+		return true, err
+	})
+	wantErr := `create not allowed while custom resource definition is terminating`
+	require.ErrorContains(t, err, wantErr)
+}

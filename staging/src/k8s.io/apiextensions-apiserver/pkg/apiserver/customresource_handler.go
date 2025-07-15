@@ -17,6 +17,8 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -25,7 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
@@ -384,17 +386,20 @@ func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, req
 		if justCreated {
 			time.Sleep(2 * time.Second)
 		}
+
+		a := r.admission
 		if terminating {
-			err := apierrors.NewMethodNotSupported(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb)
-			err.ErrStatus.Message = fmt.Sprintf("%v not allowed while custom resource definition is terminating", requestInfo.Verb)
-			responsewriters.ErrorNegotiated(err, Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
-			return nil
+			a = &forbidCreateAdmission{delegate: a}
 		}
-		return handlers.CreateResource(storage, requestScope, r.admission)
+		return handlers.CreateResource(storage, requestScope, a)
 	case "update":
 		return handlers.UpdateResource(storage, requestScope, r.admission)
 	case "patch":
-		return handlers.PatchResource(storage, requestScope, r.admission, supportedTypes)
+		a := r.admission
+		if terminating {
+			a = &forbidCreateAdmission{delegate: a}
+		}
+		return handlers.PatchResource(storage, requestScope, a, supportedTypes)
 	case "delete":
 		allowsOptions := true
 		return handlers.DeleteResource(storage, allowsOptions, requestScope, r.admission)
@@ -1451,4 +1456,37 @@ func buildOpenAPIModelsForApply(staticOpenAPISpec map[string]*spec.Schema, crd *
 		return nil, err
 	}
 	return mergedOpenAPI.Components.Schemas, nil
+}
+
+// forbidCreateAdmission is an admission.Interface wrapper that prevents a
+// CustomResource from being created while its CRD is terminating.
+type forbidCreateAdmission struct {
+	delegate admission.Interface
+}
+
+func (f *forbidCreateAdmission) Handles(operation admission.Operation) bool {
+	if operation == admission.Create {
+		return true
+	}
+	return f.delegate.Handles(operation)
+}
+
+func (f *forbidCreateAdmission) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+	if a.GetOperation() == admission.Create {
+		return apierrors.NewForbidden(a.GetResource().GroupResource(), a.GetName(), errors.New("create not allowed while custom resource definition is terminating"))
+	}
+	if delegate, ok := f.delegate.(admission.MutationInterface); ok {
+		return delegate.Admit(ctx, a, o)
+	}
+	return nil
+}
+
+func (f *forbidCreateAdmission) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+	if a.GetOperation() == admission.Create {
+		return apierrors.NewForbidden(a.GetResource().GroupResource(), a.GetName(), errors.New("create not allowed while custom resource definition is terminating"))
+	}
+	if delegate, ok := f.delegate.(admission.ValidationInterface); ok {
+		return delegate.Validate(ctx, a, o)
+	}
+	return nil
 }

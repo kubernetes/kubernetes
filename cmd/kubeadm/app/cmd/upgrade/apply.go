@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,6 +39,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -233,7 +233,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			_, _ = printer.Printf("[upgrade] In order to upgrade, a ConfigMap called %q in the %q namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			_, _ = printer.Printf("[upgrade] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n")
+			_, _ = printer.Printf("[upgrade/config] Use 'kubeadm init phase upload-config kubeadm --config your-config-file' to re-upload it.\n")
 			err = errors.Errorf("the ConfigMap %q in the %q namespace was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
 		return nil, errors.Wrap(err, "[upgrade] FATAL")

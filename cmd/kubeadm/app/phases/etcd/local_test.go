@@ -32,6 +32,7 @@ import (
 	"github.com/lithammer/dedent"
 
 	v1 "k8s.io/api/core/v1"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
@@ -71,8 +72,7 @@ func TestGetEtcdPodSpec(t *testing.T) {
 
 func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	var tests = []struct {
 		cfg              *kubeadmapi.ClusterConfiguration
@@ -81,7 +81,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	}{
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
-				KubernetesVersion: "v1.7.0",
+				KubernetesVersion: "v1.99.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						DataDir: tmpdir + "/etcd",
@@ -94,7 +94,6 @@ kind: Pod
 metadata:
   annotations:
     kubeadm.kubernetes.io/etcd.advertise-client-urls: https://:2379
-  creationTimestamp: null
   labels:
     component: etcd
     tier: control-plane
@@ -130,18 +129,22 @@ spec:
       httpGet:
         host: 127.0.0.1
         path: /livez
-        port: 2381
+        port: probe-port
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10
       timeoutSeconds: 15
     name: etcd
+    ports:
+    - containerPort: 2381
+      name: probe-port
+      protocol: TCP
     readinessProbe:
       failureThreshold: 3
       httpGet:
         host: 127.0.0.1
         path: /readyz
-        port: 2381
+        port: probe-port
         scheme: HTTP
       periodSeconds: 1
       timeoutSeconds: 15
@@ -154,7 +157,7 @@ spec:
       httpGet:
         host: 127.0.0.1
         path: /readyz
-        port: 2381
+        port: probe-port
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10
@@ -230,8 +233,7 @@ status: {}
 
 func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	// Creates a Cluster Configuration
 	cfg := &kubeadmapi.ClusterConfiguration{

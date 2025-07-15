@@ -328,19 +328,19 @@ func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
 			New:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
 			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
-			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: 1970-01-01 00:16:40 +0000 UTC: field is immutable"},
+			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: \"1970-01-01T00:16:40Z\": field is immutable"},
 		},
 		"invalid clear deletionTimestamp": {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
 			New:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
 			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
-			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: \"null\": field is immutable"},
+			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: null: field is immutable"},
 		},
 		"invalid change deletionTimestamp": {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &now},
 			New:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &later},
 			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionTimestamp: &later},
-			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: 1970-01-01 00:33:20 +0000 UTC: field is immutable"},
+			ExpectedErrs: []string{"field.deletionTimestamp: Invalid value: \"1970-01-01T00:33:20Z\": field is immutable"},
 		},
 
 		"invalid set deletionGracePeriodSeconds": {
@@ -353,7 +353,7 @@ func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
 			New:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
 			ExpectedNew:  metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
-			ExpectedErrs: []string{"field.deletionGracePeriodSeconds: Invalid value: \"null\": field is immutable"},
+			ExpectedErrs: []string{"field.deletionGracePeriodSeconds: Invalid value: null: field is immutable"},
 		},
 		"invalid change deletionGracePeriodSeconds": {
 			Old:          metav1.ObjectMeta{Name: "test", ResourceVersion: "1", DeletionGracePeriodSeconds: &gracePeriodShort},
@@ -373,7 +373,7 @@ func TestValidateObjectMetaUpdatePreventsDeletionFieldMutation(t *testing.T) {
 		}
 		for i := range errs {
 			if errs[i].Error() != tc.ExpectedErrs[i] {
-				t.Errorf("%s: error #%d: expected %q, got %q", k, i, tc.ExpectedErrs[i], errs[i].Error())
+				t.Errorf("%s: error #%d:\n  expected: %q\n       got: %q", k, i, tc.ExpectedErrs[i], errs[i].Error())
 			}
 		}
 		if !reflect.DeepEqual(tc.New, tc.ExpectedNew) {
@@ -419,7 +419,7 @@ func TestObjectMetaGenerationUpdate(t *testing.T) {
 		}
 		for i := range errList {
 			if errList[i] != tc.ExpectedErrs[i] {
-				t.Errorf("%s: error #%d: expected %q, got %q", k, i, tc.ExpectedErrs[i], errList[i])
+				t.Errorf("%s: error #%d:\n  expected: %q\n       got: %q", k, i, tc.ExpectedErrs[i], errs[i].Error())
 			}
 		}
 	}

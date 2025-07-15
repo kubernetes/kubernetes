@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -369,7 +368,7 @@ func TestSerializeObject(t *testing.T) {
 			if !reflect.DeepEqual(result.Header, tt.wantHeaders) {
 				t.Fatal(cmp.Diff(tt.wantHeaders, result.Header))
 			}
-			body, _ := ioutil.ReadAll(result.Body)
+			body, _ := io.ReadAll(result.Body)
 			if !bytes.Equal(tt.wantBody, body) {
 				t.Fatalf("wanted:\n%s\ngot:\n%s", hex.Dump(tt.wantBody), hex.Dump(body))
 			}

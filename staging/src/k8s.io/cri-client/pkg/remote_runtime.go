@@ -104,8 +104,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
 		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 		dialOpts = append(dialOpts,
-			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
-			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler(tracingOpts...)))
 	}
 
 	connParams := grpc.ConnectParams{
@@ -180,8 +179,21 @@ func (r *remoteRuntimeService) versionV1(ctx context.Context, apiVersion string)
 
 	r.log(10, "[RemoteRuntimeService] Version Response", "apiVersion", typedVersion)
 
-	if typedVersion.Version == "" || typedVersion.RuntimeName == "" || typedVersion.RuntimeApiVersion == "" || typedVersion.RuntimeVersion == "" {
-		return nil, fmt.Errorf("not all fields are set in VersionResponse (%q)", *typedVersion)
+	var missingFields []string
+	if typedVersion.Version == "" {
+		missingFields = append(missingFields, "Version")
+	}
+	if typedVersion.RuntimeName == "" {
+		missingFields = append(missingFields, "RuntimeName")
+	}
+	if typedVersion.RuntimeApiVersion == "" {
+		missingFields = append(missingFields, "RuntimeApiVersion")
+	}
+	if typedVersion.RuntimeVersion == "" {
+		missingFields = append(missingFields, "RuntimeVersion")
+	}
+	if len(missingFields) > 0 {
+		return nil, fmt.Errorf("not all fields are set in VersionResponse (missing %s)", strings.Join(missingFields, ", "))
 	}
 
 	return typedVersion, err

@@ -44,7 +44,7 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/workqueue"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
 )
@@ -302,7 +302,7 @@ func (config *DeploymentConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: pointer.Int32(int32(config.Replicas)),
+			Replicas: ptr.To[int32](int32(config.Replicas)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": config.Name,
@@ -373,7 +373,7 @@ func (config *ReplicaSetConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: pointer.Int32(int32(config.Replicas)),
+			Replicas: ptr.To[int32](int32(config.Replicas)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": config.Name,
@@ -445,7 +445,7 @@ func (config *RCConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(int32(config.Replicas)),
+			Replicas: ptr.To[int32](int32(config.Replicas)),
 			Selector: map[string]string{
 				"name": config.Name,
 			},

@@ -349,6 +349,10 @@ func NeighDeserialize(m []byte) (*Neigh, error) {
 			neigh.VNI = int(native.Uint32(attr.Value[0:4]))
 		case NDA_MASTER:
 			neigh.MasterIndex = int(native.Uint32(attr.Value[0:4]))
+		case NDA_CACHEINFO:
+			neigh.Confirmed = native.Uint32(attr.Value[0:4])
+			neigh.Used = native.Uint32(attr.Value[4:8])
+			neigh.Updated = native.Uint32(attr.Value[8:12])
 		}
 	}
 

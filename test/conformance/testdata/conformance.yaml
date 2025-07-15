@@ -601,6 +601,13 @@
     MUST now include the new Label.
   release: v1.18
   file: test/e2e/apimachinery/namespace.go
+- testname: Ordered Namespace Deletion
+  codename: '[sig-api-machinery] OrderedNamespaceDeletion namespace deletion should
+    delete pod first [Conformance]'
+  description: Pods must be deleted before other objects when deleting a namespace.
+    See https://kep.k8s.io/5080
+  release: v1.34
+  file: test/e2e/apimachinery/namespace.go
 - testname: ResourceQuota, apply changes to a ResourceQuota status
   codename: '[sig-api-machinery] ResourceQuota should apply changes to a resourcequota
     status [Conformance]'
@@ -1727,6 +1734,22 @@
     MUST have Endpoints and EndpointSlices pointing to each API server instance.
   release: v1.21
   file: test/e2e/network/endpointslice.go
+- testname: EndpointSlice, multiple IPs, multiple ports
+  codename: '[sig-network] EndpointSlice should support a Service with multiple endpoint
+    IPs specified in multiple EndpointSlices [Conformance]'
+  description: Given a selector-less Service with multiple manually-created EndpointSlices
+    (and no Endpoints) where the endpoints have different IPs and different Ports,
+    the service proxy MUST allow connections to both ports.
+  release: v1.34
+  file: test/e2e/network/endpointslice.go
+- testname: EndpointSlice, single IP, multiple ports
+  codename: '[sig-network] EndpointSlice should support a Service with multiple ports
+    specified in multiple EndpointSlices [Conformance]'
+  description: Given a selector-less Service with multiple manually-created EndpointSlices
+    (and no Endpoints) where the endpoints have the same IP but different Ports, the
+    service proxy MUST allow connections to both ports.
+  release: v1.34
+  file: test/e2e/network/endpointslice.go
 - testname: EndpointSlice API
   codename: '[sig-network] EndpointSlice should support creating EndpointSlice API
     operations [Conformance]'
@@ -2066,6 +2089,16 @@
     watch event.
   release: v1.19
   file: test/e2e/network/service.go
+- testname: ConfigMap, from environment field with various prefixes
+  codename: '[sig-node] ConfigMap should be consumable as environment variable names
+    with various prefixes [Conformance]'
+  description: Create a Pod with environment variable values set using values from
+    ConfigMap. Allows users to use envFrom to set prefixes with various printable
+    ASCII characters excluding '=' as environment variable names. This test verifies
+    that different prefixes including digits, special characters, and letters can
+    be correctly used.
+  release: v1.34
+  file: test/e2e/common/node/configmap.go
 - testname: ConfigMap, from environment field
   codename: '[sig-node] ConfigMap should be consumable via environment variable [NodeConformance]
     [Conformance]'
@@ -2638,6 +2671,16 @@
     patch, delete, and deletecollection.'
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
+- testname: Secrets, pod environment from source
+  codename: '[sig-node] Secrets should be consumable as environment variable names
+    variable names with various prefixes [Conformance]'
+  description: Create a Pod with environment variable values set using values from
+    Secret. Allows users to use envFrom to set prefixes with various printable ASCII
+    characters excluding '=' as environment variable names. This test verifies that
+    different prefixes including digits, special characters, and letters can be correctly
+    used.
+  release: v1.34
+  file: test/e2e/common/node/secrets.go
 - testname: Secrets, pod environment field
   codename: '[sig-node] Secrets should be consumable from pods in env vars [NodeConformance]
     [Conformance]'

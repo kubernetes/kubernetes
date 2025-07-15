@@ -328,7 +328,7 @@ func verifyPodRestartCount(ctx context.Context, f *framework.Framework, podName 
 			updatedPod.Name, expectedNumContainers, len(updatedPod.Status.ContainerStatuses))
 	}
 	for _, containerStatus := range updatedPod.Status.ContainerStatuses {
-		if containerStatus.RestartCount != expectedRestartCount {
+		if containerStatus.RestartCount < expectedRestartCount {
 			return fmt.Errorf("pod %s had container with restartcount %d.  Should have been at least %d",
 				updatedPod.Name, containerStatus.RestartCount, expectedRestartCount)
 		}

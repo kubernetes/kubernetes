@@ -21,14 +21,64 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/operation"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	validationmetrics "k8s.io/apiserver/pkg/validation"
 	"k8s.io/klog/v2"
 )
+
+// ValidationConfig defines how a declarative validation request may be configured.
+type ValidationConfig func(*validationConfigOption)
+
+// WithOptions sets the validation options.
+// Options should contain any validation options that the declarative validation
+// tags expect. These often correspond to feature gates.
+func WithOptions(options []string) ValidationConfig {
+	return func(config *validationConfigOption) {
+		config.options = options
+	}
+}
+
+// WithTakeover sets the takeover flag for validation.
+func WithTakeover(takeover bool) ValidationConfig {
+	return func(config *validationConfigOption) {
+		config.takeover = takeover
+	}
+}
+
+// WithSubresourceMapper sets the subresource mapper for validation.
+// This should be used when registering validation for polymorphic subresources like /scale.
+//
+// For example, the deployments/scale subresource mapper might map from:
+//
+//	group: apps, version: v1, subresource=scale
+//
+// to a target of:
+//
+//	group: autoscaling, version: v1, kind=Scale
+//
+// When set, the group version in the requestInfo of the ctx provided to a declarative validation
+// request will be passed to the subresource mapper to find the group version kind of the subresource.
+// Declarative validation will then convert the object to the subresource group version kind and validate it.
+//
+// Note that the target of the mapping contains no subresource part since the mapper is expected to
+// map to the group version kind of the subresource.
+func WithSubresourceMapper(subresourceMapper GroupVersionKindProvider) ValidationConfig {
+	return func(config *validationConfigOption) {
+		config.subresourceGVKMapper = subresourceMapper
+	}
+}
+
+type validationConfigOption struct {
+	opType               operation.Type
+	options              []string
+	takeover             bool
+	subresourceGVKMapper GroupVersionKindProvider
+}
 
 // ValidateDeclaratively validates obj against declarative validation tags
 // defined in its Go type. It uses the API version extracted from ctx and the
@@ -39,27 +89,16 @@ import (
 // before validation occurs. The scheme MUST have the declarative validation
 // registered for the requested resource/subresource.
 //
-// option should contain any validation options that the declarative validation
-// tags expect.
-//
 // Returns a field.ErrorList containing any validation errors. An internal error
 // is included if requestInfo is missing from the context or if version
 // conversion fails.
-func ValidateDeclaratively(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj runtime.Object) field.ErrorList {
-	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-		versionedObj, err := scheme.ConvertToVersion(obj, groupVersion)
-		if err != nil {
-			return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
-		}
-		subresources, err := parseSubresourcePath(requestInfo.Subresource)
-		if err != nil {
-			return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error parsing subresource path: %w", err))}
-		}
-		return scheme.Validate(ctx, options, versionedObj, subresources...)
-	} else {
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("could not find requestInfo in context"))}
+func ValidateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj runtime.Object, configOpts ...ValidationConfig) field.ErrorList {
+	cfg := &validationConfigOption{opType: operation.Create}
+	for _, o := range configOpts {
+		o(cfg)
 	}
+
+	return panicSafeValidateFunc(validateDeclaratively, cfg.takeover)(ctx, scheme, obj, nil, cfg)
 }
 
 // ValidateUpdateDeclaratively validates obj and oldObj against declarative
@@ -71,31 +110,58 @@ func ValidateDeclaratively(ctx context.Context, options sets.Set[string], scheme
 // before validation occurs. The scheme MUST have the declarative validation
 // registered for the requested resource/subresource.
 //
-// option should contain any validation options that the declarative validation
-// tags expect.
-//
 // Returns a field.ErrorList containing any validation errors. An internal error
 // is included if requestInfo is missing from the context or if version
 // conversion fails.
-func ValidateUpdateDeclaratively(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj, oldObj runtime.Object) field.ErrorList {
-	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-		versionedObj, err := scheme.ConvertToVersion(obj, groupVersion)
-		if err != nil {
-			return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
-		}
-		versionedOldObj, err := scheme.ConvertToVersion(oldObj, groupVersion)
-		if err != nil {
-			return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
-		}
-		subresources, err := parseSubresourcePath(requestInfo.Subresource)
-		if err != nil {
-			return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error parsing subresource path: %w", err))}
-		}
-		return scheme.ValidateUpdate(ctx, options, versionedObj, versionedOldObj, subresources...)
-	} else {
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("could not find requestInfo in context"))}
+func ValidateUpdateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, configOpts ...ValidationConfig) field.ErrorList {
+	cfg := &validationConfigOption{opType: operation.Update}
+	for _, o := range configOpts {
+		o(cfg)
 	}
+	return panicSafeValidateFunc(validateDeclaratively, cfg.takeover)(ctx, scheme, obj, oldObj, cfg)
+}
+
+func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
+	// Find versionedGroupVersion, which identifies the API version to use for declarative validation.
+	versionedGroupVersion, subresources, err := requestInfo(ctx, o.subresourceGVKMapper)
+	if err != nil {
+		return field.ErrorList{field.InternalError(nil, err)}
+	}
+	versionedObj, err := scheme.ConvertToVersion(obj, versionedGroupVersion)
+	if err != nil {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
+	}
+	var versionedOldObj runtime.Object
+
+	switch o.opType {
+	case operation.Create:
+		return scheme.Validate(ctx, o.options, versionedObj, subresources...)
+	case operation.Update:
+		versionedOldObj, err = scheme.ConvertToVersion(oldObj, versionedGroupVersion)
+		if err != nil {
+			return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
+		}
+		return scheme.ValidateUpdate(ctx, o.options, versionedObj, versionedOldObj, subresources...)
+	default:
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unknown operation type: %v", o.opType))}
+	}
+}
+
+func requestInfo(ctx context.Context, subresourceMapper GroupVersionKindProvider) (schema.GroupVersion, []string, error) {
+	requestInfo, found := genericapirequest.RequestInfoFrom(ctx)
+	if !found {
+		return schema.GroupVersion{}, nil, fmt.Errorf("could not find requestInfo in context")
+	}
+	groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	if subresourceMapper != nil {
+		groupVersion = subresourceMapper.GroupVersionKind(groupVersion).GroupVersion()
+	}
+	subresources, err := parseSubresourcePath(requestInfo.Subresource)
+	if err != nil {
+		return schema.GroupVersion{}, nil, fmt.Errorf("unexpected error parsing subresource path: %w", err)
+	}
+	return groupVersion, subresources, nil
+
 }
 
 func parseSubresourcePath(subresourcePath string) ([]string, error) {
@@ -240,82 +306,17 @@ func createDeclarativeValidationPanicHandler(ctx context.Context, errs *field.Er
 	}
 }
 
-// panicSafeValidateFunc wraps a validation function with panic recovery logic.
-// It takes a validation function with the ValidateDeclaratively signature
-// and returns a function with the same signature.
+// panicSafeValidateFunc wraps an validation function with panic recovery logic.
 // The returned function will execute the wrapped function and handle any panics by
 // incrementing the panic metric, and logging an error message
 // if takeover=false, and adding a validation error if takeover=true.
 func panicSafeValidateFunc(
-	validateFunc func(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj runtime.Object) field.ErrorList,
+	validateUpdateFunc func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList,
 	takeover bool,
-) func(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj runtime.Object) field.ErrorList {
-	return func(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj runtime.Object) (errs field.ErrorList) {
+) func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
+	return func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) (errs field.ErrorList) {
 		defer createDeclarativeValidationPanicHandler(ctx, &errs, takeover)()
 
-		return validateFunc(ctx, options, scheme, obj)
+		return validateUpdateFunc(ctx, scheme, obj, oldObj, o)
 	}
-}
-
-// panicSafeValidateUpdateFunc wraps an update validation function with panic recovery logic.
-// It takes a validation function with the ValidateUpdateDeclaratively signature
-// and returns a function with the same signature.
-// The returned function will execute the wrapped function and handle any panics by
-// incrementing the panic metric, and logging an error message
-// if takeover=false, and adding a validation error if takeover=true.
-func panicSafeValidateUpdateFunc(
-	validateUpdateFunc func(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj, oldObj runtime.Object) field.ErrorList,
-	takeover bool,
-) func(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj, oldObj runtime.Object) field.ErrorList {
-	return func(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj, oldObj runtime.Object) (errs field.ErrorList) {
-		defer createDeclarativeValidationPanicHandler(ctx, &errs, takeover)()
-
-		return validateUpdateFunc(ctx, options, scheme, obj, oldObj)
-	}
-}
-
-// ValidateDeclarativelyWithRecovery validates obj against declarative validation tags
-// with panic recovery logic. It uses the API version extracted from ctx and the
-// provided scheme for validation.
-//
-// The ctx MUST contain requestInfo, which determines the target API for
-// validation. The obj is converted to the API version using the provided scheme
-// before validation occurs. The scheme MUST have the declarative validation
-// registered for the requested resource/subresource.
-//
-// option should contain any validation options that the declarative validation
-// tags expect.
-//
-// takeover determines if panic recovery should return validation errors (true) or
-// just log warnings (false).
-//
-// Returns a field.ErrorList containing any validation errors. An internal error
-// is included if requestInfo is missing from the context, if version
-// conversion fails, or if a panic occurs during validation when
-// takeover is true.
-func ValidateDeclarativelyWithRecovery(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj runtime.Object, takeover bool) field.ErrorList {
-	return panicSafeValidateFunc(ValidateDeclaratively, takeover)(ctx, options, scheme, obj)
-}
-
-// ValidateUpdateDeclarativelyWithRecovery validates obj and oldObj against declarative
-// validation tags with panic recovery logic. It uses the API version extracted from
-// ctx and the provided scheme for validation.
-//
-// The ctx MUST contain requestInfo, which determines the target API for
-// validation. The obj is converted to the API version using the provided scheme
-// before validation occurs. The scheme MUST have the declarative validation
-// registered for the requested resource/subresource.
-//
-// option should contain any validation options that the declarative validation
-// tags expect.
-//
-// takeover determines if panic recovery should return validation errors (true) or
-// just log warnings (false).
-//
-// Returns a field.ErrorList containing any validation errors. An internal error
-// is included if requestInfo is missing from the context, if version
-// conversion fails, or if a panic occurs during validation when
-// takeover is true.
-func ValidateUpdateDeclarativelyWithRecovery(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj, oldObj runtime.Object, takeover bool) field.ErrorList {
-	return panicSafeValidateUpdateFunc(ValidateUpdateDeclaratively, takeover)(ctx, options, scheme, obj, oldObj)
 }

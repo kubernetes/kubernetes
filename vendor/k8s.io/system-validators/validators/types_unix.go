@@ -20,17 +20,19 @@ limitations under the License.
 package system
 
 import (
-	"os/exec"
+	"fmt"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 // DefaultSysSpec is the default SysSpec for Linux
 var DefaultSysSpec = SysSpec{
 	OS: "Linux",
 	KernelSpec: KernelSpec{
-		// 4.19 is an active kernel Long Term Support (LTS) release, tracked in https://www.kernel.org/category/releases.html.
-		Versions:     []string{`^4\.19.*$`, `^4\.[2-9][0-9].*$`, `^([5-9]|[1-9][0-9]+)\.([0-9]+)\.([0-9]+).*$`},
-		VersionsNote: "Recommended LTS version from the 4.x series is 4.19. Any 5.x or 6.x versions are also supported. For cgroups v2 support, the minimal version is 4.15 and the recommended version is 5.8+",
+		// 5.4, 5.10, 5.15 is an active kernel Long Term Support (LTS) release, tracked in https://www.kernel.org/category/releases.html.
+		Versions:     []string{`^5\.4.*$`, `^5\.10.*$`, `^5\.15.*$`, `^([6-9]|[1-9][0-9]+)\.([0-9]+)\.([0-9]+).*$`},
+		VersionsNote: "Supported LTS versions from the 5.x series are 5.4, 5.10 and 5.15. Any 6.x version is also supported. For cgroups v2 support, the recommended version is 5.10 or newer",
 		// TODO(random-liu): Add more config
 		// TODO(random-liu): Add description for each kernel configuration:
 		Required: []KernelConfig{
@@ -96,9 +98,15 @@ var _ KernelValidatorHelper = &KernelValidatorHelperImpl{}
 
 // GetKernelReleaseVersion returns the kernel release version (ex. 4.4.0-96-generic) as a string
 func (o *KernelValidatorHelperImpl) GetKernelReleaseVersion() (string, error) {
-	releaseVersion, err := exec.Command("uname", "-r").CombinedOutput()
+	return getKernelRelease()
+}
+
+// getKernelRelease returns the kernel release of the local machine.
+func getKernelRelease() (string, error) {
+	var utsname unix.Utsname
+	err := unix.Uname(&utsname)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get kernel release: %w", err)
 	}
-	return strings.TrimSpace(string(releaseVersion)), nil
+	return strings.TrimSpace(unix.ByteSliceToString(utsname.Release[:])), nil
 }

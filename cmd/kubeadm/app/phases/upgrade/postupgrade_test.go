@@ -23,8 +23,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,13 +32,11 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 func TestMoveFiles(t *testing.T) {
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-	os.Chmod(tmpdir, 0766)
+	tmpdir := t.TempDir()
 
 	certPath := filepath.Join(tmpdir, constants.APIServerCertName)
 	certFile, err := os.OpenFile(certPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
@@ -72,9 +68,7 @@ func TestMoveFiles(t *testing.T) {
 }
 
 func TestRollbackFiles(t *testing.T) {
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
-	os.Chmod(tmpdir, 0766)
+	tmpdir := t.TempDir()
 
 	subDir := filepath.Join(tmpdir, "expired")
 	if err := os.Mkdir(subDir, 0766); err != nil {

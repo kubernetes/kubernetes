@@ -21,13 +21,8 @@ package kubelet
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
 	"os/exec"
 	"strings"
-
-	securejoin "github.com/cyphar/filepath-securejoin"
-	unix "golang.org/x/sys/unix"
 )
 
 // getLoggingCmd returns the journalctl cmd and arguments for the given nodeLogQuery and boot. Note that
@@ -80,33 +75,4 @@ func checkForNativeLogger(ctx context.Context, service string) bool {
 	// journalctl won't return an error if we try to fetch logs for a non-existent service,
 	// hence we search for it in the list of services known to journalctl
 	return strings.Contains(string(output), service+".service")
-}
-
-// heuristicsCopyFileLog returns the contents of the given logFile
-func heuristicsCopyFileLog(ctx context.Context, w io.Writer, logDir, logFileName string) error {
-	f, err := securejoin.OpenInRoot(logDir, logFileName)
-	if err != nil {
-		return err
-	}
-	// Ignoring errors when closing a file opened read-only doesn't cause data loss
-	defer func() { _ = f.Close() }()
-	fInfo, err := f.Stat()
-	if err != nil {
-		return err
-	}
-	// This is to account for the heuristics where logs for service foo
-	// could be in /var/log/foo/
-	if fInfo.IsDir() {
-		return os.ErrNotExist
-	}
-	rf, err := securejoin.Reopen(f, unix.O_RDONLY)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = rf.Close() }()
-
-	if _, err := io.Copy(w, newReaderCtx(ctx, rf)); err != nil {
-		return err
-	}
-	return nil
 }

@@ -44,7 +44,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func RunTestWatch(ctx context.Context, t *testing.T, store storage.Interface) {
@@ -585,7 +585,7 @@ func RunTestWatchInitializationSignal(ctx context.Context, t *testing.T, store s
 // Given this feature is currently not explicitly used by higher layers of Kubernetes
 // (it rather is used by wrappers of storage.Interface to implement its functionalities)
 // this test is currently considered optional.
-func RunOptionalTestProgressNotify(ctx context.Context, t *testing.T, store storage.Interface) {
+func RunOptionalTestProgressNotify(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc) {
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "test-ns"}}
 	key := computePodKey(input)
 	out := &example.Pod{}
@@ -593,6 +593,15 @@ func RunOptionalTestProgressNotify(ctx context.Context, t *testing.T, store stor
 		t.Fatalf("Create failed: %v", err)
 	}
 	validateResourceVersion := resourceVersionNotOlderThan(out.ResourceVersion)
+	// Since etcd v3.6.2 we need to increase RV due to https://github.com/etcd-io/etcd/pull/20241.
+	// We must advance the resource version to ensure that etcd revision progresses past the watch we establish.
+	// As etcd does not send progress notifications for watches on future revisions.
+	//
+	// A Kubernetes watch is exclusive (first event received is after a given RV), which translates
+	// to an inclusive etcd watch at revision+1. Without this increment, if no other writes
+	// have occurred, the watch would be on a future revision, preventing progress
+	// notifications.
+	increaseRV(ctx, t)
 
 	opts := storage.ListOptions{
 		ResourceVersion: out.ResourceVersion,
@@ -1273,7 +1282,7 @@ func RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx context.Context
 // In that case we expect a watch request to be established.
 func RunSendInitialEventsBackwardCompatibility(ctx context.Context, t *testing.T, store storage.Interface) {
 	opts := storage.ListOptions{Predicate: storage.Everything}
-	opts.SendInitialEvents = pointer.Bool(true)
+	opts.SendInitialEvents = ptr.To(true)
 	w, err := store.Watch(ctx, "/pods", opts)
 	require.NoError(t, err)
 	w.Stop()

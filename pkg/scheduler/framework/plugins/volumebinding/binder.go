@@ -831,7 +831,7 @@ func (b *volumeBinder) checkBoundClaims(logger klog.Logger, claims []*v1.Persist
 	csiNode, err := b.csiNodeLister.Get(node.Name)
 	if err != nil {
 		// TODO: return the error once CSINode is created by default
-		logger.V(4).Info("Could not get a CSINode object for the node", "node", klog.KObj(node), "err", err)
+		logger.V(5).Info("Could not get a CSINode object for the node", "node", klog.KObj(node), "err", err)
 	}
 
 	for _, pvc := range claims {
@@ -851,13 +851,13 @@ func (b *volumeBinder) checkBoundClaims(logger klog.Logger, claims []*v1.Persist
 
 		err = volume.CheckNodeAffinity(pv, node.Labels)
 		if err != nil {
-			logger.V(4).Info("PersistentVolume and node mismatch for pod", "PV", klog.KRef("", pvName), "node", klog.KObj(node), "pod", klog.KObj(pod), "err", err)
+			logger.V(5).Info("PersistentVolume and node mismatch for pod", "PV", klog.KRef("", pvName), "node", klog.KObj(node), "pod", klog.KObj(pod), "err", err)
 			return false, true, nil
 		}
 		logger.V(5).Info("PersistentVolume and node matches for pod", "PV", klog.KRef("", pvName), "node", klog.KObj(node), "pod", klog.KObj(pod))
 	}
 
-	logger.V(4).Info("All bound volumes for pod match with node", "pod", klog.KObj(pod), "node", klog.KObj(node))
+	logger.V(5).Info("All bound volumes for pod match with node", "pod", klog.KObj(pod), "node", klog.KObj(node))
 	return true, true, nil
 }
 
@@ -882,7 +882,7 @@ func (b *volumeBinder) findMatchingVolumes(logger klog.Logger, pod *v1.Pod, clai
 			return false, nil, nil, err
 		}
 		if pv == nil {
-			logger.V(4).Info("No matching volumes for pod", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc), "node", klog.KObj(node))
+			logger.V(5).Info("No matching volumes for pod", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc), "node", klog.KObj(node))
 			unboundClaims = append(unboundClaims, pvc)
 			foundMatches = false
 			continue
@@ -895,7 +895,7 @@ func (b *volumeBinder) findMatchingVolumes(logger klog.Logger, pod *v1.Pod, clai
 	}
 
 	if foundMatches {
-		logger.V(4).Info("Found matching volumes for pod", "pod", klog.KObj(pod), "node", klog.KObj(node))
+		logger.V(5).Info("Found matching volumes for pod", "pod", klog.KObj(pod), "node", klog.KObj(node))
 	}
 
 	return
@@ -922,13 +922,13 @@ func (b *volumeBinder) checkVolumeProvisions(logger klog.Logger, pod *v1.Pod, cl
 		}
 		provisioner := class.Provisioner
 		if provisioner == "" || provisioner == volume.NotSupportedProvisioner {
-			logger.V(4).Info("Storage class of claim does not support dynamic provisioning", "storageClassName", className, "PVC", klog.KObj(claim))
+			logger.V(5).Info("Storage class of claim does not support dynamic provisioning", "storageClassName", className, "PVC", klog.KObj(claim))
 			return false, true, nil, nil
 		}
 
 		// Check if the node can satisfy the topology requirement in the class
 		if !v1helper.MatchTopologySelectorTerms(class.AllowedTopologies, labels.Set(node.Labels)) {
-			logger.V(4).Info("Node cannot satisfy provisioning topology requirements of claim", "node", klog.KObj(node), "PVC", klog.KObj(claim))
+			logger.V(5).Info("Node cannot satisfy provisioning topology requirements of claim", "node", klog.KObj(node), "PVC", klog.KObj(claim))
 			return false, true, nil, nil
 		}
 
@@ -947,7 +947,7 @@ func (b *volumeBinder) checkVolumeProvisions(logger klog.Logger, pod *v1.Pod, cl
 			NodeCapacity: capacity,
 		})
 	}
-	logger.V(4).Info("Provisioning for claims of pod that has no matching volumes...", "claimCount", len(claimsToProvision), "pod", klog.KObj(pod), "node", klog.KObj(node))
+	logger.V(5).Info("Provisioning for claims of pod that has no matching volumes...", "claimCount", len(claimsToProvision), "pod", klog.KObj(pod), "node", klog.KObj(node))
 
 	return true, true, dynamicProvisions, nil
 }
@@ -1007,7 +1007,7 @@ func (b *volumeBinder) hasEnoughCapacity(logger klog.Logger, provisioner string,
 
 	// TODO (?): this doesn't give any information about which pools where considered and why
 	// they had to be rejected. Log that above? But that might be a lot of log output...
-	logger.V(4).Info("Node has no accessible CSIStorageCapacity with enough capacity for PVC",
+	logger.V(5).Info("Node has no accessible CSIStorageCapacity with enough capacity for PVC",
 		"node", klog.KObj(node), "PVC", klog.KObj(claim), "size", sizeInBytes, "storageClass", klog.KObj(storageClass))
 	return false, nil, nil
 }

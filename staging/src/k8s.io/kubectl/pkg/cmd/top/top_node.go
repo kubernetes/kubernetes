@@ -19,9 +19,9 @@ package top
 import (
 	"context"
 	"errors"
-
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -45,6 +45,7 @@ type TopNodeOptions struct {
 	NoHeaders          bool
 	UseProtocolBuffers bool
 	ShowCapacity       bool
+	ShowSwap           bool
 
 	NodeClient      corev1client.CoreV1Interface
 	Printer         *metricsutil.TopCmdPrinter
@@ -95,6 +96,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericiooption
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
 	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
 	cmd.Flags().BoolVar(&o.ShowCapacity, "show-capacity", o.ShowCapacity, "Print node resources based on Capacity instead of Allocatable(default) of the nodes.")
+	cmd.Flags().BoolVar(&o.ShowSwap, "show-swap", o.ShowSwap, "Print node resources related to swap memory.")
 
 	return cmd
 }
@@ -127,7 +129,7 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 	o.NodeClient = clientset.CoreV1()
 
-	o.Printer = metricsutil.NewTopCmdPrinter(o.Out)
+	o.Printer = metricsutil.NewTopCmdPrinter(o.Out, o.ShowSwap)
 	return nil
 }
 
@@ -198,6 +200,14 @@ func (o TopNodeOptions) RunTopNode() error {
 		} else {
 			availableResources[n.Name] = n.Status.Capacity
 		}
+
+		if n.Status.NodeInfo.Swap != nil && n.Status.NodeInfo.Swap.Capacity != nil {
+			swapCapacity := *n.Status.NodeInfo.Swap.Capacity
+			availableResources[n.Name]["swap"] = *resource.NewQuantity(swapCapacity, resource.BinarySI)
+		} else {
+			o.Printer.RegisterMissingResource(n.Name, metricsutil.ResourceSwap)
+		}
+
 	}
 
 	return o.Printer.PrintNodeMetrics(metrics.Items, availableResources, o.NoHeaders, o.SortBy)

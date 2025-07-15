@@ -85,6 +85,7 @@ func extractCSIStorageCapacity(cSIStorageCapacity *storagev1beta1.CSIStorageCapa
 	b.WithAPIVersion("storage.k8s.io/v1beta1")
 	return b, nil
 }
+func (b CSIStorageCapacityApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -276,8 +277,24 @@ func (b *CSIStorageCapacityApplyConfiguration) WithMaximumVolumeSize(value resou
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *CSIStorageCapacityApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *CSIStorageCapacityApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *CSIStorageCapacityApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *CSIStorageCapacityApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

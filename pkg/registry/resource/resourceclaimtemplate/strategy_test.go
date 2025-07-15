@@ -139,7 +139,7 @@ var ns2 = &corev1.Namespace{
 		Labels: map[string]string{resource.DRAAdminNamespaceLabelKey: "true"},
 	},
 }
-var adminAccessError = "Forbidden: admin access to devices requires the `resource.k8s.io/admin-access: true` label on the containing namespace"
+var adminAccessError = "Forbidden: admin access to devices requires the `resource.kubernetes.io/admin-access: true` label on the containing namespace"
 var fieldImmutableError = "field is immutable"
 var metadataError = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 var deviceRequestError = "exactly one of `exactly` or `firstAvailable` is required"

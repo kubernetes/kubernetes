@@ -23,22 +23,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
-func newListWorkEstimator(countFn objectCountGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
+const (
+	bytesPerSeat                     = 100_000
+	cacheWithStreamingMaxMemoryUsage = 1_000_000
+)
+
+func newListWorkEstimator(countFn statsGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) *listWorkEstimator {
 	estimator := &listWorkEstimator{
 		config:        config,
-		countGetterFn: countFn,
+		statsGetterFn: countFn,
 		maxSeatsFn:    maxSeatsFn,
 	}
-	return estimator.estimate
+	return estimator
 }
 
 type listWorkEstimator struct {
 	config        *WorkEstimatorConfig
-	countGetterFn objectCountGetterFunc
+	statsGetterFn statsGetterFunc
 	maxSeatsFn    maxSeatsFunc
 }
 
@@ -90,7 +98,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	listFromStorage := result.ShouldDelegate
 	isListFromCache := requestInfo.Verb == "watch" || !listFromStorage
 
-	numStored, err := e.countGetterFn(key(requestInfo))
+	stats, err := e.statsGetterFn(key(requestInfo))
 	switch {
 	case err == ObjectCountStaleErr:
 		// object count going stale is indicative of degradation, so we should
@@ -118,7 +126,25 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		klog.ErrorS(err, "Unexpected error from object count tracker")
 		return WorkEstimate{InitialSeats: maxSeats}
 	}
+	var seats uint64
+	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		seats = e.seatsBasedOnObjectSize(stats, listOptions, isListFromCache)
+	} else {
+		seats = e.seatsBasedOnObjectCount(stats, listOptions, isListFromCache)
+	}
 
+	// make sure we never return a seat of zero
+	if seats < minSeats {
+		seats = minSeats
+	}
+	if seats > maxSeats {
+		seats = maxSeats
+	}
+	return WorkEstimate{InitialSeats: seats}
+}
+
+func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOptions metav1.ListOptions, isListFromCache bool) uint64 {
+	numStored := stats.ObjectCount
 	limit := numStored
 	if listOptions.Limit > 0 && listOptions.Limit < numStored {
 		limit = listOptions.Limit
@@ -141,16 +167,29 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	// will be processed by the list request.
 	// we will come up with a different formula for the transformation function and/or
 	// fine tune this number in future iteratons.
-	seats := uint64(math.Ceil(float64(estimatedObjectsToBeProcessed) / e.config.ObjectsPerSeat))
+	return uint64(math.Ceil(float64(estimatedObjectsToBeProcessed) / e.config.ObjectsPerSeat))
+}
 
-	// make sure we never return a seat of zero
-	if seats < minSeats {
-		seats = minSeats
+func (e *listWorkEstimator) seatsBasedOnObjectSize(stats storage.Stats, listOptions metav1.ListOptions, isListFromCache bool) uint64 {
+	// Size not available, fallback to count based estimate
+	if stats.EstimatedAverageObjectSizeBytes <= 0 && stats.ObjectCount != 0 {
+		return e.seatsBasedOnObjectCount(stats, listOptions, isListFromCache)
 	}
-	if seats > maxSeats {
-		seats = maxSeats
+	limited := stats.ObjectCount
+	if listOptions.Limit > 0 && listOptions.Limit < limited {
+		limited = listOptions.Limit
 	}
-	return WorkEstimate{InitialSeats: seats}
+	objectsLoadedInMemory := limited
+	if !isListFromCache && (listOptions.FieldSelector != "" || listOptions.LabelSelector != "") {
+		objectsLoadedInMemory = max(limited, stats.ObjectCount/2)
+	}
+
+	memoryUsedAtOnce := objectsLoadedInMemory * stats.EstimatedAverageObjectSizeBytes
+	if isListFromCache {
+		// TODO: Identify if the resource is streamed
+		memoryUsedAtOnce = min(memoryUsedAtOnce, cacheWithStreamingMaxMemoryUsage)
+	}
+	return uint64(math.Ceil(float64(memoryUsedAtOnce) / bytesPerSeat))
 }
 
 func key(requestInfo *apirequest.RequestInfo) string {

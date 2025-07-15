@@ -137,7 +137,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 	// If pod has exclusive cpu and the container in question has integer cpu requests
 	// the cfs quota will not be enforced
 	disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.ContainerHasExclusiveCPUs(pod, container)
-	klog.V(2).InfoS("Enforcing CFS quota", "pod", klog.KObj(pod), "unlimited", disableCPUQuota)
+	klog.V(5).InfoS("Enforcing CFS quota", "pod", klog.KObj(pod), "unlimited", disableCPUQuota)
 	lcr := m.calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit, disableCPUQuota)
 
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
@@ -294,13 +294,13 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 	if m.cpuCFSQuota {
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned
 		// to allow full usage of cpu resource.
-		cpuPeriod := int64(quotaPeriod)
+		cpuPeriod := int64(cm.QuotaPeriod)
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
 			// kubeGenericRuntimeManager.cpuCFSQuotaPeriod is provided in time.Duration,
 			// but we need to convert it to number of microseconds which is used by kernel.
 			cpuPeriod = int64(m.cpuCFSQuotaPeriod.Duration / time.Microsecond)
 		}
-		cpuQuota := milliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
+		cpuQuota := cm.MilliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
 		resources.CpuQuota = cpuQuota
 		if disableCPUQuota {
 			resources.CpuQuota = int64(-1)

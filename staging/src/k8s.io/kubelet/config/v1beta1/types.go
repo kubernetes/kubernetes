@@ -301,6 +301,7 @@ type KubeletConfiguration struct {
 	ClusterDNS []string `json:"clusterDNS,omitempty"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
+	// Deprecated: no longer has any effect.
 	// Default: "4h"
 	// +optional
 	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout,omitempty"`
@@ -887,7 +888,6 @@ type KubeletConfiguration struct {
 	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
 	// See https://kep.k8s.io/2832 for more details.
 	// Default: nil
-	// +featureGate=KubeletTracing
 	// +optional
 	Tracing *tracingapi.TracingConfiguration `json:"tracing,omitempty"`
 
@@ -923,7 +923,7 @@ type KubeletConfiguration struct {
 	FailCgroupV1 *bool `json:"failCgroupV1,omitempty"`
 
 	// UserNamespaces contains User Namespace configurations.
-	// +featureGate=UserNamespaceSupport
+	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces `json:"userNamespaces,omitempty"`
 }
@@ -1131,7 +1131,7 @@ type UserNamespaces struct {
 	// Changing the value may require recreating all containers on the node.
 	//
 	// Default: 65536
-	// +featureGate=UserNamespaceSupport
+	// +featureGate=UserNamespacesSupport
 	// +optional
 	IDsPerPod *int64 `json:"idsPerPod,omitempty"`
 }

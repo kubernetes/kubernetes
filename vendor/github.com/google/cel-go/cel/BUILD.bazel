@@ -18,8 +18,10 @@ go_library(
         "optimizer.go",
         "options.go",
         "program.go",
+        "prompt.go",
         "validator.go",
     ],
+    embedsrcs = ["//cel/templates"],
     importpath = "github.com/google/cel-go/cel",
     visibility = ["//visibility:public"],
     deps = [
@@ -29,6 +31,7 @@ go_library(
         "//common/ast:go_default_library",
         "//common/containers:go_default_library",
         "//common/decls:go_default_library",
+        "//common/env:go_default_library",
         "//common/functions:go_default_library",
         "//common/operators:go_default_library",
         "//common/overloads:go_default_library",
@@ -64,6 +67,7 @@ go_test(
         "io_test.go",
         "inlining_test.go",
         "optimizer_test.go",
+        "prompt_test.go",
         "validator_test.go",
     ],
     data = [
@@ -71,6 +75,9 @@ go_test(
     ],
     embed = [
         ":go_default_library",
+    ],
+    embedsrcs = [
+        "//cel/testdata:prompts",
     ],
     deps = [
         "//common/operators:go_default_library",

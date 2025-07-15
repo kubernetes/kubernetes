@@ -22,7 +22,6 @@ import (
 	"text/template"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
 	utilsexec "k8s.io/utils/exec"
@@ -33,6 +32,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var (

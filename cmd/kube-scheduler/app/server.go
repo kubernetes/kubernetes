@@ -160,6 +160,9 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 	}
 	// add feature enablement metrics
 	fg.(featuregate.MutableFeatureGate).AddMetrics()
+	// add component version metrics
+	opts.ComponentGlobalsRegistry.AddMetrics()
+
 	return Run(ctx, cc, sched)
 }
 

@@ -717,7 +717,7 @@ func (p *csiPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 }
 
 func (p *csiPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	m := p.host.GetMounter(p.GetPluginName())
+	m := p.host.GetMounter()
 	return m.GetMountRefs(deviceMountPath)
 }
 

@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/google/cel-go/common/types/ref"
 
@@ -208,4 +210,24 @@ func (d Double) Type() ref.Type {
 // Value implements ref.Val.Value.
 func (d Double) Value() any {
 	return float64(d)
+}
+
+func (d Double) format(sb *strings.Builder) {
+	if math.IsNaN(float64(d)) {
+		sb.WriteString(`double("NaN")`)
+		return
+	}
+	if math.IsInf(float64(d), -1) {
+		sb.WriteString(`double("-Infinity")`)
+		return
+	}
+	if math.IsInf(float64(d), 1) {
+		sb.WriteString(`double("Infinity")`)
+		return
+	}
+	s := strconv.FormatFloat(float64(d), 'f', -1, 64)
+	sb.WriteString(s)
+	if !strings.ContainsRune(s, '.') {
+		sb.WriteString(".0")
+	}
 }

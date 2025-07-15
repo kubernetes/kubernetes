@@ -1,143 +1,71 @@
-# go-yaml fork
+# goyaml.v2
 
-This package is a fork of the go-yaml library and is intended solely for consumption
-by kubernetes projects. In this fork, we plan to support only critical changes required for
-kubernetes, such as small bug fixes and regressions. Larger, general-purpose feature requests
-should be made in the upstream go-yaml library, and we will reject such changes in this fork
-unless we are pulling them from upstream.
+This package provides type and function aliases for the `go.yaml.in/yaml/v2` package (which is compatible with `gopkg.in/yaml.v2`).
 
-This fork is based on v2.4.0: https://github.com/go-yaml/yaml/releases/tag/v2.4.0
+## Purpose
 
-# YAML support for the Go language
+The purpose of this package is to:
 
-Introduction
-------------
+1. Provide a transition path for users migrating from the sigs.k8s.io/yaml package to direct usage of go.yaml.in/yaml/v2
+2. Maintain compatibility with existing code while encouraging migration to the upstream package
+3. Reduce maintenance overhead by delegating to the upstream implementation
 
-The yaml package enables Go programs to comfortably encode and decode YAML
-values. It was developed within [Canonical](https://www.canonical.com) as
-part of the [juju](https://juju.ubuntu.com) project, and is based on a
-pure Go port of the well-known [libyaml](http://pyyaml.org/wiki/LibYAML)
-C library to parse and generate YAML data quickly and reliably.
+## Usage
 
-Compatibility
--------------
+Instead of importing this package directly, you should migrate to using `go.yaml.in/yaml/v2` directly:
 
-The yaml package supports most of YAML 1.1 and 1.2, including support for
-anchors, tags, map merging, etc. Multi-document unmarshalling is not yet
-implemented, and base-60 floats from YAML 1.1 are purposefully not
-supported since they're a poor design and are gone in YAML 1.2.
+```go
+// Old way
+import "sigs.k8s.io/yaml/goyaml.v2"
 
-Installation and usage
-----------------------
-
-The import path for the package is *gopkg.in/yaml.v2*.
-
-To install it, run:
-
-    go get gopkg.in/yaml.v2
-
-API documentation
------------------
-
-If opened in a browser, the import path itself leads to the API documentation:
-
-  * [https://gopkg.in/yaml.v2](https://gopkg.in/yaml.v2)
-
-API stability
--------------
-
-The package API for yaml v2 will remain stable as described in [gopkg.in](https://gopkg.in).
-
-
-License
--------
-
-The yaml package is licensed under the Apache License 2.0. Please see the LICENSE file for details.
-
-
-Example
--------
-
-```Go
-package main
-
-import (
-        "fmt"
-        "log"
-
-        "gopkg.in/yaml.v2"
-)
-
-var data = `
-a: Easy!
-b:
-  c: 2
-  d: [3, 4]
-`
-
-// Note: struct fields must be public in order for unmarshal to
-// correctly populate the data.
-type T struct {
-        A string
-        B struct {
-                RenamedC int   `yaml:"c"`
-                D        []int `yaml:",flow"`
-        }
-}
-
-func main() {
-        t := T{}
-    
-        err := yaml.Unmarshal([]byte(data), &t)
-        if err != nil {
-                log.Fatalf("error: %v", err)
-        }
-        fmt.Printf("--- t:\n%v\n\n", t)
-    
-        d, err := yaml.Marshal(&t)
-        if err != nil {
-                log.Fatalf("error: %v", err)
-        }
-        fmt.Printf("--- t dump:\n%s\n\n", string(d))
-    
-        m := make(map[interface{}]interface{})
-    
-        err = yaml.Unmarshal([]byte(data), &m)
-        if err != nil {
-                log.Fatalf("error: %v", err)
-        }
-        fmt.Printf("--- m:\n%v\n\n", m)
-    
-        d, err = yaml.Marshal(&m)
-        if err != nil {
-                log.Fatalf("error: %v", err)
-        }
-        fmt.Printf("--- m dump:\n%s\n\n", string(d))
-}
+// Recommended way
+import "go.yaml.in/yaml/v2"
 ```
 
-This example will generate the following output:
+## Available Types and Functions
 
-```
---- t:
-{Easy! {2 [3 4]}}
+All public types and functions from `go.yaml.in/yaml/v2` are available through this package:
 
---- t dump:
-a: Easy!
-b:
-  c: 2
-  d: [3, 4]
+### Types
 
+- `MapSlice` - Encodes and decodes as a YAML map with preserved key order
+- `MapItem` - An item in a MapSlice
+- `Unmarshaler` - Interface for custom unmarshaling behavior
+- `Marshaler` - Interface for custom marshaling behavior
+- `IsZeroer` - Interface to check if an object is zero
+- `Decoder` - Reads and decodes YAML values from an input stream
+- `Encoder` - Writes YAML values to an output stream
+- `TypeError` - Error returned by Unmarshal for decoding issues
 
---- m:
-map[a:Easy! b:map[c:2 d:[3 4]]]
+### Functions
 
---- m dump:
-a: Easy!
-b:
-  c: 2
-  d:
-  - 3
-  - 4
-```
+- `Unmarshal` - Decodes YAML data into a Go value
+- `UnmarshalStrict` - Like Unmarshal but errors on unknown fields
+- `Marshal` - Serializes a Go value into YAML
+- `NewDecoder` - Creates a new Decoder
+- `NewEncoder` - Creates a new Encoder
+- `FutureLineWrap` - Controls line wrapping behavior
 
+## Migration Guide
+
+To migrate from this package to `go.yaml.in/yaml/v2`:
+
+1. Update your import statements:
+   ```go
+   // From
+   import "sigs.k8s.io/yaml/goyaml.v2"
+   
+   // To
+   import "go.yaml.in/yaml/v2"
+   ```
+
+2. No code changes should be necessary as the API is identical
+
+3. Update your go.mod file to include the dependency:
+   ```
+   require go.yaml.in/yaml/v2 v2.4.2
+   ```
+
+## Deprecation Notice
+
+All types and functions in this package are marked as deprecated. You should migrate to using `go.yaml.in/yaml/v2` directly.

@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/component-base/featuregate"
-	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,7 +38,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestVisitContainers(t *testing.T) {
@@ -203,6 +202,147 @@ func TestVisitContainers(t *testing.T) {
 				if c.SecurityContext != nil {
 					t.Errorf("VisitContainers() did not drop SecurityContext for ephemeral container %q", c.Name)
 				}
+			}
+		})
+	}
+}
+
+func TestContainerIter(t *testing.T) {
+	testCases := []struct {
+		desc           string
+		spec           *api.PodSpec
+		wantContainers []string
+		mask           ContainerType
+	}{
+		{
+			desc:           "empty podspec",
+			spec:           &api.PodSpec{},
+			wantContainers: []string{},
+			mask:           AllContainers,
+		},
+		{
+			desc: "regular containers",
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"c1", "c2"},
+			mask:           Containers,
+		},
+		{
+			desc: "init containers",
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2"},
+			mask:           InitContainers,
+		},
+		{
+			desc: "init + main containers",
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2", "c1", "c2"},
+			mask:           InitContainers | Containers,
+		},
+		{
+			desc: "ephemeral containers",
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"e1", "e2"},
+			mask:           EphemeralContainers,
+		},
+		{
+			desc: "all container types",
+			spec: &api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			mask:           AllContainers,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			gotContainers := []string{}
+			for c, containerType := range ContainerIter(tc.spec, tc.mask) {
+				gotContainers = append(gotContainers, c.Name)
+
+				switch containerType {
+				case InitContainers:
+					if c.Name[0] != 'i' {
+						t.Errorf("ContainerIter() yielded container type InitContainers for container %q", c.Name)
+					}
+				case Containers:
+					if c.Name[0] != 'c' {
+						t.Errorf("ContainerIter() yielded container type Containers for container %q", c.Name)
+					}
+				case EphemeralContainers:
+					if c.Name[0] != 'e' {
+						t.Errorf("ContainerIter() yielded container type EphemeralContainers for container %q", c.Name)
+					}
+				default:
+					t.Errorf("ContainerIter() yielded unknown container type %d", containerType)
+				}
+			}
+
+			if !cmp.Equal(gotContainers, tc.wantContainers) {
+				t.Errorf("ContainerIter() = %+v, want %+v", gotContainers, tc.wantContainers)
 			}
 		})
 	}
@@ -843,7 +983,7 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		},
 		Status: api.PodStatus{
 			ResourceClaimStatuses: []api.PodResourceClaimStatus{
-				{Name: "my-claim", ResourceClaimName: pointer.String("pod-my-claim")},
+				{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
 			},
 		},
 	}
@@ -2580,6 +2720,140 @@ func TestValidateTopologySpreadConstraintLabelSelectorOption(t *testing.T) {
 	}
 }
 
+func TestOldPodViolatesMatchLabelKeysValidationOption(t *testing.T) {
+	testCases := []struct {
+		name                               string
+		oldPodSpec                         *api.PodSpec
+		matchLabelKeysEnabled              bool
+		matchLabelKeysSelectorMergeEnabled bool
+		wantOption                         bool
+	}{
+		{
+			name:                               "Create",
+			oldPodSpec:                         &api.PodSpec{},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+			wantOption:                         false,
+		},
+		{
+			name: "UpdateInvalidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value1"},
+							},
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value2", "value3"},
+							},
+						},
+					},
+				}},
+			},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+			wantOption:                         true,
+		},
+		{
+			name: "UpdateValidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value1"},
+							},
+						},
+					},
+				}},
+			},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+			wantOption:                         false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.OldPodViolatesMatchLabelKeysValidation {
+				t.Errorf("Got OldPodViolatesMatchLabelKeysValidation=%t, want %t", gotOptions.OldPodViolatesMatchLabelKeysValidation, tc.wantOption)
+			}
+		})
+	}
+}
+
+func TestOldPodViolatesLegacyMatchLabelKeysValidationOption(t *testing.T) {
+	testCases := []struct {
+		name                               string
+		oldPodSpec                         *api.PodSpec
+		matchLabelKeysEnabled              bool
+		matchLabelKeysSelectorMergeEnabled bool
+		wantOption                         bool
+	}{
+		{
+			name:                               "Create",
+			oldPodSpec:                         &api.PodSpec{},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: false,
+			wantOption:                         false,
+		},
+		{
+			name: "UpdateInvalidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value1"},
+							},
+						},
+					},
+				}},
+			},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: false,
+			wantOption:                         true,
+		},
+		{
+			name: "UpdateValidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector:  &metav1.LabelSelector{},
+				}},
+			},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: false,
+			wantOption:                         false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.OldPodViolatesLegacyMatchLabelKeysValidation {
+				t.Errorf("Got OldPodViolatesLegacyMatchLabelKeysValidation=%t, want %t", gotOptions.OldPodViolatesLegacyMatchLabelKeysValidation, tc.wantOption)
+			}
+		})
+	}
+}
 func TestValidateAllowNonLocalProjectedTokenPathOption(t *testing.T) {
 	testCases := []struct {
 		name       string
@@ -3072,7 +3346,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -3105,7 +3379,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -3122,7 +3396,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -3139,7 +3413,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -3163,7 +3437,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -3180,7 +3454,7 @@ func TestDropClusterTrustBundleProjectedVolumes(t *testing.T) {
 								Sources: []api.VolumeProjection{
 									{
 										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-											Name: pointer.String("foo"),
+											Name: ptr.To("foo"),
 										},
 									},
 								},
@@ -4423,6 +4697,404 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.podSpec, nil, nil)
 			assert.Equal(t, tc.expectAllowPodLifecycleSleepActionZeroValue, gotOptions.AllowPodLifecycleSleepActionZeroValue, "AllowPodLifecycleSleepActionZeroValue")
+		})
+	}
+}
+
+func TestHasAPIReferences(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             *api.Pod
+		expectRejection bool
+		resource        string
+	}{
+		{
+			name:            "Empty ServiceAccount in Static Pod",
+			pod:             &api.Pod{Spec: api.PodSpec{}},
+			expectRejection: false,
+		},
+		{
+			name:            "Non empty ServiceAccount",
+			pod:             &api.Pod{Spec: api.PodSpec{ServiceAccountName: "default"}},
+			expectRejection: true,
+			resource:        "serviceaccounts",
+		},
+		{
+			name:            "Empty Volume list",
+			pod:             &api.Pod{Spec: api.PodSpec{Volumes: nil}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with HostPath volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-hostpath", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with EmptyDir volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-emptydir", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with Secret volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "secrets (via secret volumes)",
+		},
+		{
+			name: "Non empty volume list with ConfigMap volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-configmap", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "configmaps (via configmap volumes)",
+		},
+		{
+			name: "Non empty volume list with GCEPersistentDisk volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-gce", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with AWSElasticBlockStore volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-aws", VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with GitRepo volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-gitrepo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with NFS volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-nfs", VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with ISCSI volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-iscsi", VolumeSource: api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with Glusterfs volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-glusterfs", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "endpoints (via glusterFS volumes)",
+		},
+		{
+			name: "Non empty volume list with PersistentVolumeClaim",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-pvc", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "persistentvolumeclaims",
+		},
+		{
+			name: "Non empty volume list with RBD volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-rbd", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with FlexVolume volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-flexvolume", VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with Cinder volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-cinder", VolumeSource: api.VolumeSource{Cinder: &api.CinderVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with CephFS volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-cephfs", VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with Flocker volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-flocker", VolumeSource: api.VolumeSource{Flocker: &api.FlockerVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with DownwardAPI volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-downwardapi", VolumeSource: api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with FC volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-fc", VolumeSource: api.VolumeSource{FC: &api.FCVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with AzureFile volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-azurefile", VolumeSource: api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "secrets (via azureFile volumes)",
+		},
+		{
+			name: "Non empty volume list with VsphereVolume volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-vsphere", VolumeSource: api.VolumeSource{VsphereVolume: &api.VsphereVirtualDiskVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with Quobyte volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-quobyte", VolumeSource: api.VolumeSource{Quobyte: &api.QuobyteVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with AzureDisk volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-azuredisk", VolumeSource: api.VolumeSource{AzureDisk: &api.AzureDiskVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with PhotonPersistentDisk volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-photon", VolumeSource: api.VolumeSource{PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with Projected volume with clustertrustbundles",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{ClusterTrustBundle: &api.ClusterTrustBundleProjection{}}}}}},
+			}}},
+			expectRejection: true,
+			resource:        "clustertrustbundles",
+		},
+		{
+			name: "Non empty volume list with Projected volume with secrets",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{Secret: &api.SecretProjection{}}}}}},
+			}}},
+			expectRejection: true,
+			resource:        "secrets (via projected volumes)",
+		},
+		{
+			name: "Non empty volume list with Projected volume with configmap",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{ConfigMap: &api.ConfigMapProjection{}}}}}},
+			}}},
+			expectRejection: true,
+			resource:        "configmaps (via projected volumes)",
+		},
+		{
+			name: "Non empty volume list with Projected volume with serviceaccounttoken",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{ServiceAccountToken: &api.ServiceAccountTokenProjection{}}}}}},
+			}}},
+			expectRejection: true,
+			resource:        "serviceaccounts (via projected volumes)",
+		},
+		{
+			name: "Non empty volume list with Projected volume with downwardapi",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{DownwardAPI: &api.DownwardAPIProjection{}}}}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with Portworx volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-portworx", VolumeSource: api.VolumeSource{PortworxVolume: &api.PortworxVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with ScaleIO volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-scaleio", VolumeSource: api.VolumeSource{ScaleIO: &api.ScaleIOVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with StorageOS volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-storageos", VolumeSource: api.VolumeSource{StorageOS: &api.StorageOSVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with CSI volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-csi", VolumeSource: api.VolumeSource{CSI: &api.CSIVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "csidrivers (via CSI volumes)",
+		},
+		{
+			name: "Non empty volume list with Ephemeral volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-ephemeral", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "persistentvolumeclaims (via ephemeral volumes)",
+		},
+		{
+			name: "Non empty volume list with Image volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-image", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name:            "No envs",
+			pod:             &api.Pod{Spec: api.PodSpec{}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty Env with value",
+			pod: &api.Pod{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name:  "test-env",
+								Value: "TEST_ENV_VAL",
+							},
+						},
+					},
+				},
+			}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty EnvFrom with ConfigMap",
+			pod: &api.Pod{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						EnvFrom: []api.EnvFromSource{
+							{ConfigMapRef: &api.ConfigMapEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "test"}}},
+						},
+					},
+				},
+			}},
+			expectRejection: true,
+			resource:        "configmaps",
+		},
+		{
+			name: "Non empty EnvFrom with Secret",
+			pod: &api.Pod{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						EnvFrom: []api.EnvFromSource{
+							{SecretRef: &api.SecretEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "test"}}},
+						},
+					},
+				},
+			}},
+			expectRejection: true,
+			resource:        "secrets",
+		},
+		{
+			name: "Non empty Env with ConfigMap",
+			pod: &api.Pod{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name:      "test-env",
+								ValueFrom: &api.EnvVarSource{ConfigMapKeyRef: &api.ConfigMapKeySelector{LocalObjectReference: api.LocalObjectReference{Name: "test"}}},
+							},
+						},
+					},
+				},
+			}},
+			expectRejection: true,
+			resource:        "configmaps",
+		},
+		{
+			name: "Non empty Env with Secret",
+			pod: &api.Pod{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name:      "test-env",
+								ValueFrom: &api.EnvVarSource{SecretKeyRef: &api.SecretKeySelector{LocalObjectReference: api.LocalObjectReference{Name: "test"}}},
+							},
+						},
+					},
+				},
+			}},
+			expectRejection: true,
+			resource:        "secrets",
+		},
+		{
+			name: "Multiple volume list where invalid volume comes after valid volume source",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-portworx", VolumeSource: api.VolumeSource{PortworxVolume: &api.PortworxVolumeSource{}}},
+				{Name: "test-volume-configmap", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "configmaps (via configmap volumes)",
+		},
+		{
+			name: "Multiple volume list where invalid configmap volume comes after valid downwardapi projected volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{DownwardAPI: &api.DownwardAPIProjection{}}}}}},
+				{Name: "test-volume-configmap", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "configmaps (via configmap volumes)",
+		},
+		{
+			name: "Multiple volume list where invalid configmap projected volume comes after valid downwardapi projected volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{DownwardAPI: &api.DownwardAPIProjection{}}}}}},
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{ConfigMap: &api.ConfigMapProjection{}}}}}},
+			}}},
+			expectRejection: true,
+			resource:        "configmaps (via projected volumes)",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualResult, resource, _ := HasAPIObjectReference(test.pod)
+			if test.expectRejection != actualResult || resource != test.resource {
+				t.Errorf("unexpected result, expected %v but got %v, expected resource %v, but got %v", test.expectRejection, actualResult, test.resource, resource)
+			}
 		})
 	}
 }
