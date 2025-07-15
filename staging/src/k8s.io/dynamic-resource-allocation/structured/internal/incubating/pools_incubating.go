@@ -52,6 +52,7 @@ func nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, node
 // Both is recorded in the result.
 func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
+	needBindingSlices := []*resourceapi.ResourceSlice{}
 
 	for _, slice := range slices {
 		if !features.PartitionableDevices && slice.Spec.PerDeviceNodeSelection != nil {
@@ -65,6 +66,12 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
 			}
 			if match {
+				if hasBindingConditions(slice) {
+					// If there is a Device in the ResourceSlice that contains BindingConditions,
+					// the ResourceSlice should be sorted to be after the ResourceSlice without BindingConditions.
+					needBindingSlices = append(needBindingSlices, slice)
+					continue
+				}
 				if err := addSlice(pools, slice); err != nil {
 					return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
 				}
@@ -88,6 +95,12 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 						device.String(), slice.Name, err)
 				}
 				if match {
+					if hasBindingConditions(slice) {
+						// If there is a Device in the ResourceSlice that contains BindingConditions,
+						// the ResourceSlice should be sorted to be after the ResourceSlice without BindingConditions.
+						needBindingSlices = append(needBindingSlices, slice)
+						break
+					}
 					if err := addSlice(pools, slice); err != nil {
 						return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
 					}
@@ -107,12 +120,29 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 
 	}
 
+	if len(needBindingSlices) > 0 {
+		for _, slice := range needBindingSlices {
+			if err := addSlice(pools, slice); err != nil {
+				return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
+			}
+		}
+	}
+
 	// Find incomplete pools and flatten into a single slice.
 	result := make([]*Pool, 0, len(pools))
+	resultBinding := make([]*Pool, 0, len(pools))
 	for _, pool := range pools {
 		pool.IsIncomplete = int64(len(pool.Slices)) != pool.Slices[0].Spec.Pool.ResourceSliceCount
 		pool.IsInvalid, pool.InvalidReason = poolIsInvalid(pool)
+		// if pool has binding conditions, add the pool to the end of the result
+		if poolHasBindingConditions(*pool) {
+			resultBinding = append(resultBinding, pool)
+			continue
+		}
 		result = append(result, pool)
+	}
+	if len(resultBinding) != 0 {
+		result = append(result, resultBinding...)
 	}
 
 	return result, nil
@@ -162,6 +192,26 @@ func poolIsInvalid(pool *Pool) (bool, string) {
 		}
 	}
 	return false, ""
+}
+
+func hasBindingConditions(slice *resourceapi.ResourceSlice) bool {
+	for _, device := range slice.Spec.Devices {
+		if device.Basic != nil && device.Basic.BindingConditions != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func poolHasBindingConditions(pool Pool) bool {
+	for _, slice := range pool.Slices {
+		for _, device := range slice.Spec.Devices {
+			if device.Basic != nil && device.Basic.BindingConditions != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type Pool struct {
