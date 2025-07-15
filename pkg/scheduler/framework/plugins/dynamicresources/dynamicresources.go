@@ -68,7 +68,7 @@ type stateData struct {
 	claims []*resourceapi.ResourceClaim
 
 	// Allocator handles claims with structured parameters.
-	allocator *structured.Allocator
+	allocator structured.Allocator
 
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
