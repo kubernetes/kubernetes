@@ -4253,10 +4253,11 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		service := t.BuildServiceSpec()
+		servicePort := int32(8001)
 		service.Spec.Ports = []v1.ServicePort{
 			{
 				Name:       portName,
-				Port:       port,
+				Port:       servicePort,
 				TargetPort: intstr.FromString(portName),
 			},
 		}
@@ -4267,29 +4268,26 @@ var _ = common.SIGDescribe("Services", func() {
 
 		getPodNamesBehindService := func(expectPodCnt int) (podNames []string) {
 			for retryCnt := 0; retryCnt < max(20, expectPodCnt*2); retryCnt++ {
-				output := checkServiceReachabilityFromExecPod(ctx, f.ClientSet, ns, service.Name, service.Spec.ClusterIP, port)
+				output := checkServiceReachabilityFromExecPod(ctx, f.ClientSet, ns, service.Name, service.Spec.ClusterIP, servicePort)
 				if !slices.Contains(podNames, output) {
 					podNames = append(podNames, output)
 				}
 			}
+			slices.Sort(podNames)
 			return podNames
 		}
 
 		hostnames := getPodNamesBehindService(len(pods))
-		framework.Logf("mutable-port check hostname %v", hostnames)
-		// TODO: check pod name in hostname explicitly
-		if len(hostnames) != 2 {
-			framework.Failf("Failed to check pod connectivity for service %s/%s with session affinity", ns, serviceName)
+		if !slices.Equal(hostnames, []string{"testpod0", "testpod1"}) {
+			framework.Failf("Failed to check pod connectivity for service %s/%s with session affinity, got pod names %v", ns, serviceName, hostnames)
 		}
 
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, ns, pods[0].Name)
 		pods[0] = createPodOrFail(ctx, f, ns, "testpod2", t.Labels, ports, args...)
 
 		hostnames = getPodNamesBehindService(len(pods))
-		framework.Logf("mutable-port check hostname %v", hostnames)
-		// TODO: check pod name in hostname explicitly
-		if len(hostnames) != 2 {
-			framework.Failf("Failed to check pod connectivity for service %s/%s with session affinity", ns, serviceName)
+		if !slices.Equal(hostnames, []string{"testpod1", "testpod2"}) {
+			framework.Failf("Failed to check pod connectivity for service %s/%s with session affinity, got pod names %v", ns, serviceName, hostnames)
 		}
 
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, ns, pods[1].Name)
@@ -4299,10 +4297,8 @@ var _ = common.SIGDescribe("Services", func() {
 		pods[1] = createPodOrFail(ctx, f, ns, "testpod3", t.Labels, portsModified, args...)
 
 		hostnames = getPodNamesBehindService(len(pods))
-		framework.Logf("mutable-port check hostname %v", hostnames)
-		// TODO: check pod name in hostname explicitly
-		if len(hostnames) != 2 {
-			framework.Failf("Failed to check pod connectivity for service %s/%s with session affinity", ns, serviceName)
+		if !slices.Equal(hostnames, []string{"testpod2", "testpod3"}) {
+			framework.Failf("Failed to check pod connectivity for service %s/%s with session affinity, got pod names %v", ns, serviceName, hostnames)
 		}
 	})
 })
