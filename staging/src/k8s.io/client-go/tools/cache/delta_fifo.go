@@ -161,7 +161,25 @@ type DeltaFIFO struct {
 // Note that TransformFunc is called while inserting objects into the
 // notification queue and is therefore extremely performance sensitive; please
 // do not do anything that will take a long time.
-type TransformFunc func(interface{}) (interface{}, error)
+type TransformFunc = TypedTransformFunc[any]
+
+// TypedTransformFunc allows for transforming an object before it will be processed.
+//
+// The most common usage pattern is to clean-up some parts of the object to
+// reduce component memory usage if a given component doesn't care about them.
+//
+// TypedTransformFunc sees the object before any other actor, and it
+// is now safe to mutate the object in place instead of making a copy.
+//
+// It's recommended for the TypedTransformFunc to be idempotent.
+// It MUST be idempotent if objects already present in the cache are passed to
+// the Replace() to avoid re-mutating them. Default informers do not pass
+// existing objects to Replace though.
+//
+// Note that TypedTransformFunc is called while inserting objects into the
+// notification queue and is therefore extremely performance sensitive; please
+// do not do anything that will take a long time.
+type TypedTransformFunc[T any] func(T) (T, error)
 
 // DeltaType is the type of a change (addition, deletion, etc)
 type DeltaType string
