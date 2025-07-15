@@ -82,6 +82,10 @@ func TestNewNodeManager(t *testing.T) {
 	}{
 		{
 			name: "node object doesn't exist",
+		},
+		{
+			name:          "watchPodCIDRs and node object doesn't exist",
+			watchPodCIDRs: true,
 			// assert on error thrown by node lister
 			expectedError: "node \"test-node\" not found",
 		},
@@ -97,8 +101,6 @@ func TestNewNodeManager(t *testing.T) {
 					_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(), metav1.CreateOptions{})
 				},
 			},
-			// assert on error thrown by GetNodeHostIPs()
-			expectedError: "host IP unknown; known addresses: []",
 		},
 		{
 			name: "node object exist with NodeIP",
@@ -122,7 +124,7 @@ func TestNewNodeManager(t *testing.T) {
 			expectedNodeIPs: []net.IP{netutils.ParseIPSloppy("192.168.1.10")},
 		},
 		{
-			name:          "watchPodCIDRs and node object exist without PodCIDRs",
+			name:          "watchPodCIDRs and node object exist with NodeIP and without PodCIDRs",
 			watchPodCIDRs: true,
 			nodeUpdates: []func(ctx context.Context, client clientset.Interface){
 				func(ctx context.Context, client clientset.Interface) {
@@ -192,8 +194,7 @@ func TestNewNodeManager(t *testing.T) {
 					), metav1.UpdateOptions{})
 				},
 			},
-			// assert on error thrown by GetNodeHostIPs()
-			expectedError: "host IP unknown; known addresses: []",
+			expectedPodCIDRs: []string{"10.0.0.0/24"},
 		},
 	}
 
@@ -245,10 +246,9 @@ func TestNodeManagerOnNodeChange(t *testing.T) {
 			expectedExitCode: nil,
 		},
 		{
-			name:             "node updated with different NodeIPs",
-			initialNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
-			updatedNodeIPs:   []string{"10.0.1.1", "fd00:3:2:1::2"},
-			expectedExitCode: ptr.To(1),
+			name:           "node updated with different NodeIPs",
+			initialNodeIPs: []string{"192.168.1.1", "fd00:1:2:3::1"},
+			updatedNodeIPs: []string{"10.0.1.1", "fd00:3:2:1::2"},
 		},
 		{
 			name:             "watchPodCIDR and node updated with same PodCIDRs",
