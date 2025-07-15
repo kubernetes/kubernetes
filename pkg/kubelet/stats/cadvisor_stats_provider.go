@@ -26,6 +26,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/klog/v2"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -56,6 +57,8 @@ type cadvisorStatsProvider struct {
 	statusProvider status.PodStatusProvider
 	// hostStatsProvider is used to get pod host stat usage.
 	hostStatsProvider HostStatsProvider
+	// containerManager is used to generate the cgroup path for a pod.
+	containerManager cm.ContainerManager
 }
 
 // newCadvisorStatsProvider returns a containerStatsProvider that provides
@@ -66,6 +69,7 @@ func newCadvisorStatsProvider(
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
 	hostStatsProvider HostStatsProvider,
+	containerManager cm.ContainerManager,
 ) containerStatsProvider {
 	return &cadvisorStatsProvider{
 		cadvisor:          cadvisor,
@@ -73,6 +77,7 @@ func newCadvisorStatsProvider(
 		imageService:      imageService,
 		statusProvider:    statusProvider,
 		hostStatsProvider: hostStatsProvider,
+		containerManager:  containerManager,
 	}
 }
 
@@ -179,6 +184,43 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 // function simply calls ListPodStats.
 func (p *cadvisorStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error) {
 	return p.ListPodStats(ctx)
+}
+
+func (p *cadvisorStatsProvider) PodCPUAndMemoryStats(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	_, podName := p.containerManager.NewPodContainerManager().GetPodContainerName(pod)
+	infos, err := p.cadvisor.ContainerInfoV2(podName, cadvisorapiv2.RequestOptions{
+		IdType:    cadvisorapiv2.TypeName,
+		Count:     2,
+		Recursive: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	podStats := &statsapi.PodStats{
+		PodRef: statsapi.PodReference{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			UID:       string(pod.UID),
+		},
+	}
+
+	for name, info := range infos {
+		if name == podName {
+			// Pod container
+			podStats.StartTime = metav1.NewTime(info.Spec.CreationTime)
+			cpu, memory := cadvisorInfoToCPUandMemoryStats(&info)
+			podStats.CPU = cpu
+			podStats.Memory = memory
+		} else {
+			containerName := kubetypes.GetContainerName(info.Spec.Labels)
+			if containerName != kubetypes.PodInfraContainerName && containerName != "" {
+				podStats.Containers = append(podStats.Containers, *cadvisorInfoToContainerCPUAndMemoryStats(containerName, &info))
+			}
+		}
+	}
+
+	return podStats, nil
 }
 
 // ListPodCPUAndMemoryStats returns the cpu and memory stats of all the pod-managed containers.
