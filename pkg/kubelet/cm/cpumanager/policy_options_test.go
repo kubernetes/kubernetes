@@ -118,6 +118,18 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			featureGateEnable: true,
 			expectedAvailable: true,
 		},
+		{
+			option:            PreferAlignByUnCoreCacheOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
+			featureGateEnable: false,
+			expectedAvailable: false,
+		},
+		{
+			option:            PreferAlignByUnCoreCacheOption,
+			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
+			featureGateEnable: true,
+			expectedAvailable: true,
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.option, func(t *testing.T) {
