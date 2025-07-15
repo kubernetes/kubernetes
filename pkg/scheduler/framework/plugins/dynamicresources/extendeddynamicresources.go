@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/utils/ptr"
 )
 
@@ -374,7 +373,7 @@ func createResourceRequestAndMappings(containerIndex int, container *v1.Containe
 	}
 	// resource requests in a container is a map, their names must
 	// be sorted to determine the resource's index order.
-	slice.SortStrings(keys)
+	slices.Sort(keys)
 	ridx := 0
 	for j := range keys {
 		if keys[j] == rName.String() {
