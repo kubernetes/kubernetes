@@ -178,6 +178,13 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		return "", message, err
 	}
 
+	// don't fetch credentials if the image is present and if we don't need to check if the pod is allowed to pull it
+	if imageRef != "" && !utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+		msg := fmt.Sprintf("Container image %q already present on machine", requestedImage)
+		m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
+		return imageRef, msg, nil
+	}
+
 	repoToPull, _, _, err := parsers.ParseImageName(spec.Image)
 	if err != nil {
 		return "", err.Error(), err
@@ -207,12 +214,6 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	pullCredentials, _ := keyring.Lookup(repoToPull)
 
 	if imageRef != "" {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
-			msg := fmt.Sprintf("Container image %q already present on machine", requestedImage)
-			m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
-			return imageRef, msg, nil
-		}
-
 		var imagePullSecrets []kubeletconfiginternal.ImagePullSecret
 		for _, s := range pullCredentials {
 			if s.Source == nil {
