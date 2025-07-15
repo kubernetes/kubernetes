@@ -220,10 +220,17 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 			},
 			// The etcd probe endpoints are explained here:
 			// https://github.com/kubernetes/kubeadm/issues/3039
-			LivenessProbe:  staticpodutil.LivenessProbe(probeHostname, "/livez", probePort, probeScheme),
-			ReadinessProbe: staticpodutil.ReadinessProbe(probeHostname, "/readyz", probePort, probeScheme),
-			StartupProbe:   staticpodutil.StartupProbe(probeHostname, "/readyz", probePort, probeScheme, componentHealthCheckTimeout),
+			LivenessProbe:  staticpodutil.LivenessProbe(probeHostname, "/livez", kubeadmconstants.ProbePort, probeScheme),
+			ReadinessProbe: staticpodutil.ReadinessProbe(probeHostname, "/readyz", kubeadmconstants.ProbePort, probeScheme),
+			StartupProbe:   staticpodutil.StartupProbe(probeHostname, "/readyz", kubeadmconstants.ProbePort, probeScheme, componentHealthCheckTimeout),
 			Env:            kubeadmutil.MergeKubeadmEnvVars(cfg.Etcd.Local.ExtraEnvs),
+			Ports: []v1.ContainerPort{
+				{
+					Name:          kubeadmconstants.ProbePort,
+					ContainerPort: probePort,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
 		},
 		etcdMounts,
 		// etcd will listen on the advertise address of the API server, in a different port (2379)
