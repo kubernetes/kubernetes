@@ -31,6 +31,13 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
+var (
+	validCacheTypes = sets.New[string](
+		string(kubeletconfig.ServiceAccountServiceAccountTokenCacheType),
+		string(kubeletconfig.TokenServiceAccountTokenCacheType),
+	)
+)
+
 // readCredentialProviderConfig receives a path to a config file or directory.
 // If the path is a directory, it reads all "*.json", "*.yaml" and "*.yml" files in lexicographic order,
 // decodes them, and merges their entries into a single CredentialProviderConfig object.
@@ -205,6 +212,15 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 			duplicateAnnotationKeys := requiredServiceAccountAnnotationKeys.Intersection(optionalServiceAccountAnnotationKeys)
 			if duplicateAnnotationKeys.Len() > 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath, sets.List(duplicateAnnotationKeys), "annotation keys cannot be both required and optional"))
+			}
+
+			switch {
+			case len(provider.TokenAttributes.CacheType) == 0:
+				allErrs = append(allErrs, field.Required(fldPath.Child("cacheType"), fmt.Sprintf("cacheType is required to be set when tokenAttributes is specified. Supported values are: %s", strings.Join(sets.List(validCacheTypes), ", "))))
+			case validCacheTypes.Has(string(provider.TokenAttributes.CacheType)):
+				// ok
+			default:
+				allErrs = append(allErrs, field.NotSupported(fldPath.Child("cacheType"), provider.TokenAttributes.CacheType, sets.List(validCacheTypes)))
 			}
 		}
 	}
