@@ -19,6 +19,7 @@ package auth
 import (
 	"context"
 	o "github.com/onsi/gomega"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,6 +40,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ConstrainedImpersonation)
 	const commonName = "tester-impersonation"
 
 	f := framework.NewDefaultFramework("constrainedimperonsation")
+	agnhost := imageutils.GetConfig(imageutils.Agnhost)
 
 	/*
 	   Release: v1.34
@@ -48,11 +50,10 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ConstrainedImpersonation)
 	*/
 	framework.ConformanceIt("should impersonate the scheduled node", func(ctx context.Context) {
 		// run an actual pod to get sa token
-		agnhost := imageutils.GetConfig(imageutils.Agnhost)
 		sleeperPod := e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: f.Namespace.Name,
-				Name:      "sa-token",
+				Name:      "impersonator-pod",
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -155,6 +156,166 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ConstrainedImpersonation)
 		_, err = nodeScopedClient.CoreV1().Pods(f.Namespace.Name).Watch(ctx, metav1.ListOptions{
 			FieldSelector: "spec.nodeName=" + actualPod.Spec.NodeName,
 		})
+		o.Expect(apierrors.IsForbidden(err)).To(o.BeTrue())
+	})
+
+	/*
+	   Release: v1.34
+	   Testname: Service Account Impersonates User To Get Pod Log
+	   Description: Ensure that Service Account with correct constrained impersonation permission
+	   is able to impersonate the user to get pod log, but is disallowd to perform other actions.
+	*/
+	framework.ConformanceIt("should impersonate the user with pods/exec subresource", func(ctx context.Context) {
+		impersonaterSA := &v1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "impersonater-sa",
+				Namespace: f.Namespace.Name,
+			},
+		}
+		impersontorSA, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(ctx, impersonaterSA, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		tokenRequest := &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				ExpirationSeconds: ptr.To[int64](600),
+			},
+		}
+		tokenResponse, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).CreateToken(ctx, impersontorSA.Name, tokenRequest, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		impersonatorClientConfig := rest.AnonymousClientConfig(f.ClientConfig())
+		impersonatorClientConfig.BearerToken = tokenResponse.Status.Token
+		impersonatorClientConfig.Impersonate.UserName = "bob"
+		impersonatorClient, err := kubernetes.NewForConfig(impersonatorClientConfig)
+		framework.ExpectNoError(err)
+
+		podToLog := e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: f.Namespace.Name,
+				Name:      "pod-to-log",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "sleeper",
+						Image:   agnhost.GetE2EImage(),
+						Command: []string{"sleep"},
+						Args:    []string{"1200"},
+						SecurityContext: &v1.SecurityContext{
+							AllowPrivilegeEscalation: ptr.To(false),
+							Capabilities: &v1.Capabilities{
+								Drop: []v1.Capability{"ALL"},
+							},
+						},
+					},
+				},
+			},
+			Status: v1.PodStatus{},
+		})
+		podToLog, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, podToLog, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podToLog.Name, podToLog.Namespace)
+		framework.ExpectNoError(err)
+
+		// Grant permission for bob to get pod log and get pod
+		role, err := f.ClientSet.RbacV1().Roles(f.Namespace.Name).Create(ctx, &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: commonName + "-"},
+			Rules: []rbacv1.PolicyRule{
+				{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"pods/log", "pods"}},
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			// Tolerate RBAC not being enabled
+			framework.Logf("error granting permissions to %s, create certificatesigningrequests permissions must be granted out of band: %v", commonName, err)
+		} else {
+			defer func() {
+				framework.ExpectNoError(f.ClientSet.RbacV1().Roles(f.Namespace.Name).Delete(ctx, role.Name, metav1.DeleteOptions{}))
+			}()
+		}
+
+		roleBinding, err := f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(ctx, &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: commonName + "-"},
+			RoleRef:    rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: role.Name},
+			Subjects:   []rbacv1.Subject{{Kind: "User", Name: "bob"}},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			// Tolerate RBAC not being enabled
+			framework.Logf("error granting permissions to %s, create certificatesigningrequests permissions must be granted out of band: %v", commonName, err)
+		} else {
+			defer func() {
+				framework.ExpectNoError(f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Delete(ctx, roleBinding.Name, metav1.DeleteOptions{}))
+			}()
+		}
+
+		// sa cannot impersonate bob to get pod log.
+		_, err = impersonatorClient.CoreV1().Pods(f.Namespace.Name).GetLogs(podToLog.Name, &v1.PodLogOptions{}).Stream(ctx)
+		o.Expect(apierrors.IsForbidden(err)).To(o.BeTrue())
+
+		// gran permission for sa to impersonate bob
+		impersonterClusterRole, err := f.ClientSet.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: commonName + "-"},
+			Rules: []rbacv1.PolicyRule{
+				{Verbs: []string{"impersonate:user-info"}, APIGroups: []string{"authentication.k8s.io"}, Resources: []string{"users"}, ResourceNames: []string{"bob"}},
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			framework.Logf("error granting permissions to %s, create certificatesigningrequests permissions must be granted out of band: %v", commonName, err)
+		} else {
+			defer func() {
+				framework.ExpectNoError(f.ClientSet.RbacV1().ClusterRoles().Delete(ctx, impersonterClusterRole.Name, metav1.DeleteOptions{}))
+			}()
+		}
+
+		impersonatorClusterRoleBinding, err := f.ClientSet.RbacV1().ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: commonName + "-"},
+			RoleRef:    rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "ClusterRole", Name: impersonterClusterRole.Name},
+			Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: impersontorSA.Name, Namespace: f.Namespace.Name}},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			framework.Logf("error granting permissions to %s, create certificatesigningrequests permissions must be granted out of band: %v", commonName, err)
+		} else {
+			defer func() {
+				framework.ExpectNoError(f.ClientSet.RbacV1().ClusterRoleBindings().Delete(ctx, impersonatorClusterRoleBinding.Name, metav1.DeleteOptions{}))
+			}()
+		}
+
+		// bob still cannot access logs since impersonat-on permission still missing.
+		_, err = impersonatorClient.CoreV1().Pods(f.Namespace.Name).GetLogs(podToLog.Name, &v1.PodLogOptions{}).Stream(ctx)
+		o.Expect(apierrors.IsForbidden(err)).To(o.BeTrue())
+
+		// gran permission for sa to impersonate on get log
+		impersonterOnRole, err := f.ClientSet.RbacV1().Roles(f.Namespace.Name).Create(ctx, &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: commonName + "-"},
+			Rules: []rbacv1.PolicyRule{
+				{Verbs: []string{"impersonate-on:get"}, APIGroups: []string{""}, Resources: []string{"pods/log"}},
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			framework.Logf("error granting permissions to %s, create certificatesigningrequests permissions must be granted out of band: %v", commonName, err)
+		} else {
+			defer func() {
+				framework.ExpectNoError(f.ClientSet.RbacV1().Roles(f.Namespace.Name).Delete(ctx, impersonterOnRole.Name, metav1.DeleteOptions{}))
+			}()
+		}
+
+		impersonatorOnRoleBinding, err := f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(ctx, &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: commonName + "-"},
+			RoleRef:    rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "Role", Name: impersonterOnRole.Name},
+			Subjects:   []rbacv1.Subject{{Kind: "ServiceAccount", Name: impersontorSA.Name, Namespace: f.Namespace.Name}},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			framework.Logf("error granting permissions to %s, create certificatesigningrequests permissions must be granted out of band: %v", commonName, err)
+		} else {
+			defer func() {
+				framework.ExpectNoError(f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Delete(ctx, impersonatorOnRoleBinding.Name, metav1.DeleteOptions{}))
+			}()
+		}
+
+		// sa can impersonate bob to access logs.
+		_, err = impersonatorClient.CoreV1().Pods(f.Namespace.Name).GetLogs(podToLog.Name, &v1.PodLogOptions{}).Stream(ctx)
+		framework.ExpectNoError(err)
+
+		// sa cannot impersonate bob to get pod
+		_, err = impersonatorClient.CoreV1().Pods(f.Namespace.Name).Get(ctx, podToLog.Name, metav1.GetOptions{})
 		o.Expect(apierrors.IsForbidden(err)).To(o.BeTrue())
 	})
 })
