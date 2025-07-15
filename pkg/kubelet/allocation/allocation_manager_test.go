@@ -1020,6 +1020,253 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 	}
 }
 
+// testPodAdmitHandler is a lifecycle.PodAdmitHandler for testing.
+type testPodAdmitHandler struct {
+	// admitFunc contains the custom logic for admitting or rejecting a pod.
+	admitFunc func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
+}
+
+// Admit rejects all pods in the podsToReject list with a matching UID.
+func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	if a.admitFunc == nil {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
+	return a.admitFunc(attrs)
+}
+
+func TestAllocationManagerAddPod(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+
+	const containerName = "c1"
+
+	cpu1Mem1G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")}
+	cpu2Mem2G := v1.ResourceList{v1.ResourceCPU: resource.MustParse("2"), v1.ResourceMemory: resource.MustParse("2Gi")}
+
+	createTestPod := func(uid types.UID, name, namespace string, resources v1.ResourceList) *v1.Pod {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{UID: uid, Name: name, Namespace: namespace},
+		}
+		container := v1.Container{
+			Name:  containerName,
+			Image: "i1",
+			Resources: v1.ResourceRequirements{
+				Requests: resources,
+			},
+		}
+		pod.Spec.Containers = append(pod.Spec.Containers, container)
+		return pod
+	}
+
+	pod1UID := types.UID("1111")
+	pod2UID := types.UID("2222")
+	pod1Small := createTestPod(pod1UID, "pod1", "ns1", cpu1Mem1G)
+	pod1Large := createTestPod(pod1UID, "pod1", "ns1", cpu2Mem2G)
+	pod2Small := createTestPod(pod2UID, "pod2", "ns2", cpu1Mem1G)
+	pod2Large := createTestPod(pod2UID, "pod2", "ns2", cpu2Mem2G)
+
+	testCases := []struct {
+		name                            string
+		ipprFeatureGate                 bool
+		initialAllocatedResourcesState  map[types.UID]v1.ResourceList
+		currentActivePods               []*v1.Pod
+		podToAdd                        *v1.Pod
+		admitFunc                       func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
+		expectAdmit                     bool
+		admissionFailureReason          string
+		admissionFailureMessage         string
+		expectedAllocatedResourcesState map[types.UID]v1.ResourceList
+	}{
+		{
+			name:                           "IPPR Enabled - New pod admitted and allocated resources updated",
+			ipprFeatureGate:                true,
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{},
+			currentActivePods:              []*v1.Pod{},
+			podToAdd:                       pod1Small,
+			admitFunc:                      nil,
+			expectAdmit:                    true,
+			// allocated resources updated with pod1's resources
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
+		},
+		{
+			name:                            "IPPR Disabled - New pod admitted but allocated resources not updated",
+			ipprFeatureGate:                 false,
+			initialAllocatedResourcesState:  map[types.UID]v1.ResourceList{},
+			currentActivePods:               []*v1.Pod{},
+			podToAdd:                        pod1Small,
+			admitFunc:                       nil,
+			expectAdmit:                     true,
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{},
+		},
+		{
+			name:                           "IPPR Enabled - New pod not admititted due to insufficient resources",
+			ipprFeatureGate:                true,
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
+			currentActivePods:              []*v1.Pod{pod1Small},
+			podToAdd:                       pod2Large,
+			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+				cpuRequest := attrs.Pod.Spec.Containers[0].Resources.Requests.Cpu().Value()
+				if cpuRequest > 1 {
+					return lifecycle.PodAdmitResult{
+						Admit:   false,
+						Reason:  "OutOfcpu",
+						Message: fmt.Sprintf("not enough CPUs available for pod %s/%s, requested: %d, available:1", attrs.Pod.Namespace, attrs.Pod.Name, cpuRequest),
+					}
+				}
+				return lifecycle.PodAdmitResult{Admit: true}
+			},
+			expectAdmit:             false,
+			admissionFailureReason:  "OutOfcpu",
+			admissionFailureMessage: "not enough CPUs available for pod ns2/pod2, requested: 2, available:1",
+			// allocated resources not modified
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
+		},
+		{
+			name:                           "IPPR Disabled - New pod not admitted due to insufficient resources",
+			ipprFeatureGate:                false,
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
+			currentActivePods:              []*v1.Pod{pod1Small},
+			podToAdd:                       pod2Large,
+			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+				cpuRequest := attrs.Pod.Spec.Containers[0].Resources.Requests.Cpu().Value()
+				if cpuRequest > 1 {
+					return lifecycle.PodAdmitResult{
+						Admit:   false,
+						Reason:  "OutOfcpu",
+						Message: fmt.Sprintf("not enough CPUs available for pod %s/%s, requested: %d, available:1", attrs.Pod.Namespace, attrs.Pod.Name, cpuRequest),
+					}
+				}
+				return lifecycle.PodAdmitResult{Admit: true}
+			},
+			expectAdmit:             false,
+			admissionFailureReason:  "OutOfcpu",
+			admissionFailureMessage: "not enough CPUs available for pod ns2/pod2, requested: 2, available:1",
+			// allocated resources not modified
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
+		},
+		{
+			name:                            "IPPR Enabled - no pod resize request. Resource request same as existing allocation",
+			ipprFeatureGate:                 true,
+			initialAllocatedResourcesState:  map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G, pod2UID: cpu1Mem1G},
+			currentActivePods:               []*v1.Pod{pod1Small},
+			podToAdd:                        pod1Small,
+			admitFunc:                       nil,
+			expectAdmit:                     true,
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G, pod2UID: cpu1Mem1G},
+		},
+		{
+			name:                           "IPPR Enabled - current allocation not found for added pod. Allocated resources updated.",
+			ipprFeatureGate:                true,
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{},
+			currentActivePods:              []*v1.Pod{pod1Small},
+			podToAdd:                       pod1Large,
+			admitFunc:                      nil,
+			expectAdmit:                    true,
+			// pod2's resources added to allocated resources
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu2Mem2G},
+		},
+		{
+			name:                           "IPPR Enabled - request different from current allocation. Pod still admitted based on existing allocation, but allocated resources remains unchanges.",
+			ipprFeatureGate:                true,
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G, pod2UID: cpu1Mem1G},
+			currentActivePods:              []*v1.Pod{pod1Small, pod2Small},
+			podToAdd:                       pod1Large,
+			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+				cpuRequest := attrs.Pod.Spec.Containers[0].Resources.Requests.Cpu().Value()
+				if cpuRequest > 1 {
+					return lifecycle.PodAdmitResult{
+						Admit:   false,
+						Reason:  "OutOfcpu",
+						Message: fmt.Sprintf("not enough CPUs available for pod %s/%s, requested: %d, available:1", attrs.Pod.Namespace, attrs.Pod.Name, cpuRequest),
+					}
+				}
+				return lifecycle.PodAdmitResult{Admit: true}
+			},
+			// pod is still admitted as allocated resources are considered during admission.
+			expectAdmit: true,
+			//  allocated Resources state must not be updated.
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G, pod2UID: cpu1Mem1G},
+		},
+		{
+			name:                           "IPPR Disabled - request different from current allocation. Admission fails. Allocated resources not updated.",
+			ipprFeatureGate:                false,
+			initialAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
+			currentActivePods:              []*v1.Pod{pod1Small},
+			podToAdd:                       pod1Large,
+			admitFunc: func(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+				cpuRequest := attrs.Pod.Spec.Containers[0].Resources.Requests.Cpu().Value()
+				if cpuRequest > 1 {
+					return lifecycle.PodAdmitResult{
+						Admit:   false,
+						Reason:  "OutOfcpu",
+						Message: fmt.Sprintf("not enough CPUs available for pod %s/%s, requested: %d, available:1", attrs.Pod.Namespace, attrs.Pod.Name, cpuRequest),
+					}
+				}
+				return lifecycle.PodAdmitResult{Admit: true}
+			},
+			// pod is still admitted as allocated resources are considered during admission.
+			expectAdmit:             false,
+			admissionFailureReason:  "OutOfcpu",
+			admissionFailureMessage: "not enough CPUs available for pod ns1/pod1, requested: 2, available:1",
+			// allocated Resources state must not be updated.
+			expectedAllocatedResourcesState: map[types.UID]v1.ResourceList{pod1UID: cpu1Mem1G},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tc.ipprFeatureGate)
+			allocationManager := makeAllocationManager(t, &containertest.FakeRuntime{}, []*v1.Pod{})
+
+			podForAllocation := func(uid types.UID, resources v1.ResourceList) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{UID: uid},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Name:      containerName,
+							Resources: v1.ResourceRequirements{Requests: resources},
+						}},
+					},
+				}
+			}
+
+			for podUID, resources := range tc.initialAllocatedResourcesState {
+				err := allocationManager.SetAllocatedResources(podForAllocation(podUID, resources))
+				require.NoError(t, err)
+			}
+
+			if tc.admitFunc != nil {
+				handler := &testPodAdmitHandler{admitFunc: tc.admitFunc}
+				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
+			}
+
+			ok, reason, message := allocationManager.AddPod(tc.currentActivePods, tc.podToAdd)
+			require.Equal(t, tc.expectAdmit, ok)
+			require.Equal(t, tc.admissionFailureReason, reason)
+			require.Equal(t, tc.admissionFailureMessage, message)
+
+			for podUID, resources := range tc.expectedAllocatedResourcesState {
+				pod := podForAllocation(podUID, resources)
+				for _, container := range pod.Spec.Containers {
+					allocatedResources, found := allocationManager.GetContainerResourceAllocation(pod.UID, container.Name)
+					if pod.UID == tc.podToAdd.UID {
+						if tc.expectAdmit && !found {
+							t.Fatalf("resource allocation should exist for pod: %s", tc.podToAdd.Name)
+						}
+						if !tc.expectAdmit && found {
+							initialResources := tc.initialAllocatedResourcesState[pod.UID]
+							// allocated resources should not be modified when the pod is not admitted
+							assert.Equal(t, initialResources, allocatedResources.Requests, tc.name)
+						}
+					}
+					assert.Equal(t, container.Resources, allocatedResources, tc.name)
+				}
+			}
+		})
+	}
+}
+
 func TestIsResizeIncreasingRequests(t *testing.T) {
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
