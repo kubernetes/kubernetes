@@ -19,8 +19,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"sync"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -80,35 +78,23 @@ func newSVMController(ctx context.Context, controllerContext ControllerContext, 
 		return nil, fmt.Errorf("failed to create metadata client for %s: %w", controllerName, err)
 	}
 
-	svmc := svm.NewSVMController(
-		ctx,
-		client,
-		dynamicClient,
-		informer,
-		controllerName,
-		controllerContext.RESTMapper,
-		controllerContext.GraphBuilder,
-	)
-	return newNamedRunnableFunc(func(ctx context.Context) {
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			svm.NewResourceVersionController(
-				ctx,
-				client,
-				discoveryClient,
-				metaClient,
-				informer,
-				controllerContext.RESTMapper,
-			).Run(ctx)
-		}()
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			svmc.Run(ctx)
-		}()
-		wg.Wait()
+	return newNamedRunnable(runnables{
+		runnableFunc(svm.NewSVMController(
+			ctx,
+			client,
+			dynamicClient,
+			informer,
+			controllerName,
+			controllerContext.RESTMapper,
+			controllerContext.GraphBuilder,
+		).Run),
+		runnableFunc(svm.NewResourceVersionController(
+			ctx,
+			client,
+			discoveryClient,
+			metaClient,
+			informer,
+			controllerContext.RESTMapper,
+		).Run),
 	}, controllerName), nil
 }

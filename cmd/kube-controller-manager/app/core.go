@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -616,21 +615,13 @@ func newResourceQuotaController(ctx context.Context, controllerContext Controlle
 		return nil, err
 	}
 
-	return newNamedRunnableFunc(func(ctx context.Context) {
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	return newNamedRunnable(runnables{
+		runnableFunc(func(ctx context.Context) {
 			resourceQuotaController.Run(ctx, int(controllerContext.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs))
-		}()
-
-		// Periodically the quota controller to detect new resource types
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		}),
+		runnableFunc(func(ctx context.Context) {
 			resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
-		}()
-		wg.Wait()
+		}),
 	}, controllerName), nil
 }
 
@@ -804,20 +795,15 @@ func (c *garbageCollectorController) Run(ctx context.Context) {
 	workers := int(c.controllerContext.ComponentConfig.GarbageCollectorController.ConcurrentGCSyncs)
 	const syncPeriod = 30 * time.Second
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.GarbageCollector.Run(ctx, workers, syncPeriod)
-	}()
-
-	// Periodically refresh the RESTMapper with new discovery information and sync the garbage collector.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.Sync(ctx, c.discoveryClient, syncPeriod)
-	}()
-	wg.Wait()
+	runRunnables(ctx,
+		runnableFunc(func(ctx context.Context) {
+			c.GarbageCollector.Run(ctx, workers, syncPeriod)
+		}),
+		runnableFunc(func(ctx context.Context) {
+			// Periodically refresh the RESTMapper with new discovery information and sync the garbage collector.
+			c.Sync(ctx, c.discoveryClient, syncPeriod)
+		}),
+	)
 }
 
 func newPersistentVolumeClaimProtectionControllerDescriptor() *ControllerDescriptor {

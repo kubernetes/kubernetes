@@ -500,6 +500,10 @@ func (rx runnables) Run(ctx context.Context) {
 	}
 }
 
+func runRunnables(ctx context.Context, rx ...Runnable) {
+	runnables(rx).Run(ctx)
+}
+
 // namedRunnable implements the Controller interface.
 type namedRunnable struct {
 	Runnable

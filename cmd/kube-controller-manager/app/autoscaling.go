@@ -22,8 +22,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"sync"
-
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -94,22 +92,15 @@ func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
 	)
-	return newNamedRunnableFunc(func(ctx context.Context) {
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	return newNamedRunnable(runnables{
+		runnableFunc(func(ctx context.Context) {
 			custom_metrics.PeriodicallyInvalidate(
 				apiVersionsGetter,
 				controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
 				ctx.Done())
-		}()
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		}),
+		runnableFunc(func(ctx context.Context) {
 			pas.Run(ctx, int(controllerContext.ComponentConfig.HPAController.ConcurrentHorizontalPodAutoscalerSyncs))
-		}()
-		wg.Wait()
+		}),
 	}, controllerName), nil
 }
