@@ -805,7 +805,7 @@ func TestConstrainedImpersonationFilter(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(constrainedAuthorizer.checkedAttrs, tc.expectedAttributes) {
-				t.Errorf("%s: expected %#v, actual %#v", tc.name, len(tc.expectedAttributes), len(constrainedAuthorizer.checkedAttrs))
+				t.Errorf("%s: expected %#v, actual %#v", tc.name, tc.expectedAttributes, constrainedAuthorizer.checkedAttrs)
 			}
 			// clean the attrs after each test case.
 			constrainedAuthorizer.checkedAttrs = []authorizer.AttributesRecord{}

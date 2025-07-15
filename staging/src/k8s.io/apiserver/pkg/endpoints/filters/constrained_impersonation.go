@@ -34,6 +34,15 @@ import (
 	"strings"
 )
 
+const (
+	legacyImpersonateVerb        = "impersonate"
+	impersonateUserInfoVerb      = "impersonate:user-info"
+	impersonateSAVerb            = "impersonate:serviceaccount"
+	impersonateNodeVerb          = "impersonate:node"
+	impersonateScheduledNodeVerb = "impersonate:scheduled-node"
+	impersonateOnVerbPrefix      = "impersonate-on:"
+)
+
 // WithConstrainedImpersonation is a filter that will inspect and check requests that attempt to change the user.Info for their requests
 func WithConstrainedImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -54,6 +63,7 @@ func WithConstrainedImpersonation(handler http.Handler, a authorizer.Authorizer,
 			return
 		}
 
+		impersonateVerb := legacyImpersonateVerb
 		decision, reason, actingAsAttributes, err := authorizeConstrainedImpersonation(ctx, actingAsAttrsList, a)
 		if err != nil || decision != authorizer.DecisionAllow {
 			klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
@@ -64,12 +74,14 @@ func WithConstrainedImpersonation(handler http.Handler, a authorizer.Authorizer,
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
 				return
 			}
+		} else {
+			impersonateVerb = actingAsAttributes.GetVerb()
 		}
 
 		req = req.WithContext(request.WithUser(ctx, newUser))
 		httplog.LogOf(req, w).Addf("%v is impersonating %v", userString(requestor), userString(newUser))
 
-		audit.LogImpersonatedUser(audit.WithAuditContext(ctx), newUser)
+		audit.LogConstrainedImpersonateUser(audit.WithAuditContext(ctx), newUser, impersonateVerb)
 
 		// clear all the impersonation headers from the request
 		req.Header.Del(authenticationv1.ImpersonateUserHeader)
@@ -98,19 +110,19 @@ func buildImpersonationAttributes(headers http.Header, requestor user.Info) ([]*
 		attrs := newAttributeRecord(requestor)
 		if namespace, name, err := serviceaccount.SplitUsername(requestedUser); err == nil {
 			attrs.Resource = "serviceaccounts"
-			attrs.Verb = "impersonate:serviceaccount"
+			attrs.Verb = impersonateSAVerb
 			attrs.Namespace = namespace
 			attrs.Name = name
 		} else if nodeName, isImpersonating := isImpersonatingScheduledNode(requestor, requestedUser, groups); isImpersonating {
-			attrs.Verb = "impersonate:scheduled-node"
+			attrs.Verb = impersonateScheduledNodeVerb
 			attrs.Name = nodeName
 			attrs.Resource = "nodes"
 		} else if nodeName, isImpersonating := isImpersonatingNode(requestedUser, groups); isImpersonating {
-			attrs.Verb = "impersonate:node"
+			attrs.Verb = impersonateNodeVerb
 			attrs.Name = nodeName
 			attrs.Resource = "nodes"
 		} else {
-			attrs.Verb = "impersonate:user-info"
+			attrs.Verb = impersonateUserInfoVerb
 			attrs.Name = requestedUser
 			attrs.Resource = "users"
 		}
@@ -126,7 +138,7 @@ func buildImpersonationAttributes(headers http.Header, requestor user.Info) ([]*
 		attrs := newAttributeRecord(requestor)
 		attrs.Resource = "groups"
 		attrs.Name = group
-		attrs.Verb = "impersonate:user-info"
+		attrs.Verb = impersonateUserInfoVerb
 		attrsList = append(attrsList, attrs)
 	}
 
@@ -142,7 +154,7 @@ func buildImpersonationAttributes(headers http.Header, requestor user.Info) ([]*
 		// make a separate request for each extra value they're trying to set
 		for _, value := range values {
 			attrs := newAttributeRecord(requestor)
-			attrs.Verb = "impersonate:user-info"
+			attrs.Verb = impersonateUserInfoVerb
 			attrs.Name = value
 			attrs.Subresource = extraKey
 			attrs.Resource = "userextras"
@@ -154,7 +166,7 @@ func buildImpersonationAttributes(headers http.Header, requestor user.Info) ([]*
 	hasUID := len(uid) > 0
 	if hasUID {
 		attrs := newAttributeRecord(requestor)
-		attrs.Verb = "impersonate:user-info"
+		attrs.Verb = impersonateUserInfoVerb
 		attrs.Resource = "uids"
 		attrs.Name = uid
 		attrsList = append(attrsList, attrs)
@@ -238,9 +250,9 @@ func authorizeConstrainedImpersonation(ctx context.Context, targetAttributesList
 		}
 
 		// Fallback to authorize impersonate:node
-		if actingAsAttributes.Verb == "impersonate:scheduled-node" {
+		if actingAsAttributes.Verb == impersonateScheduledNodeVerb {
 			attrCopy := copyAuthorizerAttr(actingAsAttributes)
-			attrCopy.Verb = "impersonate:node"
+			attrCopy.Verb = impersonateNodeVerb
 			decision, reason, err = a.Authorize(ctx, attrCopy)
 		}
 
@@ -251,7 +263,7 @@ func authorizeConstrainedImpersonation(ctx context.Context, targetAttributesList
 
 	// Prepend the impersonate-on prefix to the actual verb.
 	impersonateOnAttrs := copyAuthorizerAttr(requestorAttrs)
-	impersonateOnAttrs.Verb = fmt.Sprintf("impersonate-on:%s", impersonateOnAttrs.Verb)
+	impersonateOnAttrs.Verb = fmt.Sprintf("%s%s", impersonateOnVerbPrefix, impersonateOnAttrs.Verb)
 	decision, reason, err := a.Authorize(ctx, impersonateOnAttrs)
 	return decision, reason, impersonateOnAttrs, err
 }
@@ -282,7 +294,7 @@ func authorizeLegacyImpersonation(req *http.Request, targetAttributesList []*aut
 	for _, actingAsAttributes := range targetAttributesList {
 		// verb is always impersonate with legacy impersonation.
 		actingAsAttributesCopy := copyAuthorizerAttr(actingAsAttributes)
-		actingAsAttributesCopy.Verb = "impersonate"
+		actingAsAttributesCopy.Verb = legacyImpersonateVerb
 
 		// legacy impersonation does not recognize nodes, change back to users
 		// Also add node groups attr to be authorized.
@@ -291,7 +303,7 @@ func authorizeLegacyImpersonation(req *http.Request, targetAttributesList []*aut
 			actingAsAttributesCopy.Name = fmt.Sprintf("system:node:%s", actingAsAttributesCopy.Name)
 			nodeGroupAtrribute := &authorizer.AttributesRecord{
 				Resource:        "groups",
-				Verb:            "impersonate",
+				Verb:            legacyImpersonateVerb,
 				Name:            user.NodesGroup,
 				User:            actingAsAttributes.User,
 				ResourceRequest: true,

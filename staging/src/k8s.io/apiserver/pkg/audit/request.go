@@ -81,6 +81,11 @@ func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedT
 	})
 }
 
+func LogConstrainedImpersonateUser(ctx context.Context, user user.Info, impersonateVerb string) {
+	LogImpersonatedUser(ctx, user)
+	AddAuditAnnotation(ctx, "authentication.k8s.io/impersonate-verb", impersonateVerb)
+}
+
 // LogImpersonatedUser fills in the impersonated user attributes into an audit event.
 func LogImpersonatedUser(ctx context.Context, user user.Info) {
 	ac := AuditContextFrom(ctx)
