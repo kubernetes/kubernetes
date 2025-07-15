@@ -31,6 +31,7 @@ type ValidationRuleApplyConfiguration struct {
 	Reason            *apiextensionsv1.FieldValueErrorReason `json:"reason,omitempty"`
 	FieldPath         *string                                `json:"fieldPath,omitempty"`
 	OptionalOldSelf   *bool                                  `json:"optionalOldSelf,omitempty"`
+	OptionalSelf      *bool                                  `json:"optionalSelf,omitempty"`
 }
 
 // ValidationRuleApplyConfiguration constructs a declarative configuration of the ValidationRule type for use with
@@ -84,5 +85,13 @@ func (b *ValidationRuleApplyConfiguration) WithFieldPath(value string) *Validati
 // If called multiple times, the OptionalOldSelf field is set to the value of the last call.
 func (b *ValidationRuleApplyConfiguration) WithOptionalOldSelf(value bool) *ValidationRuleApplyConfiguration {
 	b.OptionalOldSelf = &value
+	return b
+}
+
+// WithOptionalSelf sets the OptionalSelf field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the OptionalSelf field is set to the value of the last call.
+func (b *ValidationRuleApplyConfiguration) WithOptionalSelf(value bool) *ValidationRuleApplyConfiguration {
+	b.OptionalSelf = &value
 	return b
 }

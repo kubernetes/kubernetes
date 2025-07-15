@@ -567,6 +567,11 @@ func (in *ValidationRule) DeepCopyInto(out *ValidationRule) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.OptionalSelf != nil {
+		in, out := &in.OptionalSelf, &out.OptionalSelf
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

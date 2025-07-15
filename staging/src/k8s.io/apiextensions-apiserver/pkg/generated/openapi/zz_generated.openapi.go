@@ -2475,6 +2475,13 @@ func schema_pkg_apis_apiextensions_v1_ValidationRule(ref common.ReferenceCallbac
 							Format:      "",
 						},
 					},
+					"optionalSelf": {
+						SchemaProps: spec.SchemaProps{
+							Description: "optionalSelf is used to opt  a transition rule into evaluation even when the object is unset from set.\n\nYou may check for presence of self using `self.hasValue()` and unwrap it after checking using `self.value()`. Check the CEL documentation for Optional types for more information: https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"rule"},
 			},
@@ -4026,6 +4033,13 @@ func schema_pkg_apis_apiextensions_v1beta1_ValidationRule(ref common.ReferenceCa
 					"optionalOldSelf": {
 						SchemaProps: spec.SchemaProps{
 							Description: "optionalOldSelf is used to opt a transition rule into evaluation even when the object is first created, or if the old object is missing the value.\n\nWhen enabled `oldSelf` will be a CEL optional whose value will be `None` if there is no old value, or when the object is initially created.\n\nYou may check for presence of oldSelf using `oldSelf.hasValue()` and unwrap it after checking using `oldSelf.value()`. Check the CEL documentation for Optional types for more information: https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes\n\nMay not be set unless `oldSelf` is used in `rule`.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"optionalSelf": {
+						SchemaProps: spec.SchemaProps{
+							Description: "optionalSelf is used to opt into evaluation of the rule even when the value of the object is not present.\n\nWhen enabled `self` will be a CEL optional whose value will be `None` if there is no value on the object, or if the object is initially created.\n\nYou may check for presence of self using `self.hasValue()` and unwrap it after checking using `self.value()`. Check the CEL documentation for Optional types for more information: https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},

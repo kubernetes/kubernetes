@@ -175,6 +175,8 @@ func TestCelCompilation(t *testing.T) {
 						{Rule: "oldSelf.hasValue() ? self >= oldSelf.value() : true", OptionalOldSelf: ptr.To(true)},
 						{Rule: "self >= oldSelf", OptionalOldSelf: ptr.To(true)},
 						{Rule: "self >= oldSelf.orValue('')", OptionalOldSelf: ptr.To(true)},
+						{Rule: "self.value() >= oldSelf.value()", OptionalOldSelf: ptr.To(true), OptionalSelf: ptr.To(true)},
+						{Rule: "self.value() >= oldSelf", OptionalSelf: ptr.To(true)},
 					},
 				},
 			},
@@ -184,6 +186,8 @@ func TestCelCompilation(t *testing.T) {
 				matchesAll(noError(), transitionRule(true)),
 				matchesAll(invalidError("optional")),
 				matchesAll(invalidError("orValue")),
+				matchesAll(noError(), transitionRule(true)),
+				matchesAll(noError(), transitionRule(true)),
 			},
 		},
 		{
