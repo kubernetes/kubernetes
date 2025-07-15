@@ -1590,7 +1590,7 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, p
 	return
 }
 
-func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) (*kubecontainer.PodStatus, error) {
+func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
 	podIPs := m.determinePodSandboxIPs(event.PodSandboxStatus.Metadata.Namespace, event.PodSandboxStatus.Metadata.Name, event.PodSandboxStatus)
 
 	kubeContainerStatuses := []*kubecontainer.Status{}
@@ -1607,7 +1607,7 @@ func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.Containe
 		IPs:               podIPs,
 		SandboxStatuses:   []*runtimeapi.PodSandboxStatus{event.PodSandboxStatus},
 		ContainerStatuses: kubeContainerStatuses,
-	}, nil
+	}
 }
 
 // GetPodStatus retrieves the status of the pod, including the
