@@ -85,6 +85,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/code-generator/examples/apiserver/apis/core/v1.TestType":              schema_apiserver_apis_core_v1_TestType(ref),
 		"k8s.io/code-generator/examples/apiserver/apis/core/v1.TestTypeList":          schema_apiserver_apis_core_v1_TestTypeList(ref),
 		"k8s.io/code-generator/examples/apiserver/apis/core/v1.TestTypeStatus":        schema_apiserver_apis_core_v1_TestTypeStatus(ref),
+		"k8s.io/code-generator/examples/apiserver/apis/example/v1.Conversion":         schema_apiserver_apis_example_v1_Conversion(ref),
+		"k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryDifferent":    schema_apiserver_apis_example_v1_MemoryDifferent(ref),
+		"k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryIdentical":    schema_apiserver_apis_example_v1_MemoryIdentical(ref),
 		"k8s.io/code-generator/examples/apiserver/apis/example/v1.TestType":           schema_apiserver_apis_example_v1_TestType(ref),
 		"k8s.io/code-generator/examples/apiserver/apis/example/v1.TestTypeList":       schema_apiserver_apis_example_v1_TestTypeList(ref),
 		"k8s.io/code-generator/examples/apiserver/apis/example/v1.TestTypeStatus":     schema_apiserver_apis_example_v1_TestTypeStatus(ref),
@@ -2830,6 +2833,150 @@ func schema_apiserver_apis_core_v1_TestTypeStatus(ref common.ReferenceCallback) 
 				Required: []string{"blah"},
 			},
 		},
+	}
+}
+
+func schema_apiserver_apis_example_v1_Conversion(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"identical": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryIdentical"),
+						},
+					},
+					"different": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryDifferent"),
+						},
+					},
+				},
+				Required: []string{"identical", "different"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryDifferent", "k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryIdentical"},
+	}
+}
+
+func schema_apiserver_apis_example_v1_MemoryDifferent(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryDifferent"),
+						},
+					},
+					"properties": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryDifferent"),
+									},
+								},
+							},
+						},
+					},
+					"allOf": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryDifferent"),
+									},
+								},
+							},
+						},
+					},
+					"bool": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"boolean"},
+							Format: "",
+						},
+					},
+				},
+				Required: []string{"bool"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryDifferent"},
+	}
+}
+
+func schema_apiserver_apis_example_v1_MemoryIdentical(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryIdentical"),
+						},
+					},
+					"properties": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryIdentical"),
+									},
+								},
+							},
+						},
+					},
+					"allOf": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryIdentical"),
+									},
+								},
+							},
+						},
+					},
+					"bool": {
+						SchemaProps: spec.SchemaProps{
+							Default: false,
+							Type:    []string{"boolean"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"bool"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/code-generator/examples/apiserver/apis/example/v1.MemoryIdentical"},
 	}
 }
 
