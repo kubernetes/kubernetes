@@ -64,14 +64,12 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		return WorkEstimate{InitialSeats: maxSeats}
 	}
 
-	if requestInfo.Name != "" {
-		// Requests with metadata.name specified are usually executed as get
-		// requests in storage layer so their width should be 1.
-		// Example of such list requests:
-		// /apis/certificates.k8s.io/v1/certificatesigningrequests?fieldSelector=metadata.name%3Dcsr-xxs4m
-		// /api/v1/namespaces/test/configmaps?fieldSelector=metadata.name%3Dbig-deployment-1&limit=500&resourceVersion=0
-		return WorkEstimate{InitialSeats: minSeats}
-	}
+	// Requests with metadata.name specified are usually executed as get
+	// requests in storage layer so their width should be 1.
+	// Example of such list requests:
+	// /apis/certificates.k8s.io/v1/certificatesigningrequests?fieldSelector=metadata.name%3Dcsr-xxs4m
+	// /api/v1/namespaces/test/configmaps?fieldSelector=metadata.name%3Dbig-deployment-1&limit=500&resourceVersion=0
+	matchesSingle := requestInfo.Name != ""
 
 	query := r.URL.Query()
 	listOptions := metav1.ListOptions{}
@@ -126,11 +124,12 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		klog.ErrorS(err, "Unexpected error from object count tracker")
 		return WorkEstimate{InitialSeats: maxSeats}
 	}
+
 	var seats uint64
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
-		seats = e.seatsBasedOnObjectSize(stats, listOptions, isListFromCache)
+		seats = e.seatsBasedOnObjectSize(stats, listOptions, isListFromCache, matchesSingle)
 	} else {
-		seats = e.seatsBasedOnObjectCount(stats, listOptions, isListFromCache)
+		seats = e.seatsBasedOnObjectCount(stats, listOptions, isListFromCache, matchesSingle)
 	}
 
 	// make sure we never return a seat of zero
@@ -143,7 +142,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	return WorkEstimate{InitialSeats: seats}
 }
 
-func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOptions metav1.ListOptions, isListFromCache bool) uint64 {
+func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOptions metav1.ListOptions, isListFromCache bool, matchesSingle bool) uint64 {
 	numStored := stats.ObjectCount
 	limit := numStored
 	if listOptions.Limit > 0 && listOptions.Limit < numStored {
@@ -153,6 +152,8 @@ func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOpt
 	var estimatedObjectsToBeProcessed int64
 
 	switch {
+	case matchesSingle:
+		estimatedObjectsToBeProcessed = 1
 	case isListFromCache:
 		// TODO: For resources that implement indexes at the watchcache level,
 		//  we need to adjust the cost accordingly
@@ -170,18 +171,25 @@ func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOpt
 	return uint64(math.Ceil(float64(estimatedObjectsToBeProcessed) / e.config.ObjectsPerSeat))
 }
 
-func (e *listWorkEstimator) seatsBasedOnObjectSize(stats storage.Stats, listOptions metav1.ListOptions, isListFromCache bool) uint64 {
+func (e *listWorkEstimator) seatsBasedOnObjectSize(stats storage.Stats, listOptions metav1.ListOptions, isListFromCache bool, matchesSingle bool) uint64 {
 	// Size not available, fallback to count based estimate
 	if stats.EstimatedAverageObjectSizeBytes <= 0 && stats.ObjectCount != 0 {
-		return e.seatsBasedOnObjectCount(stats, listOptions, isListFromCache)
+		return e.seatsBasedOnObjectCount(stats, listOptions, isListFromCache, matchesSingle)
 	}
 	limited := stats.ObjectCount
 	if listOptions.Limit > 0 && listOptions.Limit < limited {
 		limited = listOptions.Limit
 	}
-	objectsLoadedInMemory := limited
-	if !isListFromCache && (listOptions.FieldSelector != "" || listOptions.LabelSelector != "") {
+	var objectsLoadedInMemory int64
+	switch {
+	case matchesSingle:
+		objectsLoadedInMemory = 1
+	case isListFromCache:
+		objectsLoadedInMemory = limited
+	case listOptions.FieldSelector != "" || listOptions.LabelSelector != "":
 		objectsLoadedInMemory = max(limited, stats.ObjectCount/2)
+	default:
+		objectsLoadedInMemory = limited
 	}
 
 	memoryUsedAtOnce := objectsLoadedInMemory * stats.EstimatedAverageObjectSizeBytes
