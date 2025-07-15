@@ -24,46 +24,61 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Store is a generic object storage and processing interface.  A
-// Store holds a map from string keys to accumulators, and has
+// TypedStore is a generic object storage and processing interface.  A
+// TypedStore holds a map from string keys to accumulators, and has
 // operations to add, update, and delete a given object to/from the
-// accumulator currently associated with a given key.  A Store also
+// accumulator currently associated with a given key.  A TypedStore also
 // knows how to extract the key from a given object, so many operations
 // are given only the object.
 //
-// In the simplest Store implementations each accumulator is simply
+// In the simplest TypedStore implementations each accumulator is simply
 // the last given object, or empty after Delete, and thus the Store's
 // behavior is simple storage.
 //
-// Reflector knows how to watch a server and update a Store.  This
-// package provides a variety of implementations of Store.
-type Store interface {
+// Reflector knows how to watch a server and update a TypedStore.  This
+// package provides a variety of implementations of TypedStore.
+type Store = TypedStore[any]
+
+// TypedStore is a generic object storage and processing interface.  A
+// TypedStore holds a map from string keys to accumulators, and has
+// operations to add, update, and delete a given object to/from the
+// accumulator currently associated with a given key.  A TypedStore also
+// knows how to extract the key from a given object, so many operations
+// are given only the object.
+//
+// In the simplest TypedStore implementations each accumulator is simply
+// the last given object, or empty after Delete, and thus the Store's
+// behavior is simple storage.
+//
+// TypedReflector knows how to watch a server and update a TypedStore.  This
+// package provides a variety of implementations of TypedStore.
+type TypedStore[T any] interface {
 
 	// Add adds the given object to the accumulator associated with the given object's key
-	Add(obj interface{}) error
+	Add(obj T) error
 
 	// Update updates the given object in the accumulator associated with the given object's key
-	Update(obj interface{}) error
+	Update(obj T) error
 
 	// Delete deletes the given object from the accumulator associated with the given object's key
-	Delete(obj interface{}) error
+	Delete(obj T) error
 
 	// List returns a list of all the currently non-empty accumulators
-	List() []interface{}
+	List() []T
 
 	// ListKeys returns a list of all the keys currently associated with non-empty accumulators
 	ListKeys() []string
 
 	// Get returns the accumulator associated with the given object's key
-	Get(obj interface{}) (item interface{}, exists bool, err error)
+	Get(obj T) (item T, exists bool, err error)
 
 	// GetByKey returns the accumulator associated with the given key
-	GetByKey(key string) (item interface{}, exists bool, err error)
+	GetByKey(key string) (item T, exists bool, err error)
 
 	// Replace will delete the contents of the store, using instead the
 	// given list. Store takes ownership of the list, you should not reference
 	// it after calling this function.
-	Replace([]interface{}, string) error
+	Replace([]T, string) error
 
 	// Resync is meaningless in the terms appearing here but has
 	// meaning in some implementations that have non-trivial
@@ -155,20 +170,20 @@ func SplitMetaNamespaceKey(key string) (namespace, name string, err error) {
 
 // `*cache` implements Indexer in terms of a ThreadSafeStore and an
 // associated KeyFunc.
-type cache struct {
+type cache[T any] struct {
 	// cacheStorage bears the burden of thread safety for the cache
-	cacheStorage ThreadSafeStore
+	cacheStorage ThreadSafeTypedStore[T]
 	// keyFunc is used to make the key for objects stored in and retrieved from items, and
 	// should be deterministic.
 	keyFunc KeyFunc
 	// Called with every object put in the cache.
-	transformer TransformFunc
+	transformer TypedTransformFunc[T]
 }
 
-var _ Store = &cache{}
+var _ Store = &cache[any]{}
 
 // Add inserts an item into the cache.
-func (c *cache) Add(obj interface{}) error {
+func (c *cache[T]) Add(obj T) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
@@ -184,7 +199,7 @@ func (c *cache) Add(obj interface{}) error {
 }
 
 // Update sets an item in the cache to its updated state.
-func (c *cache) Update(obj interface{}) error {
+func (c *cache[T]) Update(obj T) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
@@ -200,7 +215,7 @@ func (c *cache) Update(obj interface{}) error {
 }
 
 // Delete removes an item from the cache.
-func (c *cache) Delete(obj interface{}) error {
+func (c *cache[T]) Delete(obj T) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
@@ -211,62 +226,62 @@ func (c *cache) Delete(obj interface{}) error {
 
 // List returns a list of all the items.
 // List is completely threadsafe as long as you treat all items as immutable.
-func (c *cache) List() []interface{} {
+func (c *cache[T]) List() []T {
 	return c.cacheStorage.List()
 }
 
 // ListKeys returns a list of all the keys of the objects currently
 // in the cache.
-func (c *cache) ListKeys() []string {
+func (c *cache[T]) ListKeys() []string {
 	return c.cacheStorage.ListKeys()
 }
 
 // GetIndexers returns the indexers of cache
-func (c *cache) GetIndexers() Indexers {
+func (c *cache[T]) GetIndexers() Indexers {
 	return c.cacheStorage.GetIndexers()
 }
 
 // Index returns a list of items that match on the index function
 // Index is thread-safe so long as you treat all items as immutable
-func (c *cache) Index(indexName string, obj interface{}) ([]interface{}, error) {
+func (c *cache[T]) Index(indexName string, obj T) ([]T, error) {
 	return c.cacheStorage.Index(indexName, obj)
 }
 
 // IndexKeys returns the storage keys of the stored objects whose set of
 // indexed values for the named index includes the given indexed value.
 // The returned keys are suitable to pass to GetByKey().
-func (c *cache) IndexKeys(indexName, indexedValue string) ([]string, error) {
+func (c *cache[T]) IndexKeys(indexName, indexedValue string) ([]string, error) {
 	return c.cacheStorage.IndexKeys(indexName, indexedValue)
 }
 
 // ListIndexFuncValues returns the list of generated values of an Index func
-func (c *cache) ListIndexFuncValues(indexName string) []string {
+func (c *cache[T]) ListIndexFuncValues(indexName string) []string {
 	return c.cacheStorage.ListIndexFuncValues(indexName)
 }
 
 // ByIndex returns the stored objects whose set of indexed values
 // for the named index includes the given indexed value.
-func (c *cache) ByIndex(indexName, indexedValue string) ([]interface{}, error) {
+func (c *cache[T]) ByIndex(indexName, indexedValue string) ([]T, error) {
 	return c.cacheStorage.ByIndex(indexName, indexedValue)
 }
 
-func (c *cache) AddIndexers(newIndexers Indexers) error {
+func (c *cache[T]) AddIndexers(newIndexers Indexers) error {
 	return c.cacheStorage.AddIndexers(newIndexers)
 }
 
 // Get returns the requested item, or sets exists=false.
 // Get is completely threadsafe as long as you treat all items as immutable.
-func (c *cache) Get(obj interface{}) (item interface{}, exists bool, err error) {
+func (c *cache[T]) Get(obj T) (item T, exists bool, err error) {
 	key, err := c.keyFunc(obj)
 	if err != nil {
-		return nil, false, KeyError{obj, err}
+		return *new(T), false, KeyError{obj, err}
 	}
 	return c.GetByKey(key)
 }
 
 // GetByKey returns the request item, or exists=false.
 // GetByKey is completely threadsafe as long as you treat all items as immutable.
-func (c *cache) GetByKey(key string) (item interface{}, exists bool, err error) {
+func (c *cache[T]) GetByKey(key string) (item T, exists bool, err error) {
 	item, exists = c.cacheStorage.Get(key)
 	return item, exists, nil
 }
@@ -274,8 +289,8 @@ func (c *cache) GetByKey(key string) (item interface{}, exists bool, err error) 
 // Replace will delete the contents of 'c', using instead the given list.
 // 'c' takes ownership of the list, you should not reference the list again
 // after calling this function.
-func (c *cache) Replace(list []interface{}, resourceVersion string) error {
-	items := make(map[string]interface{}, len(list))
+func (c *cache[T]) Replace(list []T, resourceVersion string) error {
+	items := make(map[string]T, len(list))
 	for _, item := range list {
 		key, err := c.keyFunc(item)
 		if err != nil {
@@ -295,22 +310,35 @@ func (c *cache) Replace(list []interface{}, resourceVersion string) error {
 }
 
 // Resync is meaningless for one of these
-func (c *cache) Resync() error {
+func (c *cache[T]) Resync() error {
 	return nil
 }
 
-type StoreOption = func(*cache)
+type StoreOption = func(*cache[any])
+
+type TypedStoreOption[T any] = func(*cache[T])
 
 func WithTransformer(transformer TransformFunc) StoreOption {
-	return func(c *cache) {
+	return func(c *cache[any]) {
+		c.transformer = TypedTransformFunc[any](transformer)
+	}
+}
+
+func WithTypedTransformer[T any](transformer TypedTransformFunc[T]) TypedStoreOption[T] {
+	return func(c *cache[T]) {
 		c.transformer = transformer
 	}
 }
 
 // NewStore returns a Store implemented simply with a map and a lock.
 func NewStore(keyFunc KeyFunc, opts ...StoreOption) Store {
-	c := &cache{
-		cacheStorage: NewThreadSafeStore(Indexers{}, Indices{}),
+	return NewTypedStore(keyFunc, opts...)
+}
+
+// NewTypedStore returns a TypedStore implemented simply with a map and a lock.
+func NewTypedStore[T any](keyFunc KeyFunc, opts ...TypedStoreOption[T]) TypedStore[T] {
+	c := &cache[T]{
+		cacheStorage: NewThreadSafeTypedStore[T](Indexers{}, Indices{}),
 		keyFunc:      keyFunc,
 	}
 	for _, opt := range opts {
@@ -321,7 +349,7 @@ func NewStore(keyFunc KeyFunc, opts ...StoreOption) Store {
 
 // NewIndexer returns an Indexer implemented simply with a map and a lock.
 func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
-	return &cache{
+	return &cache[any]{
 		cacheStorage: NewThreadSafeStore(indexers, Indices{}),
 		keyFunc:      keyFunc,
 	}

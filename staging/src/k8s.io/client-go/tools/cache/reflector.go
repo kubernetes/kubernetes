@@ -56,20 +56,23 @@ var (
 )
 
 // ReflectorStore is the subset of cache.Store that the reflector uses
-type ReflectorStore interface {
+type ReflectorStore = TypedReflectorStore[any]
+
+// TypedReflectorStore is the subset of cache.TypedStore that the reflector uses
+type TypedReflectorStore[T any] interface {
 	// Add adds the given object to the accumulator associated with the given object's key
-	Add(obj interface{}) error
+	Add(obj T) error
 
 	// Update updates the given object in the accumulator associated with the given object's key
-	Update(obj interface{}) error
+	Update(obj T) error
 
 	// Delete deletes the given object from the accumulator associated with the given object's key
-	Delete(obj interface{}) error
+	Delete(obj T) error
 
 	// Replace will delete the contents of the store, using instead the
 	// given list. Store takes ownership of the list, you should not reference
 	// it after calling this function.
-	Replace([]interface{}, string) error
+	Replace([]T, string) error
 
 	// Resync is meaningless in the terms appearing here but has
 	// meaning in some implementations that have non-trivial
@@ -79,13 +82,20 @@ type ReflectorStore interface {
 
 // TransformingStore is an optional interface that can be implemented by the provided store.
 // If implemented on the provided store reflector will use the same transformer in its internal stores.
-type TransformingStore interface {
-	Store
-	Transformer() TransformFunc
+type TransformingStore = TypedTransformingStore[any]
+
+// TypedTransformingStore is an optional interface that can be implemented by the provided store.
+// If implemented on the provided store reflector will use the same transformer in its internal stores.
+type TypedTransformingStore[T any] interface {
+	TypedStore[T]
+	Transformer() TypedTransformFunc[T]
 }
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
-type Reflector struct {
+type Reflector = TypedReflector[any]
+
+// TypedReflector watches a specified resource and causes all changes to be reflected in the given store.
+type TypedReflector[T any] struct {
 	// name identifies this reflector. By default, it will be a file:line if possible.
 	name string
 	// The name of the type we expect to place in the store. The name
@@ -101,7 +111,7 @@ type Reflector struct {
 	// The GVK of the object we expect to place in the store if unstructured.
 	expectedGVK *schema.GroupVersionKind
 	// The destination to sync up with the watch source
-	store ReflectorStore
+	store TypedReflectorStore[T]
 	// listerWatcher is used to perform lists and watches.
 	listerWatcher ListerWatcherWithContext
 	// backoff manages backoff of ListWatch
@@ -124,7 +134,7 @@ type Reflector struct {
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
 	lastSyncResourceVersionMutex sync.RWMutex
 	// Called whenever the ListAndWatch drops the connection with an error.
-	watchErrorHandler WatchErrorHandlerWithContext
+	watchErrorHandler TypedWatchErrorHandlerWithContext[T]
 	// WatchListPageSize is the requested chunk size of initial and resync watch lists.
 	// If unset, for consistent reads (RV="") or reads that opt-into arbitrarily old data
 	// (RV="0") it will default to pager.PageSize, for the rest (RV != "" && RV != "0")
@@ -148,11 +158,11 @@ type Reflector struct {
 	useWatchList bool
 }
 
-func (r *Reflector) Name() string {
+func (r *TypedReflector[T]) Name() string {
 	return r.name
 }
 
-func (r *Reflector) TypeDescription() string {
+func (r *TypedReflector[T]) TypeDescription() string {
 	return r.typeDescription
 }
 
@@ -177,7 +187,7 @@ type ResourceVersionUpdater interface {
 // should be offloaded.
 type WatchErrorHandler func(r *Reflector, err error)
 
-// The WatchErrorHandler is called whenever ListAndWatch drops the
+// WatchErrorHandlerWithContext is called whenever ListAndWatch drops the
 // connection with an error. After calling this handler, the informer
 // will backoff and retry.
 //
@@ -189,8 +199,25 @@ type WatchErrorHandler func(r *Reflector, err error)
 // should be offloaded.
 type WatchErrorHandlerWithContext func(ctx context.Context, r *Reflector, err error)
 
+// TypedWatchErrorHandlerWithContext is called whenever ListAndWatch drops the
+// connection with an error. After calling this handler, the informer
+// will backoff and retry.
+//
+// The default implementation looks at the error type and tries to log
+// the error message at an appropriate level.
+//
+// Implementations of this handler may display the error message in other
+// ways. Implementations should return quickly - any expensive processing
+// should be offloaded.
+type TypedWatchErrorHandlerWithContext[T any] func(ctx context.Context, r *TypedReflector[T], err error)
+
 // DefaultWatchErrorHandler is the default implementation of WatchErrorHandlerWithContext.
 func DefaultWatchErrorHandler(ctx context.Context, r *Reflector, err error) {
+	DefaultTypedWatchErrorHandler[any](ctx, r, err)
+}
+
+// DefaultTypedWatchErrorHandler is the default implementation of TypedWatchErrorHandlerWithContext.
+func DefaultTypedWatchErrorHandler[T any](ctx context.Context, r *TypedReflector[T], err error) {
 	switch {
 	case isExpiredError(err):
 		// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
@@ -218,6 +245,12 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 // that is outside this package. See NewReflectorWithOptions for further information.
 func NewReflector(lw ListerWatcher, expectedType interface{}, store ReflectorStore, resyncPeriod time.Duration) *Reflector {
 	return NewReflectorWithOptions(lw, expectedType, store, ReflectorOptions{ResyncPeriod: resyncPeriod})
+}
+
+// NewTypedReflector creates a new Reflector with its name defaulted to the closest source_file.go:line in the call stack
+// that is outside this package. See NewTypedReflectorWithOptions for further information.
+func NewTypedReflector[T any](lw ListerWatcher, expectedType T, store TypedReflectorStore[T], resyncPeriod time.Duration) *TypedReflector[T] {
+	return NewTypedReflectorWithOptions(lw, expectedType, store, ReflectorOptions{ResyncPeriod: resyncPeriod})
 }
 
 // NewNamedReflector creates a new Reflector with the specified name. See NewReflectorWithOptions for further
@@ -261,7 +294,21 @@ type ReflectorOptions struct {
 // "yes".  This enables you to use reflectors to periodically process
 // everything as well as incrementally processing the things that
 // change.
-func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store ReflectorStore, options ReflectorOptions) *Reflector {
+func NewReflectorWithOptions(lw ListerWatcher, expectedType any, store ReflectorStore, options ReflectorOptions) *Reflector {
+	return NewTypedReflectorWithOptions[any](lw, expectedType, store, options)
+}
+
+// NewTypedReflectorWithOptions creates a new TypedReflector object which will keep the
+// given store up to date with the server's contents for the given
+// resource. Reflector promises to only put things in the store that
+// have the type of expectedType, unless expectedType is nil. If
+// resyncPeriod is non-zero, then the reflector will periodically
+// consult its ShouldResync function to determine whether to invoke
+// the Store's Resync operation; `ShouldResync==nil` means always
+// "yes".  This enables you to use reflectors to periodically process
+// everything as well as incrementally processing the things that
+// change.
+func NewTypedReflectorWithOptions[T any](lw ListerWatcher, expectedType T, store TypedReflectorStore[T], options ReflectorOptions) *TypedReflector[T] {
 	reflectorClock := options.Clock
 	if reflectorClock == nil {
 		reflectorClock = clock.RealClock{}
@@ -270,7 +317,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 	if options.MinWatchTimeout > defaultMinWatchTimeout {
 		minWatchTimeout = options.MinWatchTimeout
 	}
-	r := &Reflector{
+	r := &TypedReflector[T]{
 		name:            options.Name,
 		resyncPeriod:    options.ResyncPeriod,
 		minWatchTimeout: minWatchTimeout,
@@ -282,7 +329,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 		// 0.22 QPS. If we don't backoff for 2min, assume API server is healthy and we reset the backoff.
 		backoffManager:    wait.NewExponentialBackoffManager(800*time.Millisecond, 30*time.Second, 2*time.Minute, 2.0, 1.0, reflectorClock),
 		clock:             reflectorClock,
-		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+		watchErrorHandler: TypedWatchErrorHandlerWithContext[T](DefaultTypedWatchErrorHandler[T]),
 		expectedType:      reflect.TypeOf(expectedType),
 	}
 
@@ -346,14 +393,14 @@ var internalPackages = []string{"client-go/tools/cache/"}
 // Run will exit when stopCh is closed.
 //
 // Contextual logging: RunWithContext should be used instead of Run in code which supports contextual logging.
-func (r *Reflector) Run(stopCh <-chan struct{}) {
+func (r *TypedReflector[T]) Run(stopCh <-chan struct{}) {
 	r.RunWithContext(wait.ContextForChannel(stopCh))
 }
 
 // RunWithContext repeatedly uses the reflector's ListAndWatch to fetch all the
 // objects and subsequent deltas.
 // Run will exit when the context is canceled.
-func (r *Reflector) RunWithContext(ctx context.Context) {
+func (r *TypedReflector[T]) RunWithContext(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Starting reflector", "type", r.typeDescription, "resyncPeriod", r.resyncPeriod, "reflector", r.name)
 	wait.BackoffUntil(func() {
@@ -375,7 +422,7 @@ var (
 
 // resyncChan returns a channel which will receive something when a resync is
 // required, and a cleanup function.
-func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
+func (r *TypedReflector[T]) resyncChan() (<-chan time.Time, func() bool) {
 	if r.resyncPeriod == 0 {
 		return neverExitWatch, func() bool { return false }
 	}
@@ -392,14 +439,14 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // It returns error if ListAndWatch didn't even try to initialize watch.
 //
 // Contextual logging: ListAndWatchWithContext should be used instead of ListAndWatch in code which supports contextual logging.
-func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
+func (r *TypedReflector[T]) ListAndWatch(stopCh <-chan struct{}) error {
 	return r.ListAndWatchWithContext(wait.ContextForChannel(stopCh))
 }
 
 // ListAndWatchWithContext first lists all items and get the resource version at the moment of call,
 // and then use the resource version to watch.
 // It returns error if ListAndWatchWithContext didn't even try to initialize watch.
-func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
+func (r *TypedReflector[T]) ListAndWatchWithContext(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Listing and watching", "type", r.typeDescription, "reflector", r.name)
 	var err error
@@ -440,7 +487,7 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 // startResync periodically calls r.store.Resync() method.
 // Note that this method is blocking and should be
 // called in a separate goroutine.
-func (r *Reflector) startResync(ctx context.Context, resyncerrc chan error) {
+func (r *TypedReflector[T]) startResync(ctx context.Context, resyncerrc chan error) {
 	logger := klog.FromContext(ctx)
 	resyncCh, cleanup := r.resyncChan()
 	defer func() {
@@ -465,7 +512,7 @@ func (r *Reflector) startResync(ctx context.Context, resyncerrc chan error) {
 }
 
 // watchWithResync runs watch with startResync in the background.
-func (r *Reflector) watchWithResync(ctx context.Context, w watch.Interface) error {
+func (r *TypedReflector[T]) watchWithResync(ctx context.Context, w watch.Interface) error {
 	resyncerrc := make(chan error, 1)
 	cancelCtx, cancel := context.WithCancel(ctx)
 	// Waiting for completion of the goroutine is relevant for race detector.
@@ -487,7 +534,7 @@ func (r *Reflector) watchWithResync(ctx context.Context, w watch.Interface) erro
 //
 // If a watch is provided, it will be used, otherwise another will be started.
 // If the watcher has started, it will always be stopped before returning.
-func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc chan error) error {
+func (r *TypedReflector[T]) watch(ctx context.Context, w watch.Interface, resyncerrc chan error) error {
 	stopCh := ctx.Done()
 	logger := klog.FromContext(ctx)
 	var err error
@@ -575,7 +622,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 
 // list simply lists all items and records a resource version obtained from the server at the moment of the call.
 // the resource version can be used for further progress notification (aka. watch).
-func (r *Reflector) list(ctx context.Context) error {
+func (r *TypedReflector[T]) list(ctx context.Context) error {
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
@@ -699,12 +746,12 @@ func (r *Reflector) list(ctx context.Context) error {
 // After receiving a "Bookmark" event the reflector is considered to be synchronized.
 // It replaces its internal store with the collected items and
 // reuses the current watch requests for getting further events.
-func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
+func (r *TypedReflector[T]) watchList(ctx context.Context) (watch.Interface, error) {
 	stopCh := ctx.Done()
 	logger := klog.FromContext(ctx)
 	var w watch.Interface
 	var err error
-	var temporaryStore Store
+	var temporaryStore TypedStore[T]
 	var resourceVersion string
 	// TODO(#115478): see if this function could be turned
 	//  into a method and see if error handling
@@ -726,9 +773,11 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		return false
 	}
 
-	storeOpts := []StoreOption{}
-	if tr, ok := r.store.(TransformingStore); ok && tr.Transformer() != nil {
-		storeOpts = append(storeOpts, WithTransformer(tr.Transformer()))
+	storeOpts := []TypedStoreOption[T]{}
+	//nolint:staticcheck // staticcheck reports an impossible type assertion, but that's a false positive
+	// (the code is covered by a unit test and the transformer is added correctly)
+	if tr, ok := r.store.(TypedTransformingStore[T]); ok && tr.Transformer() != nil {
+		storeOpts = append(storeOpts, WithTypedTransformer(tr.Transformer()))
 	}
 
 	initTrace := trace.New("Reflector WatchList", trace.Field{Key: "name", Value: r.name})
@@ -742,7 +791,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 
 		resourceVersion = ""
 		lastKnownRV := r.rewatchResourceVersion()
-		temporaryStore = NewStore(DeletionHandlingMetaNamespaceKeyFunc, storeOpts...)
+		temporaryStore = NewTypedStore[T](DeletionHandlingMetaNamespaceKeyFunc, storeOpts...)
 		// TODO(#115478): large "list", slow clients, slow network, p&f
 		//  might slow down streaming and eventually fail.
 		//  maybe in such a case we should retry with an increased timeout?
@@ -800,10 +849,10 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 }
 
 // syncWith replaces the store's items with the given list.
-func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) error {
-	found := make([]interface{}, 0, len(items))
+func (r *TypedReflector[T]) syncWith(items []runtime.Object, resourceVersion string) error {
+	found := make([]T, 0, len(items))
 	for _, item := range items {
-		found = append(found, item)
+		found = append(found, item.(T))
 	}
 	return r.store.Replace(found, resourceVersion)
 }
@@ -812,11 +861,11 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 // last seen ResourceVersion, to allow continuing from that ResourceVersion on
 // retry. If successful, the watcher will be left open after receiving the
 // initial set of objects, to allow watching for future events.
-func handleListWatch(
+func handleListWatch[T any](
 	ctx context.Context,
 	start time.Time,
 	w watch.Interface,
-	store Store,
+	store TypedStore[T],
 	expectedType reflect.Type,
 	expectedGVK *schema.GroupVersionKind,
 	name string,
@@ -833,11 +882,11 @@ func handleListWatch(
 // handleListWatch consumes events from w, updates the Store, and records the
 // last seen ResourceVersion, to allow continuing from that ResourceVersion on
 // retry. The watcher will always be stopped on exit.
-func handleWatch(
+func handleWatch[T any](
 	ctx context.Context,
 	start time.Time,
 	w watch.Interface,
-	store ReflectorStore,
+	store TypedReflectorStore[T],
 	expectedType reflect.Type,
 	expectedGVK *schema.GroupVersionKind,
 	name string,
@@ -861,11 +910,11 @@ func handleWatch(
 // The watcher will always be stopped, unless exitOnWatchListBookmarkReceived is
 // true and watchListBookmarkReceived is true. This allows the same watch stream
 // to be re-used by the caller to continue watching for new events.
-func handleAnyWatch(
+func handleAnyWatch[T any](
 	ctx context.Context,
 	start time.Time,
 	w watch.Interface,
-	store ReflectorStore,
+	store TypedReflectorStore[T],
 	expectedType reflect.Type,
 	expectedGVK *schema.GroupVersionKind,
 	name string,
@@ -930,12 +979,12 @@ loop:
 			resourceVersion := meta.GetResourceVersion()
 			switch event.Type {
 			case watch.Added:
-				err := store.Add(event.Object)
+				err := store.Add(event.Object.(T))
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to add watch event object to store", "reflector", name, "object", event.Object)
 				}
 			case watch.Modified:
-				err := store.Update(event.Object)
+				err := store.Update(event.Object.(T))
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to update watch event object to store", "reflector", name, "object", event.Object)
 				}
@@ -943,7 +992,7 @@ loop:
 				// TODO: Will any consumers need access to the "last known
 				// state", which is passed in event.Object? If so, may need
 				// to change this.
-				err := store.Delete(event.Object)
+				err := store.Delete(event.Object.(T))
 				if err != nil {
 					utilruntime.HandleErrorWithContext(ctx, err, "Unable to delete watch event object from store", "reflector", name, "object", event.Object)
 				}
@@ -982,13 +1031,13 @@ loop:
 
 // LastSyncResourceVersion is the resource version observed when last sync with the underlying store
 // The value returned is not synchronized with access to the underlying store and is not thread-safe
-func (r *Reflector) LastSyncResourceVersion() string {
+func (r *TypedReflector[T]) LastSyncResourceVersion() string {
 	r.lastSyncResourceVersionMutex.RLock()
 	defer r.lastSyncResourceVersionMutex.RUnlock()
 	return r.lastSyncResourceVersion
 }
 
-func (r *Reflector) setLastSyncResourceVersion(v string) {
+func (r *TypedReflector[T]) setLastSyncResourceVersion(v string) {
 	r.lastSyncResourceVersionMutex.Lock()
 	defer r.lastSyncResourceVersionMutex.Unlock()
 	r.lastSyncResourceVersion = v
@@ -999,7 +1048,7 @@ func (r *Reflector) setLastSyncResourceVersion(v string) {
 // versions no older than has already been observed in relist results or watch events, or, if the last relist resulted
 // in an HTTP 410 (Gone) status code, returns "" so that the relist will use the latest resource version available in
 // etcd via a quorum read.
-func (r *Reflector) relistResourceVersion() string {
+func (r *TypedReflector[T]) relistResourceVersion() string {
 	r.lastSyncResourceVersionMutex.RLock()
 	defer r.lastSyncResourceVersionMutex.RUnlock()
 
@@ -1018,7 +1067,7 @@ func (r *Reflector) relistResourceVersion() string {
 }
 
 // rewatchResourceVersion determines the resource version the reflector should start streaming from.
-func (r *Reflector) rewatchResourceVersion() string {
+func (r *TypedReflector[T]) rewatchResourceVersion() string {
 	r.lastSyncResourceVersionMutex.RLock()
 	defer r.lastSyncResourceVersionMutex.RUnlock()
 	if r.isLastSyncResourceVersionUnavailable {
@@ -1031,7 +1080,7 @@ func (r *Reflector) rewatchResourceVersion() string {
 
 // setIsLastSyncResourceVersionUnavailable sets if the last list or watch request with lastSyncResourceVersion returned
 // "expired" or "too large resource version" error.
-func (r *Reflector) setIsLastSyncResourceVersionUnavailable(isUnavailable bool) {
+func (r *TypedReflector[T]) setIsLastSyncResourceVersionUnavailable(isUnavailable bool) {
 	r.lastSyncResourceVersionMutex.Lock()
 	defer r.lastSyncResourceVersionMutex.Unlock()
 	r.isLastSyncResourceVersionUnavailable = isUnavailable
