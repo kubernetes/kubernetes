@@ -317,15 +317,19 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg))
 		result.AddFunction(f)
 	}
-	if lm.declaredAsMap {
-		// TODO: There are some fields which are declared as maps which do not
-		// enforce uniqueness in manual validation. Those either need to not be
-		// maps or we need to allow types to opt-out from this validation.  SSA
-		// is also not able to handle these well.
-		matchArg := lm.makeListMapMatchFunc(nt.Elem)
-		f := Function("listValidator", DefaultFlags, validateUnique, matchArg)
-		result.AddFunction(f)
-	}
+	// TODO: enable the following once we have a way to either opt-out from this validation
+	// or settle the decision on how to handle the ratcheting cases.
+	// if lm.declaredAsMap {
+	// TODO: There are some fields which are declared as maps which do not
+	// enforce uniqueness in manual validation. Those either need to not be
+	// maps or we need to allow types to opt-out from this validation.  SSA
+	// is also not able to handle these well.
+
+	// matchArg := lm.makeListMapMatchFunc(nt.Elem)
+	// f := Function("listValidator", DefaultFlags, validateUnique, matchArg).
+	// 	WithComment("listType=map requires unique keys")
+	// result.AddFunction(f)
+	// }
 
 	return result, nil
 }

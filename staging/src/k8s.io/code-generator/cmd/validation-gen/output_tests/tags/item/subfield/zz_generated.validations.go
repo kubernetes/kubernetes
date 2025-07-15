@@ -62,7 +62,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[key=target].stringField")
 				})
 			})...)
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
 			return
 		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.Items }))...)
 
@@ -77,7 +76,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 					return validate.NEQ(ctx, op, fldPath, obj, oldObj, "forbidden")
 				})
 			})...)
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a RatchetItem, b RatchetItem) bool { return a.Key == b.Key })...)
 			return
 		}(fldPath.Child("ratchetItems"), obj.RatchetItems, safe.Field(oldObj, func(oldObj *Struct) []RatchetItem { return oldObj.RatchetItems }))...)
 

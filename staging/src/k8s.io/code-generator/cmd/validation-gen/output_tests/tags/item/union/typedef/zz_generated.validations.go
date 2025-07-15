@@ -54,10 +54,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Tasks
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj TaskList) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
-			}
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Task, b Task) bool { return a.Name == b.Name })...)
 			errs = append(errs, Validate_TaskList(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("tasks"), obj.Tasks, safe.Field(oldObj, func(oldObj *Struct) TaskList { return oldObj.Tasks }))...)
@@ -72,7 +68,6 @@ func Validate_TaskList(ctx context.Context, op operation.Operation, fldPath *fie
 	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Task, b Task) bool { return a.Name == b.Name })...)
 	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_union_typedef_TaskList_, func(list TaskList) bool {
 		for i := range list {
 			if list[i].Name == "failed" {

@@ -56,7 +56,6 @@ func Validate_DualItemList(ctx context.Context, op operation.Operation, fldPath 
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *DualItem) bool { return item.ID == "typedef-target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DualItem) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item DualItems[id=typedef-target] from typedef")
 	})...)
-	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a DualItem, b DualItem) bool { return a.ID == b.ID })...)
 
 	return errs
 }
@@ -70,7 +69,6 @@ func Validate_ItemList(ctx context.Context, op operation.Operation, fldPath *fie
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "validated" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item ItemList[key=validated]")
 	})...)
-	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
 
 	return errs
 }
@@ -83,7 +81,6 @@ func Validate_ItemListAlias(ctx context.Context, op operation.Operation, fldPath
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "aliased" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item ItemListAlias[key=aliased]")
 	})...)
-	errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
 
 	return errs
 }
@@ -94,10 +91,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.TypedefItems
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj ItemList) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
-			}
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
 			errs = append(errs, Validate_ItemList(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("typedefItems"), obj.TypedefItems, safe.Field(oldObj, func(oldObj *Struct) ItemList { return oldObj.TypedefItems }))...)
@@ -105,10 +98,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.NestedTypedefItems
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj ItemListAlias) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
-			}
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
 			errs = append(errs, Validate_ItemListAlias(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("nestedTypedefItems"), obj.NestedTypedefItems, safe.Field(oldObj, func(oldObj *Struct) ItemListAlias { return oldObj.NestedTypedefItems }))...)
@@ -122,7 +111,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *DualItem) bool { return item.ID == "field-target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DualItem) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item DualItems[id=field-target] from field")
 			})...)
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a DualItem, b DualItem) bool { return a.ID == b.ID })...)
 			errs = append(errs, Validate_DualItemList(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("dualItems"), obj.DualItems, safe.Field(oldObj, func(oldObj *Struct) DualItemList { return oldObj.DualItems }))...)
