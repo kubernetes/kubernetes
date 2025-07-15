@@ -237,7 +237,7 @@ func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerPr
 			curr = profiles[i].Plugins.QueueSort
 		}
 		if !apiequality.Semantic.DeepEqual(canon, curr) {
-			errs = append(errs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "queueSort must be the same for all profiles"))
+			errs = append(errs, field.Invalid(path.Index(i).Child("plugins", "queueSort"), curr, "must be the same for all profiles"))
 		}
 		for _, cfg := range profiles[i].PluginConfig {
 			if cfg.Name == queueSortName && !apiequality.Semantic.DeepEqual(queueSortArgs, cfg.Args) {

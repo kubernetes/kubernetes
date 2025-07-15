@@ -74,13 +74,13 @@ func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVersion"), ownerReference.APIVersion, "version must not be empty"))
 	}
 	if len(gvk.Kind) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ownerReference.Kind, "kind must not be empty"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ownerReference.Kind, "must not be empty"))
 	}
 	if len(ownerReference.Name) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ownerReference.Name, "name must not be empty"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ownerReference.Name, "must not be empty"))
 	}
 	if len(ownerReference.UID) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), ownerReference.UID, "uid must not be empty"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("uid"), ownerReference.UID, "must not be empty"))
 	}
 	if _, ok := BannedOwners[gvk]; ok {
 		allErrs = append(allErrs, field.Invalid(fldPath, ownerReference, fmt.Sprintf("%s is disallowed from being an owner", gvk)))

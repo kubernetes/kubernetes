@@ -824,7 +824,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			Spec: badSpec,
 		},
 		expectedErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "type must be 'Exempt' if and only if name is 'exempt'"),
+			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "must be 'Exempt' if and only if `name` is 'exempt'"),
 			field.Invalid(field.NewPath("spec"), badSpec, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
 		},
 	}, {
@@ -855,7 +855,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 		name:                       "admins are not allowed to repurpose the 'exempt' pl to a limited type",
 		priorityLevelConfiguration: exemptTypeRepurposed,
 		expectedErrors: field.ErrorList{
-			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "type must be 'Exempt' if and only if name is 'exempt'"),
+			field.Invalid(field.NewPath("spec").Child("type"), flowcontrol.PriorityLevelEnablementLimited, "must be 'Exempt' if and only if `name` is 'exempt'"),
 			field.Forbidden(field.NewPath("spec").Child("exempt"), "must be nil if the type is Limited"),
 			field.Invalid(field.NewPath("spec"), exemptTypeRepurposed.Spec, "spec of 'exempt' except the 'spec.exempt' field must equal the fixed value"),
 		},
