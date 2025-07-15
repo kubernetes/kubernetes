@@ -35,4 +35,7 @@ require (
 	sigs.k8s.io/yaml v1.5.0 // indirect
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	k8s.io/apimachinery => ../apimachinery
+	sigs.k8s.io/yaml => github.com/thockin/k8s-yaml v0.0.0-20250714181324-43a7a4f2ba4f
+)

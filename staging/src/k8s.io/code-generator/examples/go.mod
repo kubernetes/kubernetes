@@ -59,3 +59,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace sigs.k8s.io/yaml => github.com/thockin/k8s-yaml v0.0.0-20250714181324-43a7a4f2ba4f

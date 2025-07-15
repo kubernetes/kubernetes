@@ -94,4 +94,5 @@ replace (
 	k8s.io/cri-api => ../cri-api
 	k8s.io/kms => ../kms
 	k8s.io/kubelet => ../kubelet
+	sigs.k8s.io/yaml => github.com/thockin/k8s-yaml v0.0.0-20250714181324-43a7a4f2ba4f
 )
