@@ -37,6 +37,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -740,10 +741,14 @@ func newGarbageCollectorControllerDescriptor() *ControllerDescriptor {
 }
 
 type garbageCollectorController struct {
+	named
 	*garbagecollector.GarbageCollector
 	controllerContext ControllerContext
 	discoveryClient   discovery.DiscoveryInterface
 }
+
+// Make sure we are propagating properly.
+var _ controller.Debuggable = (*garbageCollectorController)(nil)
 
 func newGarbageCollectorController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 	if !controllerContext.ComponentConfig.GarbageCollectorController.EnableGarbageCollector {
@@ -785,10 +790,16 @@ func newGarbageCollectorController(ctx context.Context, controllerContext Contro
 	}
 
 	return &garbageCollectorController{
+		named:             newNamed(controllerName),
 		GarbageCollector:  garbageCollector,
 		controllerContext: controllerContext,
 		discoveryClient:   discoveryClient,
 	}, nil
+}
+
+// Name must be implemented explicitly as it collides with the embedded controller.
+func (c *garbageCollectorController) Name() string {
+	return c.named.Name()
 }
 
 func (c *garbageCollectorController) Run(ctx context.Context) {
