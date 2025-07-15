@@ -2362,6 +2362,120 @@ func TestRecordInProgressResizeCount(t *testing.T) {
 	}
 }
 
+func TestRecordPendingResizesCount(t *testing.T) {
+	metrics.Register()
+
+	for _, tc := range []struct {
+		name               string
+		existingConditions map[types.UID]podResizeConditions
+		expected           string
+	}{
+		{
+			name: "one pod, no resize status",
+			existingConditions: map[types.UID]podResizeConditions{
+				"test-pod": {},
+			},
+		},
+		{
+			name: "one pod in progress",
+			existingConditions: map[types.UID]podResizeConditions{
+				"test-pod": {
+					PodResizeInProgress: &v1.PodCondition{
+						Type:   v1.PodResizeInProgress,
+						Status: v1.ConditionTrue,
+					},
+				},
+			},
+			expected: "",
+		},
+		{
+			name: "one pod deferred",
+			existingConditions: map[types.UID]podResizeConditions{
+				"test-pod": {
+					PodResizePending: &v1.PodCondition{
+						Type:    v1.PodResizePending,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonDeferred,
+						Message: "some-message",
+					},
+				},
+			},
+			expected: `
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+				# TYPE kubelet_pod_pending_resizes gauge
+				kubelet_pod_pending_resizes{reason="deferred"} 1
+			`,
+		},
+		{
+			name: "2 pods infeasible, each with a different reason",
+			existingConditions: map[types.UID]podResizeConditions{
+				"test-pod-1": {
+					PodResizePending: &v1.PodCondition{
+						Type:    v1.PodResizePending,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonInfeasible,
+						Message: "some-reason-1",
+					},
+				},
+				"test-pod-2": {
+					PodResizePending: &v1.PodCondition{
+						Type:    v1.PodResizePending,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonInfeasible,
+						Message: "some-reason-2",
+					},
+				},
+			},
+			expected: `
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+				# TYPE kubelet_pod_pending_resizes gauge
+				kubelet_pod_pending_resizes{reason="infeasible"} 2
+			`,
+		},
+		{
+			name: "one deferred, one infeasible",
+			existingConditions: map[types.UID]podResizeConditions{
+				"test-pod-1": {
+					PodResizePending: &v1.PodCondition{
+						Type:    v1.PodResizePending,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonInfeasible,
+						Message: "some-reason-1",
+					},
+				},
+				"test-pod-2": {
+					PodResizePending: &v1.PodCondition{
+						Type:    v1.PodResizePending,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonDeferred,
+						Message: "some-reason-2",
+					},
+				},
+			},
+			expected: `
+			    # HELP kubelet_pod_pending_resizes [ALPHA] Number of pending resizes for pods.
+				# TYPE kubelet_pod_pending_resizes gauge
+				kubelet_pod_pending_resizes{reason="deferred"} 1
+				kubelet_pod_pending_resizes{reason="infeasible"} 1
+			`,
+		},
+		{
+			name:               "no pods",
+			existingConditions: make(map[types.UID]podResizeConditions),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			manager := newTestManager(&fake.Clientset{})
+			manager.podResizeConditions = tc.existingConditions
+			manager.recordPendingResizeCount()
+
+			require.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer, strings.NewReader(tc.expected), "kubelet_pod_pending_resizes",
+			))
+		})
+	}
+}
+
 func statusEqual(left, right v1.PodStatus) bool {
 	left.Conditions = nil
 	right.Conditions = nil
