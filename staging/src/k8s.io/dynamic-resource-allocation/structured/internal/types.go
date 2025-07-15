@@ -33,9 +33,25 @@ type DeviceClassLister interface {
 }
 
 // Allocator is intentionally not documented here. See the main package for docs.
+//
+// This interface is also broader than the public one.
 type Allocator interface {
 	ClaimsToAllocate() []*resourceapi.ResourceClaim
 	Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error)
+}
+
+// AllocatorExtended is an optional interface. Not all variants implement it.
+type AllocatorExtended interface {
+	// Stats shows statistics from the allocation process.
+	// May return nil if not implemented.
+	GetStats() Stats
+}
+
+// Stats shows statistics from the allocation process.
+type Stats struct {
+	// NumAllocateOneInvocations counts the number of times the allocateOne function
+	// got called.
+	NumAllocateOneInvocations int64
 }
 
 // Features contains all feature gates that may influence the behavior of ResourceClaim allocation.
