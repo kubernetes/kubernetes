@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -776,7 +777,7 @@ var _ = common.SIGDescribe("Services", func() {
 		name1 := "pod1"
 		name2 := "pod2"
 
-		createPodOrFail(ctx, f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}}, "netexec", "--http-port", "80")
+		_ = createPodOrFail(ctx, f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}}, "netexec", "--http-port", "80")
 		names[name1] = true
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name1: {80}})
 
@@ -785,7 +786,7 @@ var _ = common.SIGDescribe("Services", func() {
 		err = jig.CheckServiceReachability(ctx, svc, execPod)
 		framework.ExpectNoError(err)
 
-		createPodOrFail(ctx, f, ns, name2, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}}, "netexec", "--http-port", "80")
+		_ = createPodOrFail(ctx, f, ns, name2, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}}, "netexec", "--http-port", "80")
 		names[name2] = true
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name1: {80}, name2: {80}})
 
@@ -870,11 +871,11 @@ var _ = common.SIGDescribe("Services", func() {
 		podname1 := "pod1"
 		podname2 := "pod2"
 
-		createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts1, "netexec", "--http-port", strconv.Itoa(port1))
+		_ = createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts1, "netexec", "--http-port", strconv.Itoa(port1))
 		names[podname1] = true
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podname1: {port1}})
 
-		createPodOrFail(ctx, f, ns, podname2, jig.Labels, containerPorts2, "netexec", "--http-port", strconv.Itoa(port2))
+		_ = createPodOrFail(ctx, f, ns, podname2, jig.Labels, containerPorts2, "netexec", "--http-port", strconv.Itoa(port2))
 		names[podname2] = true
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podname1: {port1}, podname2: {port2}})
 
@@ -919,7 +920,7 @@ var _ = common.SIGDescribe("Services", func() {
 				ContainerPort: int32(port1),
 			},
 		}
-		createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts1, "netexec", "--http-port", strconv.Itoa(port1))
+		_ = createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts1, "netexec", "--http-port", strconv.Itoa(port1))
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podname1: {port1}})
 
 		ginkgo.By("Checking if the Service " + serviceName + " forwards traffic to " + podname1)
@@ -954,7 +955,7 @@ var _ = common.SIGDescribe("Services", func() {
 				ContainerPort: int32(port2),
 			},
 		}
-		createPodOrFail(ctx, f, ns, podname2, jig.Labels, containerPorts2, "netexec", "--http-port", strconv.Itoa(port2))
+		_ = createPodOrFail(ctx, f, ns, podname2, jig.Labels, containerPorts2, "netexec", "--http-port", strconv.Itoa(port2))
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podname1: {port1}, podname2: {port2}})
 
 		ginkgo.By("Checking if the Service forwards traffic to " + podname1 + " and " + podname2)
@@ -3757,7 +3758,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}}
 		podname1 := "pod1"
 		ginkgo.By("creating pod " + podname1 + " in namespace " + ns)
-		createPodOrFail(ctx, f, ns, podname1, testLabels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
+		_ = createPodOrFail(ctx, f, ns, podname1, testLabels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
 		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
 
 		ginkgo.By("Checking if the Service forwards traffic to the TCP and UDP port")
@@ -3880,7 +3881,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		podname1 := "pod1"
 
-		createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
+		_ = createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
 		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
 
 		ginkgo.By("Checking if the Service forwards traffic to pods")
@@ -3921,7 +3922,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		name1 := "pod1"
 
-		createPodOrFail(ctx, f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 5060, Protocol: v1.ProtocolSCTP}})
+		_ = createPodOrFail(ctx, f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 5060, Protocol: v1.ProtocolSCTP}})
 		names[name1] = true
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			for name := range names {
@@ -4190,7 +4191,7 @@ var _ = common.SIGDescribe("Services", func() {
 		service, err := t.CreateService(service)
 		framework.ExpectNoError(err)
 
-		checkServiceReachabilityFromExecPod(ctx, f.ClientSet, ns, service.Name, service.Spec.ClusterIP, port)
+		_ = checkServiceReachabilityFromExecPod(ctx, f.ClientSet, ns, service.Name, service.Spec.ClusterIP, port)
 	})
 
 	ginkgo.It("should connect to the named ports exposed by restartable init containers", func(ctx context.Context) {
@@ -4226,7 +4227,83 @@ var _ = common.SIGDescribe("Services", func() {
 		service, err := t.CreateService(service)
 		framework.ExpectNoError(err)
 
-		checkServiceReachabilityFromExecPod(ctx, f.ClientSet, ns, service.Name, service.Spec.ClusterIP, port)
+		_ = checkServiceReachabilityFromExecPod(ctx, f.ClientSet, ns, service.Name, service.Spec.ClusterIP, port)
+	})
+
+	ginkgo.It("should connect to the named ports during port number changing", func(ctx context.Context) {
+		serviceName := "mutable-named-port"
+		ns := f.Namespace.Name
+
+		t := NewServerTest(cs, ns, serviceName)
+		defer func() {
+			defer ginkgo.GinkgoRecover()
+			errs := t.Cleanup()
+			if len(errs) != 0 {
+				framework.Failf("errors in cleanup: %v", errs)
+			}
+		}()
+
+		port := int32(8080)
+		portName := "mutable-port"
+		ports := []v1.ContainerPort{{Name: portName, ContainerPort: port, Protocol: v1.ProtocolTCP}}
+		args := []string{"netexec", fmt.Sprintf("--http-port=%d", port)}
+		pods := []*v1.Pod{}
+		for _, podName := range []string{"testpod0", "testpod1"} {
+			pods = append(pods, createPodOrFail(ctx, f, ns, podName, t.Labels, ports, args...))
+		}
+
+		service := t.BuildServiceSpec()
+		service.Spec.Ports = []v1.ServicePort{
+			{
+				Name:       portName,
+				Port:       port,
+				TargetPort: intstr.FromString(portName),
+			},
+		}
+
+		ginkgo.By(fmt.Sprintf("creating Service %v with selectors %v", service.Name, service.Spec.Selector))
+		service, err := t.CreateService(service)
+		framework.ExpectNoError(err)
+
+		getPodNamesBehindService := func(expectPodCnt int) (podNames []string) {
+			for retryCnt := 0; retryCnt < max(20, expectPodCnt*2); retryCnt++ {
+				output := checkServiceReachabilityFromExecPod(ctx, f.ClientSet, ns, service.Name, service.Spec.ClusterIP, port)
+				if !slices.Contains(podNames, output) {
+					podNames = append(podNames, output)
+				}
+			}
+			return podNames
+		}
+
+		hostnames := getPodNamesBehindService(len(pods))
+		framework.Logf("mutable-port check hostname %v", hostnames)
+		// TODO: check pod name in hostname explicitly
+		if len(hostnames) != 2 {
+			framework.Failf("Failed to check pod connectivity for service %s/%s with session affinity", ns, serviceName)
+		}
+
+		e2epod.DeletePodOrFail(ctx, f.ClientSet, ns, pods[0].Name)
+		pods[0] = createPodOrFail(ctx, f, ns, "testpod2", t.Labels, ports, args...)
+
+		hostnames = getPodNamesBehindService(len(pods))
+		framework.Logf("mutable-port check hostname %v", hostnames)
+		// TODO: check pod name in hostname explicitly
+		if len(hostnames) != 2 {
+			framework.Failf("Failed to check pod connectivity for service %s/%s with session affinity", ns, serviceName)
+		}
+
+		e2epod.DeletePodOrFail(ctx, f.ClientSet, ns, pods[1].Name)
+		port = int32(8000)
+		args[1] = fmt.Sprintf("--http-port=%d", port)
+		portsModified := []v1.ContainerPort{{Name: portName, ContainerPort: port, Protocol: v1.ProtocolTCP}}
+		pods[1] = createPodOrFail(ctx, f, ns, "testpod3", t.Labels, portsModified, args...)
+
+		hostnames = getPodNamesBehindService(len(pods))
+		framework.Logf("mutable-port check hostname %v", hostnames)
+		// TODO: check pod name in hostname explicitly
+		if len(hostnames) != 2 {
+			framework.Failf("Failed to check pod connectivity for service %s/%s with session affinity", ns, serviceName)
+		}
 	})
 })
 
@@ -4467,14 +4544,14 @@ func createPausePodDeployment(ctx context.Context, cs clientset.Interface, name,
 }
 
 // createPodOrFail creates a pod with the specified containerPorts.
-func createPodOrFail(ctx context.Context, f *framework.Framework, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort, args ...string) {
+func createPodOrFail(ctx context.Context, f *framework.Framework, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort, args ...string) *v1.Pod {
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
 	pod := e2epod.NewAgnhostPod(ns, name, nil, nil, containerPorts, args...)
 	pod.ObjectMeta.Labels = labels
 	// Add a dummy environment variable to work around a docker issue.
 	// https://github.com/docker/docker/issues/14203
 	pod.Spec.Containers[0].Env = []v1.EnvVar{{Name: "FOO", Value: " "}}
-	e2epod.NewPodClient(f).CreateSync(ctx, pod)
+	return e2epod.NewPodClient(f).CreateSync(ctx, pod)
 }
 
 // createPodWithRestartableInitContainerOrFail creates a pod with restartable init containers using the specified containerPorts.
@@ -4541,14 +4618,14 @@ func checkReachabilityFromPod(ctx context.Context, expectToBeReachable bool, tim
 
 // checkServiceReachabilityFromExecPod creates a dedicated client pod, executes into it,
 // and checks reachability to the specified target host and port.
-func checkServiceReachabilityFromExecPod(ctx context.Context, client clientset.Interface, namespace, name, clusterIP string, port int32) {
+func checkServiceReachabilityFromExecPod(ctx context.Context, client clientset.Interface, namespace, name, clusterIP string, port int32) string {
 	// We avoid relying on DNS lookup with the service name here because
 	// we only want to test whether the named port is accessible from the service.
 	serverHost := net.JoinHostPort(clusterIP, strconv.Itoa(int(port)))
 	ginkgo.By("creating a dedicated client to send request to the http server " + serverHost)
 	execPod := e2epod.CreateExecPodOrFail(ctx, client, namespace, "execpod-", nil)
 	execPodName := execPod.Name
-	cmd := fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s/", serverHost)
+	cmd := fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s/hostname", serverHost)
 	var stdout string
 	if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 		var err error
@@ -4561,6 +4638,7 @@ func checkServiceReachabilityFromExecPod(ctx context.Context, client clientset.I
 	}); pollErr != nil {
 		framework.Failf("connection to the Service %v within %v should be succeeded, stdout: %v", name, e2eservice.KubeProxyLagTimeout, stdout)
 	}
+	return stdout
 }
 
 func validatePorts(ep, expectedEndpoints portsByPodUID) error {
