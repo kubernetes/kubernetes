@@ -1024,6 +1024,12 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 						framework.Logf("Get result: %v, err: %v", res, err)
 						gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected Get to succeed with the feature gate enabled")
 						gomega.Expect(res.PodResources.Name).To(gomega.Equal(pod.Name))
+						gomega.Expect(res.PodResources.Containers).To(gomega.HaveLen(1), "expected one container")
+						container := res.PodResources.Containers[0]
+						gomega.Expect(container.Name).To(gomega.Equal(pd.cntName), "expected container name match")
+						gomega.Expect(container.CpuIds).ToNot(gomega.BeEmpty(), "expected CPU IDs to be reported")
+						gomega.Expect(len(container.CpuIds)).To(gomega.Equal(pd.CpuRequestExclusive()), "expected one exclusive CPU")
+						gomega.Expect(container.Devices).To(gomega.BeEmpty(), "expected no devices")
 					})
 				})
 
