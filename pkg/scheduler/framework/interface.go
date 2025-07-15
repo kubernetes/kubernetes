@@ -432,6 +432,12 @@ type ReservePlugin interface {
 // These plugins are called before a pod being scheduled.
 type PreBindPlugin interface {
 	Plugin
+	// PreBindPreFlight is called before PreBind, and the plugin is supposed to return Success, Skip, or Error status.
+	// If it returns Success, it means this PreBind plugin will handle this pod.
+	// If it returns Skip, it means this PreBind plugin has nothing to do with the pod, and PreBind will be skipped.
+	// This function should be lightweight, and shouldn't do any actual operation, e.g., creating a volume etc.
+	PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status
+
 	// PreBind is called before binding a pod. All prebind plugins must return
 	// success or the pod will be rejected and won't be sent for binding.
 	PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status
