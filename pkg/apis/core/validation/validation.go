@@ -4109,6 +4109,9 @@ type PodValidationOptions struct {
 	AllowOnlyRecursiveSELinuxChangePolicy bool
 	// Indicates whether PodLevelResources feature is enabled or disabled.
 	PodLevelResourcesEnabled bool
+	// Indicates whether InPlacePodLevelResourcesVerticalScaling feature is enabled
+	// or disabled.
+	InPlacePodLevelResourcesVerticalScalingEnabled bool
 	// Allow sidecar containers resize policy for backward compatibility
 	AllowSidecarResizePolicy bool
 	// Allow invalid label-value in RequiredNodeSelector
@@ -5650,16 +5653,6 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
 
-	// pods with pod-level resources cannot be resized
-	isPodLevelResourcesSet := func(pod *core.Pod) bool {
-		return pod.Spec.Resources != nil &&
-			(len(pod.Spec.Resources.Requests)+len(pod.Spec.Resources.Limits) > 0)
-	}
-
-	if isPodLevelResourcesSet(oldPod) || isPodLevelResourcesSet(newPod) {
-		return field.ErrorList{field.Forbidden(field.NewPath(""), "pods with pod-level resources cannot be resized")}
-	}
-
 	// static pods cannot be resized.
 	if _, ok := oldPod.Annotations[core.MirrorPodAnnotationKey]; ok {
 		return field.ErrorList{field.Forbidden(field.NewPath(""), "static pods cannot be resized")}
@@ -5670,13 +5663,44 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		return field.ErrorList{field.Forbidden(field.NewPath(""), "windows pods cannot be resized")}
 	}
 
-	// Part 2: Validate that the changes between oldPod.Spec.Containers[].Resources and
-	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
-	// newPod.Spec.InitContainers[].Resources are allowed.
 	specPath := field.NewPath("spec")
 	if qos.GetPodQOS(oldPod) != qos.ComputePodQOS(newPod) {
 		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing"))
 	}
+
+	// Part 2: Validate that changes between pod-level resources in oldPod.Spec.Resources and
+	// newPod.Spec.Resources are allowed.
+
+	// pods with pod-level resources cannot be resized without
+	// InPlacePodLevelResourcesVerticalScaling feature gate being enabled.
+	isPodLevelResourcesSet := func(pod *core.Pod) bool {
+		return pod.Spec.Resources != nil &&
+			(len(pod.Spec.Resources.Requests)+len(pod.Spec.Resources.Limits) > 0)
+	}
+
+	originalCPUMemPodSpec := *newPod.Spec.DeepCopy()
+
+	if isPodLevelResourcesSet(oldPod) || isPodLevelResourcesSet(newPod) {
+		if !opts.InPlacePodLevelResourcesVerticalScalingEnabled {
+			return field.ErrorList{field.Forbidden(field.NewPath(""), "pods with pod-level resources is forbidden when InPlacePodLevelResourcesVerticalScalingEnabled feature gate is disabled")}
+		}
+
+		if !opts.PodLevelResourcesEnabled {
+			return field.ErrorList{field.Forbidden(field.NewPath(""), "pods with pod-level resources is forbidden when PodLevelResources feature gate is disabled")}
+		}
+
+		allErrs = append(allErrs, validatePodLevelResourcesResize(newPod, oldPod, specPath, opts)...)
+		dropCPUMemoryResourcesFromPodLevelResources(originalCPUMemPodSpec.Resources, oldPod.Spec.Resources)
+		if !apiequality.Semantic.DeepEqual(originalCPUMemPodSpec.Resources, oldPod.Spec.Resources) {
+			// This likely means that the user has made changes to resources other than CPU and memory for regular container.
+			errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
+			allErrs = append(allErrs, errs)
+		}
+	}
+
+	// Part 3: Validate that the changes between oldPod.Spec.Containers[].Resources and
+	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
+	// newPod.Spec.InitContainers[].Resources are allowed.
 
 	if !isPodResizeRequestSupported(*oldPod) {
 		allErrs = append(allErrs, field.Forbidden(specPath, "Pod running on node without support for resize"))
@@ -5712,7 +5736,6 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 
 	// Ensure that only CPU and memory resources are mutable for regular containers.
-	originalCPUMemPodSpec := *newPod.Spec.DeepCopy()
 	var newContainers []core.Container
 	for ix, container := range originalCPUMemPodSpec.Containers {
 		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix])
@@ -5759,6 +5782,81 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	return allErrs
 }
 
+// isPodLevelResourcesResizeRequestSupported checks whether the pod supports resize requests
+// by verifying if the pod is running and has pod-level resources populated.
+func isPodLevelResourcesResizeRequestSupported(pod core.Pod) bool {
+	// If pod is not running, we cannot tell whether the node supports resize
+	// at this point, so we assume it does.
+	if pod.Status.Phase != core.PodRunning {
+		return true
+	}
+
+	// Pod is running - check if pod-level resources are populated
+	// which indicates the node/kubelet supports in-place vertical scaling.
+	return pod.Status.Resources != nil
+}
+
+func validatePodLevelResourcesResize(newPod, oldPod *core.Pod, specPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	var allErrs field.ErrorList
+	if !isPodLevelResourcesResizeRequestSupported(*oldPod) {
+		allErrs = append(allErrs, field.Forbidden(specPath, "Pod running on node without support for resize"))
+	}
+
+	if resourcesRemoved(newPod.Spec.Resources.Requests, oldPod.Spec.Resources.Requests) {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("resources").Child("requests"), "resource requests cannot be removed"))
+	}
+
+	if resourcesRemoved(newPod.Spec.Resources.Limits, oldPod.Spec.Resources.Limits) {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("resources").Child("limits"), "resource limits cannot be removed"))
+	}
+
+	var memRestartPolicy core.ResourceResizeRestartPolicy
+
+	for _, container := range newPod.Spec.InitContainers {
+		for _, policy := range container.ResizePolicy {
+			if policy.ResourceName == core.ResourceMemory {
+				memRestartPolicy = policy.RestartPolicy
+				break
+			}
+		}
+
+	}
+	for _, container := range newPod.Spec.Containers {
+		for _, policy := range container.ResizePolicy {
+			if policy.ResourceName == core.ResourceMemory {
+				memRestartPolicy = policy.RestartPolicy
+				break
+			}
+		}
+	}
+
+	allErrs = append(allErrs, validateMemoryResize(memRestartPolicy, newPod.Spec, oldPod.Spec)...)
+
+	return allErrs
+}
+
+func validateMemoryResize(memRestartPolicy core.ResourceResizeRestartPolicy, newPodSpec, oldPodSpec core.PodSpec) field.ErrorList {
+	var allErrs field.ErrorList
+	fldPath := field.NewPath("spec")
+	if memRestartPolicy == core.NotRequired || memRestartPolicy == "" {
+		newLimit, hasNewLimit := newPodSpec.Resources.Limits[core.ResourceMemory]
+		oldLimit, hasOldLimit := oldPodSpec.Resources.Limits[core.ResourceMemory]
+		if hasNewLimit && hasOldLimit {
+			if newLimit.Cmp(oldLimit) < 0 {
+				allErrs = append(allErrs, field.Forbidden(
+					fldPath.Child("limits").Key(core.ResourceMemory.String()),
+					fmt.Sprintf("memory limits cannot be decreased unless resizePolicy is %s for all containers", core.RestartContainer)))
+			}
+		} else if hasNewLimit && !hasOldLimit {
+			// Adding a memory limit is implicitly decreasing the memory limit (from 'max')
+			allErrs = append(allErrs, field.Forbidden(
+				fldPath.Child("limits").Key(core.ResourceMemory.String()),
+				fmt.Sprintf("memory limits cannot be added unless resizePolicy is %s for all containers", core.RestartContainer)))
+		}
+	}
+	return allErrs
+}
+
 // validatePodResizeContainerOrdering validates container ordering for a resize request.
 // We do not allow adding, removing, re-ordering, or renaming containers on resize.
 func validatePodResizeContainerOrdering(newPod, oldPod *core.Pod, specPath *field.Path) field.ErrorList {
@@ -5784,31 +5882,37 @@ func validatePodResizeContainerOrdering(newPod, oldPod *core.Pod, specPath *fiel
 	return allErrs
 }
 
+func dropCPUMemoryUpdates(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+	if oldResourceList == nil {
+		return nil
+	}
+	var mungedResourceList core.ResourceList
+	if resourceList == nil {
+		mungedResourceList = make(core.ResourceList)
+	} else {
+		mungedResourceList = resourceList.DeepCopy()
+	}
+	delete(mungedResourceList, core.ResourceCPU)
+	delete(mungedResourceList, core.ResourceMemory)
+	if cpu, found := oldResourceList[core.ResourceCPU]; found {
+		mungedResourceList[core.ResourceCPU] = cpu
+	}
+	if mem, found := oldResourceList[core.ResourceMemory]; found {
+		mungedResourceList[core.ResourceMemory] = mem
+	}
+	return mungedResourceList
+}
+
 // dropCPUMemoryResourcesFromContainer deletes the cpu and memory resources from the container, and copies them from the old pod container resources if present.
 func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
-	dropCPUMemoryUpdates := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
-		if oldResourceList == nil {
-			return nil
-		}
-		var mungedResourceList core.ResourceList
-		if resourceList == nil {
-			mungedResourceList = make(core.ResourceList)
-		} else {
-			mungedResourceList = resourceList.DeepCopy()
-		}
-		delete(mungedResourceList, core.ResourceCPU)
-		delete(mungedResourceList, core.ResourceMemory)
-		if cpu, found := oldResourceList[core.ResourceCPU]; found {
-			mungedResourceList[core.ResourceCPU] = cpu
-		}
-		if mem, found := oldResourceList[core.ResourceMemory]; found {
-			mungedResourceList[core.ResourceMemory] = mem
-		}
-		return mungedResourceList
-	}
 	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
 	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
 	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
+}
+
+func dropCPUMemoryResourcesFromPodLevelResources(resources *core.ResourceRequirements, oldPodResources *core.ResourceRequirements) {
+	resources.Limits = dropCPUMemoryUpdates(resources.Limits, oldPodResources.Limits)
+	resources.Requests = dropCPUMemoryUpdates(resources.Requests, oldPodResources.Requests)
 }
 
 // isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.
