@@ -187,7 +187,7 @@ func (iv *itemValidator) Init(cfg Config) {
 }
 
 func (itemValidator) Name() string {
-	return "itemFieldValidator"
+	return "itemValidator"
 }
 
 var (
