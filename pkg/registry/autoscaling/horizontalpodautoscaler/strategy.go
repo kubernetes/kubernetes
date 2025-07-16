@@ -171,9 +171,9 @@ func (autoscalerStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) validation.HorizontalPodAutoscalerSpecValidationOptions {
 	opts := validation.HorizontalPodAutoscalerSpecValidationOptions{
 		MinReplicasLowerBound:           1,
-		ScaleTargetRefValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{ValidateAPIVersion: true, AllowEmptyAPIVersion: false},
+		ScaleTargetRefValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false},
 		ObjectMetricsValidationOptions: validation.CrossVersionObjectReferenceValidationOptions{
-			ValidateAPIVersion: true, AllowEmptyAPIVersion: true,
+			AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
 		},
 	}
 
@@ -182,16 +182,21 @@ func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.Hor
 		opts.MinReplicasLowerBound = 0
 	}
 
-	if oldHPA != nil && oldHPA.Spec.ScaleTargetRef.APIVersion == newHPA.Spec.ScaleTargetRef.APIVersion {
-		opts.ScaleTargetRefValidationOptions.ValidateAPIVersion = false
+	switch {
+	case oldHPA != nil && oldHPA.Spec.ScaleTargetRef.APIVersion == newHPA.Spec.ScaleTargetRef.APIVersion && oldHPA.Spec.ScaleTargetRef.Kind == newHPA.Spec.ScaleTargetRef.Kind:
+		// skip apiVersion validation on updates that don't change the kind/apiVersion.
+		opts.ScaleTargetRefValidationOptions.AllowInvalidAPIVersion = true
+	case newHPA.Spec.ScaleTargetRef.Kind == "ReplicationController":
+		// allow empty apiVersion for the only scalable type that exists in the core v1 API.
+		opts.ScaleTargetRefValidationOptions.AllowEmptyAPIGroup = true
 	}
 
 	if oldHPA != nil {
 		for _, metric := range oldHPA.Spec.Metrics {
-			if metric.Type == autoscaling.ObjectMetricSourceType {
+			if metric.Type == autoscaling.ObjectMetricSourceType && metric.Object != nil {
 				if err := validation.ValidateAPIVersion(metric.Object.DescribedObject, opts.ObjectMetricsValidationOptions); err != nil {
 					// metrics are already invalid.
-					opts.ObjectMetricsValidationOptions.ValidateAPIVersion = false
+					opts.ObjectMetricsValidationOptions.AllowInvalidAPIVersion = true
 					break
 				}
 			}

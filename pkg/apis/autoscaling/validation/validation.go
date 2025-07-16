@@ -65,10 +65,6 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 	if autoscaler.MinReplicas != nil && autoscaler.MaxReplicas < *autoscaler.MinReplicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("maxReplicas"), autoscaler.MaxReplicas, "must be greater than or equal to `minReplicas`"))
 	}
-	// ReplicationController works with empty APIVersion.
-	if autoscaler.ScaleTargetRef.Kind == "ReplicationController" {
-		opts.ScaleTargetRefValidationOptions.AllowEmptyAPIVersion = true
-	}
 	if refErrs := ValidateCrossVersionObjectReference(autoscaler.ScaleTargetRef, fldPath.Child("scaleTargetRef"), opts.ScaleTargetRefValidationOptions); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
@@ -107,14 +103,14 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 }
 
 func ValidateAPIVersion(ref autoscaling.CrossVersionObjectReference, opts CrossVersionObjectReferenceValidationOptions) error {
-	if !opts.ValidateAPIVersion {
+	if opts.AllowInvalidAPIVersion {
 		return nil
 	}
 	gv, err := schema.ParseGroupVersion(ref.APIVersion)
 	if err != nil {
 		return err
-	} else if !opts.AllowEmptyAPIVersion && (gv.Group == "" || gv.Version == "") {
-		return fmt.Errorf("apiVersion must specify both API group and version (e.g., 'apps/v1') for non-core resources")
+	} else if !opts.AllowEmptyAPIGroup && gv.Group == "" {
+		return fmt.Errorf("apiVersion must specify API group(e.g., 'apps/v1' or 'apps/') for non-core resources")
 	}
 	return nil
 }
@@ -149,9 +145,9 @@ func ValidateHorizontalPodAutoscalerStatusUpdate(newAutoscaler, oldAutoscaler *a
 // to validate CrossVersionObjectReference.
 type CrossVersionObjectReferenceValidationOptions struct {
 	// Whether to allow API Version empty
-	AllowEmptyAPIVersion bool
-	// Whether to validate APIVersion or not.
-	ValidateAPIVersion bool
+	AllowEmptyAPIGroup bool
+	// AllowInvalidAPIVersion skips APIVersion validation when true.
+	AllowInvalidAPIVersion bool
 }
 
 // HorizontalPodAutoscalerSpecValidationOptions contains the different settings for

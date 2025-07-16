@@ -32,12 +32,12 @@ var (
 		return HorizontalPodAutoscalerSpecValidationOptions{
 			MinReplicasLowerBound: minReplica,
 			ScaleTargetRefValidationOptions: CrossVersionObjectReferenceValidationOptions{
-				ValidateAPIVersion:   true,
-				AllowEmptyAPIVersion: false,
+				AllowInvalidAPIVersion: false,
+				AllowEmptyAPIGroup:     false,
 			},
 			ObjectMetricsValidationOptions: CrossVersionObjectReferenceValidationOptions{
-				ValidateAPIVersion:   true,
-				AllowEmptyAPIVersion: true,
+				AllowInvalidAPIVersion: false,
+				AllowEmptyAPIGroup:     true,
 			},
 		}
 	}
@@ -388,8 +388,9 @@ func prepareHPAWithBehavior(b autoscaling.HorizontalPodAutoscalerBehavior) autos
 		},
 		Spec: autoscaling.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-				Kind: "ReplicationController",
-				Name: "myrc",
+				APIVersion: "apps/v1",
+				Kind:       "Deployment",
+				Name:       "mydeployment",
 			},
 			MinReplicas: ptr.To[int32](1),
 			MaxReplicas: 5,
@@ -668,7 +669,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
 				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
 					Kind:       "Deployment",
-					Name:       "myrc",
+					Name:       "mydeployment",
 					APIVersion: "apps/v1",
 				},
 				MinReplicas: ptr.To[int32](1),
@@ -691,7 +692,11 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 	}
 
 	for _, successCase := range successCases {
-		if errs := ValidateHorizontalPodAutoscaler(&successCase, hpaSpecValidationOpts); len(errs) != 0 {
+		hpaOpts := hpaSpecValidationOpts
+		if successCase.Spec.ScaleTargetRef.Kind == "ReplicationController" {
+			hpaOpts.ScaleTargetRefValidationOptions.AllowEmptyAPIGroup = true
+		}
+		if errs := ValidateHorizontalPodAutoscaler(&successCase, hpaOpts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -703,7 +708,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -723,7 +728,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", APIVersion: "v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -744,7 +749,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "..", Name: "myrc"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "..", Name: "myrc", APIVersion: "v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -764,7 +769,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "..", Name: "myrc"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "..", Name: "myrc", APIVersion: "v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -785,7 +790,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -805,7 +810,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -826,27 +831,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "ReplicationController", Name: ".."},
-				MinReplicas:    ptr.To[int32](1),
-				MaxReplicas:    5,
-				Metrics: []autoscaling.MetricSpec{{
-					Type: autoscaling.ResourceMetricSourceType,
-					Resource: &autoscaling.ResourceMetricSource{
-						Name: api.ResourceCPU,
-						Target: autoscaling.MetricTarget{
-							Type:               autoscaling.UtilizationMetricType,
-							AverageUtilization: ptr.To[int32](70),
-						},
-					},
-				}},
-			},
-		},
-		msg: "scaleTargetRef.name: Invalid",
-	}, {
-		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
-			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Kind: "ReplicationController", Name: ".."},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "..", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -883,7 +868,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				}},
 			},
 		},
-		msg: "spec.scaleTargetRef.apiVersion: Invalid value: \"\": apiVersion must specify both API group and version (e.g., 'apps/v1') for non-core resources",
+		msg: "spec.scaleTargetRef.apiVersion: Invalid value: \"\": apiVersion must specify API group(e.g., 'apps/v1' or 'apps/') for non-core resources",
 	}, {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{
@@ -917,7 +902,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: metav1.NamespaceDefault,
 			},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -941,7 +926,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 				Namespace: metav1.NamespaceDefault,
 			},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -963,7 +948,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -982,7 +967,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1002,7 +987,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1023,7 +1008,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1043,7 +1028,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1064,7 +1049,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1084,7 +1069,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1105,7 +1090,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1124,7 +1109,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1144,7 +1129,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1164,7 +1149,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1185,7 +1170,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1210,7 +1195,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
-				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+				ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 				MinReplicas:    ptr.To[int32](1),
 				MaxReplicas:    5,
 				Metrics: []autoscaling.MetricSpec{{
@@ -1262,7 +1247,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1285,7 +1270,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1307,7 +1292,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1332,7 +1317,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1354,7 +1339,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1377,7 +1362,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1400,7 +1385,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1424,7 +1409,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1447,7 +1432,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1469,7 +1454,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1488,7 +1473,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{
@@ -1501,7 +1486,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1514,7 +1499,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "mydeployment", Kind: "Deployment", APIVersion: "apps/v1"},
 					MinReplicas:    ptr.To[int32](1),
 					MaxReplicas:    5,
 					Metrics: []autoscaling.MetricSpec{{
@@ -1547,7 +1532,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %q", c.msg)
 		} else if !strings.Contains(errs[0].Error(), c.msg) {
-			t.Errorf("unexpected error:\n  expected: %q\n       got: %q", c.msg, errs[0])
+			t.Errorf("unexpected error:\n  expected: %q\n  got: %q", c.msg, errs[0])
 		}
 	}
 
@@ -1585,8 +1570,9 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 		autoscaling.ObjectMetricSourceType: {
 			Object: &autoscaling.ObjectMetricSource{
 				DescribedObject: autoscaling.CrossVersionObjectReference{
-					Kind: "ReplicationController",
-					Name: "myrc",
+					Kind:       "Deployment",
+					Name:       "mydeployment",
+					APIVersion: "apps/v1",
 				},
 				Metric: autoscaling.MetricIdentifier{
 					Name: "somemetric",
@@ -1610,9 +1596,13 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 			errs := ValidateHorizontalPodAutoscaler(&autoscaling.HorizontalPodAutoscaler{
 				ObjectMeta: metav1.ObjectMeta{Name: "myautoscaler", Namespace: metav1.NamespaceDefault},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
-					MinReplicas:    ptr.To[int32](1),
-					MaxReplicas:    5, Metrics: []autoscaling.MetricSpec{spec},
+					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+						Kind:       "Deployment",
+						Name:       "mydeployment",
+						APIVersion: "apps/v1",
+					},
+					MinReplicas: ptr.To[int32](1),
+					MaxReplicas: 5, Metrics: []autoscaling.MetricSpec{spec},
 				},
 			}, hpaSpecValidationOpts)
 
@@ -1640,8 +1630,9 @@ func prepareMinReplicasCases(t *testing.T, minReplicas int32) []autoscaling.Hori
 		},
 		Spec: autoscaling.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-				Kind: "ReplicationController",
-				Name: "myrc",
+				Kind:       "Deployment",
+				Name:       "mydeployment",
+				APIVersion: "apps/v1",
 			},
 			MinReplicas: ptr.To[int32](minReplicas),
 			MaxReplicas: 5,
@@ -1670,8 +1661,9 @@ func prepareMinReplicasCases(t *testing.T, minReplicas int32) []autoscaling.Hori
 		},
 		Spec: autoscaling.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-				Kind: "ReplicationController",
-				Name: "myrc",
+				Kind:       "Deployment",
+				Name:       "mydeployment",
+				APIVersion: "apps/v1",
 			},
 			MinReplicas: ptr.To[int32](minReplicas),
 			MaxReplicas: 5,
@@ -1981,10 +1973,10 @@ func TestValidateHorizontalPodAutoscalerUpdateInvalidHPA(t *testing.T) {
 	opts := HorizontalPodAutoscalerSpecValidationOptions{
 		MinReplicasLowerBound: 0,
 		ScaleTargetRefValidationOptions: CrossVersionObjectReferenceValidationOptions{
-			ValidateAPIVersion: false,
+			AllowInvalidAPIVersion: true,
 		},
 		ObjectMetricsValidationOptions: CrossVersionObjectReferenceValidationOptions{
-			ValidateAPIVersion: false,
+			AllowInvalidAPIVersion: true,
 		},
 	}
 	modifiedHPAReplicasChanged := existingHPA.DeepCopy()
@@ -1996,14 +1988,14 @@ func TestValidateHorizontalPodAutoscalerUpdateInvalidHPA(t *testing.T) {
 
 	modifiedHPAMetricsChanged := existingHPA.DeepCopy()
 	modifiedHPAMetricsChanged.Spec.Metrics[0].Object.DescribedObject.APIVersion = "invalidAPIVersion/v1/v3"
-	opts.ObjectMetricsValidationOptions.ValidateAPIVersion = true
+	opts.ObjectMetricsValidationOptions.AllowInvalidAPIVersion = false
 	if errs := ValidateHorizontalPodAutoscalerUpdate(modifiedHPAMetricsChanged, &existingHPA, opts); len(errs) == 0 {
 		t.Error("expected error, APIVersion should be checked")
 	}
 
 	modifiedHPAScaleRefChanged := existingHPA.DeepCopy()
 	modifiedHPAScaleRefChanged.Spec.ScaleTargetRef.APIVersion = "invalidAPIVersion/v1/v4"
-	opts.ScaleTargetRefValidationOptions.ValidateAPIVersion = true
+	opts.ScaleTargetRefValidationOptions.AllowInvalidAPIVersion = false
 	if errs := ValidateHorizontalPodAutoscalerUpdate(modifiedHPAScaleRefChanged, &existingHPA, opts); len(errs) == 0 {
 		t.Error("expected error, APIVersion should be checked")
 	}

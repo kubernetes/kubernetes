@@ -25,6 +25,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -118,15 +119,15 @@ func TestValidateOptionsScaleToZeroDisabled(t *testing.T) {
 }
 
 func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
-	hpa := func(minReplicas int32, scaleTargetAPIVersion string, metrics []autoscaling.MetricSpec) *autoscaling.HorizontalPodAutoscaler {
+	hpa := func(minReplicas int32, scaleTargetAPIVersion string, scaleTargetKind string, metrics []autoscaling.MetricSpec) *autoscaling.HorizontalPodAutoscaler {
 		return &autoscaling.HorizontalPodAutoscaler{
 			ObjectMeta: metav1.ObjectMeta{Name: "myhpa", Namespace: "default"},
 			Spec: autoscaling.HorizontalPodAutoscalerSpec{
 				MinReplicas: &minReplicas,
 				MaxReplicas: 5,
 				ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-					Kind:       "ReplicationController",
-					Name:       "myrc",
+					Kind:       scaleTargetKind,
+					Name:       "name",
 					APIVersion: scaleTargetAPIVersion,
 				},
 				Metrics: metrics,
@@ -158,115 +159,214 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                      string
-		newHPA                    *autoscaling.HorizontalPodAutoscaler
-		oldHPA                    *autoscaling.HorizontalPodAutoscaler
-		scaleToZeroEnabled        bool
-		expectMinReplicasLower    int32
-		expectScaleTargetValidate bool
-		expectMetricsValidate     bool
+		name                               string
+		newHPA                             *autoscaling.HorizontalPodAutoscaler
+		oldHPA                             *autoscaling.HorizontalPodAutoscaler
+		scaleToZeroEnabled                 bool
+		expectMinReplicasLower             int32
+		expectScaleTargetRefValidationOpts validation.CrossVersionObjectReferenceValidationOptions
+		expectMetricsValidationOpts        validation.CrossVersionObjectReferenceValidationOptions
 	}{
 		// MinReplicasLowerBound tests
 		{
-			name:                      "scale to zero disabled, no old hpa",
-			newHPA:                    hpa(1, "", nil),
-			oldHPA:                    nil,
-			scaleToZeroEnabled:        false,
-			expectMinReplicasLower:    1,
-			expectScaleTargetValidate: true,
-			expectMetricsValidate:     true,
+			name:                   "scale to zero disabled, no old hpa",
+			newHPA:                 hpa(1, "apps/v1", "Deployment", nil),
+			oldHPA:                 nil,
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
 		},
 		{
-			name:                      "scale to zero disabled, old hpa has minReplicas=1",
-			newHPA:                    hpa(1, "", nil),
-			oldHPA:                    hpa(1, "", nil),
-			scaleToZeroEnabled:        false,
-			expectMinReplicasLower:    1,
-			expectScaleTargetValidate: false,
-			expectMetricsValidate:     true,
+			name:                   "scale to zero disabled, old hpa has minReplicas=1",
+			newHPA:                 hpa(1, "apps/v1", "Deployment", nil),
+			oldHPA:                 hpa(1, "apps/v1", "Deployment", nil),
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
 		},
 		{
-			name:                      "scale to zero disabled, old hpa has minReplicas=0",
-			newHPA:                    hpa(0, "", nil),
-			oldHPA:                    hpa(0, "", nil),
-			scaleToZeroEnabled:        false,
-			expectMinReplicasLower:    0,
-			expectScaleTargetValidate: false,
-			expectMetricsValidate:     true,
+			name:                   "scale to zero disabled, old hpa has minReplicas=0",
+			newHPA:                 hpa(0, "apps/v1", "Deployment", nil),
+			oldHPA:                 hpa(0, "apps/v1", "Deployment", nil),
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 0,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
 		},
 		{
-			name:                      "scale to zero enabled",
-			newHPA:                    hpa(1, "", nil),
-			oldHPA:                    nil,
-			scaleToZeroEnabled:        true,
-			expectMinReplicasLower:    0,
-			expectScaleTargetValidate: true,
-			expectMetricsValidate:     true,
+			name:                   "scale to zero enabled",
+			newHPA:                 hpa(0, "apps/v1", "Deployment", nil),
+			oldHPA:                 nil,
+			scaleToZeroEnabled:     true,
+			expectMinReplicasLower: 0,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
 		},
 		// ScaleTargetRefValidationOptions tests
 		{
-			name:                      "scale target ref api version changed",
-			newHPA:                    hpa(1, "apps/v1", nil),
-			oldHPA:                    hpa(1, "extensions/v1beta1", nil),
-			scaleToZeroEnabled:        false,
-			expectMinReplicasLower:    1,
-			expectScaleTargetValidate: true,
-			expectMetricsValidate:     true,
+			name:                   "ReplicationController with the legacy API Version",
+			newHPA:                 hpa(1, "", "ReplicationController", nil),
+			oldHPA:                 nil,
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
 		},
 		{
-			name:                      "scale target ref api version unchanged",
-			newHPA:                    hpa(1, "apps/v1", nil),
-			oldHPA:                    hpa(1, "apps/v1", nil),
-			scaleToZeroEnabled:        false,
-			expectMinReplicasLower:    1,
-			expectScaleTargetValidate: false,
-			expectMetricsValidate:     true,
+			name:                   "scale target ref api version changed",
+			newHPA:                 hpa(1, "apps/v1", "Deployment", nil),
+			oldHPA:                 hpa(1, "extensions/v1beta1", "RandomCR", nil),
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
+		},
+		{
+			name:                   "scale target ref api version unchanged",
+			newHPA:                 hpa(1, "apps/v1", "", nil),
+			oldHPA:                 hpa(1, "apps/v1", "", nil),
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
+		},
+		{
+			name:                   "scale target ref api and Kind are changed to ReplicationController",
+			newHPA:                 hpa(1, "", "ReplicationController", nil),
+			oldHPA:                 hpa(1, "apps/v1", "Deployment", nil),
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
+		},
+		{
+			name:                   "Kind changed",
+			newHPA:                 hpa(1, "apps/v1", "CronJobs", nil),
+			oldHPA:                 hpa(1, "apps/v1", "Deployment", nil),
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
 		},
 		// MetricsValidationOptions tests
 		{
-			name:                      "no metrics",
-			newHPA:                    hpa(1, "", nil),
-			oldHPA:                    nil,
-			scaleToZeroEnabled:        false,
-			expectMinReplicasLower:    1,
-			expectScaleTargetValidate: true,
-			expectMetricsValidate:     true,
+			name:                   "no metrics",
+			newHPA:                 hpa(1, "apps/v1", "Deployment", nil),
+			oldHPA:                 nil,
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
 		},
 		{
-			name:                      "non-object metric",
-			newHPA:                    hpa(1, "", []autoscaling.MetricSpec{podsMetric}),
-			oldHPA:                    nil,
-			scaleToZeroEnabled:        false,
-			expectMinReplicasLower:    1,
-			expectScaleTargetValidate: true,
-			expectMetricsValidate:     true,
+			name:                   "non-object metric",
+			newHPA:                 hpa(1, "", "", []autoscaling.MetricSpec{podsMetric}),
+			oldHPA:                 nil,
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
 		},
 		{
-			name:                      "new object metric with valid api version",
-			newHPA:                    hpa(1, "", []autoscaling.MetricSpec{objectMetric("apps/v1")}),
-			oldHPA:                    nil,
-			scaleToZeroEnabled:        false,
-			expectMinReplicasLower:    1,
-			expectScaleTargetValidate: true,
-			expectMetricsValidate:     true,
+			name:                   "new object metric with valid api version",
+			newHPA:                 hpa(1, "", "", []autoscaling.MetricSpec{objectMetric("apps/v1")}),
+			oldHPA:                 nil,
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
 		},
 		{
-			name:                      "old object metric with invalid api version",
-			newHPA:                    hpa(1, "", []autoscaling.MetricSpec{objectMetric("apps/v1/v3")}),
-			oldHPA:                    hpa(2, "", []autoscaling.MetricSpec{objectMetric("apps/v1/v2")}),
-			scaleToZeroEnabled:        false,
-			expectMinReplicasLower:    1,
-			expectScaleTargetValidate: false,
-			expectMetricsValidate:     false,
+			name:                   "old object metric with invalid api version",
+			newHPA:                 hpa(1, "apps/v1", "Deployment", []autoscaling.MetricSpec{objectMetric("apps/v1/v3")}),
+			oldHPA:                 hpa(2, "apps/v1", "Deployment", []autoscaling.MetricSpec{objectMetric("apps/v1/v2")}),
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: true, AllowEmptyAPIGroup: true,
+			},
 		},
 		{
-			name:                      "new object metric with invalid api version",
-			newHPA:                    hpa(1, "", []autoscaling.MetricSpec{objectMetric("apps/v1/v2")}),
-			oldHPA:                    nil,
-			scaleToZeroEnabled:        false,
-			expectMinReplicasLower:    1,
-			expectScaleTargetValidate: true,
-			expectMetricsValidate:     true,
+			name:                   "new object metric with invalid api version",
+			newHPA:                 hpa(1, "", "", []autoscaling.MetricSpec{objectMetric("apps/v1/v2")}),
+			oldHPA:                 nil,
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
+		},
+		{
+			name: "nil object Metrics",
+			newHPA: hpa(1, "", "", []autoscaling.MetricSpec{{
+				Type:   autoscaling.ObjectMetricSourceType,
+				Object: nil,
+			}}),
+			oldHPA:                 nil,
+			scaleToZeroEnabled:     false,
+			expectMinReplicasLower: 1,
+			expectScaleTargetRefValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: false,
+			},
+			expectMetricsValidationOpts: validation.CrossVersionObjectReferenceValidationOptions{
+				AllowInvalidAPIVersion: false, AllowEmptyAPIGroup: true,
+			},
 		},
 	}
 
@@ -278,12 +378,13 @@ func TestValidationOptionsForHorizontalPodAutoscaler(t *testing.T) {
 			if opts.MinReplicasLowerBound != tc.expectMinReplicasLower {
 				t.Errorf("expected MinReplicasLowerBound %d, got %d", tc.expectMinReplicasLower, opts.MinReplicasLowerBound)
 			}
-			if opts.ScaleTargetRefValidationOptions.ValidateAPIVersion != tc.expectScaleTargetValidate {
-				t.Errorf("expected ScaleTargetRefValidationOptions.ValidateAPIVersion to be %v, got %v", tc.expectScaleTargetValidate, opts.ScaleTargetRefValidationOptions.ValidateAPIVersion)
+			if opts.ScaleTargetRefValidationOptions != tc.expectScaleTargetRefValidationOpts {
+				t.Errorf("expected ScaleTargetRefValidationOptions %v, got %v", tc.expectScaleTargetRefValidationOpts, opts.ScaleTargetRefValidationOptions)
 			}
-			if opts.ObjectMetricsValidationOptions.ValidateAPIVersion != tc.expectMetricsValidate {
-				t.Errorf("expected MetricsValidationOptions.ValidateAPIVersion to be %v, got %v", tc.expectMetricsValidate, opts.ObjectMetricsValidationOptions.ValidateAPIVersion)
+			if opts.ObjectMetricsValidationOptions != tc.expectMetricsValidationOpts {
+				t.Errorf("expected ObjectMetricsValidationOptions %v, got %v", tc.expectMetricsValidationOpts, opts.ObjectMetricsValidationOptions)
 			}
+
 		})
 	}
 }
