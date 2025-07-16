@@ -19,6 +19,7 @@ package ktesting
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"k8s.io/klog/v2"
 )
@@ -35,10 +36,12 @@ import (
 // Multiple different prefixes get concatenated with a colon.
 func WithStep(tCtx TContext, what string) TContext {
 	sCtx := &stepContext{
-		TContext: tCtx,
-		what:     what,
+		TContext:  WithLogger(tCtx, klog.LoggerWithName(tCtx.Logger(), what)),
+		parentCtx: tCtx,
+		what:      what,
+		start:     time.Now(),
 	}
-	return WithLogger(sCtx, klog.LoggerWithName(sCtx.Logger(), what))
+	return sCtx
 }
 
 // Step is useful when the context with the step information is
@@ -59,9 +62,38 @@ func Step(tCtx TContext, what string, cb func(tCtx TContext)) {
 	cb(WithStep(tCtx, what))
 }
 
+// Begin and End can be used instead of Step to execute some instructions
+// with a new context without using a callback method. This is useful
+// when some local variables need to be set which are read later one.
+// Log entries document the start and end of the step, including its duration.
+//
+//	tCtx = ktesting.Begin(tCtx, "step 1")
+//	.. do something with tCtx
+//	tCtx = ktesting.End(tCtx)
+func Begin(tCtx TContext, what string) TContext {
+	tCtx.Helper()
+	tCtx = WithStep(tCtx, what)
+	tCtx.Log("Starting...")
+	return tCtx
+}
+
+// End complements Begin and returns the original context that was passed to Begin.
+// It must be called on the context returned by Begin.
+func End(tCtx TContext) TContext {
+	tCtx.Helper()
+	sCtx, ok := tCtx.(*stepContext)
+	if !ok {
+		tCtx.Fatalf("expected result of Begin, got instead %T", tCtx)
+	}
+	tCtx.Logf("Done, duration %s", time.Since(sCtx.start))
+	return sCtx.parentCtx
+}
+
 type stepContext struct {
 	TContext
-	what string
+	parentCtx TContext
+	what      string
+	start     time.Time
 }
 
 func (sCtx *stepContext) Log(args ...any) {

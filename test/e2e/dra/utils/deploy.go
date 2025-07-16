@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dra
+package utils
 
 import (
 	"bytes"
@@ -25,6 +25,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"os"
 	"path"
 	"sort"
 	"strings"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery/cached/memory"
 	resourceapiinformer "k8s.io/client-go/informers/resource/v1beta2"
@@ -61,6 +63,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
+	"k8s.io/kubernetes/test/e2e/dra/test-driver/deploy/example"
 	testdrivergomega "k8s.io/kubernetes/test/e2e/dra/test-driver/gomega"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -68,6 +71,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -81,9 +85,6 @@ type Nodes struct {
 	NodeNames []string
 	tempDir   string
 }
-
-//go:embed test-driver/deploy/example/plugin-permissions.yaml
-var pluginPermissions string
 
 // NewNodes selects nodes to run the test on.
 //
@@ -237,7 +238,7 @@ func (d *Driver) NewGetSlices() framework.GetFunc[*resourceapi.ResourceSliceList
 }
 
 type MethodInstance struct {
-	Nodename   string
+	NodeName   string
 	FullMethod string
 }
 
@@ -272,6 +273,11 @@ type Driver struct {
 	// Nodes contains entries for each node selected for a test when the test runs.
 	// In addition, there is one entry for a fictional node.
 	Nodes map[string]KubeletPlugin
+
+	// IsLocal can be set to true when using local-up-cluster.sh *and* ensuring
+	// that /var/lib/kubelet/plugins, /var/lib/kubelet/plugins_registry and
+	// /var/run/cdi are writable by the current user.
+	IsLocal bool
 
 	NodeV1alpha4 bool
 	NodeV1beta1  bool
@@ -360,7 +366,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 
 	// Create service account and corresponding RBAC rules.
 	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + d.InstanceSuffix + "-service-account"
-	content := pluginPermissions
+	content := example.PluginPermissions
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin-namespace", d.f.Namespace.Name)
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name+d.InstanceSuffix)
 	d.createFromYAML(ctx, []byte(content), d.f.Namespace.Name)
@@ -399,10 +405,19 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 					},
 				},
 			}
-			item.Spec.Template.Spec.Volumes[0].HostPath.Path = pluginDataDirectoryPath
-			item.Spec.Template.Spec.Volumes[1].HostPath.Path = registrarDirectoryPath
-			item.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath = pluginDataDirectoryPath
-			item.Spec.Template.Spec.Containers[0].VolumeMounts[1].MountPath = registrarDirectoryPath
+			if d.IsLocal {
+				// Drop mounting of directories. All operations run locally.
+				item.Spec.Template.Spec.Volumes = nil
+				item.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+				// No privileges required either.
+				item.Spec.Template.Spec.SecurityContext = nil
+				item.Spec.Template.Spec.Containers[0].SecurityContext = nil
+			} else {
+				item.Spec.Template.Spec.Volumes[0].HostPath.Path = pluginDataDirectoryPath
+				item.Spec.Template.Spec.Volumes[1].HostPath.Path = registrarDirectoryPath
+				item.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath = pluginDataDirectoryPath
+				item.Spec.Template.Spec.Containers[0].VolumeMounts[1].MountPath = registrarDirectoryPath
+			}
 		}
 		return nil
 	}, manifests...)
@@ -442,17 +457,34 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 		// https://github.com/kubernetes/kubernetes/pull/124711).
 		//
 		// Here we merely use impersonation, which is faster.
-		driverClient := d.impersonateKubeletPlugin(&pod)
+		driverClient := d.ImpersonateKubeletPlugin(&pod)
 
 		logger := klog.LoggerWithValues(klog.LoggerWithName(logger, "kubelet-plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		loggerCtx := klog.NewContext(ctx, logger)
 		fileOps := app.FileOperations{
 			Create: func(name string, content []byte) error {
 				klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
+				if d.IsLocal {
+					// Name starts with /cdi, which is how it is mapped in the container.
+					// Here we need it under /var/run.
+					// Try to create /var/run/cdi, it might not exist yet.
+					name = path.Join("/var/run", name)
+					if err := os.MkdirAll(path.Dir(name), 0700); err != nil {
+						return fmt.Errorf("create CDI directory: %w", err)
+					}
+					if err := os.WriteFile(name, content, 0644); err != nil {
+						return fmt.Errorf("write CDI file: %w", err)
+					}
+					return nil
+				}
 				return d.createFile(&pod, name, content)
 			},
 			Remove: func(name string) error {
 				klog.Background().Info("deleting CDI file", "node", nodename, "filename", name)
+				if d.IsLocal {
+					name = path.Join("/var/run", name)
+					return os.Remove(name)
+				}
 				return d.removeFile(&pod, name)
 			},
 			ErrorHandler: func(ctx context.Context, err error, msg string) {
@@ -486,6 +518,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 			// serialize when we explicitly want to test a rolling update.
 			serialize = false
 		}
+
 		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename, fileOps,
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
@@ -542,7 +575,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
 }
 
-func (d *Driver) impersonateKubeletPlugin(pod *v1.Pod) kubernetes.Interface {
+func (d *Driver) ImpersonateKubeletPlugin(pod *v1.Pod) kubernetes.Interface {
 	ginkgo.GinkgoHelper()
 	driverUserInfo := (&serviceaccount.ServiceAccountInfo{
 		Name:      d.serviceAccountName,
@@ -647,11 +680,21 @@ var errListenerDone = errors.New("listener is shutting down")
 // listen returns the function which the kubeletplugin helper needs to open a listening socket.
 // For that it spins up hostpathplugin in the pod for the desired node
 // and connects to hostpathplugin via port forwarding.
-func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path string) (net.Listener, error) {
-	return func(ctx context.Context, path string) (l net.Listener, e error) {
+func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, endpoint string) (net.Listener, error) {
+	return func(ctx context.Context, endpoint string) (l net.Listener, e error) {
 		// No need create sockets, the kubelet is not expected to use them.
 		if !d.WithKubelet {
 			return newNullListener(), nil
+		}
+
+		// Try opening the socket directly on the local host. Falls back to pod if that fails.
+		// Closing the listener will unlink the socket.
+		if d.IsLocal {
+			dir := path.Dir(endpoint)
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return nil, err
+			}
+			return net.ListenUnix("unix", &net.UnixAddr{Name: endpoint, Net: "unix"})
 		}
 
 		// "Allocate" a new port by by bumping the per-pod counter by one.
@@ -659,7 +702,7 @@ func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path
 
 		logger := klog.FromContext(ctx)
 		logger = klog.LoggerWithName(logger, "socket-listener")
-		logger = klog.LoggerWithValues(logger, "endpoint", path, "port", port)
+		logger = klog.LoggerWithValues(logger, "endpoint", endpoint, "port", port)
 		ctx = klog.NewContext(ctx, logger)
 
 		// Start hostpathplugin in proxy mode and keep it running until the listener gets closed.
@@ -673,7 +716,7 @@ func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path
 				Command: []string{
 					"/hostpathplugin",
 					"--v=5",
-					"--endpoint=" + path,
+					"--endpoint=" + endpoint,
 					fmt.Sprintf("--proxy-endpoint=tcp://:%d", port),
 				},
 				Stdout: true,
@@ -688,13 +731,26 @@ func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path
 			cmdCtx := klog.NewContext(cmdCtx, cmdLogger)
 			logger.V(1).Info("Starting...")
 			defer logger.V(1).Info("Stopped")
-			if err := execute(cmdCtx, req.URL(), d.f.ClientConfig(), 5); err != nil {
+
+			// This may fail temporarily, which is recoverable by executing again.
+			delayFn := wait.Backoff{
+				Duration: time.Second,
+				Cap:      30 * time.Second,
+				Steps:    30,
+				Factor:   2.0,
+				Jitter:   1.0,
+			}.DelayWithReset(clock.RealClock{}, 5*time.Minute)
+			runHostpathPlugin := func(ctx context.Context) (bool, error) {
 				// errors.Is(err, listenerDoneErr) would be nicer, but we don't get
 				// that error from remotecommand. Instead forgo logging when we already shut down.
-				if cmdCtx.Err() == nil {
-					logger.Error(err, "execution failed")
+				if err := execute(ctx, req.URL(), d.f.ClientConfig(), 5); err != nil && ctx.Err() == nil {
+					klog.FromContext(ctx).V(5).Info("execution failed, will retry", "err", err)
 				}
+				// There is no reason to stop except for context cancellation =>
+				// condition always false, no fatal errors.
+				return false, nil
 			}
+			_ = delayFn.Until(cmdCtx, true /* immediate */, true /* sliding */, runHostpathPlugin)
 
 			// Killing hostpathplugin does not remove the socket. Need to do that manually.
 			req := d.f.ClientSet.CoreV1().RESTClient().Post().
@@ -707,7 +763,7 @@ func (d *Driver) listen(pod *v1.Pod, port *int32) func(ctx context.Context, path
 					Command: []string{
 						"rm",
 						"-f",
-						path,
+						endpoint,
 					},
 					Stdout: true,
 					Stderr: true,
