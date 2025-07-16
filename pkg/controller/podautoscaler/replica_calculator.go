@@ -469,8 +469,8 @@ func calculateRequests(pods []*v1.Pod, container string, resource v1.ResourceNam
 		// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/2837-pod-level-resource-spec/README.md
 		usePodLevelRequests := podLevelResourcesEnabled &&
 			resourcehelpers.IsPodLevelRequestsSet(pod) &&
-			// If a container name is specified, it does not make sense to
-			// use pod-level requests.
+			// If a container name is specified in the HPA, it takes precedence over
+			// the pod-level requests.
 			container == ""
 
 		if usePodLevelRequests {

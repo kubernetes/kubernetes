@@ -2269,7 +2269,7 @@ func TestCalculateRequests(t *testing.T) {
 			expectedError:    nil,
 		},
 		{
-			name:                    "Sum container requests if pod-level resources is not set",
+			name:                    "Pod-level resources are enabled, but not set: fallback to sum container requests",
 			enablePodLevelResources: true,
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2289,7 +2289,7 @@ func TestCalculateRequests(t *testing.T) {
 			expectedError:    nil,
 		},
 		{
-			name:                    "Use pod-level resources if available and feature is enabled",
+			name:                    "Pod-level resources override container requests when feature enabled and pod resources specified",
 			enablePodLevelResources: true,
 			pods: []*v1.Pod{{
 
@@ -2332,7 +2332,7 @@ func TestCalculateRequests(t *testing.T) {
 			expectedError:    fmt.Errorf("missing request for %s in container %s of Pod %s", v1.ResourceCPU, "container1", testPod),
 		},
 		{
-			name:                    "Use pod-level requests even when missing container requests if pod-level feature/requests are set",
+			name:                    "Pod-level resources override missing container requests when feature enabled and pod resources specified",
 			enablePodLevelResources: true,
 			pods: []*v1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{

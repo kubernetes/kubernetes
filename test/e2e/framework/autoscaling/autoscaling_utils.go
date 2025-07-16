@@ -131,9 +131,9 @@ type ResourceConsumer struct {
 }
 
 // NewDynamicResourceConsumer is a wrapper to create a new dynamic ResourceConsumer
-func NewDynamicResourceConsumer(ctx context.Context, name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, enableSidecar SidecarStatusType, sidecarType SidecarWorkloadType) *ResourceConsumer {
+func NewDynamicResourceConsumer(ctx context.Context, name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, enableSidecar SidecarStatusType, sidecarType SidecarWorkloadType, podResources *v1.ResourceRequirements) *ResourceConsumer {
 	return newResourceConsumer(ctx, name, nsName, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
-		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, scaleClient, nil, nil, enableSidecar, sidecarType)
+		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, scaleClient, nil, nil, enableSidecar, sidecarType, podResources)
 }
 
 // getSidecarContainer returns sidecar container
@@ -171,7 +171,7 @@ memLimit argument is in megabytes, memLimit is a maximum amount of memory that c
 cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
 func newResourceConsumer(ctx context.Context, name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, consumptionTimeInSeconds, requestSizeInMillicores,
-	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, podAnnotations, serviceAnnotations map[string]string, sidecarStatus SidecarStatusType, sidecarType SidecarWorkloadType) *ResourceConsumer {
+	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, podAnnotations, serviceAnnotations map[string]string, sidecarStatus SidecarStatusType, sidecarType SidecarWorkloadType, podResources *v1.ResourceRequirements) *ResourceConsumer {
 	if podAnnotations == nil {
 		podAnnotations = make(map[string]string)
 	}
@@ -194,7 +194,7 @@ func newResourceConsumer(ctx context.Context, name, nsName string, kind schema.G
 	framework.ExpectNoError(err)
 	resourceClient := dynamicClient.Resource(schema.GroupVersionResource{Group: crdGroup, Version: crdVersion, Resource: crdNamePlural}).Namespace(nsName)
 
-	runServiceAndWorkloadForResourceConsumer(ctx, clientset, resourceClient, apiExtensionClient, nsName, name, kind, replicas, cpuLimit, memLimit, podAnnotations, serviceAnnotations, additionalContainers)
+	runServiceAndWorkloadForResourceConsumer(ctx, clientset, resourceClient, apiExtensionClient, nsName, name, kind, replicas, cpuLimit, memLimit, podAnnotations, serviceAnnotations, additionalContainers, podResources)
 	controllerName := name + "-ctrl"
 	// If sidecar is enabled and busy, run service and consumer for sidecar
 	if sidecarStatus == Enable && sidecarType == Busy {
@@ -617,7 +617,7 @@ func runServiceAndSidecarForResourceConsumer(ctx context.Context, c clientset.In
 		ctx, c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
 }
 
-func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.Interface, resourceClient dynamic.ResourceInterface, apiExtensionClient crdclientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string, additionalContainers []v1.Container) {
+func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.Interface, resourceClient dynamic.ResourceInterface, apiExtensionClient crdclientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string, additionalContainers []v1.Container, podResources *v1.ResourceRequirements) {
 	ginkgo.By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
 	_, err := createService(ctx, c, name, ns, serviceAnnotations, map[string]string{"name": name}, port, targetPort)
 	framework.ExpectNoError(err)
@@ -629,12 +629,15 @@ func runServiceAndWorkloadForResourceConsumer(ctx context.Context, c clientset.I
 		Namespace:            ns,
 		Timeout:              timeoutRC,
 		Replicas:             replicas,
-		CpuRequest:           cpuLimitMillis,
-		CpuLimit:             cpuLimitMillis,
+		CPURequest:           cpuLimitMillis,
+		CPULimit:             cpuLimitMillis,
 		MemRequest:           memLimitMb * 1024 * 1024, // MemLimit is in bytes
 		MemLimit:             memLimitMb * 1024 * 1024,
 		Annotations:          podAnnotations,
 		AdditionalContainers: additionalContainers,
+	}
+	if podResources != nil {
+		rcConfig.PodResources = podResources.DeepCopy()
 	}
 
 	dpConfig := testutils.DeploymentConfig{
