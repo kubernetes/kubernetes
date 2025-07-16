@@ -42,13 +42,13 @@ func TestZeroOrOneOfUnion(t *testing.T) {
 			name:        "two members set",
 			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
 			fieldValues: []bool{false, true, false, true},
-			expected:    field.ErrorList{field.Invalid(nil, "{b, d}", "must specify at most one of: `a`, `b`, `c`, `d`")},
+			expected:    field.ErrorList{field.Invalid(nil, "{b, d}", "must specify at most one of: `a`, `b`, `c`, `d`").WithOrigin("zeroOrOneOf")},
 		},
 		{
 			name:        "all members set",
 			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
 			fieldValues: []bool{true, true, true, true},
-			expected:    field.ErrorList{field.Invalid(nil, "{a, b, c, d}", "must specify at most one of: `a`, `b`, `c`, `d`")},
+			expected:    field.ErrorList{field.Invalid(nil, "{a, b, c, d}", "must specify at most one of: `a`, `b`, `c`, `d`").WithOrigin("zeroOrOneOf")},
 		},
 		{
 			name:        "no member set - allowed for ZeroOrOneOf",
@@ -113,7 +113,7 @@ func TestZeroOrOneOfUnionRatcheting(t *testing.T) {
 				M2: &m2{},
 			},
 			expected: field.ErrorList{
-				field.Invalid(nil, "{m1, m2}", "must specify at most one of: `m1`, `m2`"),
+				field.Invalid(nil, "{m1, m2}", "must specify at most one of: `m1`, `m2`").WithOrigin("zeroOrOneOf"),
 			},
 		},
 		{

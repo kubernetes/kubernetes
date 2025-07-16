@@ -45,7 +45,7 @@ func ZeroOrOneOfUnion[T any](_ context.Context, op operation.Operation, fldPath 
 		ErrorForEmpty: nil,
 		ErrorForMultiple: func(fldPath *field.Path, specifiedFields []string, allFields []string) *field.Error {
 			return field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(specifiedFields, ", ")),
-				fmt.Sprintf("must specify at most one of: %s", strings.Join(allFields, ", ")))
+				fmt.Sprintf("must specify at most one of: %s", strings.Join(allFields, ", "))).WithOrigin("zeroOrOneOf")
 		},
 	}
 

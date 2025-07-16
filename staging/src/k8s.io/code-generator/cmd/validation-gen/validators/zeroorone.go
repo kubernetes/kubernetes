@@ -30,31 +30,32 @@ func init() {
 	// ZeroOrOneOf unions are comprised of multiple tags, which need to share information
 	// between them.  The tags are on struct fields, but the validation
 	// actually pertains to the struct itself.
-	shared := map[*types.Type]unions{}
-	RegisterTypeValidator(zeroOrOneOfTypeValidator{shared})
+	shared := map[string]unions{}
+	RegisterTypeValidator(zeroOrOneOfTypeOrFieldValidator{shared})
+	RegisterFieldValidator(zeroOrOneOfTypeOrFieldValidator{shared})
 	RegisterTagValidator(zeroOrOneOfMemberTagValidator{shared})
 }
 
-type zeroOrOneOfTypeValidator struct {
-	shared map[*types.Type]unions
+type zeroOrOneOfTypeOrFieldValidator struct {
+	shared map[string]unions
 }
 
-func (zeroOrOneOfTypeValidator) Init(_ Config) {}
+func (zeroOrOneOfTypeOrFieldValidator) Init(_ Config) {}
 
-func (zeroOrOneOfTypeValidator) Name() string {
-	return "zeroOrOneOfTypeValidator"
+func (zeroOrOneOfTypeOrFieldValidator) Name() string {
+	return "zeroOrOneOfTypeOrFieldValidator"
 }
 
-func (ztv zeroOrOneOfTypeValidator) GetValidations(context Context) (Validations, error) {
+func (ztfv zeroOrOneOfTypeOrFieldValidator) GetValidations(context Context) (Validations, error) {
 	// Gengo does not treat struct definitions as aliases, which is
 	// inconsistent but unlikely to change. That means we don't REALLY need to
 	// handle it here, but let's be extra careful and extract the most concrete
 	// type possible.
-	if util.NonPointer(util.NativeType(context.Type)).Kind != types.Struct {
+	if k := util.NonPointer(util.NativeType(context.Type)).Kind; k != types.Struct && k != types.Slice {
 		return Validations{}, nil
 	}
 
-	unions := ztv.shared[context.Type]
+	unions := ztfv.shared[context.Path.String()]
 	if len(unions) == 0 {
 		return Validations{}, nil
 	}
@@ -68,7 +69,7 @@ const (
 )
 
 type zeroOrOneOfMemberTagValidator struct {
-	shared map[*types.Type]unions
+	shared map[string]unions
 }
 
 func (zeroOrOneOfMemberTagValidator) Init(_ Config) {}
@@ -78,7 +79,7 @@ func (zeroOrOneOfMemberTagValidator) TagName() string {
 }
 
 func (zeroOrOneOfMemberTagValidator) ValidScopes() sets.Set[Scope] {
-	return unionTagValidScopes
+	return sets.New(ScopeField, ScopeListVal)
 }
 
 func (zmtv zeroOrOneOfMemberTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -87,7 +88,7 @@ func (zmtv zeroOrOneOfMemberTagValidator) GetValidations(context Context, tag co
 		return Validations{}, err
 	}
 	// This tag does not actually emit any validations, it just accumulates
-	// information. The validation is done by the zeroOrOneOfTypeValidator.
+	// information. The validation is done by the zeroOrOneOfTypeOrFieldValidator.
 	return Validations{}, nil
 }
 
