@@ -23,10 +23,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func ptrint(i int) *int {
-	return &i
-}
-
 // custom type to test Stringer interface on non-pointer receiver.
 type customString string
 
@@ -99,7 +95,7 @@ func TestPretty(t *testing.T) {
 		{uint32(93), "(uint32) 93\n"},
 		{uint64(93), "(uint64) 93\n"},
 		{uintptr(93), "(uintptr) 0x5d\n"},
-		{ptrint(93), "(*int)(93)\n"},
+		{ptr.To(93), "(*int)(93)\n"},
 		{float32(93.76), "(float32) 93.76\n"},
 		{float64(93.76), "(float64) 93.76\n"},
 		{complex64(93i), "(complex64) (0+93i)\n"},
@@ -178,7 +174,7 @@ func TestForHash(t *testing.T) {
 		{uint32(93), "(uint32)93"},
 		{uint64(93), "(uint64)93"},
 		{uintptr(93), "(uintptr)0x5d"},
-		{ptrint(93), "(*int)93"},
+		{ptr.To(93), "(*int)93"},
 		{float32(93.76), "(float32)93.76"},
 		{float64(93.76), "(float64)93.76"},
 		{complex64(93i), "(complex64)(0+93i)"},
@@ -257,7 +253,7 @@ func TestOneLine(t *testing.T) {
 		{uint32(93), "(uint32)93"},
 		{uint64(93), "(uint64)93"},
 		{uintptr(93), "(uintptr)0x5d"},
-		{ptrint(93), "(*int)93"},
+		{ptr.To(93), "(*int)93"},
 		{float32(93.76), "(float32)93.76"},
 		{float64(93.76), "(float64)93.76"},
 		{complex64(93i), "(complex64)(0+93i)"},
