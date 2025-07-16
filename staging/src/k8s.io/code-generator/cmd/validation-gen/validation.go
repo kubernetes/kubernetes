@@ -598,9 +598,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				return fmt.Errorf("field %s: validation for map of slices is not supported", childPath)
 			}
 			child.fieldValidations.Add(validations)
-			if len(validations.Variables) > 0 {
-				return fmt.Errorf("%v: variable generation is not supported for field validations", childPath)
-			}
+			// TODO: re-visit erroring on specific cases where variable generation is not supported for field validations
+			// currently there are some cases where we want variable generation for field validations
 		}
 
 		// Handle non-included types.
@@ -1284,39 +1283,47 @@ func emitComments(comments []string, sw *generator.SnippetWriter) {
 func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.Type, sw *generator.SnippetWriter) {
 	tn := g.discovered.typeNodes[t]
 
-	variables := tn.typeValidations.Variables
-	slices.SortFunc(variables, func(a, b validators.VariableGen) int {
-		return cmp.Compare(a.Variable.Name, b.Variable.Name)
-	})
-	for _, variable := range variables {
-		fn := variable.InitFunc
-		targs := generator.Args{
-			"varName": c.Universe.Type(types.Name(variable.Variable)),
-			"initFn":  c.Universe.Type(fn.Function),
-		}
-		for _, comment := range fn.Comments {
-			sw.Do("// $.$\n", comment)
-		}
-		sw.Do("var $.varName|private$ = $.initFn|raw$", targs)
-		if typeArgs := fn.TypeArgs; len(typeArgs) > 0 {
-			sw.Do("[", nil)
-			for i, typeArg := range typeArgs {
-				sw.Do("$.|raw$", c.Universe.Type(typeArg))
-				if i < len(typeArgs)-1 {
-					sw.Do(",", nil)
+	emit := func(variables []validators.VariableGen) {
+		slices.SortFunc(variables, func(a, b validators.VariableGen) int {
+			return cmp.Compare(a.Variable.Name, b.Variable.Name)
+		})
+		for _, variable := range variables {
+			fn := variable.InitFunc
+			targs := generator.Args{
+				"varName": c.Universe.Type(types.Name(variable.Variable)),
+				"initFn":  c.Universe.Type(fn.Function),
+			}
+			for _, comment := range fn.Comments {
+				sw.Do("// $.$\n", comment)
+			}
+			sw.Do("var $.varName|private$ = $.initFn|raw$", targs)
+			if typeArgs := fn.TypeArgs; len(typeArgs) > 0 {
+				sw.Do("[", nil)
+				for i, typeArg := range typeArgs {
+					sw.Do("$.|raw$", c.Universe.Type(typeArg))
+					if i < len(typeArgs)-1 {
+						sw.Do(",", nil)
+					}
 				}
+				sw.Do("]", nil)
 			}
-			sw.Do("]", nil)
-		}
-		sw.Do("(", targs)
-		for i, arg := range fn.Args {
-			if i != 0 {
-				sw.Do(", ", nil)
+			sw.Do("(", targs)
+			for i, arg := range fn.Args {
+				if i != 0 {
+					sw.Do(", ", nil)
+				}
+				toGolangSourceDataLiteral(sw, c, arg)
 			}
-			toGolangSourceDataLiteral(sw, c, arg)
+			sw.Do(")\n", nil)
 		}
-		sw.Do(")\n", nil)
-
+	}
+	// TODO: Handle potential variable name collisions when multiple validators
+	// generate variables with the same name.
+	emit(tn.typeValidations.Variables)
+	for _, field := range tn.fields {
+		if len(field.fieldValidations.Variables) != 0 {
+			emit(field.fieldValidations.Variables)
+		}
 	}
 }
 
