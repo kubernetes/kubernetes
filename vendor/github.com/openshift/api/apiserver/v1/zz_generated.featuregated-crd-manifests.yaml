@@ -1,0 +1,34 @@
+apirequestcounts.apiserver.openshift.io:
+  Annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+  ApprovedPRNumber: https://github.com/openshift/api/pull/897
+  CRDName: apirequestcounts.apiserver.openshift.io
+  Capability: ""
+  Category: ""
+  FeatureGates: []
+  FilenameOperatorName: kube-apiserver
+  FilenameOperatorOrdering: ""
+  FilenameRunLevel: ""
+  GroupName: apiserver.openshift.io
+  HasStatus: true
+  KindName: APIRequestCount
+  Labels: {}
+  PluralName: apirequestcounts
+  PrinterColumns:
+  - description: Release in which an API will be removed.
+    jsonPath: .status.removedInRelease
+    name: RemovedInRelease
+    type: string
+  - description: Number of requests in the current hour.
+    jsonPath: .status.currentHour.requestCount
+    name: RequestsInCurrentHour
+    type: integer
+  - description: Number of requests in the last 24h.
+    jsonPath: .status.requestCount
+    name: RequestsInLast24h
+    type: integer
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates: []
+  Version: v1
+
