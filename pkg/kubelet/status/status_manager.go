@@ -175,6 +175,10 @@ type Manager interface {
 
 	// IsPodResizeInfeasible returns true if the pod resize is infeasible.
 	IsPodResizeInfeasible(podUID types.UID) bool
+
+	// BackfillPodResizeConditions backfills the status manager's resize conditions by reading them from the
+	// provided pods' statuses.
+	BackfillPodResizeConditions(pods []*v1.Pod)
 }
 
 const syncPeriod = 10 * time.Second
@@ -344,6 +348,37 @@ func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID) bool {
 
 	m.recordInProgressResizeCount()
 	return true
+}
+
+func (m *manager) BackfillPodResizeConditions(pods []*v1.Pod) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	for _, pod := range pods {
+		for _, c := range pod.Status.Conditions {
+			switch c.Type {
+			case v1.PodResizePending:
+				newCondition := updatedPodResizeCondition(v1.PodResizePending, nil, c.Reason, c.Message, c.ObservedGeneration)
+				oldConditions := m.podResizeConditions[pod.UID]
+
+				m.podResizeConditions[pod.UID] = podResizeConditions{
+					PodResizePending:    newCondition,
+					PodResizeInProgress: oldConditions.PodResizeInProgress,
+				}
+
+			case v1.PodResizeInProgress:
+				newCondition := updatedPodResizeCondition(v1.PodResizeInProgress, nil, c.Reason, c.Message, c.ObservedGeneration)
+				oldConditions := m.podResizeConditions[pod.UID]
+
+				m.podResizeConditions[pod.UID] = podResizeConditions{
+					PodResizeInProgress: newCondition,
+					PodResizePending:    oldConditions.PodResizePending,
+				}
+			}
+		}
+	}
+	m.recordPendingResizeCount()
+	m.recordInProgressResizeCount()
 }
 
 // IsPodResizeDeferred returns true if the pod resize is currently deferred.

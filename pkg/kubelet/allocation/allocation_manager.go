@@ -546,16 +546,6 @@ func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	defer m.allocationMutex.Unlock()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// Backfill any resize conditions that may already exist on the pod.
-		for _, c := range pod.Status.Conditions {
-			switch c.Type {
-			case v1.PodResizePending:
-				m.statusManager.SetPodResizePendingCondition(pod.UID, c.Reason, c.Message, c.ObservedGeneration)
-			case v1.PodResizeInProgress:
-				m.statusManager.SetPodResizeInProgressCondition(pod.UID, c.Reason, c.Message, c.ObservedGeneration)
-			}
-		}
-
 		// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 		// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
 		pod, _ = m.UpdatePodFromAllocation(pod)

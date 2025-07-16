@@ -2650,6 +2650,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		})
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		kl.statusManager.BackfillPodResizeConditions(pods)
 		for _, uid := range pendingResizes {
 			kl.allocationManager.PushPendingResize(uid)
 		}
