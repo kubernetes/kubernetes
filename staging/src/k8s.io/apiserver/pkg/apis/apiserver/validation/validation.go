@@ -61,7 +61,7 @@ func ValidateAuthenticationConfiguration(compiler authenticationcel.Compiler, c 
 	seenDiscoveryURLs := sets.New[string]()
 	for i, a := range c.JWT {
 		fldPath := root.Index(i)
-		_, errs := validateJWTAuthenticator(compiler, a, fldPath, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
+		_, errs := validateJWTAuthenticator(compiler, a, fldPath, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfigurationEgressSelector))
 		allErrs = append(allErrs, errs...)
 
 		if seenIssuers.Has(a.Issuer.URL) {
@@ -93,15 +93,15 @@ func ValidateAuthenticationConfiguration(compiler authenticationcel.Compiler, c 
 // CEL expressions for claim mappings and validation rules.
 // This is exported for use in oidc package.
 func CompileAndValidateJWTAuthenticator(compiler authenticationcel.Compiler, authenticator api.JWTAuthenticator, disallowedIssuers []string) (authenticationcel.CELMapper, field.ErrorList) {
-	return validateJWTAuthenticator(compiler, authenticator, nil, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration))
+	return validateJWTAuthenticator(compiler, authenticator, nil, sets.New(disallowedIssuers...), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfiguration), utilfeature.DefaultFeatureGate.Enabled(features.StructuredAuthenticationConfigurationEgressSelector))
 }
 
-func validateJWTAuthenticator(compiler authenticationcel.Compiler, authenticator api.JWTAuthenticator, fldPath *field.Path, disallowedIssuers sets.Set[string], structuredAuthnFeatureEnabled bool) (authenticationcel.CELMapper, field.ErrorList) {
+func validateJWTAuthenticator(compiler authenticationcel.Compiler, authenticator api.JWTAuthenticator, fldPath *field.Path, disallowedIssuers sets.Set[string], structuredAuthnFeatureEnabled, structuredAuthnEgressSelectorFeatureEnabled bool) (authenticationcel.CELMapper, field.ErrorList) {
 	var allErrs field.ErrorList
 
 	state := &validationState{}
 
-	allErrs = append(allErrs, validateIssuer(authenticator.Issuer, disallowedIssuers, fldPath.Child("issuer"), structuredAuthnFeatureEnabled)...)
+	allErrs = append(allErrs, validateIssuer(authenticator.Issuer, disallowedIssuers, fldPath.Child("issuer"), structuredAuthnFeatureEnabled, structuredAuthnEgressSelectorFeatureEnabled)...)
 	allErrs = append(allErrs, validateClaimValidationRules(compiler, state, authenticator.ClaimValidationRules, fldPath.Child("claimValidationRules"), structuredAuthnFeatureEnabled)...)
 	allErrs = append(allErrs, validateClaimMappings(compiler, state, authenticator.ClaimMappings, fldPath.Child("claimMappings"), structuredAuthnFeatureEnabled)...)
 	allErrs = append(allErrs, validateUserValidationRules(compiler, state, authenticator.UserValidationRules, fldPath.Child("userValidationRules"), structuredAuthnFeatureEnabled)...)
@@ -115,13 +115,14 @@ type validationState struct {
 	usesEmailVerifiedClaim bool
 }
 
-func validateIssuer(issuer api.Issuer, disallowedIssuers sets.Set[string], fldPath *field.Path, structuredAuthnFeatureEnabled bool) field.ErrorList {
+func validateIssuer(issuer api.Issuer, disallowedIssuers sets.Set[string], fldPath *field.Path, structuredAuthnFeatureEnabled, structuredAuthnEgressSelectorFeatureEnabled bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validateIssuerURL(issuer.URL, disallowedIssuers, fldPath.Child("url"))...)
 	allErrs = append(allErrs, validateIssuerDiscoveryURL(issuer.URL, issuer.DiscoveryURL, fldPath.Child("discoveryURL"), structuredAuthnFeatureEnabled)...)
 	allErrs = append(allErrs, validateAudiences(issuer.Audiences, issuer.AudienceMatchPolicy, fldPath.Child("audiences"), fldPath.Child("audienceMatchPolicy"), structuredAuthnFeatureEnabled)...)
 	allErrs = append(allErrs, validateCertificateAuthority(issuer.CertificateAuthority, fldPath.Child("certificateAuthority"))...)
+	allErrs = append(allErrs, validateEgressSelector(issuer.EgressSelectorType, fldPath.Child("egressSelectorType"), structuredAuthnFeatureEnabled, structuredAuthnEgressSelectorFeatureEnabled)...)
 
 	return allErrs
 }
@@ -225,6 +226,31 @@ func validateCertificateAuthority(certificateAuthority string, fldPath *field.Pa
 	_, err := cert.NewPoolFromBytes([]byte(certificateAuthority))
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, "<omitted>", err.Error()))
+	}
+
+	return allErrs
+}
+
+func validateEgressSelector(selectorType api.EgressSelectorType, fldPath *field.Path, structuredAuthnFeatureEnabled, structuredAuthnEgressSelectorFeatureEnabled bool) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if len(selectorType) == 0 {
+		return allErrs
+	}
+
+	if !structuredAuthnFeatureEnabled {
+		allErrs = append(allErrs, field.Invalid(fldPath, selectorType, "egress selector is not supported when StructuredAuthenticationConfiguration feature gate is disabled"))
+	}
+
+	if !structuredAuthnEgressSelectorFeatureEnabled {
+		allErrs = append(allErrs, field.Invalid(fldPath, selectorType, "egress selector is not supported when StructuredAuthenticationConfigurationEgressSelector feature gate is disabled"))
+	}
+
+	switch selectorType {
+	case api.EgressSelectorControlPlane, api.EgressSelectorCluster:
+		// valid
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, selectorType, "egress selector must be either controlplane or cluster"))
 	}
 
 	return allErrs
