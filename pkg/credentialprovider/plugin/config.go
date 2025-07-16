@@ -17,6 +17,8 @@ limitations under the License.
 package plugin
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -41,15 +43,18 @@ var (
 // readCredentialProviderConfig receives a path to a config file or directory.
 // If the path is a directory, it reads all "*.json", "*.yaml" and "*.yml" files in lexicographic order,
 // decodes them, and merges their entries into a single CredentialProviderConfig object.
-// If the path is a file, it decodes the file into a CredentialProviderConfig object directly
-func readCredentialProviderConfig(configPath string) (*kubeletconfig.CredentialProviderConfig, error) {
+// If the path is a file, it decodes the file into a CredentialProviderConfig object directly.
+// It also returns the SHA256 hash of all the raw file content. This hash is exposed via metrics
+// as an external API to allow monitoring of configuration changes.
+// The hash format follows container digest conventions (sha256:hexstring) for consistency.
+func readCredentialProviderConfig(configPath string) (*kubeletconfig.CredentialProviderConfig, string, error) {
 	if configPath == "" {
-		return nil, fmt.Errorf("credential provider config path is empty")
+		return nil, "", fmt.Errorf("credential provider config path is empty")
 	}
 
 	fileInfo, err := os.Stat(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to access path %q: %w", configPath, err)
+		return nil, "", fmt.Errorf("unable to access path %q: %w", configPath, err)
 	}
 
 	var configs []*kubeletconfig.CredentialProviderConfig
@@ -58,7 +63,7 @@ func readCredentialProviderConfig(configPath string) (*kubeletconfig.CredentialP
 	if fileInfo.IsDir() {
 		entries, err := os.ReadDir(configPath)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read directory %q: %w", configPath, err)
+			return nil, "", fmt.Errorf("unable to read directory %q: %w", configPath, err)
 		}
 
 		// Filter and sort *.json/*.yaml/*.yml files in lexicographic order
@@ -71,21 +76,29 @@ func readCredentialProviderConfig(configPath string) (*kubeletconfig.CredentialP
 		sort.Strings(configFiles)
 
 		if len(configFiles) == 0 {
-			return nil, fmt.Errorf("no configuration files found in directory %q", configPath)
+			return nil, "", fmt.Errorf("no configuration files found in directory %q", configPath)
 		}
 	} else {
 		configFiles = append(configFiles, configPath)
 	}
 
+	hasher := sha256.New()
 	for _, filePath := range configFiles {
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read file %q: %w", filePath, err)
+			return nil, "", fmt.Errorf("unable to read file %q: %w", filePath, err)
 		}
+
+		// Use length prefix to prevent hash collisions
+		dataLen := uint64(len(data))
+		if err := binary.Write(hasher, binary.BigEndian, dataLen); err != nil {
+			return nil, "", fmt.Errorf("error writing length prefix for file %q: %w", filePath, err)
+		}
+		hasher.Write(data)
 
 		config, err := decode(data)
 		if err != nil {
-			return nil, fmt.Errorf("error decoding config %q: %w", filePath, err)
+			return nil, "", fmt.Errorf("error decoding config %q: %w", filePath, err)
 		}
 		configs = append(configs, config)
 	}
@@ -96,14 +109,15 @@ func readCredentialProviderConfig(configPath string) (*kubeletconfig.CredentialP
 	for _, config := range configs {
 		for _, provider := range config.Providers {
 			if providerNames.Has(provider.Name) {
-				return nil, fmt.Errorf("duplicate provider name %q found in configuration file(s)", provider.Name)
+				return nil, "", fmt.Errorf("duplicate provider name %q found in configuration file(s)", provider.Name)
 			}
 			providerNames.Insert(provider.Name)
 			mergedConfig.Providers = append(mergedConfig.Providers, provider)
 		}
 	}
 
-	return mergedConfig, nil
+	configHash := fmt.Sprintf("sha256:%x", hasher.Sum(nil))
+	return mergedConfig, configHash, nil
 }
 
 // decode decodes data into the internal CredentialProviderConfig type.

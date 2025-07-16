@@ -152,7 +152,7 @@ func RegisterCredentialProviderPlugins(pluginConfigPath, pluginBinDir string,
 		return fmt.Errorf("error inspecting binary directory %s: %w", pluginBinDir, err)
 	}
 
-	credentialProviderConfig, err := readCredentialProviderConfig(pluginConfigPath)
+	credentialProviderConfig, configHash, err := readCredentialProviderConfig(pluginConfigPath)
 	if err != nil {
 		return err
 	}
@@ -164,6 +164,10 @@ func RegisterCredentialProviderPlugins(pluginConfigPath, pluginBinDir string,
 
 	// Register metrics for credential providers
 	registerMetrics()
+
+	// Record the hash of the credential provider configuration.
+	// This hash is exposed via metrics as an external API to allow monitoring of configuration changes.
+	recordCredentialProviderConfigHash(configHash)
 
 	for _, provider := range credentialProviderConfig.Providers {
 		// Considering Windows binary with suffix ".exe", LookPath() helps to find the correct path.
