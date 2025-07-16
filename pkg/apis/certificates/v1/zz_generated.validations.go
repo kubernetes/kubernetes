@@ -101,7 +101,7 @@ func Validate_CertificateSigningRequestList(ctx context.Context, op operation.Op
 	return errs
 }
 
-var zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1_CertificateSigningRequestStatus_conditions_ = validate.NewUnionMembership([2]string{"conditions[{\"type\": \"Approved\"}]", ""}, [2]string{"conditions[{\"type\": \"Denied\"}]", ""})
+var zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1_CertificateSigningRequestStatus_conditions_ = validate.NewUnionMembership(validate.NewUnionMember("conditions[{\"type\": \"Approved\"}]"), validate.NewUnionMember("conditions[{\"type\": \"Denied\"}]"))
 
 // Validate_CertificateSigningRequestStatus validates an instance of CertificateSigningRequestStatus according
 // to declarative validation rules in the API schema.

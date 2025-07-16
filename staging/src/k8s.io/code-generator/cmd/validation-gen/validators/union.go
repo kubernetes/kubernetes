@@ -33,7 +33,9 @@ import (
 var discriminatedUnionValidator = types.Name{Package: libValidationPkg, Name: "DiscriminatedUnion"}
 var unionValidator = types.Name{Package: libValidationPkg, Name: "Union"}
 
+var newDiscriminatedUnionMember = types.Name{Package: libValidationPkg, Name: "NewDiscriminatedUnionMember"}
 var newDiscriminatedUnionMembership = types.Name{Package: libValidationPkg, Name: "NewDiscriminatedUnionMembership"}
+var newUnionMember = types.Name{Package: libValidationPkg, Name: "NewUnionMember"}
 var newUnionMembership = types.Name{Package: libValidationPkg, Name: "NewUnionMembership"}
 var unionVariablePrefix = "unionMembershipFor"
 
@@ -78,14 +80,6 @@ func (utfv unionTypeOrFieldValidator) GetValidations(context Context) (Validatio
 
 	return processUnionValidations(context, unions, unionVariablePrefix,
 		unionMemberTagName, unionValidator, discriminatedUnionValidator)
-}
-
-func toSliceAny[T any](t []T) []any {
-	result := make([]any, len(t))
-	for i, v := range t {
-		result[i] = v
-	}
-	return result
 }
 
 const (
@@ -186,7 +180,7 @@ type union struct {
 	// the field name and [1] identifies the union member Name. fields is index
 	// aligned with fieldMembers.
 	// If member name is not set, it defaults to the go struct field name.
-	fields [][2]string
+	fields []unionMember
 	// fieldMembers describes all the members of the union.
 	fieldMembers []*types.Member
 
@@ -202,14 +196,17 @@ type union struct {
 	itemMatchers map[string]map[string]any
 }
 
+type unionMember struct {
+	fieldName          string
+	discriminatorValue string
+}
+
 // unions represents all the unions for a go struct.
 type unions map[string]*union
 
 // newUnion initializes a new union instance
 func newUnion() *union {
 	return &union{
-		fields:       make([][2]string, 0),
-		fieldMembers: make([]*types.Member, 0),
 		itemMatchers: make(map[string]map[string]any),
 	}
 }
@@ -289,7 +286,7 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 			if u.discriminator != nil {
 				supportVar := Variable(supportVarName,
 					Function(tagName, DefaultFlags, newDiscriminatedUnionMembership,
-						append([]any{*u.discriminator}, toSliceAny(getDisplayFields(u, context))...)...))
+						append([]any{*u.discriminator}, getDisplayFields(u, context, true)...)...))
 				result.Variables = append(result.Variables, supportVar)
 
 				discriminatorExtractor := FunctionLiteral{
@@ -302,7 +299,7 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...)
 				result.Functions = append(result.Functions, fn)
 			} else {
-				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, toSliceAny(getDisplayFields(u, context))...))
+				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getDisplayFields(u, context, false)...))
 				result.Variables = append(result.Variables, supportVar)
 
 				extraArgs := append([]any{supportVarName}, extractorArgs...)
@@ -433,7 +430,7 @@ func processMemberValidations(shared map[string]unions, context Context, tag cod
 	}
 
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
-	u.fields = append(u.fields, [2]string{fieldName, memberName})
+	u.fields = append(u.fields, unionMember{fieldName, memberName})
 
 	if context.Scope == ScopeListVal {
 		matcher, err := extractMatcherFromPath(fieldName)
@@ -451,16 +448,16 @@ func processMemberValidations(shared map[string]unions, context Context, tag cod
 // getDisplayFields formats union field names for user-friendly error messages.
 // For list item unions, it converts paths like "<path>/Pipeline.Tasks[{\"name\": \"succeeded\"}]"
 // to readable formats like "Tasks[{\"name\": \"succeeded\"}]".
-func getDisplayFields(u *union, context Context) [][2]string {
-	displayFields := make([][2]string, len(u.fields))
+func getDisplayFields(u *union, context Context, discrim bool) []any {
+	displayFields := make([]any, len(u.fields))
 	listFieldName := context.Path.String()
 	pathParts := strings.Split(listFieldName, ".")
 	if len(pathParts) > 0 {
 		listFieldName = pathParts[len(pathParts)-1]
 	}
 	for i, f := range u.fields {
-		fieldName := f[0]
-		memberName := f[1]
+		fieldName := f.fieldName
+		memberName := f.discriminatorValue
 		if _, isItem := u.itemMatchers[fieldName]; isItem {
 			// Extract the JSON part from the input
 			bracketIndex := strings.Index(fieldName, "[")
@@ -469,7 +466,11 @@ func getDisplayFields(u *union, context Context) [][2]string {
 				fieldName = listFieldName + jsonPart
 			}
 		}
-		displayFields[i] = [2]string{fieldName, memberName}
+		if discrim {
+			displayFields[i] = Function("xx", 0, newDiscriminatedUnionMember, fieldName, memberName)
+		} else {
+			displayFields[i] = Function("xx", 0, newUnionMember, fieldName)
+		}
 	}
 	return displayFields
 }

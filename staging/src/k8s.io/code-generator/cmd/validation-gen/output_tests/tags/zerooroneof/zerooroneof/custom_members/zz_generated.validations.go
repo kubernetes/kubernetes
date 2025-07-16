@@ -49,7 +49,7 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_zerooroneof_custom_members_Struct_ = validate.NewUnionMembership([2]string{"m1", "CustomM1"}, [2]string{"m2", "CustomM2"})
+var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_zerooroneof_custom_members_Struct_ = validate.NewUnionMembership(validate.NewUnionMember("m1"), validate.NewUnionMember("m2"))
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.

@@ -65,7 +65,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	return errs
 }
 
-var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_union_typedef_TaskList_ = validate.NewUnionMembership([2]string{"TaskList[{\"name\": \"succeeded\"}]", ""}, [2]string{"TaskList[{\"name\": \"failed\"}]", ""})
+var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_union_typedef_TaskList_ = validate.NewUnionMembership(validate.NewUnionMember("TaskList[{\"name\": \"succeeded\"}]"), validate.NewUnionMember("TaskList[{\"name\": \"failed\"}]"))
 
 // Validate_TaskList validates an instance of TaskList according
 // to declarative validation rules in the API schema.
