@@ -49,8 +49,8 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_zerooroneof_multiple_Struct_union1 = validate.NewUnionMembership([2]string{"u1m1", "U1M1"}, [2]string{"u1m2", "U1M2"})
-var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_zerooroneof_multiple_Struct_union2 = validate.NewUnionMembership([2]string{"u2m1", "U2M1"}, [2]string{"u2m2", "U2M2"})
+var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_zerooroneof_multiple_Struct_union1 = validate.NewUnionMembership(validate.NewUnionMember("u1m1"), validate.NewUnionMember("u1m2"))
+var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_zerooroneof_zerooroneof_multiple_Struct_union2 = validate.NewUnionMembership(validate.NewUnionMember("u2m1"), validate.NewUnionMember("u2m2"))
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
