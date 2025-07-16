@@ -70,6 +70,7 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 	if a == nil {
 		return
 	}
+	registerAllAdmissionPluginFlags(fs)
 	fs.StringSliceVar(&a.PluginNames, "admission-control", a.PluginNames, ""+
 		"Admission is divided into two phases. "+
 		"In the first phase, only mutating admission plugins run. "+
