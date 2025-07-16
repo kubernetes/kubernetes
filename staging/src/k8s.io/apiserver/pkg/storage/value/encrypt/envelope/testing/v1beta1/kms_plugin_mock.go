@@ -56,6 +56,7 @@ type Base64Plugin struct {
 	inFailedState      bool
 	ver                string
 	socketPath         string
+	kmsapi.UnsafeKeyManagementServiceServer
 }
 
 // NewBase64Plugin is a constructor for Base64Plugin.
