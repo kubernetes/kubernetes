@@ -38,8 +38,8 @@ func TestWorkEstimator(t *testing.T) {
 		name                      string
 		requestURI                string
 		requestInfo               *apirequest.RequestInfo
-		counts                    map[string]int64
-		countErr                  error
+		stats                     storage.Stats
+		statsErr                  error
 		watchCount                int
 		maxSeats                  uint64
 		initialSeatsExpected      uint64
@@ -70,9 +70,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 10,
 		},
@@ -84,9 +82,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 699,
-			},
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 4,
 		},
@@ -98,9 +94,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 699,
-			},
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 7,
 		},
@@ -112,9 +106,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 699,
-			},
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 4,
 		},
@@ -126,9 +118,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 399,
-			},
+			stats:                storage.Stats{ObjectCount: 399, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 4,
 		},
@@ -140,7 +130,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:             ObjectCountNotFoundErr,
+			statsErr:             ObjectCountNotFoundErr,
 			maxSeats:             10,
 			initialSeatsExpected: 1,
 		},
@@ -152,9 +142,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 699,
-			},
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 4,
 		},
@@ -166,9 +154,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 399,
-			},
+			stats:                storage.Stats{ObjectCount: 399, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 3,
 		},
@@ -180,9 +166,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
 			initialSeatsExpected: 8,
 		},
 		{
@@ -193,9 +177,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 699,
-			},
+			stats:                storage.Stats{ObjectCount: 699, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 4,
 		},
@@ -207,9 +189,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 8,
 		},
@@ -221,9 +201,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 1999,
-			},
+			stats:                storage.Stats{ObjectCount: 1999, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 10,
 		},
@@ -235,9 +213,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 1999,
-			},
+			stats:                storage.Stats{ObjectCount: 1999, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             5,
 			initialSeatsExpected: 5,
 		},
@@ -249,7 +225,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:             ObjectCountNotFoundErr,
+			statsErr:             ObjectCountNotFoundErr,
 			maxSeats:             10,
 			initialSeatsExpected: 1,
 		},
@@ -261,10 +237,8 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			countErr:             ObjectCountStaleErr,
+			stats:                storage.Stats{ObjectCount: 1999, EstimatedAverageObjectSizeBytes: 1_000},
+			statsErr:             ObjectCountStaleErr,
 			maxSeats:             10,
 			initialSeatsExpected: 10,
 		},
@@ -276,7 +250,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:             ObjectCountNotFoundErr,
+			statsErr:             ObjectCountNotFoundErr,
 			maxSeats:             10,
 			initialSeatsExpected: 1,
 		},
@@ -288,7 +262,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:             errors.New("unknown error"),
+			statsErr:             errors.New("unknown error"),
 			maxSeats:             10,
 			initialSeatsExpected: 10,
 		},
@@ -301,11 +275,22 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 1,
+		},
+		{
+			name:       "request verb is list, metadata.name specified, 1MB object",
+			requestURI: "http://server/apis/foo.bar/v1/events?fieldSelector=metadata.name%3Dtest",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				Name:     "test",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000_000},
+			maxSeats:             10,
+			initialSeatsExpected: 10,
 		},
 		{
 			name:       "request verb is list, metadata.name, resourceVersion and limit specified",
@@ -316,9 +301,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
 			maxSeats:             10,
 			initialSeatsExpected: 1,
 		},
@@ -330,9 +313,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
 			initialSeatsExpected: minimumSeats,
 		},
 		{
@@ -343,9 +324,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
 			initialSeatsExpected: minimumSeats,
 		},
 		{
@@ -356,9 +335,7 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
+			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
 			initialSeatsExpected: 8,
 		},
 		{
@@ -544,12 +521,8 @@ func TestWorkEstimator(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			counts := test.counts
-			if len(counts) == 0 {
-				counts = map[string]int64{}
-			}
-			countsFn := func(key string) (storage.Stats, error) {
-				return storage.Stats{ObjectCount: counts[key], EstimatedAverageObjectSizeBytes: 1_000}, test.countErr
+			statsFn := func(key string) (storage.Stats, error) {
+				return test.stats, test.statsErr
 			}
 			watchCountsFn := func(_ *apirequest.RequestInfo) int {
 				return test.watchCount
@@ -558,7 +531,7 @@ func TestWorkEstimator(t *testing.T) {
 				return test.maxSeats
 			}
 
-			estimator := NewWorkEstimator(countsFn, watchCountsFn, defaultCfg, maxSeatsFn)
+			estimator := NewWorkEstimator(statsFn, watchCountsFn, defaultCfg, maxSeatsFn)
 
 			req, err := http.NewRequest("GET", test.requestURI, nil)
 			if err != nil {
