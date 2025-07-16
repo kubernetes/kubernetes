@@ -329,7 +329,9 @@ func (o *WaitOptions) RunWait() error {
 		// or functions from ResourceBuilder for parsing those. Lastly, this poll
 		// should be replaced with a ListWatch cache.
 		if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, o.Timeout, true, func(context.Context) (done bool, err error) {
+			foundResource := false
 			visitErr := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
+				foundResource = true
 				return nil
 			})
 			if apierrors.IsNotFound(visitErr) {
@@ -338,7 +340,7 @@ func (o *WaitOptions) RunWait() error {
 			if visitErr != nil {
 				return false, visitErr
 			}
-			return true, nil
+			return foundResource, nil
 		}); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				return fmt.Errorf("%s", wait.ErrWaitTimeout.Error()) // nolint:staticcheck // SA1019

@@ -18,12 +18,14 @@ package storage
 
 import (
 	"context"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -38,7 +40,11 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against ResourceClaims.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, nsClient v1.NamespaceInterface) (*REST, *StatusREST, error) {
+	if nsClient == nil {
+		return nil, nil, fmt.Errorf("namespace client is required")
+	}
+	strategy := resourceclaim.NewStrategy(nsClient)
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &resource.ResourceClaim{} },
 		NewListFunc:               func() runtime.Object { return &resource.ResourceClaimList{} },
@@ -46,11 +52,11 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		DefaultQualifiedResource:  resource.Resource("resourceclaims"),
 		SingularQualifiedResource: resource.Resource("resourceclaim"),
 
-		CreateStrategy:      resourceclaim.Strategy,
-		UpdateStrategy:      resourceclaim.Strategy,
-		DeleteStrategy:      resourceclaim.Strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
 		ReturnDeletedObject: true,
-		ResetFieldsStrategy: resourceclaim.Strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -60,8 +66,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = resourceclaim.StatusStrategy
-	statusStore.ResetFieldsStrategy = resourceclaim.StatusStrategy
+	statusStrategy := resourceclaim.NewStatusStrategy(strategy)
+	statusStore.UpdateStrategy = statusStrategy
+	statusStore.ResetFieldsStrategy = statusStrategy
 
 	rest := &REST{store}
 

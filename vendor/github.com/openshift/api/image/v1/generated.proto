@@ -31,11 +31,11 @@ message DockerImageReference {
   optional string iD = 5;
 }
 
-// Image is an immutable representation of a container image and metadata at a point in time.
+// Image is an immutable representation of a container image and its metadata at a point in time.
 // Images are named by taking a hash of their contents (metadata and content) and any change
 // in format, content, or metadata results in a new name. The images resource is primarily
 // for use by cluster administrators and integrations like the cluster image registry - end
-// users instead access images via the imagestreamtags or imagestreamimages resources. While
+// users, instead, access images via the imagestreamtags or imagestreamimages resources. While
 // image metadata is stored in the API, any integration that implements the container image
 // registry API must provide its own storage for the raw manifest data, image config, and
 // layer contents.
@@ -353,12 +353,15 @@ message ImageStreamImportSpec {
 // ImageStreamImportStatus contains information about the status of an image stream import.
 message ImageStreamImportStatus {
   // import is the image stream that was successfully updated or created when 'to' was set.
+  // +optional
   optional ImageStream import = 1;
 
   // repository is set if spec.repository was set to the outcome of the import
+  // +optional
   optional RepositoryImportStatus repository = 2;
 
   // images is set with the result of importing spec.images
+  // +optional
   repeated ImageImportStatus images = 3;
 }
 
@@ -436,17 +439,20 @@ message ImageStreamSpec {
 message ImageStreamStatus {
   // dockerImageRepository represents the effective location this stream may be accessed at.
   // May be empty until the server determines where the repository is located
+  // +optional
   optional string dockerImageRepository = 1;
 
   // publicDockerImageRepository represents the public location from where the image can
   // be pulled outside the cluster. This field may be empty if the administrator
   // has not exposed the integrated registry externally.
+  // +optional
   optional string publicDockerImageRepository = 3;
 
   // tags are a historical record of images associated with each tag. The first entry in the
   // TagEvent array is the currently tagged image.
   // +patchMergeKey=tag
   // +patchStrategy=merge
+  // +optional
   repeated NamedTagEventList tags = 2;
 }
 
@@ -504,7 +510,7 @@ message ImageStreamTagList {
 // the status history, and the currently referenced image (if any) of the provided
 // tag. This type replaces the ImageStreamTag by providing a full view of the tag.
 // ImageTags are returned for every spec or status tag present on the image stream.
-// If no tag exists in either form a not found error will be returned by the API.
+// If no tag exists in either form, a not found error will be returned by the API.
 // A create operation will succeed if no spec tag has already been defined and the
 // spec field is set. Delete will remove both spec and status elements from the
 // image stream.

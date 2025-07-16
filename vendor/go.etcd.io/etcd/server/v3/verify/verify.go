@@ -90,10 +90,35 @@ func Verify(cfg Config) error {
 // VerifyIfEnabled performs verification according to ETCD_VERIFY env settings.
 // See Verify for more information.
 func VerifyIfEnabled(cfg Config) error {
-	if os.Getenv(ENV_VERIFY) == ENV_VERIFY_ALL_VALUE {
+	if VerifyEnabled() {
 		return Verify(cfg)
 	}
 	return nil
+}
+
+// VerifyEnabled returns `true` if verification is enabled.
+func VerifyEnabled() bool {
+	return os.Getenv(ENV_VERIFY) == ENV_VERIFY_ALL_VALUE
+}
+
+// EnableVerification enables the verification and returns a function that
+// can be used to bring the original settings.
+func EnableVerification() func() {
+	previousEnv := os.Getenv(ENV_VERIFY)
+	os.Setenv(ENV_VERIFY, ENV_VERIFY_ALL_VALUE)
+	return func() {
+		os.Setenv(ENV_VERIFY, previousEnv)
+	}
+}
+
+// DisableVerification disables the verification and returns a function that
+// can be used to bring the original settings.
+func DisableVerification() func() {
+	previousEnv := os.Getenv(ENV_VERIFY)
+	os.Unsetenv(ENV_VERIFY)
+	return func() {
+		os.Setenv(ENV_VERIFY, previousEnv)
+	}
 }
 
 // MustVerifyIfEnabled performs verification according to ETCD_VERIFY env settings

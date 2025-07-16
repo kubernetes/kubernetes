@@ -241,9 +241,11 @@ message TemplateInstanceSpec {
 message TemplateInstanceStatus {
   // conditions represent the latest available observations of a
   // TemplateInstance's current state.
+  // +optional
   repeated TemplateInstanceCondition conditions = 1;
 
   // objects references the objects created by the TemplateInstance.
+  // +optional
   repeated TemplateInstanceObject objects = 2;
 }
 

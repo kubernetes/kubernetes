@@ -133,19 +133,19 @@ func printOrCreateKubeProxyObjects(cmByte []byte, dsByte []byte, client clientse
 
 	// Create the objects if printManifest is false
 	if !printManifest {
-		if err := apiclient.CreateOrUpdateServiceAccount(client, sa); err != nil {
+		if err := apiclient.CreateOrUpdate(client.CoreV1().ServiceAccounts(sa.GetNamespace()), sa); err != nil {
 			return errors.Wrap(err, "error when creating kube-proxy service account")
 		}
 
-		if err := apiclient.CreateOrUpdateClusterRoleBinding(client, crb); err != nil {
+		if err := apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), crb); err != nil {
 			return err
 		}
 
-		if err := apiclient.CreateOrUpdateRole(client, role); err != nil {
+		if err := apiclient.CreateOrUpdate(client.RbacV1().Roles(role.GetNamespace()), role); err != nil {
 			return err
 		}
 
-		if err := apiclient.CreateOrUpdateRoleBinding(client, rb); err != nil {
+		if err := apiclient.CreateOrUpdate(client.RbacV1().RoleBindings(rb.GetNamespace()), rb); err != nil {
 			return err
 		}
 
@@ -243,7 +243,7 @@ func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoin
 	}
 
 	// Create the ConfigMap for kube-proxy or update it in case it already exists
-	return []byte(""), apiclient.CreateOrUpdateConfigMap(client, kubeproxyConfigMap)
+	return []byte(""), apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(kubeproxyConfigMap.GetNamespace()), kubeproxyConfigMap)
 }
 
 func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, printManifest bool) ([]byte, error) {
@@ -269,5 +269,5 @@ func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset
 	*env = append(*env, kubeadmutil.MergeKubeadmEnvVars(kubeadmutil.GetProxyEnvVars(nil))...)
 
 	// Create the DaemonSet for kube-proxy or update it in case it already exists
-	return []byte(""), apiclient.CreateOrUpdateDaemonSet(client, kubeproxyDaemonSet)
+	return []byte(""), apiclient.CreateOrUpdate(client.AppsV1().DaemonSets(kubeproxyDaemonSet.GetNamespace()), kubeproxyDaemonSet)
 }

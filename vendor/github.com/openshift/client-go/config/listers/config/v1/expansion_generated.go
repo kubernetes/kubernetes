@@ -14,6 +14,10 @@ type AuthenticationListerExpansion interface{}
 // BuildLister.
 type BuildListerExpansion interface{}
 
+// ClusterImagePolicyListerExpansion allows custom methods to be added to
+// ClusterImagePolicyLister.
+type ClusterImagePolicyListerExpansion interface{}
+
 // ClusterOperatorListerExpansion allows custom methods to be added to
 // ClusterOperatorLister.
 type ClusterOperatorListerExpansion interface{}
@@ -45,6 +49,14 @@ type ImageContentPolicyListerExpansion interface{}
 // ImageDigestMirrorSetListerExpansion allows custom methods to be added to
 // ImageDigestMirrorSetLister.
 type ImageDigestMirrorSetListerExpansion interface{}
+
+// ImagePolicyListerExpansion allows custom methods to be added to
+// ImagePolicyLister.
+type ImagePolicyListerExpansion interface{}
+
+// ImagePolicyNamespaceListerExpansion allows custom methods to be added to
+// ImagePolicyNamespaceLister.
+type ImagePolicyNamespaceListerExpansion interface{}
 
 // ImageTagMirrorSetListerExpansion allows custom methods to be added to
 // ImageTagMirrorSetLister.

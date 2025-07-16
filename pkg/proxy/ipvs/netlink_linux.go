@@ -23,13 +23,13 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	netutils "k8s.io/utils/net"
-
-	"github.com/vishvananda/netlink"
-	"golang.org/x/sys/unix"
 )
 
 type netlinkHandle struct {

@@ -53,6 +53,7 @@ type ServerHealth interface {
 	Range(context.Context, *pb.RangeRequest) (*pb.RangeResponse, error)
 	Config() config.ServerConfig
 	AuthStore() auth.AuthStore
+	IsLearner() bool
 }
 
 type serverHealthV2V3 interface {
@@ -288,6 +289,8 @@ func installReadyzEndpoints(lg *zap.Logger, mux *http.ServeMux, server ServerHea
 	reg.Register("serializable_read", readCheck(server, true))
 	// linearizable_read check would be replaced by read_index check in 3.6
 	reg.Register("linearizable_read", readCheck(server, false))
+	// check if local is learner
+	reg.Register("non_learner", learnerCheck(server))
 	reg.InstallHttpEndpoints(lg, mux)
 }
 
@@ -456,5 +459,14 @@ func readCheck(srv ServerHealth, serializable bool) func(ctx context.Context) er
 		ctx = srv.AuthStore().WithRoot(ctx)
 		_, err := srv.Range(ctx, &pb.RangeRequest{KeysOnly: true, Limit: 1, Serializable: serializable})
 		return err
+	}
+}
+
+func learnerCheck(srv ServerHealth) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		if srv.IsLearner() {
+			return fmt.Errorf("not supported for learner")
+		}
+		return nil
 	}
 }

@@ -45,13 +45,25 @@ func NewFilteredClusterRoleInformer(client versioned.Interface, resyncPeriod tim
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AuthorizationV1().ClusterRoles().List(context.TODO(), options)
+				return client.AuthorizationV1().ClusterRoles().List(context.Background(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AuthorizationV1().ClusterRoles().Watch(context.TODO(), options)
+				return client.AuthorizationV1().ClusterRoles().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AuthorizationV1().ClusterRoles().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AuthorizationV1().ClusterRoles().Watch(ctx, options)
 			},
 		},
 		&apiauthorizationv1.ClusterRole{},

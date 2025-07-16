@@ -105,10 +105,10 @@ var (
 		# List all allowed actions in namespace "foo"
 		kubectl auth can-i --list --namespace=foo`)
 
-	resourceVerbs       = sets.NewString("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*", "approve", "sign", "escalate", "attest")
-	nonResourceURLVerbs = sets.NewString("get", "put", "post", "head", "options", "delete", "patch", "*")
+	resourceVerbs       = sets.New[string]("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*", "approve", "sign", "escalate", "attest")
+	nonResourceURLVerbs = sets.New[string]("get", "put", "post", "head", "options", "delete", "patch", "*")
 	// holds all the server-supported resources that cannot be discovered by clients. i.e. users and groups for the impersonate verb
-	nonStandardResourceNames = sets.NewString("users", "groups")
+	nonStandardResourceNames = sets.New[string]("users", "groups")
 )
 
 // NewCmdCanI returns an initialized Command for 'auth can-i' sub command

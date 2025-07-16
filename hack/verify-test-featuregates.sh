@@ -43,7 +43,7 @@ fi
 
 
 # ensure all generic features are added in alphabetic order
-lines=$(git grep 'genericfeatures[.].*:' -- pkg/features/versioned_kube_features.go)
+lines=$(git grep 'genericfeatures[.].*:' -- pkg/features/kube_features.go)
 sorted_lines=$(echo "$lines" | sort -f)
 if [[ "$lines" != "$sorted_lines" ]]; then
   echo "Generic features in pkg/features/kube_features.go not sorted" >&2

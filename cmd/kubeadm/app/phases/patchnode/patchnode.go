@@ -17,6 +17,8 @@ limitations under the License.
 package patchnode
 
 import (
+	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -27,8 +29,7 @@ import (
 
 // AnnotateCRISocket annotates the node with the given crisocket
 func AnnotateCRISocket(client clientset.Interface, nodeName string, criSocket string) error {
-
-	klog.V(1).Infof("[patchnode] Uploading the CRI Socket information %q to the Node API object %q as an annotation\n", criSocket, nodeName)
+	klog.V(1).Infof("[patchnode] Uploading the CRI socket %q to Node %q as an annotation", criSocket, nodeName)
 
 	return apiclient.PatchNode(client, nodeName, func(n *v1.Node) {
 		annotateNodeWithCRISocket(n, criSocket)
@@ -40,4 +41,21 @@ func annotateNodeWithCRISocket(n *v1.Node, criSocket string) {
 		n.ObjectMeta.Annotations = make(map[string]string)
 	}
 	n.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket] = criSocket
+}
+
+// RemoveCRISocketAnnotation removes the crisocket annotation from a node.
+func RemoveCRISocketAnnotation(client clientset.Interface, nodeName string) error {
+	klog.V(1).Infof("[patchnode] Removing the CRI socket annotation from Node %q", nodeName)
+
+	if err := apiclient.PatchNode(client, nodeName, removeNodeCRISocketAnnotation); err != nil {
+		return errors.Wrapf(err, "could not remove the CRI socket annotation from Node %q", nodeName)
+	}
+	return nil
+}
+
+func removeNodeCRISocketAnnotation(n *v1.Node) {
+	if n.ObjectMeta.Annotations == nil {
+		return
+	}
+	delete(n.ObjectMeta.Annotations, constants.AnnotationKubeadmCRISocket)
 }

@@ -31,6 +31,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -227,6 +228,28 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 	}
 
 	return pod, nil
+}
+
+// ReadMultipleStaticPodsFromDisk reads multiple known component static Pods from manifestDir
+// and returns a list of Pods objects.
+func ReadMultipleStaticPodsFromDisk(manifestDir string, components ...string) (map[string]*v1.Pod, error) {
+	var (
+		podMap = map[string]*v1.Pod{}
+		errs   []error
+	)
+	for _, c := range components {
+		path := kubeadmconstants.GetStaticPodFilepath(c, manifestDir)
+		pod, err := ReadStaticPodFromDisk(path)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		podMap[c] = pod
+	}
+	if len(errs) > 0 {
+		return nil, utilerrors.NewAggregate(errs)
+	}
+	return podMap, nil
 }
 
 // LivenessProbe creates a Probe object with a HTTPGet handler

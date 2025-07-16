@@ -28,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -60,6 +62,7 @@ type FakeRuntime struct {
 	VersionInfo       string
 	APIVersionInfo    string
 	RuntimeType       string
+	SyncResults       *kubecontainer.PodSyncResult
 	Err               error
 	InspectErr        error
 	StatusErr         error
@@ -68,6 +71,7 @@ type FakeRuntime struct {
 	// from container runtime.
 	BlockImagePulls      bool
 	imagePullTokenBucket chan bool
+	SwapBehavior         map[string]kubetypes.SwapBehavior
 	T                    TB
 }
 
@@ -237,6 +241,9 @@ func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.P
 	for _, c := range pod.Spec.Containers {
 		f.StartedContainers = append(f.StartedContainers, c.Name)
 	}
+	if f.SyncResults != nil {
+		return *f.SyncResults
+	}
 	// TODO(random-liu): Add SyncResult for starting and killing containers
 	if f.Err != nil {
 		result.Fail(f.Err)
@@ -308,7 +315,7 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 	return f.Err
 }
 
-func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
+func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, creds []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
 	f.Lock()
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
 	if f.Err == nil {
@@ -319,9 +326,15 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 		f.ImageList = append(f.ImageList, i)
 	}
 
+	// if credentials were supplied for the pull at least return the first in the list
+	var retCreds *credentialprovider.TrackedAuthConfig = nil
+	if len(creds) > 0 {
+		retCreds = &creds[0]
+	}
+
 	if !f.BlockImagePulls {
 		f.Unlock()
-		return image.Image, f.Err
+		return image.Image, retCreds, f.Err
 	}
 
 	retErr := f.Err
@@ -334,7 +347,8 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 	case <-ctx.Done():
 	case <-f.imagePullTokenBucket:
 	}
-	return image.Image, retErr
+
+	return image.Image, retCreds, retErr
 }
 
 // UnblockImagePulls unblocks a certain number of image pulls, if BlockImagePulls is true.
@@ -523,4 +537,11 @@ func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ kubecontainer.Cont
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetContainerStatus")
 	return nil, f.Err
+}
+
+func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubetypes.SwapBehavior {
+	if f.SwapBehavior != nil && f.SwapBehavior[container.Name] != "" {
+		return f.SwapBehavior[container.Name]
+	}
+	return kubetypes.NoSwap
 }

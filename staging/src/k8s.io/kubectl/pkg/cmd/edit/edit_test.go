@@ -172,7 +172,7 @@ func TestEdit(t *testing.T) {
 	t.Setenv("KUBE_EDITOR", "testdata/test_editor.sh")
 	t.Setenv("KUBE_EDITOR_CALLBACK", server.URL+"/callback")
 
-	testcases := sets.NewString()
+	testcases := sets.New[string]()
 	filepath.Walk("testdata", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -194,7 +194,7 @@ func TestEdit(t *testing.T) {
 		t.Fatalf("Error locating edit testcases")
 	}
 
-	for _, testcaseName := range testcases.List() {
+	for _, testcaseName := range testcases.UnsortedList() {
 		t.Run(testcaseName, func(t *testing.T) {
 			i = 0
 			name = testcaseName

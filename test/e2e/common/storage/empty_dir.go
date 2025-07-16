@@ -32,7 +32,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -49,7 +48,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 	f := framework.NewDefaultFramework("emptydir")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	f.Context("when FSGroup is specified [LinuxOnly]", nodefeature.FSGroup, func() {
+	f.Context("when FSGroup is specified [LinuxOnly]", func() {
 
 		ginkgo.BeforeEach(func() {
 			// Windows does not support the FSGroup SecurityContext option.

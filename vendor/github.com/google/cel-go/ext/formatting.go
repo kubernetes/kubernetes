@@ -434,7 +434,7 @@ func (stringFormatValidator) Validate(env *cel.Env, _ cel.ValidatorConfig, a *as
 		// use a placeholder locale, since locale doesn't affect syntax
 		_, err := parseFormatString(formatStr, formatCheck, formatCheck, "en_US")
 		if err != nil {
-			iss.ReportErrorAtID(getErrorExprID(e.ID(), err), err.Error())
+			iss.ReportErrorAtID(getErrorExprID(e.ID(), err), "%v", err)
 			continue
 		}
 		seenArgs := formatCheck.argsRequested

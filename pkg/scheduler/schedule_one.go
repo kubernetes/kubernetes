@@ -292,29 +292,18 @@ func (sched *Scheduler) bindingCycle(
 		return status
 	}
 
-	// Run "prebind" plugins.
-	if status := fwk.RunPreBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost); !status.IsSuccess() {
-		if status.IsRejected() {
-			fitErr := &framework.FitError{
-				NumAllNodes: 1,
-				Pod:         assumedPodInfo.Pod,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatus:         framework.NewDefaultNodeToStatus(),
-					UnschedulablePlugins: sets.New(status.Plugin()),
-				},
-			}
-			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, status)
-			return framework.NewStatus(status.Code()).WithError(fitErr)
-		}
-		return status
-	}
-
 	// Any failures after this point cannot lead to the Pod being considered unschedulable.
-	// We define the Pod as "unschedulable" only when Pods are rejected at specific extension points, and PreBind is the last one in the scheduling/binding cycle.
+	// We define the Pod as "unschedulable" only when Pods are rejected at specific extension points, and Permit is the last one in the scheduling/binding cycle.
+	// If a Pod fails on PreBind or Bind, it should be moved to BackoffQ for retry.
 	//
 	// We can call Done() here because
-	// we can free the cluster events stored in the scheduling queue sonner, which is worth for busy clusters memory consumption wise.
+	// we can free the cluster events stored in the scheduling queue sooner, which is worth for busy clusters memory consumption wise.
 	sched.SchedulingQueue.Done(assumedPod.UID)
+
+	// Run "prebind" plugins.
+	if status := fwk.RunPreBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost); !status.IsSuccess() {
+		return status
+	}
 
 	// Run "bind" plugins.
 	if status := sched.bind(ctx, fwk, assumedPod, scheduleResult.SuggestedHost, state); !status.IsSuccess() {
@@ -326,7 +315,6 @@ func (sched *Scheduler) bindingCycle(
 	metrics.PodScheduled(fwk.ProfileName(), metrics.SinceInSeconds(start))
 	metrics.PodSchedulingAttempts.Observe(float64(assumedPodInfo.Attempts))
 	if assumedPodInfo.InitialAttemptTimestamp != nil {
-		metrics.PodSchedulingDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
 		metrics.PodSchedulingSLIDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(*assumedPodInfo.InitialAttemptTimestamp))
 	}
 	// Run "postbind" plugins.
@@ -1098,10 +1086,11 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	msg := truncateMessage(errMsg)
 	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 	if err := updatePod(ctx, sched.client, pod, &v1.PodCondition{
-		Type:    v1.PodScheduled,
-		Status:  v1.ConditionFalse,
-		Reason:  reason,
-		Message: errMsg,
+		Type:               v1.PodScheduled,
+		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(&pod.Status, pod.Generation, v1.PodScheduled),
+		Status:             v1.ConditionFalse,
+		Reason:             reason,
+		Message:            errMsg,
 	}, nominatingInfo); err != nil {
 		logger.Error(err, "Error updating pod", "pod", klog.KObj(pod))
 	}

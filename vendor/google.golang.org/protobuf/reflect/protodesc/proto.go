@@ -32,9 +32,6 @@ func ToFileDescriptorProto(file protoreflect.FileDescriptor) *descriptorpb.FileD
 		if imp.IsPublic {
 			p.PublicDependency = append(p.PublicDependency, int32(i))
 		}
-		if imp.IsWeak {
-			p.WeakDependency = append(p.WeakDependency, int32(i))
-		}
 	}
 	for i, locs := 0, file.SourceLocations(); i < locs.Len(); i++ {
 		loc := locs.Get(i)

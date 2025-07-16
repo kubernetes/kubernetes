@@ -689,7 +689,8 @@
             "sleep": {
               "seconds": 1
             }
-          }
+          },
+          "stopSignal": "stopSignalValue"
         },
         "terminationMessagePath": "terminationMessagePathValue",
         "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -985,7 +986,8 @@
             "sleep": {
               "seconds": 1
             }
-          }
+          },
+          "stopSignal": "stopSignalValue"
         },
         "terminationMessagePath": "terminationMessagePathValue",
         "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1281,7 +1283,8 @@
             "sleep": {
               "seconds": 1
             }
-          }
+          },
+          "stopSignal": "stopSignalValue"
         },
         "terminationMessagePath": "terminationMessagePathValue",
         "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1725,10 +1728,12 @@
     }
   },
   "status": {
+    "observedGeneration": 17,
     "phase": "phaseValue",
     "conditions": [
       {
         "type": "typeValue",
+        "observedGeneration": 7,
         "status": "statusValue",
         "lastProbeTime": "2003-01-01T01:01:01Z",
         "lastTransitionTime": "2004-01-01T01:01:01Z",
@@ -1841,7 +1846,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "containerStatuses": [
@@ -1933,7 +1939,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "qosClass": "qosClassValue",
@@ -2026,7 +2033,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "resize": "resizeValue",

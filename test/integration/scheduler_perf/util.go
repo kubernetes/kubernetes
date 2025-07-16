@@ -30,6 +30,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapialpha "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -86,11 +88,10 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
 func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, outOfTreePluginRegistry frameworkruntime.Registry) (informers.SharedInformerFactory, ktesting.TContext) {
-	// No alpha APIs (overrides api/all=true in https://github.com/kubernetes/kubernetes/blob/d647d19f6aef811bace300eec96a67644ff303d4/staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/testing/testserver.go#L136),
-	// except for DRA API group when needed.
-	runtimeConfig := []string{"api/alpha=false"}
+	var runtimeConfig []string
 	if enabledFeatures[features.DynamicResourceAllocation] {
-		runtimeConfig = append(runtimeConfig, "resource.k8s.io/v1alpha3=true")
+		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapi.SchemeGroupVersion))
+		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapialpha.SchemeGroupVersion))
 	}
 	customFlags := []string{
 		// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
@@ -303,8 +304,8 @@ func dataFilename(destFile string) (string, error) {
 }
 
 type labelValues struct {
-	label  string
-	values []string
+	Label  string
+	Values []string
 }
 
 // metricsCollectorConfig is the config to be marshalled to YAML config file.
@@ -380,13 +381,13 @@ func uniqueLVCombos(lvs []*labelValues) []map[string]string {
 	results := make([]map[string]string, 0)
 
 	current := lvs[0]
-	for _, value := range current.values {
+	for _, value := range current.Values {
 		for _, combo := range remainingCombos {
 			newCombo := make(map[string]string, len(combo)+1)
 			for k, v := range combo {
 				newCombo[k] = v
 			}
-			newCombo[current.label] = value
+			newCombo[current.Label] = value
 			results = append(results, newCombo)
 		}
 	}

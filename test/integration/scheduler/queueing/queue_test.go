@@ -51,7 +51,7 @@ import (
 	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSchedulingGates(t *testing.T) {
@@ -264,7 +264,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				Filter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -378,7 +378,7 @@ func TestRequeueByBindFailure(t *testing.T) {
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				MultiPoint: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -471,7 +471,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 	}
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				MultiPoint: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -580,4 +580,39 @@ func (p *fakePermitPlugin) EventsToRegister(_ context.Context) ([]framework.Clus
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeLabel}, QueueingHintFn: p.schedulingHint},
 	}, nil
+}
+
+func TestPopFromBackoffQWhenActiveQEmpty(t *testing.T) {
+	// Set initial backoff to 1000s to make sure pod won't go to the activeQ after being requeued.
+	testCtx := testutils.InitTestSchedulerWithNS(t, "pop-from-backoffq", scheduler.WithPodInitialBackoffSeconds(1000), scheduler.WithPodMaxBackoffSeconds(1000))
+	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+
+	// Create node, so we can schedule pods.
+	node := st.MakeNode().Name("node").Obj()
+	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatal("Failed to create node")
+	}
+
+	// Create a pod that will be unschedulable.
+	pod := st.MakePod().Namespace(ns).Name("pod").NodeAffinityIn("foo", []string{"bar"}, st.NodeSelectorTypeMatchExpressions).Container(imageutils.GetPauseImageName()).Obj()
+	if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+
+	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, ns, pod.Name))
+	if err != nil {
+		t.Fatalf("Expected pod to be unschedulable: %v", err)
+	}
+
+	// Create node with label to make the pod schedulable.
+	node2 := st.MakeNode().Name("node-schedulable").Label("foo", "bar").Obj()
+	if _, err := cs.CoreV1().Nodes().Create(ctx, node2, metav1.CreateOptions{}); err != nil {
+		t.Fatal("Failed to create node-schedulable")
+	}
+
+	// Pod should be scheduled, even if it was in the backoffQ, because PopFromBackoffQ feature is enabled.
+	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
+	if err != nil {
+		t.Fatalf("Expected pod to be scheduled: %v", err)
+	}
 }

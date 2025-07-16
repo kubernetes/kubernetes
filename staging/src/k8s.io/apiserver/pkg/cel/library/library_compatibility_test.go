@@ -17,11 +17,12 @@ limitations under the License.
 package library
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/decls"
 	"github.com/google/cel-go/common/types"
-	"strings"
-	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -56,6 +57,8 @@ func TestLibraryCompatibility(t *testing.T) {
 		"fieldSelector", "labelSelector", "validate", "format.named", "isSemver", "major", "minor", "patch", "semver",
 		// Kubernetes <1.32>:
 		"jsonpatch.escapeKey",
+		// Kubernetes <1.33>:
+		"semver", "isSemver", "major", "minor", "patch",
 		// Kubernetes <1.??>:
 	)
 

@@ -16,7 +16,10 @@ limitations under the License.
 
 package types
 
-import "strings"
+import (
+	gotypes "go/types"
+	"strings"
+)
 
 // Ref makes a reference to the given type. It can only be used for e.g.
 // passing to namers.
@@ -358,6 +361,9 @@ type Type struct {
 
 	// If Kind == Array
 	Len int64
+
+	// The underlying Go type.
+	GoType gotypes.Type
 }
 
 // String returns the name of the type.
@@ -400,6 +406,11 @@ func (t *Type) IsAssignable() bool {
 // to an anonymous struct.
 func (t *Type) IsAnonymousStruct() bool {
 	return (t.Kind == Struct && t.Name.Name == "struct{}") || (t.Kind == Alias && t.Underlying.IsAnonymousStruct())
+}
+
+// IsComparable returns whether the type is comparable.
+func (t *Type) IsComparable() bool {
+	return gotypes.Comparable(t.GoType)
 }
 
 // A single struct member
@@ -452,6 +463,10 @@ type Signature struct {
 
 // Built in types.
 var (
+	Any = &Type{
+		Name: Name{Name: "any"},
+		Kind: Interface,
+	}
 	String = &Type{
 		Name: Name{Name: "string"},
 		Kind: Builtin,
@@ -515,6 +530,7 @@ var (
 
 	builtins = &Package{
 		Types: map[string]*Type{
+			"any":     Any,
 			"bool":    Bool,
 			"string":  String,
 			"int":     Int,
@@ -538,6 +554,16 @@ var (
 		Name:    "",
 	}
 )
+
+func PointerTo(t *Type) *Type {
+	return &Type{
+		Name: Name{
+			Name: "*" + t.Name.String(),
+		},
+		Kind: Pointer,
+		Elem: t,
+	}
+}
 
 func IsInteger(t *Type) bool {
 	switch t {

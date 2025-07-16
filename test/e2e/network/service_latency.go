@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,9 +33,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -135,18 +135,13 @@ var _ = common.SIGDescribe("Service endpoints latency", func() {
 })
 
 func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel, total int, acceptableFailureRatio float32) (output []time.Duration, err error) {
-	cfg := testutils.RCConfig{
-		Client:       f.ClientSet,
-		Image:        imageutils.GetPauseImageName(),
-		Name:         "svc-latency-rc",
-		Namespace:    f.Namespace.Name,
-		Replicas:     1,
-		PollInterval: time.Second,
-	}
-	if err := e2erc.RunRC(ctx, cfg); err != nil {
-		return nil, err
-	}
+	name := "svc-latency-rc"
+	deploymentConf := e2edeployment.NewDeployment(name, 1, map[string]string{"name": name}, name, imageutils.GetPauseImageName(), appsv1.RecreateDeploymentStrategyType)
+	deployment, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Create(ctx, deploymentConf, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
 
+	err = e2edeployment.WaitForDeploymentComplete(f.ClientSet, deployment)
+	framework.ExpectNoError(err)
 	// Run a single watcher, to reduce the number of API calls we have to
 	// make; this is to minimize the timing error. It's how kube-proxy
 	// consumes the endpoints data, so it seems like the right thing to
@@ -157,7 +152,7 @@ func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel
 
 	// run one test and throw it away-- this is to make sure that the pod's
 	// ready status has propagated.
-	_, err = singleServiceLatency(ctx, f, cfg.Name, endpointQueries)
+	_, err = singleServiceLatency(ctx, f, name, endpointQueries)
 	framework.ExpectNoError(err)
 
 	// These channels are never closed, and each attempt sends on exactly
@@ -172,7 +167,7 @@ func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel
 			defer ginkgo.GinkgoRecover()
 			blocker <- struct{}{}
 			defer func() { <-blocker }()
-			if d, err := singleServiceLatency(ctx, f, cfg.Name, endpointQueries); err != nil {
+			if d, err := singleServiceLatency(ctx, f, name, endpointQueries); err != nil {
 				errs <- err
 			} else {
 				durations <- d

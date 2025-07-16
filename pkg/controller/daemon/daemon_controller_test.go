@@ -2494,6 +2494,13 @@ func TestUpdateNode(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			manager.nodeUpdateQueue = workqueue.NewTypedRateLimitingQueueWithConfig(
+				workqueue.DefaultTypedControllerRateLimiter[string](),
+				workqueue.TypedRateLimitingQueueConfig[string]{
+					Name: "test-daemon-node-updates",
+				},
+			)
+
 			expectedEvents := 0
 			if c.expectedEventsFunc != nil {
 				expectedEvents = c.expectedEventsFunc(strategy.Type)
@@ -2510,8 +2517,18 @@ func TestUpdateNode(t *testing.T) {
 				}
 			}
 
+			err = manager.nodeStore.Add(c.newNode)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			enqueued = false
 			manager.updateNode(logger, c.oldNode, c.newNode)
+
+			nodeKeys := getQueuedKeys(manager.nodeUpdateQueue)
+			for _, key := range nodeKeys {
+				manager.syncNodeUpdate(ctx, key)
+			}
 			if enqueued != c.shouldEnqueue {
 				t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
 			}
@@ -2880,18 +2897,29 @@ func TestAddNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	manager.addNode(logger, node1)
-	if got, want := manager.queue.Len(), 0; got != want {
+	if got, want := manager.nodeUpdateQueue.Len(), 1; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
+	key, done := manager.nodeUpdateQueue.Get()
+	if done {
+		t.Fatal("failed to get item from nodeUpdateQueue")
+	}
+	if key != node1.Name {
+		t.Fatalf("expected node name %v, got %v", node1.Name, key)
+	}
+	manager.nodeUpdateQueue.Done(key)
 
 	node2 := newNode("node2", simpleNodeLabel)
 	manager.addNode(logger, node2)
-	if got, want := manager.queue.Len(), 1; got != want {
+	if got, want := manager.nodeUpdateQueue.Len(), 1; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
-	key, done := manager.queue.Get()
-	if key == "" || done {
-		t.Fatalf("failed to enqueue controller for node %v", node2.Name)
+	key, done = manager.nodeUpdateQueue.Get()
+	if done {
+		t.Fatal("failed to get item from nodeUpdateQueue")
+	}
+	if key != node2.Name {
+		t.Fatalf("expected node name %v, got %v", node2.Name, key)
 	}
 }
 

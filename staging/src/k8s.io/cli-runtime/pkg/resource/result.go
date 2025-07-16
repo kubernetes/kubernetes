@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -144,7 +144,7 @@ func (r *Result) Object() (runtime.Object, error) {
 		return nil, err
 	}
 
-	versions := sets.String{}
+	versions := sets.New[string]()
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object != nil {
@@ -165,7 +165,7 @@ func (r *Result) Object() (runtime.Object, error) {
 
 	version := ""
 	if len(versions) == 1 {
-		version = versions.List()[0]
+		version = versions.UnsortedList()[0]
 	}
 
 	return toV1List(objects, version), err

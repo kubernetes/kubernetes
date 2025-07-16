@@ -10,6 +10,8 @@ endpoints:
   deprecatedTopology:
     deprecatedTopologyKey: deprecatedTopologyValue
   hints:
+    forNodes:
+    - name: nameValue
     forZones:
     - name: nameValue
   hostname: hostnameValue

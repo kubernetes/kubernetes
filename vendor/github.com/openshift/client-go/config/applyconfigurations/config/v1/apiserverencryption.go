@@ -9,7 +9,8 @@ import (
 // APIServerEncryptionApplyConfiguration represents a declarative configuration of the APIServerEncryption type for use
 // with apply.
 type APIServerEncryptionApplyConfiguration struct {
-	Type *configv1.EncryptionType `json:"type,omitempty"`
+	Type *configv1.EncryptionType     `json:"type,omitempty"`
+	KMS  *KMSConfigApplyConfiguration `json:"kms,omitempty"`
 }
 
 // APIServerEncryptionApplyConfiguration constructs a declarative configuration of the APIServerEncryption type for use with
@@ -23,5 +24,13 @@ func APIServerEncryption() *APIServerEncryptionApplyConfiguration {
 // If called multiple times, the Type field is set to the value of the last call.
 func (b *APIServerEncryptionApplyConfiguration) WithType(value configv1.EncryptionType) *APIServerEncryptionApplyConfiguration {
 	b.Type = &value
+	return b
+}
+
+// WithKMS sets the KMS field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the KMS field is set to the value of the last call.
+func (b *APIServerEncryptionApplyConfiguration) WithKMS(value *KMSConfigApplyConfiguration) *APIServerEncryptionApplyConfiguration {
+	b.KMS = value
 	return b
 }

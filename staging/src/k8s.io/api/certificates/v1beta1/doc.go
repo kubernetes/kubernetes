@@ -21,4 +21,4 @@ limitations under the License.
 
 // +groupName=certificates.k8s.io
 
-package v1beta1 // import "k8s.io/api/certificates/v1beta1"
+package v1beta1

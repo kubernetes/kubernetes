@@ -26,6 +26,7 @@ import (
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -38,6 +39,9 @@ var _ = SIGDescribe("ContainerMetrics", "[LinuxOnly]", framework.WithNodeConform
 	ginkgo.Context("when querying /metrics/cadvisor", func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			createMetricsPods(ctx, f)
+		})
+		ginkgo.AfterEach(func(ctx context.Context) {
+			removeMetricsPods(ctx, f)
 		})
 		ginkgo.It("should report container metrics", func(ctx context.Context) {
 			keys := gstruct.Keys{}
@@ -52,9 +56,9 @@ var _ = SIGDescribe("ContainerMetrics", "[LinuxOnly]", framework.WithNodeConform
 				"container_fs_reads_total":                      boundedSample(0, 100),
 				"container_fs_usage_bytes":                      boundedSample(0, 1000000),
 				"container_fs_writes_bytes_total":               boundedSample(0, 1000000),
-				"container_fs_writes_total":                     boundedSample(0, 100),
+				"container_fs_writes_total":                     boundedSample(0, 200),
 				"container_last_seen":                           boundedSample(time.Now().Add(-maxStatsAge).Unix(), time.Now().Add(2*time.Minute).Unix()),
-				"container_memory_cache":                        boundedSample(1*e2evolume.Kb, 10*e2evolume.Mb),
+				"container_memory_cache":                        boundedSample(0, 10*e2evolume.Mb),
 				"container_memory_failcnt":                      preciseSample(0),
 				"container_memory_failures_total":               boundedSample(0, 1000000),
 				"container_memory_mapped_file":                  boundedSample(0, 10000000),
@@ -70,12 +74,12 @@ var _ = SIGDescribe("ContainerMetrics", "[LinuxOnly]", framework.WithNodeConform
 				"container_spec_cpu_shares":                     preciseSample(2),
 				"container_spec_memory_limit_bytes":             preciseSample(79998976),
 				"container_spec_memory_reservation_limit_bytes": preciseSample(0),
-				"container_spec_memory_swap_limit_bytes":        preciseSample(0),
+				"container_spec_memory_swap_limit_bytes":        boundedSample(0, 80*e2evolume.Mb),
 				"container_start_time_seconds":                  boundedSample(time.Now().Add(-maxStatsAge).Unix(), time.Now().Add(2*time.Minute).Unix()),
 				"container_tasks_state":                         preciseSample(0),
 				"container_threads":                             boundedSample(0, 10),
 				"container_threads_max":                         boundedSample(0, 100000),
-				"container_ulimits_soft":                        boundedSample(0, 10000000),
+				"container_ulimits_soft":                        boundedSample(0, 1073741816),
 			}
 			appendMatchesForContainer(f.Namespace.Name, pod0, pod1, "busybox-container", ctrMatches, keys, gstruct.AllowDuplicates|gstruct.IgnoreExtras)
 
@@ -117,15 +121,12 @@ var _ = SIGDescribe("ContainerMetrics", "[LinuxOnly]", framework.WithNodeConform
 			ginkgo.By("Ensuring the metrics match the expectations a few more times")
 			gomega.Consistently(ctx, getContainerMetrics, 1*time.Minute, 15*time.Second).Should(matchResourceMetrics)
 		})
-		ginkgo.AfterEach(func(ctx context.Context) {
-			removeMetricsPods(ctx, f)
-		})
 	})
 })
 
 func getContainerMetrics(ctx context.Context) (e2emetrics.KubeletMetrics, error) {
 	ginkgo.By("getting container metrics from cadvisor")
-	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, framework.TestContext.NodeName+":10255", "/metrics/cadvisor")
+	return e2emetrics.GrabKubeletMetricsWithoutProxy(ctx, fmt.Sprintf("%s:%d", nodeNameOrIP(), ports.KubeletReadOnlyPort), "/metrics/cadvisor")
 }
 
 func preciseSample(value interface{}) types.GomegaMatcher {

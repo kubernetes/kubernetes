@@ -189,9 +189,11 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	// Assume that migration is always possible, rely on migrateCoreDNSCorefile() to fail if not.
 	canMigrateCorefile := true
 
+	configMapClient := client.CoreV1().ConfigMaps(coreDNSConfigMap.GetNamespace())
+
 	if corefile == "" || migration.Default("", corefile) {
 		// If the Corefile is empty or default, the latest default Corefile will be applied
-		if err := apiclient.CreateOrUpdateConfigMap(client, coreDNSConfigMap); err != nil {
+		if err := apiclient.CreateOrUpdate(configMapClient, coreDNSConfigMap); err != nil {
 			return err
 		}
 	} else if corefileMigrationRequired {
@@ -201,13 +203,13 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 			// to ignore preflight check errors.
 			canMigrateCorefile = false
 			klog.Warningf("the CoreDNS Configuration was not migrated: %v. The existing CoreDNS Corefile configuration has been retained.", err)
-			if err := apiclient.CreateOrRetainConfigMap(client, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
+			if err := apiclient.CreateOrRetain(configMapClient, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
 				return err
 			}
 		}
 	} else {
 		// If the Corefile is modified and doesn't require any migration, it'll be retained for the benefit of the user
-		if err := apiclient.CreateOrRetainConfigMap(client, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
+		if err := apiclient.CreateOrRetain(configMapClient, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
 			return err
 		}
 	}
@@ -218,7 +220,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	}
 
 	// Create the Clusterroles for CoreDNS or update it in case it already exists
-	if err := apiclient.CreateOrUpdateClusterRole(client, coreDNSClusterRoles); err != nil {
+	if err := apiclient.CreateOrUpdate(client.RbacV1().ClusterRoles(), coreDNSClusterRoles); err != nil {
 		return err
 	}
 
@@ -228,7 +230,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	}
 
 	// Create the Clusterrolebindings for CoreDNS or update it in case it already exists
-	if err := apiclient.CreateOrUpdateClusterRoleBinding(client, coreDNSClusterRolesBinding); err != nil {
+	if err := apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), coreDNSClusterRolesBinding); err != nil {
 		return err
 	}
 
@@ -238,7 +240,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	}
 
 	// Create the ConfigMap for CoreDNS or update it in case it already exists
-	if err := apiclient.CreateOrUpdateServiceAccount(client, coreDNSServiceAccount); err != nil {
+	if err := apiclient.CreateOrUpdate(client.CoreV1().ServiceAccounts(coreDNSServiceAccount.GetNamespace()), coreDNSServiceAccount); err != nil {
 		return err
 	}
 
@@ -248,13 +250,14 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	}
 
 	// Create the deployment for CoreDNS or retain it in case the CoreDNS migration has failed during upgrade
+	deploymentsClient := client.AppsV1().Deployments(coreDNSDeployment.GetNamespace())
 	if !canMigrateCorefile {
-		if err := apiclient.CreateOrRetainDeployment(client, coreDNSDeployment, kubeadmconstants.CoreDNSDeploymentName); err != nil {
+		if err := apiclient.CreateOrRetain(deploymentsClient, coreDNSDeployment, kubeadmconstants.CoreDNSDeploymentName); err != nil {
 			return err
 		}
 	} else {
 		// Create the Deployment for CoreDNS or update it in case it already exists
-		if err := apiclient.CreateOrUpdateDeployment(client, coreDNSDeployment); err != nil {
+		if err := apiclient.CreateOrUpdate(deploymentsClient, coreDNSDeployment); err != nil {
 			return err
 		}
 	}

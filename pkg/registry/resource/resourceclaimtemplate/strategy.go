@@ -27,60 +27,72 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	"k8s.io/kubernetes/pkg/features"
+	resourceutils "k8s.io/kubernetes/pkg/registry/resource"
 )
 
 // resourceClaimTemplateStrategy implements behavior for ResourceClaimTemplate objects
 type resourceClaimTemplateStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
+	nsClient v1.NamespaceInterface
 }
 
-var Strategy = resourceClaimTemplateStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+// NewStrategy is the default logic that applies when creating and updating ResourceClaimTemplate objects.
+func NewStrategy(nsClient v1.NamespaceInterface) *resourceClaimTemplateStrategy {
+	return &resourceClaimTemplateStrategy{
+		legacyscheme.Scheme,
+		names.SimpleNameGenerator,
+		nsClient,
+	}
+}
 
-func (resourceClaimTemplateStrategy) NamespaceScoped() bool {
+func (*resourceClaimTemplateStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (resourceClaimTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (*resourceClaimTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	claimTemplate := obj.(*resource.ResourceClaimTemplate)
 	dropDisabledFields(claimTemplate, nil)
 }
 
-func (resourceClaimTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+func (s *resourceClaimTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	resourceClaimTemplate := obj.(*resource.ResourceClaimTemplate)
-	return validation.ValidateResourceClaimTemplate(resourceClaimTemplate)
+	allErrs := resourceutils.AuthorizedForAdmin(ctx, resourceClaimTemplate.Spec.Spec.Devices.Requests, resourceClaimTemplate.Namespace, s.nsClient)
+	return append(allErrs, validation.ValidateResourceClaimTemplate(resourceClaimTemplate)...)
 }
 
-func (resourceClaimTemplateStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+func (*resourceClaimTemplateStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	return nil
 }
 
-func (resourceClaimTemplateStrategy) Canonicalize(obj runtime.Object) {
+func (*resourceClaimTemplateStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (resourceClaimTemplateStrategy) AllowCreateOnUpdate() bool {
+func (*resourceClaimTemplateStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (resourceClaimTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+func (*resourceClaimTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	claimTemplate, oldClaimTemplate := obj.(*resource.ResourceClaimTemplate), old.(*resource.ResourceClaimTemplate)
 	dropDisabledFields(claimTemplate, oldClaimTemplate)
 }
 
-func (resourceClaimTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+func (s *resourceClaimTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	// AuthorizedForAdmin isn't needed here because the spec is immutable.
 	errorList := validation.ValidateResourceClaimTemplate(obj.(*resource.ResourceClaimTemplate))
 	return append(errorList, validation.ValidateResourceClaimTemplateUpdate(obj.(*resource.ResourceClaimTemplate), old.(*resource.ResourceClaimTemplate))...)
 }
 
-func (resourceClaimTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+func (*resourceClaimTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
 
-func (resourceClaimTemplateStrategy) AllowUnconditionalUpdate() bool {
+func (*resourceClaimTemplateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
@@ -100,7 +112,35 @@ func toSelectableFields(template *resource.ResourceClaimTemplate) fields.Set {
 }
 
 func dropDisabledFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
+	dropDisabledDRAPrioritizedListFields(newClaimTemplate, oldClaimTemplate)
 	dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate)
+}
+
+func dropDisabledDRAPrioritizedListFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList) {
+		return
+	}
+	if draPrioritizedListFeatureInUse(oldClaimTemplate) {
+		return
+	}
+
+	for i := range newClaimTemplate.Spec.Spec.Devices.Requests {
+		newClaimTemplate.Spec.Spec.Devices.Requests[i].FirstAvailable = nil
+	}
+}
+
+func draPrioritizedListFeatureInUse(claimTemplate *resource.ResourceClaimTemplate) bool {
+	if claimTemplate == nil {
+		return false
+	}
+
+	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
+		if len(request.FirstAvailable) > 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
@@ -115,7 +155,9 @@ func dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate *resour
 	}
 
 	for i := range newClaimTemplate.Spec.Spec.Devices.Requests {
-		newClaimTemplate.Spec.Spec.Devices.Requests[i].AdminAccess = nil
+		if newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly != nil {
+			newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly.AdminAccess = nil
+		}
 	}
 }
 
@@ -125,7 +167,7 @@ func draAdminAccessFeatureInUse(claimTemplate *resource.ResourceClaimTemplate) b
 	}
 
 	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
-		if request.AdminAccess != nil {
+		if request.Exactly != nil && request.Exactly.AdminAccess != nil {
 			return true
 		}
 	}

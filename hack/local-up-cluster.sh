@@ -56,14 +56,10 @@ LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.6.0"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.6.2"}
 # The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
 CNI_TARGETARCH=${CNI_TARGETARCH:-""}
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
-CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"57a18478422cb321370e30a5ee6ce026321289cd9c94353ca697dddd7714f1a5"}
-CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"ab38507efe50c34bc2242a25c5783c19fdfe0376c65a2a91d48174d4f39f1fc2"}
-CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"5eea6e7033a337fd98df00fa8a72a8ca8d2d2c69f6637555828515de94158cab"}
-CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"3d1b56d8b357ee593866cd9342a61fc797852da9ff75ae5ed7b5de125a30b253"}
 
 # enables testing eviction scenarios locally.
 EVICTION_HARD=${EVICTION_HARD:-"imagefs.available<15%,memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
@@ -156,6 +152,9 @@ KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 # Audit policy
 AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
 
+# dmesg command PID for cleanup
+DMESG_PID=${DMESG_PID:-""}
+
 # Stop right away if the build fails
 set -e
 
@@ -168,8 +167,7 @@ function usage {
             echo "Example 1: hack/local-up-cluster.sh -o _output/dockerized/bin/linux/amd64/ (run from docker output)"
             echo "Example 2: hack/local-up-cluster.sh -O (auto-guess the bin path for your platform)"
             echo "Example 3: hack/local-up-cluster.sh (build a local copy of the source)"
-            echo "Example 4: FEATURE_GATES=CPUManagerPolicyOptions=true \\"
-            echo "           TOPOLOGY_MANAGER_POLICY=\"single-numa-node\" \\"
+            echo "Example 4: TOPOLOGY_MANAGER_POLICY=\"single-numa-node\" \\"
             echo "           CPUMANAGER_POLICY=\"static\" \\"
             echo "           CPUMANAGER_POLICY_OPTIONS=full-pcpus-only=\"true\" \\"
             echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
@@ -411,6 +409,9 @@ cleanup()
     [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
   fi
 
+  # Cleanup dmesg running in the background
+  [[ -n "${DMESG_PID-}" ]] && sudo kill "$DMESG_PID" 2>/dev/null
+
   exit 0
 }
 
@@ -570,11 +571,6 @@ function start_apiserver {
       generate_certs
     fi
 
-    cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
-    if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
-      cloud_config_arg="--cloud-provider=external"
-    fi
-
     if [[ -z "${EGRESS_SELECTOR_CONFIG_FILE:-}" ]]; then
       cat <<EOF > "${TMP_DIR}"/kube_egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1beta1
@@ -607,7 +603,6 @@ EOF
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
     # shellcheck disable=SC2086
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-apiserver" "${authorizer_args[@]}" "${priv_arg}" ${runtime_config} \
-      ${cloud_config_arg} \
       "${advertise_address}" \
       "${node_port_range}" \
       --v="${LOG_LEVEL}" \
@@ -810,8 +805,11 @@ function wait_coredns_available(){
     echo "6" | sudo tee /proc/sys/kernel/printk
 
     # loop through and grab all things in dmesg
-    dmesg > "${LOG_DIR}/dmesg.log"
-    dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
+    # shellcheck disable=SC2024
+    sudo dmesg > "${LOG_DIR}/dmesg.log"
+    # shellcheck disable=SC2024
+    sudo dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
+    DMESG_PID=$!
   fi
 }
 
@@ -1430,7 +1428,9 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
         ;;
       Linux)
         start_kubeproxy
-        wait_coredns_available
+        if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
+          wait_coredns_available
+        fi
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kube-proxy aborted."

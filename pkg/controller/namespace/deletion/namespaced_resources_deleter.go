@@ -529,6 +529,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 		finalizersToNumRemaining: map[string]int{},
 	}
 	podsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+
 	if _, hasPods := groupVersionResources[podsGVR]; hasPods && utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) {
 		// Ensure all pods in the namespace are deleted first
 		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(ctx, podsGVR, namespace, namespaceDeletedAt)

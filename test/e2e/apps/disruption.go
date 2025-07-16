@@ -494,7 +494,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 				waitForPdbToObserveHealthyPods(ctx, cs, ns, replicas, replicas-1)
 			} else {
 				ginkgo.By("Wait for pods to be running and not ready")
-				err := e2epod.VerifyPodsRunning(ctx, cs, ns, rsName, false, replicas)
+				err := e2epod.VerifyPodsRunning(ctx, cs, ns, rsName, labels.SelectorFromSet(rs.Labels), false, replicas)
 				framework.ExpectNoError(err)
 				waitForPdbToObserveHealthyPods(ctx, cs, ns, 0, replicas-1)
 			}

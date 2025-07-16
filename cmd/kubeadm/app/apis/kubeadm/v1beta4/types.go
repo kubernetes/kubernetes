@@ -749,6 +749,11 @@ type UpgradePlanConfiguration struct {
 	// +optional
 	DryRun *bool `json:"dryRun,omitempty"`
 
+	// EtcdUpgrade instructs kubeadm to execute etcd upgrade during upgrades.
+	// Defaults to true.
+	// +optional
+	EtcdUpgrade *bool `json:"etcdUpgrade,omitempty"`
+
 	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored during the upgrade process, e.g. 'IsPrivilegedUser,Swap'.
 	// Value 'all' ignores errors from all checks.
 	// +optional

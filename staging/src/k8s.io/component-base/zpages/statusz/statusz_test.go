@@ -152,58 +152,6 @@ func TestStatusz(t *testing.T) {
 	}
 }
 
-func TestAcceptableMediaTypes(t *testing.T) {
-	tests := []struct {
-		name      string
-		reqHeader string
-		want      bool
-	}{
-		{
-			name:      "valid text/plain header",
-			reqHeader: "text/plain",
-			want:      true,
-		},
-		{
-			name:      "valid text/* header",
-			reqHeader: "text/*",
-			want:      true,
-		},
-		{
-			name:      "valid */plain header",
-			reqHeader: "*/plain",
-			want:      true,
-		},
-		{
-			name:      "valid accept args",
-			reqHeader: "text/plain; charset=utf-8",
-			want:      true,
-		},
-		{
-			name:      "invalid text/foo header",
-			reqHeader: "text/foo",
-			want:      false,
-		},
-		{
-			name:      "invalid text/plain params",
-			reqHeader: "text/plain; foo=bar",
-			want:      false,
-		},
-	}
-	for _, tt := range tests {
-		req, err := http.NewRequest(http.MethodGet, "http://example.com/statusz", nil)
-		if err != nil {
-			t.Fatalf("Unexpected error while creating request: %v", err)
-		}
-
-		req.Header.Set("Accept", tt.reqHeader)
-		got := acceptableMediaType(req)
-
-		if got != tt.want {
-			t.Errorf("Unexpected response from acceptableMediaType(), want %v, got = %v", tt.want, got)
-		}
-	}
-}
-
 func parseVersion(t *testing.T, v string) *version.Version {
 	parsed, err := version.ParseMajorMinor(v)
 	if err != nil {

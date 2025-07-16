@@ -30,8 +30,7 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1" // should this change, too? there are still certv1beta1.CSR printers, but not their v1 versions
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
@@ -41,7 +40,7 @@ import (
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
@@ -52,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/certificate/csr"
+	"k8s.io/utils/ptr"
 
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	podutilv1 "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -420,7 +420,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	clusterTrustBundleColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "SignerName", Type: "string", Description: certificatesv1alpha1.ClusterTrustBundleSpec{}.SwaggerDoc()["signerName"]},
+		{Name: "SignerName", Type: "string", Description: certificatesv1beta1.ClusterTrustBundleSpec{}.SwaggerDoc()["signerName"]},
 	}
 	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundle)
 	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundleList)
@@ -483,9 +483,9 @@ func AddHandlers(h printers.PrintHandler) {
 
 	resourceQuotaColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Request", Type: "string", Description: "Request represents a minimum amount of cpu/memory that a container may consume."},
 		{Name: "Limit", Type: "string", Description: "Limits control the maximum amount of cpu/memory that a container may use independent of contention on the node."},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(resourceQuotaColumnDefinitions, printResourceQuota)
 	_ = h.TableHandler(resourceQuotaColumnDefinitions, printResourceQuotaList)
@@ -686,6 +686,22 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	_ = h.TableHandler(nodeResourceSliceColumnDefinitions, printResourceSlice)
 	_ = h.TableHandler(nodeResourceSliceColumnDefinitions, printResourceSliceList)
+
+	deviceTaintColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		// The filter criteria are not printed. They could be lengthy (CEL!) and in practice many of them
+		// will be empty. Instead, the admin could pick a descriptive name.
+		//
+		// The taint is more useful.
+		{Name: "Key", Type: "string", Description: resourceapi.DeviceTaint{}.SwaggerDoc()["key"]},
+		{Name: "Value", Type: "string", Description: resourceapi.DeviceTaint{}.SwaggerDoc()["value"]},
+		{Name: "Effect", Type: "string", Description: resourceapi.DeviceTaint{}.SwaggerDoc()["effect"]},
+		// TimeAdded and Age are often the same, but not necessarily.
+		{Name: "TimeAdded", Type: "string", Description: resourceapi.DeviceTaint{}.SwaggerDoc()["timeAdded"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(deviceTaintColumnDefinitions, printDeviceTaint)
+	_ = h.TableHandler(deviceTaintColumnDefinitions, printDeviceTaintRuleList)
 
 	serviceCIDRColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -1124,7 +1140,7 @@ func printReplicationController(obj *api.ReplicationController, options printers
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	desiredReplicas := obj.Spec.Replicas
+	desiredReplicas := ptr.Deref(obj.Spec.Replicas, 0)
 	currentReplicas := obj.Status.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 
@@ -2792,7 +2808,7 @@ func printResourceQuota(resourceQuota *api.ResourceQuota, options printers.Gener
 	}
 
 	age := translateTimestampSince(resourceQuota.CreationTimestamp)
-	row.Cells = append(row.Cells, resourceQuota.Name, age, strings.TrimSuffix(requestColumn.String(), ", "), strings.TrimSuffix(limitColumn.String(), ", "))
+	row.Cells = append(row.Cells, resourceQuota.Name, strings.TrimSuffix(requestColumn.String(), ", "), strings.TrimSuffix(limitColumn.String(), ", "), age)
 	return []metav1.TableRow{row}, nil
 }
 
@@ -3155,7 +3171,11 @@ func printResourceSlice(obj *resource.ResourceSlice, options printers.GenerateOp
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.NodeName, obj.Spec.Driver, obj.Spec.Pool.Name, translateTimestampSince(obj.CreationTimestamp))
+	nodeName := ""
+	if obj.Spec.NodeName != nil {
+		nodeName = *obj.Spec.NodeName
+	}
+	row.Cells = append(row.Cells, obj.Name, nodeName, obj.Spec.Driver, obj.Spec.Pool.Name, translateTimestampSince(obj.CreationTimestamp))
 
 	return []metav1.TableRow{row}, nil
 }
@@ -3164,6 +3184,32 @@ func printResourceSliceList(list *resource.ResourceSliceList, options printers.G
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printResourceSlice(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printDeviceTaint(obj *resource.DeviceTaintRule, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	timeAdded := ""
+	if added := obj.Spec.Taint.TimeAdded; added != nil {
+		timeAdded = translateTimestampSince(*added)
+	}
+	row.Cells = append(row.Cells, obj.Name, string(obj.Spec.Taint.Key), obj.Spec.Taint.Value, string(obj.Spec.Taint.Effect), timeAdded, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printDeviceTaintRuleList(list *resource.DeviceTaintRuleList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printDeviceTaint(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

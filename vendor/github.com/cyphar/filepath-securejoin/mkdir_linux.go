@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -21,6 +20,33 @@ var (
 	errInvalidMode    = errors.New("invalid permission mode")
 	errPossibleAttack = errors.New("possible attack detected")
 )
+
+// modePermExt is like os.ModePerm except that it also includes the set[ug]id
+// and sticky bits.
+const modePermExt = os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky
+
+//nolint:cyclop // this function needs to handle a lot of cases
+func toUnixMode(mode os.FileMode) (uint32, error) {
+	sysMode := uint32(mode.Perm())
+	if mode&os.ModeSetuid != 0 {
+		sysMode |= unix.S_ISUID
+	}
+	if mode&os.ModeSetgid != 0 {
+		sysMode |= unix.S_ISGID
+	}
+	if mode&os.ModeSticky != 0 {
+		sysMode |= unix.S_ISVTX
+	}
+	// We don't allow file type bits.
+	if mode&os.ModeType != 0 {
+		return 0, fmt.Errorf("%w %+.3o (%s): type bits not permitted", errInvalidMode, mode, mode)
+	}
+	// We don't allow other unknown modes.
+	if mode&^modePermExt != 0 || sysMode&unix.S_IFMT != 0 {
+		return 0, fmt.Errorf("%w %+.3o (%s): unknown mode bits", errInvalidMode, mode, mode)
+	}
+	return sysMode, nil
+}
 
 // MkdirAllHandle is equivalent to [MkdirAll], except that it is safer to use
 // in two respects:
@@ -40,17 +66,17 @@ var (
 // a brand new lookup of unsafePath (such as with [SecureJoin] or openat2) after
 // doing [MkdirAll]. If you intend to open the directory after creating it, you
 // should use MkdirAllHandle.
-func MkdirAllHandle(root *os.File, unsafePath string, mode int) (_ *os.File, Err error) {
-	// Make sure there are no os.FileMode bits set.
-	if mode&^0o7777 != 0 {
-		return nil, fmt.Errorf("%w for mkdir 0o%.3o", errInvalidMode, mode)
+func MkdirAllHandle(root *os.File, unsafePath string, mode os.FileMode) (_ *os.File, Err error) {
+	unixMode, err := toUnixMode(mode)
+	if err != nil {
+		return nil, err
 	}
 	// On Linux, mkdirat(2) (and os.Mkdir) silently ignore the suid and sgid
 	// bits. We could also silently ignore them but since we have very few
 	// users it seems more prudent to return an error so users notice that
 	// these bits will not be set.
-	if mode&^0o1777 != 0 {
-		return nil, fmt.Errorf("%w for mkdir 0o%.3o: suid and sgid are ignored by mkdir", errInvalidMode, mode)
+	if unixMode&^0o1777 != 0 {
+		return nil, fmt.Errorf("%w for mkdir %+.3o: suid and sgid are ignored by mkdir", errInvalidMode, mode)
 	}
 
 	// Try to open as much of the path as possible.
@@ -93,7 +119,7 @@ func MkdirAllHandle(root *os.File, unsafePath string, mode int) (_ *os.File, Err
 	}
 
 	remainingParts := strings.Split(remainingPath, string(filepath.Separator))
-	if slices.Contains(remainingParts, "..") {
+	if slices_Contains(remainingParts, "..") {
 		// The path contained ".." components after the end of the "real"
 		// components. We could try to safely resolve ".." here but that would
 		// add a bunch of extra logic for something that it's not clear even
@@ -104,9 +130,6 @@ func MkdirAllHandle(root *os.File, unsafePath string, mode int) (_ *os.File, Err
 		// a path that doesn't quite match what the user asked for.
 		return nil, fmt.Errorf("%w: yet-to-be-created path %q contains '..' components", unix.ENOENT, remainingPath)
 	}
-
-	// Make sure the mode doesn't have any type bits.
-	mode &^= unix.S_IFMT
 
 	// Create the remaining components.
 	for _, part := range remainingParts {
@@ -119,11 +142,20 @@ func MkdirAllHandle(root *os.File, unsafePath string, mode int) (_ *os.File, Err
 		// NOTE: mkdir(2) will not follow trailing symlinks, so we can safely
 		// create the final component without worrying about symlink-exchange
 		// attacks.
-		if err := unix.Mkdirat(int(currentDir.Fd()), part, uint32(mode)); err != nil {
+		//
+		// If we get -EEXIST, it's possible that another program created the
+		// directory at the same time as us. In that case, just continue on as
+		// if we created it (if the created inode is not a directory, the
+		// following open call will fail).
+		if err := unix.Mkdirat(int(currentDir.Fd()), part, unixMode); err != nil && !errors.Is(err, unix.EEXIST) {
 			err = &os.PathError{Op: "mkdirat", Path: currentDir.Name() + "/" + part, Err: err}
 			// Make the error a bit nicer if the directory is dead.
-			if err2 := isDeadInode(currentDir); err2 != nil {
-				err = fmt.Errorf("%w (%w)", err, err2)
+			if deadErr := isDeadInode(currentDir); deadErr != nil {
+				// TODO: Once we bump the minimum Go version to 1.20, we can use
+				// multiple %w verbs for this wrapping. For now we need to use a
+				// compatibility shim for older Go versions.
+				//err = fmt.Errorf("%w (%w)", err, deadErr)
+				err = wrapBaseError(err, deadErr)
 			}
 			return nil, err
 		}
@@ -188,10 +220,7 @@ func MkdirAllHandle(root *os.File, unsafePath string, mode int) (_ *os.File, Err
 // If you plan to open the directory after you have created it or want to use
 // an open directory handle as the root, you should use [MkdirAllHandle] instead.
 // This function is a wrapper around [MkdirAllHandle].
-//
-// NOTE: The mode argument must be set the unix mode bits (unix.S_I...), not
-// the Go generic mode bits ([os.FileMode]...).
-func MkdirAll(root, unsafePath string, mode int) error {
+func MkdirAll(root, unsafePath string, mode os.FileMode) error {
 	rootDir, err := os.OpenFile(root, unix.O_PATH|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return err

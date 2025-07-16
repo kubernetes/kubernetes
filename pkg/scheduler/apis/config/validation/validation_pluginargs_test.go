@@ -559,9 +559,9 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			}}),
 		},
 		{
-			name: "[VolumeCapacityPriority=off] shape should be nil when the feature is off",
+			name: "[StorageCapacityScoring=off] shape should be nil when the feature is off",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: false,
+				features.StorageCapacityScoring: false,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
@@ -569,9 +569,9 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "[VolumeCapacityPriority=off] error if the shape is not nil when the feature is off",
+			name: "[StorageCapacityScoring=off] error if the shape is not nil when the feature is off",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: false,
+				features.StorageCapacityScoring: false,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
@@ -586,9 +586,9 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			}}),
 		},
 		{
-			name: "[VolumeCapacityPriority=on] shape should not be empty",
+			name: "[StorageCapacityScoring=on] shape should not be empty",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: true,
+				features.StorageCapacityScoring: true,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
@@ -600,9 +600,9 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			}}),
 		},
 		{
-			name: "[VolumeCapacityPriority=on] shape points must be sorted in increasing order",
+			name: "[StorageCapacityScoring=on] shape points must be sorted in increasing order",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: true,
+				features.StorageCapacityScoring: true,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,
@@ -618,9 +618,9 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			}}),
 		},
 		{
-			name: "[VolumeCapacityPriority=on] shape point: invalid utilization and score",
+			name: "[StorageCapacityScoring=on] shape point: invalid utilization and score",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: true,
+				features.StorageCapacityScoring: true,
 			},
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: 10,

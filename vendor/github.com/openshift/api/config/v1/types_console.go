@@ -45,6 +45,7 @@ type ConsoleSpec struct {
 type ConsoleStatus struct {
 	// The URL for the console. This will be derived from the host for the route that
 	// is created for the console.
+	// +optional
 	ConsoleURL string `json:"consoleURL"`
 }
 

@@ -27,8 +27,8 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	jose "gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
+	jose "gopkg.in/go-jose/go-jose.v2"
+	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	externaljwtv1alpha1 "k8s.io/externaljwt/apis/v1alpha1"
 	"k8s.io/kubernetes/pkg/serviceaccount"

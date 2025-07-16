@@ -864,6 +864,11 @@ func (in *UpgradePlanConfiguration) DeepCopyInto(out *UpgradePlanConfiguration) 
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EtcdUpgrade != nil {
+		in, out := &in.EtcdUpgrade, &out.EtcdUpgrade
+		*out = new(bool)
+		**out = **in
+	}
 	if in.IgnorePreflightErrors != nil {
 		in, out := &in.IgnorePreflightErrors, &out.IgnorePreflightErrors
 		*out = make([]string, len(*in))

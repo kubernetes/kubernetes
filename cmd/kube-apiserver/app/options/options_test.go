@@ -35,27 +35,26 @@ import (
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	cliflag "k8s.io/component-base/cli/flag"
+	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	utilversion "k8s.io/component-base/version"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	netutils "k8s.io/utils/net"
 )
 
 func TestAddFlags(t *testing.T) {
-	componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
-	t.Cleanup(func() {
-		componentGlobalsRegistry.Reset()
-	})
+	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
 	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
 
-	utilruntime.Must(componentGlobalsRegistry.Register("test", utilversion.NewEffectiveVersion("1.32"), featuregate.NewFeatureGate()))
+	utilruntime.Must(componentGlobalsRegistry.Register("test", basecompatibility.NewEffectiveVersionFromString("1.32", "1.31", "1.31"), featuregate.NewFeatureGate()))
 	s := NewServerRunOptions()
+	s.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -105,8 +104,6 @@ func TestAddFlags(t *testing.T) {
 		"--authorization-webhook-config-file=/webhook-config",
 		"--bind-address=192.168.10.20",
 		"--client-ca-file=/client-ca",
-		"--cloud-config=/cloud-config",
-		"--cloud-provider=azure",
 		"--cors-allowed-origins=10.10.10.100,10.10.10.200",
 		"--contention-profiling=true",
 		"--egress-selector-config-file=/var/run/kubernetes/egress-selector/connectivity.yaml",
@@ -131,6 +128,8 @@ func TestAddFlags(t *testing.T) {
 		"--service-cluster-ip-range=192.168.128.0/17",
 		"--lease-reuse-duration-seconds=100",
 		"--emulated-version=test=1.31",
+		"--emulation-forward-compatible=true",
+		"--runtime-config-emulation-forward-compatible=true",
 	}
 	fs.Parse(args)
 	utilruntime.Must(componentGlobalsRegistry.Set())
@@ -139,17 +138,19 @@ func TestAddFlags(t *testing.T) {
 	expected := &ServerRunOptions{
 		Options: &controlplaneapiserver.Options{
 			GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
-				AdvertiseAddress:             netutils.ParseIPSloppy("192.168.10.10"),
-				CorsAllowedOriginList:        []string{"10.10.10.100", "10.10.10.200"},
-				MaxRequestsInFlight:          400,
-				MaxMutatingRequestsInFlight:  200,
-				RequestTimeout:               time.Duration(2) * time.Minute,
-				MinRequestTimeout:            1800,
-				StorageInitializationTimeout: time.Minute,
-				JSONPatchMaxCopyBytes:        int64(3 * 1024 * 1024),
-				MaxRequestBodyBytes:          int64(3 * 1024 * 1024),
-				ComponentGlobalsRegistry:     componentGlobalsRegistry,
-				ComponentName:                featuregate.DefaultKubeComponent,
+				AdvertiseAddress:                        netutils.ParseIPSloppy("192.168.10.10"),
+				CorsAllowedOriginList:                   []string{"10.10.10.100", "10.10.10.200"},
+				MaxRequestsInFlight:                     400,
+				MaxMutatingRequestsInFlight:             200,
+				RequestTimeout:                          time.Duration(2) * time.Minute,
+				MinRequestTimeout:                       1800,
+				StorageInitializationTimeout:            time.Minute,
+				JSONPatchMaxCopyBytes:                   int64(3 * 1024 * 1024),
+				MaxRequestBodyBytes:                     int64(3 * 1024 * 1024),
+				ComponentGlobalsRegistry:                componentGlobalsRegistry,
+				ComponentName:                           basecompatibility.DefaultKubeComponent,
+				EmulationForwardCompatible:              true,
+				RuntimeConfigEmulationForwardCompatible: true,
 			},
 			Admission: &kubeoptions.AdmissionOptions{
 				GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -175,6 +176,7 @@ func TestAddFlags(t *testing.T) {
 					CompactionInterval:    storagebackend.DefaultCompactInterval,
 					CountMetricPollPeriod: time.Minute,
 					DBMetricPollInterval:  storagebackend.DefaultDBMetricPollInterval,
+					EventsHistoryWindow:   storagebackend.DefaultEventsHistoryWindow,
 					HealthcheckTimeout:    storagebackend.DefaultHealthcheckTimeout,
 					ReadycheckTimeout:     storagebackend.DefaultReadinessTimeout,
 					LeaseManagerConfig: etcd3.LeaseManagerConfig{
@@ -271,8 +273,9 @@ func TestAddFlags(t *testing.T) {
 				OIDC:           s.Authentication.OIDC,
 				RequestHeader:  &apiserveroptions.RequestHeaderAuthenticationOptions{},
 				ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
-					Lookup:           true,
-					ExtendExpiration: true,
+					Lookup:                true,
+					ExtendExpiration:      true,
+					MaxExtendedExpiration: serviceaccount.ExpirationExtensionSeconds * time.Second,
 				},
 				TokenFile:            &kubeoptions.TokenFileAuthenticationOptions{},
 				TokenSuccessCacheTTL: 10 * time.Second,
@@ -330,10 +333,6 @@ func TestAddFlags(t *testing.T) {
 			},
 			MasterCount: 5,
 		},
-		CloudProvider: &kubeoptions.CloudProviderOptions{
-			CloudConfigFile: "/cloud-config",
-			CloudProvider:   "azure",
-		},
 	}
 
 	expected.Authentication.OIDC.UsernameClaim = "sub"
@@ -347,7 +346,7 @@ func TestAddFlags(t *testing.T) {
 	s.Authorization.AreLegacyFlagsSet = nil
 
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{}, kubeoptions.AnonymousAuthenticationOptions{})))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreFields(apiserveroptions.ServerRunOptions{}, "ComponentGlobalsRegistry"), cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{}, kubeoptions.AnonymousAuthenticationOptions{})))
 	}
 	testEffectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor("test")
 	if testEffectiveVersion.EmulationVersion().String() != "1.31" {

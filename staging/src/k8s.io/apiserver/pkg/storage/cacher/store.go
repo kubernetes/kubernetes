@@ -19,8 +19,6 @@ package cacher
 import (
 	"fmt"
 
-	"github.com/google/btree"
-
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,7 +73,9 @@ type storeIndexer interface {
 }
 
 type orderedLister interface {
-	ListPrefix(prefix, continueKey string, limit int) (items []interface{}, hasMore bool)
+	ListPrefix(prefix, continueKey string) []interface{}
+	Count(prefix, continueKey string) (count int)
+	Clone() orderedLister
 }
 
 func newStoreIndexer(indexers *cache.Indexers) storeIndexer {
@@ -96,12 +96,6 @@ type storeElement struct {
 	Labels labels.Set
 	Fields fields.Set
 }
-
-func (t *storeElement) Less(than btree.Item) bool {
-	return t.Key < than.(*storeElement).Key
-}
-
-var _ btree.Item = (*storeElement)(nil)
 
 func storeElementKey(obj interface{}) (string, error) {
 	elem, ok := obj.(*storeElement)

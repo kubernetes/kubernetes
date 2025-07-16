@@ -29,9 +29,9 @@ import (
 	"sync"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/randfill"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
@@ -43,6 +43,9 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 var scheme = runtime.NewScheme()
@@ -59,16 +62,16 @@ func init() {
 }
 
 func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv2.APIGroupDiscoveryList {
-	fuzzer := fuzz.NewWithSeed(seed)
+	fuzzer := randfill.NewWithSeed(seed)
 	fuzzer.NumElements(atLeastNumGroups, maxNumGroups)
 	fuzzer.NilChance(0)
-	fuzzer.Funcs(func(o *apidiscoveryv2.APIGroupDiscovery, c fuzz.Continue) {
-		c.FuzzNoCustom(o)
+	fuzzer.Funcs(func(o *apidiscoveryv2.APIGroupDiscovery, c randfill.Continue) {
+		c.FillNoCustom(o)
 
 		// The ResourceManager will just not serve the group if its versions
 		// list is empty
 		atLeastOne := apidiscoveryv2.APIVersionDiscovery{}
-		c.Fuzz(&atLeastOne)
+		c.Fill(&atLeastOne)
 		o.Versions = append(o.Versions, atLeastOne)
 		sort.Slice(o.Versions[:], func(i, j int) bool {
 			return version.CompareKubeAwareVersionStrings(o.Versions[i].Version, o.Versions[j].Version) > 0
@@ -76,14 +79,14 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv
 
 		o.TypeMeta = metav1.TypeMeta{}
 		var name string
-		c.Fuzz(&name)
+		c.Fill(&name)
 		o.ObjectMeta = metav1.ObjectMeta{
 			Name: name,
 		}
 	})
 
 	var apis []apidiscoveryv2.APIGroupDiscovery
-	fuzzer.Fuzz(&apis)
+	fuzzer.Fill(&apis)
 	sort.Slice(apis[:], func(i, j int) bool {
 		return apis[i].Name < apis[j].Name
 	})
@@ -187,6 +190,7 @@ func TestBasicResponseProtobuf(t *testing.T) {
 
 // V2Beta1 should still be served
 func TestV2Beta1SkewSupport(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryRemoveBetaType, false)
 	manager := discoveryendpoint.NewResourceManager("apis")
 
 	apis := fuzzAPIGroups(1, 3, 10)

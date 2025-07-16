@@ -104,7 +104,7 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, opts L
 func ValidateLabelName(labelName string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(labelName) {
-		allErrs = append(allErrs, field.Invalid(fldPath, labelName, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, labelName, msg).WithOrigin("labelKey"))
 	}
 	return allErrs
 }

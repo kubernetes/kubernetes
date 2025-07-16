@@ -31,6 +31,8 @@ const (
 	ScheduleAttemptFailure = "ScheduleAttemptFailure"
 	// BackoffComplete is the event when a pod finishes backoff.
 	BackoffComplete = "BackoffComplete"
+	// PopFromBackoffQ is the event when a pod is popped from backoffQ when activeQ is empty.
+	PopFromBackoffQ = "PopFromBackoffQ"
 	// ForceActivate is the event when a pod is moved from unschedulablePods/backoffQ
 	// to activeQ. Usually it's triggered by plugin implementations.
 	ForceActivate = "ForceActivate"
@@ -130,7 +132,7 @@ func extractPodTolerationChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
 		// Due to API validation, the user can add, but cannot modify or remove tolerations.
 		// So, it's enough to just check the length of tolerations to notice the update.
 		// And, any updates in tolerations could make Pod schedulable.
-		return UpdatePodTolerations
+		return UpdatePodToleration
 	}
 
 	return none

@@ -20,9 +20,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"k8s.io/gengo/v2/types"
 	openapi "k8s.io/kube-openapi/pkg/common"
@@ -60,6 +62,34 @@ func (c *CELTag) Validate() error {
 
 	return nil
 }
+
+// isKnownTagCommentKey returns true if the given key is a known comment tag key.
+// Known keys are identified by the json field tags in the commentTags struct.
+// If the key is a composite key, only the first key part is checked, and is
+// expected to be separated by the remainder of the key by a ':' or '[' delimiter.
+func isKnownTagCommentKey(key string) bool {
+	split := func(r rune) bool { return r == ':' || r == '[' }
+	commentTags := strings.FieldsFunc(key, split)
+	if len(commentTags) == 0 {
+		return false
+	}
+	_, ok := tagKeys()[commentTags[0]]
+	return ok
+}
+
+var tagKeys = sync.OnceValue(func() map[string]struct{} {
+	result := map[string]struct{}{}
+	t := reflect.TypeOf(commentTags{})
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		if jsonTag := field.Tag.Get("json"); jsonTag != "" {
+			if key, _, _ := strings.Cut(jsonTag, ","); key != "" {
+				result[key] = struct{}{}
+			}
+		}
+	}
+	return result
+})
 
 // commentTags represents the parsed comment tags for a given type. These types are then used to generate schema validations.
 // These only include the newer prefixed tags. The older tags are still supported,
@@ -385,12 +415,11 @@ func memberWithJSONName(t *types.Type, key string) *types.Member {
 	return nil
 }
 
-// Parses the given comments into a CommentTags type. Validates the parsed comment tags, and returns the result.
+// ParseCommentTags parses the given comments into a CommentTags type. Validates the parsed comment tags, and returns the result.
 // Accepts an optional type to validate against, and a prefix to filter out markers not related to validation.
 // Accepts a prefix to filter out markers not related to validation.
 // Returns any errors encountered while parsing or validating the comment tags.
 func ParseCommentTags(t *types.Type, comments []string, prefix string) (*spec.Schema, error) {
-
 	markers, err := parseMarkers(comments, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse marker comments: %w", err)
@@ -610,6 +639,8 @@ func parseMarkers(markerComments []string, prefix string) (map[string]any, error
 
 		if len(key) == 0 {
 			return nil, fmt.Errorf("cannot have empty key for marker comment")
+		} else if !isKnownTagCommentKey(key) {
+			continue
 		} else if _, ok := parseSymbolReference(value, ""); ok {
 			// Skip ref markers
 			continue

@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -431,6 +432,128 @@ func TestCountTerminatingPods(t *testing.T) {
 
 	terminatingList := FilterTerminatingPods(podPointers)
 	assert.Len(t, terminatingList, int(2))
+}
+
+func TestClaimedPodFiltering(t *testing.T) {
+	rsUUID := uuid.NewUUID()
+
+	type podData struct {
+		podName         string
+		ownerReferences []metav1.OwnerReference
+		labels          map[string]string
+	}
+
+	type test struct {
+		name         string
+		pods         []podData
+		wantPodNames []string
+	}
+
+	tests := []test{
+		{
+			name: "Filters claimed pods",
+			pods: []podData{
+				// single owner reference
+				{podName: "claimed-1", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "wrong-selector-1", labels: map[string]string{"foo": "baz"}, ownerReferences: []metav1.OwnerReference{
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "non-controller-1", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: rsUUID, Controller: nil},
+				}},
+				{podName: "other-controller-1", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(true)},
+				}},
+				{podName: "other-workload-1", labels: map[string]string{"foo": "bee"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(true)},
+				}},
+				{podName: "standalone-pod-1", labels: map[string]string{"foo": "beetle"}, ownerReferences: []metav1.OwnerReference{}},
+				// additional controller owner reference set to controller=false
+				{podName: "claimed-2", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "wrong-selector-2", labels: map[string]string{"foo": "baz"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "non-controller-2", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+					{UID: rsUUID, Controller: ptr.To(false)},
+				}},
+				{podName: "other-controller-2", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+					{UID: uuid.NewUUID(), Controller: ptr.To(true)},
+				}},
+				{podName: "other-workload-1", labels: map[string]string{"foo": "bee"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+					{UID: uuid.NewUUID(), Controller: ptr.To(true)},
+				}},
+				{podName: "standalone-pod-1", labels: map[string]string{"foo": "beetle"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID(), Controller: ptr.To(false)},
+				}},
+				// additional controller owner reference set to controller=nil
+				{podName: "claimed-3", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "wrong-selector-3", labels: nil, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+					{UID: rsUUID, Controller: ptr.To(true)},
+				}},
+				{podName: "non-controller-3", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+					{UID: rsUUID, Controller: nil},
+				}},
+				{podName: "other-controller-3", labels: map[string]string{"foo": "bar"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+					{UID: uuid.NewUUID(), Controller: ptr.To(true)},
+				}},
+				{podName: "other-workload-1", labels: map[string]string{"foo": "bee"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+				}},
+				{podName: "standalone-pod-1", labels: map[string]string{"foo": "beetle"}, ownerReferences: []metav1.OwnerReference{
+					{UID: uuid.NewUUID()},
+				}},
+			},
+			wantPodNames: []string{"claimed-1", "claimed-2", "claimed-3"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
+			rs := newReplicaSet("test-claim", 3, rsUUID)
+			var pods []*v1.Pod
+			for _, p := range test.pods {
+				pods = append(pods, &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            p.podName,
+						Namespace:       rs.Namespace,
+						Labels:          p.labels,
+						OwnerReferences: p.ownerReferences,
+					},
+					Status: v1.PodStatus{Phase: v1.PodRunning},
+				})
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+			if err != nil {
+				t.Fatalf("Couldn't get selector for object %#v: %v", rs, err)
+			}
+			got := FilterClaimedPods(rs, selector, pods)
+			gotNames := sets.NewString()
+			for _, pod := range got {
+				gotNames.Insert(pod.Name)
+			}
+
+			if diff := cmp.Diff(test.wantPodNames, gotNames.List()); diff != "" {
+				t.Errorf("Active pod names (-want,+got):\n%s", diff)
+			}
+		})
+	}
 }
 
 func TestActivePodFiltering(t *testing.T) {

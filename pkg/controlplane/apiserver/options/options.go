@@ -157,7 +157,8 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
-	fs.MarkDeprecated("enable-logs-handler", "This flag will be removed in v1.33") //nolint:errcheck
+	fs.MarkDeprecated("enable-logs-handler", "Log handler functionality is deprecated") //nolint:errcheck
+	fs.Lookup("enable-logs-handler").Hidden = false
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
@@ -223,6 +224,16 @@ func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternate
 
 	if err := completed.SecureServing.MaybeDefaultWithSelfSignedCerts(completed.GenericServerRunOptions.AdvertiseAddress.String(), alternateDNS, alternateIPs); err != nil {
 		return CompletedOptions{}, fmt.Errorf("error creating self-signed certificates: %v", err)
+	}
+
+	if o.GenericServerRunOptions.RequestTimeout > 0 {
+		// Setting the EventsHistoryWindow as a maximum of the value set in the
+		// watchcache-specific options and the value of the request timeout plus
+		// some epsilon.
+		// This is done to make sure that the list+watch pattern can still be
+		// usable in large clusters with the elevated request timeout where the
+		// initial list can take a considerable amount of time.
+		completed.Etcd.StorageConfig.EventsHistoryWindow = max(completed.Etcd.StorageConfig.EventsHistoryWindow, completed.GenericServerRunOptions.RequestTimeout+15*time.Second)
 	}
 
 	if len(completed.GenericServerRunOptions.ExternalHost) == 0 {
@@ -304,15 +315,19 @@ func (o *Options) completeServiceAccountOptions(ctx context.Context, completed *
 			if metadata.MaxTokenExpirationSeconds < validation.MinTokenAgeSec {
 				return fmt.Errorf("max token life supported by external-jwt-signer (%ds) is less than acceptable (min %ds)", metadata.MaxTokenExpirationSeconds, validation.MinTokenAgeSec)
 			}
-			if completed.Authentication.ServiceAccounts.MaxExpiration != 0 {
-				return fmt.Errorf("service-account-max-token-expiration and service-account-signing-endpoint are mutually exclusive and cannot be set at the same time")
+			maxExternalExpiration := time.Duration(metadata.MaxTokenExpirationSeconds) * time.Second
+			switch {
+			case completed.Authentication.ServiceAccounts.MaxExpiration == 0:
+				completed.Authentication.ServiceAccounts.MaxExpiration = maxExternalExpiration
+			case completed.Authentication.ServiceAccounts.MaxExpiration > maxExternalExpiration:
+				return fmt.Errorf("service-account-max-token-expiration cannot be set longer than the token expiration supported by service-account-signing-endpoint: %s > %s", completed.Authentication.ServiceAccounts.MaxExpiration, maxExternalExpiration)
 			}
 			transitionWarningFmt = "service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, token lifetime supported by external-jwt-signer must be longer than %d seconds (currently %s)"
 			expExtensionWarningFmt = "service-account-extend-token-expiration is true, tokens validity will be caped at the smaller of %d seconds and maximum token lifetime supported by external-jwt-signer (%s)"
 			completed.ServiceAccountIssuer = plugin
 			completed.Authentication.ServiceAccounts.ExternalPublicKeysGetter = cache
-			completed.Authentication.ServiceAccounts.MaxExpiration = time.Duration(metadata.MaxTokenExpirationSeconds) * time.Second
-			completed.Authentication.ServiceAccounts.IsTokenSignerExternal = true
+			// shorten ExtendedExpiration, if needed, to fit within the external signer's max expiration
+			completed.Authentication.ServiceAccounts.MaxExtendedExpiration = min(maxExternalExpiration, completed.Authentication.ServiceAccounts.MaxExtendedExpiration)
 		}
 	}
 

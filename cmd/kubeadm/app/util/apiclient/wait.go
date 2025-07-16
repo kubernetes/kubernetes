@@ -23,8 +23,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
+	"text/template"
 	"time"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,14 +37,48 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+)
+
+const (
+	// TODO: switch to /livez once all components support it
+	// and delete the endpointHealthz constant.
+	// https://github.com/kubernetes/kubernetes/issues/118158
+	endpointHealthz = "healthz"
+	endpointLivez   = "livez"
+
+	argPort        = "secure-port"
+	argBindAddress = "bind-address"
+	// By default, for kube-api-server, kubeadm does not apply a --bind-address flag.
+	// Check --advertise-address instead.
+	argAdvertiseAddress = "advertise-address"
+)
+
+var (
+	controlPlaneFailTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
+	A control plane component may have crashed or exited when started by the container runtime.
+	To troubleshoot, list all containers using your preferred container runtimes CLI.
+	Here is one example how you may list all running Kubernetes containers by using crictl:
+		- 'crictl --runtime-endpoint {{ .Socket }} ps -a | grep kube | grep -v pause'
+		Once you have found the failing container, you can inspect its logs with:
+		- 'crictl --runtime-endpoint {{ .Socket }} logs CONTAINERID'
+`)))
+
+	kubeletFailMsg = dedent.Dedent(`
+	Unfortunately, an error has occurred, likely caused by:
+		- The kubelet is not running
+		- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
+
+	If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
+		- 'systemctl status kubelet'
+		- 'journalctl -xeu kubelet'
+`)
 )
 
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
 type Waiter interface {
 	// WaitForControlPlaneComponents waits for all control plane components to be ready.
-	WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, apiServerAddress string) error
+	WaitForControlPlaneComponents(podMap map[string]*v1.Pod, apiServerAddress string) error
 	// WaitForAPI waits for the API Server's /healthz endpoint to become "ok"
 	// TODO: remove WaitForAPI once WaitForAllControlPlaneComponents goes GA:
 	// https://github.com/kubernetes/kubeadm/issues/2907
@@ -77,86 +114,152 @@ func NewKubeWaiter(client clientset.Interface, timeout time.Duration, writer io.
 	}
 }
 
+// controlPlaneComponent holds a component name and an URL
+// on which to perform health checks.
 type controlPlaneComponent struct {
-	name string
-	url  string
+	name        string
+	addressPort string
+	endpoint    string
 }
 
-const (
-	// TODO: switch to /livez once all components support it
-	// and delete the endpointHealthz constant.
-	// https://github.com/kubernetes/kubernetes/issues/118158
-	endpointHealthz = "healthz"
-	endpointLivez   = "livez"
-)
-
-// getControlPlaneComponents takes a ClusterConfiguration and returns a slice of
-// control plane components and their health check URLs.
-func getControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, defaultAddressAPIServer string) []controlPlaneComponent {
-	const (
-		portArg        = "secure-port"
-		bindAddressArg = "bind-address"
-		// By default, for kube-api-server, kubeadm does not apply a --bind-address flag.
-		// Check --advertise-address instead, which can override the defaultAddressAPIServer value.
-		advertiseAddressArg = "advertise-address"
-		// By default kubeadm deploys the kube-controller-manager and kube-scheduler
-		// with --bind-address=127.0.0.1. This should match get{Scheduler|ControllerManager}Command().
-		defaultAddressKCM       = "127.0.0.1"
-		defaultAddressScheduler = "127.0.0.1"
+// getControlPlaneComponentAddressAndPort parses the command in a static Pod
+// container and extracts the values of the given args.
+func getControlPlaneComponentAddressAndPort(pod *v1.Pod, name string, args []string) ([]string, error) {
+	var (
+		values    = make([]string, len(args))
+		container *v1.Container
 	)
 
-	portAPIServer, idx := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, portArg, -1)
-	if idx == -1 {
+	if pod == nil {
+		return values, errors.Errorf("got nil Pod for component %q", name)
+	}
+
+	for i, c := range pod.Spec.Containers {
+		if len(c.Command) == 0 {
+			continue
+		}
+		if c.Command[0] == name {
+			container = &pod.Spec.Containers[i]
+			break
+		}
+	}
+	if container == nil {
+		return values, errors.Errorf("the Pod has no container command starting with %q", name)
+	}
+
+	for _, line := range container.Command {
+		for i, arg := range args {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "--"+arg) && !strings.HasPrefix(line, "-"+arg) {
+				continue
+			}
+			_, value, found := strings.Cut(line, "=")
+			if !found {
+				_, value, _ = strings.Cut(line, " ")
+			}
+			values[i] = value
+		}
+	}
+	return values, nil
+}
+
+// getControlPlaneComponents reads the static Pods of control plane components
+// and returns a slice of 'controlPlaneComponent'.
+func getControlPlaneComponents(podMap map[string]*v1.Pod, addressAPIServer string) ([]controlPlaneComponent, error) {
+	var (
+		// By default kubeadm deploys the kube-controller-manager and kube-scheduler
+		// with --bind-address=127.0.0.1. This should match get{Scheduler|ControllerManager}Command().
+		addressKCM       = "127.0.0.1"
+		addressScheduler = "127.0.0.1"
+
 		portAPIServer = fmt.Sprintf("%d", constants.KubeAPIServerPort)
-	}
-	portKCM, idx := kubeadmapi.GetArgValue(cfg.ControllerManager.ExtraArgs, portArg, -1)
-	if idx == -1 {
-		portKCM = fmt.Sprintf("%d", constants.KubeControllerManagerPort)
-	}
-	portScheduler, idx := kubeadmapi.GetArgValue(cfg.Scheduler.ExtraArgs, portArg, -1)
-	if idx == -1 {
+		portKCM       = fmt.Sprintf("%d", constants.KubeControllerManagerPort)
 		portScheduler = fmt.Sprintf("%d", constants.KubeSchedulerPort)
+
+		errs   []error
+		result []controlPlaneComponent
+	)
+
+	type componentConfig struct {
+		name        string
+		args        []string
+		defaultAddr string
+		defaultPort string
+		endpoint    string
 	}
 
-	addressAPIServer, idx := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, advertiseAddressArg, -1)
-	if idx == -1 {
-		addressAPIServer = defaultAddressAPIServer
-	}
-	addressKCM, idx := kubeadmapi.GetArgValue(cfg.ControllerManager.ExtraArgs, bindAddressArg, -1)
-	if idx == -1 {
-		addressKCM = defaultAddressKCM
-	}
-	addressScheduler, idx := kubeadmapi.GetArgValue(cfg.Scheduler.ExtraArgs, bindAddressArg, -1)
-	if idx == -1 {
-		addressScheduler = defaultAddressScheduler
+	components := []componentConfig{
+		{
+			name:        constants.KubeAPIServer,
+			args:        []string{argAdvertiseAddress, argPort},
+			defaultAddr: addressAPIServer,
+			defaultPort: portAPIServer,
+			endpoint:    endpointLivez,
+		},
+		{
+			name:        constants.KubeControllerManager,
+			args:        []string{argBindAddress, argPort},
+			defaultAddr: addressKCM,
+			defaultPort: portKCM,
+			endpoint:    endpointHealthz,
+		},
+		{
+			name:        constants.KubeScheduler,
+			args:        []string{argBindAddress, argPort},
+			defaultAddr: addressScheduler,
+			defaultPort: portScheduler,
+			endpoint:    endpointLivez,
+		},
 	}
 
-	getURL := func(address, port, endpoint string) string {
-		return fmt.Sprintf(
-			"https://%s/%s",
-			net.JoinHostPort(address, port),
-			endpoint,
+	for _, component := range components {
+		address, port := component.defaultAddr, component.defaultPort
+
+		values, err := getControlPlaneComponentAddressAndPort(
+			podMap[component.name],
+			component.name,
+			component.args,
 		)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		if len(values[0]) != 0 {
+			address = values[0]
+		}
+		if len(values[1]) != 0 {
+			port = values[1]
+		}
+
+		result = append(result, controlPlaneComponent{
+			name:        component.name,
+			addressPort: net.JoinHostPort(address, port),
+			endpoint:    component.endpoint,
+		})
 	}
-	return []controlPlaneComponent{
-		{name: "kube-apiserver", url: getURL(addressAPIServer, portAPIServer, endpointLivez)},
-		{name: "kube-controller-manager", url: getURL(addressKCM, portKCM, endpointHealthz)},
-		{name: "kube-scheduler", url: getURL(addressScheduler, portScheduler, endpointLivez)},
+
+	if len(errs) > 0 {
+		return nil, utilerrors.NewAggregate(errs)
 	}
+	return result, nil
 }
 
 // WaitForControlPlaneComponents waits for all control plane components to report "ok".
-func (w *KubeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, apiSeverAddress string) error {
-	fmt.Printf("[control-plane-check] Waiting for healthy control plane components."+
+func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, apiSeverAddress string) error {
+	_, _ = fmt.Fprintf(w.writer, "[control-plane-check] Waiting for healthy control plane components."+
 		" This can take up to %v\n", w.timeout)
 
-	components := getControlPlaneComponents(cfg, apiSeverAddress)
+	components, err := getControlPlaneComponents(podMap, apiSeverAddress)
+	if err != nil {
+		return errors.Wrap(err, "could not parse the address and port of all control plane components")
+	}
 
 	var errs []error
 	errChan := make(chan error, len(components))
 
 	for _, comp := range components {
-		fmt.Printf("[control-plane-check] Checking %s at %s\n", comp.name, comp.url)
+		url := fmt.Sprintf("https://%s/%s", comp.addressPort, comp.endpoint)
+		_, _ = fmt.Fprintf(w.writer, "[control-plane-check] Checking %s at %s\n", comp.name, url)
 
 		go func(comp controlPlaneComponent) {
 			tr := &http.Transport{
@@ -164,6 +267,7 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfig
 			}
 			client := &http.Client{Transport: tr}
 			start := time.Now()
+			statusCode := 0
 			var lastError error
 
 			err := wait.PollUntilContextTimeout(
@@ -171,29 +275,41 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfig
 				constants.KubernetesAPICallRetryInterval,
 				w.timeout,
 				true, func(ctx context.Context) (bool, error) {
-					resp, err := client.Get(comp.url)
-					if err != nil {
-						lastError = errors.WithMessagef(err, "%s check failed at %s", comp.name, comp.url)
-						return false, nil
+					// The kube-apiserver check should use the client defined in the waiter
+					// or otherwise the regular http client can fail when anonymous auth is enabled.
+					if comp.name == constants.KubeAPIServer {
+						result := w.client.Discovery().RESTClient().
+							Get().AbsPath(comp.endpoint).Do(ctx).StatusCode(&statusCode)
+						if err := result.Error(); err != nil {
+							lastError = errors.WithMessagef(err, "%s check failed at %s", comp.name, url)
+							return false, nil
+						}
+					} else {
+						resp, err := client.Get(url)
+						if err != nil {
+							lastError = errors.WithMessagef(err, "%s check failed at %s", comp.name, url)
+							return false, nil
+						}
+						defer func() {
+							_ = resp.Body.Close()
+						}()
+						statusCode = resp.StatusCode
 					}
 
-					defer func() {
-						_ = resp.Body.Close()
-					}()
-					if resp.StatusCode != http.StatusOK {
+					if statusCode != http.StatusOK {
 						lastError = errors.Errorf("%s check failed at %s with status: %d",
-							comp.name, comp.url, resp.StatusCode)
+							comp.name, url, statusCode)
 						return false, nil
 					}
 
 					return true, nil
 				})
 			if err != nil {
-				fmt.Printf("[control-plane-check] %s is not healthy after %v\n", comp.name, time.Since(start))
+				_, _ = fmt.Fprintf(w.writer, "[control-plane-check] %s is not healthy after %v\n", comp.name, time.Since(start))
 				errChan <- lastError
 				return
 			}
-			fmt.Printf("[control-plane-check] %s is healthy after %v\n", comp.name, time.Since(start))
+			_, _ = fmt.Fprintf(w.writer, "[control-plane-check] %s is healthy after %v\n", comp.name, time.Since(start))
 			errChan <- nil
 		}(comp)
 	}
@@ -208,7 +324,7 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfig
 
 // WaitForAPI waits for the API Server's /healthz endpoint to report "ok"
 func (w *KubeWaiter) WaitForAPI() error {
-	fmt.Printf("[api-check] Waiting for a healthy API server. This can take up to %v\n", w.timeout)
+	_, _ = fmt.Fprintf(w.writer, "[api-check] Waiting for a healthy API server. This can take up to %v\n", w.timeout)
 
 	start := time.Now()
 	err := wait.PollUntilContextTimeout(
@@ -224,11 +340,11 @@ func (w *KubeWaiter) WaitForAPI() error {
 			return true, nil
 		})
 	if err != nil {
-		fmt.Printf("[api-check] The API server is not healthy after %v\n", time.Since(start))
+		_, _ = fmt.Fprintf(w.writer, "[api-check] The API server is not healthy after %v\n", time.Since(start))
 		return err
 	}
 
-	fmt.Printf("[api-check] The API server is healthy after %v\n", time.Since(start))
+	_, _ = fmt.Fprintf(w.writer, "[api-check] The API server is healthy after %v\n", time.Since(start))
 	return nil
 }
 
@@ -243,12 +359,12 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 			listOpts := metav1.ListOptions{LabelSelector: kvLabel}
 			pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
 			if err != nil {
-				fmt.Fprintf(w.writer, "[apiclient] Error getting Pods with label selector %q [%v]\n", kvLabel, err)
+				_, _ = fmt.Fprintf(w.writer, "[apiclient] Error getting Pods with label selector %q [%v]\n", kvLabel, err)
 				return false, nil
 			}
 
 			if lastKnownPodNumber != len(pods.Items) {
-				fmt.Fprintf(w.writer, "[apiclient] Found %d Pods for label selector %s\n", len(pods.Items), kvLabel)
+				_, _ = fmt.Fprintf(w.writer, "[apiclient] Found %d Pods for label selector %s\n", len(pods.Items), kvLabel)
 				lastKnownPodNumber = len(pods.Items)
 			}
 
@@ -275,10 +391,10 @@ func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) er
 	)
 
 	if healthzPort == 0 {
-		fmt.Println("[kubelet-check] Skipping the kubelet health check because the healthz port is set to 0")
+		_, _ = fmt.Fprintln(w.writer, "[kubelet-check] Skipping the kubelet health check because the healthz port is set to 0")
 		return nil
 	}
-	fmt.Printf("[kubelet-check] Waiting for a healthy kubelet at %s. This can take up to %v\n",
+	_, _ = fmt.Fprintf(w.writer, "[kubelet-check] Waiting for a healthy kubelet at %s. This can take up to %v\n",
 		healthzEndpoint, w.timeout)
 
 	formatError := func(cause string) error {
@@ -313,11 +429,11 @@ func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) er
 			return true, nil
 		})
 	if err != nil {
-		fmt.Printf("[kubelet-check] The kubelet is not healthy after %v\n", time.Since(start))
+		_, _ = fmt.Fprintf(w.writer, "[kubelet-check] The kubelet is not healthy after %v\n", time.Since(start))
 		return lastError
 	}
 
-	fmt.Printf("[kubelet-check] The kubelet is healthy after %v\n", time.Since(start))
+	_, _ = fmt.Fprintf(w.writer, "[kubelet-check] The kubelet is healthy after %v\n", time.Since(start))
 	return nil
 }
 
@@ -414,4 +530,20 @@ func getStaticPodSingleHash(client clientset.Interface, nodeName string, compone
 
 	staticPodHash := staticPod.Annotations["kubernetes.io/config.hash"]
 	return staticPodHash, nil
+}
+
+// PrintControlPlaneErrorHelpScreen prints help text on wait ControlPlane components errors.
+func PrintControlPlaneErrorHelpScreen(outputWriter io.Writer, criSocket string) {
+	context := struct {
+		Socket string
+	}{
+		Socket: criSocket,
+	}
+	_ = controlPlaneFailTempl.Execute(outputWriter, context)
+	_, _ = fmt.Fprintln(outputWriter, "")
+}
+
+// PrintKubeletErrorHelpScreen prints help text on kubelet errors.
+func PrintKubeletErrorHelpScreen(outputWriter io.Writer) {
+	_, _ = fmt.Fprintln(outputWriter, kubeletFailMsg)
 }

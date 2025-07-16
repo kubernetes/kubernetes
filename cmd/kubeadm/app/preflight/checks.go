@@ -906,13 +906,6 @@ func (MemCheck) Name() string {
 
 // InitNodeChecks returns checks specific to "kubeadm init"
 func InitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) ([]Checker, error) {
-	if !isSecondaryControlPlane {
-		// First, check if we're root separately from the other preflight checks and fail fast
-		if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
-			return nil, err
-		}
-	}
-
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	checks := []Checker{
 		NumCPUCheck{NumCPU: kubeadmconstants.ControlPlaneNumCPU},
@@ -1027,11 +1020,6 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 
 // JoinNodeChecks returns checks specific to "kubeadm join"
 func JoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.Set[string]) ([]Checker, error) {
-	// First, check if we're root separately from the other preflight checks and fail fast
-	if err := RunRootCheckOnly(ignorePreflightErrors); err != nil {
-		return nil, err
-	}
-
 	checks := []Checker{
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
@@ -1095,6 +1083,15 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 func RunRootCheckOnly(ignorePreflightErrors sets.Set[string]) error {
 	checks := []Checker{
 		IsPrivilegedUserCheck{},
+	}
+
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+}
+
+// RunUpgradeChecks initializes checks slice of structs and call RunChecks
+func RunUpgradeChecks(ignorePreflightErrors sets.Set[string]) error {
+	checks := []Checker{
+		SystemVerificationCheck{},
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)

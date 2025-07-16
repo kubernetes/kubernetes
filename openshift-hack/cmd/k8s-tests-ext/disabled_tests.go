@@ -10,8 +10,6 @@ func filterOutDisabledSpecs(specs et.ExtensionTestSpecs) et.ExtensionTestSpecs {
 	var disabledByReason = map[string][]string{
 		"Alpha": { // alpha features that are not gated
 			"[Feature:StorageVersionAPI]",
-			"[Feature:InPlacePodVerticalScaling]",
-			"[Feature:ServiceCIDRs]",
 			"[Feature:ClusterTrustBundle]",
 			"[Feature:SELinuxMount]",
 			"[FeatureGate:SELinuxMount]",
@@ -20,11 +18,10 @@ func filterOutDisabledSpecs(specs et.ExtensionTestSpecs) et.ExtensionTestSpecs {
 			"[sig-cli] Kubectl client Kubectl prune with applyset should apply and prune objects", // Alpha feature since k8s 1.27
 			// 4.19
 			"[Feature:PodLevelResources]",
-			"[Feature:SchedulerAsyncPreemption]",
-			"[Feature:RelaxedDNSSearchValidation]",
 			"[Feature:PodLogsQuerySplitStreams]",
-			"[Feature:PodLifecycleSleepActionAllowZero]",
-			"[Feature:OrderedNamespaceDeletion]", // disabled Beta
+			// 4.20
+			"[Feature:OffByDefault]",
+			"[Feature:CBOR]",
 		},
 		// tests for features that are not implemented in openshift
 		"Unimplemented": {
@@ -160,7 +157,7 @@ func filterOutDisabledSpecs(specs et.ExtensionTestSpecs) et.ExtensionTestSpecs {
 			"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action valid prestop hook using sleep action",
 
 			// https://issues.redhat.com/browse/OCPBUGS-38839
-			"[sig-network] [Feature:Traffic Distribution] when Service has trafficDistribution=PreferClose should route traffic to an endpoint that is close to the client",
+			"[sig-network] Traffic Distribution",
 
 			// https://issues.redhat.com/browse/OCPBUGS-45273
 			"[sig-network] Services should implement NodePort and HealthCheckNodePort correctly when ExternalTrafficPolicy changes",

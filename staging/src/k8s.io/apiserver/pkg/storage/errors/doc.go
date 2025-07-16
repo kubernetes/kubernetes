@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package storage provides conversion of storage errors to API errors.
-package errors // import "k8s.io/apiserver/pkg/storage/errors"
+package errors

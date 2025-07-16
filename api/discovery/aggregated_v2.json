@@ -364,25 +364,6 @@
             }
           ],
           "version": "v1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "selfsubjectreviews",
-              "responseKind": {
-                "group": "",
-                "kind": "SelfSubjectReview",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "selfsubjectreview",
-              "verbs": [
-                "create"
-              ]
-            }
-          ],
-          "version": "v1beta1"
         }
       ]
     },
@@ -734,6 +715,32 @@
               ]
             }
           ],
+          "version": "v1beta1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "clustertrustbundles",
+              "responseKind": {
+                "group": "",
+                "kind": "ClusterTrustBundle",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "clustertrustbundle",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
           "version": "v1alpha1"
         }
       ]
@@ -806,6 +813,29 @@
               ]
             },
             {
+              "resource": "ipaddresses",
+              "responseKind": {
+                "group": "",
+                "kind": "IPAddress",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "shortNames": [
+                "ip"
+              ],
+              "singularResource": "ipaddress",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "networkpolicies",
               "responseKind": {
                 "group": "",
@@ -817,6 +847,41 @@
                 "netpol"
               ],
               "singularResource": "networkpolicy",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "servicecidrs",
+              "responseKind": {
+                "group": "",
+                "kind": "ServiceCIDR",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "servicecidr",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "ServiceCIDR",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
               "verbs": [
                 "create",
                 "delete",
@@ -1622,6 +1687,32 @@
               ]
             }
           ],
+          "version": "v1beta1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "leasecandidates",
+              "responseKind": {
+                "group": "",
+                "kind": "LeaseCandidate",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "leasecandidate",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
           "version": "v1alpha2"
         }
       ]
@@ -1799,6 +1890,107 @@
               ]
             }
           ],
+          "version": "v1beta2"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "resource": "deviceclasses",
+              "responseKind": {
+                "group": "",
+                "kind": "DeviceClass",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "deviceclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceclaims",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClaim",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclaim",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "ResourceClaim",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceclaimtemplates",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceClaimTemplate",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "resourceclaimtemplate",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "resourceslices",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceSlice",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "resourceslice",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
           "version": "v1beta1"
         },
         {
@@ -1813,6 +2005,26 @@
               },
               "scope": "Cluster",
               "singularResource": "deviceclass",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "devicetaintrules",
+              "responseKind": {
+                "group": "",
+                "kind": "DeviceTaintRule",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "devicetaintrule",
               "verbs": [
                 "create",
                 "delete",

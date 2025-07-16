@@ -45,7 +45,7 @@ import (
 	"github.com/google/cadvisor/version"
 	"github.com/google/cadvisor/watcher"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/cgroups"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -221,7 +221,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, HousekeepingConfi
 		return nil, err
 	}
 
-	newManager.resctrlManager, err = resctrl.NewManager(resctrlInterval, resctrl.Setup, machineInfo.CPUVendorID, inHostNamespace)
+	newManager.resctrlManager, err = resctrl.NewManager(resctrlInterval, machineInfo.CPUVendorID, inHostNamespace)
 	if err != nil {
 		klog.V(4).Infof("Cannot gather resctrl metrics: %v", err)
 	}
@@ -265,7 +265,7 @@ type manager struct {
 	eventsChannel            chan watcher.ContainerEvent
 	collectorHTTPClient      *http.Client
 	perfManager              stats.Manager
-	resctrlManager           resctrl.Manager
+	resctrlManager           resctrl.ResControlManager
 	// List of raw container cgroup path prefix whitelist.
 	rawContainerCgroupPathPrefixWhiteList []string
 	// List of container env prefix whitelist, the matched container envs would be collected into metrics as extra labels.

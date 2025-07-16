@@ -140,6 +140,13 @@ service RuntimeService {
     //   The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
     //   avoid updating them without a full node reboot.
     rpc RuntimeConfig(RuntimeConfigRequest) returns (RuntimeConfigResponse) {}
+
+    // UpdatePodSandboxResources synchronously updates the PodSandboxConfig with
+    // the pod-level resource configuration. This method is called _after_ the
+    // Kubelet reconfigures the pod-level cgroups.
+    // This request is treated as best effort, and failure will not block the
+    // Kubelet with proceeding with a resize.
+    rpc UpdatePodSandboxResources(UpdatePodSandboxResourcesRequest) returns (UpdatePodSandboxResourcesResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -201,7 +208,16 @@ message PortMapping {
     Protocol protocol = 1;
     // Port number within the container. Default: 0 (not specified).
     int32 container_port = 2;
-    // Port number on the host. Default: 0 (not specified).
+    // Port number on the host to map the container port to.
+    //
+    // * Valid host port range is 1-65535.
+    // * The value 0 has explicit semantic meaning: it indicates NO host port should be allocated.
+    // * The value 0 does NOT indicate dynamic port allocation. Future implementations
+    //   of dynamic allocation will use different values/semantics.
+    // * Implementations MUST handle the case where this field is explicitly set to 0,
+    //   This field SHOULD be omitted when no port is required.
+    //
+    // Default: If omitted, container port will not be exposed on the host.
     int32 host_port = 3;
     // Host IP.
     string host_ip = 4;
@@ -248,13 +264,19 @@ message Mount {
     bool recursive_read_only = 8;
     // Mount an image reference (image ID, with or without digest), which is a
     // special use case for image volume mounts. If this field is set, then
-    // host_path should be unset. All OCI mounts are per feature definition
-    // readonly. The kubelet does an PullImage RPC and evaluates the returned
+    // host_path should be unset. All image mounts are per feature definition
+    // readonly (noexec). The kubelet does an PullImage RPC and evaluates the returned
     // PullImageResponse.image_ref value, which is then set to the
     // ImageSpec.image field. Runtimes are expected to mount the image as
     // required.
-    // Introduced in the OCI Volume Source KEP: https://kep.k8s.io/4639
+    // Introduced in the Image Volume Source KEP: https://kep.k8s.io/4639
     ImageSpec image = 9;
+    // Specific image sub path to be used from inside the image instead of its
+    // root, only necessary if the above image field is set. If the sub path is
+    // not empty and does not exist in the image, then runtimes should fail and
+    // return an error.
+    // Introduced in the Image Volume Source KEP beta graduation: https://kep.k8s.io/4639
+    string image_sub_path = 10;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.
@@ -726,6 +748,8 @@ message LinuxPodSandboxStats {
     ProcessUsage process = 4;
     // Stats of containers in the measured pod sandbox.
     repeated ContainerStats containers = 5;
+    // IO usage gathered for the pod sandbox.
+    IoUsage io = 6;
 }
 
 // WindowsPodSandboxStats provides the resource usage statistics for a pod sandbox on windows
@@ -989,7 +1013,7 @@ message LinuxContainerUser {
 // WindowsNamespaceOption provides options for Windows namespaces.
 message WindowsNamespaceOption {
     // Network namespace for this container/sandbox.
-    // Namespaces currently set by the kubelet: POD, NODE
+    // This is currently never set by the kubelet
     NamespaceMode network = 1;
 }
 
@@ -1164,6 +1188,78 @@ message ContainerConfig {
 
     // CDI devices for the container.
     repeated CDIDevice CDI_devices = 17;
+
+    // The custom stop signal for the container
+    Signal stop_signal = 18;
+}
+
+enum Signal {
+    RUNTIME_DEFAULT   = 0;
+    SIGABRT           = 1;
+    SIGALRM           = 2;
+    SIGBUS            = 3;
+    SIGCHLD           = 4;
+    SIGCLD            = 5;
+    SIGCONT           = 6;
+    SIGFPE            = 7;
+    SIGHUP            = 8;
+    SIGILL            = 9;
+    SIGINT            = 10;
+    SIGIO             = 11;
+    SIGIOT            = 12;
+    SIGKILL           = 13;
+    SIGPIPE           = 14;
+    SIGPOLL           = 15;
+    SIGPROF           = 16;
+    SIGPWR            = 17;
+    SIGQUIT           = 18;
+    SIGSEGV           = 19;
+    SIGSTKFLT         = 20;
+    SIGSTOP           = 21;
+    SIGSYS            = 22;
+    SIGTERM           = 23;
+    SIGTRAP           = 24;
+    SIGTSTP           = 25;
+    SIGTTIN           = 26;
+    SIGTTOU           = 27;
+    SIGURG            = 28;
+    SIGUSR1           = 29;
+    SIGUSR2           = 30;
+    SIGVTALRM         = 31;
+    SIGWINCH          = 32;
+    SIGXCPU           = 33;
+    SIGXFSZ           = 34;
+    SIGRTMIN          = 35;
+    SIGRTMINPLUS1     = 36;
+    SIGRTMINPLUS2     = 37;
+    SIGRTMINPLUS3     = 38;
+    SIGRTMINPLUS4     = 39;
+    SIGRTMINPLUS5     = 40;
+    SIGRTMINPLUS6     = 41;
+    SIGRTMINPLUS7     = 42;
+    SIGRTMINPLUS8     = 43;
+    SIGRTMINPLUS9     = 44;
+    SIGRTMINPLUS10    = 45;
+    SIGRTMINPLUS11    = 46;
+    SIGRTMINPLUS12    = 47;
+    SIGRTMINPLUS13    = 48;
+    SIGRTMINPLUS14    = 49;
+    SIGRTMINPLUS15    = 50;
+    SIGRTMAXMINUS14   = 51;
+    SIGRTMAXMINUS13   = 52;
+    SIGRTMAXMINUS12   = 53;
+    SIGRTMAXMINUS11   = 54;
+    SIGRTMAXMINUS10   = 55;
+    SIGRTMAXMINUS9    = 56;
+    SIGRTMAXMINUS8    = 57;
+    SIGRTMAXMINUS7    = 58;
+    SIGRTMAXMINUS6    = 59;
+    SIGRTMAXMINUS5    = 60;
+    SIGRTMAXMINUS4    = 61;
+    SIGRTMAXMINUS3    = 62;
+    SIGRTMAXMINUS2    = 63;
+    SIGRTMAXMINUS1    = 64;
+    SIGRTMAX          = 65;
 }
 
 message CreateContainerRequest {
@@ -1337,6 +1433,9 @@ message ContainerStatus {
     string image_id = 17;
     // User identities initially attached to the container
     ContainerUser user = 18;
+
+    // Returns the stop signal used by the container runtime to terminate the container 
+    Signal stop_signal = 19;
 }
 
 message ContainerStatusResponse {
@@ -1771,6 +1870,8 @@ message ContainerStats {
     FilesystemUsage writable_layer = 4;
     // Swap usage gathered from the container.
     SwapUsage swap = 5;
+    // IO usage gathered from the container.
+    IoUsage io = 6;
 }
 
 // WindowsContainerStats provides the resource usage statistics for a container specific for Windows
@@ -1785,6 +1886,27 @@ message WindowsContainerStats {
     WindowsFilesystemUsage writable_layer = 4;
 }
 
+// PSI statistics for an individual resource.
+message PsiStats {
+	// PSI data for all tasks in the cgroup.
+	PsiData Full = 1;
+	// PSI data for some tasks in the cgroup.
+	PsiData Some = 2;
+}
+
+// PSI data for an individual resource.
+message PsiData {
+	// Total time duration for tasks in the cgroup have waited due to congestion.
+	// Unit: nanoseconds.
+	uint64 Total = 1;
+	// The average (in %) tasks have waited due to congestion over a 10 second window.
+	double Avg10 = 2;
+	// The average (in %) tasks have waited due to congestion over a 60 second window.
+	double Avg60 = 3;
+	// The average (in %) tasks have waited due to congestion over a 300 second window.
+	double Avg300 = 4;
+}
+
 // CpuUsage provides the CPU usage information.
 message CpuUsage {
     // Timestamp in nanoseconds at which the information were collected. Must be > 0.
@@ -1794,6 +1916,8 @@ message CpuUsage {
     // Total CPU usage (sum of all cores) averaged over the sample window.
     // The "core" unit can be interpreted as CPU core-nanoseconds per second.
     UInt64Value usage_nano_cores = 3;
+    // CPU PSI statistics.
+    PsiStats psi = 4;
 }
 
 // WindowsCpuUsage provides the CPU usage information specific to Windows
@@ -1823,6 +1947,15 @@ message MemoryUsage {
     UInt64Value page_faults = 6;
     // Cumulative number of major page faults.
     UInt64Value major_page_faults = 7;
+    // Memory PSI statistics.
+    PsiStats psi = 8;
+}
+
+message IoUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // IO PSI statistics.
+    PsiStats psi = 2;
 }
 
 message SwapUsage {
@@ -1982,3 +2115,14 @@ enum CgroupDriver {
     CGROUPFS = 1;
 }
 
+message UpdatePodSandboxResourcesRequest {
+    // ID of the PodSandbox to update.
+    string pod_sandbox_id = 1;
+
+    // Optional overhead represents the overheads associated with this sandbox
+    LinuxContainerResources overhead = 2;
+    // Optional resources represents the sum of container resources for this sandbox
+    LinuxContainerResources resources = 3;
+}
+
+message UpdatePodSandboxResourcesResponse {}

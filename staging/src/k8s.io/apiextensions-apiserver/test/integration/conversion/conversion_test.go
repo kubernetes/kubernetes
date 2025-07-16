@@ -219,13 +219,13 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 			defer ctc.removeConversionWebhook(t)
 
 			// wait until new webhook is called the first time
-			if err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-				_, err := ctc.versionedClient(marker.GetNamespace(), "v1alpha1").Get(context.TODO(), marker.GetName(), metav1.GetOptions{})
+			if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
+				_, getErr := ctc.versionedClient(marker.GetNamespace(), "v1alpha1").Get(ctx, marker.GetName(), metav1.GetOptions{})
 				select {
 				case <-upCh:
 					return true, nil
 				default:
-					t.Logf("Waiting for webhook to become effective, getting marker object: %v", err)
+					t.Logf("Waiting for webhook to become effective, getting marker object: %v", getErr)
 					return false, nil
 				}
 			}); err != nil {
@@ -686,7 +686,6 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 		objv1beta2 := newConversionMultiVersionFixture(ns, id, "v1beta2")
 		meta, _, _ := unstructured.NestedFieldCopy(obj.Object, "metadata")
 		unstructured.SetNestedField(objv1beta2.Object, meta, "metadata")
-		lastRV := objv1beta2.GetResourceVersion()
 
 		for _, verb := range []string{"get", "list", "create", "update", "patch", "delete", "deletecollection"} {
 			t.Run(verb, func(t *testing.T) {
@@ -694,10 +693,7 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 				case "get":
 					_, err = clients["v1beta2"].Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 				case "list":
-					// With ResilientWatchcCacheInitialization feature, List requests are rejected with 429 if watchcache is not initialized.
-					// However, in some of these tests that install faulty converter webhook, watchcache will never initialize by definition (as list will never succeed due to faulty converter webook).
-					// In such case, the returned error will differ from the one returned from the etcd, so we need to force the request to go to etcd.
-					_, err = clients["v1beta2"].List(context.TODO(), metav1.ListOptions{ResourceVersion: lastRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact})
+					_, err = clients["v1beta2"].List(context.TODO(), metav1.ListOptions{})
 				case "create":
 					_, err = clients["v1beta2"].Create(context.TODO(), newConversionMultiVersionFixture(ns, id, "v1beta2"), metav1.CreateOptions{})
 				case "update":

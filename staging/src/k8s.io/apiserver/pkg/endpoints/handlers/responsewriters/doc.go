@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package responsewriters containers helpers to write responses in HTTP handlers.
-package responsewriters // import "k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+package responsewriters

@@ -45,13 +45,25 @@ func NewFilteredImageTagMirrorSetInformer(client versioned.Interface, resyncPeri
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1().ImageTagMirrorSets().List(context.TODO(), options)
+				return client.ConfigV1().ImageTagMirrorSets().List(context.Background(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1().ImageTagMirrorSets().Watch(context.TODO(), options)
+				return client.ConfigV1().ImageTagMirrorSets().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ConfigV1().ImageTagMirrorSets().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ConfigV1().ImageTagMirrorSets().Watch(ctx, options)
 			},
 		},
 		&apiconfigv1.ImageTagMirrorSet{},

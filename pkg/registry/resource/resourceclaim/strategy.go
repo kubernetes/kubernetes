@@ -30,11 +30,13 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	"k8s.io/kubernetes/pkg/features"
+	resourceutils "k8s.io/kubernetes/pkg/registry/resource"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -42,20 +44,26 @@ import (
 type resourceclaimStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
+	nsClient v1.NamespaceInterface
 }
 
-// Strategy is the default logic that applies when creating and updating
-// ResourceClaim objects via the REST API.
-var Strategy = resourceclaimStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+// NewStrategy is the default logic that applies when creating and updating ResourceClaim objects.
+func NewStrategy(nsClient v1.NamespaceInterface) *resourceclaimStrategy {
+	return &resourceclaimStrategy{
+		legacyscheme.Scheme,
+		names.SimpleNameGenerator,
+		nsClient,
+	}
+}
 
-func (resourceclaimStrategy) NamespaceScoped() bool {
+func (*resourceclaimStrategy) NamespaceScoped() bool {
 	return true
 }
 
 // GetResetFields returns the set of fields that get reset by the strategy and
 // should not be modified by the user. For a new ResourceClaim that is the
 // status.
-func (resourceclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+func (*resourceclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"resource.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
@@ -63,12 +71,15 @@ func (resourceclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpat
 		"resource.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
+		"resource.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 	}
 
 	return fields
 }
 
-func (resourceclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (*resourceclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	claim := obj.(*resource.ResourceClaim)
 	// Status must not be set by user on create.
 	claim.Status = resource.ResourceClaimStatus{}
@@ -76,23 +87,25 @@ func (resourceclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 	dropDisabledFields(claim, nil)
 }
 
-func (resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+func (s *resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	claim := obj.(*resource.ResourceClaim)
-	return validation.ValidateResourceClaim(claim)
+
+	allErrs := resourceutils.AuthorizedForAdmin(ctx, claim.Spec.Devices.Requests, claim.Namespace, s.nsClient)
+	return append(allErrs, validation.ValidateResourceClaim(claim)...)
 }
 
-func (resourceclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+func (*resourceclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	return nil
 }
 
-func (resourceclaimStrategy) Canonicalize(obj runtime.Object) {
+func (*resourceclaimStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (resourceclaimStrategy) AllowCreateOnUpdate() bool {
+func (*resourceclaimStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (resourceclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+func (*resourceclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
 	newClaim.Status = oldClaim.Status
@@ -100,30 +113,34 @@ func (resourceclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	dropDisabledFields(newClaim, oldClaim)
 }
 
-func (resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+func (s *resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
+	// AuthorizedForAdmin isn't needed here because the spec is immutable.
 	errorList := validation.ValidateResourceClaim(newClaim)
 	return append(errorList, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
 }
 
-func (resourceclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+func (*resourceclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
 
-func (resourceclaimStrategy) AllowUnconditionalUpdate() bool {
+func (*resourceclaimStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
 type resourceclaimStatusStrategy struct {
-	resourceclaimStrategy
+	*resourceclaimStrategy
 }
 
-var StatusStrategy = resourceclaimStatusStrategy{Strategy}
+// NewStatusStrategy creates a strategy for operating the status object.
+func NewStatusStrategy(resourceclaimStrategy *resourceclaimStrategy) *resourceclaimStatusStrategy {
+	return &resourceclaimStatusStrategy{resourceclaimStrategy}
+}
 
 // GetResetFields returns the set of fields that get reset by the strategy and
 // should not be modified by the user. For a status update that is the spec.
-func (resourceclaimStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+func (*resourceclaimStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"resource.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
@@ -131,12 +148,15 @@ func (resourceclaimStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fi
 		"resource.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
+		"resource.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
 	}
 
 	return fields
 }
 
-func (resourceclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+func (*resourceclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
 	newClaim.Spec = oldClaim.Spec
@@ -146,14 +166,22 @@ func (resourceclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 	dropDisabledFields(newClaim, oldClaim)
 }
 
-func (resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+func (r *resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
-	return validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim)
+	var newAllocationResult, oldAllocationResult []resource.DeviceRequestAllocationResult
+	if newClaim.Status.Allocation != nil {
+		newAllocationResult = newClaim.Status.Allocation.Devices.Results
+	}
+	if oldClaim.Status.Allocation != nil {
+		oldAllocationResult = oldClaim.Status.Allocation.Devices.Results
+	}
+	allErrs := resourceutils.AuthorizedForAdminStatus(ctx, newAllocationResult, oldAllocationResult, newClaim.Namespace, r.nsClient)
+	return append(allErrs, validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
-func (resourceclaimStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+func (*resourceclaimStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
 
@@ -183,8 +211,36 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 
 // dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
+	dropDisabledDRAPrioritizedListFields(newClaim, oldClaim)
 	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
 	dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim)
+}
+
+func dropDisabledDRAPrioritizedListFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList) {
+		return
+	}
+	if draPrioritizedListFeatureInUse(oldClaim) {
+		return
+	}
+
+	for i := range newClaim.Spec.Devices.Requests {
+		newClaim.Spec.Devices.Requests[i].FirstAvailable = nil
+	}
+}
+
+func draPrioritizedListFeatureInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+
+	for _, request := range claim.Spec.Devices.Requests {
+		if len(request.FirstAvailable) > 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim) {
@@ -203,7 +259,9 @@ func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim
 	}
 
 	for i := range newClaim.Spec.Devices.Requests {
-		newClaim.Spec.Devices.Requests[i].AdminAccess = nil
+		if newClaim.Spec.Devices.Requests[i].Exactly != nil {
+			newClaim.Spec.Devices.Requests[i].Exactly.AdminAccess = nil
+		}
 	}
 
 	if newClaim.Status.Allocation == nil {
@@ -220,7 +278,7 @@ func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
 	}
 
 	for _, request := range claim.Spec.Devices.Requests {
-		if request.AdminAccess != nil {
+		if request.Exactly != nil && request.Exactly.AdminAccess != nil {
 			return true
 		}
 	}
@@ -285,3 +343,5 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 		newClaim.Status.Devices = nil
 	}
 }
+
+// TODO: add tests after partitionable devices is merged (code conflict!)

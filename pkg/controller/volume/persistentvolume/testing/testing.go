@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp" //nolint:depguard
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"

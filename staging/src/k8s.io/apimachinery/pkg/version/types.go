@@ -20,15 +20,25 @@ package version
 // TODO: Add []string of api versions supported? It's still unclear
 // how we'll want to distribute that information.
 type Info struct {
-	Major        string `json:"major"`
-	Minor        string `json:"minor"`
-	GitVersion   string `json:"gitVersion"`
-	GitCommit    string `json:"gitCommit"`
-	GitTreeState string `json:"gitTreeState"`
-	BuildDate    string `json:"buildDate"`
-	GoVersion    string `json:"goVersion"`
-	Compiler     string `json:"compiler"`
-	Platform     string `json:"platform"`
+	// Major is the major version of the binary version
+	Major string `json:"major"`
+	// Minor is the minor version of the binary version
+	Minor string `json:"minor"`
+	// EmulationMajor is the major version of the emulation version
+	EmulationMajor string `json:"emulationMajor,omitempty"`
+	// EmulationMinor is the minor version of the emulation version
+	EmulationMinor string `json:"emulationMinor,omitempty"`
+	// MinCompatibilityMajor is the major version of the minimum compatibility version
+	MinCompatibilityMajor string `json:"minCompatibilityMajor,omitempty"`
+	// MinCompatibilityMinor is the minor version of the minimum compatibility version
+	MinCompatibilityMinor string `json:"minCompatibilityMinor,omitempty"`
+	GitVersion            string `json:"gitVersion"`
+	GitCommit             string `json:"gitCommit"`
+	GitTreeState          string `json:"gitTreeState"`
+	BuildDate             string `json:"buildDate"`
+	GoVersion             string `json:"goVersion"`
+	Compiler              string `json:"compiler"`
+	Platform              string `json:"platform"`
 }
 
 // String returns info as a human-friendly version string.

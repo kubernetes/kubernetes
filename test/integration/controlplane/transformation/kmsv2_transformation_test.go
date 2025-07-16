@@ -193,7 +193,7 @@ resources:
 `
 	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider-defaults.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -279,7 +279,7 @@ resources:
 	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
 	pluginMock := kmsv2mock.NewBase64Plugin(t, "@"+kmsName+".sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -432,7 +432,7 @@ resources:
 `
 	pluginMock := kmsv2mock.NewBase64Plugin(t, "@"+kmsName+".sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -730,7 +730,7 @@ resources:
 `
 	_ = kmsv2mock.NewBase64Plugin(t, "@"+kmsName+".sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -871,7 +871,7 @@ resources:
 	pluginMock1 := kmsv2mock.NewBase64Plugin(t, "@kms-provider-1.sock")
 	pluginMock2 := kmsv2mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver, error: %v", err)
 	}
@@ -949,7 +949,7 @@ resources:
 
 	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider-single-service.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -1006,7 +1006,7 @@ resources:
 	storageConfig := framework.SharedEtcd()
 
 	// KMSv2 is enabled by default. Loading a encryptionConfig with KMSv2 should work
-	test, err := newTransformTest(t, encryptionConfig, false, "", storageConfig)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig, storageConfig: storageConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -1078,7 +1078,7 @@ resources:
 
 	// After a restart, loading a encryptionConfig with the same KMSv2 plugin before the restart should work, decryption of data encrypted with v2 should work
 
-	test, err = newTransformTest(t, encryptionConfig, false, "", storageConfig)
+	test, err = newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig, storageConfig: storageConfig})
 	if err != nil {
 		t.Fatalf("Failed to restart api server, error: %v", err)
 	}
@@ -1126,7 +1126,7 @@ resources:
 `
 	_ = kmsv2mock.NewBase64Plugin(b, "@kms-provider-bench.sock")
 
-	test, err := newTransformTest(b, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(b, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		b.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -1279,7 +1279,7 @@ resources:
 `
 	_ = kmsv2mock.NewBase64Plugin(b, "@kms-provider-bench-rest.sock")
 
-	test, err := newTransformTest(b, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(b, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		b.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -1378,7 +1378,7 @@ resources:
 	storageConfig := storagebackend.NewDefaultConfig(path.Join(legacyDataEtcdPrefix, "registry"), nil)
 	storageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", storageConfig)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig, storageConfig: storageConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}

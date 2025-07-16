@@ -34,7 +34,10 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -67,7 +70,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	// interface, or else use a proxy.ServiceChangeTracker and proxy.NewEndpointsChangeTracker
 	// to construct them and fill in the maps for us.
 
-	sct := proxy.NewServiceChangeTracker(nil, v1.IPv4Protocol, nil, nil)
+	sct := proxy.NewServiceChangeTracker(v1.IPv4Protocol, nil, nil)
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testServiceName,
@@ -109,7 +112,7 @@ func TestCleanStaleEntries(t *testing.T) {
 	svcPortMap := make(proxy.ServicePortMap)
 	_ = svcPortMap.Update(sct)
 
-	ect := proxy.NewEndpointsChangeTracker("test-worker", nil, v1.IPv4Protocol, nil, nil)
+	ect := proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, "test-worker", nil, nil)
 	eps := &discovery.EndpointSlice{
 		TypeMeta:    metav1.TypeMeta{},
 		AddressType: discovery.AddressTypeIPv4,
@@ -306,9 +309,15 @@ func TestCleanStaleEntries(t *testing.T) {
 	t.Logf("entries before cleanup %d after cleanup %d", len(entriesBeforeCleanup), len(entriesAfterCleanup))
 	fake := NewFake()
 	fake.entries = entriesBeforeCleanup
-	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
 
+	legacyregistry.MustRegister(metrics.ReconcileConntrackFlowsDeletedEntriesTotal)
+	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
 	actualEntries, _ := fake.ListEntries(ipFamilyMap[testIPFamily])
+
+	metricCount, err := testutil.GetCounterMetricValue(metrics.ReconcileConntrackFlowsDeletedEntriesTotal.WithLabelValues(string(testIPFamily)))
+	require.NoError(t, err)
+	require.Equal(t, int(metricCount), len(entriesBeforeCleanup)-len(entriesAfterCleanup))
+
 	require.Equal(t, len(entriesAfterCleanup), len(actualEntries))
 
 	// sort the actual flows before comparison
@@ -326,7 +335,7 @@ func TestCleanStaleEntries(t *testing.T) {
 }
 
 func TestPerformanceCleanStaleEntries(t *testing.T) {
-	sct := proxy.NewServiceChangeTracker(nil, v1.IPv4Protocol, nil, nil)
+	sct := proxy.NewServiceChangeTracker(v1.IPv4Protocol, nil, nil)
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testServiceName,
@@ -356,7 +365,7 @@ func TestPerformanceCleanStaleEntries(t *testing.T) {
 	svcPortMap := make(proxy.ServicePortMap)
 	_ = svcPortMap.Update(sct)
 
-	ect := proxy.NewEndpointsChangeTracker("test-worker", nil, v1.IPv4Protocol, nil, nil)
+	ect := proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, "test-worker", nil, nil)
 	eps := &discovery.EndpointSlice{
 		TypeMeta:    metav1.TypeMeta{},
 		AddressType: discovery.AddressTypeIPv4,
@@ -436,7 +445,7 @@ func TestPerformanceCleanStaleEntries(t *testing.T) {
 }
 
 func TestServiceWithoutEndpoints(t *testing.T) {
-	sct := proxy.NewServiceChangeTracker(nil, v1.IPv4Protocol, nil, nil)
+	sct := proxy.NewServiceChangeTracker(v1.IPv4Protocol, nil, nil)
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testServiceName,
@@ -466,7 +475,7 @@ func TestServiceWithoutEndpoints(t *testing.T) {
 	svcPortMap := make(proxy.ServicePortMap)
 	_ = svcPortMap.Update(sct)
 
-	ect := proxy.NewEndpointsChangeTracker("test-worker", nil, v1.IPv4Protocol, nil, nil)
+	ect := proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, "test-worker", nil, nil)
 	eps := &discovery.EndpointSlice{
 		TypeMeta:    metav1.TypeMeta{},
 		AddressType: discovery.AddressTypeIPv4,

@@ -59,6 +59,27 @@ type GSSAPIWithMICConfig struct {
 	Server GSSAPIServer
 }
 
+// SendAuthBanner implements [ServerPreAuthConn].
+func (s *connection) SendAuthBanner(msg string) error {
+	return s.transport.writePacket(Marshal(&userAuthBannerMsg{
+		Message: msg,
+	}))
+}
+
+func (*connection) unexportedMethodForFutureProofing() {}
+
+// ServerPreAuthConn is the interface available on an incoming server
+// connection before authentication has completed.
+type ServerPreAuthConn interface {
+	unexportedMethodForFutureProofing() // permits growing ServerPreAuthConn safely later, ala testing.TB
+
+	ConnMetadata
+
+	// SendAuthBanner sends a banner message to the client.
+	// It returns an error once the authentication phase has ended.
+	SendAuthBanner(string) error
+}
+
 // ServerConfig holds server specific configuration data.
 type ServerConfig struct {
 	// Config contains configuration shared between client and server.
@@ -118,6 +139,12 @@ type ServerConfig struct {
 	// attempts.
 	AuthLogCallback func(conn ConnMetadata, method string, err error)
 
+	// PreAuthConnCallback, if non-nil, is called upon receiving a new connection
+	// before any authentication has started. The provided ServerPreAuthConn
+	// can be used at any time before authentication is complete, including
+	// after this callback has returned.
+	PreAuthConnCallback func(ServerPreAuthConn)
+
 	// ServerVersion is the version identification string to announce in
 	// the public handshake.
 	// If empty, a reasonable default is used.
@@ -149,7 +176,7 @@ func (s *ServerConfig) AddHostKey(key Signer) {
 }
 
 // cachedPubKey contains the results of querying whether a public key is
-// acceptable for a user.
+// acceptable for a user. This is a FIFO cache.
 type cachedPubKey struct {
 	user       string
 	pubKeyData []byte
@@ -157,7 +184,13 @@ type cachedPubKey struct {
 	perms      *Permissions
 }
 
-const maxCachedPubKeys = 16
+// maxCachedPubKeys is the number of cache entries we store.
+//
+// Due to consistent misuse of the PublicKeyCallback API, we have reduced this
+// to 1, such that the only key in the cache is the most recently seen one. This
+// forces the behavior that the last call to PublicKeyCallback will always be
+// with the key that is used for authentication.
+const maxCachedPubKeys = 1
 
 // pubKeyCache caches tests for public keys.  Since SSH clients
 // will query whether a public key is acceptable before attempting to
@@ -179,9 +212,10 @@ func (c *pubKeyCache) get(user string, pubKeyData []byte) (cachedPubKey, bool) {
 
 // add adds the given tuple to the cache.
 func (c *pubKeyCache) add(candidate cachedPubKey) {
-	if len(c.keys) < maxCachedPubKeys {
-		c.keys = append(c.keys, candidate)
+	if len(c.keys) >= maxCachedPubKeys {
+		c.keys = c.keys[1:]
 	}
+	c.keys = append(c.keys, candidate)
 }
 
 // ServerConn is an authenticated SSH connection, as seen from the
@@ -481,6 +515,10 @@ func (b *BannerError) Error() string {
 }
 
 func (s *connection) serverAuthenticate(config *ServerConfig) (*Permissions, error) {
+	if config.PreAuthConnCallback != nil {
+		config.PreAuthConnCallback(s)
+	}
+
 	sessionID := s.transport.getSessionID()
 	var cache pubKeyCache
 	var perms *Permissions
@@ -488,7 +526,7 @@ func (s *connection) serverAuthenticate(config *ServerConfig) (*Permissions, err
 	authFailures := 0
 	noneAuthCount := 0
 	var authErrs []error
-	var displayedBanner bool
+	var calledBannerCallback bool
 	partialSuccessReturned := false
 	// Set the initial authentication callbacks from the config. They can be
 	// changed if a PartialSuccessError is returned.
@@ -535,14 +573,10 @@ userAuthLoop:
 
 		s.user = userAuthReq.User
 
-		if !displayedBanner && config.BannerCallback != nil {
-			displayedBanner = true
-			msg := config.BannerCallback(s)
-			if msg != "" {
-				bannerMsg := &userAuthBannerMsg{
-					Message: msg,
-				}
-				if err := s.transport.writePacket(Marshal(bannerMsg)); err != nil {
+		if !calledBannerCallback && config.BannerCallback != nil {
+			calledBannerCallback = true
+			if msg := config.BannerCallback(s); msg != "" {
+				if err := s.SendAuthBanner(msg); err != nil {
 					return nil, err
 				}
 			}
@@ -755,10 +789,7 @@ userAuthLoop:
 		var bannerErr *BannerError
 		if errors.As(authErr, &bannerErr) {
 			if bannerErr.Message != "" {
-				bannerMsg := &userAuthBannerMsg{
-					Message: bannerErr.Message,
-				}
-				if err := s.transport.writePacket(Marshal(bannerMsg)); err != nil {
+				if err := s.SendAuthBanner(bannerErr.Message); err != nil {
 					return nil, err
 				}
 			}

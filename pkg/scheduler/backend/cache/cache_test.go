@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,6 +40,16 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
+var nodeInfoCmpOpts = []cmp.Option{
+	cmp.AllowUnexported(framework.NodeInfo{}),
+	// This field needs to be ignored because we can't call AllowUnexported for type framework.podResource (it's not visible in this package).
+	cmpopts.IgnoreFields(framework.PodInfo{}, "cachedResource"),
+}
+
+func init() {
+	metrics.Register()
+}
+
 func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.NodeInfo) error {
 	if (actual == nil) != (expected == nil) {
 		return errors.New("one of the actual or expected is nil and the other is not")
@@ -51,7 +62,7 @@ func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.No
 		expected.Generation = 0
 	}
 	if actual != nil {
-		if diff := cmp.Diff(expected, actual.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+		if diff := cmp.Diff(expected, actual.info, nodeInfoCmpOpts...); diff != "" {
 			return fmt.Errorf("Unexpected node info (-want,+got):\n%s", diff)
 		}
 	}
@@ -266,7 +277,6 @@ func assumeAndFinishBinding(logger klog.Logger, cache *cacheImpl, pod *v1.Pod, a
 // TestExpirePod tests that assumed pods will be removed if expired.
 // The removal will be reflected in node info.
 func TestExpirePod(t *testing.T) {
-	metrics.Register()
 	nodeName := "node"
 	testPods := []*v1.Pod{
 		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
@@ -465,7 +475,7 @@ func TestDump(t *testing.T) {
 	}
 	for name, ni := range snapshot.Nodes {
 		nItem := cache.nodes[name]
-		if diff := cmp.Diff(nItem.info, ni, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+		if diff := cmp.Diff(nItem.info, ni, nodeInfoCmpOpts...); diff != "" {
 			t.Errorf("Unexpected node info (-want,+got):\n%s", diff)
 		}
 	}
@@ -1245,7 +1255,7 @@ func TestNodeOperators(t *testing.T) {
 
 			// Generations are globally unique. We check in our unit tests that they are incremented correctly.
 			expected.Generation = got.info.Generation
-			if diff := cmp.Diff(expected, got.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+			if diff := cmp.Diff(expected, got.info, nodeInfoCmpOpts...); diff != "" {
 				t.Errorf("Failed to add node into scheduler cache (-want,+got):\n%s", diff)
 			}
 
@@ -1264,8 +1274,8 @@ func TestNodeOperators(t *testing.T) {
 				t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes.nodeInfoMap, tc.nodes)
 			}
 			expected.Generation = newNode.Generation
-			if diff := cmp.Diff(newNode, expected.Snapshot(), cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
-				t.Errorf("Failed to clone node:\n%s", diff)
+			if diff := cmp.Diff(expected.Snapshot(), newNode, nodeInfoCmpOpts...); diff != "" {
+				t.Errorf("Failed to clone node (-want,+got):\n%s", diff)
 			}
 			// check imageState of NodeInfo with specific image when update snapshot
 			if !checkImageStateSummary(cachedNodes.nodeInfoMap, "gcr.io/80:latest", "gcr.io/300:latest") {
@@ -1286,7 +1296,7 @@ func TestNodeOperators(t *testing.T) {
 			}
 			expected.Generation = got.info.Generation
 
-			if diff := cmp.Diff(expected, got.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+			if diff := cmp.Diff(expected, got.info, nodeInfoCmpOpts...); diff != "" {
 				t.Errorf("Unexpected schedulertypes after updating node (-want, +got):\n%s", diff)
 			}
 			// check imageState of NodeInfo with specific image when update node
@@ -1763,7 +1773,7 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 		if want.Node() == nil {
 			want = nil
 		}
-		if diff := cmp.Diff(want, snapshot.nodeInfoMap[name], cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+		if diff := cmp.Diff(want, snapshot.nodeInfoMap[name], nodeInfoCmpOpts...); diff != "" {
 			return fmt.Errorf("Unexpected node info for node (-want, +got):\n%s", diff)
 		}
 	}

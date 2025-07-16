@@ -782,6 +782,11 @@ func TypeVariable(t *types.Type) *VariableDecl {
 	return NewVariable(t.TypeName(), types.NewTypeTypeWithParam(t))
 }
 
+// VariableDeclToExprDecl converts a go-native variable declaration into a protobuf-type variable declaration.
+func VariableDeclToExprDecl(v *VariableDecl) (*exprpb.Decl, error) {
+	return variableDeclToExprDecl(v)
+}
+
 // variableDeclToExprDecl converts a go-native variable declaration into a protobuf-type variable declaration.
 func variableDeclToExprDecl(v *VariableDecl) (*exprpb.Decl, error) {
 	varType, err := types.TypeToExprType(v.Type())
@@ -789,6 +794,11 @@ func variableDeclToExprDecl(v *VariableDecl) (*exprpb.Decl, error) {
 		return nil, err
 	}
 	return chkdecls.NewVar(v.Name(), varType), nil
+}
+
+// FunctionDeclToExprDecl converts a go-native function declaration into a protobuf-typed function declaration.
+func FunctionDeclToExprDecl(f *FunctionDecl) (*exprpb.Decl, error) {
+	return functionDeclToExprDecl(f)
 }
 
 // functionDeclToExprDecl converts a go-native function declaration into a protobuf-typed function declaration.

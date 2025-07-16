@@ -73,6 +73,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/version"
 	"k8s.io/kubectl/pkg/cmd/wait"
+	"k8s.io/kubectl/pkg/kuberc"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -361,6 +362,11 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
 
+	pref := kuberc.NewPreferences()
+	if cmdutil.KubeRC.IsEnabled() {
+		pref.AddFlags(flags)
+	}
+
 	kubeConfigFlags := o.ConfigFlags
 	if kubeConfigFlags == nil {
 		kubeConfigFlags = defaultConfigFlags().WithWarningPrinter(o.IOStreams)
@@ -383,6 +389,8 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Avoid import cycle by setting ValidArgsFunction here instead of in NewCmdGet()
 	getCmd := get.NewCmdGet("kubectl", f, o.IOStreams)
 	getCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
+	debugCmd := debug.NewCmdDebug(f, o.IOStreams)
+	debugCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
 
 	groups := templates.CommandGroups{
 		{
@@ -434,7 +442,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 				proxyCmd,
 				cp.NewCmdCp(f, o.IOStreams),
 				auth.NewCmdAuth(f, o.IOStreams),
-				debug.NewCmdDebug(f, o.IOStreams),
+				debugCmd,
 				events.NewCmdEvents(f, o.IOStreams),
 			},
 		},
@@ -490,6 +498,15 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Stop warning about normalization of flags. That makes it possible to
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
+
+	if cmdutil.KubeRC.IsEnabled() {
+		_, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
+		if err != nil {
+			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	return cmds
 }
 

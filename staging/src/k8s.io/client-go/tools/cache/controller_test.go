@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -32,13 +33,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	fcache "k8s.io/client-go/tools/cache/testing"
+	"k8s.io/klog/v2/ktesting"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 )
 
 func Example() {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
+	defer source.Shutdown()
 
 	// This will hold the downstream state, as we know it.
 	downstream := NewStore(DeletionHandlingMetaNamespaceKeyFunc)
@@ -46,10 +49,7 @@ func Example() {
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KeyFunction:  MetaNamespaceKeyFunc,
-		KnownObjects: downstream,
-	})
+	fifo := NewRealFIFO(MetaNamespaceKeyFunc, downstream, nil)
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
@@ -59,7 +59,6 @@ func Example() {
 		ListerWatcher:    source,
 		ObjectType:       &v1.Pod{},
 		FullResyncPeriod: time.Millisecond * 100,
-		RetryOnError:     false,
 
 		// Let's implement a simple controller that just deletes
 		// everything that comes in.
@@ -85,7 +84,7 @@ func Example() {
 
 				// fifo's KeyOf is easiest, because it handles
 				// DeletedFinalStateUnknown markers.
-				key, err := fifo.KeyOf(newest.Object)
+				key, err := fifo.keyOf(newest.Object)
 				if err != nil {
 					return err
 				}
@@ -97,10 +96,10 @@ func Example() {
 		},
 	}
 
-	// Create the controller and run it until we close stop.
-	stop := make(chan struct{})
-	defer close(stop)
-	go New(cfg).Run(stop)
+	// Create the controller and run it until we cancel.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go New(cfg).RunWithContext(ctx)
 
 	// Let's add a few objects to the source.
 	testIDs := []string{"a-hello", "b-controller", "c-framework"}
@@ -128,6 +127,7 @@ func Example() {
 func ExampleNewInformer() {
 	// source simulates an apiserver object endpoint.
 	source := fcache.NewFakeControllerSource()
+	defer source.Shutdown()
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
@@ -154,10 +154,10 @@ func ExampleNewInformer() {
 		},
 	)
 
-	// Run the controller and run it until we close stop.
-	stop := make(chan struct{})
-	defer close(stop)
-	go controller.Run(stop)
+	// Run the controller and run it until we cancel.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go controller.RunWithContext(ctx)
 
 	// Let's add a few objects to the source.
 	testIDs := []string{"a-hello", "b-controller", "c-framework"}
@@ -189,7 +189,7 @@ func TestHammerController(t *testing.T) {
 	// race detector.
 
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	// Let's do threadsafe output to get predictable test results.
 	outputSetLock := sync.Mutex{}
@@ -225,9 +225,15 @@ func TestHammerController(t *testing.T) {
 		t.Errorf("Expected HasSynced() to return false before we started the controller")
 	}
 
-	// Run the controller and run it until we close stop.
-	stop := make(chan struct{})
-	go controller.Run(stop)
+	// Run the controller and run it until we cancel.
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	var controllerWG sync.WaitGroup
+	controllerWG.Add(1)
+	go func() {
+		defer controllerWG.Done()
+		controller.RunWithContext(ctx)
+	}()
 
 	// Let's wait for the controller to do its initial sync
 	wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -246,12 +252,12 @@ func TestHammerController(t *testing.T) {
 			// Let's add a few objects to the source.
 			currentNames := sets.String{}
 			rs := rand.NewSource(rand.Int63())
-			f := fuzz.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
+			f := randfill.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
 			for i := 0; i < 100; i++ {
 				var name string
 				var isNew bool
 				if currentNames.Len() == 0 || rand.Intn(3) == 1 {
-					f.Fuzz(&name)
+					f.Fill(&name)
 					isNew = true
 				} else {
 					l := currentNames.List()
@@ -259,7 +265,7 @@ func TestHammerController(t *testing.T) {
 				}
 
 				pod := &v1.Pod{}
-				f.Fuzz(pod)
+				f.Fill(pod)
 				pod.ObjectMeta.Name = name
 				pod.ObjectMeta.Namespace = "default"
 				// Add, update, or delete randomly.
@@ -286,10 +292,13 @@ func TestHammerController(t *testing.T) {
 	// Let's wait for the controller to finish processing the things we just added.
 	// TODO: look in the queue to see how many items need to be processed.
 	time.Sleep(100 * time.Millisecond)
-	close(stop)
+	cancel()
 
-	// TODO: Verify that no goroutines were leaked here and that everything shut
-	// down cleanly.
+	// Before we permanently lock this mutex, we have to be sure
+	// that the controller has stopped running. At this point,
+	// all goroutines should have stopped. Leak checking is
+	// done by TestMain.
+	controllerWG.Wait()
 
 	outputSetLock.Lock()
 	t.Logf("got: %#v", outputSet)
@@ -300,7 +309,7 @@ func TestUpdate(t *testing.T) {
 	// call to update.
 
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	const (
 		FROM = "from"
@@ -354,7 +363,7 @@ func TestUpdate(t *testing.T) {
 	// everything we've added has been deleted.
 	watchCh := make(chan struct{})
 	_, controller := NewInformer(
-		&testLW{
+		&ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				watch, err := source.Watch(options)
 				close(watchCh)
@@ -383,11 +392,13 @@ func TestUpdate(t *testing.T) {
 		},
 	)
 
-	// Run the controller and run it until we close stop.
+	// Run the controller and run it until we cancel.
 	// Once Run() is called, calls to testDoneWG.Done() might start, so
 	// all testDoneWG.Add() calls must happen before this point
-	stop := make(chan struct{})
-	go controller.Run(stop)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go controller.RunWithContext(ctx)
 	<-watchCh
 
 	// run every test a few times, in parallel
@@ -405,12 +416,11 @@ func TestUpdate(t *testing.T) {
 
 	// Let's wait for the controller to process the things we just added.
 	testDoneWG.Wait()
-	close(stop)
 }
 
 func TestPanicPropagated(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	// Make a controller that just panic if the AddFunc is called.
 	_, controller := NewInformer(
@@ -425,9 +435,10 @@ func TestPanicPropagated(t *testing.T) {
 		},
 	)
 
-	// Run the controller and run it until we close stop.
-	stop := make(chan struct{})
-	defer close(stop)
+	// Run the controller and run it until we cancel.
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	propagated := make(chan interface{})
 	go func() {
@@ -436,7 +447,7 @@ func TestPanicPropagated(t *testing.T) {
 				propagated <- r
 			}
 		}()
-		controller.Run(stop)
+		controller.RunWithContext(ctx)
 	}()
 	// Let's add a object to the source. It will trigger a panic.
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test"}})
@@ -456,7 +467,7 @@ func TestPanicPropagated(t *testing.T) {
 
 func TestTransformingInformer(t *testing.T) {
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	makePod := func(name, generation string) *v1.Pod {
 		return &v1.Pod{
@@ -553,8 +564,10 @@ func TestTransformingInformer(t *testing.T) {
 		}
 	}
 
-	stopCh := make(chan struct{})
-	go controller.Run(stopCh)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go controller.RunWithContext(ctx)
 
 	verifyEvent(watch.Added, nil, expectedPod("pod1", "2"))
 	verifyStore([]interface{}{expectedPod("pod1", "2")})
@@ -572,13 +585,19 @@ func TestTransformingInformer(t *testing.T) {
 	source.Delete(makePod("pod1", "2"))
 	verifyEvent(watch.Deleted, expectedPod("pod1", "2"), nil)
 	verifyStore([]interface{}{expectedPod("pod2", "2"), expectedPod("pod3", "1")})
-
-	close(stopCh)
 }
 
 func TestTransformingInformerRace(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	// Canceled *only* when the test is done.
+	testCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	// Canceled *also* during the test.
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
 	// source simulates an apiserver object endpoint.
-	source := fcache.NewFakeControllerSource()
+	source := newFakeControllerSource(t)
 
 	label := "to-be-transformed"
 	makePod := func(name string) *v1.Pod {
@@ -616,7 +635,11 @@ func TestTransformingInformerRace(t *testing.T) {
 	type event struct{}
 	events := make(chan event, numObjs)
 	recordEvent := func(eventType watch.EventType, previous, current interface{}) {
-		events <- event{}
+		select {
+		case events <- event{}:
+		case <-testCtx.Done():
+			// Don't block forever in the write above when test is already done.
+		}
 	}
 	checkEvents := func(count int) {
 		for i := 0; i < count; i++ {
@@ -635,8 +658,7 @@ func TestTransformingInformerRace(t *testing.T) {
 		podTransformer,
 	)
 
-	stopCh := make(chan struct{})
-	go controller.Run(stopCh)
+	go controller.RunWithContext(ctx)
 
 	checkEvents(numObjs)
 
@@ -650,7 +672,7 @@ func TestTransformingInformerRace(t *testing.T) {
 			key := fmt.Sprintf("namespace/pod-%d", index)
 			for {
 				select {
-				case <-stopCh:
+				case <-ctx.Done():
 					return
 				default:
 				}
@@ -672,7 +694,7 @@ func TestTransformingInformerRace(t *testing.T) {
 	// Let resyncs to happen for some time.
 	time.Sleep(time.Second)
 
-	close(stopCh)
+	cancel()
 	wg.Wait()
 	close(errors)
 	for err := range errors {

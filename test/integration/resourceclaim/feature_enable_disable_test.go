@@ -42,6 +42,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 	// apiserver with the feature disabled
 	server1 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
+			fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion),
 			fmt.Sprintf("--feature-gates=%s=true,%s=false", features.DynamicResourceAllocation, features.DRAResourceClaimDeviceStatus),
 		},
 		etcdOptions)
@@ -81,7 +82,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Driver: "foo",
 				Pool:   "foo",
 				Device: "foo",
-				Data: runtime.RawExtension{
+				Data: &runtime.RawExtension{
 					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 				},
 				NetworkData: &v1beta1.NetworkDeviceData{
@@ -114,6 +115,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 	// apiserver with the feature enabled
 	server2 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
+			fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion),
 			fmt.Sprintf("--feature-gates=%s=true,%s=true", features.DynamicResourceAllocation, features.DRAResourceClaimDeviceStatus),
 		},
 		etcdOptions)
@@ -153,7 +155,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Driver: "bar",
 				Pool:   "bar",
 				Device: "bar",
-				Data: runtime.RawExtension{
+				Data: &runtime.RawExtension{
 					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 				},
 				NetworkData: &v1beta1.NetworkDeviceData{
@@ -189,7 +191,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Driver: "bar",
 				Pool:   "bar",
 				Device: "bar",
-				Data: runtime.RawExtension{
+				Data: &runtime.RawExtension{
 					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 				},
 				NetworkData: &v1beta1.NetworkDeviceData{

@@ -128,6 +128,7 @@ import (
 	reflect "reflect"
 	sync "sync"
 	utf8 "unicode/utf8"
+	unsafe "unsafe"
 )
 
 // `NullValue` is a singleton enumeration to represent the null value for the
@@ -187,12 +188,11 @@ func (NullValue) EnumDescriptor() ([]byte, []int) {
 //
 // The JSON representation for `Struct` is JSON object.
 type Struct struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// Unordered map of dynamically typed values.
-	Fields map[string]*Value `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Fields        map[string]*Value `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 // NewStruct constructs a Struct from a general-purpose Go map.
@@ -276,13 +276,10 @@ func (x *Struct) GetFields() map[string]*Value {
 //
 // The JSON representation for `Value` is JSON value.
 type Value struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// The kind of value.
 	//
-	// Types that are assignable to Kind:
+	// Types that are valid to be assigned to Kind:
 	//
 	//	*Value_NullValue
 	//	*Value_NumberValue
@@ -290,7 +287,9 @@ type Value struct {
 	//	*Value_BoolValue
 	//	*Value_StructValue
 	//	*Value_ListValue
-	Kind isValue_Kind `protobuf_oneof:"kind"`
+	Kind          isValue_Kind `protobuf_oneof:"kind"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 // NewValue constructs a Value from a general-purpose Go interface.
@@ -483,51 +482,63 @@ func (*Value) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_struct_proto_rawDescGZIP(), []int{1}
 }
 
-func (m *Value) GetKind() isValue_Kind {
-	if m != nil {
-		return m.Kind
+func (x *Value) GetKind() isValue_Kind {
+	if x != nil {
+		return x.Kind
 	}
 	return nil
 }
 
 func (x *Value) GetNullValue() NullValue {
-	if x, ok := x.GetKind().(*Value_NullValue); ok {
-		return x.NullValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_NullValue); ok {
+			return x.NullValue
+		}
 	}
 	return NullValue_NULL_VALUE
 }
 
 func (x *Value) GetNumberValue() float64 {
-	if x, ok := x.GetKind().(*Value_NumberValue); ok {
-		return x.NumberValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_NumberValue); ok {
+			return x.NumberValue
+		}
 	}
 	return 0
 }
 
 func (x *Value) GetStringValue() string {
-	if x, ok := x.GetKind().(*Value_StringValue); ok {
-		return x.StringValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_StringValue); ok {
+			return x.StringValue
+		}
 	}
 	return ""
 }
 
 func (x *Value) GetBoolValue() bool {
-	if x, ok := x.GetKind().(*Value_BoolValue); ok {
-		return x.BoolValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_BoolValue); ok {
+			return x.BoolValue
+		}
 	}
 	return false
 }
 
 func (x *Value) GetStructValue() *Struct {
-	if x, ok := x.GetKind().(*Value_StructValue); ok {
-		return x.StructValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_StructValue); ok {
+			return x.StructValue
+		}
 	}
 	return nil
 }
 
 func (x *Value) GetListValue() *ListValue {
-	if x, ok := x.GetKind().(*Value_ListValue); ok {
-		return x.ListValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_ListValue); ok {
+			return x.ListValue
+		}
 	}
 	return nil
 }
@@ -582,12 +593,11 @@ func (*Value_ListValue) isValue_Kind() {}
 //
 // The JSON representation for `ListValue` is JSON array.
 type ListValue struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// Repeated field of dynamically typed values.
-	Values []*Value `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
+	Values        []*Value `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 // NewList constructs a ListValue from a general-purpose Go slice.
@@ -662,7 +672,7 @@ func (x *ListValue) GetValues() []*Value {
 
 var File_google_protobuf_struct_proto protoreflect.FileDescriptor
 
-var file_google_protobuf_struct_proto_rawDesc = []byte{
+var file_google_protobuf_struct_proto_rawDesc = string([]byte{
 	0x0a, 0x1c, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
 	0x66, 0x2f, 0x73, 0x74, 0x72, 0x75, 0x63, 0x74, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0f,
 	0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x22,
@@ -710,16 +720,16 @@ var file_google_protobuf_struct_proto_rawDesc = []byte{
 	0x6c, 0x65, 0x2e, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x57, 0x65, 0x6c, 0x6c,
 	0x4b, 0x6e, 0x6f, 0x77, 0x6e, 0x54, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
 	0x6f, 0x33,
-}
+})
 
 var (
 	file_google_protobuf_struct_proto_rawDescOnce sync.Once
-	file_google_protobuf_struct_proto_rawDescData = file_google_protobuf_struct_proto_rawDesc
+	file_google_protobuf_struct_proto_rawDescData []byte
 )
 
 func file_google_protobuf_struct_proto_rawDescGZIP() []byte {
 	file_google_protobuf_struct_proto_rawDescOnce.Do(func() {
-		file_google_protobuf_struct_proto_rawDescData = protoimpl.X.CompressGZIP(file_google_protobuf_struct_proto_rawDescData)
+		file_google_protobuf_struct_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_google_protobuf_struct_proto_rawDesc), len(file_google_protobuf_struct_proto_rawDesc)))
 	})
 	return file_google_protobuf_struct_proto_rawDescData
 }
@@ -764,7 +774,7 @@ func file_google_protobuf_struct_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_google_protobuf_struct_proto_rawDesc,
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_google_protobuf_struct_proto_rawDesc), len(file_google_protobuf_struct_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   4,
 			NumExtensions: 0,
@@ -776,7 +786,6 @@ func file_google_protobuf_struct_proto_init() {
 		MessageInfos:      file_google_protobuf_struct_proto_msgTypes,
 	}.Build()
 	File_google_protobuf_struct_proto = out.File
-	file_google_protobuf_struct_proto_rawDesc = nil
 	file_google_protobuf_struct_proto_goTypes = nil
 	file_google_protobuf_struct_proto_depIdxs = nil
 }

@@ -25,13 +25,17 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	credentialprovider "k8s.io/kubernetes/pkg/credentialprovider"
+
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 
 	io "io"
 
 	mock "github.com/stretchr/testify/mock"
 
-	types "k8s.io/apimachinery/pkg/types"
+	pkgtypes "k8s.io/apimachinery/pkg/types"
+
+	types "k8s.io/kubernetes/pkg/kubelet/types"
 
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -417,6 +421,53 @@ func (_c *MockRuntime_GetContainerStatus_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// GetContainerSwapBehavior provides a mock function with given fields: pod, _a1
+func (_m *MockRuntime) GetContainerSwapBehavior(pod *corev1.Pod, _a1 *corev1.Container) types.SwapBehavior {
+	ret := _m.Called(pod, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContainerSwapBehavior")
+	}
+
+	var r0 types.SwapBehavior
+	if rf, ok := ret.Get(0).(func(*corev1.Pod, *corev1.Container) types.SwapBehavior); ok {
+		r0 = rf(pod, _a1)
+	} else {
+		r0 = ret.Get(0).(types.SwapBehavior)
+	}
+
+	return r0
+}
+
+// MockRuntime_GetContainerSwapBehavior_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContainerSwapBehavior'
+type MockRuntime_GetContainerSwapBehavior_Call struct {
+	*mock.Call
+}
+
+// GetContainerSwapBehavior is a helper method to define mock.On call
+//   - pod *corev1.Pod
+//   - _a1 *corev1.Container
+func (_e *MockRuntime_Expecter) GetContainerSwapBehavior(pod interface{}, _a1 interface{}) *MockRuntime_GetContainerSwapBehavior_Call {
+	return &MockRuntime_GetContainerSwapBehavior_Call{Call: _e.mock.On("GetContainerSwapBehavior", pod, _a1)}
+}
+
+func (_c *MockRuntime_GetContainerSwapBehavior_Call) Run(run func(pod *corev1.Pod, _a1 *corev1.Container)) *MockRuntime_GetContainerSwapBehavior_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*corev1.Pod), args[1].(*corev1.Container))
+	})
+	return _c
+}
+
+func (_c *MockRuntime_GetContainerSwapBehavior_Call) Return(_a0 types.SwapBehavior) *MockRuntime_GetContainerSwapBehavior_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRuntime_GetContainerSwapBehavior_Call) RunAndReturn(run func(*corev1.Pod, *corev1.Container) types.SwapBehavior) *MockRuntime_GetContainerSwapBehavior_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetImageRef provides a mock function with given fields: ctx, image
 func (_m *MockRuntime) GetImageRef(ctx context.Context, image container.ImageSpec) (string, error) {
 	ret := _m.Called(ctx, image)
@@ -532,7 +583,7 @@ func (_c *MockRuntime_GetImageSize_Call) RunAndReturn(run func(context.Context, 
 }
 
 // GetPodStatus provides a mock function with given fields: ctx, uid, name, namespace
-func (_m *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name string, namespace string) (*container.PodStatus, error) {
+func (_m *MockRuntime) GetPodStatus(ctx context.Context, uid pkgtypes.UID, name string, namespace string) (*container.PodStatus, error) {
 	ret := _m.Called(ctx, uid, name, namespace)
 
 	if len(ret) == 0 {
@@ -541,10 +592,10 @@ func (_m *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name str
 
 	var r0 *container.PodStatus
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.UID, string, string) (*container.PodStatus, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, pkgtypes.UID, string, string) (*container.PodStatus, error)); ok {
 		return rf(ctx, uid, name, namespace)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.UID, string, string) *container.PodStatus); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, pkgtypes.UID, string, string) *container.PodStatus); ok {
 		r0 = rf(ctx, uid, name, namespace)
 	} else {
 		if ret.Get(0) != nil {
@@ -552,7 +603,7 @@ func (_m *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name str
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.UID, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, pkgtypes.UID, string, string) error); ok {
 		r1 = rf(ctx, uid, name, namespace)
 	} else {
 		r1 = ret.Error(1)
@@ -568,16 +619,16 @@ type MockRuntime_GetPodStatus_Call struct {
 
 // GetPodStatus is a helper method to define mock.On call
 //   - ctx context.Context
-//   - uid types.UID
+//   - uid pkgtypes.UID
 //   - name string
 //   - namespace string
 func (_e *MockRuntime_Expecter) GetPodStatus(ctx interface{}, uid interface{}, name interface{}, namespace interface{}) *MockRuntime_GetPodStatus_Call {
 	return &MockRuntime_GetPodStatus_Call{Call: _e.mock.On("GetPodStatus", ctx, uid, name, namespace)}
 }
 
-func (_c *MockRuntime_GetPodStatus_Call) Run(run func(ctx context.Context, uid types.UID, name string, namespace string)) *MockRuntime_GetPodStatus_Call {
+func (_c *MockRuntime_GetPodStatus_Call) Run(run func(ctx context.Context, uid pkgtypes.UID, name string, namespace string)) *MockRuntime_GetPodStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.UID), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(pkgtypes.UID), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -587,7 +638,7 @@ func (_c *MockRuntime_GetPodStatus_Call) Return(_a0 *container.PodStatus, _a1 er
 	return _c
 }
 
-func (_c *MockRuntime_GetPodStatus_Call) RunAndReturn(run func(context.Context, types.UID, string, string) (*container.PodStatus, error)) *MockRuntime_GetPodStatus_Call {
+func (_c *MockRuntime_GetPodStatus_Call) RunAndReturn(run func(context.Context, pkgtypes.UID, string, string) (*container.PodStatus, error)) *MockRuntime_GetPodStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -990,32 +1041,41 @@ func (_c *MockRuntime_ListPodSandboxMetrics_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// PullImage provides a mock function with given fields: ctx, image, pullSecrets, podSandboxConfig
-func (_m *MockRuntime) PullImage(ctx context.Context, image container.ImageSpec, pullSecrets []corev1.Secret, podSandboxConfig *v1.PodSandboxConfig) (string, error) {
-	ret := _m.Called(ctx, image, pullSecrets, podSandboxConfig)
+// PullImage provides a mock function with given fields: ctx, image, credentials, podSandboxConfig
+func (_m *MockRuntime) PullImage(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
+	ret := _m.Called(ctx, image, credentials, podSandboxConfig)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PullImage")
 	}
 
 	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []corev1.Secret, *v1.PodSandboxConfig) (string, error)); ok {
-		return rf(ctx, image, pullSecrets, podSandboxConfig)
+	var r1 *credentialprovider.TrackedAuthConfig
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error)); ok {
+		return rf(ctx, image, credentials, podSandboxConfig)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []corev1.Secret, *v1.PodSandboxConfig) string); ok {
-		r0 = rf(ctx, image, pullSecrets, podSandboxConfig)
+	if rf, ok := ret.Get(0).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) string); ok {
+		r0 = rf(ctx, image, credentials, podSandboxConfig)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, container.ImageSpec, []corev1.Secret, *v1.PodSandboxConfig) error); ok {
-		r1 = rf(ctx, image, pullSecrets, podSandboxConfig)
+	if rf, ok := ret.Get(1).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) *credentialprovider.TrackedAuthConfig); ok {
+		r1 = rf(ctx, image, credentials, podSandboxConfig)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*credentialprovider.TrackedAuthConfig)
+		}
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) error); ok {
+		r2 = rf(ctx, image, credentials, podSandboxConfig)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // MockRuntime_PullImage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PullImage'
@@ -1026,25 +1086,25 @@ type MockRuntime_PullImage_Call struct {
 // PullImage is a helper method to define mock.On call
 //   - ctx context.Context
 //   - image container.ImageSpec
-//   - pullSecrets []corev1.Secret
+//   - credentials []credentialprovider.TrackedAuthConfig
 //   - podSandboxConfig *v1.PodSandboxConfig
-func (_e *MockRuntime_Expecter) PullImage(ctx interface{}, image interface{}, pullSecrets interface{}, podSandboxConfig interface{}) *MockRuntime_PullImage_Call {
-	return &MockRuntime_PullImage_Call{Call: _e.mock.On("PullImage", ctx, image, pullSecrets, podSandboxConfig)}
+func (_e *MockRuntime_Expecter) PullImage(ctx interface{}, image interface{}, credentials interface{}, podSandboxConfig interface{}) *MockRuntime_PullImage_Call {
+	return &MockRuntime_PullImage_Call{Call: _e.mock.On("PullImage", ctx, image, credentials, podSandboxConfig)}
 }
 
-func (_c *MockRuntime_PullImage_Call) Run(run func(ctx context.Context, image container.ImageSpec, pullSecrets []corev1.Secret, podSandboxConfig *v1.PodSandboxConfig)) *MockRuntime_PullImage_Call {
+func (_c *MockRuntime_PullImage_Call) Run(run func(ctx context.Context, image container.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *v1.PodSandboxConfig)) *MockRuntime_PullImage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(container.ImageSpec), args[2].([]corev1.Secret), args[3].(*v1.PodSandboxConfig))
+		run(args[0].(context.Context), args[1].(container.ImageSpec), args[2].([]credentialprovider.TrackedAuthConfig), args[3].(*v1.PodSandboxConfig))
 	})
 	return _c
 }
 
-func (_c *MockRuntime_PullImage_Call) Return(_a0 string, _a1 error) *MockRuntime_PullImage_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockRuntime_PullImage_Call) Return(_a0 string, _a1 *credentialprovider.TrackedAuthConfig, _a2 error) *MockRuntime_PullImage_Call {
+	_c.Call.Return(_a0, _a1, _a2)
 	return _c
 }
 
-func (_c *MockRuntime_PullImage_Call) RunAndReturn(run func(context.Context, container.ImageSpec, []corev1.Secret, *v1.PodSandboxConfig) (string, error)) *MockRuntime_PullImage_Call {
+func (_c *MockRuntime_PullImage_Call) RunAndReturn(run func(context.Context, container.ImageSpec, []credentialprovider.TrackedAuthConfig, *v1.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error)) *MockRuntime_PullImage_Call {
 	_c.Call.Return(run)
 	return _c
 }

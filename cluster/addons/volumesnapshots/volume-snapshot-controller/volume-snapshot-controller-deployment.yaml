@@ -22,7 +22,7 @@ spec:
       serviceAccount: volume-snapshot-controller
       containers:
         - name: volume-snapshot-controller
-          image: registry.k8s.io/sig-storage/snapshot-controller:v8.0.0
+          image: registry.k8s.io/sig-storage/snapshot-controller:v8.1.0
           args:
             - "--v=5"
             - "--metrics-path=/metrics"

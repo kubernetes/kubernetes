@@ -192,54 +192,67 @@ type ImageChangeCause struct {
 type BuildStatus struct {
 	// phase is the point in the build lifecycle. Possible values are
 	// "New", "Pending", "Running", "Complete", "Failed", "Error", and "Cancelled".
+	// +optional
 	Phase BuildPhase `json:"phase" protobuf:"bytes,1,opt,name=phase,casttype=BuildPhase"`
 
 	// cancelled describes if a cancel event was triggered for the build.
+	// +optional
 	Cancelled bool `json:"cancelled,omitempty" protobuf:"varint,2,opt,name=cancelled"`
 
 	// reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.
+	// +optional
 	Reason StatusReason `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason,casttype=StatusReason"`
 
 	// message is a human-readable message indicating details about why the build has this status.
+	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,4,opt,name=message"`
 
 	// startTimestamp is a timestamp representing the server time when this Build started
 	// running in a Pod.
 	// It is represented in RFC3339 form and is in UTC.
+	// +optional
 	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty" protobuf:"bytes,5,opt,name=startTimestamp"`
 
 	// completionTimestamp is a timestamp representing the server time when this Build was
 	// finished, whether that build failed or succeeded.  It reflects the time at which
 	// the Pod running the Build terminated.
 	// It is represented in RFC3339 form and is in UTC.
+	// +optional
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty" protobuf:"bytes,6,opt,name=completionTimestamp"`
 
 	// duration contains time.Duration object describing build time.
+	// +optional
 	Duration time.Duration `json:"duration,omitempty" protobuf:"varint,7,opt,name=duration,casttype=time.Duration"`
 
 	// outputDockerImageReference contains a reference to the container image that
 	// will be built by this build. Its value is computed from
 	// Build.Spec.Output.To, and should include the registry address, so that
 	// it can be used to push and pull the image.
+	// +optional
 	OutputDockerImageReference string `json:"outputDockerImageReference,omitempty" protobuf:"bytes,8,opt,name=outputDockerImageReference"`
 
 	// config is an ObjectReference to the BuildConfig this Build is based on.
+	// +optional
 	Config *corev1.ObjectReference `json:"config,omitempty" protobuf:"bytes,9,opt,name=config"`
 
 	// output describes the container image the build has produced.
+	// +optional
 	Output BuildStatusOutput `json:"output,omitempty" protobuf:"bytes,10,opt,name=output"`
 
 	// stages contains details about each stage that occurs during the build
 	// including start time, duration (in milliseconds), and the steps that
 	// occured within each stage.
+	// +optional
 	Stages []StageInfo `json:"stages,omitempty" protobuf:"bytes,11,opt,name=stages"`
 
 	// logSnippet is the last few lines of the build log.  This value is only set for builds that failed.
+	// +optional
 	LogSnippet string `json:"logSnippet,omitempty" protobuf:"bytes,12,opt,name=logSnippet"`
 
 	// conditions represents the latest available observations of a build's current state.
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +optional
 	Conditions []BuildCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,13,rep,name=conditions"`
 }
 
@@ -1005,11 +1018,13 @@ const (
 // BuildConfigStatus contains current state of the build config object.
 type BuildConfigStatus struct {
 	// lastVersion is used to inform about number of last triggered build.
+	// +optional
 	LastVersion int64 `json:"lastVersion" protobuf:"varint,1,opt,name=lastVersion"`
 
 	// imageChangeTriggers captures the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
 	// including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID. There is a single entry
 	// in this array for each image change trigger in spec. Each trigger status references the ImageStreamTag that acts as the source of the trigger.
+	// +optional
 	ImageChangeTriggers []ImageChangeTriggerStatus `json:"imageChangeTriggers,omitempty" protobuf:"bytes,2,rep,name=imageChangeTriggers"`
 }
 

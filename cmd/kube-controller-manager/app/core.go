@@ -41,6 +41,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	pkgcontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/devicetainteviction"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -231,6 +232,36 @@ func startTaintEvictionController(ctx context.Context, controllerContext Control
 	return nil, true, nil
 }
 
+func newDeviceTaintEvictionControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.DeviceTaintEvictionController,
+		initFunc: startDeviceTaintEvictionController,
+		requiredFeatureGates: []featuregate.Feature{
+			// TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing these feature gates.
+			features.DynamicResourceAllocation,
+			features.DRADeviceTaints,
+		},
+	}
+}
+
+func startDeviceTaintEvictionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	deviceTaintEvictionController := devicetainteviction.New(
+		controllerContext.ClientBuilder.ClientOrDie(names.DeviceTaintEvictionController),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Resource().V1beta1().ResourceClaims(),
+		controllerContext.InformerFactory.Resource().V1beta1().ResourceSlices(),
+		controllerContext.InformerFactory.Resource().V1alpha3().DeviceTaintRules(),
+		controllerContext.InformerFactory.Resource().V1beta1().DeviceClasses(),
+		controllerName,
+	)
+	go func() {
+		if err := deviceTaintEvictionController.Run(ctx); err != nil {
+			klog.FromContext(ctx).Error(err, "Device taint processing leading to Pod eviction failed and is now paused")
+		}
+	}()
+	return nil, true, nil
+}
+
 func newCloudNodeLifecycleControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                      cpnames.CloudNodeLifecycleController,
@@ -408,7 +439,10 @@ func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 func startResourceClaimController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	ephemeralController, err := resourceclaim.NewController(
 		klog.FromContext(ctx),
-		utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+		resourceclaim.Features{
+			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+		},
 		controllerContext.ClientBuilder.ClientOrDie("resource-claim-controller"),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Resource().V1beta1().ResourceClaims(),

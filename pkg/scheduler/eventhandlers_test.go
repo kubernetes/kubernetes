@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -27,11 +28,15 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,22 +47,173 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
-	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
+
+func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
+	highPriorityPod :=
+		st.MakePod().Name("hpp").Namespace("ns1").UID("hppns1").Priority(highPriority).SchedulerName(testSchedulerName).Obj()
+
+	medNominatedPriorityPod :=
+		st.MakePod().Name("mpp").Namespace("ns2").UID("mppns1").Priority(midPriority).SchedulerName(testSchedulerName).NominatedNodeName("node1").Obj()
+	medPriorityPod :=
+		st.MakePod().Name("smpp").Namespace("ns3").UID("mppns2").Priority(midPriority).SchedulerName(testSchedulerName).Obj()
+
+	lowPriorityPod :=
+		st.MakePod().Name("lpp").Namespace("ns4").UID("lppns1").Priority(lowPriority).SchedulerName(testSchedulerName).Obj()
+
+	unschedulablePods := []*v1.Pod{highPriorityPod, medNominatedPriorityPod, medPriorityPod, lowPriorityPod}
+
+	// Make pods schedulable on Delete event when QHints are enabled, but not when nominated node appears.
+	queueHintForPodDelete := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+		oldPod, _, err := util.As[*v1.Pod](oldObj, newObj)
+		if err != nil {
+			t.Errorf("Failed to convert objects to pods: %v", err)
+		}
+		if oldPod.Status.NominatedNodeName == "" {
+			return framework.QueueSkip, nil
+		}
+		return framework.Queue, nil
+	}
+	queueingHintMap := internalqueue.QueueingHintMapPerProfile{
+		testSchedulerName: {
+			framework.EventAssignedPodDelete: {
+				{
+					PluginName:     "fooPlugin1",
+					QueueingHintFn: queueHintForPodDelete,
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name                  string
+		updateFunc            func(s *Scheduler)
+		wantInActiveOrBackoff sets.Set[string]
+	}{
+		{
+			name: "Update of a nominated node name to a different value should trigger rescheduling of lower priority pods",
+			updateFunc: func(s *Scheduler) {
+				updatedPod := medNominatedPriorityPod.DeepCopy()
+				updatedPod.Status.NominatedNodeName = "node2"
+				updatedPod.ResourceVersion = "1"
+				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
+			},
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
+		},
+		{
+			name: "Removal of a nominated node name should trigger rescheduling of lower priority pods",
+			updateFunc: func(s *Scheduler) {
+				updatedPod := medNominatedPriorityPod.DeepCopy()
+				updatedPod.Status.NominatedNodeName = ""
+				updatedPod.ResourceVersion = "1"
+				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
+			},
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
+		},
+		{
+			name: "Removal of a pod that had nominated node name should trigger rescheduling of lower priority pods",
+			updateFunc: func(s *Scheduler) {
+				s.deletePodFromSchedulingQueue(medNominatedPriorityPod)
+			},
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name),
+		},
+		{
+			name: "Addition of a nominated node name to the high priority pod that did not have it before shouldn't trigger rescheduling",
+			updateFunc: func(s *Scheduler) {
+				updatedPod := highPriorityPod.DeepCopy()
+				updatedPod.Status.NominatedNodeName = "node2"
+				updatedPod.ResourceVersion = "1"
+				s.updatePodInSchedulingQueue(highPriorityPod, updatedPod)
+			},
+			wantInActiveOrBackoff: sets.New[string](),
+		},
+	}
+
+	for _, tt := range tests {
+		for _, qHintEnabled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s, with queuehint(%v)", tt.name, qHintEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, qHintEnabled)
+
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+
+				var objs []runtime.Object
+				for _, pod := range unschedulablePods {
+					objs = append(objs, pod)
+				}
+				client := fake.NewClientset(objs...)
+				informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+				queue := internalqueue.NewPriorityQueue(
+					newDefaultQueueSort(),
+					informerFactory,
+					internalqueue.WithMetricsRecorder(*recorder),
+					internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+					// disable backoff queue
+					internalqueue.WithPodInitialBackoffDuration(0),
+					internalqueue.WithPodMaxBackoffDuration(0))
+				schedulerCache := internalcache.New(ctx, 30*time.Second)
+
+				// Put test pods into unschedulable queue
+				for _, pod := range unschedulablePods {
+					queue.Add(logger, pod)
+					poppedPod, err := queue.Pop(logger)
+					if err != nil {
+						t.Fatalf("Pop failed: %v", err)
+					}
+					poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
+					if err := queue.AddUnschedulableIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
+						t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+					}
+				}
+
+				s, _, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
+				if err != nil {
+					t.Fatalf("Failed to initialize test scheduler: %v", err)
+				}
+
+				if len(s.SchedulingQueue.PodsInActiveQ()) > 0 {
+					t.Errorf("No pods were expected to be in the activeQ before the update, but there were %v", s.SchedulingQueue.PodsInActiveQ())
+				}
+				tt.updateFunc(s)
+
+				podsInActiveOrBackoff := s.SchedulingQueue.PodsInActiveQ()
+				podsInActiveOrBackoff = append(podsInActiveOrBackoff, s.SchedulingQueue.PodsInBackoffQ()...)
+				if len(podsInActiveOrBackoff) != len(tt.wantInActiveOrBackoff) {
+					t.Errorf("Different number of pods were expected to be in the activeQ or backoffQ, but found actual %v vs. expected %v", podsInActiveOrBackoff, tt.wantInActiveOrBackoff)
+				}
+				for _, pod := range podsInActiveOrBackoff {
+					if !tt.wantInActiveOrBackoff.Has(pod.Name) {
+						t.Errorf("Found unexpected pod in activeQ or backoffQ: %s", pod.Name)
+					}
+				}
+			})
+		}
+	}
+}
+
+func newDefaultQueueSort() framework.LessFunc {
+	sort := &queuesort.PrioritySort{}
+	return sort.Less
+}
 
 func TestUpdatePodInCache(t *testing.T) {
 	ttl := 10 * time.Second
 	nodeName := "node"
-	metrics.Register()
 
 	tests := []struct {
 		name   string
@@ -81,8 +237,8 @@ func TestUpdatePodInCache(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           cache.New(ctx, ttl),
-				SchedulingQueue: queue.NewTestQueue(ctx, nil),
+				Cache:           internalcache.New(ctx, ttl),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
 			sched.addPodToCache(tt.oldObj)
@@ -244,6 +400,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 		name                   string
 		gvkMap                 map[framework.EventResource]framework.ActionType
 		enableDRA              bool
+		enableDRADeviceTaints  bool
 		expectStaticInformers  map[reflect.Type]bool
 		expectDynamicInformers map[schema.GroupVersionResource]bool
 	}{
@@ -272,7 +429,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "all DRA events enabled",
+			name: "core DRA events enabled",
 			gvkMap: map[framework.EventResource]framework.ActionType{
 				framework.ResourceClaim: framework.Add,
 				framework.ResourceSlice: framework.Add,
@@ -286,6 +443,26 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
 				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
 				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
+		},
+		{
+			name: "all DRA events enabled",
+			gvkMap: map[framework.EventResource]framework.ActionType{
+				framework.ResourceClaim: framework.Add,
+				framework.ResourceSlice: framework.Add,
+				framework.DeviceClass:   framework.Add,
+			},
+			enableDRA:             true,
+			enableDRADeviceTaints: true,
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeOf(&v1.Pod{}):                           true,
+				reflect.TypeOf(&v1.Node{}):                          true,
+				reflect.TypeOf(&v1.Namespace{}):                     true,
+				reflect.TypeOf(&resourceapi.ResourceClaim{}):        true,
+				reflect.TypeOf(&resourceapi.ResourceSlice{}):        true,
+				reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{}): true,
+				reflect.TypeOf(&resourceapi.DeviceClass{}):          true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -348,13 +525,14 @@ func TestAddAllEventHandlers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tt.enableDRA)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, tt.enableDRADeviceTaints)
 
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
-			schedulingQueue := queue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
+			schedulingQueue := internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
 			testSched := Scheduler{
 				StopEverything:  ctx.Done(),
 				SchedulingQueue: schedulingQueue,
@@ -364,12 +542,27 @@ func TestAddAllEventHandlers(t *testing.T) {
 			dynclient := dyfake.NewSimpleDynamicClient(scheme)
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 			var resourceClaimCache *assumecache.AssumeCache
+			var resourceSliceTracker *resourceslicetracker.Tracker
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+				var err error
+				opts := resourceslicetracker.Options{
+					EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
+					SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+				}
+				if opts.EnableDeviceTaints {
+					opts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+					opts.ClassInformer = informerFactory.Resource().V1beta1().DeviceClasses()
+
+				}
+				resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, opts)
+				if err != nil {
+					t.Fatalf("couldn't start resource slice tracker: %v", err)
+				}
 			}
 
-			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, tt.gvkMap); err != nil {
+			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, tt.gvkMap); err != nil {
 				t.Fatalf("Add event handlers failed, error = %v", err)
 			}
 

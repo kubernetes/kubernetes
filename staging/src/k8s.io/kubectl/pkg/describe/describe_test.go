@@ -6397,6 +6397,41 @@ func TestDescribeStatefulSet(t *testing.T) {
 	}
 }
 
+func TestDescribeDaemonSet(t *testing.T) {
+	fake := fake.NewSimpleClientset(&appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"node-role.kubernetes.io/control-plane": "true"},
+			},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{Image: "mytest-image:latest"},
+					},
+				},
+			},
+		},
+	})
+	d := DaemonSetDescriber{fake}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedOutputs := []string{
+		"bar", "foo", "Containers:", "mytest-image:latest", "Selector", "node-role.kubernetes.io/control-plane=true",
+	}
+	for _, o := range expectedOutputs {
+		if !strings.Contains(out, o) {
+			t.Errorf("unexpected out: %s", out)
+			break
+		}
+	}
+}
+
 func TestDescribeEndpointSlice(t *testing.T) {
 	protocolTCP := corev1.ProtocolTCP
 	port80 := int32(80)
@@ -6592,6 +6627,54 @@ Annotations:  <none>
 CIDRs:        fd00:1:1::/64
 Events:       <none>` + "\n",
 		},
+		"ServiceCIDR v1": {
+			input: fake.NewSimpleClientset(&networkingv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1.ServiceCIDRSpec{
+					CIDRs: []string{"10.1.0.0/16", "fd00:1:1::/64"},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+CIDRs:        10.1.0.0/16, fd00:1:1::/64
+Events:       <none>` + "\n",
+		},
+		"ServiceCIDR v1 IPv4": {
+			input: fake.NewSimpleClientset(&networkingv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1.ServiceCIDRSpec{
+					CIDRs: []string{"10.1.0.0/16"},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+CIDRs:        10.1.0.0/16
+Events:       <none>` + "\n",
+		},
+		"ServiceCIDR v1 IPv6": {
+			input: fake.NewSimpleClientset(&networkingv1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1.ServiceCIDRSpec{
+					CIDRs: []string{"fd00:1:1::/64"},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+CIDRs:        fd00:1:1::/64
+Events:       <none>` + "\n",
+		},
 	}
 
 	for name, tc := range testcases {
@@ -6622,6 +6705,31 @@ func TestDescribeIPAddress(t *testing.T) {
 				},
 				Spec: networkingv1beta1.IPAddressSpec{
 					ParentRef: &networkingv1beta1.ParentReference{
+						Group:     "mygroup",
+						Resource:  "myresource",
+						Namespace: "mynamespace",
+						Name:      "myname",
+					},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+Parent Reference:
+  Group:      mygroup
+  Resource:   myresource
+  Namespace:  mynamespace
+  Name:       myname
+Events:       <none>` + "\n",
+		},
+		"IPAddress v1": {
+			input: fake.NewSimpleClientset(&networkingv1.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1.IPAddressSpec{
+					ParentRef: &networkingv1.ParentReference{
 						Group:     "mygroup",
 						Resource:  "myresource",
 						Namespace: "mynamespace",
@@ -6904,5 +7012,45 @@ func TestDescribeSeccompProfile(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDescribeProjectedVolumesOptionalSecret(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "optional-secret",
+					VolumeSource: corev1.VolumeSource{
+						Projected: &corev1.ProjectedVolumeSource{
+							Sources: []corev1.VolumeProjection{
+								{
+									Secret: &corev1.SecretProjection{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: "optional-secret",
+										},
+										Optional: ptr.To(true),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedOut := "SecretName:  optional-secret\n    Optional:    true"
+	if !strings.Contains(out, expectedOut) {
+		t.Errorf("expected to find %q in output: %q", expectedOut, out)
 	}
 }

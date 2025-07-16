@@ -67,7 +67,7 @@ func (pl *TaintToleration) EventsToRegister(_ context.Context) ([]framework.Clus
 			// the scheduling queue uses Pod/Update Queueing Hint
 			// to determine whether a Pod's update makes the Pod schedulable or not.
 			// https://github.com/kubernetes/kubernetes/pull/122234
-			{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodTolerations}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
+			{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodToleration}, QueueingHintFn: pl.isSchedulableAfterPodTolerationChange},
 		}, nil
 	}
 
@@ -143,9 +143,6 @@ func getAllTolerationPreferNoSchedule(tolerations []v1.Toleration) (tolerationLi
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
 func (pl *TaintToleration) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
-	if len(nodes) == 0 {
-		return nil
-	}
 	tolerationsPreferNoSchedule := getAllTolerationPreferNoSchedule(pod.Spec.Tolerations)
 	state := &preScoreState{
 		tolerationsPreferNoSchedule: tolerationsPreferNoSchedule,
@@ -183,11 +180,7 @@ func countIntolerableTaintsPreferNoSchedule(taints []v1.Taint, tolerations []v1.
 }
 
 // Score invoked at the Score extension point.
-func (pl *TaintToleration) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
-	if err != nil {
-		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
-	}
+func (pl *TaintToleration) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	node := nodeInfo.Node()
 
 	s, err := getPreScoreState(state)

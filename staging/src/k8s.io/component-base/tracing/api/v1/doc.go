@@ -26,4 +26,4 @@ limitations under the License.
 // The "v1" package name is just a reminder that API compatibility rules apply,
 // not an indication of the stability of all features covered by it.
 
-package v1 // import "k8s.io/component-base/tracing/api/v1"
+package v1

@@ -486,7 +486,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 	}
 
 	allErrs := []error{}
-	errs := sets.NewString()
+	errs := sets.New[string]()
 	infos, err := r.Infos()
 	if err != nil {
 		allErrs = append(allErrs, err)

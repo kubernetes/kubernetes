@@ -25,7 +25,7 @@ import (
 	kubeapiserveradmission "k8s.io/apiserver/pkg/admission"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/component-base/featuregate"
+	basecompatibility "k8s.io/component-base/compatibility"
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/features"
 
@@ -164,34 +164,6 @@ func TestValidateUnknownVersionInteroperabilityProxy(t *testing.T) {
 	}
 }
 
-func TestValidateUnknownVersionInteroperabilityProxyFeature(t *testing.T) {
-	const conflict = "UnknownVersionInteroperabilityProxy feature requires StorageVersionAPI feature flag to be enabled"
-	tests := []struct {
-		name            string
-		featuresEnabled []featuregate.Feature
-	}{
-		{
-			name:            "enabled: UnknownVersionInteroperabilityProxy, disabled: StorageVersionAPI",
-			featuresEnabled: []featuregate.Feature{features.UnknownVersionInteroperabilityProxy},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			for _, feature := range test.featuresEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)
-			}
-			var errMessageGot string
-			if errs := validateUnknownVersionInteroperabilityProxyFeature(); len(errs) > 0 {
-				errMessageGot = errs[0].Error()
-			}
-			if !strings.Contains(errMessageGot, conflict) {
-				t.Errorf("Expected error message to contain: %q, but got: %q", conflict, errMessageGot)
-			}
-		})
-	}
-}
-
 func TestValidateOptions(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -202,7 +174,7 @@ func TestValidateOptions(t *testing.T) {
 			name:         "validate master count equal 0",
 			expectErrors: true,
 			options: &Options{
-				GenericServerRunOptions: &genericoptions.ServerRunOptions{ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry},
+				GenericServerRunOptions: &genericoptions.ServerRunOptions{ComponentGlobalsRegistry: basecompatibility.NewComponentGlobalsRegistry()},
 				Etcd:                    &genericoptions.EtcdOptions{},
 				SecureServing:           &genericoptions.SecureServingOptionsWithLoopback{},
 				Audit:                   &genericoptions.AuditOptions{},
@@ -229,7 +201,7 @@ func TestValidateOptions(t *testing.T) {
 			name:         "validate token request enable not attempted",
 			expectErrors: true,
 			options: &Options{
-				GenericServerRunOptions: &genericoptions.ServerRunOptions{ComponentGlobalsRegistry: featuregate.DefaultComponentGlobalsRegistry},
+				GenericServerRunOptions: &genericoptions.ServerRunOptions{ComponentGlobalsRegistry: basecompatibility.NewComponentGlobalsRegistry()},
 				Etcd:                    &genericoptions.EtcdOptions{},
 				SecureServing:           &genericoptions.SecureServingOptionsWithLoopback{},
 				Audit:                   &genericoptions.AuditOptions{},

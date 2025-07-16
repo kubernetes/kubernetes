@@ -23,7 +23,11 @@ import (
 const (
 	// ErrCodeNotSupported code for NotSupported Errors.
 	ErrCodeNotSupported int = iota + 1
+
+	// ErrCodeNoPathDefined code for NoPathDefined Errors.
 	ErrCodeNoPathDefined
+
+	// ErrCodeFsInfoFailed code for FsInfoFailed Errors.
 	ErrCodeFsInfoFailed
 )
 

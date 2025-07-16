@@ -45,13 +45,25 @@ func NewFilteredClusterVersionInformer(client versioned.Interface, resyncPeriod 
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1().ClusterVersions().List(context.TODO(), options)
+				return client.ConfigV1().ClusterVersions().List(context.Background(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1().ClusterVersions().Watch(context.TODO(), options)
+				return client.ConfigV1().ClusterVersions().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ConfigV1().ClusterVersions().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ConfigV1().ClusterVersions().Watch(ctx, options)
 			},
 		},
 		&apiconfigv1.ClusterVersion{},

@@ -437,6 +437,8 @@ func (plugin *FakeVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
 	return !plugin.NonAttachable, nil
 }
 
+func (plugin *FakeVolumePlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {}
+
 func (plugin *FakeVolumePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
 	return true, nil
 }
@@ -615,6 +617,9 @@ func (f *FakeAttachableVolumePlugin) NewDetacher() (volume.Detacher, error) {
 
 func (f *FakeAttachableVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
 	return true, nil
+}
+
+func (f *FakeAttachableVolumePlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {
 }
 
 var _ volume.VolumePlugin = &FakeAttachableVolumePlugin{}

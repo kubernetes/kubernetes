@@ -137,7 +137,7 @@ func TestPodNodeConstraints(t *testing.T) {
 		}
 		attrs := admission.NewAttributesRecord(tc.resource, nil, kapi.Kind("Pod").WithVersion("version"), ns, "test", kapi.Resource("pods").WithVersion("version"), "", admission.Create, nil, false, tc.userinfo)
 		if tc.expectedErrorMsg != "" {
-			expectedError = admission.NewForbidden(attrs, fmt.Errorf(tc.expectedErrorMsg))
+			expectedError = admission.NewForbidden(attrs, fmt.Errorf("%s", tc.expectedErrorMsg))
 		}
 		err = prc.(admission.ValidationInterface).Validate(context.TODO(), attrs, nil)
 		checkAdmitError(t, err, expectedError, errPrefix)

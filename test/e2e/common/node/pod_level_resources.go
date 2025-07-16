@@ -52,7 +52,7 @@ var (
 	cmd = []string{"/bin/sh", "-c", "sleep 1d"}
 )
 
-var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLevelResources, "[NodeAlphaFeature:PodLevelResources]", func() {
+var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLevelResources, func() {
 	f := framework.NewDefaultFramework("pod-level-resources-tests")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -233,10 +233,9 @@ func verifyPodCgroups(ctx context.Context, f *framework.Framework, pod *v1.Pod, 
 	}
 
 	cpuLimCgPath := fmt.Sprintf("%s/%s", podCgPath, cgroupv2CPULimit)
-	cpuQuota := kubecm.MilliCPUToQuota(expectedResources.Limits.Cpu().MilliValue(), kubecm.QuotaPeriod)
-	expectedCPULimit := strconv.FormatInt(cpuQuota, 10)
-	expectedCPULimit = fmt.Sprintf("%s %s", expectedCPULimit, CPUPeriod)
-	err = e2epod.VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuLimCgPath, expectedCPULimit)
+	expectedCPULimits := e2epod.GetCPULimitCgroupExpectations(expectedResources.Limits.Cpu())
+
+	err = e2epod.VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuLimCgPath, expectedCPULimits...)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
 	}
@@ -395,10 +394,8 @@ func verifyContainersCgroupLimits(f *framework.Framework, pod *v1.Pod) error {
 
 		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Cpu() != nil &&
 			container.Resources.Limits.Cpu() == nil {
-			cpuQuota := kubecm.MilliCPUToQuota(pod.Spec.Resources.Limits.Cpu().MilliValue(), kubecm.QuotaPeriod)
-			expectedCPULimit := strconv.FormatInt(cpuQuota, 10)
-			expectedCPULimit = fmt.Sprintf("%s %s", expectedCPULimit, CPUPeriod)
-			err := e2epod.VerifyCgroupValue(f, pod, container.Name, fmt.Sprintf("%s/%s", cgroupFsPath, cgroupv2CPULimit), expectedCPULimit)
+			expectedCPULimits := e2epod.GetCPULimitCgroupExpectations(pod.Spec.Resources.Limits.Cpu())
+			err := e2epod.VerifyCgroupValue(f, pod, container.Name, fmt.Sprintf("%s/%s", cgroupFsPath, cgroupv2CPULimit), expectedCPULimits...)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
 			}

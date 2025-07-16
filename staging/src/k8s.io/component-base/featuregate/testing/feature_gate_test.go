@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
@@ -173,15 +174,15 @@ func TestSpecialGatesVersioned(t *gotest.T) {
 			{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 		},
 		"beta_default_on_set_off": {
-			{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 			{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 		},
 		"beta_default_off": {
 			{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
 		},
 		"beta_default_off_set_on": {
-			{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 			{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 		},
 	})
 	require.NoError(t, err)

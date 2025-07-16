@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20 AS builder
 WORKDIR /go/src/k8s.io/kubernetes
 COPY . .
 RUN make WHAT='cmd/kube-apiserver cmd/kube-controller-manager cmd/kube-scheduler cmd/kubelet cmd/watch-termination openshift-hack/cmd/k8s-tests-ext' && \
@@ -8,10 +8,10 @@ RUN make WHAT='cmd/kube-apiserver cmd/kube-controller-manager cmd/kube-scheduler
     /tmp/build && \
     gzip /tmp/build/k8s-tests-ext
 
-FROM registry.ci.openshift.org/ocp/4.19:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.20:base-rhel9
 RUN yum install -y --setopt=tsflags=nodocs --setopt=skip_missing_names_on_install=False iproute && yum clean all
 COPY --from=builder /tmp/build/* /usr/bin/
 LABEL io.k8s.display-name="OpenShift Kubernetes Server Commands" \
-    io.k8s.description="OpenShift is a platform for developing, building, and deploying containerized applications." \
-    io.openshift.tags="openshift,hyperkube" \
-    io.openshift.build.versions="kubernetes=1.32.6"
+      io.k8s.description="OpenShift is a platform for developing, building, and deploying containerized applications." \
+      io.openshift.tags="openshift,hyperkube" \
+      io.openshift.build.versions="kubernetes=1.33.2"

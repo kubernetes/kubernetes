@@ -24,11 +24,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	nodeapi "k8s.io/kubernetes/pkg/api/node"
 	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/pods"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func GetWarningsForPod(ctx context.Context, pod, oldPod *api.Pod) []string {
@@ -96,12 +99,12 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		if n.RequiredDuringSchedulingIgnoredDuringExecution != nil {
 			termFldPath := fieldPath.Child("spec", "affinity", "nodeAffinity", "requiredDuringSchedulingIgnoredDuringExecution", "nodeSelectorTerms")
 			for i, term := range n.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-				warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term, termFldPath.Index(i))...)
+				warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term, false, termFldPath.Index(i))...)
 			}
 		}
 		preferredFldPath := fieldPath.Child("spec", "affinity", "nodeAffinity", "preferredDuringSchedulingIgnoredDuringExecution")
 		for i, term := range n.PreferredDuringSchedulingIgnoredDuringExecution {
-			warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term.Preference, preferredFldPath.Index(i).Child("preference"))...)
+			warnings = append(warnings, nodeapi.GetWarningsForNodeSelectorTerm(term.Preference, true, preferredFldPath.Index(i).Child("preference"))...)
 		}
 	}
 	for i, t := range podSpec.TopologySpreadConstraints {
@@ -141,7 +144,11 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.11, non-functional in v1.16+", fieldPath.Child("spec", "volumes").Index(i).Child("photonPersistentDisk")))
 		}
 		if v.GitRepo != nil {
-			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.11", fieldPath.Child("spec", "volumes").Index(i).Child("gitRepo")))
+			if !utilfeature.DefaultFeatureGate.Enabled(features.GitRepoVolumeDriver) {
+				warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.11, and disabled by default in v1.33+", fieldPath.Child("spec", "volumes").Index(i).Child("gitRepo")))
+			} else {
+				warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.11", fieldPath.Child("spec", "volumes").Index(i).Child("gitRepo")))
+			}
 		}
 		if v.ScaleIO != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.16, non-functional in v1.22+", fieldPath.Child("spec", "volumes").Index(i).Child("scaleIO")))
@@ -320,6 +327,21 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		return true
 	})
 
+	// Accumulate port names of containers and sidecar containers
+	allPortsNames := map[string]*field.Path{}
+	pods.VisitContainersWithPath(podSpec, fieldPath.Child("spec"), func(c *api.Container, fldPath *field.Path) bool {
+		for i, port := range c.Ports {
+			if port.Name != "" {
+				if other, found := allPortsNames[port.Name]; found {
+					warnings = append(warnings, fmt.Sprintf("%s: duplicate port name %q with %s, services and probes that select ports by name will use %s", fldPath.Child("ports").Index(i), port.Name, other, other))
+				} else {
+					allPortsNames[port.Name] = fldPath.Child("ports").Index(i)
+				}
+			}
+		}
+		return true
+	})
+
 	// warn if the terminationGracePeriodSeconds is negative.
 	if podSpec.TerminationGracePeriodSeconds != nil && *podSpec.TerminationGracePeriodSeconds < 0 {
 		warnings = append(warnings, fmt.Sprintf("%s: must be >= 0; negative values are invalid and will be treated as 1", fieldPath.Child("spec", "terminationGracePeriodSeconds")))
@@ -334,6 +356,16 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 			warnings = append(warnings, warningsForPodAffinityTerms(affinity.RequiredDuringSchedulingIgnoredDuringExecution, fieldPath.Child("spec", "affinity", "podAntiAffinity", "requiredDuringSchedulingIgnoredDuringExecution"))...)
 			warnings = append(warnings, warningsForWeightedPodAffinityTerms(affinity.PreferredDuringSchedulingIgnoredDuringExecution, fieldPath.Child("spec", "affinity", "podAntiAffinity", "preferredDuringSchedulingIgnoredDuringExecution"))...)
 		}
+	}
+
+	// Deprecated IP address formats
+	if podSpec.DNSConfig != nil {
+		for i, ns := range podSpec.DNSConfig.Nameservers {
+			warnings = append(warnings, validation.GetWarningsForIP(fieldPath.Child("spec", "dnsConfig", "nameservers").Index(i), ns)...)
+		}
+	}
+	for i, hostAlias := range podSpec.HostAliases {
+		warnings = append(warnings, validation.GetWarningsForIP(fieldPath.Child("spec", "hostAliases").Index(i).Child("ip"), hostAlias.IP)...)
 	}
 
 	return warnings
@@ -500,7 +532,7 @@ func checkVolumeMappingForOverlap(paths []pathAndSource) []string {
 }
 
 func checkForOverlap(haystack []pathAndSource, needle pathAndSource) []pathAndSource {
-	pathSeparator := string(os.PathSeparator)
+	pathSeparator := `/` // this check runs in the API server, use the OS-agnostic separator
 
 	if needle.path == "" {
 		return nil

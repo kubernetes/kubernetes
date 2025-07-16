@@ -77,7 +77,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				// GCE/GKE
 				{
 					Name:           "SSD PD on GCE/GKE",
-					CloudProviders: []string{"gce", "gke"},
+					CloudProviders: []string{"gce"},
 					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/gce-pd",
 					Parameters: map[string]string{
@@ -92,8 +92,8 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					},
 				},
 				{
-					Name:           "HDD PD on GCE/GKE",
-					CloudProviders: []string{"gce", "gke"},
+					Name:           "HDD PD on GCE",
+					CloudProviders: []string{"gce"},
 					Timeouts:       f.Timeouts,
 					Provisioner:    "kubernetes.io/gce-pd",
 					Parameters: map[string]string{
@@ -273,12 +273,12 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 
 		ginkgo.It("should provision storage with non-default reclaim policy Retain", func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce")
 
 			test := testsuites.StorageClassTest{
 				Client:         c,
-				Name:           "HDD PD on GCE/GKE",
-				CloudProviders: []string{"gce", "gke"},
+				Name:           "HDD PD on GCE",
+				CloudProviders: []string{"gce"},
 				Provisioner:    "kubernetes.io/gce-pd",
 				Timeouts:       f.Timeouts,
 				Parameters: map[string]string{
@@ -322,7 +322,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// not being deleted.
 			// NOTE:  Polls until no PVs are detected, times out at 5 minutes.
 
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "vsphere", "azure")
 
 			const raceAttempts int = 100
 			var residualPVs []*v1.PersistentVolume
@@ -368,7 +368,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// volume and changes the reclaim policy to Delete.
 			// PV controller should delete the PV even though the underlying volume
 			// is already deleted.
-			e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
+			e2eskipper.SkipUnlessProviderIs("gce", "aws")
 			ginkgo.By("creating PD")
 			diskName, err := e2epv.CreatePDWithRetry(ctx)
 			framework.ExpectNoError(err)
@@ -400,7 +400,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 						VolumeID: diskName,
 					},
 				}
-			case "gce", "gke":
+			case "gce":
 				pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
 					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 						PDName: diskName,
@@ -442,8 +442,9 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				Name:      serviceAccountName,
 			}
 
-			err := e2eauth.BindClusterRole(ctx, c.RbacV1(), "system:persistent-volume-provisioner", ns, subject)
+			cleanupFunc, err := e2eauth.BindClusterRole(ctx, c.RbacV1(), "system:persistent-volume-provisioner", ns, subject)
 			framework.ExpectNoError(err)
+			defer cleanupFunc(ctx)
 
 			roleName := "leader-locking-nfs-provisioner"
 			_, err = f.ClientSet.RbacV1().Roles(ns).Create(ctx, &rbacv1.Role{
@@ -497,7 +498,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 	ginkgo.Describe("DynamicProvisioner Default", func() {
 		f.It("should create and delete default persistent volumes", f.WithSlow(), func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			ginkgo.By("creating a claim with no annotation")
@@ -521,7 +522,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		f.It("should be disabled by changing the default annotation", f.WithSerial(), f.WithDisruptive(), func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(ctx, c)
@@ -558,7 +559,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		f.It("should be disabled by removing the default annotation", f.WithSerial(), f.WithDisruptive(), func(ctx context.Context) {
-			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			e2eskipper.SkipUnlessProviderIs("openstack", "gce", "aws", "vsphere", "azure")
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			scName, scErr := e2epv.GetDefaultStorageClassName(ctx, c)

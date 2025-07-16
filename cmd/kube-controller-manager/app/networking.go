@@ -40,8 +40,8 @@ func newServiceCIDRsControllerDescriptor() *ControllerDescriptor {
 func startServiceCIDRsController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	go servicecidrs.NewController(
 		ctx,
-		controllerContext.InformerFactory.Networking().V1beta1().ServiceCIDRs(),
-		controllerContext.InformerFactory.Networking().V1beta1().IPAddresses(),
+		controllerContext.InformerFactory.Networking().V1().ServiceCIDRs(),
+		controllerContext.InformerFactory.Networking().V1().IPAddresses(),
 		controllerContext.ClientBuilder.ClientOrDie("service-cidrs-controller"),
 	).Run(ctx, 5)
 	// TODO use component config

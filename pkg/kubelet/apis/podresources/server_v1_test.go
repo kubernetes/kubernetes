@@ -298,8 +298,7 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 			*podresourcetest.MockCPUsProvider,
 			*podresourcetest.MockMemoryProvider,
 			*podresourcetest.MockDynamicResourcesProvider)
-		sidecarContainersEnabled bool
-		expectedResponse         *podresourcesapi.ListPodResourcesResponse
+		expectedResponse *podresourcesapi.ListPodResourcesResponse
 	}{
 		{
 			desc: "pod having an init container",
@@ -352,110 +351,7 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 			},
 		},
 		{
-			desc: "pod having an init container with SidecarContainers enabled",
-			pods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      podName,
-						Namespace: podNamespace,
-						UID:       podUID,
-					},
-					Spec: v1.PodSpec{
-						InitContainers: []v1.Container{
-							{
-								Name: initContainerName,
-							},
-						},
-						Containers: containers,
-					},
-				},
-			},
-			mockFunc: func(
-				pods []*v1.Pod,
-				devicesProvider *podresourcetest.MockDevicesProvider,
-				cpusProvider *podresourcetest.MockCPUsProvider,
-				memoryProvider *podresourcetest.MockMemoryProvider,
-				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
-
-			},
-			sidecarContainersEnabled: true,
-			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
-				PodResources: []*podresourcesapi.PodResources{
-					{
-						Name:      podName,
-						Namespace: podNamespace,
-						Containers: []*podresourcesapi.ContainerResources{
-							{
-								Name:             containerName,
-								Devices:          devs,
-								CpuIds:           cpus,
-								Memory:           memory,
-								DynamicResources: []*podresourcesapi.DynamicResource{},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "pod having a restartable init container with SidecarContainers disabled",
-			pods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      podName,
-						Namespace: podNamespace,
-						UID:       podUID,
-					},
-					Spec: v1.PodSpec{
-						InitContainers: []v1.Container{
-							{
-								Name:          initContainerName,
-								RestartPolicy: &containerRestartPolicyAlways,
-							},
-						},
-						Containers: containers,
-					},
-				},
-			},
-			mockFunc: func(
-				pods []*v1.Pod,
-				devicesProvider *podresourcetest.MockDevicesProvider,
-				cpusProvider *podresourcetest.MockCPUsProvider,
-				memoryProvider *podresourcetest.MockMemoryProvider,
-				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
-
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
-
-			},
-			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
-				PodResources: []*podresourcesapi.PodResources{
-					{
-						Name:      podName,
-						Namespace: podNamespace,
-						Containers: []*podresourcesapi.ContainerResources{
-							{
-								Name:             containerName,
-								Devices:          devs,
-								CpuIds:           cpus,
-								Memory:           memory,
-								DynamicResources: []*podresourcesapi.DynamicResource{},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "pod having an init container with SidecarContainers enabled",
+			desc: "pod having a restartable init container",
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -493,7 +389,6 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 				dynamicResourcesProvider.EXPECT().GetDynamicResources(pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
-			sidecarContainersEnabled: true,
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
 					{
@@ -521,8 +416,6 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.SidecarContainers, tc.sidecarContainersEnabled)
-
 			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
 			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
 			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
@@ -1069,8 +962,7 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 			*podresourcetest.MockCPUsProvider,
 			*podresourcetest.MockMemoryProvider,
 			*podresourcetest.MockDynamicResourcesProvider)
-		sidecarContainersEnabled bool
-		expectedResponse         *podresourcesapi.GetPodResourcesResponse
+		expectedResponse *podresourcesapi.GetPodResourcesResponse
 	}{
 		{
 			desc: "pod having an init container",
@@ -1119,102 +1011,7 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 			},
 		},
 		{
-			desc: "pod having an init container with SidecarContainers enabled",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      podName,
-					Namespace: podNamespace,
-					UID:       podUID,
-				},
-				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
-						{
-							Name: initContainerName,
-						},
-					},
-					Containers: containers,
-				},
-			},
-			mockFunc: func(
-				pod *v1.Pod,
-				devicesProvider *podresourcetest.MockDevicesProvider,
-				cpusProvider *podresourcetest.MockCPUsProvider,
-				memoryProvider *podresourcetest.MockMemoryProvider,
-				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
-
-			},
-			sidecarContainersEnabled: true,
-			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
-				PodResources: &podresourcesapi.PodResources{
-					Name:      podName,
-					Namespace: podNamespace,
-					Containers: []*podresourcesapi.ContainerResources{
-						{
-							Name:             containerName,
-							Devices:          devs,
-							CpuIds:           cpus,
-							Memory:           memory,
-							DynamicResources: []*podresourcesapi.DynamicResource{},
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "pod having a restartable init container with SidecarContainers disabled",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      podName,
-					Namespace: podNamespace,
-					UID:       podUID,
-				},
-				Spec: v1.PodSpec{
-					InitContainers: []v1.Container{
-						{
-							Name:          initContainerName,
-							RestartPolicy: &containerRestartPolicyAlways,
-						},
-					},
-					Containers: containers,
-				},
-			},
-			mockFunc: func(
-				pod *v1.Pod,
-				devicesProvider *podresourcetest.MockDevicesProvider,
-				cpusProvider *podresourcetest.MockCPUsProvider,
-				memoryProvider *podresourcetest.MockMemoryProvider,
-				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
-				devicesProvider.EXPECT().UpdateAllocatedDevices().Return().Maybe()
-
-				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
-				memoryProvider.EXPECT().GetMemory(string(podUID), containerName).Return(memory).Maybe()
-				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
-
-			},
-			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
-				PodResources: &podresourcesapi.PodResources{
-					Name:      podName,
-					Namespace: podNamespace,
-					Containers: []*podresourcesapi.ContainerResources{
-						{
-							Name:             containerName,
-							Devices:          devs,
-							CpuIds:           cpus,
-							Memory:           memory,
-							DynamicResources: []*podresourcesapi.DynamicResource{},
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "pod having an init container with SidecarContainers enabled",
+			desc: "pod having a restartable init container",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      podName,
@@ -1250,7 +1047,6 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 				dynamicResourcesProvider.EXPECT().GetDynamicResources(pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
-			sidecarContainersEnabled: true,
 			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
 				PodResources: &podresourcesapi.PodResources{
 					Name:      podName,
@@ -1276,8 +1072,6 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.SidecarContainers, tc.sidecarContainersEnabled)
-
 			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
 			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
 			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)

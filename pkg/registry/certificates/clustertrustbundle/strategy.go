@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package clustertrustbundle provides Registry interface and its RESTStorage
 // implementation for storing ClusterTrustBundle objects.
-package clustertrustbundle // import "k8s.io/kubernetes/pkg/registry/certificates/clustertrustbundle"
+package clustertrustbundle
 
 import (
 	"context"

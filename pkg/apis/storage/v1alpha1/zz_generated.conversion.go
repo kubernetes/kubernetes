@@ -410,6 +410,7 @@ func Convert_storage_VolumeAttributesClassList_To_v1alpha1_VolumeAttributesClass
 func autoConvert_v1alpha1_VolumeError_To_storage_VolumeError(in *storagev1alpha1.VolumeError, out *storage.VolumeError, s conversion.Scope) error {
 	out.Time = in.Time
 	out.Message = in.Message
+	out.ErrorCode = (*int32)(unsafe.Pointer(in.ErrorCode))
 	return nil
 }
 
@@ -421,6 +422,7 @@ func Convert_v1alpha1_VolumeError_To_storage_VolumeError(in *storagev1alpha1.Vol
 func autoConvert_storage_VolumeError_To_v1alpha1_VolumeError(in *storage.VolumeError, out *storagev1alpha1.VolumeError, s conversion.Scope) error {
 	out.Time = in.Time
 	out.Message = in.Message
+	out.ErrorCode = (*int32)(unsafe.Pointer(in.ErrorCode))
 	return nil
 }
 

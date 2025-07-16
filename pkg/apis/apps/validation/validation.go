@@ -34,6 +34,12 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
+// StatefulSetValidationOptions is a struct that can be passed to ValidateStatefulSetSpec to record the validate options
+type StatefulSetValidationOptions struct {
+	// Allow invalid DNS1123 ServiceName
+	AllowInvalidServiceName bool
+}
+
 // ValidateStatefulSetName can be used to check whether the given StatefulSet name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
@@ -89,7 +95,7 @@ func ValidatePersistentVolumeClaimRetentionPolicy(policy *apps.StatefulSetPersis
 }
 
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
-func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions) field.ErrorList {
+func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions, setOpts StatefulSetValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	switch spec.PodManagementPolicy {
@@ -134,6 +140,10 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(replicaStartOrdinal), fldPath.Child("ordinals.start"))...)
 	}
 
+	if !setOpts.AllowInvalidServiceName && len(spec.ServiceName) > 0 {
+		allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(spec.ServiceName, fldPath.Child("serviceName"))...)
+	}
+
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {
@@ -164,7 +174,10 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 // ValidateStatefulSet validates a StatefulSet.
 func ValidateStatefulSet(statefulSet *apps.StatefulSet, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&statefulSet.ObjectMeta, true, ValidateStatefulSetName, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateStatefulSetSpec(&statefulSet.Spec, field.NewPath("spec"), opts)...)
+	setOpts := StatefulSetValidationOptions{
+		AllowInvalidServiceName: false, // require valid serviceNames in new StatefulSets
+	}
+	allErrs = append(allErrs, ValidateStatefulSetSpec(&statefulSet.Spec, field.NewPath("spec"), opts, setOpts)...)
 	return allErrs
 }
 
@@ -177,20 +190,24 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 	// thing to do it delete such an instance, but if there is a finalizer, it
 	// would need to pass update validation.  Name can't change anyway.
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateStatefulSetSpec(&statefulSet.Spec, field.NewPath("spec"), opts)...)
+	setOpts := StatefulSetValidationOptions{
+		AllowInvalidServiceName: true, // serviceName is immutable, tolerate existing invalid names on update
+	}
+	allErrs = append(allErrs, ValidateStatefulSetSpec(&statefulSet.Spec, field.NewPath("spec"), opts, setOpts)...)
 
 	// statefulset updates aren't super common and general updates are likely to be touching spec, so we'll do this
 	// deep copy right away.  This avoids mutating our inputs
 	newStatefulSetClone := statefulSet.DeepCopy()
-	newStatefulSetClone.Spec.Replicas = oldStatefulSet.Spec.Replicas               // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template               // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy   // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds // +k8s:verify-mutation:reason=clone
-	newStatefulSetClone.Spec.Ordinals = oldStatefulSet.Spec.Ordinals               // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.Replicas = oldStatefulSet.Spec.Replicas                         // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template                         // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy             // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.MinReadySeconds = oldStatefulSet.Spec.MinReadySeconds           // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.Ordinals = oldStatefulSet.Spec.Ordinals                         // +k8s:verify-mutation:reason=clone
+	newStatefulSetClone.Spec.RevisionHistoryLimit = oldStatefulSet.Spec.RevisionHistoryLimit // +k8s:verify-mutation:reason=clone
 
 	newStatefulSetClone.Spec.PersistentVolumeClaimRetentionPolicy = oldStatefulSet.Spec.PersistentVolumeClaimRetentionPolicy // +k8s:verify-mutation:reason=clone
 	if !apiequality.Semantic.DeepEqual(newStatefulSetClone.Spec, oldStatefulSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'updateStrategy', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to statefulset spec for fields other than 'replicas', 'ordinals', 'template', 'updateStrategy', 'revisionHistoryLimit', 'persistentVolumeClaimRetentionPolicy' and 'minReadySeconds' are forbidden"))
 	}
 
 	return allErrs
@@ -605,6 +622,9 @@ func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
+	if status.TerminatingReplicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.TerminatingReplicas), fldPath.Child("terminatingReplicas"))...)
+	}
 	if status.CollisionCount != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fldPath.Child("collisionCount"))...)
 	}
@@ -701,6 +721,9 @@ func ValidateReplicaSetStatus(status apps.ReplicaSetStatus, fldPath *field.Path)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ObservedGeneration), fldPath.Child("observedGeneration"))...)
+	if status.TerminatingReplicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.TerminatingReplicas), fldPath.Child("terminatingReplicas"))...)
+	}
 	msg := "cannot be greater than status.replicas"
 	if status.FullyLabeledReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("fullyLabeledReplicas"), status.FullyLabeledReplicas, msg))

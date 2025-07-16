@@ -26,9 +26,11 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 // NewWaitControlPlanePhase is a hidden phase that runs after the control-plane and etcd phases
@@ -65,15 +67,26 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return nil
 	}
 
-	waiter, err := newControlPlaneWaiter(data.DryRun(), 0, nil, data.OutputWriter())
+	client, err := data.Client()
+	if err != nil {
+		return err
+	}
+
+	waiter, err := newControlPlaneWaiter(data.DryRun(), 0, client, data.OutputWriter())
 	if err != nil {
 		return errors.Wrap(err, "error creating waiter")
 	}
 
 	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
-	if err := waiter.WaitForControlPlaneComponents(&initCfg.ClusterConfiguration,
-		data.Cfg().ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
+	pods, err := staticpodutil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
+		constants.ControlPlaneComponents...)
+	if err != nil {
 		return err
+	}
+	if err = waiter.WaitForControlPlaneComponents(pods,
+		data.Cfg().ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
+		apiclient.PrintControlPlaneErrorHelpScreen(data.OutputWriter(), data.Cfg().NodeRegistration.CRISocket)
+		return errors.Wrap(err, "failed while waiting for the control plane to start")
 	}
 
 	return nil

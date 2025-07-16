@@ -163,11 +163,13 @@ message BuildConfigSpec {
 // BuildConfigStatus contains current state of the build config object.
 message BuildConfigStatus {
   // lastVersion is used to inform about number of last triggered build.
+  // +optional
   optional int64 lastVersion = 1;
 
   // imageChangeTriggers captures the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
   // including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID. There is a single entry
   // in this array for each image change trigger in spec. Each trigger status references the ImageStreamTag that acts as the source of the trigger.
+  // +optional
   repeated ImageChangeTriggerStatus imageChangeTriggers = 2;
 }
 
@@ -465,54 +467,67 @@ message BuildSpec {
 message BuildStatus {
   // phase is the point in the build lifecycle. Possible values are
   // "New", "Pending", "Running", "Complete", "Failed", "Error", and "Cancelled".
+  // +optional
   optional string phase = 1;
 
   // cancelled describes if a cancel event was triggered for the build.
+  // +optional
   optional bool cancelled = 2;
 
   // reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.
+  // +optional
   optional string reason = 3;
 
   // message is a human-readable message indicating details about why the build has this status.
+  // +optional
   optional string message = 4;
 
   // startTimestamp is a timestamp representing the server time when this Build started
   // running in a Pod.
   // It is represented in RFC3339 form and is in UTC.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time startTimestamp = 5;
 
   // completionTimestamp is a timestamp representing the server time when this Build was
   // finished, whether that build failed or succeeded.  It reflects the time at which
   // the Pod running the Build terminated.
   // It is represented in RFC3339 form and is in UTC.
+  // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time completionTimestamp = 6;
 
   // duration contains time.Duration object describing build time.
+  // +optional
   optional int64 duration = 7;
 
   // outputDockerImageReference contains a reference to the container image that
   // will be built by this build. Its value is computed from
   // Build.Spec.Output.To, and should include the registry address, so that
   // it can be used to push and pull the image.
+  // +optional
   optional string outputDockerImageReference = 8;
 
   // config is an ObjectReference to the BuildConfig this Build is based on.
+  // +optional
   optional .k8s.io.api.core.v1.ObjectReference config = 9;
 
   // output describes the container image the build has produced.
+  // +optional
   optional BuildStatusOutput output = 10;
 
   // stages contains details about each stage that occurs during the build
   // including start time, duration (in milliseconds), and the steps that
   // occured within each stage.
+  // +optional
   repeated StageInfo stages = 11;
 
   // logSnippet is the last few lines of the build log.  This value is only set for builds that failed.
+  // +optional
   optional string logSnippet = 12;
 
   // conditions represents the latest available observations of a build's current state.
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +optional
   repeated BuildCondition conditions = 13;
 }
 

@@ -19,7 +19,7 @@ package fuzzer
 import (
 	"time"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/util/certificate/csr"
@@ -30,14 +30,14 @@ import (
 // Funcs returns the fuzzer functions for the certificates api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(obj *certificates.CertificateSigningRequestSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *certificates.CertificateSigningRequestSpec, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			obj.Usages = []certificates.KeyUsage{certificates.UsageKeyEncipherment}
 			obj.SignerName = "example.com/custom-sample-signer"
 			obj.ExpirationSeconds = csr.DurationToExpirationSeconds(time.Hour + time.Minute + time.Second)
 		},
-		func(obj *certificates.CertificateSigningRequestCondition, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *certificates.CertificateSigningRequestCondition, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			if len(obj.Status) == 0 {
 				obj.Status = api.ConditionTrue
 			}

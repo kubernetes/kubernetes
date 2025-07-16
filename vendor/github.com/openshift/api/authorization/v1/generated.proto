@@ -561,10 +561,12 @@ message SubjectRulesReviewSpec {
 // SubjectRulesReviewStatus is contains the result of a rules check
 message SubjectRulesReviewStatus {
   // rules is the list of rules (no particular sort) that are allowed for the subject
+  // +optional
   repeated PolicyRule rules = 1;
 
   // evaluationError can appear in combination with Rules.  It means some error happened during evaluation
   // that may have prevented additional rules from being populated.
+  // +optional
   optional string evaluationError = 2;
 }
 

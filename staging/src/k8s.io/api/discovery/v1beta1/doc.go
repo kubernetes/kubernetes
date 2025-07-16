@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:prerelease-lifecycle-gen=true
 // +groupName=discovery.k8s.io
 
-package v1beta1 // import "k8s.io/api/discovery/v1beta1"
+package v1beta1

@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -74,6 +75,22 @@ const CleanupGracePeriod = 5 * time.Second
 type TContext interface {
 	context.Context
 	TB
+
+	// Parallel signals that this test is to be run in parallel with (and
+	// only with) other parallel tests. In other words, it needs to be
+	// called in each test which is meant to run in parallel.
+	//
+	// Only supported in Go unit tests. When such a test is run multiple
+	// times due to use of -test.count or -test.cpu, multiple instances of
+	// a single test never run in parallel with each other.
+	Parallel()
+
+	// Run runs f as a subtest of t called name. It blocks until f returns or
+	// calls t.Parallel to become a parallel test.
+	//
+	// Only supported in Go unit tests or benchmarks. It fails the current
+	// test when called elsewhere.
+	Run(name string, f func(tCtx TContext)) bool
 
 	// Cancel can be invoked to cancel the context before the test is completed.
 	// Tests which use the context to control goroutines and then wait for
@@ -165,6 +182,7 @@ type TContext interface {
 	// - CleanupCtx
 	// - Expect
 	// - ExpectNoError
+	// - Run
 	// - Logger
 	//
 	// Usually these methods would be stand-alone functions with a TContext
@@ -241,45 +259,8 @@ func Init(tb TB, opts ...InitOption) TContext {
 
 	ctx := interruptCtx
 	if c.PerTestOutput {
-		config := ktesting.NewConfig(
-			ktesting.AnyToString(func(v interface{}) string {
-				// For basic types where the string
-				// representation is "obvious" we use
-				// fmt.Sprintf because format.Object always
-				// adds a <"type"> prefix, which is too long
-				// for simple values.
-				switch v := v.(type) {
-				case int, int32, int64, uint, uint32, uint64, float32, float64, bool:
-					return fmt.Sprintf("%v", v)
-				case string:
-					return v
-				default:
-					return strings.TrimSpace(format.Object(v, 1))
-				}
-			}),
-			ktesting.VerbosityFlagName("v"),
-			ktesting.VModuleFlagName("vmodule"),
-			ktesting.BufferLogs(c.BufferLogs),
-		)
-
-		// Copy klog settings instead of making the ktesting logger
-		// configurable directly.
-		var fs flag.FlagSet
-		config.AddFlags(&fs)
-		for _, name := range []string{"v", "vmodule"} {
-			from := flag.CommandLine.Lookup(name)
-			to := fs.Lookup(name)
-			if err := to.Value.Set(from.Value.String()); err != nil {
-				panic(err)
-			}
-		}
-
-		// Ensure consistent logging: this klog.Logger writes to tb, adding the
-		// date/time header, and our own wrapper emulates that behavior for
-		// Log/Logf/...
-		logger := ktesting.NewLogger(tb, config)
+		logger := newLogger(tb, c.BufferLogs)
 		ctx = klog.NewContext(interruptCtx, logger)
-
 		tb = withKlogHeader(tb)
 	}
 
@@ -297,6 +278,47 @@ func Init(tb TB, opts ...InitOption) TContext {
 		}
 	}
 	return WithCancel(InitCtx(ctx, tb))
+}
+
+func newLogger(tb TB, bufferLogs bool) klog.Logger {
+	config := ktesting.NewConfig(
+		ktesting.AnyToString(func(v interface{}) string {
+			// For basic types where the string
+			// representation is "obvious" we use
+			// fmt.Sprintf because format.Object always
+			// adds a <"type"> prefix, which is too long
+			// for simple values.
+			switch v := v.(type) {
+			case int, int32, int64, uint, uint32, uint64, float32, float64, bool:
+				return fmt.Sprintf("%v", v)
+			case string:
+				return v
+			default:
+				return strings.TrimSpace(format.Object(v, 1))
+			}
+		}),
+		ktesting.VerbosityFlagName("v"),
+		ktesting.VModuleFlagName("vmodule"),
+		ktesting.BufferLogs(bufferLogs),
+	)
+
+	// Copy klog settings instead of making the ktesting logger
+	// configurable directly.
+	var fs flag.FlagSet
+	config.AddFlags(&fs)
+	for _, name := range []string{"v", "vmodule"} {
+		from := flag.CommandLine.Lookup(name)
+		to := fs.Lookup(name)
+		if err := to.Value.Set(from.Value.String()); err != nil {
+			panic(err)
+		}
+	}
+
+	// Ensure consistent logging: this klog.Logger writes to tb, adding the
+	// date/time header, and our own wrapper emulates that behavior for
+	// Log/Logf/...
+	logger := ktesting.NewLogger(tb, config)
+	return logger
 }
 
 type InitOption = initoption.InitOption
@@ -327,9 +349,13 @@ func InitCtx(ctx context.Context, tb TB, _ ...InitOption) TContext {
 //	       ...
 //	   })
 //
-// WithTB sets up cancellation for the sub-test.
+// WithTB sets up cancellation for the sub-test and uses per-test output.
+//
+// A simpler API is to use TContext.Run as replacement
+// for [testing.T.Run].
 func WithTB(parentCtx TContext, tb TB) TContext {
-	tCtx := InitCtx(parentCtx, tb)
+	tCtx := InitCtx(klog.NewContext(parentCtx, newLogger(tb, false /* don't buffer log output */)), tb)
+
 	tCtx = WithCancel(tCtx)
 	tCtx = WithClients(tCtx,
 		parentCtx.RESTConfig(),
@@ -339,6 +365,27 @@ func WithTB(parentCtx TContext, tb TB) TContext {
 		parentCtx.APIExtensions(),
 	)
 	return tCtx
+}
+
+// run implements the different Run methods. It's not an exported
+// method because tCtx.Run is more discoverable (same usage as
+// with normal Go).
+func run(tCtx TContext, name string, cb func(tCtx TContext)) bool {
+	tCtx.Helper()
+	switch tb := tCtx.TB().(type) {
+	case interface {
+		Run(string, func(t *testing.T)) bool
+	}:
+		return tb.Run(name, func(t *testing.T) { cb(WithTB(tCtx, t)) })
+	case interface {
+		Run(string, func(t *testing.B)) bool
+	}:
+		return tb.Run(name, func(b *testing.B) { cb(WithTB(tCtx, b)) })
+	default:
+		tCtx.Fatalf("Run not implemented, underlying %T does not support it", tCtx.TB())
+	}
+
+	return false
 }
 
 // WithContext constructs a new TContext with a different Context instance.
@@ -379,6 +426,12 @@ type tContext struct {
 // between field and method in tContext.
 type testingTB struct {
 	TB
+}
+
+func (tCtx tContext) Parallel() {
+	if tb, ok := tCtx.TB().(interface{ Parallel() }); ok {
+		tb.Parallel()
+	}
 }
 
 func (tCtx tContext) Cancel(cause string) {
@@ -422,6 +475,10 @@ func cleanupCtx(tCtx TContext, cb func(TContext)) {
 		childCtx := WithContext(tCtx, context.WithoutCancel(tCtx))
 		cb(childCtx)
 	})
+}
+
+func (cCtx tContext) Run(name string, cb func(tCtx TContext)) bool {
+	return run(cCtx, name, cb)
 }
 
 func (tCtx tContext) Logger() klog.Logger {

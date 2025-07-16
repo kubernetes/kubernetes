@@ -30,7 +30,7 @@ import (
 	"time"
 
 	cadvisorv1 "github.com/google/cadvisor/info/v1"
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/opencontainers/cgroups"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
 )
 
@@ -133,7 +133,12 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 
 	memoryLimit := getMemoryLimit(pod, container)
 	cpuLimit := getCPULimit(pod, container)
-	lcr := m.calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit)
+
+	// If pod has exclusive cpu and the container in question has integer cpu requests
+	// the cfs quota will not be enforced
+	disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.ContainerHasExclusiveCPUs(pod, container)
+	klog.V(2).InfoS("Enforcing CFS quota", "pod", klog.KObj(pod), "unlimited", disableCPUQuota)
+	lcr := m.calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit, disableCPUQuota)
 
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
@@ -201,33 +206,43 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 	}
 
 	swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo)
-	if m.memorySwapBehavior == kubelettypes.LimitedSwap {
-		if !isCgroup2UnifiedMode() {
-			swapConfigurationHelper.ConfigureNoSwap(lcr)
-			return
-		}
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
-		swapConfigurationHelper.ConfigureNoSwap(lcr)
-		return
-	}
-
-	if kubelettypes.IsCriticalPod(pod) {
-		swapConfigurationHelper.ConfigureNoSwap(lcr)
-		return
-	}
-
 	// NOTE(ehashman): Behavior is defined in the opencontainers runtime spec:
 	// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
-	switch m.memorySwapBehavior {
-	case kubelettypes.NoSwap:
+	switch m.GetContainerSwapBehavior(pod, container) {
+	case types.NoSwap:
 		swapConfigurationHelper.ConfigureNoSwap(lcr)
-	case kubelettypes.LimitedSwap:
+	case types.LimitedSwap:
 		swapConfigurationHelper.ConfigureLimitedSwap(lcr, pod, container)
 	default:
 		swapConfigurationHelper.ConfigureNoSwap(lcr)
 	}
+}
+
+// GetContainerSwapBehavior checks what swap behavior should be configured for a container,
+// considering the requirements for enabling swap.
+func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) types.SwapBehavior {
+	c := types.SwapBehavior(m.memorySwapBehavior)
+	if c == types.LimitedSwap {
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) || !swapControllerAvailable() {
+			return types.NoSwap
+		}
+
+		if !isCgroup2UnifiedMode() {
+			return types.NoSwap
+		}
+
+		if types.IsCriticalPod(pod) {
+			return types.NoSwap
+		}
+		podQos := kubeapiqos.GetPodQOS(pod)
+		containerDoesNotRequestMemory := container.Resources.Requests.Memory().IsZero() && container.Resources.Limits.Memory().IsZero()
+		memoryRequestEqualsToLimit := container.Resources.Requests.Memory().Cmp(*container.Resources.Limits.Memory()) == 0
+		if podQos != v1.PodQOSBurstable || containerDoesNotRequestMemory || memoryRequestEqualsToLimit {
+			return types.NoSwap
+		}
+		return c
+	}
+	return types.NoSwap
 }
 
 // generateContainerResources generates platform specific (linux) container resources config for runtime
@@ -243,8 +258,19 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 	}
 }
 
+// generateUpdatePodSandboxResourcesRequest generates platform specific (linux) podsandox resources config for runtime
+func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) *runtimeapi.UpdatePodSandboxResourcesRequest {
+
+	podResourcesWithoutOverhead := subtractOverheadFromResourceConfig(podResources, pod)
+	return &runtimeapi.UpdatePodSandboxResourcesRequest{
+		PodSandboxId: sandboxID,
+		Overhead:     m.convertOverheadToLinuxResources(pod),
+		Resources:    convertResourceConfigToLinuxContainerResources(podResourcesWithoutOverhead),
+	}
+}
+
 // calculateLinuxResources will create the linuxContainerResources type based on the provided CPU and memory resource requests, limits
-func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit *resource.Quantity) *runtimeapi.LinuxContainerResources {
+func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit *resource.Quantity, disableCPUQuota bool) *runtimeapi.LinuxContainerResources {
 	resources := runtimeapi.LinuxContainerResources{}
 	var cpuShares int64
 
@@ -276,6 +302,9 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		}
 		cpuQuota := milliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
 		resources.CpuQuota = cpuQuota
+		if disableCPUQuota {
+			resources.CpuQuota = int64(-1)
+		}
 		resources.CpuPeriod = cpuPeriod
 	}
 
@@ -409,15 +438,6 @@ func newSwapConfigurationHelper(machineInfo cadvisorv1.MachineInfo) *swapConfigu
 }
 
 func (m swapConfigurationHelper) ConfigureLimitedSwap(lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
-	podQos := kubeapiqos.GetPodQOS(pod)
-	containerDoesNotRequestMemory := container.Resources.Requests.Memory().IsZero() && container.Resources.Limits.Memory().IsZero()
-	memoryRequestEqualsToLimit := container.Resources.Requests.Memory().Cmp(*container.Resources.Limits.Memory()) == 0
-
-	if podQos != v1.PodQOSBurstable || containerDoesNotRequestMemory || !isCgroup2UnifiedMode() || memoryRequestEqualsToLimit {
-		m.ConfigureNoSwap(lcr)
-		return
-	}
-
 	containerMemoryRequest := container.Resources.Requests.Memory()
 	swapLimit, err := calcSwapForBurstablePods(containerMemoryRequest.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
 	if err != nil {

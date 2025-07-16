@@ -1,11 +1,13 @@
 package extension
 
 import (
+	"time"
+
 	"github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 )
 
-const CurrentExtensionAPIVersion = "v1.0"
+const CurrentExtensionAPIVersion = "v1.1"
 
 // Extension represents an extension to openshift-tests.
 type Extension struct {
@@ -45,14 +47,40 @@ type Component struct {
 	Name string `json:"name"`
 }
 
-// Suite represents additional suites the extension wants to advertise.
+type ClusterStability string
+
+var (
+	// ClusterStabilityStable means that at no point during testing do we expect a component to take downtime and upgrades are not happening.
+	ClusterStabilityStable ClusterStability = "Stable"
+
+	// ClusterStabilityDisruptive means that the suite is expected to induce outages to the cluster.
+	ClusterStabilityDisruptive ClusterStability = "Disruptive"
+
+	// ClusterStabilityUpgrade was previously defined, but was removed by @deads2k. Please contact him if you find a use
+	// case for it and needs to be reintroduced.
+	// ClusterStabilityUpgrade    ClusterStability = "Upgrade"
+)
+
+// Suite represents additional suites the extension wants to advertise. Child suites when being executed in the context
+// of a parent will have their count, parallelism, stability, and timeout options superseded by the parent's suite.
 type Suite struct {
-	// The name of the suite.
-	Name string `json:"name"`
-	// Parent suites this suite is part of.
+	Name        string `json:"name"`
+	Description string `json:"description"`
+
+	// Parents are the parent suites this suite is part of.
 	Parents []string `json:"parents,omitempty"`
 	// Qualifiers are CEL expressions that are OR'd together for test selection that are members of the suite.
 	Qualifiers []string `json:"qualifiers,omitempty"`
+
+	// Count is the default number of times to execute each test in this suite.
+	Count int `json:"count,omitempty"`
+	// Parallelism is the maximum parallelism of this suite.
+	Parallelism int `json:"parallelism,omitempty"`
+	// ClusterStability informs openshift-tests whether this entire test suite is expected to be disruptive or not
+	// to normal cluster operations.
+	ClusterStability ClusterStability `json:"clusterStability,omitempty"`
+	// TestTimeout is the default timeout for tests in this suite.
+	TestTimeout *time.Duration `json:"testTimeout,omitempty"`
 }
 
 type Image struct {

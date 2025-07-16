@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package flushwriter implements a wrapper for a writer that flushes on every
 // write if that writer implements the io.Flusher interface
-package flushwriter // import "k8s.io/apiserver/pkg/util/flushwriter"
+package flushwriter

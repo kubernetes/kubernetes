@@ -128,9 +128,6 @@ func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterA
 			AddFunc: func(obj interface{}) {
 				c.queue.Add(keyFn())
 			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				c.queue.Add(keyFn())
-			},
 			DeleteFunc: func(obj interface{}) {
 				c.queue.Add(keyFn())
 			},

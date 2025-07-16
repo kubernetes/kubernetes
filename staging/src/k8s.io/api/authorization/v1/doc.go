@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:prerelease-lifecycle-gen=true
 // +groupName=authorization.k8s.io
 
-package v1 // import "k8s.io/api/authorization/v1"
+package v1

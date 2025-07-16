@@ -24,7 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -45,6 +47,11 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 	return &runtimeapi.ContainerResources{
 		Windows: m.generateWindowsContainerResources(pod, container),
 	}
+}
+
+// generateUpdatePodSandboxResourcesRequest generates platform specific podsandox resources config for runtime
+func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) *runtimeapi.UpdatePodSandboxResourcesRequest {
+	return nil
 }
 
 // generateWindowsContainerResources generates windows container resources config for runtime
@@ -176,4 +183,8 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 
 func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.ContainerUser {
 	return nil
+}
+
+func (m *kubeGenericRuntimeManager) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) types.SwapBehavior {
+	return types.NoSwap
 }

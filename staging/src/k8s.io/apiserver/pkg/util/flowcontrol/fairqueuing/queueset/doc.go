@@ -116,4 +116,4 @@ limitations under the License.
 // queue’s virtual start time is advanced by G. When a request
 // finishes being served, and the actual service time was S, the
 // queue’s virtual start time is decremented by G - S.
-package queueset // import "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
+package queueset

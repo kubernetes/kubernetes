@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -395,7 +396,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 		}
 	})
 
-	f.Context("Expansion with recovery", feature.RecoverVolumeExpansionFailure, func() {
+	f.Context("Expansion with recovery", feature.RecoverVolumeExpansionFailure, framework.WithFeatureGate(features.RecoverVolumeExpansionFailure), func() {
 		tests := []recoveryTest{
 			{
 				name:                       "should record target size in allocated resources",

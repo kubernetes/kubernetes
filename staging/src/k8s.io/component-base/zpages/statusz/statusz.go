@@ -22,18 +22,18 @@ import (
 	"html/template"
 	"math/rand"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/munnerz/goautoneg"
-
+	"k8s.io/component-base/compatibility"
+	"k8s.io/component-base/zpages/httputil"
 	"k8s.io/klog/v2"
 )
 
 var (
-	delimiters              = []string{":", ": ", "=", " "}
-	errUnsupportedMediaType = fmt.Errorf("media type not acceptable, must be: text/plain")
+	delimiters = []string{":", ": ", "=", " "}
 )
+
+const DefaultStatuszPath = "/statusz"
 
 const (
 	headerFmt = `
@@ -63,8 +63,8 @@ type mux interface {
 	Handle(path string, handler http.Handler)
 }
 
-func NewRegistry() statuszRegistry {
-	return registry{}
+func NewRegistry(effectiveVersion compatibility.EffectiveVersion) statuszRegistry {
+	return &registry{effectiveVersion: effectiveVersion}
 }
 
 func Install(m mux, componentName string, reg statuszRegistry) {
@@ -73,7 +73,7 @@ func Install(m mux, componentName string, reg statuszRegistry) {
 		klog.Errorf("error while parsing gotemplates: %v", err)
 		return
 	}
-	m.Handle("/statusz", handleStatusz(componentName, dataTmpl, reg))
+	m.Handle(DefaultStatuszPath, handleStatusz(componentName, dataTmpl, reg))
 }
 
 func initializeTemplates() (*template.Template, error) {
@@ -88,8 +88,8 @@ func initializeTemplates() (*template.Template, error) {
 
 func handleStatusz(componentName string, dataTmpl *template.Template, reg statuszRegistry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !acceptableMediaType(r) {
-			http.Error(w, errUnsupportedMediaType.Error(), http.StatusNotAcceptable)
+		if !httputil.AcceptableMediaType(r) {
+			http.Error(w, httputil.ErrUnsupportedMediaType.Error(), http.StatusNotAcceptable)
 			return
 		}
 
@@ -104,30 +104,6 @@ func handleStatusz(componentName string, dataTmpl *template.Template, reg status
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		fmt.Fprint(w, data)
 	}
-}
-
-// TODO(richabanker) : Move this to a common place to be reused for all zpages.
-func acceptableMediaType(r *http.Request) bool {
-	accepts := goautoneg.ParseAccept(r.Header.Get("Accept"))
-	for _, accept := range accepts {
-		if !mediaTypeMatches(accept) {
-			continue
-		}
-		if len(accept.Params) == 0 {
-			return true
-		}
-		if len(accept.Params) == 1 {
-			if charset, ok := accept.Params["charset"]; ok && strings.EqualFold(charset, "utf-8") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func mediaTypeMatches(a goautoneg.Accept) bool {
-	return (a.Type == "text" || a.Type == "*") &&
-		(a.SubType == "plain" || a.SubType == "*")
 }
 
 func populateStatuszData(tmpl *template.Template, reg statuszRegistry) (string, error) {

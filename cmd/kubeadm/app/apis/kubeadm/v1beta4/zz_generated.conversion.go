@@ -1141,6 +1141,7 @@ func autoConvert_v1beta4_UpgradePlanConfiguration_To_kubeadm_UpgradePlanConfigur
 	out.AllowExperimentalUpgrades = (*bool)(unsafe.Pointer(in.AllowExperimentalUpgrades))
 	out.AllowRCUpgrades = (*bool)(unsafe.Pointer(in.AllowRCUpgrades))
 	out.DryRun = (*bool)(unsafe.Pointer(in.DryRun))
+	out.EtcdUpgrade = (*bool)(unsafe.Pointer(in.EtcdUpgrade))
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.PrintConfig = (*bool)(unsafe.Pointer(in.PrintConfig))
 	return nil
@@ -1156,6 +1157,7 @@ func autoConvert_kubeadm_UpgradePlanConfiguration_To_v1beta4_UpgradePlanConfigur
 	out.AllowExperimentalUpgrades = (*bool)(unsafe.Pointer(in.AllowExperimentalUpgrades))
 	out.AllowRCUpgrades = (*bool)(unsafe.Pointer(in.AllowRCUpgrades))
 	out.DryRun = (*bool)(unsafe.Pointer(in.DryRun))
+	out.EtcdUpgrade = (*bool)(unsafe.Pointer(in.EtcdUpgrade))
 	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	out.PrintConfig = (*bool)(unsafe.Pointer(in.PrintConfig))
 	return nil

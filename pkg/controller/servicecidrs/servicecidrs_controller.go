@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingapiv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,12 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
-	networkingapiv1beta1apply "k8s.io/client-go/applyconfigurations/networking/v1beta1"
-	networkinginformers "k8s.io/client-go/informers/networking/v1beta1"
+	networkingapiv1apply "k8s.io/client-go/applyconfigurations/networking/v1"
+	networkinginformers "k8s.io/client-go/informers/networking/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	networkinglisters "k8s.io/client-go/listers/networking/v1beta1"
+	networkinglisters "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -147,7 +147,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 }
 
 func (c *Controller) addServiceCIDR(obj interface{}) {
-	cidr, ok := obj.(*networkingapiv1beta1.ServiceCIDR)
+	cidr, ok := obj.(*networkingapiv1.ServiceCIDR)
 	if !ok {
 		return
 	}
@@ -174,7 +174,7 @@ func (c *Controller) deleteServiceCIDR(obj interface{}) {
 
 // addIPAddress may block a ServiceCIDR deletion
 func (c *Controller) addIPAddress(obj interface{}) {
-	ip, ok := obj.(*networkingapiv1beta1.IPAddress)
+	ip, ok := obj.(*networkingapiv1.IPAddress)
 	if !ok {
 		return
 	}
@@ -186,13 +186,13 @@ func (c *Controller) addIPAddress(obj interface{}) {
 
 // deleteIPAddress may unblock a ServiceCIDR deletion
 func (c *Controller) deleteIPAddress(obj interface{}) {
-	ip, ok := obj.(*networkingapiv1beta1.IPAddress)
+	ip, ok := obj.(*networkingapiv1.IPAddress)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			return
 		}
-		ip, ok = tombstone.Obj.(*networkingapiv1beta1.IPAddress)
+		ip, ok = tombstone.Obj.(*networkingapiv1.IPAddress)
 		if !ok {
 			return
 		}
@@ -206,7 +206,7 @@ func (c *Controller) deleteIPAddress(obj interface{}) {
 // overlappingServiceCIDRs, given a ServiceCIDR return the ServiceCIDRs that contain or are contained,
 // this is required because adding or removing a CIDR will require to recompute the
 // state of each ServiceCIDR to check if can be unblocked on deletion.
-func (c *Controller) overlappingServiceCIDRs(serviceCIDR *networkingapiv1beta1.ServiceCIDR) []string {
+func (c *Controller) overlappingServiceCIDRs(serviceCIDR *networkingapiv1.ServiceCIDR) []string {
 	result := sets.New[string]()
 	for _, cidr := range serviceCIDR.Spec.CIDRs {
 		if prefix, err := netip.ParsePrefix(cidr); err == nil { // if is empty err will not be nil
@@ -222,9 +222,9 @@ func (c *Controller) overlappingServiceCIDRs(serviceCIDR *networkingapiv1beta1.S
 
 // containingServiceCIDRs, given an IPAddress return the ServiceCIDRs that contains the IP,
 // as it may block or be blocking the deletion of the ServiceCIDRs that contain it.
-func (c *Controller) containingServiceCIDRs(ip *networkingapiv1beta1.IPAddress) []string {
+func (c *Controller) containingServiceCIDRs(ip *networkingapiv1.IPAddress) []string {
 	// only process IPs managed by the kube-apiserver
-	managedBy, ok := ip.Labels[networkingapiv1beta1.LabelManagedBy]
+	managedBy, ok := ip.Labels[networkingapiv1.LabelManagedBy]
 	if !ok || managedBy != ipallocator.ControllerName {
 		return []string{}
 	}
@@ -302,15 +302,15 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 			// update the status to indicate why the ServiceCIDR can not be deleted,
 			// it will be reevaludated by an event on any ServiceCIDR or IPAddress related object
 			// that may remove this condition.
-			svcApplyStatus := networkingapiv1beta1apply.ServiceCIDRStatus().WithConditions(
+			svcApplyStatus := networkingapiv1apply.ServiceCIDRStatus().WithConditions(
 				metav1apply.Condition().
-					WithType(networkingapiv1beta1.ServiceCIDRConditionReady).
+					WithType(networkingapiv1.ServiceCIDRConditionReady).
 					WithStatus(metav1.ConditionFalse).
-					WithReason(networkingapiv1beta1.ServiceCIDRReasonTerminating).
+					WithReason(networkingapiv1.ServiceCIDRReasonTerminating).
 					WithMessage("There are still IPAddresses referencing the ServiceCIDR, please remove them or create a new ServiceCIDR").
 					WithLastTransitionTime(metav1.Now()))
-			svcApply := networkingapiv1beta1apply.ServiceCIDR(cidr.Name).WithStatus(svcApplyStatus)
-			_, err = c.client.NetworkingV1beta1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: controllerName, Force: true})
+			svcApply := networkingapiv1apply.ServiceCIDR(cidr.Name).WithStatus(svcApplyStatus)
+			_, err = c.client.NetworkingV1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: controllerName, Force: true})
 			return err
 		}
 		// If there are no IPAddress depending on this ServiceCIDR is safe to remove it,
@@ -333,14 +333,14 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 	}
 
 	// Set Ready condition to True.
-	svcApplyStatus := networkingapiv1beta1apply.ServiceCIDRStatus().WithConditions(
+	svcApplyStatus := networkingapiv1apply.ServiceCIDRStatus().WithConditions(
 		metav1apply.Condition().
-			WithType(networkingapiv1beta1.ServiceCIDRConditionReady).
+			WithType(networkingapiv1.ServiceCIDRConditionReady).
 			WithStatus(metav1.ConditionTrue).
 			WithMessage("Kubernetes Service CIDR is ready").
 			WithLastTransitionTime(metav1.Now()))
-	svcApply := networkingapiv1beta1apply.ServiceCIDR(cidr.Name).WithStatus(svcApplyStatus)
-	if _, err := c.client.NetworkingV1beta1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: controllerName, Force: true}); err != nil {
+	svcApply := networkingapiv1apply.ServiceCIDR(cidr.Name).WithStatus(svcApplyStatus)
+	if _, err := c.client.NetworkingV1().ServiceCIDRs().ApplyStatus(ctx, svcApply, metav1.ApplyOptions{FieldManager: controllerName, Force: true}); err != nil {
 		logger.Info("error updating default ServiceCIDR status", "error", err)
 		c.eventRecorder.Eventf(cidr, v1.EventTypeWarning, "KubernetesServiceCIDRError", "The ServiceCIDR Status can not be set to Ready=True")
 		return err
@@ -350,7 +350,7 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 }
 
 // canDeleteCIDR checks that the ServiceCIDR can be safely deleted and not leave orphan IPAddresses
-func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkingapiv1beta1.ServiceCIDR) (bool, error) {
+func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkingapiv1.ServiceCIDR) (bool, error) {
 	logger := klog.FromContext(ctx)
 	// Check if there is a subnet that already contains the ServiceCIDR that is going to be deleted.
 	hasParent := true
@@ -379,8 +379,8 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 	for _, cidr := range serviceCIDR.Spec.CIDRs {
 		// get all the IPv4 addresses
 		ipLabelSelector := labels.Set(map[string]string{
-			networkingapiv1beta1.LabelIPAddressFamily: string(convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidr))),
-			networkingapiv1beta1.LabelManagedBy:       ipallocator.ControllerName,
+			networkingapiv1.LabelIPAddressFamily: string(convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidr))),
+			networkingapiv1.LabelManagedBy:       ipallocator.ControllerName,
 		}).AsSelectorPreValidated()
 		ips, err := c.ipAddressLister.List(ipLabelSelector)
 		if err != nil {
@@ -411,7 +411,7 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 	return true, nil
 }
 
-func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1beta1.ServiceCIDR) error {
+func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1.ServiceCIDR) error {
 	for _, f := range cidr.GetFinalizers() {
 		if f == ServiceCIDRProtectionFinalizer {
 			return nil
@@ -427,7 +427,7 @@ func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *
 	if err != nil {
 		return err
 	}
-	_, err = c.client.NetworkingV1beta1().ServiceCIDRs().Patch(ctx, cidr.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	_, err = c.client.NetworkingV1().ServiceCIDRs().Patch(ctx, cidr.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -436,7 +436,7 @@ func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *
 
 }
 
-func (c *Controller) removeServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1beta1.ServiceCIDR) error {
+func (c *Controller) removeServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1.ServiceCIDR) error {
 	found := false
 	for _, f := range cidr.GetFinalizers() {
 		if f == ServiceCIDRProtectionFinalizer {
@@ -456,7 +456,7 @@ func (c *Controller) removeServiceCIDRFinalizerIfNeeded(ctx context.Context, cid
 	if err != nil {
 		return err
 	}
-	_, err = c.client.NetworkingV1beta1().ServiceCIDRs().Patch(ctx, cidr.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	_, err = c.client.NetworkingV1().ServiceCIDRs().Patch(ctx, cidr.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}

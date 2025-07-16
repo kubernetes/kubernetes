@@ -377,7 +377,7 @@ func (b *iscsiDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
 
 func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs)
 	if err != nil {
 		klog.Errorf("iscsi: failed to setup")
 	}

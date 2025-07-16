@@ -99,6 +99,7 @@ type FeatureGateStatus struct {
 	// Known .status.conditions.type are: "DeterminationDegraded"
 	// +listType=map
 	// +listMapKey=type
+	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// featureGates contains a list of enabled and disabled featureGates that are keyed by payloadVersion.
@@ -111,6 +112,7 @@ type FeatureGateStatus struct {
 	// Only featureGates with .version in the ClusterVersion.status will be present in this list.
 	// +listType=map
 	// +listMapKey=version
+	// +optional
 	FeatureGates []FeatureGateDetails `json:"featureGates"`
 }
 

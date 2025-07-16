@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/randfill"
 
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
@@ -81,8 +81,8 @@ func TestRoundtripToUnstructured(t *testing.T) {
 			apiextensionsfuzzer.Funcs,
 			func(_ serializer.CodecFactory) []any {
 				return []any{
-					func(obj *apiextensionsv1.ConversionReview, c fuzz.Continue) {
-						c.FuzzNoCustom(obj)
+					func(obj *apiextensionsv1.ConversionReview, c randfill.Continue) {
+						c.FillNoCustom(obj)
 						if obj.Request != nil {
 							for i := range obj.Request.Objects {
 								fuzzer.NormalizeJSONRawExtension(&obj.Request.Objects[i])
@@ -94,8 +94,8 @@ func TestRoundtripToUnstructured(t *testing.T) {
 							}
 						}
 					},
-					func(obj *apiextensionsv1beta1.ConversionReview, c fuzz.Continue) {
-						c.FuzzNoCustom(obj)
+					func(obj *apiextensionsv1beta1.ConversionReview, c randfill.Continue) {
+						c.FillNoCustom(obj)
 						if obj.Request != nil {
 							for i := range obj.Request.Objects {
 								fuzzer.NormalizeJSONRawExtension(&obj.Request.Objects[i])

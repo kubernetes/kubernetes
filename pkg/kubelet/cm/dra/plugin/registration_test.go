@@ -149,15 +149,26 @@ func TestRegistrationHandler(t *testing.T) {
 					// Set expected slice fields for the next call of this reactor.
 					// The reactor will be called next time when resourceslices object is deleted
 					// by the kubelet after plugin deregistration.
-					expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": test.pluginName}
-
+					switch len(expectedSliceFields) {
+					case 1:
+						// Startup cleanup done, now expect cleanup for test plugin.
+						expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": test.pluginName}
+					case 2:
+						// Test plugin cleanup done, now expect cleanup for the other plugin.
+						otherPlugin := pluginA
+						if otherPlugin == test.pluginName {
+							otherPlugin = pluginB
+						}
+						expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": otherPlugin}
+					}
 					return true, nil, err
 				})
 				client = fakeClient
 			}
 
 			// The handler wipes all slices at startup.
-			handler := NewRegistrationHandler(client, getFakeNode)
+			handler := newRegistrationHandler(tCtx, client, getFakeNode, time.Second /* very short wiping delay for testing */)
+			tCtx.Cleanup(handler.Stop)
 			requireNoSlices := func() {
 				t.Helper()
 				if client == nil {
@@ -176,6 +187,10 @@ func TestRegistrationHandler(t *testing.T) {
 			// Simulate one existing plugin A.
 			err := handler.RegisterPlugin(pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
 			require.NoError(t, err)
+			t.Cleanup(func() {
+				tCtx.Logf("Removing plugin %s", pluginA)
+				handler.DeRegisterPlugin(pluginA, endpointA)
+			})
 
 			err = handler.ValidatePlugin(test.pluginName, test.endpoint, test.supportedServices)
 			if test.shouldError {
@@ -206,9 +221,10 @@ func TestRegistrationHandler(t *testing.T) {
 					assert.NoError(t, err, "recreate slice")
 				}
 
-				handler.DeRegisterPlugin(test.pluginName)
+				tCtx.Logf("Removing plugin %s", test.pluginName)
+				handler.DeRegisterPlugin(test.pluginName, test.endpoint)
 				// Nop.
-				handler.DeRegisterPlugin(test.pluginName)
+				handler.DeRegisterPlugin(test.pluginName, test.endpoint)
 
 				requireNoSlices()
 			})

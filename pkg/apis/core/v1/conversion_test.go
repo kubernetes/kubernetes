@@ -292,7 +292,7 @@ func TestReplicationControllerConversion(t *testing.T) {
 	apiObjectFuzzer := fuzzer.FuzzerFor(fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, corefuzzer.Funcs), rand.NewSource(152), legacyscheme.Codecs)
 	for i := 0; i < 100; i++ {
 		rc := &v1.ReplicationController{}
-		apiObjectFuzzer.Fuzz(rc)
+		apiObjectFuzzer.Fill(rc)
 		// Sometimes the fuzzer decides to leave Spec.Template nil.
 		// We can't support that because Spec.Template is not a pointer in RS,
 		// so it will round-trip as non-nil but empty.

@@ -22,9 +22,11 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func Test_getSafeSysctlAllowlist(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tests := []struct {
 		name       string
 		getVersion func() (*version.Version, error)
@@ -82,7 +84,7 @@ func Test_getSafeSysctlAllowlist(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getSafeSysctlAllowlist(tt.getVersion); !reflect.DeepEqual(got, tt.want) {
+			if got := getSafeSysctlAllowlist(tCtx, tt.getVersion); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("getSafeSysctlAllowlist() = %v, want %v", got, tt.want)
 			}
 		})

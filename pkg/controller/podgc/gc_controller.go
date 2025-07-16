@@ -246,10 +246,11 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 		}
 		logger.V(2).Info("Found orphaned Pod assigned to the Node, deleting", "pod", klog.KObj(pod), "node", klog.KRef("", pod.Spec.NodeName))
 		condition := &v1.PodCondition{
-			Type:    v1.DisruptionTarget,
-			Status:  v1.ConditionTrue,
-			Reason:  "DeletionByPodGC",
-			Message: "PodGC: node no longer exists",
+			Type:               v1.DisruptionTarget,
+			ObservedGeneration: apipod.GetPodObservedGenerationIfEnabledOnCondition(&pod.Status, pod.Generation, v1.DisruptionTarget),
+			Status:             v1.ConditionTrue,
+			Reason:             "DeletionByPodGC",
+			Message:            "PodGC: node no longer exists",
 		}
 		if err := gcc.markFailedAndDeletePodWithCondition(ctx, pod, condition); err != nil {
 			utilruntime.HandleError(err)
@@ -348,6 +349,7 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 	if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
 		newStatus := pod.Status.DeepCopy()
 		newStatus.Phase = v1.PodFailed
+		newStatus.ObservedGeneration = apipod.GetPodObservedGenerationIfEnabled(pod)
 		if condition != nil {
 			apipod.UpdatePodCondition(newStatus, condition)
 		}

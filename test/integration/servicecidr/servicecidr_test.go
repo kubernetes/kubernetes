@@ -25,7 +25,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -43,7 +43,7 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1beta1=true",
+			"--runtime-config=networking.k8s.io/v1=true",
 			"--service-cluster-ip-range=192.168.0.0/29",
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
@@ -63,8 +63,8 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	go servicecidrs.NewController(
 		ctx,
-		informerFactory.Networking().V1beta1().ServiceCIDRs(),
-		informerFactory.Networking().V1beta1().IPAddresses(),
+		informerFactory.Networking().V1().ServiceCIDRs(),
+		informerFactory.Networking().V1().IPAddresses(),
 		client,
 	).Run(ctx, 5)
 	informerFactory.Start(ctx.Done())
@@ -97,12 +97,12 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 
 	// Add a new service CIDR to be able to create new IPs.
 	cidr := makeServiceCIDR("test2", "10.168.0.0/24", "")
-	if _, err := client.NetworkingV1beta1().ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{}); err != nil {
+	if _, err := client.NetworkingV1().ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 	// wait ServiceCIDR is ready
 	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
-		cidr, err := client.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), cidr.Name, metav1.GetOptions{})
+		cidr, err := client.NetworkingV1().ServiceCIDRs().Get(context.TODO(), cidr.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -141,7 +141,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1beta1=true",
+			"--runtime-config=networking.k8s.io/v1=true",
 			"--service-cluster-ip-range=" + cidr1,
 			"--advertise-address=172.16.1.1",
 			"--disable-admission-plugins=ServiceAccount",
@@ -165,8 +165,8 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	go servicecidrs.NewController(
 		ctx,
-		informerFactory.Networking().V1beta1().ServiceCIDRs(),
-		informerFactory.Networking().V1beta1().IPAddresses(),
+		informerFactory.Networking().V1().ServiceCIDRs(),
+		informerFactory.Networking().V1().IPAddresses(),
 		client,
 	).Run(ctx, 5)
 	informerFactory.Start(ctx.Done())
@@ -180,13 +180,13 @@ func TestServiceCIDRDeletion(t *testing.T) {
 		}
 	}
 	// create a new ServiceCIDRs that overlaps the default one
-	_, err = client.NetworkingV1beta1().ServiceCIDRs().Create(ctx, makeServiceCIDR("cidr1", cidr1, ""), metav1.CreateOptions{})
+	_, err = client.NetworkingV1().ServiceCIDRs().Create(ctx, makeServiceCIDR("cidr1", cidr1, ""), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Wait until is ready.
 	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
-		cidr, err := client.NetworkingV1beta1().ServiceCIDRs().Get(ctx, "cidr1", metav1.GetOptions{})
+		cidr, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, "cidr1", metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -195,13 +195,13 @@ func TestServiceCIDRDeletion(t *testing.T) {
 		t.Fatalf("cidr1 is not ready")
 	}
 	// we should be able to delete the ServiceCIDR despite it contains IP addresses as it overlaps with the default ServiceCIDR
-	err = client.NetworkingV1beta1().ServiceCIDRs().Delete(ctx, "cidr1", metav1.DeleteOptions{})
+	err = client.NetworkingV1().ServiceCIDRs().Delete(ctx, "cidr1", metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
-		_, err := client.NetworkingV1beta1().ServiceCIDRs().Get(ctx, "cidr1", metav1.GetOptions{})
+		_, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, "cidr1", metav1.GetOptions{})
 		if err != nil && apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -211,14 +211,14 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	}
 
 	// add a new ServiceCIDR with a new range
-	_, err = client.NetworkingV1beta1().ServiceCIDRs().Create(ctx, makeServiceCIDR("cidr2", cidr2, ""), metav1.CreateOptions{})
+	_, err = client.NetworkingV1().ServiceCIDRs().Create(ctx, makeServiceCIDR("cidr2", cidr2, ""), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// wait the allocator process the new ServiceCIDR
 	// Wait until is ready.
 	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
-		cidr, err := client.NetworkingV1beta1().ServiceCIDRs().Get(ctx, "cidr2", metav1.GetOptions{})
+		cidr, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, "cidr2", metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -237,13 +237,13 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	}
 
 	// add a new ServiceCIDR that overlaps the existing one
-	_, err = client.NetworkingV1beta1().ServiceCIDRs().Create(ctx, makeServiceCIDR("cidr3", cidr3, ""), metav1.CreateOptions{})
+	_, err = client.NetworkingV1().ServiceCIDRs().Create(ctx, makeServiceCIDR("cidr3", cidr3, ""), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Wait until is ready.
 	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
-		cidr, err := client.NetworkingV1beta1().ServiceCIDRs().Get(ctx, "cidr3", metav1.GetOptions{})
+		cidr, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, "cidr3", metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -252,13 +252,13 @@ func TestServiceCIDRDeletion(t *testing.T) {
 		t.Fatalf("cidr3 is not ready")
 	}
 	// we should be able to delete the ServiceCIDR2 despite it contains IP addresses as it is contained on ServiceCIDR3
-	err = client.NetworkingV1beta1().ServiceCIDRs().Delete(ctx, "cidr2", metav1.DeleteOptions{})
+	err = client.NetworkingV1().ServiceCIDRs().Delete(ctx, "cidr2", metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
-		_, err := client.NetworkingV1beta1().ServiceCIDRs().Get(ctx, "cidr2", metav1.GetOptions{})
+		_, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, "cidr2", metav1.GetOptions{})
 		if err != nil && apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -268,18 +268,18 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	}
 
 	// serviceCIDR3 will not be able to be deleted until the IPAddress is removed
-	err = client.NetworkingV1beta1().ServiceCIDRs().Delete(ctx, "cidr3", metav1.DeleteOptions{})
+	err = client.NetworkingV1().ServiceCIDRs().Delete(ctx, "cidr3", metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Wait until is not ready.
 	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
-		cidr, err := client.NetworkingV1beta1().ServiceCIDRs().Get(ctx, "cidr3", metav1.GetOptions{})
+		cidr, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, "cidr3", metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
 		for _, condition := range cidr.Status.Conditions {
-			if condition.Type == networkingv1beta1.ServiceCIDRConditionReady {
+			if condition.Type == networkingv1.ServiceCIDRConditionReady {
 				return condition.Status == metav1.ConditionStatus(metav1.ConditionFalse), nil
 			}
 		}
@@ -295,7 +295,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 
 	// cidr3 must not exist
 	if err := wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
-		_, err := client.NetworkingV1beta1().ServiceCIDRs().Get(ctx, "cidr3", metav1.GetOptions{})
+		_, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, "cidr3", metav1.GetOptions{})
 		if err != nil && apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -305,12 +305,12 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	}
 }
 
-func makeServiceCIDR(name, primary, secondary string) *networkingv1beta1.ServiceCIDR {
-	serviceCIDR := &networkingv1beta1.ServiceCIDR{
+func makeServiceCIDR(name, primary, secondary string) *networkingv1.ServiceCIDR {
+	serviceCIDR := &networkingv1.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: networkingv1beta1.ServiceCIDRSpec{},
+		Spec: networkingv1.ServiceCIDRSpec{},
 	}
 	serviceCIDR.Spec.CIDRs = append(serviceCIDR.Spec.CIDRs, primary)
 	if secondary != "" {
@@ -334,13 +334,13 @@ func makeService(name string) *v1.Service {
 }
 
 // returns true of the ServiceCIDRConditionReady is true
-func isServiceCIDRReady(serviceCIDR *networkingv1beta1.ServiceCIDR) bool {
+func isServiceCIDRReady(serviceCIDR *networkingv1.ServiceCIDR) bool {
 	if serviceCIDR == nil {
 		return false
 	}
 
 	for _, condition := range serviceCIDR.Status.Conditions {
-		if condition.Type == networkingv1beta1.ServiceCIDRConditionReady {
+		if condition.Type == networkingv1.ServiceCIDRConditionReady {
 			return condition.Status == metav1.ConditionStatus(metav1.ConditionTrue)
 		}
 	}

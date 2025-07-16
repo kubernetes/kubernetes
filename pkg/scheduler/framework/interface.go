@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/go-cmp/cmp"         //nolint:depguard
+	"github.com/google/go-cmp/cmp/cmpopts" //nolint:depguard
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -227,8 +227,8 @@ const (
 	// Pending means that the scheduling process is finished successfully,
 	// but the plugin wants to stop the scheduling cycle/binding cycle here.
 	//
-	// For example, the DRA plugin sometimes needs to wait for the external device driver
-	// to provision the resource for the Pod.
+	// For example, if your plugin has to notify the scheduling result to an external component,
+	// and wait for it to complete something **before** binding.
 	// It's different from when to return Unschedulable/UnschedulableAndUnresolvable,
 	// because in this case, the scheduler decides where the Pod can go successfully,
 	// but we need to wait for the external component to do something based on that scheduling result.
@@ -609,7 +609,7 @@ type ScorePlugin interface {
 	// Score is called on each filtered node. It must return success and an integer
 	// indicating the rank of the node. All scoring plugins must return success or
 	// the pod will be rejected.
-	Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (int64, *Status)
+	Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeInfo *NodeInfo) (int64, *Status)
 
 	// ScoreExtensions returns a ScoreExtensions interface if it implements one, or nil if does not.
 	ScoreExtensions() ScoreExtensions

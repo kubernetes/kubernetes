@@ -437,13 +437,10 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		})
 
 		ginkgo.By("Updating a validating webhook configuration's rules to not include the create operation")
-		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			h, err := admissionClient.ValidatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
-			framework.ExpectNoError(err, "Getting validating webhook configuration")
-			h.Webhooks[0].Rules[0].Operations = []admissionregistrationv1.OperationType{admissionregistrationv1.Update}
-			_, err = admissionClient.ValidatingWebhookConfigurations().Update(ctx, h, metav1.UpdateOptions{})
-			return err
-		})
+		notIncludeCreateOperationFn := func(c *admissionregistrationv1.ValidatingWebhookConfiguration) {
+			c.Webhooks[0].Rules[0].Operations = []admissionregistrationv1.OperationType{admissionregistrationv1.Update}
+		}
+		_, err = updateValidatingWebhookConfigurations(ctx, client, f.UniqueName, notIncludeCreateOperationFn)
 		framework.ExpectNoError(err, "Updating validating webhook configuration")
 
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
@@ -743,9 +740,12 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 				Expression: "object.metadata.namespace == 'staging'",
 			},
 		}
-		validatingWebhookConfiguration.Webhooks[0].MatchConditions = updatedMatchConditions
-		_, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(ctx, validatingWebhookConfiguration, metav1.UpdateOptions{})
-		framework.ExpectNoError(err)
+
+		updateMatchConditionsFn := func(c *admissionregistrationv1.ValidatingWebhookConfiguration) {
+			c.Webhooks[0].MatchConditions = updatedMatchConditions
+		}
+		_, err = updateValidatingWebhookConfigurations(ctx, client, f.UniqueName, updateMatchConditionsFn)
+		framework.ExpectNoError(err, "Updating validating webhook configuration")
 
 		ginkgo.By("verifying the validating webhook match conditions")
 		validatingWebhookConfiguration, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, f.UniqueName, metav1.GetOptions{})
@@ -794,8 +794,11 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 				Expression: "object.metadata.namespace == 'staging'",
 			},
 		}
-		mutatingWebhookConfiguration.Webhooks[0].MatchConditions = updatedMatchConditions
-		_, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(ctx, mutatingWebhookConfiguration, metav1.UpdateOptions{})
+
+		updateMatchConditionsFn := func(c *admissionregistrationv1.MutatingWebhookConfiguration) {
+			c.Webhooks[0].MatchConditions = updatedMatchConditions
+		}
+		_, err = updateMutatingWebhookConfigurations(ctx, client, f.UniqueName, updateMatchConditionsFn)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("verifying the mutating webhook match conditions")
@@ -1912,6 +1915,38 @@ func updateConfigMap(ctx context.Context, c clientset.Interface, ns, name string
 		return false, nil
 	})
 	return cm, pollErr
+}
+
+type updateValidatingWebhookConfigurationsFn func(c *admissionregistrationv1.ValidatingWebhookConfiguration)
+
+func updateValidatingWebhookConfigurations(ctx context.Context, client clientset.Interface, name string,
+	update updateValidatingWebhookConfigurationsFn) (*admissionregistrationv1.ValidatingWebhookConfiguration, error) {
+	var config *admissionregistrationv1.ValidatingWebhookConfiguration
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		config, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Getting validating webhook configuration")
+		update(config)
+		config, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(ctx, config, metav1.UpdateOptions{})
+		return err
+	})
+	return config, err
+}
+
+type updateMutatingWebhookConfigurationsFn func(c *admissionregistrationv1.MutatingWebhookConfiguration)
+
+func updateMutatingWebhookConfigurations(ctx context.Context, client clientset.Interface, name string,
+	update updateMutatingWebhookConfigurationsFn) (*admissionregistrationv1.MutatingWebhookConfiguration, error) {
+	var config *admissionregistrationv1.MutatingWebhookConfiguration
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		config, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Get(ctx, name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Getting mutating webhook configuration")
+		update(config)
+		config, err = client.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(ctx, config, metav1.UpdateOptions{})
+		return err
+	})
+	return config, err
 }
 
 type updateCustomResourceFn func(cm *unstructured.Unstructured)

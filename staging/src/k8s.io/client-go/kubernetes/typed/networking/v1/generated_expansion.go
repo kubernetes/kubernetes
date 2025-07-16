@@ -18,8 +18,12 @@ limitations under the License.
 
 package v1
 
+type IPAddressExpansion interface{}
+
 type IngressExpansion interface{}
 
 type IngressClassExpansion interface{}
 
 type NetworkPolicyExpansion interface{}
+
+type ServiceCIDRExpansion interface{}

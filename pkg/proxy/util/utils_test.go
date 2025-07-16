@@ -27,21 +27,6 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-func TestValidateWorks(t *testing.T) {
-	if isValidEndpoint("", 0) {
-		t.Errorf("Didn't fail for empty set")
-	}
-	if isValidEndpoint("foobar", 0) {
-		t.Errorf("Didn't fail with invalid port")
-	}
-	if isValidEndpoint("foobar", -1) {
-		t.Errorf("Didn't fail with a negative port")
-	}
-	if !isValidEndpoint("foobar", 8080) {
-		t.Errorf("Failed a valid config.")
-	}
-}
-
 func TestShouldSkipService(t *testing.T) {
 	testCases := []struct {
 		service    *v1.Service

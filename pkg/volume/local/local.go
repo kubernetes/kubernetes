@@ -610,7 +610,9 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 	if !m.readOnly {
 		// Volume owner will be written only once on the first volume mount
 		if len(refs) == 0 {
-			return volume.SetVolumeOwnership(m, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(m.plugin, nil))
+			ownershipChanger := volume.NewVolumeOwnership(m, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(m.plugin, nil))
+			ownershipChanger.AddProgressNotifier(m.pod, mounterArgs.Recorder)
+			return ownershipChanger.ChangePermissions()
 		}
 	}
 	return nil

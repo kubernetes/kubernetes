@@ -63,8 +63,15 @@ func (s *balancedAllocationPreScoreState) Clone() framework.StateData {
 
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
 func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
+	podRequests := ba.calculatePodResourceRequestList(pod, ba.resources)
+	if ba.isBestEffortPod(podRequests) {
+		// Skip BalancedAllocation scoring for best-effort pods to
+		// prevent a large number of pods from being scheduled to the same node.
+		// See https://github.com/kubernetes/kubernetes/issues/129138 for details.
+		return framework.NewStatus(framework.Skip)
+	}
 	state := &balancedAllocationPreScoreState{
-		podRequests: ba.calculatePodResourceRequestList(pod, ba.resources),
+		podRequests: podRequests,
 	}
 	cycleState.Write(balancedAllocationPreScoreStateKey, state)
 	return nil
@@ -89,15 +96,13 @@ func (ba *BalancedAllocation) Name() string {
 }
 
 // Score invoked at the score extension point.
-func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, err := ba.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
-	if err != nil {
-		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
-	}
-
+func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	s, err := getBalancedAllocationPreScoreState(state)
 	if err != nil {
 		s = &balancedAllocationPreScoreState{podRequests: ba.calculatePodResourceRequestList(pod, ba.resources)}
+		if ba.isBestEffortPod(s.podRequests) {
+			return 0, nil
+		}
 	}
 
 	// ba.score favors nodes with balanced resource usage rate.
@@ -127,10 +132,12 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h framework
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			Name:         BalancedAllocationName,
-			scorer:       balancedResourceScorer,
-			useRequested: true,
-			resources:    args.Resources,
+			Name:                            BalancedAllocationName,
+			enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
+			enablePodLevelResources:         fts.EnablePodLevelResources,
+			scorer:                          balancedResourceScorer,
+			useRequested:                    true,
+			resources:                       args.Resources,
 		},
 	}, nil
 }
@@ -157,7 +164,6 @@ func balancedResourceScorer(requested, allocable []int64) int64 {
 	// Otherwise, set the std to zero is enough.
 	if len(resourceToFractions) == 2 {
 		std = math.Abs((resourceToFractions[0] - resourceToFractions[1]) / 2)
-
 	} else if len(resourceToFractions) > 2 {
 		mean := totalFraction / float64(len(resourceToFractions))
 		var sum float64

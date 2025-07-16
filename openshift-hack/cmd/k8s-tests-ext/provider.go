@@ -30,9 +30,41 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/lifecycle"
 )
 
-// copied directly from github.com/openshift/origin/cmd/openshift-tests/provider.go
-// and github.com/openshift/origin/test/extended/util/test.go
-func initializeTestFramework(provider string) error {
+// Initialize a good enough test context for generating e2e tests,
+// so they can be listed and filtered.
+func initializeCommonTestFramework() error {
+	// update testContext with loaded config
+	testContext := &framework.TestContext
+	testContext.AllowedNotReadyNodes = -1
+	testContext.MinStartupPods = -1
+	testContext.MaxNodesToGather = 0
+	testContext.KubeConfig = os.Getenv("KUBECONFIG")
+
+	if ad := os.Getenv("ARTIFACT_DIR"); len(strings.TrimSpace(ad)) == 0 {
+		os.Setenv("ARTIFACT_DIR", filepath.Join(os.TempDir(), "artifacts"))
+	}
+
+	testContext.DeleteNamespace = os.Getenv("DELETE_NAMESPACE") != "false"
+	testContext.VerifyServiceAccount = true
+	testfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
+	testfiles.AddFileSource(testfixtures.GetTestFixturesFS())
+	testfiles.AddFileSource(conformancetestdata.GetConformanceTestdataFS())
+	testContext.KubectlPath = "kubectl"
+	// context.KubeConfig = KubeConfigPath()
+	testContext.KubeConfig = os.Getenv("KUBECONFIG")
+
+	// "debian" is used when not set. At least GlusterFS tests need "custom".
+	// (There is no option for "rhel" or "centos".)
+	testContext.NodeOSDistro = "custom"
+	testContext.MasterOSDistro = "custom"
+
+	return nil
+}
+
+// Finish test context initialization. This is called before a real test is going to run.
+// It parses the cloud provider and file other parameters that are needed for running
+// already generated tests.
+func updateTestFrameworkForTests(provider string) error {
 	providerInfo := &ClusterConfiguration{}
 	if err := json.Unmarshal([]byte(provider), &providerInfo); err != nil {
 		return fmt.Errorf("provider must be a JSON object with the 'type' key at a minimum: %v", err)
@@ -58,38 +90,12 @@ func initializeTestFramework(provider string) error {
 		MultiZone:   config.MultiZone,
 		ConfigFile:  config.ConfigFile,
 	}
-	testContext.AllowedNotReadyNodes = -1
-	testContext.MinStartupPods = -1
-	testContext.MaxNodesToGather = 0
-	testContext.KubeConfig = os.Getenv("KUBECONFIG")
 
-	// allow the CSI tests to access test data, but only briefly
-	// TODO: ideally CSI would not use any of these test methods
-	// var err error
-	// exutil.WithCleanup(func() { err = initCSITests(dryRun) })
-	// TODO: for now I'm only initializing CSI directly, but we probably need that
-	// WithCleanup here as well
-	if err := initCSITests(); err != nil {
-		return err
+	// these constants are taken from kube e2e and used by tests
+	testContext.IPFamily = "ipv4"
+	if config.HasIPv6 && !config.HasIPv4 {
+		testContext.IPFamily = "ipv6"
 	}
-
-	if ad := os.Getenv("ARTIFACT_DIR"); len(strings.TrimSpace(ad)) == 0 {
-		os.Setenv("ARTIFACT_DIR", filepath.Join(os.TempDir(), "artifacts"))
-	}
-
-	testContext.DeleteNamespace = os.Getenv("DELETE_NAMESPACE") != "false"
-	testContext.VerifyServiceAccount = true
-	testfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
-	testfiles.AddFileSource(testfixtures.GetTestFixturesFS())
-	testfiles.AddFileSource(conformancetestdata.GetConformanceTestdataFS())
-	testContext.KubectlPath = "kubectl"
-	// context.KubeConfig = KubeConfigPath()
-	testContext.KubeConfig = os.Getenv("KUBECONFIG")
-
-	// "debian" is used when not set. At least GlusterFS tests need "custom".
-	// (There is no option for "rhel" or "centos".)
-	testContext.NodeOSDistro = "custom"
-	testContext.MasterOSDistro = "custom"
 
 	// load and set the host variable for kubectl
 	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&clientcmd.ClientConfigLoadingRules{ExplicitPath: testContext.KubeConfig}, &clientcmd.ConfigOverrides{})
@@ -108,14 +114,17 @@ func initializeTestFramework(provider string) error {
 
 	framework.AfterReadingAllFlags(testContext)
 	testContext.DumpLogsOnFailure = true
-
-	// these constants are taken from kube e2e and used by tests
-	testContext.IPFamily = "ipv4"
-	if config.HasIPv6 && !config.HasIPv4 {
-		testContext.IPFamily = "ipv6"
-	}
-
 	testContext.ReportDir = os.Getenv("TEST_JUNIT_DIR")
+
+	// allow the CSI tests to access test data, but only briefly
+	// TODO: ideally CSI would not use any of these test methods
+	// var err error
+	// exutil.WithCleanup(func() { err = initCSITests(dryRun) })
+	// TODO: for now I'm only initializing CSI directly, but we probably need that
+	// WithCleanup here as well
+	if err := initCSITests(); err != nil {
+		return err
+	}
 
 	return nil
 }

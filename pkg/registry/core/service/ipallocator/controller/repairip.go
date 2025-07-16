@@ -23,17 +23,17 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	networkinginformers "k8s.io/client-go/informers/networking/v1beta1"
+	networkinginformers "k8s.io/client-go/informers/networking/v1"
 	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	networkinglisters "k8s.io/client-go/listers/networking/v1beta1"
+	networkinglisters "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
@@ -263,7 +263,7 @@ func (r *RepairIPAddress) doRunOnce() error {
 	// Check that there is no IP created by the allocator without
 	// a Service associated.
 	ipLabelSelector := labels.Set(map[string]string{
-		networkingv1beta1.LabelManagedBy: ipallocator.ControllerName,
+		networkingv1.LabelManagedBy: ipallocator.ControllerName,
 	}).AsSelectorPreValidated()
 	ipAddresses, err := r.ipAddressLister.List(ipLabelSelector)
 	if err != nil {
@@ -360,7 +360,7 @@ func (r *RepairIPAddress) syncService(key string) error {
 			// ClusterIP doesn't seem to be allocated, create it.
 			r.recorder.Eventf(svc, nil, v1.EventTypeWarning, "ClusterIPNotAllocated", "ClusterIPAllocation", "Cluster IP [%v]: %s is not allocated; repairing", family, ip)
 			runtime.HandleError(fmt.Errorf("the ClusterIP [%v]: %s for Service %s/%s is not allocated; repairing", family, ip, svc.Namespace, svc.Name))
-			_, err := r.client.NetworkingV1beta1().IPAddresses().Create(context.Background(), newIPAddress(ip.String(), svc), metav1.CreateOptions{})
+			_, err := r.client.NetworkingV1().IPAddresses().Create(context.Background(), newIPAddress(ip.String(), svc), metav1.CreateOptions{})
 			if err != nil {
 				return err
 			}
@@ -417,11 +417,11 @@ func (r *RepairIPAddress) syncService(key string) error {
 }
 
 func (r *RepairIPAddress) recreateIPAddress(name string, svc *v1.Service) error {
-	err := r.client.NetworkingV1beta1().IPAddresses().Delete(context.Background(), name, metav1.DeleteOptions{})
+	err := r.client.NetworkingV1().IPAddresses().Delete(context.Background(), name, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	_, err = r.client.NetworkingV1beta1().IPAddresses().Create(context.Background(), newIPAddress(name, svc), metav1.CreateOptions{})
+	_, err = r.client.NetworkingV1().IPAddresses().Create(context.Background(), newIPAddress(name, svc), metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -482,7 +482,7 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 	if ipAddress.Spec.ParentRef.Group != "" || ipAddress.Spec.ParentRef.Resource != "services" {
 		runtime.HandleError(fmt.Errorf("IPAddress %s appears to have been modified, not referencing a Service %v: cleaning up", ipAddress.Name, ipAddress.Spec.ParentRef))
 		r.recorder.Eventf(ipAddress, nil, v1.EventTypeWarning, "IPAddressNotAllocated", "IPAddressAllocation", "IPAddress %s appears to have been modified, not referencing a Service %v: cleaning up", ipAddress.Name, ipAddress.Spec.ParentRef)
-		err := r.client.NetworkingV1beta1().IPAddresses().Delete(context.Background(), ipAddress.Name, metav1.DeleteOptions{})
+		err := r.client.NetworkingV1().IPAddresses().Delete(context.Background(), ipAddress.Name, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -499,7 +499,7 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 		if ipLifetime > gracePeriod {
 			runtime.HandleError(fmt.Errorf("IPAddress %s appears to have leaked: cleaning up", ipAddress.Name))
 			r.recorder.Eventf(ipAddress, nil, v1.EventTypeWarning, "IPAddressNotAllocated", "IPAddressAllocation", "IPAddress: %s for Service %s/%s appears to have leaked: cleaning up", ipAddress.Name, ipAddress.Spec.ParentRef.Namespace, ipAddress.Spec.ParentRef.Name)
-			err := r.client.NetworkingV1beta1().IPAddresses().Delete(context.Background(), ipAddress.Name, metav1.DeleteOptions{})
+			err := r.client.NetworkingV1().IPAddresses().Delete(context.Background(), ipAddress.Name, metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -522,7 +522,7 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 	}
 	runtime.HandleError(fmt.Errorf("the IPAddress: %s for Service %s/%s has a wrong reference %#v; cleaning up", ipAddress.Name, svc.Name, svc.Namespace, ipAddress.Spec.ParentRef))
 	r.recorder.Eventf(ipAddress, nil, v1.EventTypeWarning, "IPAddressWrongReference", "IPAddressAllocation", "IPAddress: %s for Service %s/%s has a wrong reference; cleaning up", ipAddress.Name, svc.Namespace, svc.Name)
-	err = r.client.NetworkingV1beta1().IPAddresses().Delete(context.Background(), ipAddress.Name, metav1.DeleteOptions{})
+	err = r.client.NetworkingV1().IPAddresses().Delete(context.Background(), ipAddress.Name, metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -535,31 +535,31 @@ func (r *RepairIPAddress) isIPOutOfRange(ip net.IP) bool {
 	return len(servicecidr.ContainsIP(r.serviceCIDRLister, ip)) == 0
 }
 
-func newIPAddress(name string, svc *v1.Service) *networkingv1beta1.IPAddress {
+func newIPAddress(name string, svc *v1.Service) *networkingv1.IPAddress {
 	family := string(v1.IPv4Protocol)
 	if netutils.IsIPv6String(name) {
 		family = string(v1.IPv6Protocol)
 	}
-	return &networkingv1beta1.IPAddress{
+	return &networkingv1.IPAddress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				networkingv1beta1.LabelIPAddressFamily: family,
-				networkingv1beta1.LabelManagedBy:       ipallocator.ControllerName,
+				networkingv1.LabelIPAddressFamily: family,
+				networkingv1.LabelManagedBy:       ipallocator.ControllerName,
 			},
 		},
-		Spec: networkingv1beta1.IPAddressSpec{
+		Spec: networkingv1.IPAddressSpec{
 			ParentRef: serviceToRef(svc),
 		},
 	}
 }
 
-func serviceToRef(svc *v1.Service) *networkingv1beta1.ParentReference {
+func serviceToRef(svc *v1.Service) *networkingv1.ParentReference {
 	if svc == nil {
 		return nil
 	}
 
-	return &networkingv1beta1.ParentReference{
+	return &networkingv1.ParentReference{
 		Group:     "",
 		Resource:  "services",
 		Namespace: svc.Namespace,
@@ -576,16 +576,16 @@ func getFamilyByIP(ip net.IP) v1.IPFamily {
 
 // managedByController returns true if the controller of the provided
 // EndpointSlices is the EndpointSlice controller.
-func managedByController(ip *networkingv1beta1.IPAddress) bool {
-	managedBy, ok := ip.Labels[networkingv1beta1.LabelManagedBy]
+func managedByController(ip *networkingv1.IPAddress) bool {
+	managedBy, ok := ip.Labels[networkingv1.LabelManagedBy]
 	if !ok {
 		return false
 	}
 	return managedBy == ipallocator.ControllerName
 }
 
-func verifyIPAddressLabels(ip *networkingv1beta1.IPAddress) bool {
-	labelFamily, ok := ip.Labels[networkingv1beta1.LabelIPAddressFamily]
+func verifyIPAddressLabels(ip *networkingv1.IPAddress) bool {
+	labelFamily, ok := ip.Labels[networkingv1.LabelIPAddressFamily]
 	if !ok {
 		return false
 	}

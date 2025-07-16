@@ -77,7 +77,7 @@ type instrumentedScorePlugin struct {
 
 var _ framework.ScorePlugin = &instrumentedScorePlugin{}
 
-func (p *instrumentedScorePlugin) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (p *instrumentedScorePlugin) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	p.metric.Inc()
-	return p.ScorePlugin.Score(ctx, state, pod, nodeName)
+	return p.ScorePlugin.Score(ctx, state, pod, nodeInfo)
 }

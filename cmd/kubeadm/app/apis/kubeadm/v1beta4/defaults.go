@@ -299,6 +299,10 @@ func SetDefaults_UpgradeConfiguration(obj *UpgradeConfiguration) {
 		obj.Apply.ImagePullSerial = ptr.To(true)
 	}
 
+	if obj.Plan.EtcdUpgrade == nil {
+		obj.Plan.EtcdUpgrade = ptr.To(true)
+	}
+
 	if obj.Timeouts == nil {
 		obj.Timeouts = &Timeouts{}
 	}

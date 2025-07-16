@@ -182,21 +182,24 @@ func NewDisruptionControllerInternal(ctx context.Context,
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				DelayingQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
-					Clock: clock,
-					Name:  "disruption",
+					Logger: &logger,
+					Clock:  clock,
+					Name:   "disruption",
 				}),
 			},
 		),
 		recheckQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
-			Clock: clock,
-			Name:  "disruption_recheck",
+			Logger: &logger,
+			Clock:  clock,
+			Name:   "disruption_recheck",
 		}),
 		stalePodDisruptionQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				DelayingQueue: workqueue.NewTypedDelayingQueueWithConfig(workqueue.TypedDelayingQueueConfig[string]{
-					Clock: clock,
-					Name:  "stale_pod_disruption",
+					Logger: &logger,
+					Clock:  clock,
+					Name:   "stale_pod_disruption",
 				}),
 			},
 		),
@@ -481,7 +484,6 @@ func (dc *DisruptionController) addDB(logger klog.Logger, obj interface{}) {
 }
 
 func (dc *DisruptionController) updateDB(logger klog.Logger, old, cur interface{}) {
-	// TODO(mml) ignore updates where 'old' is equivalent to 'cur'.
 	pdb := cur.(*policy.PodDisruptionBudget)
 	logger.V(4).Info("Update DB", "podDisruptionBudget", klog.KObj(pdb))
 	dc.enqueuePdb(logger, pdb)
@@ -787,8 +789,9 @@ func (dc *DisruptionController) syncStalePodDisruption(ctx context.Context, key 
 
 	newPod := pod.DeepCopy()
 	updated := apipod.UpdatePodCondition(&newPod.Status, &v1.PodCondition{
-		Type:   v1.DisruptionTarget,
-		Status: v1.ConditionFalse,
+		Type:               v1.DisruptionTarget,
+		ObservedGeneration: apipod.GetPodObservedGenerationIfEnabledOnCondition(&newPod.Status, newPod.Generation, v1.DisruptionTarget),
+		Status:             v1.ConditionFalse,
 	})
 	if !updated {
 		return nil

@@ -326,7 +326,7 @@ func (o *DrainCmdOptions) RunDrain() error {
 		return err
 	}
 
-	drainedNodes := sets.NewString()
+	drainedNodes := sets.New[string]()
 	var fatal []error
 
 	remainingNodes := []string{}

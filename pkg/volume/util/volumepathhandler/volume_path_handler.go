@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -232,7 +233,7 @@ func (v VolumePathHandler) RemoveMapPath(mapPath string) error {
 	return nil
 }
 
-// IsSymlinkExist returns true if specified file exists and the type is symbolik link.
+// IsSymlinkExist returns true if specified file exists and the type is symbolik link or irregular file on Windows.
 // If file doesn't exist, or file exists but not symbolic link, return false with no error.
 // On other cases, return false with error from Lstat().
 func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
@@ -247,6 +248,10 @@ func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	}
 	// If file exits and it's symbolic link, return true and no error
 	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
+		return true, nil
+	}
+	// go1.23 behavior change: https://github.com/golang/go/issues/63703#issuecomment-2535941458
+	if (runtime.GOOS == "windows") && (fi.Mode()&os.ModeIrregular != 0) {
 		return true, nil
 	}
 	// If file exits but it's not symbolic link, return false and no error

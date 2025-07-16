@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.23.0-bullseye as builder
+# NOTE: this is just a default placeholder for convenience
+# To build this image properly, please invoke test/e2e/testing-manifests/auth/encrypt/run-e2e.sh
+ARG BUILDER_IMAGE=golang:latest
+FROM $BUILDER_IMAGE AS builder
 
 WORKDIR /workspace
 
@@ -23,6 +26,7 @@ WORKDIR /workspace/kms/internal/plugins/_mock
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
+ARG GOTOOLCHAIN
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH} GO111MODULE=on go build -a -o mock-kms-plugin plugin.go
 
 FROM alpine:latest

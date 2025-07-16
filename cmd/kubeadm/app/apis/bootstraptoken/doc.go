@@ -18,4 +18,4 @@ limitations under the License.
 
 // Package bootstraptoken contains an API and utilities wrapping the
 // "bootstrap.kubernetes.io/token" Secret type to ease its usage in kubeadm.
-package bootstraptoken // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken"
+package bootstraptoken

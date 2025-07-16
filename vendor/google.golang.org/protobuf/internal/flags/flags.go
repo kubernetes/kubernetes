@@ -6,7 +6,7 @@
 package flags
 
 // ProtoLegacy specifies whether to enable support for legacy functionality
-// such as MessageSets, weak fields, and various other obscure behavior
+// such as MessageSets, and various other obscure behavior
 // that is necessary to maintain backwards compatibility with proto1 or
 // the pre-release variants of proto2 and proto3.
 //

@@ -24,6 +24,11 @@ limitations under the License.
 //
 // A list of changes since v1beta3:
 //
+// v1.33:
+//   - Add an `EtcdUpgrade` field into `UpgradeConfiguration.Plan` that can be used to control whether the etcd upgrade plan
+//     should be displayed.
+//
+// v1.31:
 //   - Support custom environment variables in control plane components under `ClusterConfiguration`.
 //     Use `APIServer.ExtraEnvs`, `ControllerManager.ExtraEnvs`, `Scheduler.ExtraEnvs`, `Etcd.Local.ExtraEnvs`.
 //   - The `ResetConfiguration` API type is now supported in v1beta4. Users are able to reset a node by passing
@@ -60,7 +65,7 @@ limitations under the License.
 //
 // # Basics
 //
-// The preferred way to configure kubeadm is to pass an YAML configuration file with the --config option. Some of the
+// The preferred way to configure kubeadm is to pass a YAML configuration file with the --config option. Some of the
 // configuration options defined in the kubeadm config file are also available as command line flags, but only
 // the most common/simple use case are supported with this approach.
 //
@@ -351,4 +356,4 @@ limitations under the License.
 // The UpgradeConfiguration structure includes a few substructures that only apply to different subcommands of "kubeadm upgrade".
 // For example, the "apply" substructure will be used with the "kubeadm upgrade apply" subcommand and all other substructures
 // will be ignored in such a case.
-package v1beta4 // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+package v1beta4

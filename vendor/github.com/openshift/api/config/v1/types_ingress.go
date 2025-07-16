@@ -150,7 +150,7 @@ type AWSIngressSpec struct {
 	// +unionDiscriminator
 	// +kubebuilder:validation:Enum:=NLB;Classic
 	// +required
-	Type AWSLBType `json:"type,omitempty"`
+	Type AWSLBType `json:"type"`
 }
 
 type AWSLBType string

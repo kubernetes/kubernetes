@@ -18,4 +18,4 @@ limitations under the License.
 // +k8s:openapi-gen=true
 // +groupName=kubeproxy.config.k8s.io
 
-package v1alpha1 // import "k8s.io/kube-proxy/config/v1alpha1"
+package v1alpha1

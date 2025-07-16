@@ -45,13 +45,25 @@ func NewFilteredImageDigestMirrorSetInformer(client versioned.Interface, resyncP
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1().ImageDigestMirrorSets().List(context.TODO(), options)
+				return client.ConfigV1().ImageDigestMirrorSets().List(context.Background(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1().ImageDigestMirrorSets().Watch(context.TODO(), options)
+				return client.ConfigV1().ImageDigestMirrorSets().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ConfigV1().ImageDigestMirrorSets().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ConfigV1().ImageDigestMirrorSets().Watch(ctx, options)
 			},
 		},
 		&apiconfigv1.ImageDigestMirrorSet{},

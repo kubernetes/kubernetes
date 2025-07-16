@@ -2,8 +2,6 @@
 # enable an increasing amount of checks:
 # - golangci.yaml is the most permissive configuration. All existing code
 #   passed.
-# - golangci-strict.yaml adds checks that all new code in pull requests
-#   must pass.
 # - golangci-hints.yaml adds checks for code patterns where developer
 #   and reviewer may decide whether findings should get addressed before
 #   merging. Beware that the golangci-lint output includes also the
@@ -15,8 +13,6 @@
 
 run:
   timeout: 30m
-  skip-files:
-    - "^zz_generated.*"
 
 output:
   sort-results: true
@@ -33,6 +29,9 @@ issues:
     # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
     - ineffective break statement. Did you mean to break out of the outer loop
 
+  exclude-files:
+    - "^zz_generated.*"
+
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
     # exclude ineffassign linter for generated files for conversion
@@ -44,6 +43,12 @@ issues:
     - linters:
         - forbidigo
       text: should not be used because managedFields was removed
+      path: _test.go$
+
+    # Adding unversioned feature gates is allowed in tests
+    - linters:
+        - forbidigo
+      text: should not use Add, use AddVersioned instead
       path: _test.go$
 
     {{- if .Base}}
@@ -70,6 +75,27 @@ issues:
     - linters:
        - ginkgolinter
       text: use a function call in (Eventually|Consistently)
+
+    {{- if .Base}}
+
+    # Some of these seem legitimate, maybe better fix code (https://github.com/kubernetes/kubernetes/issues/130449).
+
+    - linters:
+        - govet
+      text: "lostcancel|printf"
+
+    - linters:
+        - ginkgolinter
+      text: "wrong error assertion. Consider using `gomega.(Eventually|Consistently)|wrong comparison assertion|wrong length assertion"
+
+    - linters:
+        - testifylint
+      text: "encoded-compare|error-nil|formatter"
+
+    - linters:
+        - gocritic
+      text: "append result not assigned to the same slice|put a space between `//` and comment text|sloppyLen|elseif|should rewrite switch statement to if statement|regexpMust|wrapperFunc: use strings.ReplaceAll|singleCaseSwitch|deprecatedComment|exitAfterDefer|captLocal|unlambda|underef|unslice|valSwap|typeSwitchVar"
+    {{- end}}
 
     # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
     - linters:
@@ -147,6 +173,7 @@ issues:
 linters:
   disable-all: {{if .Base -}} true {{- else -}} false {{- end}}
   enable: # please keep this alphabetized
+    - depguard
     - forbidigo
     - ginkgolinter
     - gocritic
@@ -164,11 +191,6 @@ linters:
   {{- if not .Base }}
     - usestdlibvars
   {{- end}}
-  {{- if .Strict}}
-  disable:
-    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008359
-    - errcheck
-  {{- end}}
 
 linters-settings: # please keep this alphabetized
   custom:
@@ -180,6 +202,16 @@ linters-settings: # please keep this alphabetized
       settings:
         config: |
           {{include "hack/logcheck.conf" | indent 10 | trim}}
+  depguard:
+    rules:
+      main:
+        files:
+          - $all
+          - "!$test"
+          - "!**/test/**"
+        deny:
+          - pkg: "github.com/google/go-cmp/cmp"
+            desc: "cmp is allowed only in test files"
   forbidigo:
     analyze-types: true
     forbid:
@@ -189,6 +221,9 @@ linters-settings: # please keep this alphabetized
     - p: \.Extract
       pkg: ^k8s\.io/client-go/applyconfigurations/
       msg: should not be used because managedFields was removed
+    - p: \.Add$
+      pkg: ^k8s\.io/component-base/featuregate$
+      msg: should not use Add, use AddVersioned instead
     {{- if .Hints}}
     - p: ^gomega\.BeTrue$
       pkg: ^github.com/onsi/gomega$
@@ -228,7 +263,6 @@ linters-settings: # please keep this alphabetized
     disable:  # TODO: remove each disabled rule and fix it
       {{- if .Base }}
       - float-compare
-      - go-require
       {{- end}}
       - require-error
     {{- end}}

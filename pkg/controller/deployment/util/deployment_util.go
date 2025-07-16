@@ -714,6 +714,26 @@ func GetAvailableReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int3
 	return totalAvailableReplicas
 }
 
+// GetTerminatingReplicaCountForReplicaSets returns the number of terminating pods for all replica sets
+// or returns an error if any replica sets have been synced by the controller but do not report their terminating count.
+func GetTerminatingReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) *int32 {
+	terminatingReplicas := int32(0)
+	for _, rs := range replicaSets {
+		switch {
+		case rs == nil:
+			// No-op
+		case rs.Status.ObservedGeneration == 0 && rs.Status.TerminatingReplicas == nil:
+			// Replicasets that have never been synced by the controller don't contribute to TerminatingReplicas
+		case rs.Status.TerminatingReplicas == nil:
+			// If any replicaset synced by the controller hasn't reported TerminatingReplicas, we cannot calculate a sum
+			return nil
+		default:
+			terminatingReplicas += *rs.Status.TerminatingReplicas
+		}
+	}
+	return &terminatingReplicas
+}
+
 // IsRollingUpdate returns true if the strategy type is a rolling update.
 func IsRollingUpdate(deployment *apps.Deployment) bool {
 	return deployment.Spec.Strategy.Type == apps.RollingUpdateDeploymentStrategyType

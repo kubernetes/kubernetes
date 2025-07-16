@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package storagemigration provides Registry interface and its RESTStorage
 // implementation for storing StorageVersionMigration objects.
-package storagemigration // import "k8s.io/kubernetes/pkg/registry/storagemigration/storagemigration"
+package storagemigration
 
 import (
 	"context"

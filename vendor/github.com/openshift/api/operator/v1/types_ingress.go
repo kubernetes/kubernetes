@@ -1401,7 +1401,7 @@ type IngressControllerCaptureHTTPCookieUnion struct {
 	//
 	// +unionDiscriminator
 	// +required
-	MatchType CookieMatchType `json:"matchType,omitempty"`
+	MatchType CookieMatchType `json:"matchType"`
 
 	// name specifies a cookie name.  Its value must be a valid HTTP cookie
 	// name as defined in RFC 6265 section 4.1.
@@ -1554,7 +1554,6 @@ type IngressControllerHTTPUniqueIdHeaderPolicy struct {
 // (for example, "X-Forwarded-For") in the desired capitalization.  The value
 // must be a valid HTTP header name as defined in RFC 2616 section 4.2.
 //
-// +optional
 // +kubebuilder:validation:Pattern="^$|^[-!#$%&'*+.0-9A-Z^_`a-z|~]+$"
 // +kubebuilder:validation:MinLength=0
 // +kubebuilder:validation:MaxLength=1024
@@ -2021,17 +2020,21 @@ var (
 type IngressControllerStatus struct {
 	// availableReplicas is number of observed available replicas according to the
 	// ingress controller deployment.
+	// +optional
 	AvailableReplicas int32 `json:"availableReplicas"`
 
 	// selector is a label selector, in string format, for ingress controller pods
 	// corresponding to the IngressController. The number of matching pods should
 	// equal the value of availableReplicas.
+	// +optional
 	Selector string `json:"selector"`
 
 	// domain is the actual domain in use.
+	// +optional
 	Domain string `json:"domain"`
 
 	// endpointPublishingStrategy is the actual strategy in use.
+	// +optional
 	EndpointPublishingStrategy *EndpointPublishingStrategy `json:"endpointPublishingStrategy,omitempty"`
 
 	// conditions is a list of conditions and their status.
@@ -2068,6 +2071,7 @@ type IngressControllerStatus struct {
 	//   - False if any of those conditions are unsatisfied.
 	// +listType=map
 	// +listMapKey=type
+	// +optional
 	Conditions []OperatorCondition `json:"conditions,omitempty"`
 
 	// tlsProfile is the TLS connection configuration that is in effect.

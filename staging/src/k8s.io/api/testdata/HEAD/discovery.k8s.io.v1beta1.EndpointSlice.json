@@ -73,6 +73,11 @@
           {
             "name": "nameValue"
           }
+        ],
+        "forNodes": [
+          {
+            "name": "nameValue"
+          }
         ]
       }
     }

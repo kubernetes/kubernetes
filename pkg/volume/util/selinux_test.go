@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -303,8 +304,12 @@ func TestGetMountSELinuxLabel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
-			for _, fg := range tt.featureGates {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, true)
+			// Set feature gates for the test. *Disable* those that are not in tt.featureGates.
+			allGates := []featuregate.Feature{features.SELinuxChangePolicy, features.SELinuxMount}
+			enabledGates := sets.New(tt.featureGates...)
+			for _, fg := range allGates {
+				enable := enabledGates.Has(fg)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, enable)
 			}
 			seLinuxTranslator := NewFakeSELinuxLabelTranslator()
 			pluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)

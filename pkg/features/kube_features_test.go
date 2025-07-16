@@ -28,7 +28,7 @@ import (
 func TestKubeFeaturesRegistered(t *testing.T) {
 	registeredFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
 
-	for featureName := range defaultKubernetesFeatureGates {
+	for featureName := range defaultVersionedKubernetesFeatureGates {
 		if _, ok := registeredFeatures[featureName]; !ok {
 			t.Errorf("The feature gate %q is not registered in the DefaultFeatureGate", featureName)
 		}
@@ -59,9 +59,6 @@ func TestAllRegisteredFeaturesExpected(t *testing.T) {
 	if err := clientfeatures.AddFeaturesToExistingFeatureGates(&clientAdapter{knownFeatureGates}); err != nil {
 		t.Fatal(err)
 	}
-	if err := knownFeatureGates.Add(defaultKubernetesFeatureGates); err != nil {
-		t.Fatal(err)
-	}
 	if err := knownFeatureGates.AddVersioned(defaultVersionedKubernetesFeatureGates); err != nil {
 		t.Fatal(err)
 	}
@@ -70,6 +67,31 @@ func TestAllRegisteredFeaturesExpected(t *testing.T) {
 	for registeredFeature := range registeredFeatures {
 		if _, ok := knownFeatures[registeredFeature]; !ok {
 			t.Errorf("The feature gate %q is not from known feature gates", registeredFeature)
+		}
+	}
+}
+func TestEnsureAlphaGatesAreNotSwitchedOnByDefault(t *testing.T) {
+	checkAlphaGates := func(feature featuregate.Feature, spec featuregate.FeatureSpec) {
+		// FIXME(dims): remove this check when WindowsHostNetwork is fixed up or removed
+		// entirely. Please do NOT add more entries here.
+		if feature == "WindowsHostNetwork" {
+			return
+		}
+		// OpenShift-specific
+		if feature == "NodeLogQuery" {
+			return
+		}
+		if spec.PreRelease == featuregate.Alpha && spec.Default {
+			t.Errorf("The alpha feature gate %q is switched on by default", feature)
+		}
+		if spec.PreRelease == featuregate.Alpha && spec.LockToDefault {
+			t.Errorf("The alpha feature gate %q is locked to default", feature)
+		}
+	}
+
+	for feature, specs := range defaultVersionedKubernetesFeatureGates {
+		for _, spec := range specs {
+			checkAlphaGates(feature, spec)
 		}
 	}
 }

@@ -45,13 +45,25 @@ func NewFilteredClusterImagePolicyInformer(client versioned.Interface, resyncPer
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1alpha1().ClusterImagePolicies().List(context.TODO(), options)
+				return client.ConfigV1alpha1().ClusterImagePolicies().List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ConfigV1alpha1().ClusterImagePolicies().Watch(context.TODO(), options)
+				return client.ConfigV1alpha1().ClusterImagePolicies().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ConfigV1alpha1().ClusterImagePolicies().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.ConfigV1alpha1().ClusterImagePolicies().Watch(ctx, options)
 			},
 		},
 		&apiconfigv1alpha1.ClusterImagePolicy{},

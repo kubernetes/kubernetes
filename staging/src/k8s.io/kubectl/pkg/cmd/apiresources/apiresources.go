@@ -123,11 +123,11 @@ func NewCmdAPIResources(restClientGetter genericclioptions.RESTClientGetter, ioS
 
 // Validate checks to the APIResourceOptions to see if there is sufficient information run the command
 func (o *APIResourceOptions) Validate() error {
-	supportedOutputTypes := sets.NewString("", "wide", "name")
+	supportedOutputTypes := sets.New[string]("", "wide", "name")
 	if !supportedOutputTypes.Has(o.Output) {
 		return fmt.Errorf("--output %v is not available", o.Output)
 	}
-	supportedSortTypes := sets.NewString("", "name", "kind")
+	supportedSortTypes := sets.New[string]("", "name", "kind")
 	if len(o.SortBy) > 0 {
 		if !supportedSortTypes.Has(o.SortBy) {
 			return fmt.Errorf("--sort-by accepts only name or kind")
@@ -193,11 +193,11 @@ func (o *APIResourceOptions) RunAPIResources() error {
 				continue
 			}
 			// filter to resources that support the specified verbs
-			if len(o.Verbs) > 0 && !sets.NewString(resource.Verbs...).HasAll(o.Verbs...) {
+			if len(o.Verbs) > 0 && !sets.New[string](resource.Verbs...).HasAll(o.Verbs...) {
 				continue
 			}
 			// filter to resources that belong to the specified categories
-			if len(o.Categories) > 0 && !sets.NewString(resource.Categories...).HasAll(o.Categories...) {
+			if len(o.Categories) > 0 && !sets.New[string](resource.Categories...).HasAll(o.Categories...) {
 				continue
 			}
 			resources = append(resources, groupResource{

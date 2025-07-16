@@ -24,6 +24,10 @@ func (c *FakeConfigV1) Builds() v1.BuildInterface {
 	return newFakeBuilds(c)
 }
 
+func (c *FakeConfigV1) ClusterImagePolicies() v1.ClusterImagePolicyInterface {
+	return newFakeClusterImagePolicies(c)
+}
+
 func (c *FakeConfigV1) ClusterOperators() v1.ClusterOperatorInterface {
 	return newFakeClusterOperators(c)
 }
@@ -54,6 +58,10 @@ func (c *FakeConfigV1) ImageContentPolicies() v1.ImageContentPolicyInterface {
 
 func (c *FakeConfigV1) ImageDigestMirrorSets() v1.ImageDigestMirrorSetInterface {
 	return newFakeImageDigestMirrorSets(c)
+}
+
+func (c *FakeConfigV1) ImagePolicies(namespace string) v1.ImagePolicyInterface {
+	return newFakeImagePolicies(c, namespace)
 }
 
 func (c *FakeConfigV1) ImageTagMirrorSets() v1.ImageTagMirrorSetInterface {

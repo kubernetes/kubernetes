@@ -926,7 +926,9 @@ func TestNodeDeletionReleaseCIDR(t *testing.T) {
 			rangeAllocator.nodesSynced = test.AlwaysReady
 			rangeAllocator.recorder = testutil.NewFakeRecorder()
 
-			rangeAllocator.syncNode(tCtx, tc.nodeKey)
+			if err := rangeAllocator.syncNode(tCtx, tc.nodeKey); err != nil {
+				t.Fatalf("failed to run rangeAllocator.syncNode")
+			}
 
 			if len(rangeAllocator.cidrSets) != 1 {
 				t.Fatalf("Expected a single cidrSet, but got %d", len(rangeAllocator.cidrSets))

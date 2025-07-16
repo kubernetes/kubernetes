@@ -22,7 +22,7 @@ package e2enode
 import (
 	"fmt"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
 )
 

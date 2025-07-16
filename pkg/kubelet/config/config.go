@@ -456,6 +456,7 @@ func checkAndUpdatePod(existing, ref *v1.Pod) (needUpdate, needReconcile, needGr
 	existing.Labels = ref.Labels
 	existing.DeletionTimestamp = ref.DeletionTimestamp
 	existing.DeletionGracePeriodSeconds = ref.DeletionGracePeriodSeconds
+	existing.Generation = ref.Generation
 	existing.Status = ref.Status
 	updateAnnotations(existing, ref)
 

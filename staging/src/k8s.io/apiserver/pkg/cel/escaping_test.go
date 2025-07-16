@@ -19,9 +19,10 @@ package cel
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 )
 
 // TestEscaping tests that property names are escaped as expected.
@@ -142,10 +143,10 @@ func TestUnescapeMalformed(t *testing.T) {
 }
 
 func TestEscapingFuzz(t *testing.T) {
-	fuzzer := fuzz.New()
+	fuzzer := randfill.New()
 	for i := 0; i < 1000; i++ {
 		var unescaped string
-		fuzzer.Fuzz(&unescaped)
+		fuzzer.Fill(&unescaped)
 		t.Run(fmt.Sprintf("%d - '%s'", i, unescaped), func(t *testing.T) {
 			if len(unescaped) == 0 {
 				return
@@ -202,5 +203,13 @@ func TestCanSkipRegex(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCELReservedSymbolsNoDoubleUnderscore(t *testing.T) {
+	for symbol := range celReservedSymbols {
+		if strings.Contains(symbol, "__") {
+			t.Errorf("CEL reserved symbol '%s' contains '__', which is not allowed as it would interfere with escaping", symbol)
+		}
 	}
 }

@@ -10,9 +10,9 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
-	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/dbtime"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/flags"
 )
 
 // Walk iterates over all test specs, and executions the function provided. The test spec can be mutated.
@@ -38,6 +38,17 @@ func (specs ExtensionTestSpecs) Select(selectFn SelectFunction) ExtensionTestSpe
 	return filtered
 }
 
+// MustSelect filters the ExtensionTestSpecs to only those that match the provided SelectFunction.
+// if no specs are selected, it will throw an error
+func (specs ExtensionTestSpecs) MustSelect(selectFn SelectFunction) (ExtensionTestSpecs, error) {
+	filtered := specs.Select(selectFn)
+	if len(filtered) == 0 {
+		return filtered, fmt.Errorf("no specs selected with specified SelectFunctions")
+	}
+
+	return filtered, nil
+}
+
 // SelectAny filters the ExtensionTestSpecs to only those that match any of the provided SelectFunctions
 func (specs ExtensionTestSpecs) SelectAny(selectFns []SelectFunction) ExtensionTestSpecs {
 	filtered := ExtensionTestSpecs{}
@@ -51,6 +62,17 @@ func (specs ExtensionTestSpecs) SelectAny(selectFns []SelectFunction) ExtensionT
 	}
 
 	return filtered
+}
+
+// MustSelectAny filters the ExtensionTestSpecs to only those that match any of the provided SelectFunctions.
+// if no specs are selected, it will throw an error
+func (specs ExtensionTestSpecs) MustSelectAny(selectFns []SelectFunction) (ExtensionTestSpecs, error) {
+	filtered := specs.SelectAny(selectFns)
+	if len(filtered) == 0 {
+		return filtered, fmt.Errorf("no specs selected with specified SelectFunctions")
+	}
+
+	return filtered, nil
 }
 
 // SelectAll filters the ExtensionTestSpecs to only those that match all the provided SelectFunctions
@@ -70,6 +92,38 @@ func (specs ExtensionTestSpecs) SelectAll(selectFns []SelectFunction) ExtensionT
 	}
 
 	return filtered
+}
+
+// MustSelectAll filters the ExtensionTestSpecs to only those that match all the provided SelectFunctions.
+// if no specs are selected, it will throw an error
+func (specs ExtensionTestSpecs) MustSelectAll(selectFns []SelectFunction) (ExtensionTestSpecs, error) {
+	filtered := specs.SelectAll(selectFns)
+	if len(filtered) == 0 {
+		return filtered, fmt.Errorf("no specs selected with specified SelectFunctions")
+	}
+
+	return filtered, nil
+}
+
+// ModuleTestsOnly ensures that ginkgo tests from vendored sources aren't selected.
+func ModuleTestsOnly() SelectFunction {
+	return func(spec *ExtensionTestSpec) bool {
+		for _, cl := range spec.CodeLocations {
+			if strings.Contains(cl, "/vendor/") {
+				return false
+			}
+		}
+
+		return true
+	}
+}
+
+// AllTestsIncludingVendored is an alternative to ModuleTestsOnly, which would explicitly opt-in
+// to including vendored tests.
+func AllTestsIncludingVendored() SelectFunction {
+	return func(spec *ExtensionTestSpec) bool {
+		return true
+	}
 }
 
 // NameContains returns a function that selects specs whose name contains the provided string
@@ -251,6 +305,7 @@ func (specs ExtensionTestSpecs) Filter(celExprs []string) (ExtensionTestSpecs, e
 			decls.NewVar("name", decls.String),
 			decls.NewVar("originalName", decls.String),
 			decls.NewVar("labels", decls.NewListType(decls.String)),
+			decls.NewVar("codeLocations", decls.NewListType(decls.String)),
 			decls.NewVar("tags", decls.NewMapType(decls.String, decls.String)),
 		),
 	)
@@ -267,11 +322,12 @@ func (specs ExtensionTestSpecs) Filter(celExprs []string) (ExtensionTestSpecs, e
 				return nil, err
 			}
 			out, _, err := prg.Eval(map[string]interface{}{
-				"name":         spec.Name,
-				"source":       spec.Source,
-				"originalName": spec.OriginalName,
-				"labels":       spec.Labels.UnsortedList(),
-				"tags":         spec.Tags,
+				"name":          spec.Name,
+				"source":        spec.Source,
+				"originalName":  spec.OriginalName,
+				"labels":        spec.Labels.UnsortedList(),
+				"codeLocations": spec.CodeLocations,
+				"tags":          spec.Tags,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("error evaluating CEL expression: %v", err)
@@ -325,16 +381,18 @@ func (specs ExtensionTestSpecs) FilterByEnvironment(envFlags flags.Environmental
 
 	env, err := cel.NewEnv(
 		cel.Declarations(
-			decls.NewVar("platform", decls.String),
-			decls.NewVar("network", decls.String),
-			decls.NewVar("networkStack", decls.String),
-			decls.NewVar("upgrade", decls.String),
-			decls.NewVar("topology", decls.String),
+			decls.NewVar("apiGroups", decls.NewListType(decls.String)),
 			decls.NewVar("architecture", decls.String),
 			decls.NewVar("externalConnectivity", decls.String),
-			decls.NewVar("optionalCapabilities", decls.NewListType(decls.String)),
-			decls.NewVar("facts", decls.NewMapType(decls.String, decls.String)),
 			decls.NewVar("fact_keys", decls.NewListType(decls.String)),
+			decls.NewVar("facts", decls.NewMapType(decls.String, decls.String)),
+			decls.NewVar("featureGates", decls.NewListType(decls.String)),
+			decls.NewVar("network", decls.String),
+			decls.NewVar("networkStack", decls.String),
+			decls.NewVar("optionalCapabilities", decls.NewListType(decls.String)),
+			decls.NewVar("platform", decls.String),
+			decls.NewVar("topology", decls.String),
+			decls.NewVar("upgrade", decls.String),
 			decls.NewVar("version", decls.String),
 		),
 	)
@@ -346,16 +404,18 @@ func (specs ExtensionTestSpecs) FilterByEnvironment(envFlags flags.Environmental
 		factKeys = append(factKeys, k)
 	}
 	vars := map[string]interface{}{
-		"platform":             envFlags.Platform,
-		"network":              envFlags.Network,
-		"networkStack":         envFlags.NetworkStack,
-		"upgrade":              envFlags.Upgrade,
-		"topology":             envFlags.Topology,
+		"apiGroups":            envFlags.APIGroups,
 		"architecture":         envFlags.Architecture,
 		"externalConnectivity": envFlags.ExternalConnectivity,
-		"optionalCapabilities": envFlags.OptionalCapabilities,
-		"facts":                envFlags.Facts,
 		"fact_keys":            factKeys,
+		"facts":                envFlags.Facts,
+		"featureGates":         envFlags.FeatureGates,
+		"network":              envFlags.Network,
+		"networkStack":         envFlags.NetworkStack,
+		"optionalCapabilities": envFlags.OptionalCapabilities,
+		"platform":             envFlags.Platform,
+		"topology":             envFlags.Topology,
+		"upgrade":              envFlags.Upgrade,
 		"version":              envFlags.Version,
 	}
 

@@ -54,6 +54,9 @@ func runPreflight(c workflow.RunData) error {
 	if err := preflight.RunRootCheckOnly(data.IgnorePreflightErrors()); err != nil {
 		return err
 	}
+	if err := preflight.RunUpgradeChecks(data.IgnorePreflightErrors()); err != nil {
+		return err
+	}
 
 	// If this is a control-plane node, pull the basic images.
 	if data.IsControlPlaneNode() {

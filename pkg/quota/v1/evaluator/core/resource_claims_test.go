@@ -39,7 +39,38 @@ func testResourceClaim(name string, namespace string, spec api.ResourceClaimSpec
 
 func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	classGpu := "gpu"
-	validClaim := testResourceClaim("foo", "ns", api.ResourceClaimSpec{Devices: api.DeviceClaim{Requests: []api.DeviceRequest{{Name: "req-0", DeviceClassName: classGpu, AllocationMode: api.DeviceAllocationModeExactCount, Count: 1}}}})
+	classTpu := "tpu"
+	validClaim := testResourceClaim("foo", "ns", api.ResourceClaimSpec{
+		Devices: api.DeviceClaim{
+			Requests: []api.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &api.ExactDeviceRequest{
+						DeviceClassName: classGpu,
+						AllocationMode:  api.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				},
+			},
+		},
+	})
+	validClaimWithPrioritizedList := testResourceClaim("foo", "ns", api.ResourceClaimSpec{
+		Devices: api.DeviceClaim{
+			Requests: []api.DeviceRequest{
+				{
+					Name: "req-0",
+					FirstAvailable: []api.DeviceSubRequest{
+						{
+							Name:            "subreq-0",
+							DeviceClassName: classGpu,
+							AllocationMode:  api.DeviceAllocationModeExactCount,
+							Count:           1,
+						},
+					},
+				},
+			},
+		},
+	})
 
 	evaluator := NewResourceClaimEvaluator(nil)
 	testCases := map[string]struct {
@@ -70,7 +101,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		"count": {
 			claim: func() *api.ResourceClaim {
 				claim := validClaim.DeepCopy()
-				claim.Spec.Devices.Requests[0].Count = 5
+				claim.Spec.Devices.Requests[0].Exactly.Count = 5
 				return claim
 			}(),
 			usage: corev1.ResourceList{
@@ -81,7 +112,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		"all": {
 			claim: func() *api.ResourceClaim {
 				claim := validClaim.DeepCopy()
-				claim.Spec.Devices.Requests[0].AllocationMode = api.DeviceAllocationModeAll
+				claim.Spec.Devices.Requests[0].Exactly.AllocationMode = api.DeviceAllocationModeAll
 				return claim
 			}(),
 			usage: corev1.ResourceList{
@@ -92,7 +123,7 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		"unknown-count-mode": {
 			claim: func() *api.ResourceClaim {
 				claim := validClaim.DeepCopy()
-				claim.Spec.Devices.Requests[0].AllocationMode = "future-mode"
+				claim.Spec.Devices.Requests[0].Exactly.AllocationMode = "future-mode"
 				return claim
 			}(),
 			usage: corev1.ResourceList{
@@ -104,12 +135,67 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			claim: func() *api.ResourceClaim {
 				claim := validClaim.DeepCopy()
 				// Admins are *not* exempt from quota.
-				claim.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				claim.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 				return claim
 			}(),
 			usage: corev1.ResourceList{
 				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
 				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+			},
+		},
+		"prioritized-list": {
+			claim: validClaimWithPrioritizedList,
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+			},
+		},
+		"prioritized-list-multiple-subrequests": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaimWithPrioritizedList.DeepCopy()
+				claim.Spec.Devices.Requests[0].FirstAvailable[0].Count = 2
+				claim.Spec.Devices.Requests[0].FirstAvailable = append(claim.Spec.Devices.Requests[0].FirstAvailable, api.DeviceSubRequest{
+					Name:            "subreq-1",
+					DeviceClassName: classGpu,
+					AllocationMode:  api.DeviceAllocationModeExactCount,
+					Count:           1,
+				})
+				return claim
+			}(),
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("2"),
+			},
+		},
+		"prioritized-list-multiple-subrequests-allocation-mode-all": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaimWithPrioritizedList.DeepCopy()
+				claim.Spec.Devices.Requests[0].FirstAvailable = append(claim.Spec.Devices.Requests[0].FirstAvailable, api.DeviceSubRequest{
+					Name:            "subreq-1",
+					DeviceClassName: classGpu,
+					AllocationMode:  api.DeviceAllocationModeAll,
+				})
+				return claim
+			}(),
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("32"),
+			},
+		},
+		"prioritized-list-multiple-subrequests-different-device-classes": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaimWithPrioritizedList.DeepCopy()
+				claim.Spec.Devices.Requests[0].FirstAvailable = append(claim.Spec.Devices.Requests[0].FirstAvailable, api.DeviceSubRequest{
+					Name:            "subreq-1",
+					DeviceClassName: classTpu,
+					AllocationMode:  api.DeviceAllocationModeAll,
+				})
+				return claim
+			}(),
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+				"tpu.deviceclass.resource.k8s.io/devices": resource.MustParse("32"),
 			},
 		},
 	}

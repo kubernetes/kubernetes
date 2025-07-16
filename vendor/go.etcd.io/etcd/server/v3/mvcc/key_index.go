@@ -119,6 +119,15 @@ func (ki *keyIndex) restore(lg *zap.Logger, created, modified revision, ver int6
 	keysGauge.Inc()
 }
 
+// restoreTombstone is used to restore a tombstone revision, which is the only
+// revision so far for a key. We don't know the creating revision (i.e. already
+// compacted) of the key, so set it empty.
+func (ki *keyIndex) restoreTombstone(lg *zap.Logger, main, sub int64) {
+	ki.restore(lg, revision{}, revision{main, sub}, 1)
+	ki.generations = append(ki.generations, generation{})
+	keysGauge.Dec()
+}
+
 // tombstone puts a revision, pointing to a tombstone, to the keyIndex.
 // It also creates a new empty generation in the keyIndex.
 // It returns ErrRevisionNotFound when tombstone on an empty generation.

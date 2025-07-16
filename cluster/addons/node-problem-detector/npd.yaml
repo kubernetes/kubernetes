@@ -43,6 +43,8 @@ spec:
         app.kubernetes.io/name: node-problem-detector
         app.kubernetes.io/version: v0.8.20
     spec:
+      nodeSelectors:
+        kubernetes.io/os: linux
       containers:
       - name: node-problem-detector
         image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.20

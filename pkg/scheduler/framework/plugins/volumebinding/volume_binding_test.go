@@ -59,6 +59,22 @@ var (
 		},
 		VolumeBindingMode: &waitForFirstConsumer,
 	}
+	waitSCWithStorageCapacity = &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "wait-sc-with-storage-capacity",
+		},
+		Provisioner:       "driver-with-storage-capacity",
+		VolumeBindingMode: &waitForFirstConsumer,
+	}
+
+	driverWithStorageCapacity = &storagev1.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "driver-with-storage-capacity",
+		},
+		Spec: storagev1.CSIDriverSpec{
+			StorageCapacity: ptr.To(true),
+		},
+	}
 
 	defaultShapePoint = []config.UtilizationShapePoint{
 		{
@@ -79,6 +95,7 @@ func TestVolumeBinding(t *testing.T) {
 		nodes                   []*v1.Node
 		pvcs                    []*v1.PersistentVolumeClaim
 		pvs                     []*v1.PersistentVolume
+		capacities              []*storagev1.CSIStorageCapacity
 		fts                     feature.Features
 		args                    *config.VolumeBindingArgs
 		wantPreFilterResult     *framework.PreFilterResult
@@ -239,20 +256,6 @@ func TestVolumeBinding(t *testing.T) {
 			wantPreScoreStatus: framework.NewStatus(framework.Skip),
 		},
 		{
-			name: "pvc not found",
-			pod:  makePod("pod-a").withPVCVolume("pvc-a", "").Pod,
-			nodes: []*v1.Node{
-				makeNode("node-a").Node,
-			},
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-a" not found`),
-			wantFilterStatus: []*framework.Status{
-				nil,
-			},
-			wantScores: []int64{
-				0,
-			},
-		},
-		{
 			name: "pv not found",
 			pod:  makePod("pod-a").withPVCVolume("pvc-a", "").Pod,
 			nodes: []*v1.Node{
@@ -324,7 +327,7 @@ func TestVolumeBinding(t *testing.T) {
 					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-b"}}).PersistentVolume,
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
+				EnableStorageCapacityScoring: true,
 			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
@@ -414,7 +417,7 @@ func TestVolumeBinding(t *testing.T) {
 					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-b"}}).PersistentVolume,
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
+				EnableStorageCapacityScoring: true,
 			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
@@ -533,7 +536,7 @@ func TestVolumeBinding(t *testing.T) {
 					}).PersistentVolume,
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
+				EnableStorageCapacityScoring: true,
 			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
@@ -651,7 +654,7 @@ func TestVolumeBinding(t *testing.T) {
 					}).PersistentVolume,
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
+				EnableStorageCapacityScoring: true,
 			},
 			args: &config.VolumeBindingArgs{
 				BindTimeoutSeconds: 300,
@@ -730,6 +733,250 @@ func TestVolumeBinding(t *testing.T) {
 				0,
 			},
 		},
+		{
+			name: "storage capacity score",
+			pod:  makePod("pod-a").withPVCVolume("pvc-dynamic", "").Pod,
+			nodes: []*v1.Node{
+				makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node,
+				makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node,
+				makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node,
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+			},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("node-a", waitSCWithStorageCapacity.Name, makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node, "100Gi", ""),
+				makeCapacity("node-b", waitSCWithStorageCapacity.Name, makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node, "50Gi", ""),
+				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "10Gi", ""),
+			},
+			fts: feature.Features{
+				EnableStorageCapacityScoring: true,
+			},
+			wantPreFilterStatus: nil,
+			wantStateAfterPreFilter: &stateData{
+				podVolumeClaims: &PodVolumeClaims{
+					boundClaims: []*v1.PersistentVolumeClaim{},
+					unboundClaimsDelayBinding: []*v1.PersistentVolumeClaim{
+						makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+					},
+					unboundVolumesDelayBinding: map[string][]*v1.PersistentVolume{waitSCWithStorageCapacity.Name: {}},
+				},
+				podVolumesByNode: map[string]*PodVolumes{},
+			},
+			wantFilterStatus: []*framework.Status{
+				nil,
+				nil,
+				nil,
+			},
+			wantScores: []int64{
+				10,
+				20,
+				100,
+			},
+		},
+		{
+			name: "storage capacity score with static binds",
+			pod:  makePod("pod-a").withPVCVolume("pvc-dynamic", "").withPVCVolume("pvc-static", "").Pod,
+			nodes: []*v1.Node{
+				makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node,
+				makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node,
+				makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node,
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+				makePVC("pvc-static", waitSC.Name).withRequestStorage(resource.MustParse("50Gi")).PersistentVolumeClaim,
+			},
+			pvs: []*v1.PersistentVolume{
+				makePV("pv-static-a", waitSC.Name).
+					withPhase(v1.VolumeAvailable).
+					withCapacity(resource.MustParse("100Gi")).
+					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-a"}}).PersistentVolume,
+				makePV("pv-static-b", waitSC.Name).
+					withPhase(v1.VolumeAvailable).
+					withCapacity(resource.MustParse("100Gi")).
+					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-b"}}).PersistentVolume,
+				makePV("pv-static-c", waitSC.Name).
+					withPhase(v1.VolumeAvailable).
+					withCapacity(resource.MustParse("100Gi")).
+					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-c"}}).PersistentVolume,
+			},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("node-a", waitSCWithStorageCapacity.Name, makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node, "100Gi", ""),
+				makeCapacity("node-b", waitSCWithStorageCapacity.Name, makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node, "50Gi", ""),
+				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "10Gi", ""),
+			},
+			fts: feature.Features{
+				EnableStorageCapacityScoring: true,
+			},
+			wantPreFilterStatus: nil,
+			wantStateAfterPreFilter: &stateData{
+				podVolumeClaims: &PodVolumeClaims{
+					boundClaims: []*v1.PersistentVolumeClaim{},
+					unboundClaimsDelayBinding: []*v1.PersistentVolumeClaim{
+						makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+						makePVC("pvc-static", waitSC.Name).withRequestStorage(resource.MustParse("50Gi")).PersistentVolumeClaim,
+					},
+					unboundVolumesDelayBinding: map[string][]*v1.PersistentVolume{
+						waitSC.Name: {
+							makePV("pv-static-a", waitSC.Name).
+								withPhase(v1.VolumeAvailable).
+								withCapacity(resource.MustParse("100Gi")).
+								withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-a"}}).PersistentVolume,
+							makePV("pv-static-b", waitSC.Name).
+								withPhase(v1.VolumeAvailable).
+								withCapacity(resource.MustParse("100Gi")).
+								withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-b"}}).PersistentVolume,
+							makePV("pv-static-c", waitSC.Name).
+								withPhase(v1.VolumeAvailable).
+								withCapacity(resource.MustParse("100Gi")).
+								withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-c"}}).PersistentVolume,
+						},
+						waitSCWithStorageCapacity.Name: {},
+					},
+				},
+				podVolumesByNode: map[string]*PodVolumes{},
+			},
+			wantFilterStatus: []*framework.Status{
+				nil,
+				nil,
+				nil,
+			},
+			wantScores: []int64{
+				50,
+				50,
+				50,
+			},
+		},
+		{
+			name: "dynamic provisioning with multiple PVCs of the same StorageClass",
+			pod:  makePod("pod-a").withPVCVolume("pvc-dynamic-0", "").withPVCVolume("pvc-dynamic-1", "").Pod,
+			nodes: []*v1.Node{
+				makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node,
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				makePVC("pvc-dynamic-0", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("50Gi")).PersistentVolumeClaim,
+				makePVC("pvc-dynamic-1", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("50Gi")).PersistentVolumeClaim,
+			},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("node-a", waitSCWithStorageCapacity.Name, makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node, "100Gi", ""),
+			},
+			fts: feature.Features{
+				EnableStorageCapacityScoring: true,
+			},
+			wantPreFilterStatus: nil,
+			wantStateAfterPreFilter: &stateData{
+				podVolumeClaims: &PodVolumeClaims{
+					boundClaims: []*v1.PersistentVolumeClaim{},
+					unboundClaimsDelayBinding: []*v1.PersistentVolumeClaim{
+						makePVC("pvc-dynamic-0", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("50Gi")).PersistentVolumeClaim,
+						makePVC("pvc-dynamic-1", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("50Gi")).PersistentVolumeClaim,
+					},
+					unboundVolumesDelayBinding: map[string][]*v1.PersistentVolume{waitSCWithStorageCapacity.Name: {}},
+				},
+				podVolumesByNode: map[string]*PodVolumes{},
+			},
+			wantFilterStatus: []*framework.Status{
+				nil,
+			},
+			wantScores: []int64{
+				100,
+			},
+		},
+		{
+			name: "prefer node with least allocatable",
+			pod:  makePod("pod-a").withPVCVolume("pvc-dynamic", "").Pod,
+			nodes: []*v1.Node{
+				makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node,
+				makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node,
+				makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node,
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+			},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("node-a", waitSCWithStorageCapacity.Name, makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node, "100Gi", ""),
+				makeCapacity("node-b", waitSCWithStorageCapacity.Name, makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node, "20Gi", ""),
+				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "10Gi", ""),
+			},
+			fts: feature.Features{
+				EnableStorageCapacityScoring: true,
+			},
+			wantPreFilterStatus: nil,
+			wantStateAfterPreFilter: &stateData{
+				podVolumeClaims: &PodVolumeClaims{
+					boundClaims: []*v1.PersistentVolumeClaim{},
+					unboundClaimsDelayBinding: []*v1.PersistentVolumeClaim{
+						makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+					},
+					unboundVolumesDelayBinding: map[string][]*v1.PersistentVolume{waitSCWithStorageCapacity.Name: {}},
+				},
+				podVolumesByNode: map[string]*PodVolumes{},
+			},
+			wantFilterStatus: []*framework.Status{
+				nil,
+				nil,
+				nil,
+			},
+			wantScores: []int64{
+				10,
+				50,
+				100,
+			},
+		},
+		{
+			name: "prefer node with maximum allocatable",
+			pod:  makePod("pod-a").withPVCVolume("pvc-dynamic", "").Pod,
+			nodes: []*v1.Node{
+				makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node,
+				makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node,
+				makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node,
+			},
+			pvcs: []*v1.PersistentVolumeClaim{
+				makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+			},
+			capacities: []*storagev1.CSIStorageCapacity{
+				makeCapacity("node-a", waitSCWithStorageCapacity.Name, makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node, "100Gi", ""),
+				makeCapacity("node-b", waitSCWithStorageCapacity.Name, makeNode("node-b").withLabel(nodeLabelKey, "node-b").Node, "20Gi", ""),
+				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "10Gi", ""),
+			},
+			fts: feature.Features{
+				EnableStorageCapacityScoring: true,
+			},
+			args: &config.VolumeBindingArgs{
+				BindTimeoutSeconds: 300,
+				Shape: []config.UtilizationShapePoint{
+					{
+						Utilization: 0,
+						Score:       int32(config.MaxCustomPriorityScore),
+					},
+					{
+						Utilization: 100,
+						Score:       0,
+					},
+				},
+			},
+			wantPreFilterStatus: nil,
+			wantStateAfterPreFilter: &stateData{
+				podVolumeClaims: &PodVolumeClaims{
+					boundClaims: []*v1.PersistentVolumeClaim{},
+					unboundClaimsDelayBinding: []*v1.PersistentVolumeClaim{
+						makePVC("pvc-dynamic", waitSCWithStorageCapacity.Name).withRequestStorage(resource.MustParse("10Gi")).PersistentVolumeClaim,
+					},
+					unboundVolumesDelayBinding: map[string][]*v1.PersistentVolume{waitSCWithStorageCapacity.Name: {}},
+				},
+				podVolumesByNode: map[string]*PodVolumes{},
+			},
+			wantFilterStatus: []*framework.Status{
+				nil,
+				nil,
+				nil,
+			},
+			wantScores: []int64{
+				90,
+				50,
+				0,
+			},
+		},
 	}
 
 	for _, item := range table {
@@ -754,7 +1001,7 @@ func TestVolumeBinding(t *testing.T) {
 				args = &config.VolumeBindingArgs{
 					BindTimeoutSeconds: 300,
 				}
-				if item.fts.EnableVolumeCapacityPriority {
+				if item.fts.EnableStorageCapacityScoring {
 					args.Shape = defaultShapePoint
 				}
 			}
@@ -765,17 +1012,50 @@ func TestVolumeBinding(t *testing.T) {
 			}
 
 			t.Log("Feed testing data and wait for them to be synced")
-			client.StorageV1().StorageClasses().Create(ctx, immediateSC, metav1.CreateOptions{})
-			client.StorageV1().StorageClasses().Create(ctx, waitSC, metav1.CreateOptions{})
-			client.StorageV1().StorageClasses().Create(ctx, waitHDDSC, metav1.CreateOptions{})
+			_, err = client.StorageV1().StorageClasses().Create(ctx, immediateSC, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = client.StorageV1().StorageClasses().Create(ctx, waitSC, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = client.StorageV1().StorageClasses().Create(ctx, waitHDDSC, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = client.StorageV1().StorageClasses().Create(ctx, waitSCWithStorageCapacity, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = client.StorageV1().CSIDrivers().Create(ctx, driverWithStorageCapacity, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
 			for _, node := range item.nodes {
-				client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
+				_, err = client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 			for _, pvc := range item.pvcs {
-				client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
+				_, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 			for _, pv := range item.pvs {
-				client.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
+				_, err = client.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, capacity := range item.capacities {
+				_, err = client.StorageV1().CSIStorageCapacities(capacity.Namespace).Create(ctx, capacity, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			t.Log("Start informer factory after initialization")
@@ -787,12 +1067,7 @@ func TestVolumeBinding(t *testing.T) {
 			t.Log("Verify")
 
 			p := pl.(*VolumeBinding)
-			nodeInfos := make([]*framework.NodeInfo, 0)
-			for _, node := range item.nodes {
-				nodeInfo := framework.NewNodeInfo()
-				nodeInfo.SetNode(node)
-				nodeInfos = append(nodeInfos, nodeInfo)
-			}
+			nodeInfos := tf.BuildNodeInfos(item.nodes)
 			state := framework.NewCycleState()
 
 			t.Logf("Verify: call PreFilter and check status")
@@ -832,7 +1107,7 @@ func TestVolumeBinding(t *testing.T) {
 			}
 
 			t.Logf("Verify: call PreScore and check status")
-			gotPreScoreStatus := p.PreScore(ctx, state, item.pod, tf.BuildNodeInfos(item.nodes))
+			gotPreScoreStatus := p.PreScore(ctx, state, item.pod, nodeInfos)
 			if diff := cmp.Diff(item.wantPreScoreStatus, gotPreScoreStatus); diff != "" {
 				t.Errorf("state got after prescore does not match (-want,+got):\n%s", diff)
 			}
@@ -841,13 +1116,14 @@ func TestVolumeBinding(t *testing.T) {
 			}
 
 			t.Logf("Verify: Score")
-			for i, node := range item.nodes {
-				score, status := p.Score(ctx, state, item.pod, node.Name)
+			for i, nodeInfo := range nodeInfos {
+				nodeName := nodeInfo.Node().Name
+				score, status := p.Score(ctx, state, item.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("Score expects success status, got: %v", status)
 				}
 				if score != item.wantScores[i] {
-					t.Errorf("Score expects score %d for node %q, got: %d", item.wantScores[i], node.Name, score)
+					t.Errorf("Score expects score %d for node %q, got: %d", item.wantScores[i], nodeName, score)
 				}
 			}
 		})

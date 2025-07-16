@@ -17,7 +17,7 @@ type PlatformSpecApplyConfiguration struct {
 	OpenStack    *OpenStackPlatformSpecApplyConfiguration `json:"openstack,omitempty"`
 	Ovirt        *configv1.OvirtPlatformSpec              `json:"ovirt,omitempty"`
 	VSphere      *VSpherePlatformSpecApplyConfiguration   `json:"vsphere,omitempty"`
-	IBMCloud     *configv1.IBMCloudPlatformSpec           `json:"ibmcloud,omitempty"`
+	IBMCloud     *IBMCloudPlatformSpecApplyConfiguration  `json:"ibmcloud,omitempty"`
 	Kubevirt     *configv1.KubevirtPlatformSpec           `json:"kubevirt,omitempty"`
 	EquinixMetal *configv1.EquinixMetalPlatformSpec       `json:"equinixMetal,omitempty"`
 	PowerVS      *PowerVSPlatformSpecApplyConfiguration   `json:"powervs,omitempty"`
@@ -99,8 +99,8 @@ func (b *PlatformSpecApplyConfiguration) WithVSphere(value *VSpherePlatformSpecA
 // WithIBMCloud sets the IBMCloud field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the IBMCloud field is set to the value of the last call.
-func (b *PlatformSpecApplyConfiguration) WithIBMCloud(value configv1.IBMCloudPlatformSpec) *PlatformSpecApplyConfiguration {
-	b.IBMCloud = &value
+func (b *PlatformSpecApplyConfiguration) WithIBMCloud(value *IBMCloudPlatformSpecApplyConfiguration) *PlatformSpecApplyConfiguration {
+	b.IBMCloud = value
 	return b
 }
 

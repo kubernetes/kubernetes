@@ -134,7 +134,7 @@ type RetentionNumberConfig struct {
 	// the oldest backup will be removed before a new backup is initiated.
 	// +kubebuilder:validation:Minimum=1
 	// +required
-	MaxNumberOfBackups int `json:"maxNumberOfBackups,omitempty"`
+	MaxNumberOfBackups int `json:"maxNumberOfBackups"`
 }
 
 // RetentionSizeConfig specifies the configuration of the retention policy on the total size of backups
@@ -144,7 +144,7 @@ type RetentionSizeConfig struct {
 	// the oldest backup will be removed before a new backup is initiated.
 	// +kubebuilder:validation:Minimum=1
 	// +required
-	MaxSizeOfBackupsGb int `json:"maxSizeOfBackupsGb,omitempty"`
+	MaxSizeOfBackupsGb int `json:"maxSizeOfBackupsGb"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

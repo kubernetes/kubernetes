@@ -124,9 +124,9 @@ func (pl *node2PrioritizerPlugin) Name() string {
 }
 
 // Score return score 100 if the given nodeName is "node2"; otherwise return score 10.
-func (pl *node2PrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (pl *node2PrioritizerPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	score := 10
-	if nodeName == "node2" {
+	if nodeInfo.Node().Name == "node2" {
 		score = 100
 	}
 	return int64(score), nil

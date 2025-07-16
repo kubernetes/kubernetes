@@ -221,7 +221,9 @@ define TEST_E2E_NODE_HELP_INFO
 # Args:
 #  FOCUS: Regexp that matches the tests to be run.  Defaults to "".
 #  SKIP: Regexp that matches the tests that needs to be skipped.
-#    Defaults to "\[Flaky\]|\[Slow\]|\[Serial\]".
+#    Defaults to "\[Flaky\]|\[Slow\]|\[Serial\]" unless LABEL_FILTER is set.
+#    If LABEL_FILTER is set, then no tests are skipped by default.
+#  LABEL_FILTER: Use Ginkgo labels query language to filter the tests to be run. May contain spaces and special characters (exclamation mark, vertical bar, etc.) but not quotation marks.
 #  TEST_ARGS: A space-separated list of arguments to pass to node e2e test.
 #    Defaults to "".
 #  RUN_UNTIL_FAILURE: If true, pass --until-it-fails=true to ginkgo so tests are run

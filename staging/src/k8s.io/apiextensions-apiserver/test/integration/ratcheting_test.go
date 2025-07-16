@@ -46,8 +46,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/cel/environment"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -165,12 +167,7 @@ func (a applyPatchOperation) Do(ctx *ratchetingTestContext) error {
 
 	patch := &unstructured.Unstructured{}
 	if obj, ok := a.patch.(map[string]interface{}); ok {
-		patch.Object = map[string]interface{}{}
-
-		// Copy the map at the top level to avoid modifying the original.
-		for k, v := range obj {
-			patch.Object[k] = v
-		}
+		patch.Object = runtime.DeepCopyJSON(obj)
 	} else if str, ok := a.patch.(string); ok {
 		str = FixTabsOrDie(str)
 		if err := utilyaml.NewYAMLOrJSONDecoder(strings.NewReader(str), len(str)).Decode(&patch.Object); err != nil {
@@ -232,17 +229,6 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 			sch.Properties = map[string]apiextensionsv1.JSONSchemaProps{}
 		}
 
-		if ctx.StatusSubresource {
-			sch = &apiextensionsv1.JSONSchemaProps{
-				Type: "object",
-				Properties: map[string]apiextensionsv1.JSONSchemaProps{
-					"status": *sch,
-				},
-			}
-		}
-
-		// sentinel must be in the root level of the schema.
-		// Do not include this in the status schema.
 		uuidString := string(uuid.NewUUID())
 		sentinelName := "__ratcheting_sentinel_field__"
 		sch.Properties[sentinelName] = apiextensionsv1.JSONSchemaProps{
@@ -250,6 +236,15 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 			Enum: []apiextensionsv1.JSON{{
 				Raw: []byte(`"` + uuidString + `"`),
 			}},
+		}
+
+		if ctx.StatusSubresource {
+			sch = &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"status": *sch,
+				},
+			}
 		}
 
 		for _, v := range myCRD.Spec.Versions {
@@ -278,12 +273,7 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 				name: "sentinel-resource",
 				patch: map[string]interface{}{
 					sentinelName: fmt.Sprintf("invalid-%d", counter),
-				}}.Do(&ratchetingTestContext{
-				T:                   ctx.T,
-				DynamicClient:       ctx.DynamicClient,
-				APIExtensionsClient: ctx.APIExtensionsClient,
-				StatusSubresource:   false, // Do not carry this over, sentinel check is in the root level.
-			})
+				}}.Do(ctx)
 
 			if err == nil {
 				return false, errors.New("expected error when creating sentinel resource")
@@ -377,7 +367,6 @@ type ratchetingTestCase struct {
 }
 
 func runTests(t *testing.T, cases []ratchetingTestCase) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, true)
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -507,23 +496,23 @@ func TestRatchetingFunctionality(t *testing.T) {
 					myCRDV1Beta1,
 					myCRDInstanceName,
 					map[string]interface{}{
-						"hasMinimum":           0,
-						"hasMaximum":           1000,
-						"hasMinimumAndMaximum": 50,
+						"hasMinimum":           int64(0),
+						"hasMaximum":           int64(1000),
+						"hasMinimumAndMaximum": int64(50),
 					}},
 				patchMyCRDV1Beta1Schema{
 					"Add stricter minimums and maximums that violate the previous object",
 					map[string]interface{}{
 						"properties": map[string]interface{}{
 							"hasMinimum": map[string]interface{}{
-								"minimum": 10,
+								"minimum": int64(10),
 							},
 							"hasMaximum": map[string]interface{}{
-								"maximum": 20,
+								"maximum": int64(20),
 							},
 							"hasMinimumAndMaximum": map[string]interface{}{
-								"minimum": 10,
-								"maximum": 20,
+								"minimum": int64(10),
+								"maximum": int64(20),
 							},
 							"noRestrictions": map[string]interface{}{
 								"type": "integer",
@@ -535,33 +524,33 @@ func TestRatchetingFunctionality(t *testing.T) {
 					myCRDV1Beta1,
 					myCRDInstanceName,
 					map[string]interface{}{
-						"noRestrictions": 50,
+						"noRestrictions": int64(50),
 					}},
 				expectError{
 					applyPatchOperation{
 						"Change a single old field to be invalid",
 						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
-							"hasMinimum": 5,
+							"hasMinimum": int64(5),
 						}},
 				},
 				expectError{
 					applyPatchOperation{
 						"Change multiple old fields to be invalid",
 						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
-							"hasMinimum": 5,
-							"hasMaximum": 21,
+							"hasMinimum": int64(5),
+							"hasMaximum": int64(21),
 						}},
 				},
 				applyPatchOperation{
 					"Change single old field to be valid",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
-						"hasMinimum": 11,
+						"hasMinimum": int64(11),
 					}},
 				applyPatchOperation{
 					"Change multiple old fields to be valid",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
-						"hasMaximum":           19,
-						"hasMinimumAndMaximum": 15,
+						"hasMaximum":           int64(19),
+						"hasMinimumAndMaximum": int64(15),
 					}},
 			},
 		},
@@ -640,8 +629,8 @@ func TestRatchetingFunctionality(t *testing.T) {
 					"Create an instance",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"nums": map[string]interface{}{
-							"num1": 1,
-							"num2": 1000000,
+							"num1": int64(1),
+							"num2": int64(1000000),
 						},
 						"content": map[string]interface{}{
 							"k1": "some content",
@@ -654,7 +643,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"properties": map[string]interface{}{
 							"nums": map[string]interface{}{
 								"additionalProperties": map[string]interface{}{
-									"minimum": 1000,
+									"minimum": int64(1000),
 								},
 							},
 						},
@@ -663,16 +652,16 @@ func TestRatchetingFunctionality(t *testing.T) {
 					"updating validating field num2 to another validating value, but rachet invalid field num1",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"nums": map[string]interface{}{
-							"num1": 1,
-							"num2": 2000,
+							"num1": int64(1),
+							"num2": int64(2000),
 						},
 					}},
 				expectError{applyPatchOperation{
 					"update field num1 to different invalid value",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"nums": map[string]interface{}{
-							"num1": 2,
-							"num2": 2000,
+							"num1": int64(2),
+							"num2": int64(2000),
 						},
 					}}},
 			},
@@ -710,8 +699,8 @@ func TestRatchetingFunctionality(t *testing.T) {
 					map[string]interface{}{
 						"properties": map[string]interface{}{
 							"restricted": map[string]interface{}{
-								"minProperties": 1,
-								"maxProperties": 1,
+								"minProperties": int64(1),
+								"maxProperties": int64(1),
 							},
 						},
 					}},
@@ -743,7 +732,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 					map[string]interface{}{
 						"properties": map[string]interface{}{
 							"restricted": map[string]interface{}{
-								"minProperties": 2,
+								"minProperties": int64(2),
 								"maxProperties": nil,
 							},
 						},
@@ -773,7 +762,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"properties": map[string]interface{}{
 							"restricted": map[string]interface{}{
 								"minProperties": nil,
-								"maxProperties": 1,
+								"maxProperties": int64(1),
 							},
 						},
 					}},
@@ -827,7 +816,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 					map[string]interface{}{
 						"properties": map[string]interface{}{
 							"array": map[string]interface{}{
-								"minItems": 10,
+								"minItems": int64(10),
 							},
 						},
 					}},
@@ -889,7 +878,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 					map[string]interface{}{
 						"properties": map[string]interface{}{
 							"array": map[string]interface{}{
-								"maxItems": 1,
+								"maxItems": int64(1),
 							},
 						},
 					}},
@@ -948,10 +937,10 @@ func TestRatchetingFunctionality(t *testing.T) {
 					map[string]interface{}{
 						"properties": map[string]interface{}{
 							"minField": map[string]interface{}{
-								"minLength": 10,
+								"minLength": int64(10),
 							},
 							"maxField": map[string]interface{}{
-								"maxLength": 15,
+								"maxLength": int64(15),
 							},
 						},
 					}},
@@ -1148,17 +1137,17 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"field": []interface{}{
 							map[string]interface{}{
 								"name":  "nginx",
-								"port":  443,
+								"port":  int64(443),
 								"field": "value",
 							},
 							map[string]interface{}{
 								"name":  "etcd",
-								"port":  2379,
+								"port":  int64(2379),
 								"field": "value",
 							},
 							map[string]interface{}{
 								"name":  "kube-apiserver",
-								"port":  6443,
+								"port":  int64(6443),
 								"field": "value",
 							},
 						},
@@ -1168,7 +1157,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 					map[string]interface{}{
 						"properties": map[string]interface{}{
 							"field": map[string]interface{}{
-								"maxItems": 2,
+								"maxItems": int64(2),
 							},
 						},
 					}},
@@ -1178,17 +1167,17 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"field": []interface{}{
 							map[string]interface{}{
 								"name":  "kube-apiserver",
-								"port":  6443,
+								"port":  int64(6443),
 								"field": "value",
 							},
 							map[string]interface{}{
 								"name":  "nginx",
-								"port":  443,
+								"port":  int64(443),
 								"field": "value",
 							},
 							map[string]interface{}{
 								"name":  "etcd",
-								"port":  2379,
+								"port":  int64(2379),
 								"field": "value",
 							},
 						},
@@ -1200,22 +1189,22 @@ func TestRatchetingFunctionality(t *testing.T) {
 							"field": []interface{}{
 								map[string]interface{}{
 									"name":  "kube-apiserver",
-									"port":  6443,
+									"port":  int64(6443),
 									"field": "value",
 								},
 								map[string]interface{}{
 									"name":  "nginx",
-									"port":  443,
+									"port":  int64(443),
 									"field": "value",
 								},
 								map[string]interface{}{
 									"name":  "etcd",
-									"port":  2379,
+									"port":  int64(2379),
 									"field": "value",
 								},
 								map[string]interface{}{
 									"name":  "dev",
-									"port":  8080,
+									"port":  int64(8080),
 									"field": "value",
 								},
 							},
@@ -1229,7 +1218,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 								"items": map[string]interface{}{
 									"properties": map[string]interface{}{
 										"port": map[string]interface{}{
-											"multipleOf": 2,
+											"multipleOf": int64(2),
 										},
 									},
 								},
@@ -1243,17 +1232,17 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"field": []interface{}{
 							map[string]interface{}{
 								"name":  "nginx",
-								"port":  443,
+								"port":  int64(443),
 								"field": "value",
 							},
 							map[string]interface{}{
 								"name":  "etcd",
-								"port":  2379,
+								"port":  int64(2379),
 								"field": "value",
 							},
 							map[string]interface{}{
 								"name":  "kube-apiserver",
-								"port":  6443,
+								"port":  int64(6443),
 								"field": "value",
 							},
 						},
@@ -1265,22 +1254,22 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"field": []interface{}{
 							map[string]interface{}{
 								"name":  "nginx",
-								"port":  443,
+								"port":  int64(443),
 								"field": "value",
 							},
 							map[string]interface{}{
 								"name":  "etcd",
-								"port":  2379,
+								"port":  int64(2379),
 								"field": "value",
 							},
 							map[string]interface{}{
 								"name":  "kube-apiserver",
-								"port":  6443,
+								"port":  int64(6443),
 								"field": "this is a changed value for an an invalid but grandfathered key",
 							},
 							map[string]interface{}{
 								"name":  "dev",
-								"port":  8080,
+								"port":  int64(8080),
 								"field": "value",
 							},
 						},
@@ -1323,7 +1312,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 							"values": map[string]interface{}{
 								"items": map[string]interface{}{
 									"additionalProperties": map[string]interface{}{
-										"minLength": 6,
+										"minLength": int64(6),
 									},
 								},
 							},
@@ -1526,15 +1515,15 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"field": map[string]interface{}{
 							"object1": map[string]interface{}{
 								"stringField": "a string",
-								"intField":    5,
+								"intField":    int64(5),
 							},
 							"object2": map[string]interface{}{
 								"stringField": "another string",
-								"intField":    15,
+								"intField":    int64(15),
 							},
 							"object3": map[string]interface{}{
 								"stringField": "a third string",
-								"intField":    7,
+								"intField":    int64(7),
 							},
 						},
 					}},
@@ -1564,19 +1553,19 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"field": map[string]interface{}{
 							"object1": map[string]interface{}{
 								"stringField": "a string",
-								"intField":    5,
+								"intField":    int64(5),
 							},
 							"object2": map[string]interface{}{
 								"stringField": "another string",
-								"intField":    15,
+								"intField":    int64(15),
 							},
 							"object3": map[string]interface{}{
 								"stringField": "a third string",
-								"intField":    7,
+								"intField":    int64(7),
 							},
 							"object4": map[string]interface{}{
 								"stringField": "k8s third string",
-								"intField":    7,
+								"intField":    int64(7),
 							},
 						},
 					}},
@@ -1586,12 +1575,12 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"field": map[string]interface{}{
 							"object1": map[string]interface{}{
 								"stringField": "a string",
-								"intField":    15,
+								"intField":    int64(15),
 							},
 							"object2": map[string]interface{}{
 								"stringField":   "another string",
-								"intField":      10,
-								"otherIntField": 20,
+								"intField":      int64(10),
+								"otherIntField": int64(20),
 							},
 						},
 					}},
@@ -1636,11 +1625,11 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"field": map[string]interface{}{
 							"object1": map[string]interface{}{
 								"stringField": "a string", // invalid. even number length, no k8s prefix
-								"intField":    1000,
+								"intField":    int64(1000),
 							},
 							"object4": map[string]interface{}{
 								"stringField": "k8s third string", // invalid. even number length. ratcheted
-								"intField":    7000,
+								"intField":    int64(7000),
 							},
 						},
 					}},
@@ -1651,11 +1640,11 @@ func TestRatchetingFunctionality(t *testing.T) {
 							"field": map[string]interface{}{
 								"object1": map[string]interface{}{
 									"stringField": "k8s third string",
-									"intField":    1000,
+									"intField":    int64(1000),
 								},
 								"object4": map[string]interface{}{
 									"stringField": "a string",
-									"intField":    7000,
+									"intField":    int64(7000),
 								},
 							},
 						}}},
@@ -1665,11 +1654,11 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"field": map[string]interface{}{
 							"object1": map[string]interface{}{
 								"stringField": "k8s a stringy",
-								"intField":    1000,
+								"intField":    int64(1000),
 							},
 							"object4": map[string]interface{}{
 								"stringField": "k8s third stringy",
-								"intField":    7000,
+								"intField":    int64(7000),
 							},
 						},
 					}},
@@ -1708,7 +1697,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 					"reate a list of numbers with duplicates using the old simple schema",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"values": map[string]interface{}{
-							"dups": []interface{}{1, 2, 2, 3, 1000, 2000},
+							"dups": []interface{}{int64(1), int64(2), int64(2), int64(3), int64(1000), int64(2000)},
 						},
 					}},
 				patchMyCRDV1Beta1Schema{
@@ -1727,15 +1716,15 @@ func TestRatchetingFunctionality(t *testing.T) {
 						"change original without removing duplicates",
 						myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 							"values": map[string]interface{}{
-								"dups": []interface{}{1, 2, 2, 3, 1000, 2000, 3},
+								"dups": []interface{}{int64(1), int64(2), int64(2), int64(3), int64(1000), int64(2000), int64(3)},
 							},
 						}}},
 				expectError{applyPatchOperation{
 					"add another list with duplicates",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"values": map[string]interface{}{
-							"dups":  []interface{}{1, 2, 2, 3, 1000, 2000},
-							"dups2": []interface{}{1, 2, 2, 3, 1000, 2000},
+							"dups":  []interface{}{int64(1), int64(2), int64(2), int64(3), int64(1000), int64(2000)},
+							"dups2": []interface{}{int64(1), int64(2), int64(2), int64(3), int64(1000), int64(2000)},
 						},
 					}}},
 				// Can add a valid sibling field
@@ -1745,8 +1734,8 @@ func TestRatchetingFunctionality(t *testing.T) {
 					"add a valid sibling field",
 					myCRDV1Beta1, myCRDInstanceName, map[string]interface{}{
 						"values": map[string]interface{}{
-							"dups":       []interface{}{1, 2, 2, 3, 1000, 2000},
-							"otherField": []interface{}{1, 2, 3},
+							"dups":       []interface{}{int64(1), int64(2), int64(2), int64(3), int64(1000), int64(2000)},
+							"otherField": []interface{}{int64(1), int64(2), int64(3)},
 						},
 					}},
 				// Can remove dups to make valid
@@ -1759,8 +1748,8 @@ func TestRatchetingFunctionality(t *testing.T) {
 					myCRDInstanceName,
 					map[string]interface{}{
 						"values": map[string]interface{}{
-							"dups":       []interface{}{1, 3, 1000, 2000},
-							"otherField": []interface{}{1, 2, 3},
+							"dups":       []interface{}{int64(1), int64(3), int64(1000), int64(2000)},
+							"otherField": []interface{}{int64(1), int64(2), int64(3)},
 						},
 					}},
 			},
@@ -1781,7 +1770,8 @@ func newValidator(customResourceValidation *apiextensionsinternal.JSONSchemaProp
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
 		// TODO: replace with NewStructural(...).ToGoOpenAPI
-		if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, apiservervalidation.StripUnsupportedFormatsPostProcess); err != nil {
+		formatPostProcessor := apiservervalidation.StripUnsupportedFormatsPostProcessorForVersion(environment.DefaultCompatibilityVersion())
+		if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, formatPostProcessor); err != nil {
 			return nil, err
 		}
 	}
@@ -2006,6 +1996,7 @@ func BenchmarkRatcheting(b *testing.B) {
 }
 
 func TestRatchetingDropFields(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 	// Field dropping only takes effect when feature is disabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, false)
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)

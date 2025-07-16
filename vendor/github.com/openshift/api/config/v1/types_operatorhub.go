@@ -28,6 +28,7 @@ type OperatorHubSpec struct {
 type OperatorHubStatus struct {
 	// sources encapsulates the result of applying the configuration for each
 	// hub source
+	// +optional
 	Sources []HubSourceStatus `json:"sources,omitempty"`
 }
 

@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,7 +67,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
-	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -470,7 +471,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("Starting http_proxy")
 			var proxyLogs bytes.Buffer
-			testSrv := httptest.NewServer(utilnettesting.NewHTTPProxyHandler(ginkgo.GinkgoT(), func(req *http.Request) bool {
+			testSrv := httptest.NewServer(utilnettesting.NewHTTPProxyHandler(ginkgo.GinkgoTB(), func(req *http.Request) bool {
 				fmt.Fprintf(&proxyLogs, "Accepting %s to %s\n", req.Method, req.Host)
 				return true
 			}))
@@ -566,20 +567,16 @@ var _ = SIGDescribe("Kubectl client", func() {
 			})
 
 			ginkgo.It("should handle in-cluster config", func(ctx context.Context) {
-				// This test does not work for dynamically linked kubectl binaries; only statically linked ones. The
-				// problem happens when the kubectl binary is copied to a pod in the cluster. For dynamically linked
-				// binaries, the necessary libraries are not also copied. For this reason, the test can not be
-				// guaranteed to work with GKE, which sometimes run tests using a dynamically linked kubectl.
-				e2eskipper.SkipIfProviderIs("gke")
 				// TODO: Find a way to download and copy the appropriate kubectl binary, or maybe a multi-arch kubectl image
 				// for now this only works on amd64
 				e2eskipper.SkipUnlessNodeOSArchIs("amd64")
 
 				ginkgo.By("adding rbac permissions")
 				// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
-				err := e2eauth.BindClusterRole(ctx, f.ClientSet.RbacV1(), "view", f.Namespace.Name,
+				cleanupFunc, err := e2eauth.BindClusterRole(ctx, f.ClientSet.RbacV1(), "view", f.Namespace.Name,
 					rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 				framework.ExpectNoError(err)
+				defer cleanupFunc(ctx)
 
 				err = e2eauth.WaitForAuthorizationUpdate(ctx, f.ClientSet.AuthorizationV1(),
 					serviceaccount.MakeUsername(f.Namespace.Name, "default"),
@@ -661,13 +658,13 @@ metadata:
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
 
-				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/configmap-namespace/configmaps", inClusterURL)))
+				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf(`verb="POST" url="https://%s/api/v1/namespaces/configmap-namespace/configmaps`, inClusterURL)))
 
 				ginkgo.By("creating an object not containing a namespace with in-cluster config")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-without-namespace.yaml --v=6 2>&1")
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
-				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/%s/configmaps", inClusterURL, f.Namespace.Name)))
+				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf(`verb="POST" url="https://%s/api/v1/namespaces/%s/configmaps`, inClusterURL, f.Namespace.Name)))
 
 				ginkgo.By("trying to use kubectl with invalid token")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
@@ -675,27 +672,27 @@ metadata:
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
-				gomega.Expect(err).To(gomega.ContainSubstring("Response Status: 401 Unauthorized"))
+				gomega.Expect(err).To(gomega.ContainSubstring(`"Response" status="401 Unauthorized"`))
 
 				ginkgo.By("trying to use kubectl with invalid server")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --server=invalid --v=6 2>&1")
 				framework.Logf("got err %v", err)
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err).To(gomega.ContainSubstring("Unable to connect to the server"))
-				gomega.Expect(err).To(gomega.ContainSubstring("GET http://invalid/api"))
+				gomega.Expect(err).To(gomega.ContainSubstring(`verb="GET" url="http://invalid/api`))
 
 				ginkgo.By("trying to use kubectl with invalid namespace")
 				execOutput = e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --namespace=invalid --v=6 2>&1")
 				gomega.Expect(execOutput).To(gomega.ContainSubstring("No resources found"))
 				gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
-				gomega.Expect(execOutput).To(gomega.MatchRegexp(fmt.Sprintf("GET http[s]?://[\\[]?%s[\\]]?:%s/api/v1/namespaces/invalid/pods", inClusterHost, inClusterPort)))
+				gomega.Expect(execOutput).To(gomega.MatchRegexp(fmt.Sprintf(`verb="GET" url="http[s]?://[\[]?%s[\]]?:%s/api/v1/namespaces/invalid/pods`, inClusterHost, inClusterPort)))
 
 				ginkgo.By("trying to use kubectl with kubeconfig")
 				execOutput = e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --kubeconfig=/tmp/"+overrideKubeconfigName+" --v=6 2>&1")
 				gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster configuration"))
-				gomega.Expect(execOutput).To(gomega.ContainSubstring("GET https://kubernetes.default.svc:443/api/v1/namespaces/default/pods"))
+				gomega.Expect(execOutput).To(gomega.ContainSubstring(`verb="GET" url="https://kubernetes.default.svc:443/api/v1/namespaces/default/pods`))
 			})
 		})
 
@@ -1553,10 +1550,10 @@ metadata:
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
-					ep, err := c.CoreV1().Endpoints(ns).Get(ctx, name, metav1.GetOptions{})
+					slices, err := c.DiscoveryV1().EndpointSlices(ns).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, name)})
 					if err != nil {
 						// log the real error
-						framework.Logf("Get endpoints failed (interval %v): %v", framework.Poll, err)
+						framework.Logf("List endpointslices failed (interval %v): %v", framework.Poll, err)
 
 						// if the error is API not found or could not find default credentials or TLS handshake timeout, try again
 						if apierrors.IsNotFound(err) ||
@@ -1567,7 +1564,7 @@ metadata:
 						return false, err
 					}
 
-					uidToPort := e2eendpoints.GetContainerPortsByPodUID(ep)
+					uidToPort := e2eendpointslice.GetContainerPortsByPodUID(slices.Items)
 					if len(uidToPort) == 0 {
 						framework.Logf("No endpoint found, retrying")
 						return false, nil

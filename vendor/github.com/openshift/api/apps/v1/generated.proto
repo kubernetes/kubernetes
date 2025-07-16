@@ -186,34 +186,43 @@ message DeploymentConfigSpec {
 message DeploymentConfigStatus {
   // latestVersion is used to determine whether the current deployment associated with a deployment
   // config is out of sync.
+  // +optional
   optional int64 latestVersion = 1;
 
   // observedGeneration is the most recent generation observed by the deployment config controller.
+  // +optional
   optional int64 observedGeneration = 2;
 
   // replicas is the total number of pods targeted by this deployment config.
+  // +optional
   optional int32 replicas = 3;
 
   // updatedReplicas is the total number of non-terminated pods targeted by this deployment config
   // that have the desired template spec.
+  // +optional
   optional int32 updatedReplicas = 4;
 
   // availableReplicas is the total number of available pods targeted by this deployment config.
+  // +optional
   optional int32 availableReplicas = 5;
 
   // unavailableReplicas is the total number of unavailable pods targeted by this deployment config.
+  // +optional
   optional int32 unavailableReplicas = 6;
 
   // details are the reasons for the update to this deployment config.
   // This could be based on a change made by the user or caused by an automatic trigger
+  // +optional
   optional DeploymentDetails details = 7;
 
   // conditions represents the latest available observations of a deployment config's current state.
   // +patchMergeKey=type
   // +patchStrategy=merge
+  // +optional
   repeated DeploymentCondition conditions = 8;
 
   // Total number of ready pods targeted by this deployment.
+  // +optional
   optional int32 readyReplicas = 9;
 }
 

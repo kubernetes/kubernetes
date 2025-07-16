@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package dynamicresourceallocation contains helper packages for the dynamic
 // resource allocation feature.
-package dynamicresourceallocation // import "k8s.io/dynamic-resource-allocation"
+package dynamicresourceallocation

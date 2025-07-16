@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -85,6 +86,7 @@ func validNewController() *api.ReplicationController {
 				},
 				Spec: podtest.MakePodSpec(),
 			},
+			Replicas: ptr.To[int32](1),
 		},
 	}
 }
@@ -104,7 +106,7 @@ func TestCreate(t *testing.T) {
 		// invalid (invalid selector)
 		&api.ReplicationController{
 			Spec: api.ReplicationControllerSpec{
-				Replicas: 2,
+				Replicas: ptr.To[int32](2),
 				Selector: map[string]string{},
 				Template: validController.Spec.Template,
 			},
@@ -123,7 +125,7 @@ func TestUpdate(t *testing.T) {
 		// valid updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*api.ReplicationController)
-			object.Spec.Replicas = object.Spec.Replicas + 1
+			object.Spec.Replicas = ptr.To[int32](*object.Spec.Replicas + 1)
 			return object
 		},
 		// invalid updateFunc
@@ -172,7 +174,7 @@ func TestGenerationNumber(t *testing.T) {
 	}
 
 	// Updates to spec should increment the generation number
-	controller.Spec.Replicas++
+	(*controller.Spec.Replicas)++
 	if _, _, err := storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -297,7 +299,7 @@ func TestScaleGet(t *testing.T) {
 			CreationTimestamp: rc.CreationTimestamp,
 		},
 		Spec: autoscaling.ScaleSpec{
-			Replicas: validController.Spec.Replicas,
+			Replicas: *validController.Spec.Replicas,
 		},
 		Status: autoscaling.ScaleStatus{
 			Replicas: validController.Status.Replicas,
@@ -341,7 +343,7 @@ func TestScaleUpdate(t *testing.T) {
 	}
 	scale := obj.(*autoscaling.Scale)
 	if scale.Spec.Replicas != replicas {
-		t.Errorf("wrong replicas count expected: %d got: %d", replicas, rc.Spec.Replicas)
+		t.Errorf("wrong replicas count expected: %d got: %d", replicas, *rc.Spec.Replicas)
 	}
 
 	update.ResourceVersion = rc.ResourceVersion

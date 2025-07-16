@@ -21,4 +21,4 @@ limitations under the License.
 
 // +groupName=admission.k8s.io
 
-package v1beta1 // import "k8s.io/api/admission/v1beta1"
+package v1beta1

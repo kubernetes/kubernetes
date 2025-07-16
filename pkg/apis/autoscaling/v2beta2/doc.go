@@ -19,4 +19,4 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/api/autoscaling/v2beta2
 
-package v2beta2 // import "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2"
+package v2beta2

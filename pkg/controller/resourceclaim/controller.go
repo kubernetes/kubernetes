@@ -71,8 +71,8 @@ const (
 
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
 type Controller struct {
-	// adminAccessEnabled matches the DRAAdminAccess feature gate state.
-	adminAccessEnabled bool
+	// features defines the feature gates that are enabled.
+	features Features
 
 	// kubeClient is the kube API client used to communicate with the API
 	// server.
@@ -118,25 +118,31 @@ const (
 	podKeyPrefix   = "pod:"
 )
 
+// Features defines which features should be enabled in the controller.
+type Features struct {
+	AdminAccess     bool
+	PrioritizedList bool
+}
+
 // NewController creates a ResourceClaim controller.
 func NewController(
 	logger klog.Logger,
-	adminAccessEnabled bool,
+	features Features,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
 	claimInformer resourceinformers.ResourceClaimInformer,
 	templateInformer resourceinformers.ResourceClaimTemplateInformer) (*Controller, error) {
 
 	ec := &Controller{
-		adminAccessEnabled: adminAccessEnabled,
-		kubeClient:         kubeClient,
-		podLister:          podInformer.Lister(),
-		podIndexer:         podInformer.Informer().GetIndexer(),
-		podSynced:          podInformer.Informer().HasSynced,
-		claimLister:        claimInformer.Lister(),
-		claimsSynced:       claimInformer.Informer().HasSynced,
-		templateLister:     templateInformer.Lister(),
-		templatesSynced:    templateInformer.Informer().HasSynced,
+		features:        features,
+		kubeClient:      kubeClient,
+		podLister:       podInformer.Lister(),
+		podIndexer:      podInformer.Informer().GetIndexer(),
+		podSynced:       podInformer.Informer().HasSynced,
+		claimLister:     claimInformer.Lister(),
+		claimsSynced:    claimInformer.Informer().HasSynced,
+		templateLister:  templateInformer.Lister(),
+		templatesSynced: templateInformer.Informer().HasSynced,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resource_claim"},
@@ -146,7 +152,7 @@ func NewController(
 
 	metrics.RegisterMetrics()
 
-	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ec.enqueuePod(logger, obj, false)
 		},
@@ -156,10 +162,10 @@ func NewController(
 		DeleteFunc: func(obj interface{}) {
 			ec.enqueuePod(logger, obj, true)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
-	if _, err := claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := claimInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			logger.V(6).Info("new claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, nil, obj)
@@ -172,7 +178,7 @@ func NewController(
 			logger.V(6).Info("deleted claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, obj, nil)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
 	if err := ec.podIndexer.AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
@@ -190,7 +196,7 @@ func NewController(
 	if err := claimInformerCache.AddIndexers(cache.Indexers{claimPodOwnerIndex: claimPodOwnerIndexFunc}); err != nil {
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
-	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(claimInformerCache, claimInformerCache,
+	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(logger, claimInformerCache, claimInformerCache,
 		// Very long time to live, unlikely to be needed because
 		// the informer cache should get updated soon.
 		time.Hour,
@@ -617,8 +623,12 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 			return fmt.Errorf("resource claim template %q: %v", *templateName, err)
 		}
 
-		if !ec.adminAccessEnabled && needsAdminAccess(template) {
+		if !ec.features.AdminAccess && needsAdminAccess(template) {
 			return errors.New("admin access is requested, but the feature is disabled")
+		}
+
+		if !ec.features.PrioritizedList && hasPrioritizedList(template) {
+			return errors.New("template includes a prioritized list of subrequests, but the feature is disabled")
 		}
 
 		// Create the ResourceClaim with pod as owner, with a generated name that uses
@@ -682,6 +692,15 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 func needsAdminAccess(claimTemplate *resourceapi.ResourceClaimTemplate) bool {
 	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
 		if ptr.Deref(request.AdminAccess, false) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPrioritizedList(claimTemplate *resourceapi.ResourceClaimTemplate) bool {
+	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
+		if len(request.FirstAvailable) > 0 {
 			return true
 		}
 	}

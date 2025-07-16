@@ -83,6 +83,16 @@ const (
 	// The number of batches is given by:
 	//      1+floor(log_2(ceil(N/SlowStartInitialBatchSize)))
 	SlowStartInitialBatchSize = 1
+
+	// PodNodeNameKeyIndex is the name of the index used by PodInformer to index pods by their node name.
+	PodNodeNameKeyIndex = "spec.nodeName"
+
+	// OrphanPodIndexKey is used to index all Orphan pods to this key
+	OrphanPodIndexKey = "_ORPHAN_POD"
+
+	// podControllerUIDIndex is the name for the Pod store's index function,
+	// which is to index by pods's controllerUID.
+	PodControllerUIDIndex = "podControllerUID"
 )
 
 var UpdateTaintBackoff = wait.Backoff{
@@ -973,14 +983,27 @@ func compareMaxContainerRestarts(pi *v1.Pod, pj *v1.Pod) *bool {
 	return nil
 }
 
+// FilterClaimedPods returns pods that are controlled by the controller and match the selector.
+func FilterClaimedPods(controller metav1.Object, selector labels.Selector, pods []*v1.Pod) []*v1.Pod {
+	var result []*v1.Pod
+	for _, pod := range pods {
+		if !metav1.IsControlledBy(pod, controller) {
+			// It's an orphan or owned by someone else.
+			continue
+		}
+		if selector.Matches(labels.Set(pod.Labels)) {
+			result = append(result, pod)
+		}
+	}
+	return result
+}
+
 // FilterActivePods returns pods that have not terminated.
 func FilterActivePods(logger klog.Logger, pods []*v1.Pod) []*v1.Pod {
 	var result []*v1.Pod
 	for _, p := range pods {
 		if IsPodActive(p) {
 			result = append(result, p)
-		} else {
-			logger.V(4).Info("Ignoring inactive pod", "pod", klog.KObj(p), "phase", p.Status.Phase, "deletionTime", klog.SafePtr(p.DeletionTimestamp))
 		}
 	}
 	return result
@@ -1036,6 +1059,52 @@ func FilterReplicaSets(RSes []*apps.ReplicaSet, filterFn filterRS) []*apps.Repli
 		}
 	}
 	return filtered
+}
+
+// AddPodNodeNameIndexer adds an indexer for Pod's nodeName to the given PodInformer.
+// This indexer is used to efficiently look up pods by their node name.
+func AddPodNodeNameIndexer(podInformer cache.SharedIndexInformer) error {
+	if _, exists := podInformer.GetIndexer().GetIndexers()[PodNodeNameKeyIndex]; exists {
+		// indexer already exists, do nothing
+		return nil
+	}
+
+	return podInformer.AddIndexers(cache.Indexers{
+		PodNodeNameKeyIndex: func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return []string{}, nil
+			}
+			if len(pod.Spec.NodeName) == 0 {
+				return []string{}, nil
+			}
+			return []string{pod.Spec.NodeName}, nil
+		},
+	})
+}
+
+// AddPodControllerUIDIndexer adds an indexer for Pod's controllerRef.UID to the given PodInformer.
+// This indexer is used to efficiently look up pods by their ControllerRef.UID
+func AddPodControllerUIDIndexer(podInformer cache.SharedIndexInformer) error {
+	if _, exists := podInformer.GetIndexer().GetIndexers()[PodControllerUIDIndex]; exists {
+		// indexer already exists, do nothing
+		return nil
+	}
+	return podInformer.AddIndexers(cache.Indexers{
+		PodControllerUIDIndex: func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return nil, nil
+			}
+			// Get the ControllerRef of the Pod to check if it's managed by a controller
+			if ref := metav1.GetControllerOf(pod); ref != nil {
+				return []string{string(ref.UID)}, nil
+			}
+			// If the Pod has no controller (i.e., it's orphaned), index it with the OrphanPodIndexKey
+			// This helps identify orphan pods for reconciliation and adoption by controllers
+			return []string{OrphanPodIndexKey}, nil
+		},
+	})
 }
 
 // PodKey returns a key unique to the given pod within a cluster.

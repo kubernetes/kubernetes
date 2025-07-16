@@ -45,13 +45,25 @@ func NewFilteredHostSubnetInformer(client versioned.Interface, resyncPeriod time
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NetworkV1().HostSubnets().List(context.TODO(), options)
+				return client.NetworkV1().HostSubnets().List(context.Background(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NetworkV1().HostSubnets().Watch(context.TODO(), options)
+				return client.NetworkV1().HostSubnets().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.NetworkV1().HostSubnets().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.NetworkV1().HostSubnets().Watch(ctx, options)
 			},
 		},
 		&apinetworkv1.HostSubnet{},

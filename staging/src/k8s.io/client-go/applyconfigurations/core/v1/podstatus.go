@@ -26,6 +26,7 @@ import (
 // PodStatusApplyConfiguration represents a declarative configuration of the PodStatus type for use
 // with apply.
 type PodStatusApplyConfiguration struct {
+	ObservedGeneration         *int64                                     `json:"observedGeneration,omitempty"`
 	Phase                      *corev1.PodPhase                           `json:"phase,omitempty"`
 	Conditions                 []PodConditionApplyConfiguration           `json:"conditions,omitempty"`
 	Message                    *string                                    `json:"message,omitempty"`
@@ -48,6 +49,14 @@ type PodStatusApplyConfiguration struct {
 // apply.
 func PodStatus() *PodStatusApplyConfiguration {
 	return &PodStatusApplyConfiguration{}
+}
+
+// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObservedGeneration field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithObservedGeneration(value int64) *PodStatusApplyConfiguration {
+	b.ObservedGeneration = &value
+	return b
 }
 
 // WithPhase sets the Phase field in the declarative configuration to the given value

@@ -17,10 +17,19 @@ limitations under the License.
 package cache
 
 import (
-	"os"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(m.Run())
+	options := []goleak.Option{
+		// These tests run goroutines which get stuck in Pop.
+		// This cannot be fixed without modifying the API.
+		goleak.IgnoreAnyFunction("k8s.io/client-go/tools/cache.TestFIFO_addReplace.func1"),
+		goleak.IgnoreAnyFunction("k8s.io/client-go/tools/cache.TestFIFO_addUpdate.func1"),
+		goleak.IgnoreAnyFunction("k8s.io/client-go/tools/cache.TestDeltaFIFO_addReplace.func1"),
+		goleak.IgnoreAnyFunction("k8s.io/client-go/tools/cache.TestDeltaFIFO_addUpdate.func1"),
+	}
+	goleak.VerifyTestMain(m, options...)
 }

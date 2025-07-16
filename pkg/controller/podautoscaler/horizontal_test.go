@@ -37,16 +37,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
@@ -54,7 +57,7 @@ import (
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/stretchr/testify/assert"
 
@@ -382,6 +385,13 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 					assert.Equal(t, tc.CPUCurrent, *utilization, "the report CPU utilization percentage should be as expected")
 				}
 			}
+
+			if len(obj.Spec.Metrics) > 0 && obj.Spec.Metrics[0].Object != nil && len(obj.Status.CurrentMetrics) > 0 && obj.Status.CurrentMetrics[0].Object != nil {
+				assert.Equal(t, obj.Spec.Metrics[0].Object.DescribedObject.APIVersion, obj.Status.CurrentMetrics[0].Object.DescribedObject.APIVersion)
+				assert.Equal(t, obj.Spec.Metrics[0].Object.DescribedObject.Kind, obj.Status.CurrentMetrics[0].Object.DescribedObject.Kind)
+				assert.Equal(t, obj.Spec.Metrics[0].Object.DescribedObject.Name, obj.Status.CurrentMetrics[0].Object.DescribedObject.Name)
+			}
+
 			actualConditions := obj.Status.Conditions
 			// TODO: it's ok not to sort these because statusOk
 			// contains all the conditions, so we'll never be appending.
@@ -675,7 +685,7 @@ func findCpuUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization 
 	return nil
 }
 
-func (tc *testCase) verifyResults(t *testing.T, m *mockMonitor) {
+func (tc *testCase) verifyResults(ctx context.Context, t *testing.T, m *mockMonitor) {
 	tc.Lock()
 	defer tc.Unlock()
 
@@ -685,12 +695,12 @@ func (tc *testCase) verifyResults(t *testing.T, m *mockMonitor) {
 		assert.Equal(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.eventCreated, "an event should have been created only if we expected a change in replicas")
 	}
 
-	tc.verifyRecordedMetric(t, m)
+	tc.verifyRecordedMetric(ctx, t, m)
 }
 
-func (tc *testCase) verifyRecordedMetric(t *testing.T, m *mockMonitor) {
+func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T, m *mockMonitor) {
 	// First, wait for the reconciliation completed at least once.
-	m.waitUntilRecorded(t)
+	m.waitUntilRecorded(ctx, t)
 
 	assert.Equal(t, tc.expectedReportedReconciliationActionLabel, m.reconciliationActionLabels[0], "the reconciliation action should be recorded in monitor expectedly")
 	assert.Equal(t, tc.expectedReportedReconciliationErrorLabel, m.reconciliationErrorLabels[0], "the reconciliation error should be recorded in monitor expectedly")
@@ -833,7 +843,7 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 	if !ok {
 		t.Fatalf("test HPA controller should have mockMonitor, but actually not")
 	}
-	tc.verifyResults(t, m)
+	tc.verifyResults(ctx, t, m)
 }
 
 func (tc *testCase) runTest(t *testing.T) {
@@ -875,8 +885,8 @@ func (m *mockMonitor) ObserveMetricComputationResult(action monitor.ActionLabel,
 }
 
 // waitUntilRecorded waits for the HPA controller to reconcile at least once.
-func (m *mockMonitor) waitUntilRecorded(t *testing.T) {
-	if err := wait.Poll(20*time.Millisecond, 100*time.Millisecond, func() (done bool, err error) {
+func (m *mockMonitor) waitUntilRecorded(ctx context.Context, t *testing.T) {
+	if err := wait.PollUntilContextTimeout(ctx, 20*time.Millisecond, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
 		m.RWMutex.RLock()
 		defer m.RWMutex.RUnlock()
 		if len(m.reconciliationActionLabels) == 0 || len(m.reconciliationErrorLabels) == 0 {
@@ -925,7 +935,7 @@ func TestScaleUpContainer(t *testing.T) {
 				Name: v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: pointer.Int32(30),
+					AverageUtilization: ptr.To(int32(30)),
 				},
 				Container: "container1",
 			},
@@ -1619,7 +1629,7 @@ func TestScaleDownContainerResource(t *testing.T) {
 				Name:      v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: pointer.Int32(50),
+					AverageUtilization: ptr.To(int32(50)),
 				},
 			},
 		}},
@@ -2207,6 +2217,107 @@ func TestTolerance(t *testing.T) {
 		},
 	}
 	tc.runTest(t)
+}
+
+func TestConfigurableTolerance(t *testing.T) {
+	onePercentQuantity := resource.MustParse("0.01")
+	ninetyPercentQuantity := resource.MustParse("0.9")
+
+	testCases := []struct {
+		name                      string
+		configurableToleranceGate bool
+		replicas                  int32
+		scaleUpRules              *autoscalingv2.HPAScalingRules
+		scaleDownRules            *autoscalingv2.HPAScalingRules
+		reportedLevels            []uint64
+		reportedCPURequests       []resource.Quantity
+		expectedDesiredReplicas   int32
+		expectedConditionReason   string
+		expectedActionLabel       monitor.ActionLabel
+	}{
+		{
+			name:                      "Scaling up because of a 1% configurable tolerance",
+			configurableToleranceGate: true,
+			replicas:                  3,
+			scaleUpRules: &autoscalingv2.HPAScalingRules{
+				Tolerance: &onePercentQuantity,
+			},
+			reportedLevels:          []uint64{1010, 1030, 1020},
+			reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+			expectedDesiredReplicas: 4,
+			expectedConditionReason: "SucceededRescale",
+			expectedActionLabel:     monitor.ActionLabelScaleUp,
+		},
+		{
+			name:                      "No scale-down because of a 90% configurable tolerance",
+			configurableToleranceGate: true,
+			replicas:                  3,
+			scaleDownRules: &autoscalingv2.HPAScalingRules{
+				Tolerance: &ninetyPercentQuantity,
+			},
+			reportedLevels:          []uint64{300, 300, 300},
+			reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			expectedDesiredReplicas: 3,
+			expectedConditionReason: "ReadyForNewScale",
+			expectedActionLabel:     monitor.ActionLabelNone,
+		},
+		{
+			name:                      "No scaling because of the large default tolerance",
+			configurableToleranceGate: true,
+			replicas:                  3,
+			reportedLevels:            []uint64{1010, 1030, 1020},
+			reportedCPURequests:       []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+			expectedDesiredReplicas:   3,
+			expectedConditionReason:   "ReadyForNewScale",
+			expectedActionLabel:       monitor.ActionLabelNone,
+		},
+		{
+			name:                      "No scaling because the configurable tolerance is ignored as the feature gate is disabled",
+			configurableToleranceGate: false,
+			replicas:                  3,
+			scaleUpRules: &autoscalingv2.HPAScalingRules{
+				Tolerance: &onePercentQuantity,
+			},
+			reportedLevels:          []uint64{1010, 1030, 1020},
+			reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+			expectedDesiredReplicas: 3,
+			expectedConditionReason: "ReadyForNewScale",
+			expectedActionLabel:     monitor.ActionLabelNone,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, tc.configurableToleranceGate)
+			tc := testCase{
+				minReplicas:             1,
+				maxReplicas:             5,
+				specReplicas:            tc.replicas,
+				statusReplicas:          tc.replicas,
+				scaleDownRules:          tc.scaleDownRules,
+				scaleUpRules:            tc.scaleUpRules,
+				expectedDesiredReplicas: tc.expectedDesiredReplicas,
+				CPUTarget:               100,
+				reportedLevels:          tc.reportedLevels,
+				reportedCPURequests:     tc.reportedCPURequests,
+				useMetricsAPI:           true,
+				expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+					Type:   autoscalingv2.AbleToScale,
+					Status: v1.ConditionTrue,
+					Reason: tc.expectedConditionReason,
+				}),
+				expectedReportedReconciliationActionLabel: tc.expectedActionLabel,
+				expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+					autoscalingv2.ResourceMetricSourceType: tc.expectedActionLabel,
+				},
+				expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+					autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+				},
+			}
+			tc.runTest(t)
+		})
+	}
 }
 
 func TestToleranceCM(t *testing.T) {
@@ -3848,7 +3959,7 @@ func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
 	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: pointer.Int32(300),
+		StabilizationWindowSeconds: ptr.To(int32(300)),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
@@ -3870,7 +3981,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
 	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: pointer.Int32(300),
+		StabilizationWindowSeconds: ptr.To(int32(300)),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
@@ -3891,7 +4002,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
 	policy := autoscalingv2.MaxChangePolicySelect
 	directionBehavior := autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: pointer.Int32(stabilizationWindow),
+		StabilizationWindowSeconds: ptr.To(int32(stabilizationWindow)),
 		SelectPolicy:               &policy,
 	}
 	if pods != 0 {

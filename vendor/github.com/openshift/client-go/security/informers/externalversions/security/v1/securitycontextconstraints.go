@@ -45,13 +45,25 @@ func NewFilteredSecurityContextConstraintsInformer(client versioned.Interface, r
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SecurityV1().SecurityContextConstraints().List(context.TODO(), options)
+				return client.SecurityV1().SecurityContextConstraints().List(context.Background(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SecurityV1().SecurityContextConstraints().Watch(context.TODO(), options)
+				return client.SecurityV1().SecurityContextConstraints().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.SecurityV1().SecurityContextConstraints().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.SecurityV1().SecurityContextConstraints().Watch(ctx, options)
 			},
 		},
 		&apisecurityv1.SecurityContextConstraints{},

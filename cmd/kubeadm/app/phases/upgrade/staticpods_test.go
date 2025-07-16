@@ -30,6 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
 
@@ -99,7 +100,7 @@ func NewFakeStaticPodWaiter(errsToReturn map[string]error) apiclient.Waiter {
 }
 
 // WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
-func (w *fakeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, apiServerAddress string) error {
+func (w *fakeWaiter) WaitForControlPlaneComponents(podsMap map[string]*v1.Pod, apiServerAddress string) error {
 	return nil
 }
 

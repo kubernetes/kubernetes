@@ -1078,7 +1078,7 @@ func TestReconcile(t *testing.T) {
 			for _, epSlice := range tc.existingEndpointSlices {
 				epSlice.Labels = map[string]string{
 					discovery.LabelServiceName: endpoints.Name,
-					discovery.LabelManagedBy:   controllerName,
+					discovery.LabelManagedBy:   ControllerName,
 				}
 				_, err := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), epSlice, metav1.CreateOptions{})
 				if err != nil {
@@ -1245,7 +1245,7 @@ func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEnd
 	expectedEndpoints := map[string]addressInfo{}
 
 	for _, address := range epSubset.Addresses {
-		at := getAddressType(address.IP)
+		_, at := addressToEndpoint(address, true)
 		if at != nil && *at == addrType && len(expectedEndpoints) < maxEndpointsPerSubset {
 			expectedEndpoints[address.IP] = addressInfo{
 				ready:     true,
@@ -1255,7 +1255,7 @@ func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEnd
 	}
 
 	for _, address := range epSubset.NotReadyAddresses {
-		at := getAddressType(address.IP)
+		_, at := addressToEndpoint(address, true)
 		if at != nil && *at == addrType && len(expectedEndpoints) < maxEndpointsPerSubset {
 			expectedEndpoints[address.IP] = addressInfo{
 				ready:     false,
@@ -1305,7 +1305,7 @@ func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEnd
 func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string) []discovery.EndpointSlice {
 	t.Helper()
 	fetchedSlices, err := client.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: discovery.LabelManagedBy + "=" + controllerName,
+		LabelSelector: discovery.LabelManagedBy + "=" + ControllerName,
 	})
 	if err != nil {
 		t.Fatalf("Expected no error fetching Endpoint Slices, got: %v", err)

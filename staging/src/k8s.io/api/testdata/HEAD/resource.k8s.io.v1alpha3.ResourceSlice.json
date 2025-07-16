@@ -90,6 +90,61 @@
           },
           "capacity": {
             "capacityKey": "0"
+          },
+          "consumesCounters": [
+            {
+              "counterSet": "counterSetValue",
+              "counters": {
+                "countersKey": {
+                  "value": "0"
+                }
+              }
+            }
+          ],
+          "nodeName": "nodeNameValue",
+          "nodeSelector": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "keyValue",
+                    "operator": "operatorValue",
+                    "values": [
+                      "valuesValue"
+                    ]
+                  }
+                ],
+                "matchFields": [
+                  {
+                    "key": "keyValue",
+                    "operator": "operatorValue",
+                    "values": [
+                      "valuesValue"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "allNodes": true,
+          "taints": [
+            {
+              "key": "keyValue",
+              "value": "valueValue",
+              "effect": "effectValue",
+              "timeAdded": "2004-01-01T01:01:01Z"
+            }
+          ]
+        }
+      }
+    ],
+    "perDeviceNodeSelection": true,
+    "sharedCounters": [
+      {
+        "name": "nameValue",
+        "counters": {
+          "countersKey": {
+            "value": "0"
           }
         }
       }

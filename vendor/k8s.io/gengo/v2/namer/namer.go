@@ -370,7 +370,11 @@ func (r *rawNamer) Name(t *types.Type) string {
 			// TODO: include function signature
 			elems = append(elems, m.Name.Name)
 		}
-		name = "interface{" + strings.Join(elems, "; ") + "}"
+		if len(elems) == 0 {
+			name = "any"
+		} else {
+			name = "interface{" + strings.Join(elems, "; ") + "}"
+		}
 	case types.Func:
 		// TODO: add to name test
 		params := []string{}

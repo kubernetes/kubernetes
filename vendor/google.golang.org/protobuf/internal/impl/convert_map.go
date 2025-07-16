@@ -101,7 +101,7 @@ func (ms *mapReflect) Mutable(k protoreflect.MapKey) protoreflect.Value {
 	return v
 }
 func (ms *mapReflect) Range(f func(protoreflect.MapKey, protoreflect.Value) bool) {
-	iter := mapRange(ms.v)
+	iter := ms.v.MapRange()
 	for iter.Next() {
 		k := ms.keyConv.PBValueOf(iter.Key()).MapKey()
 		v := ms.valConv.PBValueOf(iter.Value())

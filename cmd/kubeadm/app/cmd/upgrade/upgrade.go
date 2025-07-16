@@ -35,6 +35,7 @@ type applyPlanFlags struct {
 	allowExperimentalUpgrades bool
 	allowRCUpgrades           bool
 	printConfig               bool
+	etcdUpgrade               bool
 	ignorePreflightErrors     []string
 	out                       io.Writer
 }
@@ -48,6 +49,7 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 		allowExperimentalUpgrades: false,
 		allowRCUpgrades:           false,
 		printConfig:               false,
+		etcdUpgrade:               true,
 		out:                       out,
 	}
 
@@ -71,5 +73,6 @@ func addApplyPlanFlags(fs *pflag.FlagSet, flags *applyPlanFlags) {
 	fs.BoolVar(&flags.allowExperimentalUpgrades, "allow-experimental-upgrades", flags.allowExperimentalUpgrades, "Show unstable versions of Kubernetes as an upgrade alternative and allow upgrading to an alpha/beta/release candidate versions of Kubernetes.")
 	fs.BoolVar(&flags.allowRCUpgrades, "allow-release-candidate-upgrades", flags.allowRCUpgrades, "Show release candidate versions of Kubernetes as an upgrade alternative and allow upgrading to a release candidate versions of Kubernetes.")
 	fs.BoolVar(&flags.printConfig, "print-config", flags.printConfig, "Specifies whether the configuration file that will be used in the upgrade should be printed or not.")
+	fs.BoolVar(&flags.etcdUpgrade, options.EtcdUpgrade, flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	options.AddIgnorePreflightErrorsFlag(fs, &flags.ignorePreflightErrors)
 }

@@ -20,6 +20,7 @@ import (
 	"container/list"
 	"fmt"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -61,14 +62,63 @@ type activeQueuer interface {
 // underLock() method should be used to protect these methods.
 type unlockedActiveQueuer interface {
 	unlockedActiveQueueReader
-	AddOrUpdate(pInfo *framework.QueuedPodInfo)
+	// add adds a new pod to the activeQ.
+	// The event should show which event triggered this addition and is used for the metric recording.
+	// This method should be called in activeQueue.underLock().
+	add(pInfo *framework.QueuedPodInfo, event string)
 }
 
 // unlockedActiveQueueReader defines activeQ read-only methods that are not protected by the lock itself.
 // underLock() or underRLock() method should be used to protect these methods.
 type unlockedActiveQueueReader interface {
-	Get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
-	Has(pInfo *framework.QueuedPodInfo) bool
+	// get returns the pod matching pInfo inside the activeQ.
+	// Returns false if the pInfo doesn't exist in the queue.
+	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+	get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
+	// has returns if pInfo exists in the queue.
+	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+	has(pInfo *framework.QueuedPodInfo) bool
+}
+
+// unlockedActiveQueue defines activeQ methods that are not protected by the lock itself.
+// activeQueue.underLock() or activeQueue.underRLock() method should be used to protect these methods.
+type unlockedActiveQueue struct {
+	queue *heap.Heap[*framework.QueuedPodInfo]
+}
+
+func newUnlockedActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo]) *unlockedActiveQueue {
+	return &unlockedActiveQueue{
+		queue: queue,
+	}
+}
+
+// add adds a new pod to the activeQ.
+// The event should show which event triggered this addition and is used for the metric recording.
+// This method should be called in activeQueue.underLock().
+func (uaq *unlockedActiveQueue) add(pInfo *framework.QueuedPodInfo, event string) {
+	uaq.queue.AddOrUpdate(pInfo)
+	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
+}
+
+// get returns the pod matching pInfo inside the activeQ.
+// Returns false if the pInfo doesn't exist in the queue.
+// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+func (uaq *unlockedActiveQueue) get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool) {
+	return uaq.queue.Get(pInfo)
+}
+
+// has returns if pInfo exists in the queue.
+// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+func (uaq *unlockedActiveQueue) has(pInfo *framework.QueuedPodInfo) bool {
+	return uaq.queue.Has(pInfo)
+}
+
+// backoffQPopper defines method that is used to pop from the backoffQ when the activeQ is empty.
+type backoffQPopper interface {
+	// popBackoff pops the pInfo from the podBackoffQ.
+	popBackoff() (*framework.QueuedPodInfo, error)
+	// len returns length of the podBackoffQ queue.
+	lenBackoff() int
 }
 
 // activeQueue implements activeQueuer. All of the fields have to be protected using the lock.
@@ -77,15 +127,21 @@ type activeQueue struct {
 	// It protects activeQ, inFlightPods, inFlightEvents, schedulingCycle and closed fields.
 	// Caution: DO NOT take "SchedulingQueue.lock" after taking "lock".
 	// You should always take "SchedulingQueue.lock" first, otherwise the queue could end up in deadlock.
-	// "lock" should not be taken after taking "nLock".
-	// Correct locking order is: SchedulingQueue.lock > lock > nominator.nLock.
+	// "lock" should not be taken after taking "backoffQueue.lock" or "nominator.nLock".
+	// Correct locking order is: SchedulingQueue.lock > lock > backoffQueue.lock > nominator.nLock.
 	lock sync.RWMutex
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
 	queue *heap.Heap[*framework.QueuedPodInfo]
 
+	// unlockedQueue is a wrapper of queue providing methods that are not locked themselves
+	// and can be used in the underLock() or underRLock().
+	unlockedQueue *unlockedActiveQueue
+
 	// cond is a condition that is notified when the pod is added to activeQ.
+	// When SchedulerPopFromBackoffQ feature is enabled,
+	// condition is also notified when the pod is added to backoffQ.
 	// It is used with lock.
 	cond sync.Cond
 
@@ -125,15 +181,21 @@ type activeQueue struct {
 	isSchedulingQueueHintEnabled bool
 
 	metricsRecorder metrics.MetricAsyncRecorder
+
+	// backoffQPopper is used to pop from backoffQ when activeQ is empty.
+	// It is non-nil only when SchedulerPopFromBackoffQ feature is enabled.
+	backoffQPopper backoffQPopper
 }
 
-func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder metrics.MetricAsyncRecorder) *activeQueue {
+func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
 	aq := &activeQueue{
 		queue:                        queue,
 		inFlightPods:                 make(map[types.UID]*list.Element),
 		inFlightEvents:               list.New(),
 		isSchedulingQueueHintEnabled: isSchedulingQueueHintEnabled,
 		metricsRecorder:              metricRecorder,
+		unlockedQueue:                newUnlockedActiveQueue(queue),
+		backoffQPopper:               backoffQPopper,
 	}
 	aq.cond.L = &aq.lock
 
@@ -146,7 +208,7 @@ func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueu
 func (aq *activeQueue) underLock(fn func(unlockedActiveQ unlockedActiveQueuer)) {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
-	fn(aq.queue)
+	fn(aq.unlockedQueue)
 }
 
 // underLock runs the fn function under the lock.RLock.
@@ -155,7 +217,7 @@ func (aq *activeQueue) underLock(fn func(unlockedActiveQ unlockedActiveQueuer)) 
 func (aq *activeQueue) underRLock(fn func(unlockedActiveQ unlockedActiveQueueReader)) {
 	aq.lock.RLock()
 	defer aq.lock.RUnlock()
-	fn(aq.queue)
+	fn(aq.unlockedQueue)
 }
 
 // update updates the pod in activeQ if oldPodInfo is already in the queue.
@@ -191,7 +253,13 @@ func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 }
 
 func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
+	var pInfo *framework.QueuedPodInfo
 	for aq.queue.Len() == 0 {
+		// backoffQPopper is non-nil only if SchedulerPopFromBackoffQ feature is enabled.
+		// In case of non-empty backoffQ, try popping from there.
+		if aq.backoffQPopper != nil && aq.backoffQPopper.lenBackoff() != 0 {
+			break
+		}
 		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
 		// When Close() is called, the p.closed is set and the condition is broadcast,
 		// which causes this loop to continue and return from the Pop().
@@ -203,9 +271,18 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 	}
 	pInfo, err := aq.queue.Pop()
 	if err != nil {
-		return nil, err
+		if aq.backoffQPopper == nil {
+			return nil, err
+		}
+		// Try to pop from backoffQ when activeQ is empty.
+		pInfo, err = aq.backoffQPopper.popBackoff()
+		if err != nil {
+			return nil, err
+		}
+		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Inc()
 	}
 	pInfo.Attempts++
+	pInfo.BackoffExpiration = time.Time{}
 	// In flight, no concurrent events yet.
 	if aq.isSchedulingQueueHintEnabled {
 		// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.
@@ -354,6 +431,12 @@ func (aq *activeQueue) done(pod types.UID) {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 
+	aq.unlockedDone(pod)
+}
+
+// unlockedDone is used by the activeQueue internally and doesn't take the lock itself.
+// It assumes the lock is already taken outside before the method is called.
+func (aq *activeQueue) unlockedDone(pod types.UID) {
 	inFlightPod, ok := aq.inFlightPods[pod]
 	if !ok {
 		// This Pod is already done()ed.
@@ -398,15 +481,15 @@ func (aq *activeQueue) done(pod types.UID) {
 
 // close closes the activeQueue.
 func (aq *activeQueue) close() {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
 	// We should call done() for all in-flight pods to clean up the inFlightEvents metrics.
 	// It's safe even if the binding cycle running asynchronously calls done() afterwards
 	// done() will just be a no-op.
 	for pod := range aq.inFlightPods {
-		aq.done(pod)
+		aq.unlockedDone(pod)
 	}
-	aq.lock.Lock()
 	aq.closed = true
-	aq.lock.Unlock()
 }
 
 // broadcast notifies the pop() operation that new pod(s) was added to the activeQueue.

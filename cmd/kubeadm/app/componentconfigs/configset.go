@@ -86,7 +86,7 @@ func (h *handler) fromConfigMap(client clientset.Interface, cmName, cmKey string
 		return nil, errors.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing", cmName, cmKey)
 	}
 
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments([]byte(configData))
+	gvkmap, err := kubeadmutil.SplitConfigDocuments([]byte(configData))
 	if err != nil {
 		return nil, err
 	}

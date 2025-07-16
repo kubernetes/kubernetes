@@ -5,8 +5,10 @@ package v1
 // TokenClaimMappingsApplyConfiguration represents a declarative configuration of the TokenClaimMappings type for use
 // with apply.
 type TokenClaimMappingsApplyConfiguration struct {
-	Username *UsernameClaimMappingApplyConfiguration `json:"username,omitempty"`
-	Groups   *PrefixedClaimMappingApplyConfiguration `json:"groups,omitempty"`
+	Username *UsernameClaimMappingApplyConfiguration          `json:"username,omitempty"`
+	Groups   *PrefixedClaimMappingApplyConfiguration          `json:"groups,omitempty"`
+	UID      *TokenClaimOrExpressionMappingApplyConfiguration `json:"uid,omitempty"`
+	Extra    []ExtraMappingApplyConfiguration                 `json:"extra,omitempty"`
 }
 
 // TokenClaimMappingsApplyConfiguration constructs a declarative configuration of the TokenClaimMappings type for use with
@@ -28,5 +30,26 @@ func (b *TokenClaimMappingsApplyConfiguration) WithUsername(value *UsernameClaim
 // If called multiple times, the Groups field is set to the value of the last call.
 func (b *TokenClaimMappingsApplyConfiguration) WithGroups(value *PrefixedClaimMappingApplyConfiguration) *TokenClaimMappingsApplyConfiguration {
 	b.Groups = value
+	return b
+}
+
+// WithUID sets the UID field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UID field is set to the value of the last call.
+func (b *TokenClaimMappingsApplyConfiguration) WithUID(value *TokenClaimOrExpressionMappingApplyConfiguration) *TokenClaimMappingsApplyConfiguration {
+	b.UID = value
+	return b
+}
+
+// WithExtra adds the given value to the Extra field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Extra field.
+func (b *TokenClaimMappingsApplyConfiguration) WithExtra(values ...*ExtraMappingApplyConfiguration) *TokenClaimMappingsApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithExtra")
+		}
+		b.Extra = append(b.Extra, *values[i])
+	}
 	return b
 }

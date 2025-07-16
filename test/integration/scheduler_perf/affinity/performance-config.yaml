@@ -65,7 +65,7 @@
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 70
+    threshold: 60
     params:
       initNodes: 5000
       initPods: 1000
@@ -74,7 +74,7 @@
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
-    threshold: 70
+    threshold: 60
     params:
       initNodes: 5000
       initPods: 1000

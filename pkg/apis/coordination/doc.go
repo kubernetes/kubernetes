@@ -18,4 +18,4 @@ limitations under the License.
 
 // +groupName=coordination.k8s.io
 
-package coordination // import "k8s.io/kubernetes/pkg/apis/coordination"
+package coordination

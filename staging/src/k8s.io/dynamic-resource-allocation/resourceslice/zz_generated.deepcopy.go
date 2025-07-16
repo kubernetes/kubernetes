@@ -103,6 +103,18 @@ func (in *Slice) DeepCopyInto(out *Slice) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.SharedCounters != nil {
+		in, out := &in.SharedCounters, &out.SharedCounters
+		*out = make([]v1beta1.CounterSet, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.PerDeviceNodeSelection != nil {
+		in, out := &in.PerDeviceNodeSelection, &out.PerDeviceNodeSelection
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

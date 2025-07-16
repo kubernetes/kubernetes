@@ -81,35 +81,6 @@ func TestApplyConfiguration(t *testing.T) {
 			}},
 		},
 		{
-			name: "apply configuration add to listType=map",
-			expression: `Object{
-					spec: Object.spec{
-						template: Object.spec.template{
-							spec: Object.spec.template.spec{
-								volumes: [Object.spec.template.spec.volumes{
-									name: "y"
-								}]
-							}
-						}
-					}
-				}`,
-			gvr: deploymentGVR,
-			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Volumes: []corev1.Volume{{Name: "x"}},
-					},
-				},
-			}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Volumes: []corev1.Volume{{Name: "x"}, {Name: "y"}},
-					},
-				},
-			}},
-		},
-		{
 			name: "apply configuration update listType=map entry",
 			expression: `Object{
 					spec: Object.spec{

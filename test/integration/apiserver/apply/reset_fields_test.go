@@ -61,6 +61,7 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                `{"status": {"currentHealthy": 25}}`,
 	gvr("resource.k8s.io", "v1alpha3", "resourceclaims"):            `{"status": {"allocation": {"nodeSelector": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "some-label", "operator": "In", "values": ["some-other-value"]}] }]}}}}`,
 	gvr("resource.k8s.io", "v1beta1", "resourceclaims"):             `{"status": {"allocation": {"nodeSelector": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "some-label", "operator": "In", "values": ["some-other-value"]}] }]}}}}`,
+	gvr("resource.k8s.io", "v1beta2", "resourceclaims"):             `{"status": {"allocation": {"nodeSelector": {"nodeSelectorTerms": [{"matchExpressions": [{"key": "some-label", "operator": "In", "values": ["some-other-value"]}] }]}}}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): `{"status": {"commonEncodingVersion":"v1","storageVersions":[{"apiServerID":"1","decodableVersions":["v1","v2"],"encodingVersion":"v1"}],"conditions":[{"type":"AllEncodingVersionsEqual","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"allEncodingVersionsEqual","message":"all encoding versions are set to v1"}]}}`,
 	// standard for []metav1.Condition
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
@@ -68,6 +69,7 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("admissionregistration.k8s.io", "v1", "validatingadmissionpolicies"):       `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("networking.k8s.io", "v1alpha1", "servicecidrs"):                           `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("networking.k8s.io", "v1beta1", "servicecidrs"):                            `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("networking.k8s.io", "v1", "servicecidrs"):                                 `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 }
 
 // resetFieldsStatusDefault conflicts with statusDefault
@@ -138,6 +140,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("networking.k8s.io", "v1", "ingresses"):                                    `{"spec": {"defaultBackend": {"service": {"name": "service2"}}}}`,
 	gvr("networking.k8s.io", "v1alpha1", "servicecidrs"):                           `{}`,
 	gvr("networking.k8s.io", "v1beta1", "servicecidrs"):                            `{}`,
+	gvr("networking.k8s.io", "v1", "servicecidrs"):                                 `{}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                                    `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                               `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("storage.k8s.io", "v1alpha1", "volumeattachments"):                         `{"metadata": {"name": "va3"}, "spec": {"nodeName": "localhost2"}}`,
@@ -151,9 +154,13 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("resource.k8s.io", "v1alpha3", "deviceclasses"):                            `{"metadata": {"labels":{"a":"c"}}}`,
 	gvr("resource.k8s.io", "v1alpha3", "resourceclaims"):                           `{"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "other-class"}]}}}`, // spec is immutable, but that doesn't matter for the test.
 	gvr("resource.k8s.io", "v1alpha3", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
+	gvr("resource.k8s.io", "v1alpha3", "devicetaintrules"):                         `{"metadata": {"labels":{"a":"c"}}}`,
 	gvr("resource.k8s.io", "v1beta1", "deviceclasses"):                             `{"metadata": {"labels":{"a":"c"}}}`,
 	gvr("resource.k8s.io", "v1beta1", "resourceclaims"):                            `{"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "other-class"}]}}}`, // spec is immutable, but that doesn't matter for the test.
 	gvr("resource.k8s.io", "v1beta1", "resourceclaimtemplates"):                    `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
+	gvr("resource.k8s.io", "v1beta2", "deviceclasses"):                             `{"metadata": {"labels":{"a":"c"}}}`,
+	gvr("resource.k8s.io", "v1beta2", "resourceclaims"):                            `{"spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "other-class"}}]}}}`, // spec is immutable, but that doesn't matter for the test.
+	gvr("resource.k8s.io", "v1beta2", "resourceclaimtemplates"):                    `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):                `{}`,
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,
 	gvr("admissionregistration.k8s.io", "v1beta1", "validatingadmissionpolicies"):  `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,

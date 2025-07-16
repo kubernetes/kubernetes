@@ -43,6 +43,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -56,7 +57,6 @@ import (
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -165,10 +165,10 @@ func (n *nfsDriver) PrepareTest(ctx context.Context, f *framework.Framework) *st
 
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
-	err := e2eauth.BindClusterRole(ctx, cs.RbacV1(), "cluster-admin", ns.Name,
+	cleanupFunc, err := e2eauth.BindClusterRole(ctx, cs.RbacV1(), "cluster-admin", ns.Name,
 		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
 	framework.ExpectNoError(err)
-	ginkgo.DeferCleanup(cs.RbacV1().ClusterRoleBindings().Delete, ns.Name+"--"+"cluster-admin", *metav1.NewDeleteOptions(0))
+	ginkgo.DeferCleanup(cleanupFunc)
 
 	err = e2eauth.WaitForAuthorizationUpdate(ctx, cs.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),
@@ -368,6 +368,12 @@ type hostPathDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
+type hostPathVolume struct {
+	targetPath string
+	prepPod    *v1.Pod
+	f          *framework.Framework
+}
+
 var _ storageframework.TestDriver = &hostPathDriver{}
 var _ storageframework.PreprovisionedVolumeTestDriver = &hostPathDriver{}
 var _ storageframework.InlineVolumeTestDriver = &hostPathDriver{}
@@ -402,13 +408,18 @@ func (h *hostPathDriver) SkipUnsupportedTest(pattern storageframework.TestPatter
 }
 
 func (h *hostPathDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
+	hv, ok := e2evolume.(*hostPathVolume)
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the Hostpath test volume", e2evolume)
+	}
+
 	// hostPath doesn't support readOnly volume
 	if readOnly {
 		return nil
 	}
 	return &v1.VolumeSource{
 		HostPath: &v1.HostPathVolumeSource{
-			Path: "/tmp",
+			Path: hv.targetPath,
 		},
 	}
 }
@@ -425,11 +436,86 @@ func (h *hostPathDriver) CreateVolume(ctx context.Context, config *storageframew
 	f := config.Framework
 	cs := f.ClientSet
 
+	targetPath := fmt.Sprintf("/tmp/%v", f.Namespace.Name)
+	volumeName := "test-volume"
+
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
 	framework.ExpectNoError(err)
 	config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
-	return nil
+
+	cmd := fmt.Sprintf("mkdir %v -m 777", targetPath)
+	privileged := true
+
+	// Launch pod to initialize hostPath directory
+	prepPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("hostpath-prep-%s", f.Namespace.Name),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"/bin/sh", "-ec", cmd},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: "/tmp",
+						},
+					},
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privileged,
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name: volumeName,
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: "/tmp",
+						},
+					},
+				},
+			},
+			NodeName: node.Name,
+		},
+	}
+	// h.prepPod will be reused in cleanupDriver.
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, prepPod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "while creating hostPath init pod")
+
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+	framework.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
+
+	err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
+	framework.ExpectNoError(err, "while deleting hostPath init pod")
+	return &hostPathVolume{
+		targetPath: targetPath,
+		prepPod:    prepPod,
+		f:          f,
+	}
+}
+
+var _ storageframework.TestVolume = &hostPathVolume{}
+
+// DeleteVolume implements the storageframework.TestVolume interface method
+func (v *hostPathVolume) DeleteVolume(ctx context.Context) {
+	f := v.f
+
+	cmd := fmt.Sprintf("rm -rf %v", v.targetPath)
+	v.prepPod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", cmd}
+
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, v.prepPod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "while creating hostPath teardown pod")
+
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+	framework.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
+
+	err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
+	framework.ExpectNoError(err, "while deleting hostPath teardown pod")
 }
 
 // HostPathSymlink
@@ -571,6 +657,9 @@ func (h *hostPathSymlinkDriver) CreateVolume(ctx context.Context, config *storag
 	}
 }
 
+var _ storageframework.TestVolume = &hostPathSymlinkVolume{}
+
+// DeleteVolume implements the storageframework.TestVolume interface method
 func (v *hostPathSymlinkVolume) DeleteVolume(ctx context.Context) {
 	f := v.f
 
@@ -712,14 +801,7 @@ type gcePdDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
-type gcePdVolume struct {
-	volumeName string
-}
-
 var _ storageframework.TestDriver = &gcePdDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &gcePdDriver{}
-var _ storageframework.InlineVolumeTestDriver = &gcePdDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &gcePdDriver{}
 var _ storageframework.DynamicPVTestDriver = &gcePdDriver{}
 
 // InitGcePdDriver returns gcePdDriver that implements TestDriver interface
@@ -800,46 +882,12 @@ func (g *gcePdDriver) GetDriverInfo() *storageframework.DriverInfo {
 }
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("gce", "gke")
+	e2eskipper.SkipUnlessProviderIs("gce")
 	for _, tag := range pattern.TestTags {
 		if tag == feature.Windows {
 			e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 		}
 	}
-}
-
-func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
-	gv, ok := e2evolume.(*gcePdVolume)
-	if !ok {
-		framework.Failf("Failed to cast test volume of type %T to the GCE PD test volume", e2evolume)
-	}
-	volSource := v1.VolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:   gv.volumeName,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		volSource.GCEPersistentDisk.FSType = fsType
-	}
-	return &volSource
-}
-
-func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	gv, ok := e2evolume.(*gcePdVolume)
-	if !ok {
-		framework.Failf("Failed to cast test volume of type %T to the GCE PD test volume", e2evolume)
-	}
-	pvSource := v1.PersistentVolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:   gv.volumeName,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		pvSource.GCEPersistentDisk.FSType = fsType
-	}
-	return &pvSource, nil
 }
 
 func (g *gcePdDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -870,29 +918,6 @@ func (g *gcePdDriver) PrepareTest(ctx context.Context, f *framework.Framework) *
 	}
 	return config
 
-}
-
-func (g *gcePdDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	zone := getInlineVolumeZone(ctx, config.Framework)
-	if volType == storageframework.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
-		// so pods should be also scheduled there.
-		config.ClientNodeSelection = e2epod.NodeSelection{
-			Selector: map[string]string{
-				v1.LabelTopologyZone: zone,
-			},
-		}
-	}
-	ginkgo.By("creating a test gce pd volume")
-	vname, err := e2epv.CreatePDWithRetryAndZone(ctx, zone)
-	framework.ExpectNoError(err)
-	return &gcePdVolume{
-		volumeName: vname,
-	}
-}
-
-func (v *gcePdVolume) DeleteVolume(ctx context.Context) {
-	_ = e2epv.DeletePDWithRetry(ctx, v.volumeName)
 }
 
 // vSphere
@@ -1138,19 +1163,54 @@ type localVolume struct {
 var (
 	// capabilities
 	defaultLocalVolumeCapabilities = map[storageframework.Capability]bool{
-		storageframework.CapPersistence:       true,
-		storageframework.CapFsGroup:           true,
-		storageframework.CapBlock:             false,
-		storageframework.CapExec:              true,
+		storageframework.CapPersistence: true,
+		storageframework.CapFsGroup:     true,
+		storageframework.CapBlock:       false,
+		// To test CapExec, we need a volume with a filesystem.
+		// During end-to-end (e2e) testing, we utilize the `/tmp` directory for volume creation.
+		// However, best practices recommend mounting `/tmp` with the `noexec`, `nodev`, and `nosuid` parameters.
+		// This security measure prevents the execution of scripts and binaries within the `/tmp` directory.
+		// This practice, while promoting security, creates a dependency on the infrastructure configuration during e2e tests.
+		// This can result in "Permission Denied" errors when attempting to execute files from `/tmp`.
+		// To address this, we intentionally skip exec tests for certain types of LocalVolumes, such as `dir` or `dir-link`.
+		// This allows us to conduct comprehensive testing without relying on potentially restrictive security configurations.
+		storageframework.CapExec:              false,
 		storageframework.CapMultiPODs:         true,
 		storageframework.CapSingleNodeVolume:  true,
 		storageframework.CapMultiplePVsSameID: true,
 	}
 	localVolumeCapabitilies = map[utils.LocalVolumeType]map[storageframework.Capability]bool{
+		utils.LocalVolumeTmpfs: {
+			storageframework.CapPersistence:       true,
+			storageframework.CapFsGroup:           true,
+			storageframework.CapBlock:             false,
+			storageframework.CapExec:              true,
+			storageframework.CapMultiPODs:         true,
+			storageframework.CapSingleNodeVolume:  true,
+			storageframework.CapMultiplePVsSameID: true,
+		},
 		utils.LocalVolumeBlock: {
 			storageframework.CapPersistence:       true,
 			storageframework.CapFsGroup:           true,
 			storageframework.CapBlock:             true,
+			storageframework.CapExec:              false,
+			storageframework.CapMultiPODs:         true,
+			storageframework.CapSingleNodeVolume:  true,
+			storageframework.CapMultiplePVsSameID: true,
+		},
+		utils.LocalVolumeBlockFS: {
+			storageframework.CapPersistence:       true,
+			storageframework.CapFsGroup:           true,
+			storageframework.CapBlock:             false,
+			storageframework.CapExec:              true,
+			storageframework.CapMultiPODs:         true,
+			storageframework.CapSingleNodeVolume:  true,
+			storageframework.CapMultiplePVsSameID: true,
+		},
+		utils.LocalVolumeGCELocalSSD: {
+			storageframework.CapPersistence:       true,
+			storageframework.CapFsGroup:           true,
+			storageframework.CapBlock:             false,
 			storageframework.CapExec:              true,
 			storageframework.CapMultiPODs:         true,
 			storageframework.CapSingleNodeVolume:  true,
@@ -1310,24 +1370,6 @@ func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 // cleanUpVolumeServer is a wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
 func cleanUpVolumeServer(ctx context.Context, f *framework.Framework, serverPod *v1.Pod) {
 	cleanUpVolumeServerWithSecret(ctx, f, serverPod, nil)
-}
-
-func getInlineVolumeZone(ctx context.Context, f *framework.Framework) string {
-	if framework.TestContext.CloudConfig.Zone != "" {
-		return framework.TestContext.CloudConfig.Zone
-	}
-	// if zone is not specified we will randomly pick a zone from schedulable nodes for inline tests
-	node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-	framework.ExpectNoError(err)
-	zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]
-	if ok {
-		return zone
-	}
-	topologyZone, ok := node.Labels[v1.LabelTopologyZone]
-	if ok {
-		return topologyZone
-	}
-	return ""
 }
 
 // cleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.

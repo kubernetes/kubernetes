@@ -168,10 +168,10 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 		klog.InfoS("Creating memory manager")
 		cm.memoryManager, err = memorymanager.NewManager(
-			nodeConfig.ExperimentalMemoryManagerPolicy,
+			nodeConfig.MemoryManagerPolicy,
 			machineInfo,
 			cm.GetNodeAllocatableReservation(),
-			nodeConfig.ExperimentalMemoryManagerReservedMemory,
+			nodeConfig.MemoryManagerReservedMemory,
 			nodeConfig.KubeletRootDir,
 			cm.topologyManager,
 		)
@@ -368,4 +368,12 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(ctx context.Context, p
 
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
+}
+
+func (cm *containerManagerImpl) PodHasExclusiveCPUs(pod *v1.Pod) bool {
+	return podHasExclusiveCPUs(cm.cpuManager, pod)
+}
+
+func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
+	return containerHasExclusiveCPUs(cm.cpuManager, pod, container)
 }

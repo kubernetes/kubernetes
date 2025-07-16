@@ -72,7 +72,7 @@ type PodSandboxManager interface {
 	RunPodSandbox(ctx context.Context, config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error)
 	// StopPodSandbox stops the sandbox. If there are any running containers in the
 	// sandbox, they should be force terminated.
-	StopPodSandbox(pctx context.Context, odSandboxID string) error
+	StopPodSandbox(ctx context.Context, podSandboxID string) error
 	// RemovePodSandbox removes the sandbox. If there are running containers in the
 	// sandbox, they should be forcibly removed.
 	RemovePodSandbox(ctx context.Context, podSandboxID string) error
@@ -82,6 +82,12 @@ type PodSandboxManager interface {
 	ListPodSandbox(ctx context.Context, filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error)
 	// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
 	PortForward(ctx context.Context, request *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
+	// UpdatePodSandboxResources synchronously updates the PodSandboxConfig with
+	// the pod-level resource configuration. This method is called _after_ the
+	// Kubelet reconfigures the pod-level cgroups.
+	// This request is treated as best effort, and failure will not block the
+	// Kubelet with proceeding with a resize.
+	UpdatePodSandboxResources(ctx context.Context, request *runtimeapi.UpdatePodSandboxResourcesRequest) (*runtimeapi.UpdatePodSandboxResourcesResponse, error)
 }
 
 // ContainerStatsManager contains methods for retrieving the container

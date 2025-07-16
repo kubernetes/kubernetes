@@ -19,7 +19,6 @@ package prober
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -152,14 +151,7 @@ func TestDoProbe(t *testing.T) {
 				t.Errorf("[%s-%d] Expected result: %v but got %v", probeType, i, test.expectedResult, result)
 			}
 
-			// Clean up.
-			testRootDir := ""
-			if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
-				t.Fatalf("can't make a temp rootdir: %v", err)
-			} else {
-				testRootDir = tempDir
-			}
-			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker(), testRootDir)
+			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}

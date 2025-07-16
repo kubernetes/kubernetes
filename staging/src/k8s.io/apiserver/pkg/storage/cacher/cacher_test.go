@@ -176,50 +176,40 @@ func TestListPaging(t *testing.T) {
 	storagetesting.RunTestListPaging(ctx, t, cacher)
 }
 
-func TestList(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client.Client), true)
-}
+func TestLists(t *testing.T) {
+	for _, consistentRead := range []bool{true, false} {
+		for _, listFromCacheSnapshot := range []bool{true, false} {
+			t.Run(fmt.Sprintf("ConsistentListFromCache=%v,ListFromCacheSnapshot=%v", consistentRead, listFromCacheSnapshot), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, consistentRead)
+				t.Run("List", func(t *testing.T) {
+					t.Parallel()
+					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+					t.Cleanup(terminate)
+					storagetesting.RunTestList(ctx, t, cacher, increaseRV(server.V3Client.Client), true)
+				})
 
-func TestListWithConsistentListFromCache(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client.Client), true)
-}
+				t.Run("ConsistentList", func(t *testing.T) {
+					t.Parallel()
+					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+					t.Cleanup(terminate)
+					storagetesting.RunTestConsistentList(ctx, t, cacher, increaseRV(server.V3Client.Client), true, consistentRead, listFromCacheSnapshot)
+				})
 
-func TestConsistentList(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestConsistentList(ctx, t, cacher, compactStorage(cacher, server.V3Client.Client), true, false)
-}
-
-func TestConsistentListWithConsistentListFromCache(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestConsistentList(ctx, t, cacher, compactStorage(cacher, server.V3Client.Client), true, true)
-}
-
-func TestGetListNonRecursive(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client.Client), cacher)
-}
-
-func TestGetListNonRecursiveWithConsistentListFromCache(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client.Client), cacher)
+				t.Run("GetListNonRecursive", func(t *testing.T) {
+					t.Parallel()
+					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+					t.Cleanup(terminate)
+					storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRV(server.V3Client.Client), cacher)
+				})
+			})
+		}
+	}
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
-	ctx, store, _ := testSetup(t)
+	ctx, store, terminate := testSetup(t)
+	t.Cleanup(terminate)
 	storagetesting.RunTestGetListRecursivePrefix(ctx, t, store)
 }
 
@@ -246,10 +236,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 }
 
 func TestListInconsistentContinuation(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
 	// TODO(#109831): Enable use of this by setting compaction.
-	storagetesting.RunTestListInconsistentContinuation(ctx, t, cacher, nil)
 }
 
 func TestListResourceVersionMatch(t *testing.T) {
@@ -257,7 +244,7 @@ func TestListResourceVersionMatch(t *testing.T) {
 }
 
 func TestNamespaceScopedList(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
+	ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
 	t.Cleanup(terminate)
 	storagetesting.RunTestNamespaceScopedList(ctx, t, cacher)
 }
@@ -307,7 +294,7 @@ func TestWatch(t *testing.T) {
 func TestWatchFromZero(t *testing.T) {
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactStorage(cacher, server.V3Client.Client))
+	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactWatchCache(cacher, server.V3Client.Client))
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
@@ -355,13 +342,13 @@ func TestWatchInitializationSignal(t *testing.T) {
 }
 
 func TestClusterScopedWatch(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withSpecNodeNameIndexerFuncs)
+	ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withNodeNameAndNamespaceIndex)
 	t.Cleanup(terminate)
 	storagetesting.RunTestClusterScopedWatch(ctx, t, cacher)
 }
 
 func TestNamespaceScopedWatch(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
+	ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
 	t.Cleanup(terminate)
 	storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
 }
@@ -432,7 +419,8 @@ func withClusterScopedKeyFunc(options *setupOptions) {
 	}
 }
 
-func withSpecNodeNameIndexerFuncs(options *setupOptions) {
+// mirror indexer configuration from pkg/registry/core/pod/strategy.go
+func withNodeNameAndNamespaceIndex(options *setupOptions) {
 	options.indexerFuncs = map[string]storage.IndexerFunc{
 		"spec.nodeName": func(obj runtime.Object) string {
 			pod, ok := obj.(*example.Pod)
@@ -447,15 +435,19 @@ func withSpecNodeNameIndexerFuncs(options *setupOptions) {
 			pod := obj.(*example.Pod)
 			return []string{pod.Spec.NodeName}, nil
 		},
+		"f:metadata.namespace": func(obj interface{}) ([]string, error) {
+			pod := obj.(*example.Pod)
+			return []string{pod.ObjectMeta.Namespace}, nil
+		},
 	}
 }
 
-func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tearDownFunc) {
+func testSetup(t *testing.T, opts ...setupOption) (context.Context, *CacheDelegator, tearDownFunc) {
 	ctx, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
 	return ctx, cacher, tearDown
 }
 
-func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context, *Cacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
+func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context, *CacheDelegator, *etcd3testing.EtcdTestServer, tearDownFunc) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -470,28 +462,25 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 	}
 
 	config := Config{
-		Storage:        wrappedStorage,
-		Versioner:      storage.APIObjectVersioner{},
-		GroupResource:  schema.GroupResource{Resource: "pods"},
-		ResourcePrefix: setupOpts.resourcePrefix,
-		KeyFunc:        setupOpts.keyFunc,
-		GetAttrsFunc:   GetPodAttrs,
-		NewFunc:        newPod,
-		NewListFunc:    newPodList,
-		IndexerFuncs:   setupOpts.indexerFuncs,
-		Indexers:       &setupOpts.indexers,
-		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
-		Clock:          setupOpts.clock,
+		Storage:             wrappedStorage,
+		Versioner:           storage.APIObjectVersioner{},
+		GroupResource:       schema.GroupResource{Resource: "pods"},
+		EventsHistoryWindow: DefaultEventFreshDuration,
+		ResourcePrefix:      setupOpts.resourcePrefix,
+		KeyFunc:             setupOpts.keyFunc,
+		GetAttrsFunc:        GetPodAttrs,
+		NewFunc:             newPod,
+		NewListFunc:         newPodList,
+		IndexerFuncs:        setupOpts.indexerFuncs,
+		Indexers:            &setupOpts.indexers,
+		Codec:               codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:               setupOpts.clock,
 	}
 	cacher, err := NewCacherFromConfig(config)
 	if err != nil {
 		t.Fatalf("Failed to initialize cacher: %v", err)
 	}
 	ctx := context.Background()
-	terminate := func() {
-		cacher.Stop()
-		server.Terminate(t)
-	}
 
 	// Since some tests depend on the fact that GetList shouldn't fail,
 	// we wait until the error from the underlying storage is consumed.
@@ -507,32 +496,38 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 			t.Fatal(err)
 		}
 	}
+	delegator := NewCacheDelegator(cacher, wrappedStorage)
+	terminate := func() {
+		delegator.Stop()
+		cacher.Stop()
+		server.Terminate(t)
+	}
 
-	return ctx, cacher, server, terminate
+	return ctx, delegator, server, terminate
 }
 
 func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
 	_, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.TODO()); err != nil {
+		if err := cacher.cacher.ready.wait(context.TODO()); err != nil {
 			t.Fatalf("unexpected error waiting for the cache to be ready")
 		}
 	}
-	return &createWrapper{Cacher: cacher}, tearDown
+	return &createWrapper{CacheDelegator: cacher}, tearDown
 }
 
 type createWrapper struct {
-	*Cacher
+	*CacheDelegator
 }
 
 func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	if err := c.Cacher.Create(ctx, key, obj, out, ttl); err != nil {
+	if err := c.CacheDelegator.Create(ctx, key, obj, out, ttl); err != nil {
 		return err
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		currentObj := c.Cacher.newFunc()
-		err := c.Cacher.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
+		currentObj := c.CacheDelegator.cacher.newFunc()
+		err := c.CacheDelegator.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
 		if err != nil {
 			if storage.IsNotFound(err) {
 				return false, nil
@@ -546,23 +541,102 @@ func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime
 	})
 }
 
-func BenchmarkStoreListCreate(b *testing.B) {
+func BenchmarkStoreCreateList(b *testing.B) {
 	klog.SetLogger(logr.Discard())
-	b.Run("RV=NotOlderThan", func(b *testing.B) {
-		ctx, cacher, _, terminate := testSetupWithEtcdServer(b)
-		b.Cleanup(terminate)
-		storagetesting.RunBenchmarkStoreListCreate(ctx, b, cacher, metav1.ResourceVersionMatchNotOlderThan)
-	})
-	b.Run("RV=ExactMatch", func(b *testing.B) {
-		ctx, cacher, _, terminate := testSetupWithEtcdServer(b)
-		b.Cleanup(terminate)
-		storagetesting.RunBenchmarkStoreListCreate(ctx, b, cacher, metav1.ResourceVersionMatchExact)
-	})
+	storeOptions := []struct {
+		name         string
+		btreeEnabled bool
+	}{
+		{
+			name:         "Btree",
+			btreeEnabled: true,
+		},
+		{
+			name:         "Map",
+			btreeEnabled: false,
+		},
+	}
+	for _, store := range storeOptions {
+		b.Run(fmt.Sprintf("Store=%s", store.name), func(b *testing.B) {
+			featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.BtreeWatchCache, store.btreeEnabled)
+			for _, rvm := range []metav1.ResourceVersionMatch{metav1.ResourceVersionMatchNotOlderThan, metav1.ResourceVersionMatchExact} {
+				b.Run(fmt.Sprintf("RV=%s", rvm), func(b *testing.B) {
+					for _, useIndex := range []bool{true, false} {
+						b.Run(fmt.Sprintf("Indexed=%v", useIndex), func(b *testing.B) {
+							opts := []setupOption{}
+							if useIndex {
+								opts = append(opts, withNodeNameAndNamespaceIndex)
+							}
+							ctx, cacher, _, terminate := testSetupWithEtcdServer(b, opts...)
+							b.Cleanup(terminate)
+							storagetesting.RunBenchmarkStoreListCreate(ctx, b, cacher, rvm)
+						})
+					}
+				})
+			}
+		})
+	}
 }
 
 func BenchmarkStoreList(b *testing.B) {
 	klog.SetLogger(logr.Discard())
-	ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withSpecNodeNameIndexerFuncs)
-	b.Cleanup(terminate)
-	storagetesting.RunBenchmarkStoreList(ctx, b, cacher)
+	// Based on https://github.com/kubernetes/community/blob/master/sig-scalability/configs-and-limits/thresholds.md
+	dimensions := []struct {
+		namespaceCount       int
+		podPerNamespaceCount int
+		nodeCount            int
+	}{
+		{
+			namespaceCount:       10_000,
+			podPerNamespaceCount: 15,
+			nodeCount:            5_000,
+		},
+		{
+			namespaceCount:       50,
+			podPerNamespaceCount: 3_000,
+			nodeCount:            5_000,
+		},
+		{
+			namespaceCount:       100,
+			podPerNamespaceCount: 1_100,
+			nodeCount:            1000,
+		},
+	}
+	for _, dims := range dimensions {
+		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+			data := storagetesting.PrepareBenchchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+			storeOptions := []struct {
+				name         string
+				btreeEnabled bool
+			}{
+				{
+					name:         "Btree",
+					btreeEnabled: true,
+				},
+				{
+					name:         "Map",
+					btreeEnabled: false,
+				},
+			}
+			for _, store := range storeOptions {
+				b.Run(fmt.Sprintf("Store=%s", store.name), func(b *testing.B) {
+					featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.BtreeWatchCache, store.btreeEnabled)
+					ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withNodeNameAndNamespaceIndex)
+					b.Cleanup(terminate)
+					var out example.Pod
+					for _, pod := range data.Pods {
+						err := cacher.Create(ctx, computePodKey(pod), pod, &out, 0)
+						if err != nil {
+							b.Fatal(err)
+						}
+					}
+					for _, useIndex := range []bool{true, false} {
+						b.Run(fmt.Sprintf("Indexed=%v", useIndex), func(b *testing.B) {
+							storagetesting.RunBenchmarkStoreList(ctx, b, cacher, data, useIndex)
+						})
+					}
+				})
+			}
+		})
+	}
 }

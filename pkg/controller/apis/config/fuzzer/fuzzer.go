@@ -19,7 +19,7 @@ package fuzzer
 import (
 	"fmt"
 
-	"github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -28,20 +28,20 @@ import (
 // Funcs returns the fuzzer functions for the kube-controller manager apis.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(obj *kubectrlmgrconfig.KubeControllerManagerConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
+		func(obj *kubectrlmgrconfig.KubeControllerManagerConfiguration, c randfill.Continue) {
+			c.FillNoCustom(obj)
 			obj.Generic.Address = fmt.Sprintf("%d.%d.%d.%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))
-			obj.Generic.ClientConnection.ContentType = fmt.Sprintf("%s/%s.%s.%s", c.RandString(), c.RandString(), c.RandString(), c.RandString())
+			obj.Generic.ClientConnection.ContentType = fmt.Sprintf("%s/%s.%s.%s", c.String(0), c.String(0), c.String(0), c.String(0))
 			if obj.Generic.LeaderElection.ResourceLock == "" {
 				obj.Generic.LeaderElection.ResourceLock = "endpoints"
 			}
-			obj.Generic.Controllers = []string{fmt.Sprintf("%s", c.RandString())}
+			obj.Generic.Controllers = []string{c.String(0)}
 			if obj.KubeCloudShared.ClusterName == "" {
 				obj.KubeCloudShared.ClusterName = "kubernetes"
 			}
-			obj.CSRSigningController.ClusterSigningCertFile = fmt.Sprintf("/%s", c.RandString())
-			obj.CSRSigningController.ClusterSigningKeyFile = fmt.Sprintf("/%s", c.RandString())
-			obj.PersistentVolumeBinderController.VolumeConfiguration.FlexVolumePluginDir = fmt.Sprintf("/%s", c.RandString())
+			obj.CSRSigningController.ClusterSigningCertFile = fmt.Sprintf("/%s", c.String(0))
+			obj.CSRSigningController.ClusterSigningKeyFile = fmt.Sprintf("/%s", c.String(0))
+			obj.PersistentVolumeBinderController.VolumeConfiguration.FlexVolumePluginDir = fmt.Sprintf("/%s", c.String(0))
 			obj.TTLAfterFinishedController.ConcurrentTTLSyncs = c.Int31()
 		},
 	}

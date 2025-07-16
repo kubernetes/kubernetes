@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/resource/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -44,6 +45,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1beta1.BasicDevice)(nil), (*BasicDevice)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_BasicDevice_To_api_BasicDevice(a.(*v1beta1.BasicDevice), b.(*BasicDevice), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*Counter)(nil), (*v1beta1.Counter)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_Counter_To_v1beta1_Counter(a.(*Counter), b.(*v1beta1.Counter), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.Counter)(nil), (*Counter)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Counter_To_api_Counter(a.(*v1beta1.Counter), b.(*Counter), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*CounterSet)(nil), (*v1beta1.CounterSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_CounterSet_To_v1beta1_CounterSet(a.(*CounterSet), b.(*v1beta1.CounterSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CounterSet)(nil), (*CounterSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CounterSet_To_api_CounterSet(a.(*v1beta1.CounterSet), b.(*CounterSet), scope)
 	}); err != nil {
 		return err
 	}
@@ -74,6 +95,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*v1beta1.DeviceCapacity)(nil), (*DeviceCapacity)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_DeviceCapacity_To_api_DeviceCapacity(a.(*v1beta1.DeviceCapacity), b.(*DeviceCapacity), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*DeviceCounterConsumption)(nil), (*v1beta1.DeviceCounterConsumption)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_DeviceCounterConsumption_To_v1beta1_DeviceCounterConsumption(a.(*DeviceCounterConsumption), b.(*v1beta1.DeviceCounterConsumption), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DeviceCounterConsumption)(nil), (*DeviceCounterConsumption)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeviceCounterConsumption_To_api_DeviceCounterConsumption(a.(*v1beta1.DeviceCounterConsumption), b.(*DeviceCounterConsumption), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*DeviceTaint)(nil), (*v1beta1.DeviceTaint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_DeviceTaint_To_v1beta1_DeviceTaint(a.(*DeviceTaint), b.(*v1beta1.DeviceTaint), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DeviceTaint)(nil), (*DeviceTaint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeviceTaint_To_api_DeviceTaint(a.(*v1beta1.DeviceTaint), b.(*DeviceTaint), scope)
 	}); err != nil {
 		return err
 	}
@@ -123,6 +164,21 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_api_BasicDevice_To_v1beta1_BasicDevice(in *BasicDevice, out *v1beta1.BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[v1beta1.QualifiedName]v1beta1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.Capacity = *(*map[v1beta1.QualifiedName]v1beta1.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	if in.ConsumesCounters != nil {
+		in, out := &in.ConsumesCounters, &out.ConsumesCounters
+		*out = make([]v1beta1.DeviceCounterConsumption, len(*in))
+		for i := range *in {
+			if err := Convert_api_DeviceCounterConsumption_To_v1beta1_DeviceCounterConsumption(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ConsumesCounters = nil
+	}
+	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
+	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
+	out.Taints = *(*[]v1beta1.DeviceTaint)(unsafe.Pointer(&in.Taints))
 	return nil
 }
 
@@ -134,6 +190,21 @@ func Convert_api_BasicDevice_To_v1beta1_BasicDevice(in *BasicDevice, out *v1beta
 func autoConvert_v1beta1_BasicDevice_To_api_BasicDevice(in *v1beta1.BasicDevice, out *BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[QualifiedName]DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.Capacity = *(*map[QualifiedName]DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	if in.ConsumesCounters != nil {
+		in, out := &in.ConsumesCounters, &out.ConsumesCounters
+		*out = make([]DeviceCounterConsumption, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_DeviceCounterConsumption_To_api_DeviceCounterConsumption(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ConsumesCounters = nil
+	}
+	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
+	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
+	out.Taints = *(*[]v1beta1.DeviceTaint)(unsafe.Pointer(&in.Taints))
 	return nil
 }
 
@@ -142,11 +213,65 @@ func Convert_v1beta1_BasicDevice_To_api_BasicDevice(in *v1beta1.BasicDevice, out
 	return autoConvert_v1beta1_BasicDevice_To_api_BasicDevice(in, out, s)
 }
 
+func autoConvert_api_Counter_To_v1beta1_Counter(in *Counter, out *v1beta1.Counter, s conversion.Scope) error {
+	out.Value = in.Value
+	return nil
+}
+
+// Convert_api_Counter_To_v1beta1_Counter is an autogenerated conversion function.
+func Convert_api_Counter_To_v1beta1_Counter(in *Counter, out *v1beta1.Counter, s conversion.Scope) error {
+	return autoConvert_api_Counter_To_v1beta1_Counter(in, out, s)
+}
+
+func autoConvert_v1beta1_Counter_To_api_Counter(in *v1beta1.Counter, out *Counter, s conversion.Scope) error {
+	out.Value = in.Value
+	return nil
+}
+
+// Convert_v1beta1_Counter_To_api_Counter is an autogenerated conversion function.
+func Convert_v1beta1_Counter_To_api_Counter(in *v1beta1.Counter, out *Counter, s conversion.Scope) error {
+	return autoConvert_v1beta1_Counter_To_api_Counter(in, out, s)
+}
+
+func autoConvert_api_CounterSet_To_v1beta1_CounterSet(in *CounterSet, out *v1beta1.CounterSet, s conversion.Scope) error {
+	if err := Convert_api_UniqueString_To_string(&in.Name, &out.Name, s); err != nil {
+		return err
+	}
+	out.Counters = *(*map[string]v1beta1.Counter)(unsafe.Pointer(&in.Counters))
+	return nil
+}
+
+// Convert_api_CounterSet_To_v1beta1_CounterSet is an autogenerated conversion function.
+func Convert_api_CounterSet_To_v1beta1_CounterSet(in *CounterSet, out *v1beta1.CounterSet, s conversion.Scope) error {
+	return autoConvert_api_CounterSet_To_v1beta1_CounterSet(in, out, s)
+}
+
+func autoConvert_v1beta1_CounterSet_To_api_CounterSet(in *v1beta1.CounterSet, out *CounterSet, s conversion.Scope) error {
+	if err := Convert_string_To_api_UniqueString(&in.Name, &out.Name, s); err != nil {
+		return err
+	}
+	out.Counters = *(*map[string]Counter)(unsafe.Pointer(&in.Counters))
+	return nil
+}
+
+// Convert_v1beta1_CounterSet_To_api_CounterSet is an autogenerated conversion function.
+func Convert_v1beta1_CounterSet_To_api_CounterSet(in *v1beta1.CounterSet, out *CounterSet, s conversion.Scope) error {
+	return autoConvert_v1beta1_CounterSet_To_api_CounterSet(in, out, s)
+}
+
 func autoConvert_api_Device_To_v1beta1_Device(in *Device, out *v1beta1.Device, s conversion.Scope) error {
 	if err := Convert_api_UniqueString_To_string(&in.Name, &out.Name, s); err != nil {
 		return err
 	}
-	out.Basic = (*v1beta1.BasicDevice)(unsafe.Pointer(in.Basic))
+	if in.Basic != nil {
+		in, out := &in.Basic, &out.Basic
+		*out = new(v1beta1.BasicDevice)
+		if err := Convert_api_BasicDevice_To_v1beta1_BasicDevice(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Basic = nil
+	}
 	return nil
 }
 
@@ -159,7 +284,15 @@ func autoConvert_v1beta1_Device_To_api_Device(in *v1beta1.Device, out *Device, s
 	if err := Convert_string_To_api_UniqueString(&in.Name, &out.Name, s); err != nil {
 		return err
 	}
-	out.Basic = (*BasicDevice)(unsafe.Pointer(in.Basic))
+	if in.Basic != nil {
+		in, out := &in.Basic, &out.Basic
+		*out = new(BasicDevice)
+		if err := Convert_v1beta1_BasicDevice_To_api_BasicDevice(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Basic = nil
+	}
 	return nil
 }
 
@@ -212,6 +345,58 @@ func autoConvert_v1beta1_DeviceCapacity_To_api_DeviceCapacity(in *v1beta1.Device
 // Convert_v1beta1_DeviceCapacity_To_api_DeviceCapacity is an autogenerated conversion function.
 func Convert_v1beta1_DeviceCapacity_To_api_DeviceCapacity(in *v1beta1.DeviceCapacity, out *DeviceCapacity, s conversion.Scope) error {
 	return autoConvert_v1beta1_DeviceCapacity_To_api_DeviceCapacity(in, out, s)
+}
+
+func autoConvert_api_DeviceCounterConsumption_To_v1beta1_DeviceCounterConsumption(in *DeviceCounterConsumption, out *v1beta1.DeviceCounterConsumption, s conversion.Scope) error {
+	if err := Convert_api_UniqueString_To_string(&in.CounterSet, &out.CounterSet, s); err != nil {
+		return err
+	}
+	out.Counters = *(*map[string]v1beta1.Counter)(unsafe.Pointer(&in.Counters))
+	return nil
+}
+
+// Convert_api_DeviceCounterConsumption_To_v1beta1_DeviceCounterConsumption is an autogenerated conversion function.
+func Convert_api_DeviceCounterConsumption_To_v1beta1_DeviceCounterConsumption(in *DeviceCounterConsumption, out *v1beta1.DeviceCounterConsumption, s conversion.Scope) error {
+	return autoConvert_api_DeviceCounterConsumption_To_v1beta1_DeviceCounterConsumption(in, out, s)
+}
+
+func autoConvert_v1beta1_DeviceCounterConsumption_To_api_DeviceCounterConsumption(in *v1beta1.DeviceCounterConsumption, out *DeviceCounterConsumption, s conversion.Scope) error {
+	if err := Convert_string_To_api_UniqueString(&in.CounterSet, &out.CounterSet, s); err != nil {
+		return err
+	}
+	out.Counters = *(*map[string]Counter)(unsafe.Pointer(&in.Counters))
+	return nil
+}
+
+// Convert_v1beta1_DeviceCounterConsumption_To_api_DeviceCounterConsumption is an autogenerated conversion function.
+func Convert_v1beta1_DeviceCounterConsumption_To_api_DeviceCounterConsumption(in *v1beta1.DeviceCounterConsumption, out *DeviceCounterConsumption, s conversion.Scope) error {
+	return autoConvert_v1beta1_DeviceCounterConsumption_To_api_DeviceCounterConsumption(in, out, s)
+}
+
+func autoConvert_api_DeviceTaint_To_v1beta1_DeviceTaint(in *DeviceTaint, out *v1beta1.DeviceTaint, s conversion.Scope) error {
+	out.Key = in.Key
+	out.Value = in.Value
+	out.Effect = v1beta1.DeviceTaintEffect(in.Effect)
+	out.TimeAdded = (*metav1.Time)(unsafe.Pointer(in.TimeAdded))
+	return nil
+}
+
+// Convert_api_DeviceTaint_To_v1beta1_DeviceTaint is an autogenerated conversion function.
+func Convert_api_DeviceTaint_To_v1beta1_DeviceTaint(in *DeviceTaint, out *v1beta1.DeviceTaint, s conversion.Scope) error {
+	return autoConvert_api_DeviceTaint_To_v1beta1_DeviceTaint(in, out, s)
+}
+
+func autoConvert_v1beta1_DeviceTaint_To_api_DeviceTaint(in *v1beta1.DeviceTaint, out *DeviceTaint, s conversion.Scope) error {
+	out.Key = in.Key
+	out.Value = in.Value
+	out.Effect = DeviceTaintEffect(in.Effect)
+	out.TimeAdded = (*metav1.Time)(unsafe.Pointer(in.TimeAdded))
+	return nil
+}
+
+// Convert_v1beta1_DeviceTaint_To_api_DeviceTaint is an autogenerated conversion function.
+func Convert_v1beta1_DeviceTaint_To_api_DeviceTaint(in *v1beta1.DeviceTaint, out *DeviceTaint, s conversion.Scope) error {
+	return autoConvert_v1beta1_DeviceTaint_To_api_DeviceTaint(in, out, s)
 }
 
 func autoConvert_api_ResourcePool_To_v1beta1_ResourcePool(in *ResourcePool, out *v1beta1.ResourcePool, s conversion.Scope) error {
@@ -291,6 +476,18 @@ func autoConvert_api_ResourceSliceSpec_To_v1beta1_ResourceSliceSpec(in *Resource
 	} else {
 		out.Devices = nil
 	}
+	out.PerDeviceNodeSelection = (*bool)(unsafe.Pointer(in.PerDeviceNodeSelection))
+	if in.SharedCounters != nil {
+		in, out := &in.SharedCounters, &out.SharedCounters
+		*out = make([]v1beta1.CounterSet, len(*in))
+		for i := range *in {
+			if err := Convert_api_CounterSet_To_v1beta1_CounterSet(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.SharedCounters = nil
+	}
 	return nil
 }
 
@@ -321,6 +518,18 @@ func autoConvert_v1beta1_ResourceSliceSpec_To_api_ResourceSliceSpec(in *v1beta1.
 		}
 	} else {
 		out.Devices = nil
+	}
+	out.PerDeviceNodeSelection = (*bool)(unsafe.Pointer(in.PerDeviceNodeSelection))
+	if in.SharedCounters != nil {
+		in, out := &in.SharedCounters, &out.SharedCounters
+		*out = make([]CounterSet, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_CounterSet_To_api_CounterSet(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.SharedCounters = nil
 	}
 	return nil
 }

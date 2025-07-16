@@ -7,17 +7,17 @@ import (
 )
 
 var Annotations = map[string]string{
-	"[sig-api-machinery] API Streaming (aka. WatchList) [Serial] doesn't support receiving resources as Tables": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-api-machinery] API Streaming (aka. WatchList) [FeatureGate:WatchList] [Beta] [Feature:OffByDefault] [Serial] doesn't support receiving resources as Tables": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-api-machinery] API Streaming (aka. WatchList) [Serial] falls backs to supported content type when when receiving resources as Tables was requested": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-api-machinery] API Streaming (aka. WatchList) [FeatureGate:WatchList] [Beta] [Feature:OffByDefault] [Serial] falls backs to supported content type when when receiving resources as Tables was requested": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-api-machinery] API Streaming (aka. WatchList) [Serial] should be requested by client-go's List method when WatchListClient is enabled": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-api-machinery] API Streaming (aka. WatchList) [FeatureGate:WatchList] [Beta] [Feature:OffByDefault] [Serial] should be requested by client-go's List method when WatchListClient is enabled": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-api-machinery] API Streaming (aka. WatchList) [Serial] should be requested by dynamic client's List method when WatchListClient is enabled": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-api-machinery] API Streaming (aka. WatchList) [FeatureGate:WatchList] [Beta] [Feature:OffByDefault] [Serial] should be requested by dynamic client's List method when WatchListClient is enabled": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-api-machinery] API Streaming (aka. WatchList) [Serial] should be requested by informers when WatchListClient is enabled": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-api-machinery] API Streaming (aka. WatchList) [FeatureGate:WatchList] [Beta] [Feature:OffByDefault] [Serial] should be requested by informers when WatchListClient is enabled": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-api-machinery] API Streaming (aka. WatchList) [Serial] should be requested by metadata client's List method when WatchListClient is enabled": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-api-machinery] API Streaming (aka. WatchList) [FeatureGate:WatchList] [Beta] [Feature:OffByDefault] [Serial] should be requested by metadata client's List method when WatchListClient is enabled": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-api-machinery] API priority and fairness should ensure that requests can be classified by adding FlowSchema and PriorityLevelConfiguration": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -83,23 +83,35 @@ var Annotations = map[string]string{
 
 	"[sig-api-machinery] Aggregator Should be able to support the 1.17 Sample API Server using the current Aggregator [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] CBOR [Feature:CBOR] clients remain compatible with the 1.17 sample-apiserver [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-api-machinery] CBOR [Feature:CBOR] clients remain compatible with the 1.17 sample-apiserver [Serial]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST NOT fail to update a resource due to CRD Validation Rule errors on unchanged correlatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] MUST NOT fail to update a resource due to CRD Validation Rule errors on unchanged correlatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST NOT fail to update a resource due to JSONSchema errors on unchanged correlatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] MUST NOT fail to update a resource due to JSONSchema errors on unchanged correlatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST NOT ratchet errors raised by transition rules": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] MUST NOT ratchet errors raised by transition rules": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST evaluate a CRD Validation Rule with oldSelf = nil for new values when optionalOldSelf is true": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] MUST evaluate a CRD Validation Rule with oldSelf = nil for new values when optionalOldSelf is true": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST fail to update a resource due to CRD Validation Rule errors on changed fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] MUST fail to update a resource due to CRD Validation Rule errors on changed fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST fail to update a resource due to CRD Validation Rule errors on unchanged uncorrelatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] MUST fail to update a resource due to CRD Validation Rule errors on unchanged uncorrelatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST fail to update a resource due to JSONSchema errors on changed fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] MUST fail to update a resource due to JSONSchema errors on changed fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] [Beta] MUST fail to update a resource due to JSONSchema errors on unchanged uncorrelatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-api-machinery] CRDValidationRatcheting [Privileged:ClusterAdmin] [FeatureGate:CRDValidationRatcheting] MUST fail to update a resource due to JSONSchema errors on unchanged uncorrelatable fields": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] CoordinatedLeaderElection [Feature:CoordinatedLeaderElection] [FeatureGate:CoordinatedLeaderElection] [Beta] [Feature:OffByDefault] CLE Preemption": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-api-machinery] CoordinatedLeaderElection [Feature:CoordinatedLeaderElection] [FeatureGate:CoordinatedLeaderElection] [Beta] [Feature:OffByDefault] CLE downgrade to disabled": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-api-machinery] CoordinatedLeaderElection [Feature:CoordinatedLeaderElection] [FeatureGate:CoordinatedLeaderElection] [Beta] [Feature:OffByDefault] CLE upgrade to enabled": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-api-machinery] CoordinatedLeaderElection [Feature:CoordinatedLeaderElection] [FeatureGate:CoordinatedLeaderElection] [Beta] [Feature:OffByDefault] multiple LeaseCandidate": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-api-machinery] CoordinatedLeaderElection [Feature:CoordinatedLeaderElection] [FeatureGate:CoordinatedLeaderElection] [Beta] [Feature:OffByDefault] multiple LeaseCandidates third party strategy": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-api-machinery] CoordinatedLeaderElection [Feature:CoordinatedLeaderElection] [FeatureGate:CoordinatedLeaderElection] [Beta] [Feature:OffByDefault] single LeaseCandidate": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin] should be able to convert a non homogeneous list of CRs [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -185,15 +197,15 @@ var Annotations = map[string]string{
 
 	"[sig-api-machinery] Garbage collector should delete pods created by rc when not orphaning [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] Garbage collector should keep the rc around until all its pods are deleted if the deleteOptions says so [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[sig-api-machinery] Garbage collector should keep the rc around until all its pods are deleted if the deleteOptions says so [Serial] [Conformance]": " [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
 	"[sig-api-machinery] Garbage collector should not be blocked by dependency circle [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] Garbage collector should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[sig-api-machinery] Garbage collector should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted [Serial] [Conformance]": " [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
 	"[sig-api-machinery] Garbage collector should orphan RS created by deployment when deleteOptions.PropagationPolicy is Orphan [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-api-machinery] Garbage collector should orphan pods created by rc if delete options say so [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[sig-api-machinery] Garbage collector should orphan pods created by rc if delete options say so [Serial] [Conformance]": " [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
 	"[sig-api-machinery] Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -204,6 +216,12 @@ var Annotations = map[string]string{
 	"[sig-api-machinery] Generated clientset should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-api-machinery] Generated clientset should create v1 cronJobs, delete cronJobs, watch cronJobs": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] MutatingAdmissionPolicy [Privileged:ClusterAdmin] [Feature:MutatingAdmissionPolicy] [FeatureGate:MutatingAdmissionPolicy] [Alpha] [Feature:OffByDefault] should mutate a Deployment": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-api-machinery] MutatingAdmissionPolicy [Privileged:ClusterAdmin] [Feature:MutatingAdmissionPolicy] [FeatureGate:MutatingAdmissionPolicy] [Alpha] [Feature:OffByDefault] should support MutatingAdmissionPolicy API operations": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-api-machinery] MutatingAdmissionPolicy [Privileged:ClusterAdmin] [Feature:MutatingAdmissionPolicy] [FeatureGate:MutatingAdmissionPolicy] [Alpha] [Feature:OffByDefault] should support MutatingAdmissionPolicyBinding API operations": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-api-machinery] Namespaces [Serial] should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -227,7 +245,7 @@ var Annotations = map[string]string{
 
 	"[sig-api-machinery] OpenAPIV3 should round trip OpenAPI V3 for all built-in group versions": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-api-machinery] OrderedNamespaceDeletion namespace deletion should delete pod first [Feature:OrderedNamespaceDeletion] [FeatureGate:OrderedNamespaceDeletion] [Beta]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-api-machinery] OrderedNamespaceDeletion namespace deletion should delete pod first [Feature:OrderedNamespaceDeletion] [FeatureGate:OrderedNamespaceDeletion] [Beta] [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-api-machinery] ResourceQuota [Feature:PodPriority] should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes.": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -242,6 +260,10 @@ var Annotations = map[string]string{
 	"[sig-api-machinery] ResourceQuota [Feature:PodPriority] should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with different priority class (ScopeSelectorOpNotIn).": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-api-machinery] ResourceQuota [Feature:PodPriority] should verify ResourceQuota's priority class scope (quota set to pod count: 1) against a pod with same priority class.": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-api-machinery] ResourceQuota [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should verify ResourceQuota's volume attributes class scope (quota set to pvc count: 1) against 2 pvcs with same volume attributes class.": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-api-machinery] ResourceQuota [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should verify ResourceQuota's volume attributes class scope (quota set to pvc count: 1) against a pvc with different volume attributes class.": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-api-machinery] ResourceQuota should apply changes to a resourcequota status [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -487,7 +509,7 @@ var Annotations = map[string]string{
 
 	"[sig-apps] Job should delete pods when suspended": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-apps] Job should execute all indexes despite some failing when using backoffLimitPerIndex": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-apps] Job should execute all indexes despite some failing when using backoffLimitPerIndex [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-apps] Job should fail to exceed backoffLimit": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -495,9 +517,11 @@ var Annotations = map[string]string{
 
 	"[sig-apps] Job should manage the lifecycle of a job [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-apps] Job should mark indexes as failed when the FailIndex action is matched in podFailurePolicy": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-apps] Job should mark indexes as failed when the FailIndex action is matched in podFailurePolicy [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-apps] Job should not create pods when created in suspend state": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-apps] Job should record the failure-count in the Pod annotation when using backoffLimitPerIndex": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-apps] Job should recreate pods only after they have failed if pod replacement policy is set to Failed": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -511,15 +535,15 @@ var Annotations = map[string]string{
 
 	"[sig-apps] Job should run a job to completion with CPU requests [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-apps] Job should terminate job execution when the number of failed indexes exceeds maxFailedIndexes": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-apps] Job should terminate job execution when the number of failed indexes exceeds maxFailedIndexes [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-apps] Job should update the status ready field": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-apps] Job with successPolicy should succeeded when all indexes succeeded": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-apps] Job with successPolicy should succeeded when all indexes succeeded [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-apps] Job with successPolicy succeededCount rule should succeeded even when some indexes remain pending": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-apps] Job with successPolicy succeededCount rule should succeeded even when some indexes remain pending [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-apps] Job with successPolicy succeededIndexes rule should succeeded even when some indexes remain pending": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-apps] Job with successPolicy succeededIndexes rule should succeeded even when some indexes remain pending [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-apps] ReplicaSet Replace and Patch tests [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -625,6 +649,10 @@ var Annotations = map[string]string{
 
 	"[sig-auth] Certificates API [Privileged:ClusterAdmin] should support building a client with a CSR": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-auth] NodeAuthenticator The kubelet can delegate ServiceAccount tokens to the API server": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-auth] NodeAuthenticator The kubelet's main port 10250 should reject requests with no credentials": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-auth] SelfSubjectReview should support SelfSubjectReview API operations": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-auth] SelfSubjectReview testing SSR in different API groups authentication/v1": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -649,7 +677,7 @@ var Annotations = map[string]string{
 
 	"[sig-auth] ServiceAccounts should run through the lifecycle of a ServiceAccount [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-auth] ServiceAccounts should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-auth] ServiceAccounts should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-auth] ServiceAccounts should support InClusterConfig with token rotation [Slow]": " [Suite:k8s]",
 
@@ -658,28 +686,6 @@ var Annotations = map[string]string{
 	"[sig-auth] SubjectReview should support SubjectReview API operations [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-auth] ValidatingAdmissionPolicy can restrict access by-node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-auth] [Feature:ClusterTrustBundle] [Feature:ClusterTrustBundleProjection] [Serial] should be able to mount a big number (>100) of CTBs": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-auth] [Feature:ClusterTrustBundle] [Feature:ClusterTrustBundleProjection] [Serial] should be able to mount a single ClusterTrustBundle by name": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-auth] [Feature:ClusterTrustBundle] [Feature:ClusterTrustBundleProjection] [Serial] should be able to specify multiple CTB volumes": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-auth] [Feature:ClusterTrustBundle] [Feature:ClusterTrustBundleProjection] [Serial] should be capable to mount multiple trust bundles by signer+labels can combine all signer CTBs with an empty label selector": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-auth] [Feature:ClusterTrustBundle] [Feature:ClusterTrustBundleProjection] [Serial] should be capable to mount multiple trust bundles by signer+labels can combine multiple CTBs with signer name and label selector": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-auth] [Feature:ClusterTrustBundle] [Feature:ClusterTrustBundleProjection] [Serial] should be capable to mount multiple trust bundles by signer+labels should start if only signer name and explicit label selector matches nothing + optional=true": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-auth] [Feature:ClusterTrustBundle] [Feature:ClusterTrustBundleProjection] [Serial] should be capable to mount multiple trust bundles by signer+labels should start if only signer name and nil label selector + optional=true": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-auth] [Feature:ClusterTrustBundle] [Feature:ClusterTrustBundleProjection] [Serial] should prevent a pod from starting if:  sets optional=false and no trust bundle matches query": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-auth] [Feature:ClusterTrustBundle] [Feature:ClusterTrustBundleProjection] [Serial] should prevent a pod from starting if:  sets optional=false and the configured CTB does not exist": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-auth] [Feature:NodeAuthenticator] The kubelet can delegate ServiceAccount tokens to the API server": " [Skipped:ibmroks] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-auth] [Feature:NodeAuthenticator] The kubelet's main port 10250 should reject requests with no credentials": " [Skipped:ibmroks] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-auth] [Feature:NodeAuthorizer] A node shouldn't be able to create another node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -694,6 +700,66 @@ var Annotations = map[string]string{
 	"[sig-auth] [Feature:NodeAuthorizer] Getting an existing configmap should exit with the Forbidden error": " [Skipped:ibmroks] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-auth] [Feature:NodeAuthorizer] Getting an existing secret should exit with the Forbidden error": " [Skipped:ibmroks] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-auth] [FeatureGate:ClusterTrustBundle] [Beta] [Feature:OffByDefault] [FeatureGate:ClusterTrustBundleProjection] [Beta] [Feature:OffByDefault] should be able to mount a big number (>100) of CTBs": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-auth] [FeatureGate:ClusterTrustBundle] [Beta] [Feature:OffByDefault] [FeatureGate:ClusterTrustBundleProjection] [Beta] [Feature:OffByDefault] should be able to mount a single ClusterTrustBundle by name": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-auth] [FeatureGate:ClusterTrustBundle] [Beta] [Feature:OffByDefault] [FeatureGate:ClusterTrustBundleProjection] [Beta] [Feature:OffByDefault] should be able to specify multiple CTB volumes": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-auth] [FeatureGate:ClusterTrustBundle] [Beta] [Feature:OffByDefault] [FeatureGate:ClusterTrustBundleProjection] [Beta] [Feature:OffByDefault] should be capable to mount multiple trust bundles by signer+labels can combine all signer CTBs with an empty label selector": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-auth] [FeatureGate:ClusterTrustBundle] [Beta] [Feature:OffByDefault] [FeatureGate:ClusterTrustBundleProjection] [Beta] [Feature:OffByDefault] should be capable to mount multiple trust bundles by signer+labels can combine multiple CTBs with signer name and label selector": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-auth] [FeatureGate:ClusterTrustBundle] [Beta] [Feature:OffByDefault] [FeatureGate:ClusterTrustBundleProjection] [Beta] [Feature:OffByDefault] should be capable to mount multiple trust bundles by signer+labels should start if only signer name and explicit label selector matches nothing + optional=true": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-auth] [FeatureGate:ClusterTrustBundle] [Beta] [Feature:OffByDefault] [FeatureGate:ClusterTrustBundleProjection] [Beta] [Feature:OffByDefault] should be capable to mount multiple trust bundles by signer+labels should start if only signer name and nil label selector + optional=true": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-auth] [FeatureGate:ClusterTrustBundle] [Beta] [Feature:OffByDefault] [FeatureGate:ClusterTrustBundleProjection] [Beta] [Feature:OffByDefault] should prevent a pod from starting if:  sets optional=false and no trust bundle matches query": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-auth] [FeatureGate:ClusterTrustBundle] [Beta] [Feature:OffByDefault] [FeatureGate:ClusterTrustBundleProjection] [Beta] [Feature:OffByDefault] should prevent a pod from starting if:  sets optional=false and the configured CTB does not exist": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should be able to scale down by draining multiple pods one by one as dictated by pdb [Feature:ClusterSizeAutoscalingScaleDown]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should be able to scale down by draining system pods with pdb [Feature:ClusterSizeAutoscalingScaleDown]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should be able to scale down when rescheduling a pod is required and pdb allows for it [Feature:ClusterSizeAutoscalingScaleDown]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should correctly scale down after a node is not needed [Feature:ClusterSizeAutoscalingScaleDown]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should increase cluster size if pending pods are small [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should increase cluster size if pod requesting EmptyDir volume is pending [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should increase cluster size if pods are pending due to host port conflict [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should increase cluster size if pods are pending due to pod anti-affinity [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should scale down when expendable pod is running [Feature:ClusterSizeAutoscalingScaleDown]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should scale up when non expendable pod is created [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] should scale up when unprocessed pod is created and is going to be unschedulable [Feature:ClusterScaleUpBypassScheduler]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't be able to scale down when rescheduling a pod is required, but pdb doesn't allow drain [Feature:ClusterSizeAutoscalingScaleDown]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't increase cluster size if pending pod is too large [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't scale down when non expendable pod is running [Feature:ClusterSizeAutoscalingScaleDown]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't scale up when expendable pod is created [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't scale up when expendable pod is preempted [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't scale up when unprocessed pod is created and is going to be schedulable [Feature:ClusterScaleUpBypassScheduler]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't scale up when unprocessed pod is created and scheduler is not specified to be bypassed [Feature:ClusterScaleUpBypassScheduler]": " [Suite:k8s]",
+
+	"[sig-autoscaling] Cluster size autoscaling [Slow] shouldn't trigger additional scale-ups during processing scale-up [Feature:ClusterSizeAutoscalingScaleUp]": " [Suite:k8s]",
+
+	"[sig-autoscaling] [Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling Autoscaling a service from 1 pod and 3 nodes to 8 pods and >=4 nodes takes less than 15 minutes": " [Suite:k8s]",
+
+	"[sig-autoscaling] [Feature:HPAConfigurableTolerance] [FeatureGate:HPAConfigurableTolerance] [Alpha] [Feature:OffByDefault] [Serial] [Slow] Horizontal pod autoscaling (configurable tolerance) with large configurable tolerance should not scale": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) CustomResourceDefinition Should scale with a CRD targetRef": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -750,6 +816,10 @@ var Annotations = map[string]string{
 	"[sig-autoscaling] [Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior) with scale limited by percentage should scale up no more than given percentage of current Pods per minute": " [Suite:k8s]",
 
 	"[sig-autoscaling] [Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior) with short downscale stabilization window should scale down soon after the stabilization period": " [Suite:k8s]",
+
+	"[sig-autoscaling] [Feature:KubeDNSAutoscaler] DNS horizontal autoscaling [Serial] [Slow] kube-dns-autoscaler should scale kube-dns pods when cluster size changed": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-autoscaling] [Feature:KubeDNSAutoscaler] DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios": " [Disabled:SpecialConfig] [Suite:k8s]",
 
 	"[sig-cli] Kubectl Port forwarding Shutdown client connection while the remote stream is writing data to the port-forward connection port-forward should keep working after detect broken connection": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -975,8 +1045,6 @@ var Annotations = map[string]string{
 
 	"[sig-instrumentation] MetricsGrabber should grab all metrics slis from API server.": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] CVE-2021-29923 IPv4 Service Type ClusterIP with leading zeros should work interpreted as decimal": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
 	"[sig-network] Connectivity Pod Lifecycle should be able to connect from a Pod to a terminating Pod": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Connectivity Pod Lifecycle should be able to connect to other Pod from a terminating Pod": " [Disabled:RebaseInProgress] [Suite:k8s]",
@@ -999,7 +1067,7 @@ var Annotations = map[string]string{
 
 	"[sig-network] DNS HostNetwork spec.Hostname field is silently ignored and the node hostname is used when hostNetwork is set to true for a Pod": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] DNS [Feature:RelaxedDNSSearchValidation] [Feature:Alpha] should work with a search path containing an underscore and a search path with a single dot": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-network] DNS [Feature:RelaxedDNSSearchValidation] [FeatureGate:RelaxedDNSSearchValidation] [Beta] should work with a search path containing an underscore and a search path with a single dot": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] DNS configMap nameserver Change stubDomain should be able to change stubDomain configuration [Slow] [Serial]": " [Disabled:SpecialConfig] [Suite:k8s]",
 
@@ -1279,7 +1347,13 @@ var Annotations = map[string]string{
 
 	"[sig-network] Proxy version v1 should proxy through a service and a pod [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[sig-network] Service CIDRs should create Services and serve on different Service CIDRs": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-network] Service endpoints latency should not be very high [Conformance]": " [Serial] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
+
+	"[sig-network] ServiceCIDR and IPAddress API should support IPAddress API operations [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-network] ServiceCIDR and IPAddress API should support ServiceCIDR API operations [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-network] Services should allow creating a basic SCTP service with pod and endpoints [LinuxOnly] [Serial]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -1316,6 +1390,10 @@ var Annotations = map[string]string{
 	"[sig-network] Services should check NodePort out-of-range": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Services should complete a service status lifecycle [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-network] Services should connect to the named ports exposed by restartable init containers": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-network] Services should connect to the ports exposed by restartable init containers": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] Services should create endpoints for unready pods": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1381,6 +1459,20 @@ var Annotations = map[string]string{
 
 	"[sig-network] Services should work after the service has been recreated": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-network] Topology Hints should distribute endpoints evenly": " [Disabled:Broken] [Suite:k8s]",
+
+	"[sig-network] Traffic Distribution should route traffic correctly between pods on multiple nodes when using PreferClose": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-network] Traffic Distribution should route traffic correctly between pods on multiple nodes when using PreferSameZone [FeatureGate:PreferSameTrafficDistribution] [Alpha] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-network] Traffic Distribution should route traffic to an endpoint in the same zone when using PreferClose": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-network] Traffic Distribution should route traffic to an endpoint in the same zone when using PreferSameZone [FeatureGate:PreferSameTrafficDistribution] [Alpha] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-network] Traffic Distribution should route traffic to an endpoint on the same node or fall back to same zone when using PreferSameNode [FeatureGate:PreferSameTrafficDistribution] [Alpha] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-network] Traffic Distribution should route traffic to an endpoint on the same node when using PreferSameNode and fall back when the endpoint becomes unavailable [FeatureGate:PreferSameTrafficDistribution] [Alpha] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
 	"[sig-network] [Feature:IPv6DualStack] Granular Checks: Services Secondary IP Family [LinuxOnly] should be able to handle large requests: http": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] [Feature:IPv6DualStack] Granular Checks: Services Secondary IP Family [LinuxOnly] should be able to handle large requests: udp": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -1428,12 +1520,6 @@ var Annotations = map[string]string{
 	"[sig-network] [Feature:IPv6DualStack] should have ipv4 and ipv6 internal node ip": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] [Feature:PerformanceDNS] [Serial] Should answer DNS query for maximum number of services per cluster": " [Slow] [Suite:k8s]",
-
-	"[sig-network] [Feature:ServiceCIDRs] [FeatureGate:MultiCIDRServiceAllocator] [Beta] should create Services and serve on different Service CIDRs": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-network] [Feature:Topology Hints] should distribute endpoints evenly": " [Disabled:SpecialConfig] [Suite:k8s]",
-
-	"[sig-network] [Feature:Traffic Distribution] when Service has trafficDistribution=PreferClose should route traffic to an endpoint that is close to the client": " [Disabled:Broken] [Suite:k8s]",
 
 	"[sig-network] kube-proxy migration [Serial] [Disruptive] [Feature:KubeProxyDaemonSetMigration] Downgrade kube-proxy from a DaemonSet to static pods should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]": " [Disabled:Unimplemented] [Suite:k8s]",
 
@@ -1499,83 +1585,103 @@ var Annotations = map[string]string{
 
 	"[sig-node] Containers should use the image defaults if command and args are blank [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] ResourceSlice Controller creates slices": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] ResourceSlice Controller creates slices": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster DaemonSet with admin access [Feature:DRAAdminAccess]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] cluster DaemonSet with admin access [Feature:DRAAdminAccess] [FeatureGate:DRAAdminAccess] [Alpha] [Feature:OffByDefault] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster must apply per-node permission checks": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] cluster must apply per-node permission checks": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster must manage ResourceSlices [Slow]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] cluster must manage ResourceSlices [Slow]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster support validating admission policy for admin access [Feature:DRAAdminAccess]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] cluster supports count/resourceclaims.resource.k8s.io ResourceQuota": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster supports count/resourceclaims.resource.k8s.io ResourceQuota": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] cluster truncates the name of a generated resource claim": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster truncates the name of a generated resource claim": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] cluster validate ResourceClaimTemplate and ResourceClaim for admin access [Feature:DRAAdminAccess] [FeatureGate:DRAAdminAccess] [Alpha] [Feature:OffByDefault] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet must call NodePrepareResources even if not used by any container": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] failed update": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet must map configs and devices to the right containers": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] kubelet must call NodePrepareResources even if not used by any container": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet must not run a pod if a claim is not ready": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] kubelet must map configs and devices to the right containers": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet must retry NodePrepareResources": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] kubelet must not run a pod if a claim is not ready": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet must unprepare resources for force-deleted pod": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] kubelet must retry NodePrepareResources": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet registers plugin": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] kubelet must unprepare resources for force-deleted pod": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] multiple drivers using both drav1alpha4 and drapbv1beta1 work": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] kubelet registers plugin": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] multiple drivers using only drapbv1alpha4 work": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] multiple drivers using only drapbv1beta1 work": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] multiple drivers using only drapbv1beta1 work": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on multiple nodes with different ResourceSlices keeps pod pending because of CEL runtime errors": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on multiple nodes with different ResourceSlices keeps pod pending because of CEL runtime errors": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on multiple nodes with network-attached resources supports sharing a claim sequentially [Slow]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on multiple nodes with network-attached resources supports sharing a claim sequentially [Slow]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on multiple nodes with node-local resources uses all resources": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on multiple nodes with node-local resources uses all resources": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node must be possible for the driver to update the ResourceClaim.Status.Devices once allocated [Feature:DRAResourceClaimDeviceStatus] [FeatureGate:DRAResourceClaimDeviceStatus] [Beta] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node must be possible for the driver to update the ResourceClaim.Status.Devices once allocated [Feature:DRAResourceClaimDeviceStatus]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node must deallocate after use": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node must deallocate after use": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node retries pod scheduling after creating device class": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node retries pod scheduling after creating device class": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node retries pod scheduling after updating device class": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node retries pod scheduling after updating device class": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node runs a pod without a generated resource claim": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node runs a pod without a generated resource claim": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node supports claim and class parameters": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node supports claim and class parameters": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node supports init containers": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node supports init containers": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node supports reusing resources": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node supports reusing resources": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node supports sharing a claim concurrently": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node supports sharing a claim concurrently": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] on single node supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] on single node supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] rolling update": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] DRA [Feature:DynamicResourceAllocation] runs pod after driver starts": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] runs pod after driver starts": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPIHugePages] Downward API tests for hugepages should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars": " [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] sequential update with pods replacing each other [Slow]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-node] Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPIHugePages] Downward API tests for hugepages should provide default limits.hugepages-<pagesize> from node allocatable": " [Suite:k8s]",
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] with device taints [Feature:DRADeviceTaints] [FeatureGate:DRADeviceTaints] [Alpha] [Feature:OffByDefault] DeviceTaint keeps pod pending": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] with device taints [Feature:DRADeviceTaints] [FeatureGate:DRADeviceTaints] [Alpha] [Feature:OffByDefault] DeviceTaintRule evicts pod": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] with device taints [Feature:DRADeviceTaints] [FeatureGate:DRADeviceTaints] [Alpha] [Feature:OffByDefault] DeviceToleration enables pod scheduling": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] with prioritized list chooses the correct subrequest subject to constraints [Feature:DRAPrioritizedList]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] with prioritized list filters config correctly for multiple devices [Feature:DRAPrioritizedList]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] with prioritized list selects the first subrequest that can be satisfied [Feature:DRAPrioritizedList]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] with prioritized list uses the config for the selected subrequest [Feature:DRAPrioritizedList]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] with v1beta2 API supports requests with alternatives [Feature:DRAPrioritizedList]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] [FeatureGate:DynamicResourceAllocation] [Beta] [Feature:OffByDefault] with v1beta2 API supports simple ResourceClaim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Downward API [Serial] [Disruptive] [Feature:DownwardAPIHugePages] Downward API tests for hugepages should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars": " [Suite:k8s]",
+
+	"[sig-node] Downward API [Serial] [Disruptive] [Feature:DownwardAPIHugePages] Downward API tests for hugepages should provide default limits.hugepages-<pagesize> from node allocatable": " [Suite:k8s]",
 
 	"[sig-node] Downward API should provide container's limits.cpu/memory and requests.cpu/memory as env vars [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1653,109 +1759,121 @@ var Annotations = map[string]string{
 
 	"[sig-node] NodeLease NodeLease the kubelet should report node status infrequently": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] NodeProblemDetector [NodeFeature:NodeProblemDetector] should run without error": " [Disabled:SpecialConfig] [Suite:k8s]",
+	"[sig-node] NodeProblemDetector [Feature:NodeProblemDetector] should run without error": " [Disabled:SpecialConfig] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] pod-resize-limit-ranger-test": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] BestEffort QoS pod - empty resize": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Feature:InPlacePodVerticalScaling] pod-resize-resource-quota-test": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] BestEffort pod - try requesting memory, expect error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] BestEffort QoS pod - empty resize": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod with memory requests + limits - decrease memory limit": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] BestEffort pod - try requesting memory, expect error": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, mixed containers - add limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, mixed containers - add limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, mixed containers - add requests": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, mixed containers - add requests": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, mixed containers - scale up cpu and memory": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, mixed containers - scale up cpu and memory": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container - decrease CPU (NotRequired) & memory (RestartContainer)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container - decrease CPU (RestartContainer) & memory (NotRequired)": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container - decrease memory request (RestartContainer memory resize policy)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with CPU requests + limits, cpu requests - remove memory requests": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container - increase memory request (NoRestart memory resize policy)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU limits only": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with CPU requests + limits, cpu requests - remove memory requests": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and increase CPU limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU limits only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and increase memory limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and increase CPU limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and increase memory limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests only": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory limits only": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and increase CPU limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and increase CPU limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and increase memory limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and increase memory limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests only": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU limits only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU limits only": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and decrease CPU limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and decrease CPU limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and decrease memory limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory limits only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests only": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and decrease CPU limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory limits only": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and decrease CPU limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and decrease memory limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - remove CPU limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests + limits - remove memory limits": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests only": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests - decrease memory request": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - remove CPU limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu & memory requests - increase cpu request": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests + limits - remove memory limits": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with cpu requests and limits - resize with equivalents": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests - decrease memory request": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container with memory requests + limits, cpu requests - remove CPU requests": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu & memory requests - increase cpu request": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container, one restartable init container - decrease init container CPU only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with cpu requests and limits - resize with equivalents": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container, one restartable init container - decrease init container memory requests only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, one container with memory requests + limits, cpu requests - remove CPU requests": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container, one restartable init container - increase init container CPU & memory": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, three containers - decrease c1 resources, increase c2 resources, no change for c3 (net increase for pod)": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container, one restartable init container - increase init container CPU only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, three containers - increase c1 resources, no change for c2, decrease c3 resources (no net change for pod)": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, one container, one restartable init container - increase init container memory only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Burstable QoS pod, three containers - no change for c1, increase c2 resources, decrease c3 (net decrease for pod)": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, three containers - decrease c1 resources, increase c2 resources, no change for c3 (net increase for pod)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - decrease CPU & increase memory": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, three containers - increase c1 resources, no change for c2, decrease c3 resources (no net change for pod)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - decrease CPU & memory": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, three containers - no change for c1, increase c2 resources, decrease c3 (net decrease for pod)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - increase CPU & decrease memory": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Burstable QoS pod, two containers with cpu & memory requests + limits - reorder containers": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - increase CPU & memory with an extended resource": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Guaranteed QoS pod, one container - decrease CPU only": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - increase CPU & memory": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Guaranteed QoS pod, one container - increase CPU & memory with an extended resource": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Guaranteed QoS pod, one container - increase CPU (NotRequired) & memory (RestartContainer)": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Guaranteed QoS pod, one container - increase CPU & memory": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod InPlace Resize Container [Serial] [Feature:InPlacePodVerticalScaling] [NodeAlphaFeature:InPlacePodVerticalScaling] Guaranteed QoS pod, three containers (c1, c2, c3) - increase: CPU (c1,c3), memory (c2) ; decrease: CPU (c2), memory (c1,c3)": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Guaranteed QoS pod, one container - increase CPU (NotRequired) & memory (RestartContainer)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] [NodeAlphaFeature:PodLevelResources] Burstable QoS pod with container resources": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Guaranteed QoS pod, one container, one restartable init container - decrease init container CPU": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] [NodeAlphaFeature:PodLevelResources] Burstable QoS pod, 1 container with resources": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Guaranteed QoS pod, one restartable init container - decrease CPU & increase memory": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] [NodeAlphaFeature:PodLevelResources] Burstable QoS pod, no container resources": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Guaranteed QoS pod, one restartable init container - increase CPU & memory": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] [NodeAlphaFeature:PodLevelResources] Guaranteed QoS pod with container resources": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] Guaranteed QoS pod, three containers (c1, c2, c3) - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] [NodeAlphaFeature:PodLevelResources] Guaranteed QoS pod, 1 container with resources": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] pod-resize-limit-ranger-test": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] [NodeAlphaFeature:PodLevelResources] Guaranteed QoS pod, no container resources": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Pod InPlace Resize Container [FeatureGate:InPlacePodVerticalScaling] [Beta] pod-resize-resource-quota-test": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] Burstable QoS pod with container resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] Burstable QoS pod, 1 container with resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] Burstable QoS pod, no container resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] Guaranteed QoS pod with container resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] Guaranteed QoS pod, 1 container with resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pod Level Resources [Serial] [Feature:PodLevelResources] Guaranteed QoS pod, no container resources": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-node] Pod garbage collector [Feature:PodGarbageCollector] [Slow] should handle the creation of 1000 pods": " [Suite:k8s]",
 
@@ -1768,6 +1886,16 @@ var Annotations = map[string]string{
 	"[sig-node] PodTemplates should replace a pod template [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-node] PodTemplates should run the lifecycle of PodTemplates [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Alpha] [Feature:OffByDefault] Pod Generation custom-set generation on new pods and graceful delete": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Alpha] [Feature:OffByDefault] Pod Generation issue 500 podspec updates and verify generation and observedGeneration eventually converge": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Alpha] [Feature:OffByDefault] Pod Generation pod generation should start at 1 and increment per update": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Alpha] [Feature:OffByDefault] Pod Generation pod observedGeneration field set in pod conditions": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Alpha] [Feature:OffByDefault] Pod Generation pod rejected by kubelet should have updated generation and observedGeneration": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-node] Pods Extended Delete Grace Period should be submitted and removed": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1861,7 +1989,7 @@ var Annotations = map[string]string{
 
 	"[sig-node] Probing container with readiness probe that fails should never be ready and never restart [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-node] RuntimeClass should reject a Pod requesting a RuntimeClass with an unconfigured handler [NodeFeature:RuntimeHandler]": " [Disabled:Broken] [Suite:k8s]",
+	"[sig-node] RuntimeClass should reject a Pod requesting a RuntimeClass with an unconfigured handler [Feature:RuntimeHandler]": " [Disabled:Broken] [Suite:k8s]",
 
 	"[sig-node] RuntimeClass should reject a Pod requesting a RuntimeClass with conflicting node selector": " [Disabled:Broken] [Suite:k8s]",
 
@@ -1869,7 +1997,7 @@ var Annotations = map[string]string{
 
 	"[sig-node] RuntimeClass should reject a Pod requesting a non-existent RuntimeClass [NodeConformance] [Conformance]": " [Disabled:Broken] [Suite:k8s]",
 
-	"[sig-node] RuntimeClass should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]": " [Disabled:Broken] [Suite:k8s]",
+	"[sig-node] RuntimeClass should run a Pod requesting a RuntimeClass with a configured handler [Feature:RuntimeHandler]": " [Disabled:Broken] [Suite:k8s]",
 
 	"[sig-node] RuntimeClass should run a Pod requesting a RuntimeClass with scheduling with taints [Serial]": " [Disabled:Broken] [Suite:k8s]",
 
@@ -1893,6 +2021,18 @@ var Annotations = map[string]string{
 
 	"[sig-node] Secrets should patch a secret [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[sig-node] Security Context SupplementalGroupsPolicy [LinuxOnly] [Feature:SupplementalGroupsPolicy] [FeatureGate:SupplementalGroupsPolicy] [Beta] when SupplementalGroupsPolicy nil in SecurityContext when if the container's primary UID belongs to some groups in the image when scheduled node does not support SupplementalGroupsPolicy it should add SupplementalGroups to them [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] Security Context SupplementalGroupsPolicy [LinuxOnly] [Feature:SupplementalGroupsPolicy] [FeatureGate:SupplementalGroupsPolicy] [Beta] when SupplementalGroupsPolicy nil in SecurityContext when if the container's primary UID belongs to some groups in the image when scheduled node supports SupplementalGroupsPolicy it should add SupplementalGroups to them [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] Security Context SupplementalGroupsPolicy [LinuxOnly] [Feature:SupplementalGroupsPolicy] [FeatureGate:SupplementalGroupsPolicy] [Beta] when SupplementalGroupsPolicy was set to Merge in PodSpec when the container's primary UID belongs to some groups in the image when scheduled node does not support SupplementalGroupsPolicy it should add SupplementalGroups to them [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] Security Context SupplementalGroupsPolicy [LinuxOnly] [Feature:SupplementalGroupsPolicy] [FeatureGate:SupplementalGroupsPolicy] [Beta] when SupplementalGroupsPolicy was set to Merge in PodSpec when the container's primary UID belongs to some groups in the image when scheduled node supports SupplementalGroupsPolicy it should add SupplementalGroups to them [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] Security Context SupplementalGroupsPolicy [LinuxOnly] [Feature:SupplementalGroupsPolicy] [FeatureGate:SupplementalGroupsPolicy] [Beta] when SupplementalGroupsPolicy was set to Strict in PodSpec when the container's primary UID belongs to some groups in the image when scheduled node does not support SupplementalGroupsPolicy it should reject the pod [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] Security Context SupplementalGroupsPolicy [LinuxOnly] [Feature:SupplementalGroupsPolicy] [FeatureGate:SupplementalGroupsPolicy] [Beta] when SupplementalGroupsPolicy was set to Strict in PodSpec when the container's primary UID belongs to some groups in the image when scheduled node supports SupplementalGroupsPolicy it should NOT add SupplementalGroups to them [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-node] Security Context When creating a container with runAsNonRoot should not run with an explicit root user ID [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] Security Context When creating a container with runAsNonRoot should not run without a specified user ID": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -1905,27 +2045,23 @@ var Annotations = map[string]string{
 
 	"[sig-node] Security Context When creating a container with runAsUser should run the container with uid 65534 [LinuxOnly] [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-node] Security Context When creating a pod with HostUsers must create the user namespace if set to false [LinuxOnly] [Feature:UserNamespacesSupport]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Security Context When creating a pod with HostUsers must create the user namespace if set to false [LinuxOnly] [Feature:UserNamespacesSupport]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Security Context When creating a pod with HostUsers must not create the user namespace if set to true [LinuxOnly] [Feature:UserNamespacesSupport]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Security Context When creating a pod with HostUsers must create the user namespace in the configured hostUID/hostGID range [LinuxOnly] [Feature:UserNamespacesSupport]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Security Context When creating a pod with HostUsers should mount all volumes with proper permissions with hostUsers=false [LinuxOnly] [Feature:UserNamespacesSupport]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Security Context When creating a pod with HostUsers must not create the user namespace if set to true [LinuxOnly] [Feature:UserNamespacesSupport]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Security Context When creating a pod with HostUsers should set FSGroup to user inside the container with hostUsers=false [LinuxOnly] [Feature:UserNamespacesSupport]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] Security Context When creating a pod with HostUsers should mount all volumes with proper permissions with hostUsers=false [LinuxOnly] [Feature:UserNamespacesSupport]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] Security Context When creating a pod with privileged should run the container as privileged when true [LinuxOnly] [NodeFeature:HostAccess]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] Security Context When creating a pod with HostUsers should set FSGroup to user inside the container with hostUsers=false [LinuxOnly] [Feature:UserNamespacesSupport]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] Security Context When creating a pod with privileged should run the container as privileged when true [LinuxOnly] [Feature:HostAccess]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] Security Context When creating a pod with privileged should run the container as unprivileged when false [LinuxOnly] [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-node] Security Context When creating a pod with readOnlyRootFilesystem should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] Security Context When creating a pod with readOnlyRootFilesystem should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[sig-node] Security Context [sig-node] SupplementalGroupsPolicy [Feature:SupplementalGroupsPolicy] when SupplementalGroupsPolicy was not set if the container's primary UID belongs to some groups in the image, it should add SupplementalGroups to them [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-node] Security Context [sig-node] SupplementalGroupsPolicy [Feature:SupplementalGroupsPolicy] when SupplementalGroupsPolicy was set to Merge if the container's primary UID belongs to some groups in the image, it should add SupplementalGroups to them [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[sig-node] Security Context [sig-node] SupplementalGroupsPolicy [Feature:SupplementalGroupsPolicy] when SupplementalGroupsPolicy was set to Strict even if the container's primary UID belongs to some groups in the image, it should not add SupplementalGroups to them [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] Security Context should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [LinuxOnly] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1967,7 +2103,7 @@ var Annotations = map[string]string{
 
 	"[sig-node] Sysctls [LinuxOnly] [NodeConformance] should support sysctls with slashes as separator [MinimumKubeletVersion:1.23] [Environment:NotInUserNS]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] User Namespaces for Pod Security Standards [LinuxOnly] with UserNamespacesSupport and UserNamespacesPodSecurityStandards enabled should allow pod [Feature:UserNamespacesPodSecurityStandards]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] User Namespaces for Pod Security Standards [LinuxOnly] with UserNamespacesSupport and UserNamespacesPodSecurityStandards enabled should allow pod [Feature:UserNamespacesPodSecurityStandards]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] Variable Expansion allow almost all printable ASCII characters as environment variable names [Feature:RelaxedEnvironmentVariableValidation]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1987,6 +2123,8 @@ var Annotations = map[string]string{
 
 	"[sig-node] Variable Expansion should verify that a failing subpath expansion can be modified during the lifecycle of a container [Slow] [Conformance]": " [Suite:k8s]",
 
+	"[sig-node] [Feature:ContainerStopSignals] when create a pod with a StopSignal lifecycle StopSignal defined with pod.OS": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[sig-node] [Feature:Example] Downward API should create a pod that prints his name and namespace": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] [Feature:Example] Liveness liveness pods should be automatically restarted": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -1999,7 +2137,13 @@ var Annotations = map[string]string{
 
 	"[sig-node] [Feature:GPUDevicePlugin] [Serial] Test using a Pod should run gpu based matrix multiplication": " [Disabled:SpecialConfig] [Suite:k8s]",
 
-	"[sig-node] [Feature:PodLifecycleSleepActionAllowZero] when create a pod with lifecycle hook using sleep action with a duration of zero seconds prestop hook using sleep action with zero duration": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] [Feature:KubeletFineGrainedAuthz] when calling kubelet API check /healthz enpoint is accessible via nodes/healthz RBAC": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] [Feature:KubeletFineGrainedAuthz] when calling kubelet API check /healthz enpoint is accessible via nodes/proxy RBAC": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] [Feature:KubeletFineGrainedAuthz] when calling kubelet API check /healthz enpoint is not accessible via nodes/configz RBAC": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-node] [Feature:PodLifecycleSleepActionAllowZero] when create a pod with lifecycle hook using sleep action with a duration of zero seconds prestop hook using sleep action with zero duration": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action ignore terminated container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -2007,65 +2151,65 @@ var Annotations = map[string]string{
 
 	"[sig-node] [Feature:PodLifecycleSleepAction] when create a pod with lifecycle hook using sleep action valid prestop hook using sleep action": " [Disabled:Broken] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted by liveness probe because startup probe delays it": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted by liveness probe because startup probe delays it": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a /healthz http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a /healthz http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a GRPC liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a GRPC liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a exec \"cat /tmp/health\" liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a exec \"cat /tmp/health\" liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a non-local redirect http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a non-local redirect http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a tcp:8080 liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should *not* be restarted with a tcp:8080 liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be ready immediately after startupProbe succeeds": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should be ready immediately after startupProbe succeeds": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted by liveness probe after startup probe enables it": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should be restarted by liveness probe after startup probe enables it": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted startup probe fails": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should be restarted startup probe fails": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a /healthz http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should be restarted with a /healthz http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a GRPC liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should be restarted with a GRPC liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a exec \"cat /tmp/health\" liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should be restarted with a exec \"cat /tmp/health\" liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a failing exec liveness probe that took longer than the timeout": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should be restarted with a failing exec liveness probe that took longer than the timeout": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with a local redirect http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should be restarted with a local redirect http liveness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should have monotonically increasing restart count": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should have monotonically increasing restart count": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should override timeoutGracePeriodSeconds when LivenessProbe field is set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should override timeoutGracePeriodSeconds when LivenessProbe field is set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container should override timeoutGracePeriodSeconds when StartupProbe field is set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container should override timeoutGracePeriodSeconds when StartupProbe field is set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container with readiness probe should not be ready before initial delay and never restart": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container with readiness probe should not be ready before initial delay and never restart": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Probing restartable init container with readiness probe that fails should never be ready and never restart": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Probing restartable init container with readiness probe that fails should never be ready and never restart": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart exec hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart exec hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart http hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart http hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart https hook properly [MinimumKubeletVersion:1.23]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart https hook properly [MinimumKubeletVersion:1.23]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop exec hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop exec hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop http hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop http hook properly": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [NodeFeature:SidecarContainers] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop https hook properly [MinimumKubeletVersion:1.23]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-node] [Feature:SidecarContainers] Restartable Init Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop https hook properly [MinimumKubeletVersion:1.23]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] [Serial] Pod InPlace Resize Container (scheduler-focused) [Feature:InPlacePodVerticalScaling] pod-resize-scheduler-tests": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-node] [Serial] Pod InPlace Resize Container (scheduler-focused) [FeatureGate:InPlacePodVerticalScaling] [Beta] pod-resize-scheduler-tests": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-node] crictl should be able to run crictl on the node": " [Disabled:Broken] [Suite:k8s]",
 
@@ -2107,7 +2251,7 @@ var Annotations = map[string]string{
 
 	"[sig-scheduling] SchedulerPredicates [Serial] validates Pods with non-empty schedulingGates are blocked on scheduling": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-scheduling] SchedulerPredicates [Serial] validates local ephemeral storage resource limits of pods that are allowed to run [Feature:LocalStorageCapacityIsolation]": " [Disabled:SpecialConfig] [Suite:k8s]",
+	"[sig-scheduling] SchedulerPredicates [Serial] validates local ephemeral storage resource limits of pods that are allowed to run": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-scheduling] SchedulerPredicates [Serial] validates pod overhead is considered along with resource limits of pods that are allowed to run verify pod overhead is accounted for": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -2143,7 +2287,7 @@ var Annotations = map[string]string{
 
 	"[sig-scheduling] SchedulerPreemption [Serial] validates pod disruption condition is added to the preempted pod [Conformance]": " [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
-	"[sig-scheduling] SchedulerPreemption [Serial] validates various priority Pods preempt expectedly with the async preemption [Feature:SchedulerAsyncPreemption]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-scheduling] SchedulerPreemption [Serial] validates various priority Pods preempt expectedly with the async preemption [Feature:SchedulerAsyncPreemption] [FeatureGate:SchedulerAsyncPreemption] [Beta]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-scheduling] SchedulerPriorities [Serial] Pod should be preferably scheduled to nodes pod can tolerate": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -2151,23 +2295,35 @@ var Annotations = map[string]string{
 
 	"[sig-scheduling] SchedulerPriorities [Serial] PodTopologySpread Scoring validates pod should be preferably scheduled to node which makes the matching pods more evenly distributed": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock Node Volume Health [Feature:CSIVolumeHealth] [FeatureGate:CSIVolumeHealth] [Alpha] CSI Mock Node Volume Health [Slow] return normal volume stats with abnormal volume condition": " [Suite:k8s]",
+	"[sig-storage] CSI Mock Node Volume Health [FeatureGate:CSIVolumeHealth] [Alpha] [Feature:OffByDefault] CSI Mock Node Volume Health [Slow] return normal volume stats with abnormal volume condition": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock Node Volume Health [Feature:CSIVolumeHealth] [FeatureGate:CSIVolumeHealth] [Alpha] CSI Mock Node Volume Health [Slow] return normal volume stats without volume condition": " [Suite:k8s]",
+	"[sig-storage] CSI Mock Node Volume Health [FeatureGate:CSIVolumeHealth] [Alpha] [Feature:OffByDefault] CSI Mock Node Volume Health [Slow] return normal volume stats without volume condition": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock Node Volume Health [Feature:CSIVolumeHealth] [FeatureGate:CSIVolumeHealth] [Alpha] CSI Mock Node Volume Health [Slow] return normal volume stats": " [Suite:k8s]",
+	"[sig-storage] CSI Mock Node Volume Health [FeatureGate:CSIVolumeHealth] [Alpha] [Feature:OffByDefault] CSI Mock Node Volume Health [Slow] return normal volume stats": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock fsgroup as mount option Delegate FSGroup to CSI driver [LinuxOnly] should not pass FSGroup to CSI driver if it is set in pod and driver supports VOLUME_MOUNT_GROUP": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock fsgroup as mount option Delegate FSGroup to CSI driver [LinuxOnly] should pass FSGroup to CSI driver if it is set in pod and driver supports VOLUME_MOUNT_GROUP": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock honor pv reclaim policy [Feature:HonorPVReclaimPolicy] [FeatureGate:HonorPVReclaimPolicy] [Beta] CSI honor pv reclaim policy using mock driver Dynamic provisioning should honor pv delete reclaim policy": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock honor pv reclaim policy CSI honor pv reclaim policy changes using mock driver should honor pv reclaim policy after it is changed from deleted to retain": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock honor pv reclaim policy [Feature:HonorPVReclaimPolicy] [FeatureGate:HonorPVReclaimPolicy] [Beta] CSI honor pv reclaim policy using mock driver Dynamic provisioning should honor pv retain reclaim policy": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock honor pv reclaim policy CSI honor pv reclaim policy changes using mock driver should honor pv reclaim policy after it is changed from retain to deleted": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock honor pv reclaim policy [Feature:HonorPVReclaimPolicy] [FeatureGate:HonorPVReclaimPolicy] [Beta] CSI honor pv reclaim policy using mock driver Static provisioning should honor pv delete reclaim policy": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock honor pv reclaim policy CSI honor pv reclaim policy using mock driver Dynamic provisioning should honor pv delete reclaim policy when deleting pv then pvc": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock honor pv reclaim policy [Feature:HonorPVReclaimPolicy] [FeatureGate:HonorPVReclaimPolicy] [Beta] CSI honor pv reclaim policy using mock driver Static provisioning should honor pv retain reclaim policy": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock honor pv reclaim policy CSI honor pv reclaim policy using mock driver Dynamic provisioning should honor pv delete reclaim policy when deleting pvc": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock honor pv reclaim policy CSI honor pv reclaim policy using mock driver Dynamic provisioning should honor pv retain reclaim policy when deleting pv then pvc": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock honor pv reclaim policy CSI honor pv reclaim policy using mock driver Dynamic provisioning should honor pv retain reclaim policy when deleting pvc then pv": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock honor pv reclaim policy CSI honor pv reclaim policy using mock driver Static provisioning should honor pv delete reclaim policy when deleting pv then pvc": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock honor pv reclaim policy CSI honor pv reclaim policy using mock driver Static provisioning should honor pv delete reclaim policy when deleting pvc": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock honor pv reclaim policy CSI honor pv reclaim policy using mock driver Static provisioning should honor pv retain reclaim policy when deleting pv then pvc": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock honor pv reclaim policy CSI honor pv reclaim policy using mock driver Static provisioning should honor pv retain reclaim policy when deleting pvc then pv": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should add SELinux mount option to existing mount options [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -2177,29 +2333,57 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not pass SELinux mount option for RWO volume with SELinuxMount disabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not unstage RWO volume when starting a second pod with the same SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not pass SELinux mount option for RWO volume with SELinuxMount disabled and Recursive policy [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not pass SELinux mount option for RWO volume with only SELinuxChangePolicy enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly] [FeatureGate:SELinuxChangePolicy] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not unstage RWO volume when starting a second pod with the same SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should not unstage RWOP volume when starting a second pod with the same SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should pass SELinux mount option for RWO volume with SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should pass SELinux mount option for RWO volume with SELinuxMount enabled and MountOption policy [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should pass SELinux mount option for RWO volume with SELinuxMount enabled and nil policy [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should pass SELinux mount option for RWOP volume and Pod with SELinux context set [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should unstage RWO volume when starting a second pod with different SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should unstage RWO volume when starting a second pod with different SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should unstage RWO volume when starting a second pod with different policy (MountOption -> Recursive) [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should unstage RWO volume when starting a second pod with different policy (Recursive -> MountOption) [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock selinux on mount SELinuxMount [LinuxOnly] [Feature:SELinux] should unstage RWOP volume when starting a second pod with different SELinux context [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different context on RWO volume and SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with MountOption policy and a different context on RWOP volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different context on RWOP volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different context on RWO volume and SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different context on RWX volume and SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different context on RWOP volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMountReadWriteOncePod] [Beta]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is not bumped on two Pods with the same context on RWO volume and SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxMount] [Alpha]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different context on RWX volume and SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] warning is bumped on two Pods with a different context on RWO volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different policy on RWO volume and SELinuxMount enabled (Recursive + MountOption) [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock selinux on mount metrics SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] warning is not bumped on two Pods with the same context on RWO volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different policy on RWO volume and SELinuxMount enabled (Recursive + nil) [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is bumped on two Pods with a different policy on RWO volume and SELinuxMount enabled (nil + Recursive) [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is not bumped on two Pods with Recursive policy and a different context on RWX volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is not bumped on two Pods with a different policy RWX volume (MountOption + MountOption) [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is not bumped on two Pods with a different policy RWX volume (nil + MountOption) [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] error is not bumped on two Pods with the same context on RWO volume and SELinuxMount enabled [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxMount] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] warning is bumped on two Pods with a different context on RWO volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] warning is bumped on two Pods with different policies on RWO volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] warning is not bumped on two Pods with Recursive policy and a different context on RWO volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-storage] CSI Mock selinux on mount metrics and SELinuxWarningController SELinuxMount metrics [LinuxOnly] [Feature:SELinux] [Serial] warning is not bumped on two Pods with the same context on RWO volume [FeatureGate:SELinuxMountReadWriteOncePod] [Beta] [FeatureGate:SELinuxChangePolicy] [Beta] [Feature:SELinuxMountReadWriteOncePodOnly]": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock volume attach CSI CSIDriver deployment after pod creation using non-attachable mock driver should bringup pod after deploying CSIDriver attach=false [Slow]": " [Suite:k8s]",
 
@@ -2227,17 +2411,17 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Mock volume expansion CSI online volume expansion with secret should expand volume without restarting pod if attach=on, nodeExpansion=on, csiNodeExpandSecret=on": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] recovery should be possible for node-only expanded volumes with final error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] [FeatureGate:RecoverVolumeExpansionFailure] [Beta] recovery should be possible for node-only expanded volumes with final error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] recovery should be possible for node-only expanded volumes with infeasible error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] [FeatureGate:RecoverVolumeExpansionFailure] [Beta] recovery should be possible for node-only expanded volumes with infeasible error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] recovery should not be possible in partially expanded volumes": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] [FeatureGate:RecoverVolumeExpansionFailure] [Beta] recovery should not be possible in partially expanded volumes": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should allow recovery if controller expansion fails with final error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] [FeatureGate:RecoverVolumeExpansionFailure] [Beta] should allow recovery if controller expansion fails with final error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should allow recovery if controller expansion fails with infeasible error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] [FeatureGate:RecoverVolumeExpansionFailure] [Beta] should allow recovery if controller expansion fails with infeasible error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should record target size in allocated resources": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] [FeatureGate:RecoverVolumeExpansionFailure] [Beta] should record target size in allocated resources": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock volume fsgroup policies CSI FSGroupPolicy Update [LinuxOnly] should not update fsGroup if update from File to None": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -2387,11 +2571,15 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should be protected by vac-protection finalizer": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should recover from invalid target VAC by updating PVC to new valid VAC [Flaky]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-stress multiple pods should access different volumes repeatedly [Slow] [Serial]": " [Suite:k8s]",
 
@@ -2481,11 +2669,15 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should be protected by vac-protection finalizer": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should recover from invalid target VAC by updating PVC to new valid VAC [Flaky]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-stress multiple pods should access different volumes repeatedly [Slow] [Serial]": " [Suite:k8s]",
 
@@ -2645,11 +2837,15 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should be protected by vac-protection finalizer": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should recover from invalid target VAC by updating PVC to new valid VAC [Flaky]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volumeIO should write files of various sizes, verify size, validate content [Slow]": " [Suite:k8s]",
 
@@ -2981,11 +3177,15 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (block volmode)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (block volmode)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should create a volume with VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should be protected by vac-protection finalizer": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (block volmode)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume that already has a VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should create a volume with VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (block volmode)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume with no VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume that already has a VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume with no VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should recover from invalid target VAC by updating PVC to new valid VAC [Flaky]": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (block volmode)] volume-stress multiple pods should access different volumes repeatedly [Slow] [Serial]": " [Skipped:gce] [Suite:k8s]",
 
@@ -3075,11 +3275,15 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (default fs)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (default fs)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should create a volume with VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should be protected by vac-protection finalizer": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (default fs)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume that already has a VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should create a volume with VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (default fs)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume with no VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume that already has a VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume with no VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should recover from invalid target VAC by updating PVC to new valid VAC [Flaky]": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (default fs)] volume-stress multiple pods should access different volumes repeatedly [Slow] [Serial]": " [Skipped:gce] [Suite:k8s]",
 
@@ -3239,11 +3443,15 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should create a volume with VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should be protected by vac-protection finalizer": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume that already has a VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should create a volume with VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
 
-	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume with no VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume that already has a VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume with no VAC": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
+
+	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should recover from invalid target VAC by updating PVC to new valid VAC [Flaky]": " [Disabled:Alpha] [Skipped:gce] [Suite:k8s]",
 
 	"[sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io] [Serial] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volumeIO should write files of various sizes, verify size, validate content [Slow]": " [Skipped:gce] [Suite:k8s]",
 
@@ -3533,9 +3741,9 @@ var Annotations = map[string]string{
 
 	"[sig-storage] ConfigMap should be consumable from pods in volume as non-root [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-storage] ConfigMap should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] ConfigMap should be consumable from pods in volume as non-root with FSGroup [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] ConfigMap should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] ConfigMap should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] ConfigMap should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -3545,7 +3753,7 @@ var Annotations = map[string]string{
 
 	"[sig-storage] ConfigMap should be consumable from pods in volume with mappings as non-root [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-storage] ConfigMap should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] ConfigMap should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] ConfigMap should be consumable in multiple volumes in the same pod [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -3569,9 +3777,9 @@ var Annotations = map[string]string{
 
 	"[sig-storage] Downward API volume should provide node allocatable (memory) as default memory limit if the limit is not set [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-storage] Downward API volume should provide podname as non-root with fsgroup [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] Downward API volume should provide podname as non-root with fsgroup [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] Downward API volume should provide podname as non-root with fsgroup and defaultMode [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] Downward API volume should provide podname as non-root with fsgroup and defaultMode [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] Downward API volume should provide podname only [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -3633,21 +3841,21 @@ var Annotations = map[string]string{
 
 	"[sig-storage] EmptyDir volumes volume on tmpfs should have the correct mode [LinuxOnly] [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup] files with FSGroup ownership should support (root,0644,tmpfs)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] files with FSGroup ownership should support (root,0644,tmpfs)": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup] new files should be created with FSGroup ownership when container is non-root": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] new files should be created with FSGroup ownership when container is non-root": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup] new files should be created with FSGroup ownership when container is root": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] new files should be created with FSGroup ownership when container is root": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup] nonexistent volume subPath should have the correct mode and owner using FSGroup": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] nonexistent volume subPath should have the correct mode and owner using FSGroup": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup] volume on default medium should have the correct mode using FSGroup": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] volume on default medium should have the correct mode using FSGroup": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup] volume on tmpfs should have the correct mode using FSGroup": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] volume on tmpfs should have the correct mode using FSGroup": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] EmptyDir wrapper volumes should not cause race condition when used for configmaps [Serial] [Conformance]": " [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
-	"[sig-storage] EmptyDir wrapper volumes should not cause race condition when used for git_repo [Serial] [Slow]": " [Suite:k8s]",
+	"[sig-storage] EmptyDir wrapper volumes should not cause race condition when used for git_repo [FeatureGate:GitRepoVolumeDriver] [Deprecated] [Feature:OffByDefault] [Serial] [Slow]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] EmptyDir wrapper volumes should not conflict [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -12803,13 +13011,11 @@ var Annotations = map[string]string{
 
 	"[sig-storage] Mounted volume expand [Feature:StorageProvider] Should verify mounted devices can be resized": " [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] NFSPersistentVolumes [Disruptive] [Flaky] when kube-controller-manager restarts should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash": " [Serial] [Suite:k8s]",
+	"[sig-storage] NFSPersistentVolumes [Disruptive] when kubelet restarts Should test that a file written to the mount before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] NFSPersistentVolumes [Disruptive] [Flaky] when kubelet restarts Should test that a file written to the mount before kubelet restart is readable after restart.": " [Serial] [Suite:k8s]",
+	"[sig-storage] NFSPersistentVolumes [Disruptive] when kubelet restarts Should test that a volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns.": " [Serial] [Suite:k8s]",
 
-	"[sig-storage] NFSPersistentVolumes [Disruptive] [Flaky] when kubelet restarts Should test that a volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns.": " [Serial] [Suite:k8s]",
-
-	"[sig-storage] NFSPersistentVolumes [Disruptive] [Flaky] when kubelet restarts Should test that a volume mounted to a pod that is force deleted while the kubelet is down unmounts when the kubelet returns.": " [Serial] [Suite:k8s]",
+	"[sig-storage] NFSPersistentVolumes [Disruptive] when kubelet restarts Should test that a volume mounted to a pod that is force deleted while the kubelet is down unmounts when the kubelet returns.": " [Serial] [Suite:k8s]",
 
 	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern:  (delete policy)] volumegroupsnapshottable [Feature:volumegroupsnapshot] VolumeGroupSnapshottable should create snapshots for multiple volumes in a pod": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -12873,11 +13079,15 @@ var Annotations = map[string]string{
 
 	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (block volmode)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (block volmode)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should be protected by vac-protection finalizer": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (block volmode)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (block volmode)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (block volmode)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should recover from invalid target VAC by updating PVC to new valid VAC [Flaky]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (block volmode)] volume-stress multiple pods should access different volumes repeatedly [Slow] [Serial]": " [Suite:k8s]",
 
@@ -12967,11 +13177,15 @@ var Annotations = map[string]string{
 
 	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (default fs)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (default fs)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should be protected by vac-protection finalizer": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (default fs)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (default fs)] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (default fs)] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should recover from invalid target VAC by updating PVC to new valid VAC [Flaky]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (default fs)] volume-stress multiple pods should access different volumes repeatedly [Slow] [Serial]": " [Suite:k8s]",
 
@@ -13131,11 +13345,15 @@ var Annotations = map[string]string{
 
 	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should be protected by vac-protection finalizer": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should create a volume with VAC": " [Disabled:Alpha] [Suite:k8s]",
 
-	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume that already has a VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should modify volume with no VAC": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volume-modify [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should recover from invalid target VAC by updating PVC to new valid VAC [Flaky]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] OCP CSI Volumes [Driver: csi-hostpath-groupsnapshot] [OCPFeatureGate:VolumeGroupSnapshot] [Testpattern: Dynamic PV (ntfs)] [Feature:Windows] volumeIO should write files of various sizes, verify size, validate content [Slow]": " [Suite:k8s]",
 
@@ -13601,9 +13819,9 @@ var Annotations = map[string]string{
 
 	"[sig-storage] Projected configMap should be consumable from pods in volume as non-root [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-storage] Projected configMap should be consumable from pods in volume as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] Projected configMap should be consumable from pods in volume as non-root with FSGroup [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] Projected configMap should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] Projected configMap should be consumable from pods in volume as non-root with defaultMode and fsGroup set [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] Projected configMap should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -13613,7 +13831,7 @@ var Annotations = map[string]string{
 
 	"[sig-storage] Projected configMap should be consumable from pods in volume with mappings as non-root [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-storage] Projected configMap should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] Projected configMap should be consumable from pods in volume with mappings as non-root with FSGroup [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] Projected configMap should be consumable in multiple volumes in the same pod [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -13631,9 +13849,9 @@ var Annotations = map[string]string{
 
 	"[sig-storage] Projected downwardAPI should provide node allocatable (memory) as default memory limit if the limit is not set [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-storage] Projected downwardAPI should provide podname as non-root with fsgroup [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] Projected downwardAPI should provide podname as non-root with fsgroup [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] Projected downwardAPI should provide podname as non-root with fsgroup and defaultMode [LinuxOnly] [NodeFeature:FSGroup]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] Projected downwardAPI should provide podname as non-root with fsgroup and defaultMode [LinuxOnly]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] Projected downwardAPI should provide podname only [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -13709,9 +13927,7 @@ var Annotations = map[string]string{
 
 	"[sig-storage] VolumeAttachment Conformance should run through the lifecycle of a VolumeAttachment [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[sig-storage] VolumeAttributesClass [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta] should run through the lifecycle of a VolumeAttributesClass": " [Disabled:Alpha] [Suite:k8s]",
-
-	"[sig-storage] Volumes ConfigMap should be mountable": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-storage] VolumeAttributesClass [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault] should run through the lifecycle of a VolumeAttributesClass": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] Volumes NFSv3 should be mountable for NFSv3": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -13755,7 +13971,7 @@ var Annotations = map[string]string{
 
 	"[sig-storage] [Serial] Volume metrics PVController should create bound pv/pvc count metrics for pvc controller after creating both pv and pvc": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] [Serial] Volume metrics PVController should create bound pv/pvc count metrics for pvc controller with volume attributes class dimension after creating both pv and pvc [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] [Serial] Volume metrics PVController should create bound pv/pvc count metrics for pvc controller with volume attributes class dimension after creating both pv and pvc [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-storage] [Serial] Volume metrics PVController should create none metrics for pvc controller before creating any PV or PVC": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -13765,7 +13981,7 @@ var Annotations = map[string]string{
 
 	"[sig-storage] [Serial] Volume metrics PVController should create unbound pvc count metrics for pvc controller after creating pvc only": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[sig-storage] [Serial] Volume metrics PVController should create unbound pvc count metrics for pvc controller with volume attributes class dimension after creating pvc only [Feature:VolumeAttributesClass] [FeatureGate:VolumeAttributesClass] [Beta]": " [Disabled:Alpha] [Suite:k8s]",
+	"[sig-storage] [Serial] Volume metrics PVController should create unbound pvc count metrics for pvc controller with volume attributes class dimension after creating pvc only [FeatureGate:VolumeAttributesClass] [Beta] [Feature:OffByDefault]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-windows] Hybrid cluster network for all supported CNIs should have stable networking for Linux and Windows pods": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 

@@ -38,12 +38,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/compatibility"
+	"k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	utiltesting "k8s.io/client-go/util/testing"
+	basecompatibility "k8s.io/component-base/compatibility"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration"
@@ -66,7 +70,8 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *APIServer {
 	tCtx := ktesting.Init(t)
 
-	certDir, err := os.MkdirTemp("", t.Name())
+	// Strip out "/" in subtests
+	certDir, err := os.MkdirTemp("", strings.ReplaceAll(t.Name(), "/", ""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,6 +96,17 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	}
 
 	opts := options.NewServerRunOptions()
+	// If EmulationVersion of DefaultFeatureGate is set during test, we need to propagate it to the apiserver ComponentGlobalsRegistry.
+	featureGate := feature.DefaultMutableFeatureGate.DeepCopy()
+	effectiveVersion := compatibility.DefaultKubeEffectiveVersionForTest()
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
+	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
+	if err := componentGlobalsRegistry.Register(basecompatibility.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
+		t.Fatal(err)
+	}
+	opts.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
+
 	opts.Options.SecureServing.Listener = listener
 	opts.Options.SecureServing.ServerCert.CertDirectory = certDir
 	opts.Options.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
@@ -106,6 +122,19 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	for _, f := range configFuncs {
 		f(opts)
 	}
+
+	// If the local ComponentGlobalsRegistry is changed by configFuncs,
+	// we need to copy the new feature values back to the DefaultFeatureGate because most feature checks still use the DefaultFeatureGate.
+	if !featureGate.EmulationVersion().EqualTo(feature.DefaultMutableFeatureGate.EmulationVersion()) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	}
+	for f := range feature.DefaultMutableFeatureGate.GetAll() {
+		if featureGate.Enabled(f) != feature.DefaultFeatureGate.Enabled(f) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, f, featureGate.Enabled(f))
+		}
+	}
+	feature.DefaultMutableFeatureGate.AddMetrics()
+
 	completedOptions, err := opts.Complete(tCtx)
 	if err != nil {
 		t.Fatal(err)

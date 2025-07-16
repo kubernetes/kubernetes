@@ -134,9 +134,9 @@ export WINDOWS_CNI_DIR="${WINDOWS_K8S_DIR}\cni"
 # Directory where CNI config files will be stored on Windows nodes.
 export WINDOWS_CNI_CONFIG_DIR="${WINDOWS_K8S_DIR}\cni\config"
 # CNI storage path for Windows nodes
-export WINDOWS_CNI_STORAGE_PATH="https://storage.googleapis.com/k8s-artifacts-cni/release"
+export WINDOWS_CNI_STORAGE_PATH="https://github.com/containernetworking/plugins/releases/download"
 # CNI version for Windows nodes
-export WINDOWS_CNI_VERSION="v1.6.0"
+export WINDOWS_CNI_VERSION="v1.6.2"
 # Pod manifests directory for Windows nodes on Windows nodes.
 export WINDOWS_MANIFESTS_DIR="${WINDOWS_K8S_DIR}\manifests"
 # Directory where cert/key files will be stores on Windows nodes.
@@ -158,7 +158,7 @@ export WINDOWS_INFRA_CONTAINER="registry.k8s.io/pause:3.10"
 # Storage Path for csi-proxy. csi-proxy only needs to be installed for Windows.
 export CSI_PROXY_STORAGE_PATH="https://storage.googleapis.com/gke-release/csi-proxy"
 # Version for csi-proxy
-export CSI_PROXY_VERSION="${CSI_PROXY_VERSION:-v1.1.1-gke.0}"
+export CSI_PROXY_VERSION="${CSI_PROXY_VERSION:-v1.2.1-gke.2}"
 # csi-proxy additional flags, there are additional flags that cannot be unset in k8s-node-setup.psm1
 export CSI_PROXY_FLAGS="${CSI_PROXY_FLAGS:-}"
 # Storage path for auth-provider-gcp binaries

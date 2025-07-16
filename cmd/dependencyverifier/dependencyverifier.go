@@ -26,7 +26,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp" //nolint:depguard
 )
 
 type Unwanted struct {

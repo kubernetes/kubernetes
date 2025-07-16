@@ -150,6 +150,10 @@ func (statefulSetStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Obj
 	for i, pvc := range newStatefulSet.Spec.VolumeClaimTemplates {
 		warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec", "volumeClaimTemplates").Index(i), pvc.Spec)...)
 	}
+
+	if newStatefulSet.Spec.RevisionHistoryLimit != nil && *newStatefulSet.Spec.RevisionHistoryLimit < 0 {
+		warnings = append(warnings, "spec.revisionHistoryLimit: a negative value retains all historical revisions; a value >= 0 is recommended")
+	}
 	return warnings
 }
 
@@ -181,6 +185,9 @@ func (statefulSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 	}
 	for i, pvc := range newStatefulSet.Spec.VolumeClaimTemplates {
 		warnings = append(warnings, pvcutil.GetWarningsForPersistentVolumeClaimSpec(field.NewPath("spec", "volumeClaimTemplates").Index(i).Child("Spec"), pvc.Spec)...)
+	}
+	if newStatefulSet.Spec.RevisionHistoryLimit != nil && *newStatefulSet.Spec.RevisionHistoryLimit < 0 {
+		warnings = append(warnings, "spec.revisionHistoryLimit: a negative value retains all historical revisions; a value >= 0 is recommended")
 	}
 
 	return warnings

@@ -659,3 +659,34 @@ EOF
   set +o nounset
   set +o errexit
 }
+
+run_kubectl_debug_warning_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace  
+  kube::log::status "Testing kubectl debug warning"
+
+  ### Non-root Pod Troubleshooting by ephemeral containers
+  # Pre-Condition: Non-root Pod "busybox" is created 
+  kubectl create -f hack/testdata/pod-run-as-non-root.yaml  "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Command: add a new debug container with netadmin profile
+  output_message=$(kubectl debug target -it --image=busybox --container=debug-container --attach=false --profile=netadmin "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'Warning: Non-root user is configured for the entire target Pod, and some capabilities granted by debug profile may not work. Please consider using "--custom" with a custom profile that specifies "securityContext.runAsUser: 0".'
+  # Clean up
+  kubectl delete pod target "${kube_flags[@]:?}"
+
+  ### Non-root Pod Troubleshooting by pod copy
+  # Pre-Condition: Non-root Pod "busybox" is created 
+  kubectl create -f hack/testdata/pod-run-as-non-root.yaml  "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target:'
+  # Command: create a copy of target with a new debug container
+  output_message=$(kubectl debug target -it --copy-to=target-copy --image=busybox --container=debug-container --attach=false --profile=netadmin "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'Warning: Non-root user is configured for the entire target Pod, and some capabilities granted by debug profile may not work. Please consider using "--custom" with a custom profile that specifies "securityContext.runAsUser: 0".'
+  # Clean up
+  kubectl delete pod target "${kube_flags[@]:?}"
+
+  set +o nounset
+  set +o errexit
+}

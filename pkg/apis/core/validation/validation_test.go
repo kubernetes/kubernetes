@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +48,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -704,9 +704,28 @@ func TestValidatePersistentVolumeSpec(t *testing.T) {
 				MountOptions: []string{"soft", "read-write"},
 			},
 		},
+		"invalid-node-affinity": {
+			isExpectedFailure: true,
+			isInlineSpec:      false,
+			pvSpec: &core.PersistentVolumeSpec{
+				NodeAffinity: &core.VolumeNodeAffinity{
+					Required: &core.NodeSelector{
+						NodeSelectorTerms: []core.NodeSelectorTerm{{
+							MatchExpressions: []core.NodeSelectorRequirement{{
+								Key:      "foo",
+								Operator: core.NodeSelectorOpIn,
+								Values:   []string{"-1"},
+							}},
+						}},
+					},
+				},
+			},
+		},
 	}
 	for name, scenario := range scenarios {
-		opts := PersistentVolumeSpecValidationOptions{}
+		opts := ValidationOptionsForPersistentVolume(&core.PersistentVolume{
+			Spec: *scenario.pvSpec.DeepCopy(),
+		}, nil)
 		errs := ValidatePersistentVolumeSpec(scenario.pvSpec, "", scenario.isInlineSpec, field.NewPath("field"), opts)
 		if len(errs) == 0 && scenario.isExpectedFailure {
 			t.Errorf("Unexpected success for scenario: %s", name)
@@ -997,6 +1016,24 @@ func TestValidationOptionsForPersistentVolume(t *testing.T) {
 			},
 			enableVolumeAttributesClass: false,
 			expectValidationOpts:        PersistentVolumeSpecValidationOptions{EnableVolumeAttributesClass: true},
+		},
+		"old pv has invalid label-value in node affinity": {
+			oldPv: &core.PersistentVolume{
+				Spec: core.PersistentVolumeSpec{
+					NodeAffinity: &core.VolumeNodeAffinity{
+						Required: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "foo",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"-1"},
+								}},
+							}},
+						},
+					},
+				},
+			},
+			expectValidationOpts: PersistentVolumeSpecValidationOptions{AllowInvalidLabelValueInRequiredNodeAffinity: true},
 		},
 	}
 
@@ -1463,6 +1500,11 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 			isExpectedFailure: true,
 			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
 			newPV:             testVolumeWithNodeAffinity(nil),
+		},
+		"old affinity already has invalid label-value": {
+			isExpectedFailure: false,
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceType, "-1")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelInstanceTypeStable, "-1")),
 		},
 	}
 
@@ -2715,7 +2757,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		Phase: core.ClaimBound,
 	})
 	validClaimEmptyVolumeAttributesClass := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
-		VolumeAttributesClassName: utilpointer.String(""),
+		VolumeAttributesClassName: ptr.To(""),
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
@@ -2729,7 +2771,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		Phase: core.ClaimBound,
 	})
 	validClaimVolumeAttributesClass1 := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
-		VolumeAttributesClassName: utilpointer.String("vac1"),
+		VolumeAttributesClassName: ptr.To("vac1"),
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
@@ -2743,7 +2785,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		Phase: core.ClaimBound,
 	})
 	validClaimVolumeAttributesClass2 := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
-		VolumeAttributesClassName: utilpointer.String("vac2"),
+		VolumeAttributesClassName: ptr.To("vac2"),
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
@@ -3085,7 +3127,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			},
 		},
 		"volume attributes class allowed because feature enable": {
-			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
+			oldPvc:                      pvcWithVolumeAttributesClassName(ptr.To("foo")),
 			enableVolumeAttributesClass: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableRecoverFromExpansionFailure: true,
@@ -3093,7 +3135,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			},
 		},
 		"volume attributes class validated because used and feature disabled": {
-			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
+			oldPvc:                      pvcWithVolumeAttributesClassName(ptr.To("foo")),
 			enableVolumeAttributesClass: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableRecoverFromExpansionFailure: true,
@@ -3125,7 +3167,7 @@ func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{},
 		},
 		"volume attributes class allowed because feature enable": {
-			oldPvcTemplate:              pvcTemplateWithVolumeAttributesClassName(utilpointer.String("foo")),
+			oldPvcTemplate:              pvcTemplateWithVolumeAttributesClassName(ptr.To("foo")),
 			enableVolumeAttributesClass: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableVolumeAttributesClass: true,
@@ -3160,7 +3202,7 @@ func TestValidateKeyToPath(t *testing.T) {
 		kp: core.KeyToPath{Key: "k", Path: "p/..p/p../p..p"},
 		ok: true,
 	}, {
-		kp: core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32(0644)},
+		kp: core.KeyToPath{Key: "k", Path: "p", Mode: ptr.To[int32](0644)},
 		ok: true,
 	}, {
 		kp:      core.KeyToPath{Key: "", Path: "p"},
@@ -3187,11 +3229,11 @@ func TestValidateKeyToPath(t *testing.T) {
 		ok:      false,
 		errtype: field.ErrorTypeInvalid,
 	}, {
-		kp:      core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32(01000)},
+		kp:      core.KeyToPath{Key: "k", Path: "p", Mode: ptr.To[int32](01000)},
 		ok:      false,
 		errtype: field.ErrorTypeInvalid,
 	}, {
-		kp:      core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32(-1)},
+		kp:      core.KeyToPath{Key: "k", Path: "p", Mode: ptr.To[int32](-1)},
 		ok:      false,
 		errtype: field.ErrorTypeInvalid,
 	},
@@ -4148,7 +4190,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "my-secret",
-						DefaultMode: utilpointer.Int32(0644),
+						DefaultMode: ptr.To[int32](0644),
 					},
 				},
 			},
@@ -4162,7 +4204,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
-							Mode: utilpointer.Int32(0644),
+							Mode: ptr.To[int32](0644),
 						}},
 					},
 				},
@@ -4233,7 +4275,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "s",
-						DefaultMode: utilpointer.Int32(01000),
+						DefaultMode: ptr.To[int32](01000),
 					},
 				},
 			},
@@ -4248,7 +4290,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "s",
-						DefaultMode: utilpointer.Int32(-1),
+						DefaultMode: ptr.To[int32](-1),
 					},
 				},
 			},
@@ -4279,7 +4321,7 @@ func TestValidateVolumes(t *testing.T) {
 						LocalObjectReference: core.LocalObjectReference{
 							Name: "my-cfgmap",
 						},
-						DefaultMode: utilpointer.Int32(0644),
+						DefaultMode: ptr.To[int32](0644),
 					},
 				},
 			},
@@ -4294,7 +4336,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
-							Mode: utilpointer.Int32(0644),
+							Mode: ptr.To[int32](0644),
 						}},
 					},
 				},
@@ -4366,7 +4408,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{Name: "c"},
-						DefaultMode:          utilpointer.Int32(01000),
+						DefaultMode:          ptr.To[int32](01000),
 					},
 				},
 			},
@@ -4381,7 +4423,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{Name: "c"},
-						DefaultMode:          utilpointer.Int32(-1),
+						DefaultMode:          ptr.To[int32](-1),
 					},
 				},
 			},
@@ -4723,7 +4765,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: utilpointer.Int32(0644),
+						DefaultMode: ptr.To[int32](0644),
 					},
 				},
 			},
@@ -4734,7 +4776,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: utilpointer.Int32(0644),
+							Mode: ptr.To[int32](0644),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -4751,7 +4793,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: utilpointer.Int32(01000),
+							Mode: ptr.To[int32](01000),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -4772,7 +4814,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: utilpointer.Int32(-1),
+							Mode: ptr.To[int32](-1),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -4920,7 +4962,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: utilpointer.Int32(01000),
+						DefaultMode: ptr.To[int32](01000),
 					},
 				},
 			},
@@ -4934,7 +4976,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: utilpointer.Int32(-1),
+						DefaultMode: ptr.To[int32](-1),
 					},
 				},
 			},
@@ -4951,7 +4993,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"some_wwn"},
-						Lun:        utilpointer.Int32(1),
+						Lun:        ptr.To[int32](1),
 						FSType:     "ext4",
 						ReadOnly:   false,
 					},
@@ -4976,7 +5018,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{},
-						Lun:        utilpointer.Int32(1),
+						Lun:        ptr.To[int32](1),
 						WWIDs:      []string{},
 						FSType:     "ext4",
 						ReadOnly:   false,
@@ -4995,7 +5037,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"some_wwn"},
-						Lun:        utilpointer.Int32(1),
+						Lun:        ptr.To[int32](1),
 						WWIDs:      []string{"some_wwid"},
 						FSType:     "ext4",
 						ReadOnly:   false,
@@ -5032,7 +5074,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"wwn"},
-						Lun:        utilpointer.Int32(256),
+						Lun:        ptr.To[int32](256),
 						FSType:     "ext4",
 						ReadOnly:   false,
 					},
@@ -7094,6 +7136,8 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "123", MountPath: "/rro-enabled", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)},
 		{Name: "123", MountPath: "/rro-enabled-2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationNone)},
 		{Name: "image-volume", MountPath: "/image-volume"},
+		{Name: "image-volume", MountPath: "/image-volume-1", SubPath: "foo"},
+		{Name: "image-volume", MountPath: "/image-volume-2", SubPathExpr: "$(POD_NAME)"},
 	}
 	goodVolumeDevices := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/foofoo"},
@@ -7104,23 +7148,22 @@ func TestValidateVolumeMounts(t *testing.T) {
 	}
 
 	errorCases := map[string][]core.VolumeMount{
-		"empty name":                                       {{Name: "", MountPath: "/foo"}},
-		"name not found":                                   {{Name: "", MountPath: "/foo"}},
-		"empty mountpath":                                  {{Name: "abc", MountPath: ""}},
-		"mountpath collision":                              {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
-		"absolute subpath":                                 {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
-		"subpath in ..":                                    {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
-		"subpath contains ..":                              {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
-		"subpath ends in ..":                               {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
-		"disabled MountPropagation feature gate":           {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
-		"name exists in volumeDevice":                      {{Name: "xyz", MountPath: "/bar"}},
-		"mountpath exists in volumeDevice":                 {{Name: "uvw", MountPath: "/mnt/exists"}},
-		"both exist in volumeDevice":                       {{Name: "xyz", MountPath: "/mnt/exists"}},
-		"rro but not ro":                                   {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
-		"rro with incompatible propagation":                {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
-		"rro-if-possible but not ro":                       {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
-		"subPath not allowed for image volume sources":     {{Name: "image-volume", MountPath: "/image-volume-err-1", SubPath: "/foo"}},
-		"subPathExpr not allowed for image volume sources": {{Name: "image-volume", MountPath: "/image-volume-err-2", SubPathExpr: "$(POD_NAME)"}},
+		"empty name":                                          {{Name: "", MountPath: "/foo"}},
+		"name not found":                                      {{Name: "", MountPath: "/foo"}},
+		"empty mountpath":                                     {{Name: "abc", MountPath: ""}},
+		"mountpath collision":                                 {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
+		"absolute subpath":                                    {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
+		"subpath in ..":                                       {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
+		"subpath contains ..":                                 {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
+		"subpath ends in ..":                                  {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
+		"disabled MountPropagation feature gate":              {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
+		"name exists in volumeDevice":                         {{Name: "xyz", MountPath: "/bar"}},
+		"mountpath exists in volumeDevice":                    {{Name: "uvw", MountPath: "/mnt/exists"}},
+		"both exist in volumeDevice":                          {{Name: "xyz", MountPath: "/mnt/exists"}},
+		"rro but not ro":                                      {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
+		"rro with incompatible propagation":                   {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
+		"rro-if-possible but not ro":                          {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
+		"subPath for image volume sources should be relative": {{Name: "image-volume", MountPath: "/image-volume-err-1", SubPath: "/foo"}},
 	}
 	badVolumeDevice := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/mnt/exists"},
@@ -7538,7 +7581,7 @@ func Test_validateProbe(t *testing.T) {
 		args: args{
 			probe: &core.Probe{
 				ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
-				TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				TerminationGracePeriodSeconds: ptr.To[int64](-1),
 			},
 			fldPath: fldPath,
 		},
@@ -7547,7 +7590,7 @@ func Test_validateProbe(t *testing.T) {
 		args: args{
 			probe: &core.Probe{
 				ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
-				TerminationGracePeriodSeconds: utilpointer.Int64(0),
+				TerminationGracePeriodSeconds: ptr.To[int64](0),
 			},
 			fldPath: fldPath,
 		},
@@ -7556,7 +7599,7 @@ func Test_validateProbe(t *testing.T) {
 		args: args{
 			probe: &core.Probe{
 				ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
-				TerminationGracePeriodSeconds: utilpointer.Int64(1),
+				TerminationGracePeriodSeconds: ptr.To[int64](1),
 			},
 			fldPath: fldPath,
 		},
@@ -8234,8 +8277,10 @@ func TestValidateEphemeralContainers(t *testing.T) {
 }
 
 func TestValidateWindowsPodSecurityContext(t *testing.T) {
-	validWindowsSC := &core.PodSecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}
+	validWindowsSC := &core.PodSecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("dummy")}}
 	invalidWindowsSC := &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummyRole"}}
+	invalidWindowsSC2 := &core.PodSecurityContext{SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyStrict)}
+
 	cases := map[string]struct {
 		podSec      *core.PodSpec
 		expectErr   bool
@@ -8246,8 +8291,14 @@ func TestValidateWindowsPodSecurityContext(t *testing.T) {
 			podSec:    &core.PodSpec{SecurityContext: validWindowsSC},
 			expectErr: false,
 		},
-		"invalid SC, windows, error": {
+		"invalid SC(by SELinuxOptions), windows, error": {
 			podSec:      &core.PodSpec{SecurityContext: invalidWindowsSC},
+			errorType:   "FieldValueForbidden",
+			errorDetail: "cannot be set for a windows pod",
+			expectErr:   true,
+		},
+		"invalid SC(by SupplementalGroupsPolicy), windows, error": {
+			podSec:      &core.PodSpec{SecurityContext: invalidWindowsSC2},
 			errorType:   "FieldValueForbidden",
 			errorDetail: "cannot be set for a windows pod",
 			expectErr:   true,
@@ -8282,7 +8333,7 @@ func TestValidateLinuxPodSecurityContext(t *testing.T) {
 		RunAsUser: &runAsUser,
 	}
 	invalidLinuxSC := &core.PodSecurityContext{
-		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("myUser")},
+		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("myUser")},
 	}
 
 	cases := map[string]struct {
@@ -8321,6 +8372,7 @@ func TestValidateLinuxPodSecurityContext(t *testing.T) {
 
 func TestValidateContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
+	podOS := &core.PodOS{Name: core.OSName(v1.Linux)}
 	capabilities.ResetForTest()
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
@@ -8517,11 +8569,19 @@ func TestValidateContainers(t *testing.T) {
 				{ResourceName: "memory", RestartPolicy: "NotRequired"},
 				{ResourceName: "cpu", RestartPolicy: "RestartContainer"},
 			},
+		}, {
+			Name:                     "container-with-stopsignal-lifecycle",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			Lifecycle: &core.Lifecycle{
+				StopSignal: ptr.To(core.SIGTERM),
+			},
 		},
 	}
 
 	var PodRestartPolicy core.RestartPolicy = "Always"
-	if errs := validateContainers(successCase, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateContainers(successCase, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -8717,7 +8777,7 @@ func TestValidateContainers(t *testing.T) {
 						Port: intstr.FromInt32(80),
 					},
 				},
-				TerminationGracePeriodSeconds: utilpointer.Int64(10),
+				TerminationGracePeriodSeconds: ptr.To[int64](10),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -8806,7 +8866,7 @@ func TestValidateContainers(t *testing.T) {
 				PeriodSeconds:                 -1,
 				SuccessThreshold:              -1,
 				FailureThreshold:              -1,
-				TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				TerminationGracePeriodSeconds: ptr.To[int64](-1),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -8837,7 +8897,7 @@ func TestValidateContainers(t *testing.T) {
 				PeriodSeconds:                 -1,
 				SuccessThreshold:              -1,
 				FailureThreshold:              -1,
-				TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				TerminationGracePeriodSeconds: ptr.To[int64](-1),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -8871,7 +8931,7 @@ func TestValidateContainers(t *testing.T) {
 				PeriodSeconds:                 -1,
 				SuccessThreshold:              -1,
 				FailureThreshold:              -1,
-				TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				TerminationGracePeriodSeconds: ptr.To[int64](-1),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -9136,12 +9196,12 @@ func TestValidateContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateContainers(tc.containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateContainers(tc.containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
-			if diff := cmp.Diff(tc.expectedErrors, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")); diff != "" {
+			if diff := cmp.Diff(tc.expectedErrors, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail", "Origin")); diff != "" {
 				t.Errorf("unexpected diff in errors (-want, +got):\n%s", diff)
 				t.Errorf("INFO: all errors:\n%s", prettyErrorList(errs))
 			}
@@ -9151,6 +9211,7 @@ func TestValidateContainers(t *testing.T) {
 
 func TestValidateInitContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
+	podOS := &core.PodOS{Name: core.OSName(v1.Linux)}
 	capabilities.ResetForTest()
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
@@ -9223,10 +9284,18 @@ func TestValidateInitContainers(t *testing.T) {
 			},
 			SuccessThreshold: 1,
 		},
+	}, {
+		Name:                     "container-4-allowed-resize-policy",
+		Image:                    "image",
+		ImagePullPolicy:          "IfNotPresent",
+		TerminationMessagePolicy: "File",
+		ResizePolicy: []core.ContainerResizePolicy{
+			{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+		},
 	},
 	}
 	var PodRestartPolicy core.RestartPolicy = "Never"
-	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowSidecarResizePolicy: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9377,7 +9446,7 @@ func TestValidateInitContainers(t *testing.T) {
 				PeriodSeconds:                 -1,
 				SuccessThreshold:              -1,
 				FailureThreshold:              -1,
-				TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				TerminationGracePeriodSeconds: ptr.To[int64](-1),
 			},
 		}},
 		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].startupProbe", BadValue: ""}},
@@ -9457,10 +9526,10 @@ func TestValidateInitContainers(t *testing.T) {
 						Port: intstr.FromInt32(80),
 					},
 				},
-				TerminationGracePeriodSeconds: utilpointer.Int64(10),
+				TerminationGracePeriodSeconds: ptr.To[int64](10),
 			},
 		}},
-		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].readinessProbe.terminationGracePeriodSeconds", BadValue: utilpointer.Int64(10)}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].readinessProbe.terminationGracePeriodSeconds", BadValue: ptr.To[int64](10)}},
 	}, {
 		"invalid liveness probe, successThreshold != 1",
 		line(),
@@ -9602,11 +9671,25 @@ func TestValidateInitContainers(t *testing.T) {
 		}},
 		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop", BadValue: ""}},
 	},
+		{
+			"Not supported ResizePolicy: invalid",
+			line(),
+			[]core.Container{{
+				Name:                     "init",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				ResizePolicy: []core.ContainerResizePolicy{
+					{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+				},
+			}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].resizePolicy", BadValue: []core.ContainerResizePolicy{{ResourceName: "cpu", RestartPolicy: "NotRequired"}}}},
+		},
 	}
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateInitContainers(tc.initContainers, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -9673,6 +9756,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 		dnsConfig     *core.PodDNSConfig
 		dnsPolicy     *core.DNSPolicy
 		opts          PodValidationOptions
+		legacyIPs     bool
 		expectedError bool
 	}{{
 		desc:          "valid: empty DNSConfig",
@@ -9868,6 +9952,19 @@ func TestValidatePodDNSConfig(t *testing.T) {
 		},
 		expectedError: true,
 	}, {
+		desc: "valid legacy IP nameserver with legacy IP validation",
+		dnsConfig: &core.PodDNSConfig{
+			Nameservers: []string{"001.002.003.004"},
+		},
+		legacyIPs:     true,
+		expectedError: false,
+	}, {
+		desc: "invalid legacy IP nameserver with strict IP validation",
+		dnsConfig: &core.PodDNSConfig{
+			Nameservers: []string{"001.002.003.004"},
+		},
+		expectedError: true,
+	}, {
 		desc: "invalid empty option name",
 		dnsConfig: &core.PodDNSConfig{
 			Options: []core.PodDNSConfigOption{
@@ -9886,16 +9983,20 @@ func TestValidatePodDNSConfig(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if tc.dnsPolicy == nil {
-			tc.dnsPolicy = &testDNSClusterFirst
-		}
+		t.Run("", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 
-		errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), tc.opts)
-		if len(errs) != 0 && !tc.expectedError {
-			t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
-		} else if len(errs) == 0 && tc.expectedError {
-			t.Errorf("%v: validatePodDNSConfig(%v) = nil, want error", tc.desc, tc.dnsConfig)
-		}
+			if tc.dnsPolicy == nil {
+				tc.dnsPolicy = &testDNSClusterFirst
+			}
+
+			errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), tc.opts)
+			if len(errs) != 0 && !tc.expectedError {
+				t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
+			} else if len(errs) == 0 && tc.expectedError {
+				t.Errorf("%v: validatePodDNSConfig(%v) = nil, want error", tc.desc, tc.dnsConfig)
+			}
+		})
 	}
 }
 
@@ -10014,6 +10115,9 @@ func TestValidatePodSpec(t *testing.T) {
 	goodfsGroupChangePolicy := core.FSGroupChangeAlways
 	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
 	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
+	goodSupplementalGroupsPolicy := core.SupplementalGroupsPolicyStrict
+	badSupplementalGroupsPolicy1 := core.SupplementalGroupsPolicy("invalid")
+	badSupplementalGroupsPolicy2 := core.SupplementalGroupsPolicy("")
 
 	successCases := map[string]*core.Pod{
 		"populate basic fields, leave defaults for most": podtest.MakePod(""),
@@ -10122,9 +10226,32 @@ func TestValidatePodSpec(t *testing.T) {
 				core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"}),
 			)),
 		),
+		"populate SupplementalGroupsPolicy": podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				SupplementalGroupsPolicy: &goodSupplementalGroupsPolicy,
+			}),
+		),
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			opts := PodValidationOptions{
+				ResourceIsPod: true,
+			}
+			if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
+	}
+
+	legacyValidationCases := map[string]*core.Pod{
+		"populate HostAliases with legacy IP with legacy validation": podtest.MakePod("",
+			podtest.SetHostAliases(core.HostAlias{IP: "012.034.056.078", Hostnames: []string{"host1", "host2"}}),
+		),
+	}
+	for k, v := range legacyValidationCases {
+		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			opts := PodValidationOptions{
 				ResourceIsPod: true,
 			}
@@ -10169,6 +10296,12 @@ func TestValidatePodSpec(t *testing.T) {
 				HostNetwork: false,
 			}),
 			podtest.SetHostAliases(core.HostAlias{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}),
+		),
+		"with hostAliases with invalid legacy IP with strict IP validation": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				HostNetwork: false,
+			}),
+			podtest.SetHostAliases(core.HostAlias{IP: "001.002.003.004", Hostnames: []string{"host1", "host2"}}),
 		),
 		"with hostAliases with invalid hostname": *podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
@@ -10237,19 +10370,27 @@ func TestValidatePodSpec(t *testing.T) {
 				FSGroupChangePolicy: &badfsGroupChangePolicy1,
 			}),
 		),
-		"disallowed resources resize policy for init containers": *podtest.MakePod("",
-			podtest.SetInitContainers(podtest.MakeContainer("initctr", podtest.SetContainerResizePolicy(
-				core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"},
-			))),
+		"bad empty SupplementalGroupsPolicy": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				SupplementalGroupsPolicy: &badSupplementalGroupsPolicy2,
+			}),
+		),
+		"bad invalid SupplementalGroupsPolicy": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				SupplementalGroupsPolicy: &badSupplementalGroupsPolicy1,
+			}),
 		),
 	}
 	for k, v := range failureCases {
-		opts := PodValidationOptions{
-			ResourceIsPod: true,
-		}
-		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) == 0 {
-			t.Errorf("expected failure for %q", k)
-		}
+		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			opts := PodValidationOptions{
+				ResourceIsPod: true,
+			}
+			if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) == 0 {
+				t.Errorf("expected failure")
+			}
+		})
 	}
 }
 
@@ -10540,7 +10681,7 @@ func TestValidatePod(t *testing.T) {
 			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SeccompProfile: &core.SeccompProfile{
 					Type:             core.SeccompProfileTypeLocalhost,
-					LocalhostProfile: utilpointer.String("filename.json"),
+					LocalhostProfile: ptr.To("filename.json"),
 				},
 			}),
 		),
@@ -10549,7 +10690,7 @@ func TestValidatePod(t *testing.T) {
 				podtest.SetContainerSecurityContext(core.SecurityContext{
 					SeccompProfile: &core.SeccompProfile{
 						Type:             core.SeccompProfileTypeLocalhost,
-						LocalhostProfile: utilpointer.String("filename.json"),
+						LocalhostProfile: ptr.To("filename.json"),
 					},
 				}),
 			)),
@@ -10710,7 +10851,7 @@ func TestValidatePod(t *testing.T) {
 							{
 								ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 									Path: "foo-path",
-									Name: utilpointer.String("foo"),
+									Name: ptr.To("foo"),
 								},
 							},
 						},
@@ -10727,7 +10868,7 @@ func TestValidatePod(t *testing.T) {
 							{
 								ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 									Path:       "foo-path",
-									SignerName: utilpointer.String("example.com/foo"),
+									SignerName: ptr.To("example.com/foo"),
 									LabelSelector: &metav1.LabelSelector{
 										MatchLabels: map[string]string{
 											"version": "live",
@@ -10919,6 +11060,22 @@ func TestValidatePod(t *testing.T) {
 					},
 				},
 			}),
+		),
+		"Pod with valid StopSignal and valid OS": *podtest.MakePod("test-pod",
+			podtest.SetOS(core.Linux),
+			podtest.SetContainers(podtest.MakeContainer(
+				"test-container",
+				podtest.SetContainerImage("image"),
+				podtest.SetContainerLifecycle(core.Lifecycle{StopSignal: ptr.To(core.SIGTERM)}),
+			)),
+		),
+		"Pod with valid StopSignal and valid OS (Windows)": *podtest.MakePod("test-pod",
+			podtest.SetOS(core.Windows),
+			podtest.SetContainers(podtest.MakeContainer(
+				"test-container",
+				podtest.SetContainerImage("image"),
+				podtest.SetContainerLifecycle(core.Lifecycle{StopSignal: ptr.To(core.SIGTERM)}),
+			)),
 		),
 	}
 
@@ -12126,13 +12283,13 @@ func TestValidatePod(t *testing.T) {
 								{
 									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 										Path:       "foo-path",
-										SignerName: utilpointer.String("example.com/foo"),
+										SignerName: ptr.To("example.com/foo"),
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"version": "live",
 											},
 										},
-										Name: utilpointer.String("foo"),
+										Name: ptr.To("foo"),
 									},
 								},
 							},
@@ -12152,7 +12309,7 @@ func TestValidatePod(t *testing.T) {
 								{
 									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 										Path: "foo-path",
-										Name: utilpointer.String(""),
+										Name: ptr.To(""),
 									},
 								},
 							},
@@ -12172,7 +12329,7 @@ func TestValidatePod(t *testing.T) {
 								{
 									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 										Path:       "foo-path",
-										SignerName: utilpointer.String(""),
+										SignerName: ptr.To(""),
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"foo": "bar",
@@ -12197,7 +12354,7 @@ func TestValidatePod(t *testing.T) {
 								{
 									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 										Path:       "foo-path",
-										SignerName: utilpointer.String("example.com/foo/invalid"),
+										SignerName: ptr.To("example.com/foo/invalid"),
 									},
 								},
 							},
@@ -12240,6 +12397,44 @@ func TestValidatePod(t *testing.T) {
 			expectedError: "metadata.annotations[controller.kubernetes.io/pod-deletion-cost]: Invalid value: \"+10\": must be a 32bit integer",
 			spec: *podtest.MakePod("valid-extended",
 				podtest.SetAnnotations(map[string]string{core.PodDeletionCost: "+10"}),
+			),
+		},
+		"invalid required node affinity, value of NodeSelectorRequirement should be a valid label value": {
+			expectedError: "spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].values[0]: Invalid value: \"-1\": a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')",
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "foo",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"-1"},
+								}},
+							}},
+						}},
+				}),
+			),
+		},
+		"Pod with a StopSignal without `spec.os.name`": {
+			expectedError: "spec.containers[0].lifecycle.stopSignal: Forbidden: may not be set for containers with empty `spec.os.name`",
+			spec: *podtest.MakePod("test-pod",
+				podtest.SetContainers(podtest.MakeContainer(
+					"test-container",
+					podtest.SetContainerImage("image"),
+					podtest.SetContainerLifecycle(core.Lifecycle{StopSignal: ptr.To(core.SIGTERM)}),
+				)),
+			),
+		},
+		"Pod with a StopSignal not supported by OS": {
+			expectedError: "spec.containers[0].lifecycle.stopSignal: Unsupported value: \"SIGHUP\": supported values: \"SIGKILL\", \"SIGTERM\"",
+			spec: *podtest.MakePod("test-pod",
+				podtest.SetOS(core.Windows),
+				podtest.SetContainers(podtest.MakeContainer(
+					"test-container",
+					podtest.SetContainerImage("image"),
+					podtest.SetContainerLifecycle(core.Lifecycle{StopSignal: ptr.To(core.SIGHUP)}),
+				)),
 			),
 		},
 	}
@@ -12316,6 +12511,7 @@ func TestValidatePodUpdate(t *testing.T) {
 		old  core.Pod
 		new  core.Pod
 		err  string
+		opts PodValidationOptions
 	}{
 		{new: *podtest.MakePod(""), old: *podtest.MakePod(""), err: "", test: "nothing"}, {
 			new:  *podtest.MakePod("foo"),
@@ -13670,6 +13866,73 @@ func TestValidatePodUpdate(t *testing.T) {
 			test: "the podAntiAffinity cannot be updated on gated pods",
 		},
 		{
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"-1"},
+								}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"-1"},
+								}},
+							}},
+						}},
+				}),
+			),
+			test: "allow update pod if old pod already has invalid label-value in node affinity",
+			opts: PodValidationOptions{AllowInvalidLabelValueInRequiredNodeAffinity: true},
+		},
+		{
+			old: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"bar"},
+								}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			new: *podtest.MakePod("foo",
+				podtest.SetAffinity(&core.Affinity{
+					NodeAffinity: &core.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+							NodeSelectorTerms: []core.NodeSelectorTerm{{
+								MatchExpressions: []core.NodeSelectorRequirement{{
+									Key:      "expr",
+									Operator: core.NodeSelectorOpIn,
+									Values:   []string{"-1"},
+								}},
+							}},
+						}},
+				}),
+				podtest.SetSchedulingGates(core.PodSchedulingGate{Name: "baz"}),
+			),
+			err:  `a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.'`,
+			test: "not allow update node affinity to an invalid label-value",
+		},
+		{
 			new: *podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
@@ -13730,7 +13993,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			test.old.Spec.RestartPolicy = "Always"
 		}
 
-		errs := ValidatePodUpdate(&test.new, &test.old, PodValidationOptions{})
+		errs := ValidatePodUpdate(&test.new, &test.old, test.opts)
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
@@ -13752,6 +14015,50 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		err  string
 		test string
 	}{{
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				ObservedGeneration: 1,
+			}),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"set valid status.observedGeneration",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				Conditions: []core.PodCondition{{
+					Type:               core.PodScheduled,
+					Status:             core.ConditionTrue,
+					ObservedGeneration: 1,
+				}},
+			}),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"set valid condition.observedGeneration",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				ObservedGeneration: -1,
+			}),
+		),
+		*podtest.MakePod("foo"),
+		"status.observedGeneration: Invalid value: -1: must be a non-negative integer",
+		"set invalid status.observedGeneration",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				Conditions: []core.PodCondition{{
+					Type:               core.PodScheduled,
+					Status:             core.ConditionTrue,
+					ObservedGeneration: -1,
+				}},
+			}),
+		),
+		*podtest.MakePod("foo"),
+		"status.conditions[0].observedGeneration: Invalid value: -1: must be a non-negative integer",
+		"set invalid condition.observedGeneration",
+	}, {
 		*podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
 			podtest.SetStatus(core.PodStatus{
@@ -14164,7 +14471,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		*podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{Name: "no-such-claim", ResourceClaimName: utilpointer.String("my-claim")},
+					{Name: "no-such-claim", ResourceClaimName: ptr.To("my-claim")},
 				},
 			}),
 		),
@@ -14176,7 +14483,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
 			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{Name: "my-claim", ResourceClaimName: utilpointer.String("%$!#")},
+					{Name: "my-claim", ResourceClaimName: ptr.To("%$!#")},
 				},
 			}),
 		),
@@ -14193,7 +14500,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			),
 			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-claim", ResourceClaimName: ptr.To("foo-my-claim-12345")},
 					{Name: "my-other-claim", ResourceClaimName: nil},
 					{Name: "my-other-claim", ResourceClaimName: nil},
 				},
@@ -14212,7 +14519,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			),
 			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-claim", ResourceClaimName: ptr.To("foo-my-claim-12345")},
 					{Name: "my-other-claim", ResourceClaimName: nil},
 				},
 			}),
@@ -14511,6 +14818,253 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		"",
 		"qosClass no change",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"nil containerUser in containerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"empty containerUser in containerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                0,
+								GID:                0,
+								SupplementalGroups: []int64{0, 100},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"containerUser with valid ids in containerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                -1,
+								GID:                -1,
+								SupplementalGroups: []int64{-1},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		`status.containerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.containerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.containerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
+		"containerUser with invalid uids/gids/supplementalGroups in containerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+		),
+		`status.containerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
+		"containerUser cannot be set for windows pod in containerStatuses",
+	}, {
+
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetInitContainerStatuses(core.ContainerStatus{}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"nil containerUser in initContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetInitContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"empty containerUser in initContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetInitContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                0,
+								GID:                0,
+								SupplementalGroups: []int64{0, 100},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"containerUser with valid ids in initContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetInitContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                -1,
+								GID:                -1,
+								SupplementalGroups: []int64{-1},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		`status.initContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.initContainerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.initContainerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
+		"containerUser with invalid uids/gids/supplementalGroups in initContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetInitContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+		),
+		`status.initContainerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
+		"containerUser cannot be set for windows pod in initContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"nil containerUser in ephemeralContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"empty containerUser in ephemeralContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                0,
+								GID:                0,
+								SupplementalGroups: []int64{0, 100},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"containerUser with valid ids in ephemeralContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                -1,
+								GID:                -1,
+								SupplementalGroups: []int64{-1},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		`status.ephemeralContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.ephemeralContainerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.ephemeralContainerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
+		"containerUser with invalid uids/gids/supplementalGroups in ephemeralContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+		),
+		`status.ephemeralContainerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
+		"containerUser cannot be set for windows pod in ephemeralContainerStatuses",
 	},
 	}
 
@@ -14925,7 +15479,17 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc     func(svc *core.Service) // given a basic valid service, each test case can customize it
 		numErrs      int
 		featureGates []featuregate.Feature
+		legacyIPs    bool
 	}{{
+		name:     "default",
+		tweakSvc: func(s *core.Service) {},
+		numErrs:  0,
+	}, {
+		name:      "default, with legacy IP validation",
+		tweakSvc:  func(s *core.Service) {},
+		legacyIPs: true,
+		numErrs:   0,
+	}, {
 		name: "missing namespace",
 		tweakSvc: func(s *core.Service) {
 			s.Namespace = ""
@@ -15062,6 +15626,21 @@ func TestValidateServiceCreate(t *testing.T) {
 		},
 		numErrs: 1,
 	}, {
+		name: "valid legacy cluster ip with legacy validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.ClusterIP = "001.002.003.004"
+			s.Spec.ClusterIPs = []string{"001.002.003.004"}
+		},
+		legacyIPs: true,
+		numErrs:   0,
+	}, {
+		name: "invalid legacy cluster ip with strict validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.ClusterIP = "001.002.003.004"
+			s.Spec.ClusterIPs = []string{"001.002.003.004"}
+		},
+		numErrs: 1,
+	}, {
 		name: "missing port",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Ports[0].Port = 0
@@ -15113,35 +15692,50 @@ func TestValidateServiceCreate(t *testing.T) {
 		// numErrs: 1,
 		numErrs: 0,
 	}, {
-		name: "invalid publicIPs localhost",
+		name: "invalid externalIPs localhost",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"127.0.0.1"}
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid publicIPs unspecified",
+		name: "invalid externalIPs unspecified",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"0.0.0.0"}
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid publicIPs loopback",
+		name: "invalid externalIPs loopback",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"127.0.0.1"}
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid publicIPs host",
+		name: "invalid externalIPs host",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"myhost.mydomain"}
 		},
 		numErrs: 1,
 	}, {
-		name: "valid publicIPs",
+		name: "valid legacy externalIPs with legacy validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.ExternalIPs = []string{"001.002.003.004"}
+		},
+		legacyIPs: true,
+		numErrs:   0,
+	}, {
+		name: "invalid legacy externalIPs with strict validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.ExternalIPs = []string{"001.002.003.004"}
+		},
+		numErrs: 1,
+	}, {
+		name: "valid externalIPs",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"1.2.3.4"}
@@ -15159,7 +15753,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports[0].Protocol = "UDP"
 		},
 		numErrs: 0,
@@ -15168,7 +15762,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports[0] = core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt32(12345)}
 		},
 		numErrs: 0,
@@ -15177,7 +15771,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15225,7 +15819,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		},
 		numErrs: 0,
 	}, {
@@ -15233,7 +15827,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 		},
 		numErrs: 0,
 	}, {
@@ -15248,7 +15842,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15257,7 +15851,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15315,7 +15909,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		},
 		numErrs: 0,
 	}, {
@@ -15323,7 +15917,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15332,7 +15926,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15380,27 +15974,26 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
 	}, {
-		// For now we open firewalls, and its insecure if we open 10250, remove this
-		// when we have better protections in place.
-		name: "invalid port type=LoadBalancer",
+		// Remove the limitation on exposing port 10250 externally
+		name: "valid port type=LoadBalancer",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
-		numErrs: 1,
+		numErrs: 0,
 	}, {
 		name: "valid LoadBalancer source range annotation",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.0/24,  5.6.0.0/16"
 		},
 		numErrs: 0,
@@ -15409,7 +16002,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = ""
 		},
 		numErrs: 0,
@@ -15418,7 +16011,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "  "
 		},
 		numErrs: 0,
@@ -15427,7 +16020,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
 		},
 		numErrs: 1,
@@ -15436,7 +16029,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/33"
 		},
 		numErrs: 1,
@@ -15453,11 +16046,39 @@ func TestValidateServiceCreate(t *testing.T) {
 		},
 		numErrs: 1,
 	}, {
+		name: "valid legacy LoadBalancer source range with legacy validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+			s.Spec.LoadBalancerSourceRanges = []string{"001.002.003.000/24"}
+		},
+		legacyIPs: true,
+		numErrs:   0,
+	}, {
+		name: "invalid legacy LoadBalancer source range with strict validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+			s.Spec.LoadBalancerSourceRanges = []string{"001.002.003.000/24"}
+		},
+		numErrs: 1,
+	}, {
+		name: "invalid legacy LoadBalancer source range annotation with strict validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "001.002.003.000/24"
+		},
+		numErrs: 1,
+	}, {
 		name: "valid LoadBalancer source range",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "5.6.0.0/16"}
 		},
 		numErrs: 0,
@@ -15466,7 +16087,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24  ", " 5.6.0.0/16"}
 		},
 		numErrs: 0,
@@ -15475,7 +16096,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.LoadBalancerSourceRanges = []string{"   "}
 		},
 		numErrs: 1,
@@ -15484,7 +16105,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.LoadBalancerSourceRanges = []string{"foo.bar"}
 		},
 		numErrs: 1,
@@ -15493,7 +16114,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.4/33"}
 		},
 		numErrs: 1,
@@ -15508,7 +16129,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
 			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "5.6.0.0/16"}
 		},
@@ -15559,7 +16180,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			s.Spec.ClusterIPs = []string{"None"}
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		},
 		numErrs: 1,
 	}, {
@@ -15578,7 +16199,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid externalTraffic field",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				s.Spec.ExternalTrafficPolicy = "invalid"
 			},
 			numErrs: 1,
@@ -15634,7 +16255,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "negative healthCheckNodePort field",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 				s.Spec.HealthCheckNodePort = -1
 			},
@@ -15643,7 +16264,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "negative healthCheckNodePort field",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 				s.Spec.HealthCheckNodePort = 31100
 			},
@@ -15657,7 +16278,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.SessionAffinity = core.ServiceAffinityClientIP
 				s.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 					ClientIP: &core.ClientIPConfig{
-						TimeoutSeconds: utilpointer.Int32(-1),
+						TimeoutSeconds: ptr.To[int32](-1),
 					},
 				}
 			},
@@ -15667,11 +16288,11 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				s.Spec.SessionAffinity = core.ServiceAffinityNone
 				s.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 					ClientIP: &core.ClientIPConfig{
-						TimeoutSeconds: utilpointer.Int32(90),
+						TimeoutSeconds: ptr.To[int32](90),
 					},
 				}
 			},
@@ -16025,7 +16646,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					Port:        12345,
 					TargetPort:  intstr.FromInt32(12345),
 					Protocol:    "TCP",
-					AppProtocol: utilpointer.String("HTTP"),
+					AppProtocol: ptr.To("HTTP"),
 				}}
 			},
 			numErrs: 0,
@@ -16036,7 +16657,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					Port:        12345,
 					TargetPort:  intstr.FromInt32(12345),
 					Protocol:    "TCP",
-					AppProtocol: utilpointer.String("example.com/protocol"),
+					AppProtocol: ptr.To("example.com/protocol"),
 				}}
 			},
 			numErrs: 0,
@@ -16047,7 +16668,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					Port:        12345,
 					TargetPort:  intstr.FromInt32(12345),
 					Protocol:    "TCP",
-					AppProtocol: utilpointer.String("example.com/protocol_with{invalid}[characters]"),
+					AppProtocol: ptr.To("example.com/protocol_with{invalid}[characters]"),
 				}}
 			},
 			numErrs: 1,
@@ -16071,7 +16692,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		}, {
 			name: "Use AllocateLoadBalancerNodePorts when type is not LoadBalancer",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			},
 			numErrs: 1,
 		}, {
@@ -16079,8 +16700,8 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				s.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 0,
 		}, {
@@ -16088,15 +16709,15 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.LoadBalancerClass = utilpointer.String("Bad/LoadBalancerClass")
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				s.Spec.LoadBalancerClass = ptr.To("Bad/LoadBalancerClass")
 			},
 			numErrs: 1,
 		}, {
 			name: "invalid: set LoadBalancerClass when type is not LoadBalancer",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				s.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 1,
 		}, {
@@ -16109,13 +16730,39 @@ func TestValidateServiceCreate(t *testing.T) {
 		}, {
 			name: "valid: trafficDistribution field set to PreferClose",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.TrafficDistribution = utilpointer.String("PreferClose")
+				s.Spec.TrafficDistribution = ptr.To("PreferClose")
 			},
 			numErrs: 0,
 		}, {
+			name: "valid: trafficDistribution field set to PreferSameZone with feature gate",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TrafficDistribution = ptr.To("PreferSameZone")
+			},
+			featureGates: []featuregate.Feature{features.PreferSameTrafficDistribution},
+			numErrs:      0,
+		}, {
+			name: "valid: trafficDistribution field set to PreferSameNode with feature gate",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
+			},
+			featureGates: []featuregate.Feature{features.PreferSameTrafficDistribution},
+			numErrs:      0,
+		}, {
 			name: "invalid: trafficDistribution field set to Random",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.TrafficDistribution = utilpointer.String("Random")
+				s.Spec.TrafficDistribution = ptr.To("Random")
+			},
+			numErrs: 1,
+		}, {
+			name: "invalid: trafficDistribution field set to PreferSameZone without feature gate",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TrafficDistribution = ptr.To("PreferSameZone")
+			},
+			numErrs: 1,
+		}, {
+			name: "invalid: trafficDistribution field set to PreferSameNode without feature gate",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
 			numErrs: 1,
 		},
@@ -16126,6 +16773,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			for i := range tc.featureGates {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates[i], true)
 			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
 			errs := ValidateServiceCreate(&svc)
@@ -16145,7 +16793,7 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 		name: "valid loadBalancer service with externalTrafficPolicy and healthCheckNodePort set",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 			s.Spec.HealthCheckNodePort = 34567
 		},
@@ -16167,7 +16815,7 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 		name: "cannot set healthCheckNodePort field on loadBalancer service with externalTrafficPolicy!=Local",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.HealthCheckNodePort = 34567
 		},
@@ -16368,7 +17016,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 		update: core.ReplicationController{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: core.ReplicationControllerSpec{
-				Replicas: 3,
+				Replicas: ptr.To[int32](3),
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
@@ -16400,7 +17048,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 			update: core.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: core.ReplicationControllerSpec{
-					Replicas: 2,
+					Replicas: ptr.To[int32](2),
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
 				},
@@ -16418,390 +17066,310 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 
 }
 
+// Helper function for RC tests.
+func mkValidReplicationController(tweaks ...func(rc *core.ReplicationController)) core.ReplicationController {
+	rc := core.ReplicationController{
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+		Spec: core.ReplicationControllerSpec{
+			Replicas: ptr.To[int32](1),
+			Selector: map[string]string{"a": "b"},
+			Template: &core.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+				Spec: podtest.MakePodSpec(),
+			},
+		},
+	}
+	for _, tweak := range tweaks {
+		tweak(&rc)
+	}
+	return rc
+}
+
 func TestValidateReplicationControllerUpdate(t *testing.T) {
-	validSelector := map[string]string{"a": "b"}
-	validPodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: podtest.MakePodSpec(),
-		},
-	}
-	readWriteVolumePodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: podtest.MakePodSpec(
-				podtest.SetVolumes(core.Volume{Name: "gcepd", VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
-			),
-		},
-	}
-	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
-	invalidPodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: invalidSelector,
-			},
-			Spec: podtest.MakePodSpec(),
-		},
-	}
-	type rcUpdateTest struct {
+	successCases := []struct {
 		old    core.ReplicationController
 		update core.ReplicationController
-	}
-	successCases := []rcUpdateTest{{
-		old: core.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-		update: core.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Replicas: 3,
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
+	}{{
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](0)
+		}),
 	}, {
-		old: core.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-		update: core.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Replicas: 1,
-				Selector: validSelector,
-				Template: &readWriteVolumePodTemplate.Template,
-			},
-		},
-	},
-	}
-	for _, successCase := range successCases {
-		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateReplicationControllerUpdate(&successCase.update, &successCase.old, PodValidationOptions{}); len(errs) != 0 {
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](3)
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.MinReadySeconds = 0
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.MinReadySeconds = 3
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](2)
+			rc.Spec.Template.Spec = podtest.MakePodSpec(
+				podtest.SetVolumes(
+					core.Volume{
+						Name: "gcepd",
+						VolumeSource: core.VolumeSource{
+							GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{
+								PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false,
+							},
+						},
+					}))
+		}),
+	}}
+	for _, tc := range successCases {
+		tc.old.ObjectMeta.ResourceVersion = "1"
+		tc.update.ObjectMeta.ResourceVersion = "1"
+		if errs := ValidateReplicationControllerUpdate(&tc.update, &tc.old, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
-	errorCases := map[string]rcUpdateTest{
-		"more than one read/write": {
-			old: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-			update: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: 2,
-					Selector: validSelector,
-					Template: &readWriteVolumePodTemplate.Template,
-				},
+
+	errorCases := map[string]struct {
+		old          core.ReplicationController
+		update       core.ReplicationController
+		expectedErrs field.ErrorList
+	}{
+		"unmatched selector": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Selector["another"] = "value"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.metadata.labels"), nil, "does not match template"),
 			},
 		},
 		"invalid selector": {
-			old: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-			update: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: 2,
-					Selector: invalidSelector,
-					Template: &validPodTemplate.Template,
-				},
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				invalid := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+				rc.Spec.Template.Labels = invalid
+				rc.Spec.Selector = invalid
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.labels"), nil, "").WithOrigin("labelKey"),
 			},
 		},
 		"invalid pod": {
-			old: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-			update: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: 2,
-					Selector: validSelector,
-					Template: &invalidPodTemplate.Template,
-				},
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Template = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.template"), ""),
 			},
 		},
 		"negative replicas": {
-			old: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Replicas = ptr.To[int32](-1)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
 			},
-			update: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: -1,
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
+		},
+		"nil replicas": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Replicas = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
+			},
+		},
+		"negative minReadySeconds": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.MinReadySeconds = -1
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
 			},
 		},
 	}
-	for testName, errorCase := range errorCases {
-		if errs := ValidateReplicationControllerUpdate(&errorCase.update, &errorCase.old, PodValidationOptions{}); len(errs) == 0 {
-			t.Errorf("expected failure: %s", testName)
-		}
+	for k, tc := range errorCases {
+		t.Run(k, func(t *testing.T) {
+			tc.old.ObjectMeta.ResourceVersion = "1"
+			tc.update.ObjectMeta.ResourceVersion = "1"
+			errs := ValidateReplicationControllerUpdate(&tc.update, &tc.old, PodValidationOptions{})
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
 	}
 }
 
 func TestValidateReplicationController(t *testing.T) {
-	validSelector := map[string]string{"a": "b"}
-	validPodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: podtest.MakePodSpec(),
-		},
-	}
-	readWriteVolumePodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: podtest.MakePodSpec(
-				podtest.SetVolumes(core.Volume{Name: "gcepd", VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
-			),
-		},
-	}
-	hostnetPodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: podtest.MakePodSpec(
-				podtest.SetSecurityContext(&core.PodSecurityContext{
-					HostNetwork: true,
-				}),
-				podtest.SetContainers(podtest.MakeContainer("abc", podtest.SetContainerPorts(
-					core.ContainerPort{
-						ContainerPort: 12345,
-						Protocol:      core.ProtocolTCP,
+	successCases := []core.ReplicationController{
+		mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Name = "abc-123" }),
+		mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](2)
+			rc.Spec.Template.Spec = podtest.MakePodSpec(
+				podtest.SetVolumes(
+					core.Volume{
+						Name: "gcepd",
+						VolumeSource: core.VolumeSource{
+							GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{
+								PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false,
+							},
+						},
+					}))
+		}),
+		mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Template.Spec = podtest.MakePodSpec(
+				podtest.SetSecurityContext(&core.PodSecurityContext{HostNetwork: true}),
+				podtest.SetContainers(podtest.MakeContainer("abc",
+					podtest.SetContainerPorts(core.ContainerPort{
+						ContainerPort: 12345, Protocol: core.ProtocolTCP,
 					}))),
-			),
-		},
+			)
+		}),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](0) }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](1) }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](100) }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = 0 }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = 1 }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = 100 }),
 	}
-	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
-	invalidPodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			Spec: podtest.MakePodSpec(),
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: invalidSelector,
-			},
-		},
-	}
-	successCases := []core.ReplicationController{{
-		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-		Spec: core.ReplicationControllerSpec{
-			Selector: validSelector,
-			Template: &validPodTemplate.Template,
-		},
-	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-		Spec: core.ReplicationControllerSpec{
-			Selector: validSelector,
-			Template: &validPodTemplate.Template,
-		},
-	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-		Spec: core.ReplicationControllerSpec{
-			Replicas: 1,
-			Selector: validSelector,
-			Template: &readWriteVolumePodTemplate.Template,
-		},
-	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: "hostnet", Namespace: metav1.NamespaceDefault},
-		Spec: core.ReplicationControllerSpec{
-			Replicas: 1,
-			Selector: validSelector,
-			Template: &hostnetPodTemplate.Template,
-		},
-	}}
-	for _, successCase := range successCases {
-		if errs := ValidateReplicationController(&successCase, PodValidationOptions{}); len(errs) != 0 {
+	for _, tc := range successCases {
+		if errs := ValidateReplicationController(&tc, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 
-	errorCases := map[string]core.ReplicationController{
-		"zero-length ID": {
-			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
+	errorCases := map[string]struct {
+		input        core.ReplicationController
+		expectedErrs field.ErrorList
+	}{
+		"missing name": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Name = "" }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata.name"), ""),
 			},
 		},
-		"missing-namespace": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
+		"missing namespace": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Namespace = "" }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata.namespace"), ""),
 			},
 		},
 		"empty selector": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Template: &validPodTemplate.Template,
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Selector = nil }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.selector"), ""),
 			},
 		},
-		"selector_doesnt_match": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Selector: map[string]string{"foo": "bar"},
-				Template: &validPodTemplate.Template,
+		"selector doesnt match": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Selector = map[string]string{"foo": "bar"} }),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.metadata.labels"), nil, "does not match template"),
 			},
 		},
 		"invalid manifest": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Template = nil }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.template"), ""),
 			},
 		},
-		"read-write persistent disk with > 1 pod": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc"},
-			Spec: core.ReplicationControllerSpec{
-				Replicas: 2,
-				Selector: validSelector,
-				Template: &readWriteVolumePodTemplate.Template,
+		"negative replicas": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](-1) }),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
 			},
 		},
-		"negative_replicas": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Replicas: -1,
-				Selector: validSelector,
+		"negative minReadySeconds": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = -1 }),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
 			},
 		},
-		"invalid_label": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-				Labels: map[string]string{
+		"nil replicas": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = nil }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
+			},
+		},
+		"invalid label": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Labels = map[string]string{
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-				},
-			},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-		"invalid_label 2": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-				Labels: map[string]string{
-					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-				},
-			},
-			Spec: core.ReplicationControllerSpec{
-				Template: &invalidPodTemplate.Template,
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.labels"), nil, "").WithOrigin("labelKey"),
 			},
 		},
-		"invalid_annotation": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-				Annotations: map[string]string{
+		"invalid label 2": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Template.Labels = map[string]string{
 					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-				},
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.metadata.labels"), nil, "does not match template"),
+				field.Invalid(field.NewPath("spec.template.labels"), nil, "").WithOrigin("labelKey"),
 			},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
+		},
+		"invalid annotation": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Annotations = map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.annotations"), nil, "name part must consist of"),
 			},
 		},
 		"invalid restart policy 1": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &core.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(core.RestartPolicyOnFailure)),
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: validSelector,
-					},
-				},
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Template.Spec.RestartPolicy = core.RestartPolicyOnFailure
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported[core.RestartPolicy](field.NewPath("spec.template.spec.restartPolicy"), nil, nil),
 			},
 		},
 		"invalid restart policy 2": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &core.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(core.RestartPolicyNever)),
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: validSelector,
-					},
-				},
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Template.Spec.RestartPolicy = core.RestartPolicyNever
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported[core.RestartPolicy](field.NewPath("spec.template.spec.restartPolicy"), nil, nil),
 			},
 		},
 		"template may not contain ephemeral containers": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Replicas: 1,
-				Selector: validSelector,
-				Template: &core.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: validSelector,
-					},
-					Spec: podtest.MakePodSpec(
-						podtest.SetEphemeralContainers(core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}),
-					),
-				},
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Template.Spec = podtest.MakePodSpec(
+					podtest.SetEphemeralContainers(
+						core.EphemeralContainer{
+							EphemeralContainerCommon: core.EphemeralContainerCommon{
+								Name:                     "debug",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						}))
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.template.spec.ephemeralContainers"), "not allowed in pod template"),
 			},
 		},
 	}
-	for k, v := range errorCases {
-		errs := ValidateReplicationController(&v, PodValidationOptions{})
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		}
-		for i := range errs {
-			field := errs[i].Field
-			if !strings.HasPrefix(field, "spec.template.") &&
-				field != "metadata.name" &&
-				field != "metadata.namespace" &&
-				field != "spec.selector" &&
-				field != "spec.template" &&
-				field != "GCEPersistentDisk.ReadOnly" &&
-				field != "spec.replicas" &&
-				field != "spec.template.labels" &&
-				field != "metadata.annotations" &&
-				field != "metadata.labels" &&
-				field != "status.replicas" {
-				t.Errorf("%s: missing prefix for: %v", k, errs[i])
-			}
-		}
+	for k, tc := range errorCases {
+		t.Run(k, func(t *testing.T) {
+			errs := ValidateReplicationController(&tc.input, PodValidationOptions{})
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
 	}
 }
 
@@ -16924,9 +17492,40 @@ func TestValidateNode(t *testing.T) {
 	},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateNode(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
+		t.Run("", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			if errs := ValidateNode(&successCase); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
+	}
+
+	legacyValidationCases := map[string]core.Node{
+		"valid-legacy-pod-cidr-with-legacy-validation": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{
+					{Type: core.NodeExternalIP, Address: "something"},
+				},
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
+				},
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.000.000/16"},
+			},
+		},
+	}
+	for name, legacyCase := range legacyValidationCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
+			if errs := ValidateNode(&legacyCase); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
 	}
 
 	errorCases := map[string]core.Node{
@@ -17111,6 +17710,23 @@ func TestValidateNode(t *testing.T) {
 				PodCIDRs: []string{"192.168.0.0"},
 			},
 		},
+		"invalid-legacy-pod-cidr-with-strict-validation": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{
+					{Type: core.NodeExternalIP, Address: "something"},
+				},
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
+				},
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.000.000/16"},
+			},
+		},
 		"duplicate-pod-cidr": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "abc",
@@ -17130,30 +17746,34 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateNode(&v)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		}
-		for i := range errs {
-			field := errs[i].Field
-			expectedFields := map[string]bool{
-				"metadata.name":         true,
-				"metadata.labels":       true,
-				"metadata.annotations":  true,
-				"metadata.namespace":    true,
-				"spec.externalID":       true,
-				"spec.taints[0].key":    true,
-				"spec.taints[0].value":  true,
-				"spec.taints[0].effect": true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature":                          true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature.PodController.Controller": true,
+		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+
+			errs := ValidateNode(&v)
+			if len(errs) == 0 {
+				t.Errorf("expected failure")
 			}
-			if val, ok := expectedFields[field]; ok {
-				if !val {
-					t.Errorf("%s: missing prefix for: %v", k, errs[i])
+			for i := range errs {
+				field := errs[i].Field
+				expectedFields := map[string]bool{
+					"metadata.name":         true,
+					"metadata.labels":       true,
+					"metadata.annotations":  true,
+					"metadata.namespace":    true,
+					"spec.externalID":       true,
+					"spec.taints[0].key":    true,
+					"spec.taints[0].value":  true,
+					"spec.taints[0].effect": true,
+					"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature":                          true,
+					"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature.PodController.Controller": true,
+				}
+				if val, ok := expectedFields[field]; ok {
+					if !val {
+						t.Errorf("missing prefix for: %v", errs[i])
+					}
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -17656,7 +18276,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			newSvc.Spec.SessionAffinity = "ClientIP"
 			newSvc.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 				ClientIP: &core.ClientIPConfig{
-					TimeoutSeconds: utilpointer.Int32(90),
+					TimeoutSeconds: ptr.To[int32](90),
 				},
 			}
 		},
@@ -17672,7 +18292,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 		tweakSvc: func(oldSvc, newSvc *core.Service) {
 			newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 			newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		},
 		numErrs: 0,
 	}, {
@@ -17692,10 +18312,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 		name: "add loadBalancerSourceRanges",
 		tweakSvc: func(oldSvc, newSvc *core.Service) {
 			oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-			oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 			newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
 		},
 		numErrs: 0,
@@ -17703,11 +18323,11 @@ func TestValidateServiceUpdate(t *testing.T) {
 		name: "update loadBalancerSourceRanges",
 		tweakSvc: func(oldSvc, newSvc *core.Service) {
 			oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-			oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			oldSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
 			newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 			newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			newSvc.Spec.LoadBalancerSourceRanges = []string{"10.100.0.0/16"}
 		},
 		numErrs: 0,
@@ -17718,7 +18338,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			newSvc.Spec.ClusterIPs = []string{"None"}
 			newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 			newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		},
 		numErrs: 1,
 	}, {
@@ -17815,7 +18435,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -17830,7 +18450,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -17843,20 +18463,20 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type can change its AllocateLoadBalancerNodePorts from true to false",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 			},
 			numErrs: 0,
 		}, {
 			name: "Service with LoadBalancer type can change its AllocateLoadBalancerNodePorts from false to true",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			},
 			numErrs: 0,
 		}, {
@@ -17919,7 +18539,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -17934,7 +18554,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -17947,10 +18567,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type cannot change its set ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -17963,10 +18583,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type can change its empty ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -17979,7 +18599,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type cannot change its set ClusterIP when changing type to ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
@@ -17993,7 +18613,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type can change its empty ClusterIP when changing type to ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = ""
@@ -18007,7 +18627,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type cannot change its set ClusterIP when changing type to NodePort",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
@@ -18022,7 +18642,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type can change its empty ClusterIP when changing type to NodePort",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
@@ -18470,58 +19090,58 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "update to valid app protocol",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP"}}
-				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP", AppProtocol: utilpointer.String("https")}}
+				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP", AppProtocol: ptr.To("https")}}
 			},
 			numErrs: 0,
 		}, {
 			name: "update to invalid app protocol",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP"}}
-				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP", AppProtocol: utilpointer.String("~https")}}
+				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP", AppProtocol: ptr.To("~https")}}
 			},
 			numErrs: 1,
 		}, {
 			name: "Set AllocateLoadBalancerNodePorts when type is not LoadBalancer",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			},
 			numErrs: 1,
 		}, {
 			name: "update LoadBalancer type of service without change LoadBalancerClass",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-old")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-old")
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-old")
 			},
 			numErrs: 0,
 		}, {
 			name: "invalid: change LoadBalancerClass when update service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-old")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-new")
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-new")
 			},
 			numErrs: 1,
 		}, {
 			name: "invalid: unset LoadBalancerClass when update service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-old")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.LoadBalancerClass = nil
 			},
 			numErrs: 1,
@@ -18529,13 +19149,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "invalid: set LoadBalancerClass when update service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				oldSvc.Spec.LoadBalancerClass = nil
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-new")
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-new")
 			},
 			numErrs: 1,
 		}, {
@@ -18545,8 +19165,8 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 0,
 		}, {
@@ -18556,7 +19176,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.LoadBalancerClass = nil
 			},
 			numErrs: 0,
@@ -18567,8 +19187,8 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("Bad/LoadBalancerclass")
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerClass = ptr.To("Bad/LoadBalancerclass")
 			},
 			numErrs: 2,
 		}, {
@@ -18577,7 +19197,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
 		}, {
@@ -18586,7 +19206,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeExternalName
 
 				newSvc.Spec.Type = core.ServiceTypeExternalName
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 3,
 		}, {
@@ -18596,41 +19216,41 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
 		}, {
 			name: "invalid: set LoadBalancerClass when update from LoadBalancer service to non LoadBalancer type of service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
 		}, {
 			name: "invalid: set LoadBalancerClass when update from LoadBalancer service to non LoadBalancer type of service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 
 				newSvc.Spec.Type = core.ServiceTypeExternalName
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 3,
 		}, {
 			name: "invalid: set LoadBalancerClass when update from LoadBalancer service to non LoadBalancer type of service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
 		}, {
@@ -18661,10 +19281,212 @@ func TestValidateServiceUpdate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+
+		// IP validation ratcheting tests. Note: this is tested for
+		// LoadBalancerStatus in TestValidateLoadBalancerStatus.
+		{
+			name: "pre-existing invalid clusterIP ignored when updating other fields",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.04"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				newSvc.Spec.ClusterIP = "1.2.3.04"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid clusterIP ignored when adding clusterIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.04"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.ClusterIP = "1.2.3.04"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.04", "2001:db8::4"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid clusterIP ignored when removing clusterIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.04"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.04", "2001:db::4"}
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.ClusterIP = "1.2.3.04"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				newSvc.Spec.IPFamilyPolicy = &singleStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid externalIP ignored",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid externalIP ignored when adding externalIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"5.6.7.8", "1.2.3.04"}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid externalIP ignored when removing externalIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"5.6.7.8", "1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can fix invalid externalIP",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.4"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can't add invalid externalIP",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+			},
+			numErrs: 1,
+		}, {
+			name: "pre-existing invalid loadBalancerSourceRanges ignored when updating other fields",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid loadBalancerSourceRanges ignored when adding source ranges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "010.0.0.0/8"}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid loadBalancerSourceRanges ignored when removing source ranges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can fix invalid loadBalancerSourceRanges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can't add invalid loadBalancerSourceRanges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+			},
+			numErrs: 1,
+		}, {
+			name: "pre-existing invalid source ranges ignored when updating other fields",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "can fix invalid source ranges annotation",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "10.0.0.0/8"
+			},
+			numErrs: 0,
+		}, {
+			name: "can't modify pre-existing invalid source ranges annotation without fixing it",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8, 1.2.3.0/24"
+			},
+			numErrs: 1,
+		}, {
+			name: "can't add invalid source ranges annotation",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8, 1.2.3.0/24"
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+
 			oldSvc := makeValidService()
 			newSvc := makeValidService()
 			tc.tweakSvc(&oldSvc, &newSvc)
@@ -18835,7 +19657,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			},
 		},
 	}, {
-		name: "indivdual container limits greater than pod limits",
+		name: "individual container limits greater than pod limits",
 		podResources: core.ResourceRequirements{
 			Limits: core.ResourceList{
 				core.ResourceCPU:    resource.MustParse("10"),
@@ -18895,6 +19717,8 @@ func TestValidatePodResourceNames(t *testing.T) {
 		{"memory", false},
 		{"cpu", false},
 		{"storage", true},
+		{v1.ResourceHugePagesPrefix + "2Mi", false},
+		{v1.ResourceHugePagesPrefix + "1Gi", false},
 		{"requests.cpu", true},
 		{"requests.memory", true},
 		{"requests.storage", true},
@@ -18939,6 +19763,8 @@ func TestValidateResourceNames(t *testing.T) {
 		{"memory", true, ""},
 		{"cpu", true, ""},
 		{"storage", true, ""},
+		{v1.ResourceHugePagesPrefix + "2Mi", true, ""},
+		{v1.ResourceHugePagesPrefix + "1Gi", true, ""},
 		{"requests.cpu", true, ""},
 		{"requests.memory", true, ""},
 		{"requests.storage", true, ""},
@@ -20504,7 +21330,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []core.EndpointSubset{{
 					Addresses: []core.EndpointAddress{{IP: "10.10.1.1"}},
-					Ports:     []core.EndpointPort{{Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.String("HTTP")}},
+					Ports:     []core.EndpointPort{{Port: 8675, Protocol: "TCP", AppProtocol: ptr.To("HTTP")}},
 				}},
 			},
 		},
@@ -20517,9 +21343,36 @@ func TestValidateEndpointsCreate(t *testing.T) {
 			},
 		},
 	}
-
 	for name, tc := range successCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			errs := ValidateEndpointsCreate(&tc.endpoints)
+			if len(errs) != 0 {
+				t.Errorf("Expected no validation errors, got %v", errs)
+			}
+
+		})
+	}
+
+	legacyValidationCases := map[string]struct {
+		endpoints core.Endpoints
+	}{
+		"legacy IPs with legacy validation": {
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []core.EndpointSubset{{
+					Addresses: []core.EndpointAddress{{IP: "010.010.001.001"}, {IP: "10.10.2.2"}},
+					Ports:     []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}, {Name: "b", Port: 309, Protocol: "TCP"}},
+				}, {
+					Addresses: []core.EndpointAddress{{IP: "::ffff:10.10.3.3"}},
+					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}, {Name: "b", Port: 76, Protocol: "TCP"}},
+				}},
+			},
+		},
+	}
+	for name, tc := range legacyValidationCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			errs := ValidateEndpointsCreate(&tc.endpoints)
 			if len(errs) != 0 {
 				t.Errorf("Expected no validation errors, got %v", errs)
@@ -20529,27 +21382,32 @@ func TestValidateEndpointsCreate(t *testing.T) {
 	}
 
 	errorCases := map[string]struct {
-		endpoints   core.Endpoints
-		errorType   field.ErrorType
-		errorDetail string
+		endpoints    core.Endpoints
+		expectedErrs field.ErrorList
 	}{
 		"missing namespace": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc"}},
-			errorType: "FieldValueRequired",
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata.namespace"), ""),
+			},
 		},
 		"missing name": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Namespace: "namespace"}},
-			errorType: "FieldValueRequired",
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata.name"), ""),
+			},
 		},
 		"invalid namespace": {
-			endpoints:   core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
-			errorType:   "FieldValueInvalid",
-			errorDetail: dnsLabelErrMsg,
+			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.namespace"), nil, ""),
+			},
 		},
 		"invalid name": {
-			endpoints:   core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
-			errorType:   "FieldValueInvalid",
-			errorDetail: dnsSubdomainLabelErrMsg,
+			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.name"), nil, ""),
+			},
 		},
 		"empty addresses": {
 			endpoints: core.Endpoints{
@@ -20558,7 +21416,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports: []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType: "FieldValueRequired",
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("subsets[0]"), ""),
+			},
 		},
 		"invalid IP": {
 			endpoints: core.Endpoints{
@@ -20568,8 +21428,21 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorDetail: "must be a valid IP address",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=ip-sloppy"),
+			},
+		},
+		"invalid legacy IP with strict validation": {
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []core.EndpointSubset{{
+					Addresses: []core.EndpointAddress{{IP: "001.002.003.004"}},
+					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
+				}},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=ip-sloppy"),
+			},
 		},
 		"Multiple ports, one without name": {
 			endpoints: core.Endpoints{
@@ -20579,7 +21452,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Port: 8675, Protocol: "TCP"}, {Name: "b", Port: 309, Protocol: "TCP"}},
 				}},
 			},
-			errorType: "FieldValueRequired",
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("subsets[0].ports[0].name"), ""),
+			},
 		},
 		"Invalid port number": {
 			endpoints: core.Endpoints{
@@ -20589,8 +21464,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 66000, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorDetail: "between",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].ports[0].port"), nil, "").WithOrigin("portNum"),
+			},
 		},
 		"Invalid protocol": {
 			endpoints: core.Endpoints{
@@ -20600,7 +21476,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "Protocol"}},
 				}},
 			},
-			errorType: "FieldValueNotSupported",
+			expectedErrs: field.ErrorList{
+				field.NotSupported[string](field.NewPath("subsets[0].ports[0].protocol"), nil, nil),
+			},
 		},
 		"Address missing IP": {
 			endpoints: core.Endpoints{
@@ -20610,8 +21488,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorDetail: "must be a valid IP address",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=ip-sloppy"),
+			},
 		},
 		"Port missing number": {
 			endpoints: core.Endpoints{
@@ -20621,8 +21500,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorDetail: "between",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].ports[0].port"), nil, "").WithOrigin("portNum"),
+			},
 		},
 		"Port missing protocol": {
 			endpoints: core.Endpoints{
@@ -20632,7 +21512,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 93}},
 				}},
 			},
-			errorType: "FieldValueRequired",
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("subsets[0].ports[0].protocol"), ""),
+			},
 		},
 		"Address is loopback": {
 			endpoints: core.Endpoints{
@@ -20642,8 +21524,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorDetail: "loopback",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
+			},
 		},
 		"Address is link-local": {
 			endpoints: core.Endpoints{
@@ -20653,8 +21536,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorDetail: "link-local",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
+			},
 		},
 		"Address is link-local multicast": {
 			endpoints: core.Endpoints{
@@ -20664,27 +21548,31 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorDetail: "link-local multicast",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
+			},
 		},
 		"Invalid AppProtocol": {
 			endpoints: core.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []core.EndpointSubset{{
 					Addresses: []core.EndpointAddress{{IP: "10.10.1.1"}},
-					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP", AppProtocol: utilpointer.String("lots-of[invalid]-{chars}")}},
+					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP", AppProtocol: ptr.To("lots-of[invalid]-{chars}")}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorDetail: "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].ports[0].appProtocol"), nil, "").WithOrigin("format=qualified-name"),
+			},
 		},
 	}
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidateEndpointsCreate(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
-				t.Errorf("Expected error type %s with detail %q, got %v", v.errorType, v.errorDetail, errs)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			errs := ValidateEndpointsCreate(&v.endpoints)
+			// TODO: set .RequireOriginWhenInvalid() once metadata is done
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			matcher.Test(t, v.expectedErrs, errs)
 		})
 	}
 }
@@ -20707,7 +21595,7 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
 			},
 			tweakNewEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.String("https")}}
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: ptr.To("https")}}
 			},
 			numExpectedErrors: 0,
 		},
@@ -20716,7 +21604,7 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
 			},
 			tweakNewEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.String("~https")}}
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: ptr.To("~https")}}
 			},
 			numExpectedErrors: 1,
 		},
@@ -20753,7 +21641,7 @@ func TestValidateWindowsSecurityContext(t *testing.T) {
 		errorType:   "FieldValueForbidden",
 	}, {
 		name:        "pod with SeccompProfile",
-		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: utilpointer.String("dummy")}}}}},
+		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: ptr.To("dummy")}}}}},
 		expectError: true,
 		errorMsg:    "cannot be set for a windows pod",
 		errorType:   "FieldValueForbidden",
@@ -20765,7 +21653,7 @@ func TestValidateWindowsSecurityContext(t *testing.T) {
 		errorType:   "FieldValueForbidden",
 	}, {
 		name:        "pod with WindowsOptions, no error",
-		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
+		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("dummy")}}}}},
 		expectError: false,
 	},
 	}
@@ -21047,7 +21935,7 @@ func TestValidateSchedulingGates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			errs := validateSchedulingGates(tt.schedulingGates, fieldPath)
-			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+			if diff := cmp.Diff(tt.wantFieldErrors, errs, cmpopts.IgnoreFields(field.Error{}, "Detail", "Origin")); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
 		})
@@ -21129,7 +22017,7 @@ func TestValidateTLSSecret(t *testing.T) {
 func TestValidateLinuxSecurityContext(t *testing.T) {
 	runAsUser := int64(1)
 	validLinuxSC := &core.SecurityContext{
-		Privileged: utilpointer.Bool(false),
+		Privileged: ptr.To(false),
 		Capabilities: &core.Capabilities{
 			Add:  []core.Capability{"foo"},
 			Drop: []core.Capability{"bar"},
@@ -21143,7 +22031,7 @@ func TestValidateLinuxSecurityContext(t *testing.T) {
 		RunAsUser: &runAsUser,
 	}
 	invalidLinuxSC := &core.SecurityContext{
-		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("myUser")},
+		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("myUser")},
 	}
 	cases := map[string]struct {
 		sc          *core.PodSpec
@@ -21183,7 +22071,7 @@ func TestValidateSecurityContext(t *testing.T) {
 	runAsUser := int64(1)
 	fullValidSC := func() *core.SecurityContext {
 		return &core.SecurityContext{
-			Privileged: utilpointer.Bool(false),
+			Privileged: ptr.To(false),
 			Capabilities: &core.Capabilities{
 				Add:  []core.Capability{"foo"},
 				Drop: []core.Capability{"bar"},
@@ -21239,19 +22127,19 @@ func TestValidateSecurityContext(t *testing.T) {
 	}
 
 	privRequestWithGlobalDeny := fullValidSC()
-	privRequestWithGlobalDeny.Privileged = utilpointer.Bool(true)
+	privRequestWithGlobalDeny.Privileged = ptr.To(true)
 
 	negativeRunAsUser := fullValidSC()
 	negativeUser := int64(-1)
 	negativeRunAsUser.RunAsUser = &negativeUser
 
 	privWithoutEscalation := fullValidSC()
-	privWithoutEscalation.Privileged = utilpointer.Bool(true)
-	privWithoutEscalation.AllowPrivilegeEscalation = utilpointer.Bool(false)
+	privWithoutEscalation.Privileged = ptr.To(true)
+	privWithoutEscalation.AllowPrivilegeEscalation = ptr.To(false)
 
 	capSysAdminWithoutEscalation := fullValidSC()
 	capSysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"CAP_SYS_ADMIN"}
-	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = utilpointer.Bool(false)
+	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = ptr.To(false)
 
 	errorCases := map[string]struct {
 		sc           *core.SecurityContext
@@ -21796,7 +22684,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 	updatedEndpoint := newNodeNameEndpoint("kubernetes-changed-nodename")
 	// Check that NodeName can be changed during update, this is to accommodate the case where nodeIP or PodCIDR is reused.
 	// The same ip will now have a different nodeName.
-	errList := ValidateEndpoints(updatedEndpoint)
+	errList := ValidateEndpoints(updatedEndpoint, oldEndpoint)
 	errList = append(errList, ValidateEndpointsUpdate(updatedEndpoint, oldEndpoint)...)
 	if len(errList) != 0 {
 		t.Error("Endpoint should allow changing of Subset.Addresses.NodeName on update")
@@ -21806,7 +22694,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 	// Check NodeName DNS validation
 	endpoint := newNodeNameEndpoint("illegal*.nodename")
-	errList := ValidateEndpoints(endpoint)
+	errList := ValidateEndpoints(endpoint, nil)
 	if len(errList) == 0 {
 		t.Error("Endpoint should reject invalid NodeName")
 	}
@@ -21814,7 +22702,7 @@ func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 
 func TestEndpointAddressNodeNameCanBeAnIPAddress(t *testing.T) {
 	endpoint := newNodeNameEndpoint("10.10.1.1")
-	errList := ValidateEndpoints(endpoint)
+	errList := ValidateEndpoints(endpoint, nil)
 	if len(errList) != 0 {
 		t.Error("Endpoint should accept a NodeName that is an IP address")
 	}
@@ -21907,17 +22795,17 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 	successCases := map[string]*core.SessionAffinityConfig{
 		"non-empty config, valid timeout: 1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(1),
+				TimeoutSeconds: ptr.To[int32](1),
 			},
 		},
 		"non-empty config, valid timeout: core.MaxClientIPServiceAffinitySeconds-1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(core.MaxClientIPServiceAffinitySeconds - 1),
+				TimeoutSeconds: ptr.To[int32](core.MaxClientIPServiceAffinitySeconds - 1),
 			},
 		},
 		"non-empty config, valid timeout: core.MaxClientIPServiceAffinitySeconds": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(core.MaxClientIPServiceAffinitySeconds),
+				TimeoutSeconds: ptr.To[int32](core.MaxClientIPServiceAffinitySeconds),
 			},
 		},
 	}
@@ -21940,17 +22828,17 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 		},
 		"non-empty config, invalid timeout: core.MaxClientIPServiceAffinitySeconds+1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(core.MaxClientIPServiceAffinitySeconds + 1),
+				TimeoutSeconds: ptr.To[int32](core.MaxClientIPServiceAffinitySeconds + 1),
 			},
 		},
 		"non-empty config, invalid timeout: -1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(-1),
+				TimeoutSeconds: ptr.To[int32](-1),
 			},
 		},
 		"non-empty config, invalid timeout: 0": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(0),
+				TimeoutSeconds: ptr.To[int32](0),
 			},
 		},
 	}
@@ -22394,19 +23282,19 @@ func TestVolumeAttributesClass(t *testing.T) {
 			testName:                    "Feature gate enabled and an empty volumeAttributesClassName specified",
 			expectedFail:                false,
 			enableVolumeAttributesClass: true,
-			claimSpec:                   pvcSpecWithVolumeAttributesClassName(utilpointer.String("")),
+			claimSpec:                   pvcSpecWithVolumeAttributesClassName(ptr.To("")),
 		},
 		{
 			testName:                    "Feature gate enabled and valid volumeAttributesClassName specified",
 			expectedFail:                false,
 			enableVolumeAttributesClass: true,
-			claimSpec:                   pvcSpecWithVolumeAttributesClassName(utilpointer.String("foo")),
+			claimSpec:                   pvcSpecWithVolumeAttributesClassName(ptr.To("foo")),
 		},
 		{
 			testName:                    "Feature gate enabled and invalid volumeAttributesClassName specified",
 			expectedFail:                true,
 			enableVolumeAttributesClass: true,
-			claimSpec:                   pvcSpecWithVolumeAttributesClassName(utilpointer.String("-invalid-")),
+			claimSpec:                   pvcSpecWithVolumeAttributesClassName(ptr.To("-invalid-")),
 		},
 	}
 	for _, tc := range testCases {
@@ -22444,29 +23332,33 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 	testCases := []struct {
 		name            string
 		constraints     []core.TopologySpreadConstraint
-		wantFieldErrors field.ErrorList
 		opts            PodValidationOptions
+		wantFieldErrors field.ErrorList
 	}{{
 		name: "all required fields ok",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
 			WhenUnsatisfiable: core.DoNotSchedule,
-			MinDomains:        utilpointer.Int32(3),
+			MinDomains:        ptr.To[int32](3),
 		}},
-		wantFieldErrors: field.ErrorList{},
+		wantFieldErrors: nil,
 	}, {
 		name: "missing MaxSkew",
 		constraints: []core.TopologySpreadConstraint{
 			{TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 		},
-		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMaxSkew, int32(0), isNotPositiveErrorMsg)},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMaxSkew, nil, "").WithOrigin("minimum"),
+		},
 	}, {
 		name: "negative MaxSkew",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: -1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 		},
-		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMaxSkew, int32(-1), isNotPositiveErrorMsg)},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMaxSkew, nil, "").WithOrigin("minimum"),
+		},
 	}, {
 		name: "can use MinDomains with ScheduleAnyway, when MinDomains = nil",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22475,77 +23367,89 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.ScheduleAnyway,
 			MinDomains:        nil,
 		}},
-		wantFieldErrors: field.ErrorList{},
+		wantFieldErrors: nil,
 	}, {
 		name: "negative minDomains is invalid",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
 			WhenUnsatisfiable: core.DoNotSchedule,
-			MinDomains:        utilpointer.Int32(-1),
+			MinDomains:        ptr.To[int32](-1),
 		}},
-		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), isNotPositiveErrorMsg)},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("minimum"),
+		},
 	}, {
 		name: "cannot use non-nil MinDomains with ScheduleAnyway",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
 			WhenUnsatisfiable: core.ScheduleAnyway,
-			MinDomains:        utilpointer.Int32(10),
+			MinDomains:        ptr.To[int32](10),
 		}},
-		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, utilpointer.Int32(10), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway)))},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("dependsOn"),
+		},
 	}, {
 		name: "use negative MinDomains with ScheduleAnyway(invalid)",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
 			WhenUnsatisfiable: core.ScheduleAnyway,
-			MinDomains:        utilpointer.Int32(-1),
+			MinDomains:        ptr.To[int32](-1),
 		}},
-		wantFieldErrors: []*field.Error{
-			field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), isNotPositiveErrorMsg),
-			field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway))),
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("minimum"),
+			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("dependsOn"),
 		},
 	}, {
 		name: "missing TopologyKey",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, WhenUnsatisfiable: core.DoNotSchedule},
 		},
-		wantFieldErrors: []*field.Error{field.Required(fieldPathTopologyKey, "can not be empty")},
+		wantFieldErrors: field.ErrorList{
+			field.Required(fieldPathTopologyKey, ""),
+		},
 	}, {
 		name: "missing scheduling mode",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone"},
 		},
-		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction(""), sets.List(supportedScheduleActions))},
+		wantFieldErrors: field.ErrorList{
+			field.NotSupported[core.UnsatisfiableConstraintAction](fieldPathWhenUnsatisfiable, nil, nil),
+		},
 	}, {
 		name: "unsupported scheduling mode",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.UnsatisfiableConstraintAction("N/A")},
 		},
-		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction("N/A"), sets.List(supportedScheduleActions))},
+		wantFieldErrors: field.ErrorList{
+			field.NotSupported[core.UnsatisfiableConstraintAction](fieldPathWhenUnsatisfiable, nil, nil),
+		},
 	}, {
 		name: "multiple constraints ok with all required fields",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			{MaxSkew: 2, TopologyKey: "k8s.io/node", WhenUnsatisfiable: core.ScheduleAnyway},
 		},
-		wantFieldErrors: field.ErrorList{},
+		wantFieldErrors: nil,
 	}, {
 		name: "multiple constraints missing TopologyKey on partial ones",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, WhenUnsatisfiable: core.ScheduleAnyway},
 			{MaxSkew: 2, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 		},
-		wantFieldErrors: []*field.Error{field.Required(fieldPathTopologyKey, "can not be empty")},
+		wantFieldErrors: field.ErrorList{
+			field.Required(fieldPathTopologyKey, ""),
+		},
 	}, {
 		name: "duplicate constraints",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			{MaxSkew: 2, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 		},
-		wantFieldErrors: []*field.Error{
-			field.Duplicate(fieldPathTopologyKeyAndWhenUnsatisfiable, fmt.Sprintf("{%v, %v}", "k8s.io/zone", core.DoNotSchedule)),
+		wantFieldErrors: field.ErrorList{
+			field.Duplicate(fieldPathTopologyKeyAndWhenUnsatisfiable, nil),
 		},
 	}, {
 		name: "supported policy name set on NodeAffinityPolicy and NodeTaintsPolicy",
@@ -22556,7 +23460,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeAffinityPolicy: &honor,
 			NodeTaintsPolicy:   &ignore,
 		}},
-		wantFieldErrors: []*field.Error{},
+		wantFieldErrors: nil,
 	}, {
 		name: "unsupported policy name set on NodeAffinityPolicy",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22566,8 +23470,8 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeAffinityPolicy: &unknown,
 			NodeTaintsPolicy:   &ignore,
 		}},
-		wantFieldErrors: []*field.Error{
-			field.NotSupported(nodeAffinityField, &unknown, sets.List(supportedPodTopologySpreadNodePolicies)),
+		wantFieldErrors: field.ErrorList{
+			field.NotSupported[core.NodeInclusionPolicy](nodeAffinityField, nil, nil),
 		},
 	}, {
 		name: "unsupported policy name set on NodeTaintsPolicy",
@@ -22578,8 +23482,8 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeAffinityPolicy: &honor,
 			NodeTaintsPolicy:   &unknown,
 		}},
-		wantFieldErrors: []*field.Error{
-			field.NotSupported(nodeTaintsField, &unknown, sets.List(supportedPodTopologySpreadNodePolicies)),
+		wantFieldErrors: field.ErrorList{
+			field.NotSupported[core.NodeInclusionPolicy](nodeTaintsField, nil, nil),
 		},
 	}, {
 		name: "key in MatchLabelKeys isn't correctly defined",
@@ -22590,7 +23494,9 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.DoNotSchedule,
 			MatchLabelKeys:    []string{"/simple"},
 		}},
-		wantFieldErrors: field.ErrorList{field.Invalid(fieldPathMatchLabelKeys.Index(0), "/simple", "prefix part must be non-empty")},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("labelKey"),
+		},
 	}, {
 		name: "key exists in both matchLabelKeys and labelSelector",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22608,7 +23514,9 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 				},
 			},
 		}},
-		wantFieldErrors: field.ErrorList{field.Invalid(fieldPathMatchLabelKeys.Index(0), "foo", "exists in both matchLabelKeys and labelSelector")},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("overlappingKeys"),
+		},
 	}, {
 		name: "key in MatchLabelKeys is forbidden to be specified when labelSelector is not set",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22617,7 +23525,9 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.DoNotSchedule,
 			MatchLabelKeys:    []string{"foo"},
 		}},
-		wantFieldErrors: field.ErrorList{field.Forbidden(fieldPathMatchLabelKeys, "must not be specified when labelSelector is not set")},
+		wantFieldErrors: field.ErrorList{
+			field.Forbidden(fieldPathMatchLabelKeys, ""),
+		},
 	}, {
 		name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22627,8 +23537,10 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			MinDomains:        nil,
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "foo"}},
 		}},
-		wantFieldErrors: []*field.Error{field.Invalid(labelSelectorField.Child("matchLabels"), "NoUppercaseOrSpecialCharsLike=Equals", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
-		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(labelSelectorField.Child("matchLabels"), nil, "").WithOrigin("labelKey"),
+		},
+		opts: PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
 	}, {
 		name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is true",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22638,7 +23550,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			MinDomains:        nil,
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "foo"}},
 		}},
-		wantFieldErrors: []*field.Error{},
+		wantFieldErrors: nil,
 		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: true},
 	}, {
 		name: "valid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
@@ -22649,17 +23561,15 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			MinDomains:        nil,
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "foo"}},
 		}},
-		wantFieldErrors: []*field.Error{},
+		wantFieldErrors: nil,
 		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
-	},
-	}
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath, tc.opts)
-			if diff := cmp.Diff(tc.wantFieldErrors, errs); diff != "" {
-				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
-			}
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().RequireOriginWhenInvalid()
+			matcher.Test(t, tc.wantFieldErrors, errs)
 		})
 	}
 }
@@ -22716,32 +23626,48 @@ func makePod(podName string, podNamespace string, podIPs []core.PodIP) core.Pod 
 	}
 }
 func TestPodIPsValidation(t *testing.T) {
+	// We test updating every pod in testCases to every other pod in testCases.
+	// expectError is true if we expect an error when updating *to* that pod.
+	// allowNoOpUpdate is true if we expect a no-op update to succeed.
+
 	testCases := []struct {
-		pod         core.Pod
-		expectError bool
-	}{{
-		expectError: false,
-		pod:         makePod("nil-ips", "ns", nil),
-	}, {
-		expectError: false,
-		pod:         makePod("empty-podips-list", "ns", []core.PodIP{}),
-	}, {
-		expectError: false,
-		pod:         makePod("single-ip-family-6", "ns", []core.PodIP{{IP: "::1"}}),
-	}, {
-		expectError: false,
-		pod:         makePod("single-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}}),
-	}, {
-		expectError: false,
-		pod:         makePod("dual-stack-4-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
-	}, {
-		expectError: false,
-		pod:         makePod("dual-stack-6-4", "ns", []core.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
-	},
+		pod             core.Pod
+		legacyIPs       bool
+		expectError     bool
+		allowNoOpUpdate bool
+	}{
+		{
+			expectError: false,
+			pod:         makePod("nil-ips", "ns", nil),
+		}, {
+			expectError: false,
+			pod:         makePod("empty-podips-list", "ns", []core.PodIP{}),
+		}, {
+			expectError: false,
+			pod:         makePod("single-ip-family-6", "ns", []core.PodIP{{IP: "::1"}}),
+		}, {
+			expectError: false,
+			pod:         makePod("single-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}}),
+		}, {
+			expectError: false,
+			pod:         makePod("dual-stack-4-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+		}, {
+			expectError: false,
+			pod:         makePod("dual-stack-6-4", "ns", []core.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		}, {
+			expectError: false,
+			legacyIPs:   true,
+			pod:         makePod("legacy-pod-ip-with-legacy-validation", "ns", []core.PodIP{{IP: "001.002.003.004"}}),
+		},
 		/* failure cases start here */
 		{
-			expectError: true,
-			pod:         makePod("invalid-pod-ip", "ns", []core.PodIP{{IP: "this-is-not-an-ip"}}),
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePod("invalid-pod-ip", "ns", []core.PodIP{{IP: "1.1.1.01"}}),
+		}, {
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePod("legacy-pod-ip-with-strict-validation", "ns", []core.PodIP{{IP: "001.002.003.004"}}),
 		}, {
 			expectError: true,
 			pod:         makePod("dualstack-same-ip-family-6", "ns", []core.PodIP{{IP: "::1"}, {IP: "::2"}}),
@@ -22765,9 +23691,14 @@ func TestPodIPsValidation(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
+	for i, testCase := range testCases {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
-			for _, oldTestCase := range testCases {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
+			for j, oldTestCase := range testCases {
+				if oldTestCase.legacyIPs && !testCase.legacyIPs {
+					continue
+				}
+
 				newPod := testCase.pod.DeepCopy()
 				newPod.ResourceVersion = "1"
 
@@ -22777,11 +23708,15 @@ func TestPodIPsValidation(t *testing.T) {
 
 				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
 
-				if len(errs) == 0 && testCase.expectError {
-					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)
+				expectError := testCase.expectError
+				if testCase.allowNoOpUpdate && i == j {
+					expectError = false
+				}
+				if len(errs) == 0 && expectError {
+					t.Fatalf("expected failure updating from %s, but there were none", oldTestCase.pod.Name)
 				}
 				if len(errs) != 0 && !testCase.expectError {
-					t.Fatalf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+					t.Fatalf("expected success updating from %s, but there were errors: %v", oldTestCase.pod.Name, errs)
 				}
 			}
 		})
@@ -22812,9 +23747,15 @@ func makePodWithHostIPs(podName string, podNamespace string, hostIPs []core.Host
 }
 
 func TestHostIPsValidation(t *testing.T) {
+	// We test updating every pod in testCases to every other pod in testCases.
+	// expectError is true if we expect an error when updating *to* that pod.
+	// allowNoOpUpdate is true if we expect a no-op update to succeed.
+
 	testCases := []struct {
-		pod         core.Pod
-		expectError bool
+		pod             core.Pod
+		legacyIPs       bool
+		expectError     bool
+		allowNoOpUpdate bool
 	}{
 		{
 			expectError: false,
@@ -22840,10 +23781,21 @@ func TestHostIPsValidation(t *testing.T) {
 			expectError: false,
 			pod:         makePodWithHostIPs("dual-stack-6-4", "ns", []core.HostIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
 		},
+		{
+			expectError: false,
+			legacyIPs:   true,
+			pod:         makePodWithHostIPs("legacy-host-ip-with-legacy-validation", "ns", []core.HostIP{{IP: "001.002.003.004"}}),
+		},
 		/* failure cases start here */
 		{
-			expectError: true,
-			pod:         makePodWithHostIPs("invalid-pod-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePodWithHostIPs("invalid-host-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
+		},
+		{
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePodWithHostIPs("invalid-legacy-host-ip-with-strict-validation", "ns", []core.HostIP{{IP: "001.002.003.004"}}),
 		},
 		{
 			expectError: true,
@@ -22872,9 +23824,14 @@ func TestHostIPsValidation(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
+	for i, testCase := range testCases {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
-			for _, oldTestCase := range testCases {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
+			for j, oldTestCase := range testCases {
+				if oldTestCase.legacyIPs && !testCase.legacyIPs {
+					continue
+				}
+
 				newPod := testCase.pod.DeepCopy()
 				newPod.ResourceVersion = "1"
 
@@ -22884,11 +23841,15 @@ func TestHostIPsValidation(t *testing.T) {
 
 				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
 
-				if len(errs) == 0 && testCase.expectError {
-					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)
+				expectError := testCase.expectError
+				if testCase.allowNoOpUpdate && i == j {
+					expectError = false
+				}
+				if len(errs) == 0 && expectError {
+					t.Fatalf("expected failure updating from %s, but there were none", oldTestCase.pod.Name)
 				}
 				if len(errs) != 0 && !testCase.expectError {
-					t.Fatalf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+					t.Fatalf("expected success updating from %s, but there were errors: %v", oldTestCase.pod.Name, errs)
 				}
 			}
 		})
@@ -23247,7 +24208,7 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 	}, {
 		description:     "localhost/test.json annotation and SeccompProfileTypeLocalhost with correct profile should return empty",
 		annotationValue: "localhost/test.json",
-		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeLocalhost, LocalhostProfile: utilpointer.String("test.json")},
+		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeLocalhost, LocalhostProfile: ptr.To("test.json")},
 		expectedErr:     nil,
 	}, {
 		description:     "localhost/test.json annotation and SeccompProfileTypeLocalhost without profile should error",
@@ -23258,7 +24219,7 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 	}, {
 		description:     "localhost/test.json annotation and SeccompProfileTypeLocalhost with different profile should error",
 		annotationValue: "localhost/test.json",
-		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeLocalhost, LocalhostProfile: utilpointer.String("different.json")},
+		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeLocalhost, LocalhostProfile: ptr.To("different.json")},
 		fldPath:         rootFld,
 		expectedErr:     field.Forbidden(rootFld.Child("localhostProfile"), "seccomp profile in annotation and field must match"),
 	}, {
@@ -23392,6 +24353,48 @@ func TestValidateResourceRequirements(t *testing.T) {
 		},
 		validateFn: ValidateContainerResourceRequirements,
 	}, {
+		name: "container resource hugepage with cpu or memory",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				core.ResourceCPU: resource.MustParse("10"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		validateFn: ValidateContainerResourceRequirements,
+	}, {
+		name: "container resource hugepage limit without request",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceMemory: resource.MustParse("2Mi"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		validateFn: ValidateContainerResourceRequirements,
+	}, {
+		name: "pod resource hugepages with cpu or memory",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceMemory: resource.MustParse("2Mi"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		validateFn: validatePodResourceRequirements,
+	}, {
+		name: "pod resource hugepages limit without request",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceMemory: resource.MustParse("2Mi"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		validateFn: validatePodResourceRequirements,
+	}, {
 		name: "limits and requests of memory resource are equal",
 		requirements: core.ResourceRequirements{
 			Limits: core.ResourceList{
@@ -23453,62 +24456,81 @@ func TestValidateResourceRequirements(t *testing.T) {
 		validateFn   func(requirements *core.ResourceRequirements,
 			podClaimNames sets.Set[string], fldPath *field.Path,
 			opts PodValidationOptions) field.ErrorList
-	}{{
-		name: "hugepage resource without cpu or memory",
-		requirements: core.ResourceRequirements{
-			Limits: core.ResourceList{
-				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+	}{
+		{
+			name: "container resource hugepage without cpu or memory",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
 			},
-			Requests: core.ResourceList{
-				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			validateFn: ValidateContainerResourceRequirements,
+		}, {
+			name: "container resource hugepage without limit",
+			requirements: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("2Mi"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
 			},
+			validateFn: ValidateContainerResourceRequirements,
+		}, {
+			name: "pod resource hugepages without cpu or memory",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		}, {
+			name: "pod resource hugepages request without limit",
+			requirements: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("2Mi"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		}, {
+			name: "pod resource with ephemeral-storage",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName(core.ResourceEphemeralStorage): resource.MustParse("2Mi"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName(core.ResourceEphemeralStorage + "2Mi"): resource.MustParse("2Mi"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		}, {
+			name: "pod resource with unsupported prefixed resources",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName("kubernetesio/" + core.ResourceCPU): resource.MustParse("2"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName("kubernetesio/" + core.ResourceMemory): resource.MustParse("2"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		}, {
+			name: "pod resource with unsupported native resources",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
 		},
-		validateFn: ValidateContainerResourceRequirements,
-	}, {
-		name: "pod resource with hugepages",
-		requirements: core.ResourceRequirements{
-			Limits: core.ResourceList{
-				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
-			},
-			Requests: core.ResourceList{
-				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
-			},
-		},
-		validateFn: validatePodResourceRequirements,
-	}, {
-		name: "pod resource with ephemeral-storage",
-		requirements: core.ResourceRequirements{
-			Limits: core.ResourceList{
-				core.ResourceName(core.ResourceEphemeralStorage): resource.MustParse("2Mi"),
-			},
-			Requests: core.ResourceList{
-				core.ResourceName(core.ResourceEphemeralStorage + "2Mi"): resource.MustParse("2Mi"),
-			},
-		},
-		validateFn: validatePodResourceRequirements,
-	}, {
-		name: "pod resource with unsupported prefixed resources",
-		requirements: core.ResourceRequirements{
-			Limits: core.ResourceList{
-				core.ResourceName("kubernetesio/" + core.ResourceCPU): resource.MustParse("2"),
-			},
-			Requests: core.ResourceList{
-				core.ResourceName("kubernetesio/" + core.ResourceMemory): resource.MustParse("2"),
-			},
-		},
-		validateFn: validatePodResourceRequirements,
-	}, {
-		name: "pod resource with unsupported native resources",
-		requirements: core.ResourceRequirements{
-			Limits: core.ResourceList{
-				core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
-			},
-			Requests: core.ResourceList{
-				core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
-			},
-		},
-		validateFn: validatePodResourceRequirements,
-	},
 		{
 			name: "pod resource with unsupported empty native resource name",
 			requirements: core.ResourceRequirements{
@@ -23532,7 +24554,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 	}
 }
 
-func TestValidateNonSpecialIP(t *testing.T) {
+func TestValidateEndpointIP(t *testing.T) {
 	fp := field.NewPath("ip")
 
 	// Valid values.
@@ -23543,11 +24565,15 @@ func TestValidateNonSpecialIP(t *testing.T) {
 		{"ipv4", "10.1.2.3"},
 		{"ipv4 class E", "244.1.2.3"},
 		{"ipv6", "2000::1"},
+
+		// These probably should not have been allowed, but they are
+		{"ipv4 multicast", "239.255.255.253"},
+		{"ipv6 multicast", "ff05::1:3"},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			errs := ValidateNonSpecialIP(tc.ip, fp)
+			errs := ValidateEndpointIP(tc.ip, fp)
 			if len(errs) != 0 {
-				t.Errorf("ValidateNonSpecialIP(%q, ...) = %v; want nil", tc.ip, errs)
+				t.Errorf("ValidateEndpointIP(%q, ...) = %v; want nil", tc.ip, errs)
 			}
 		})
 	}
@@ -23561,13 +24587,15 @@ func TestValidateNonSpecialIP(t *testing.T) {
 		{"ipv4 localhost", "127.0.0.0"},
 		{"ipv4 localhost", "127.255.255.255"},
 		{"ipv6 localhost", "::1"},
+		{"ipv4 link local", "169.254.169.254"},
 		{"ipv6 link local", "fe80::"},
+		{"ipv4 local multicast", "224.0.0.251"},
 		{"ipv6 local multicast", "ff02::"},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			errs := ValidateNonSpecialIP(tc.ip, fp)
+			errs := ValidateEndpointIP(tc.ip, fp)
 			if len(errs) == 0 {
-				t.Errorf("ValidateNonSpecialIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
+				t.Errorf("ValidateEndpointIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
 			}
 		})
 	}
@@ -24443,12 +25471,14 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	ipModeDummy := core.LoadBalancerIPMode("dummy")
 
 	testCases := []struct {
-		name          string
-		ipModeEnabled bool
-		nonLBAllowed  bool
-		tweakLBStatus func(s *core.LoadBalancerStatus)
-		tweakSvcSpec  func(s *core.ServiceSpec)
-		numErrs       int
+		name             string
+		ipModeEnabled    bool
+		legacyIPs        bool
+		nonLBAllowed     bool
+		tweakOldLBStatus func(s *core.LoadBalancerStatus)
+		tweakLBStatus    func(s *core.LoadBalancerStatus)
+		tweakSvcSpec     func(s *core.ServiceSpec)
+		numErrs          int
 	}{
 		{
 			name:         "type is not LB",
@@ -24531,22 +25561,99 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 				}}
 			},
 			numErrs: 1,
+		}, {
+			name:          "legacy IP with legacy validation",
+			ipModeEnabled: true,
+			legacyIPs:     true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "001.002.003.004",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name:          "legacy IP with strict validation",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "001.002.003.004",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 1,
+		}, {
+			name: "invalid ingress IP ignored on update",
+			tweakOldLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name: "invalid ingress IP ignored when adding IP",
+			tweakOldLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}, {
+					IP:     "5.6.7.8",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name: "invalid ingress IP can be fixed",
+			tweakOldLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if !tc.ipModeEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+			} else {
+				// (This feature gate doesn't exist in 1.31 so we can't set it
+				// when testing !ipModeEnabled.)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)
+			oldStatus := core.LoadBalancerStatus{}
+			if tc.tweakOldLBStatus != nil {
+				tc.tweakOldLBStatus(&oldStatus)
+			}
 			status := core.LoadBalancerStatus{}
 			tc.tweakLBStatus(&status)
 			spec := core.ServiceSpec{Type: core.ServiceTypeLoadBalancer}
 			if tc.tweakSvcSpec != nil {
 				tc.tweakSvcSpec(&spec)
 			}
-			errs := ValidateLoadBalancerStatus(&status, field.NewPath("status"), &spec)
+			errs := ValidateLoadBalancerStatus(&status, &oldStatus, field.NewPath("status"), &spec)
 			if len(errs) != tc.numErrs {
 				t.Errorf("Unexpected error list for case %q(expected:%v got %v) - Errors:\n %v", tc.name, tc.numErrs, len(errs), errs.ToAggregate())
 			}
@@ -24674,7 +25781,7 @@ func TestValidateSleepAction(t *testing.T) {
 	}
 }
 
-// TODO: merge these test to TestValidatePodSpec after AllowRelaxedDNSSearchValidation feature graduates to Beta
+// TODO: merge these test to TestValidatePodSpec after AllowRelaxedDNSSearchValidation feature graduates to GA
 func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -24840,221 +25947,6 @@ func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
 	}
 }
 
-// TODO: merge these test to TestValidatePodSpec after SupplementalGroupsPolicy feature graduates to Beta
-func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
-	fldPath := field.NewPath("spec")
-	badSupplementalGroupsPolicyEmpty := ptr.To(core.SupplementalGroupsPolicy(""))
-	badSupplementalGroupsPolicyNotSupported := ptr.To(core.SupplementalGroupsPolicy("not-supported"))
-
-	validatePodSpecTestCases := map[string]struct {
-		securityContext *core.PodSecurityContext
-		wantFieldErrors field.ErrorList
-	}{
-		"nil SecurityContext is valid": {
-			securityContext: nil,
-		},
-		"nil SupplementalGroupsPolicy is valid": {
-			securityContext: &core.PodSecurityContext{},
-		},
-		"SupplementalGroupsPolicyMerge is valid": {
-			securityContext: &core.PodSecurityContext{
-				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyMerge),
-			},
-		},
-		"SupplementalGroupsPolicyStrict is valid": {
-			securityContext: &core.PodSecurityContext{
-				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyStrict),
-			},
-		},
-		"empty SupplementalGroupsPolicy is invalid": {
-			securityContext: &core.PodSecurityContext{
-				SupplementalGroupsPolicy: badSupplementalGroupsPolicyEmpty,
-			},
-			wantFieldErrors: field.ErrorList{
-				field.NotSupported(
-					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
-					badSupplementalGroupsPolicyEmpty, sets.List(validSupplementalGroupsPolicies)),
-			},
-		},
-		"not-supported SupplementalGroupsPolicy is invalid": {
-			securityContext: &core.PodSecurityContext{
-				SupplementalGroupsPolicy: badSupplementalGroupsPolicyNotSupported,
-			},
-			wantFieldErrors: field.ErrorList{
-				field.NotSupported(
-					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
-					badSupplementalGroupsPolicyNotSupported, sets.List(validSupplementalGroupsPolicies)),
-			},
-		},
-	}
-	for name, tt := range validatePodSpecTestCases {
-		t.Run(name, func(t *testing.T) {
-			podSpec := podtest.MakePodSpec(podtest.SetSecurityContext(tt.securityContext), podtest.SetContainers(podtest.MakeContainer("con")))
-
-			if tt.wantFieldErrors == nil {
-				tt.wantFieldErrors = field.ErrorList{}
-			}
-			errs := ValidatePodSpec(&podSpec, nil, fldPath, PodValidationOptions{})
-			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
-				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-// TODO: merge these testcases to TestValidateWindowsPodSecurityContext after SupplementalGroupsPolicy feature graduates to Beta
-func TestValidateWindowsPodSecurityContextSupplementalGroupsPolicy(t *testing.T) {
-	fldPath := field.NewPath("spec")
-
-	testCases := map[string]struct {
-		securityContext *core.PodSecurityContext
-		wantFieldErrors field.ErrorList
-	}{
-		"nil SecurityContext is valid": {
-			securityContext: nil,
-		},
-		"nil SupplementalGroupdPolicy is valid": {
-			securityContext: &core.PodSecurityContext{},
-		},
-		"non-empty SupplementalGroupdPolicy is invalid": {
-			securityContext: &core.PodSecurityContext{
-				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyMerge),
-			},
-			wantFieldErrors: field.ErrorList{
-				field.Forbidden(
-					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
-					"cannot be set for a windows pod"),
-			},
-		},
-	}
-
-	for name, tt := range testCases {
-		t.Run(name, func(t *testing.T) {
-			podSpec := podtest.MakePodSpec(podtest.SetSecurityContext(tt.securityContext), podtest.SetOS(core.Windows), podtest.SetContainers(podtest.MakeContainer("con")))
-			if tt.wantFieldErrors == nil {
-				tt.wantFieldErrors = field.ErrorList{}
-			}
-			errs := validateWindows(&podSpec, fldPath)
-			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
-				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-// TODO: merge these testcases to TestValidatePodStatusUpdate after SupplementalGroupsPolicy feature graduates to Beta
-func TestValidatePodStatusUpdateWithSupplementalGroupsPolicy(t *testing.T) {
-	badUID := int64(-1)
-	badGID := int64(-1)
-
-	containerTypes := map[string]func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus){
-		"container": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
-			podStatus.ContainerStatuses = containerStatus
-		},
-		"initContainer": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
-			podStatus.InitContainerStatuses = containerStatus
-		},
-		"ephemeralContainer": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
-			podStatus.EphemeralContainerStatuses = containerStatus
-		},
-	}
-
-	testCases := map[string]struct {
-		podOSes           []*core.PodOS
-		containerStatuses []core.ContainerStatus
-		wantFieldErrors   field.ErrorList
-	}{
-		"nil container user is valid": {
-			podOSes:           []*core.PodOS{nil, {Name: core.Linux}},
-			containerStatuses: []core.ContainerStatus{},
-		},
-		"empty container user is valid": {
-			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
-			containerStatuses: []core.ContainerStatus{{
-				User: &core.ContainerUser{},
-			}},
-		},
-		"container user with valid ids": {
-			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
-			containerStatuses: []core.ContainerStatus{{
-				User: &core.ContainerUser{
-					Linux: &core.LinuxContainerUser{},
-				},
-			}},
-		},
-		"container user with invalid ids": {
-			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
-			containerStatuses: []core.ContainerStatus{{
-				User: &core.ContainerUser{
-					Linux: &core.LinuxContainerUser{
-						UID:                badUID,
-						GID:                badGID,
-						SupplementalGroups: []int64{badGID},
-					},
-				},
-			}},
-			wantFieldErrors: field.ErrorList{
-				field.Invalid(field.NewPath("[0].linux.uid"), badUID, "must be between 0 and 2147483647, inclusive"),
-				field.Invalid(field.NewPath("[0].linux.gid"), badGID, "must be between 0 and 2147483647, inclusive"),
-				field.Invalid(field.NewPath("[0].linux.supplementalGroups[0]"), badGID, "must be between 0 and 2147483647, inclusive"),
-			},
-		},
-		"user.linux must not be set in windows": {
-			podOSes: []*core.PodOS{{Name: core.Windows}},
-			containerStatuses: []core.ContainerStatus{{
-				User: &core.ContainerUser{
-					Linux: &core.LinuxContainerUser{},
-				},
-			}},
-			wantFieldErrors: field.ErrorList{
-				field.Forbidden(field.NewPath("[0].linux"), "cannot be set for a windows pod"),
-			},
-		},
-	}
-
-	for name, tt := range testCases {
-		for _, podOS := range tt.podOSes {
-			for containerType, setContainerStatuses := range containerTypes {
-				t.Run(fmt.Sprintf("[podOS=%v][containerType=%s] %s", podOS, containerType, name), func(t *testing.T) {
-					oldPod := &core.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            "foo",
-							ResourceVersion: "1",
-						},
-						Spec: core.PodSpec{
-							OS: podOS,
-						},
-						Status: core.PodStatus{},
-					}
-					newPod := &core.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            "foo",
-							ResourceVersion: "1",
-						},
-						Spec: core.PodSpec{
-							OS: podOS,
-						},
-					}
-					setContainerStatuses(&newPod.Status, tt.containerStatuses)
-					var expectedFieldErrors field.ErrorList
-					for _, err := range tt.wantFieldErrors {
-						expectedField := fmt.Sprintf("%s%s", field.NewPath("status").Child(containerType+"Statuses"), err.Field)
-						expectedFieldErrors = append(expectedFieldErrors, &field.Error{
-							Type:     err.Type,
-							Field:    expectedField,
-							BadValue: err.BadValue,
-							Detail:   err.Detail,
-						})
-					}
-					errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
-					if diff := cmp.Diff(expectedFieldErrors, errs); diff != "" {
-						t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
-					}
-				})
-			}
-		}
-	}
-}
 func TestValidateContainerStatusNoAllocatedResourcesStatus(t *testing.T) {
 	containerStatuses := []core.ContainerStatus{
 		{
@@ -25472,10 +26364,8 @@ func TestValidateSELinuxChangePolicy(t *testing.T) {
 }
 
 func TestValidatePodResize(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
-
 	mkPod := func(req, lim core.ResourceList, tweaks ...podtest.Tweak) *core.Pod {
-		return podtest.MakePod("pod", append(tweaks,
+		allTweaks := []podtest.Tweak{
 			podtest.SetContainers(
 				podtest.MakeContainer(
 					"container",
@@ -25487,11 +26377,14 @@ func TestValidatePodResize(t *testing.T) {
 					),
 				),
 			),
-		)...)
+		}
+		// Prepend the SetContainers call so TweakContainers can be used.
+		allTweaks = append(allTweaks, tweaks...)
+		return podtest.MakePod("pod", allTweaks...)
 	}
 
 	mkPodWithInitContainers := func(req, lim core.ResourceList, restartPolicy core.ContainerRestartPolicy, tweaks ...podtest.Tweak) *core.Pod {
-		return podtest.MakePod("pod", append(tweaks,
+		allTweaks := []podtest.Tweak{
 			podtest.SetInitContainers(
 				podtest.MakeContainer(
 					"container",
@@ -25504,7 +26397,18 @@ func TestValidatePodResize(t *testing.T) {
 					podtest.SetContainerRestartPolicy(restartPolicy),
 				),
 			),
-		)...)
+		}
+		// Prepend the SetInitContainers call so TweakContainers can be used.
+		allTweaks = append(allTweaks, tweaks...)
+		return podtest.MakePod("pod", allTweaks...)
+	}
+
+	resizePolicy := func(resource core.ResourceName, policy core.ResourceResizeRestartPolicy) podtest.Tweak {
+		return podtest.TweakContainers(podtest.SetContainerResizePolicy(
+			core.ContainerResizePolicy{
+				ResourceName:  resource,
+				RestartPolicy: policy,
+			}))
 	}
 
 	tests := []struct {
@@ -25535,14 +26439,14 @@ func TestValidatePodResize(t *testing.T) {
 			new: podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResources("100m", "100Mi", "", ""),
+						Limits: getResources("100m", "200Mi", "", ""),
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
 			old: podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResources("100m", "200Mi", "", ""),
+						Limits: getResources("100m", "100Mi", "", ""),
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
@@ -25661,9 +26565,24 @@ func TestValidatePodResize(t *testing.T) {
 			new:  mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
 			err:  "",
 		}, {
-			test: "memory limit change",
+			test: "memory limit increase",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", "")),
+			err:  "",
+		}, {
+			test: "no restart policy: memory limit decrease",
 			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", "")),
 			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
+			err:  "memory limits cannot be decreased",
+		}, {
+			test: "restart NotRequired: memory limit decrease",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", ""), resizePolicy("memory", core.NotRequired)),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", ""), resizePolicy("memory", core.NotRequired)),
+			err:  "memory limits cannot be decreased",
+		}, {
+			test: "RestartContainer: memory limit decrease",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", ""), resizePolicy("memory", core.RestartContainer)),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", ""), resizePolicy("memory", core.RestartContainer)),
 			err:  "",
 		}, {
 			test: "storage limit change",
@@ -25692,13 +26611,13 @@ func TestValidatePodResize(t *testing.T) {
 			err:  "",
 		}, {
 			test: "Pod QoS unchanged, burstable -> burstable",
-			old:  mkPod(getResources("200m", "200Mi", "1Gi", ""), getResources("400m", "400Mi", "2Gi", "")),
-			new:  mkPod(getResources("100m", "100Mi", "1Gi", ""), getResources("200m", "200Mi", "2Gi", "")),
+			old:  mkPod(getResources("200m", "100Mi", "1Gi", ""), getResources("400m", "200Mi", "2Gi", "")),
+			new:  mkPod(getResources("100m", "200Mi", "1Gi", ""), getResources("200m", "400Mi", "2Gi", "")),
 			err:  "",
 		}, {
 			test: "Pod QoS unchanged, burstable -> burstable, add limits",
 			old:  mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
-			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "", "", "")),
 			err:  "",
 		}, {
 			test: "Pod QoS unchanged, burstable -> burstable, add requests",
@@ -25799,9 +26718,8 @@ func TestValidatePodResize(t *testing.T) {
 			test: "Pod QoS unchanged, burstable -> burstable, remove cpu and memory requests",
 			old:  mkPodWithInitContainers(getResources("100m", "100Mi", "", ""), getResources("100m", "", "", ""), ""),
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "", "", ""), ""),
-			err:  "spec: Forbidden: only cpu and memory resources are mutable",
-		},
-		{
+			err:  "spec: Forbidden: resources for non-sidecar init containers are immutable",
+		}, {
 			test: "Pod with nil Resource field in Status",
 			old: mkPod(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
@@ -25868,46 +26786,296 @@ func TestValidatePodResize(t *testing.T) {
 			})),
 			new: mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
 			err: "",
+		}, {
+			test: "cpu limit change for sidecar containers",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "0", "1Gi", ""), core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("200m", "0", "1Gi", ""), core.ContainerRestartPolicyAlways),
+			err:  "",
+		}, {
+			test: "memory limit increase for sidecar containers",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways),
+			err:  "",
+		}, {
+			test: "memory limit decrease for sidecar containers, no resize policy",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
+			err:  "memory limits cannot be decreased",
+		}, {
+			test: "memory limit decrease for sidecar containers, resize policy NotRequired",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
+			err:  "memory limits cannot be decreased",
+		}, {
+			test: "memory limit decrease for sidecar containers, resize policy RestartContainer",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
+			err:  "",
+		}, {
+			test: "storage limit change for sidecar containers",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "2Gi", ""), core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "1Gi", ""), core.ContainerRestartPolicyAlways),
+			err:  "spec: Forbidden: only cpu and memory resources for sidecar containers are mutable",
+		}, {
+			test: "cpu request change for sidecar containers",
+			old:  mkPodWithInitContainers(getResources("200m", "0", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(getResources("100m", "0", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			err:  "",
+		}, {
+			test: "memory request change for sidecar containers",
+			old:  mkPodWithInitContainers(getResources("0", "100Mi", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(getResources("0", "200Mi", "", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			err:  "",
+		}, {
+			test: "storage request change for sidecar containers",
+			old:  mkPodWithInitContainers(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
+			err:  "spec: Forbidden: only cpu and memory resources for sidecar containers are mutable",
+		}, {
+			test: "pod container addition",
+			old: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			new: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+				podtest.MakeContainer(
+					"c2",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			err: "spec.containers: Forbidden: containers may not be added or removed on resize",
+		}, {
+			test: "pod container removal",
+			old: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+				podtest.MakeContainer(
+					"c2",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			new: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			err: "spec.containers: Forbidden: containers may not be added or removed on resize",
+		}, {
+			test: "pod container reorder",
+			old: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+				podtest.MakeContainer(
+					"c2",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			new: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c2",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			err: "spec.containers[0].name: Forbidden: containers may not be renamed or reordered on resize, spec.containers[1].name: Forbidden: containers may not be renamed or reordered on resize",
+		},
+		{
+			test: "pod container rename",
+			old: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			new: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c2",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			err: "spec.containers[0].name: Forbidden: containers may not be renamed or reordered on resize",
+		}, {
+			test: "change resize restart policy",
+			old:  mkPod(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, resizePolicy(core.ResourceCPU, core.NotRequired)),
+			new:  mkPod(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, resizePolicy(core.ResourceCPU, core.RestartContainer)),
+			err:  "spec: Forbidden: only cpu and memory resources are mutable",
+		}, {
+			test: "change sidecar container resize restart policy",
+			old:  mkPodWithInitContainers(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
+			new:  mkPodWithInitContainers(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
+			err:  "spec: Forbidden: only cpu and memory resources are mutable",
 		},
 	}
 
 	for _, test := range tests {
-		test.new.ObjectMeta.ResourceVersion = "1"
-		test.old.ObjectMeta.ResourceVersion = "1"
+		t.Run(test.test, func(t *testing.T) {
+			test.new.ObjectMeta.ResourceVersion = "1"
+			test.old.ObjectMeta.ResourceVersion = "1"
 
-		// set required fields if old and new match and have no opinion on the value
-		if test.new.Name == "" && test.old.Name == "" {
-			test.new.Name = "name"
-			test.old.Name = "name"
-		}
-		if test.new.Namespace == "" && test.old.Namespace == "" {
-			test.new.Namespace = "namespace"
-			test.old.Namespace = "namespace"
-		}
-		if test.new.Spec.Containers == nil && test.old.Spec.Containers == nil {
-			test.new.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
-			test.old.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
-		}
-		if len(test.new.Spec.DNSPolicy) == 0 && len(test.old.Spec.DNSPolicy) == 0 {
-			test.new.Spec.DNSPolicy = core.DNSClusterFirst
-			test.old.Spec.DNSPolicy = core.DNSClusterFirst
-		}
-		if len(test.new.Spec.RestartPolicy) == 0 && len(test.old.Spec.RestartPolicy) == 0 {
-			test.new.Spec.RestartPolicy = "Always"
-			test.old.Spec.RestartPolicy = "Always"
-		}
+			// set required fields if old and new match and have no opinion on the value
+			if test.new.Name == "" && test.old.Name == "" {
+				test.new.Name = "name"
+				test.old.Name = "name"
+			}
+			if test.new.Namespace == "" && test.old.Namespace == "" {
+				test.new.Namespace = "namespace"
+				test.old.Namespace = "namespace"
+			}
+			if test.new.Spec.Containers == nil && test.old.Spec.Containers == nil {
+				test.new.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
+				test.old.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
+			}
+			if len(test.new.Spec.DNSPolicy) == 0 && len(test.old.Spec.DNSPolicy) == 0 {
+				test.new.Spec.DNSPolicy = core.DNSClusterFirst
+				test.old.Spec.DNSPolicy = core.DNSClusterFirst
+			}
+			if len(test.new.Spec.RestartPolicy) == 0 && len(test.old.Spec.RestartPolicy) == 0 {
+				test.new.Spec.RestartPolicy = "Always"
+				test.old.Spec.RestartPolicy = "Always"
+			}
 
-		errs := ValidatePodResize(test.new, test.old, PodValidationOptions{})
-		if test.err == "" {
-			if len(errs) != 0 {
-				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
+			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{AllowSidecarResizePolicy: true})
+			if test.err == "" {
+				if len(errs) != 0 {
+					t.Errorf("unexpected invalid: (%+v)\nA: %+v\nB: %+v", errs, test.new, test.old)
+				}
+			} else {
+				if len(errs) == 0 {
+					t.Errorf("unexpected valid:\nA: %+v\nB: %+v", test.new, test.old)
+				} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
+					t.Errorf("unexpected error message:\nExpected error: %s\nActual error: %s", test.err, actualErr)
+				}
 			}
-		} else {
-			if len(errs) == 0 {
-				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.new, test.old)
-			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
-				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
-			}
+		})
+	}
+}
+
+func TestValidateNodeSwapStatus(t *testing.T) {
+	makeNode := func(nodeSwapStatus *core.NodeSwapStatus) core.Node {
+		node := makeNode("test-node", nil)
+		node.Status.NodeInfo.Swap = nodeSwapStatus
+
+		return node
+	}
+	makeSwapStatus := func(capacity int64) *core.NodeSwapStatus {
+		return &core.NodeSwapStatus{
+			Capacity: ptr.To(capacity),
 		}
+	}
+
+	testCases := []struct {
+		name        string
+		expectError bool
+		node        core.Node
+	}{
+		{
+			name:        "node with nil nodeSwapStatus",
+			expectError: false,
+			node:        makeNode(nil),
+		},
+		{
+			name:        "node with nil nodeSwapStatus.Capacity",
+			expectError: false,
+			node:        makeNode(&core.NodeSwapStatus{}),
+		},
+		{
+			name:        "node with positive capacity",
+			expectError: false,
+			node:        makeNode(makeSwapStatus(123456)),
+		},
+		{
+			name:        "node with zero capacity should be invalid (nodeSwapStatus should be nil)",
+			expectError: true,
+			node:        makeNode(makeSwapStatus(0)),
+		},
+		{
+			name:        "node with negative capacity should be invalid",
+			expectError: true,
+			node:        makeNode(makeSwapStatus(-123456)),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateNode(&tc.node)
+
+			if len(errs) == 0 && tc.expectError {
+				t.Errorf("expected failure for %s, but there were none", tc.name)
+				return
+			}
+			if len(errs) != 0 && !tc.expectError {
+				t.Errorf("expected success for %s, but there were errors: %v", tc.name, errs)
+				return
+			}
+		})
+	}
+}
+
+func TestValidateStopSignal(t *testing.T) {
+	fldPath := field.NewPath("root")
+	sigkill := core.SIGKILL
+	sigterm := core.SIGTERM
+	sighup := core.SIGHUP
+	linux := core.PodOS{Name: core.Linux}
+	windows := core.PodOS{Name: core.Windows}
+
+	testCases := []struct {
+		name       string
+		stopsignal *core.Signal
+		os         *core.PodOS
+		expectErr  field.ErrorList
+	}{
+		{
+			name:       "Empty spec.os.name",
+			stopsignal: &sigterm,
+			os:         nil,
+			expectErr:  field.ErrorList{field.Forbidden(fldPath, "may not be set for containers with empty `spec.os.name`")},
+		},
+		{
+			name:       "Invalid signal passed to windows pod",
+			stopsignal: &sighup,
+			os:         &windows,
+			expectErr:  field.ErrorList{field.NotSupported(fldPath, &sighup, sets.List(supportedStopSignalsWindows))},
+		},
+		{
+			name:       "Valid signal passed to windows pod",
+			stopsignal: &sigkill,
+			os:         &windows,
+		},
+		{
+			name:       "Valid signal passed to linux pod",
+			stopsignal: &sighup,
+			os:         &linux,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateStopSignal(tc.stopsignal, fldPath, tc.os)
+
+			if len(tc.expectErr) > 0 && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			} else if len(tc.expectErr) == 0 && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			} else if len(tc.expectErr) > 0 {
+				if tc.expectErr[0].Error() != errs[0].Error() {
+					t.Errorf("Unexpected error(s): %v", errs)
+				}
+			}
+		})
 	}
 }

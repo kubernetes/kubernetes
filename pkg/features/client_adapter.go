@@ -65,7 +65,7 @@ func (a *clientAdapter) Add(in map[clientfeatures.Feature]clientfeatures.Feature
 		}
 		out[featuregate.Feature(name)] = converted
 	}
-	return a.mfg.Add(out)
+	return a.mfg.Add(out) //nolint:forbidigo // No need to support versioned feature gates in client adapter
 }
 
 // Set implements the unexported interface that client-go feature gate testing expects for

@@ -99,6 +99,7 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 			// This detects if there are any new fields in Status that were dropped by the pod rejection.
 			// These new fields either should be kept by kubelet's admission or added explicitly in the list of fields that are having a different value or must be cleared.
 			gomega.Expect(gotPod.Status).To(gstruct.MatchAllFields(gstruct.Fields{
+				"ObservedGeneration":         gstruct.Ignore(),
 				"Phase":                      gstruct.Ignore(),
 				"Conditions":                 gstruct.Ignore(),
 				"Message":                    gstruct.Ignore(),

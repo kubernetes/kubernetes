@@ -293,9 +293,9 @@ func TestConfigBaseUnmarshal(t *testing.T) {
 			config: validUnmarshallableClusterConfig.obj,
 		}
 
-		gvkmap, err := kubeadmutil.SplitYAMLDocuments([]byte(validUnmarshallableClusterConfig.yaml))
+		gvkmap, err := kubeadmutil.SplitConfigDocuments([]byte(validUnmarshallableClusterConfig.yaml))
 		if err != nil {
-			t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
+			t.Fatalf("unexpected failure of SplitConfigDocuments: %v", err)
 		}
 
 		got := &clusterConfig{
@@ -461,9 +461,9 @@ func runClusterConfigFromTest(t *testing.T, perform func(t *testing.T, in string
 
 func TestLoadingFromDocumentMap(t *testing.T) {
 	runClusterConfigFromTest(t, func(t *testing.T, in string) (kubeadmapi.ComponentConfig, error) {
-		gvkmap, err := kubeadmutil.SplitYAMLDocuments([]byte(in))
+		gvkmap, err := kubeadmutil.SplitConfigDocuments([]byte(in))
 		if err != nil {
-			t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
+			t.Fatalf("unexpected failure of SplitConfigDocuments: %v", err)
 		}
 
 		return clusterConfigHandler.FromDocumentMap(gvkmap)

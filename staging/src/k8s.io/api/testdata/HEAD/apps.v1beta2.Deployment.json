@@ -748,7 +748,8 @@
                 "sleep": {
                   "seconds": 1
                 }
-              }
+              },
+              "stopSignal": "stopSignalValue"
             },
             "terminationMessagePath": "terminationMessagePathValue",
             "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1044,7 +1045,8 @@
                 "sleep": {
                   "seconds": 1
                 }
-              }
+              },
+              "stopSignal": "stopSignalValue"
             },
             "terminationMessagePath": "terminationMessagePathValue",
             "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1340,7 +1342,8 @@
                 "sleep": {
                   "seconds": 1
                 }
-              }
+              },
+              "stopSignal": "stopSignalValue"
             },
             "terminationMessagePath": "terminationMessagePathValue",
             "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1803,6 +1806,7 @@
     "readyReplicas": 7,
     "availableReplicas": 4,
     "unavailableReplicas": 5,
+    "terminatingReplicas": 9,
     "conditions": [
       {
         "type": "typeValue",

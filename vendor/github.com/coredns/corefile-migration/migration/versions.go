@@ -30,22 +30,34 @@ type release struct {
 
 // Versions holds a map of plugin/option migrations per CoreDNS release (since 1.1.4)
 var Versions = map[string]release{
+	"1.12.0": {
+		priorVersion:   "1.11.4",
+		dockerImageSHA: "40384aa1f5ea6bfdc77997d243aec73da05f27aed0c5e9d65bfa98933c519d97",
+		plugins:        plugins_1_11_4,
+	},
+	"1.11.4": {
+		nextVersion:    "1.12.0",
+		priorVersion:   "1.11.3",
+		dockerImageSHA: "4190b960ea90e017631e3e1a38eea28e98e057ab60d57d47b3db6e5cf77436f7",
+		plugins:        plugins_1_11_4,
+	},
 	"1.11.3": {
+		nextVersion:    "1.11.4",
 		priorVersion:   "1.11.1",
 		dockerImageSHA: "9caabbf6238b189a65d0d6e6ac138de60d6a1c419e5a341fbbb7c78382559c6e",
-		plugins: 		plugins_1_11_0,
+		plugins:        plugins_1_11_0,
 	},
 	"1.11.1": {
 		nextVersion:    "1.11.3",
 		priorVersion:   "1.11.0",
 		dockerImageSHA: "1eeb4c7316bacb1d4c8ead65571cd92dd21e27359f0d4917f1a5822a73b75db1",
-		plugins: 		plugins_1_11_0,
+		plugins:        plugins_1_11_0,
 	},
 	"1.11.0": {
 		nextVersion:    "1.11.1",
 		priorVersion:   "1.10.1",
 		dockerImageSHA: "cc3ebb05fbdba439d2d69813f162aa204b027098c8244fb3156e6e7c0f31c548",
-		plugins: 		plugins_1_11_0,
+		plugins:        plugins_1_11_0,
 	},
 	"1.10.1": {
 		nextVersion:    "1.11.0",
@@ -57,13 +69,13 @@ var Versions = map[string]release{
 		nextVersion:    "1.10.1",
 		priorVersion:   "1.9.4",
 		dockerImageSHA: "017727efcfeb7d053af68e51436ce8e65edbc6ca573720afb4f79c8594036955",
-		plugins:        plugins_1_9_3,
+		plugins:        plugins_1_9_4,
 	},
 	"1.9.4": {
 		nextVersion:    "1.10.0",
 		priorVersion:   "1.9.3",
 		dockerImageSHA: "b82e294de6be763f73ae71266c8f5466e7e03c69f3a1de96efd570284d35bb18",
-		plugins:        plugins_1_9_3,
+		plugins:        plugins_1_9_4,
 	},
 	"1.9.3": {
 		nextVersion:    "1.9.4",
@@ -763,6 +775,25 @@ var Versions = map[string]release{
 }`},
 }
 
+var plugins_1_11_4 = map[string]plugin{
+	"errors":       plugins["errors"]["v3"],
+	"log":          plugins["log"]["v1"],
+	"health":       plugins["health"]["v1"],
+	"ready":        {},
+	"autopath":     {},
+	"kubernetes":   plugins["kubernetes"]["v8"],
+	"k8s_external": plugins["k8s_external"]["v2"],
+	"prometheus":   {},
+	"forward":      plugins["forward"]["v4"], // add next option
+	"cache":        plugins["cache"]["v4"],
+	"loop":         {},
+	"reload":       {},
+	"loadbalance":  {},
+	"hosts":        plugins["hosts"]["v1"],
+	"rewrite":      plugins["rewrite"]["v3"],
+	"transfer":     plugins["transfer"]["v1"],
+}
+
 var plugins_1_11_0 = map[string]plugin{
 	"errors":       plugins["errors"]["v3"],
 	"log":          plugins["log"]["v1"],
@@ -773,7 +804,7 @@ var plugins_1_11_0 = map[string]plugin{
 	"k8s_external": plugins["k8s_external"]["v2"], //add fallthrough option
 	"prometheus":   {},
 	"forward":      plugins["forward"]["v3"],
-	"cache":        plugins["cache"]["v2"],
+	"cache":        plugins["cache"]["v4"],
 	"loop":         {},
 	"reload":       {},
 	"loadbalance":  {},
@@ -792,7 +823,26 @@ var plugins_1_10_1 = map[string]plugin{
 	"k8s_external": plugins["k8s_external"]["v1"],
 	"prometheus":   {},
 	"forward":      plugins["forward"]["v3"],
-	"cache":        plugins["cache"]["v2"], // add keepttl option
+	"cache":        plugins["cache"]["v4"], // add keepttl option
+	"loop":         {},
+	"reload":       {},
+	"loadbalance":  {},
+	"hosts":        plugins["hosts"]["v1"],
+	"rewrite":      plugins["rewrite"]["v2"],
+	"transfer":     plugins["transfer"]["v1"],
+}
+
+var plugins_1_9_4 = map[string]plugin{
+	"errors":       plugins["errors"]["v3"], // stacktrace option added
+	"log":          plugins["log"]["v1"],
+	"health":       plugins["health"]["v1"],
+	"ready":        {},
+	"autopath":     {},
+	"kubernetes":   plugins["kubernetes"]["v8"],
+	"k8s_external": plugins["k8s_external"]["v1"],
+	"prometheus":   {},
+	"forward":      plugins["forward"]["v3"],
+	"cache":        plugins["cache"]["v3"], // add disable and servfail options
 	"loop":         {},
 	"reload":       {},
 	"loadbalance":  {},

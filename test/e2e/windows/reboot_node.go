@@ -18,6 +18,7 @@ package windows
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -49,6 +50,10 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 		targetNode, err := findWindowsNode(ctx, f)
 		framework.ExpectNoError(err, "Error finding Windows node")
 		framework.Logf("Using node: %v", targetNode.Name)
+
+		bootID, err := strconv.Atoi(targetNode.Status.NodeInfo.BootID)
+		framework.ExpectNoError(err, "Error converting bootID to int")
+		framework.Logf("Initial BootID: %d", bootID)
 
 		windowsImage := imageutils.GetE2EImage(imageutils.Agnhost)
 
@@ -195,6 +200,14 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 				time.Sleep(time.Second * 30)
 			}
 		}
+
+		ginkgo.By("Checking whether the node is rebooted")
+		refreshNode, err := f.ClientSet.CoreV1().Nodes().Get(ctx, targetNode.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Error getting node info after reboot")
+		currentbootID, err := strconv.Atoi(refreshNode.Status.NodeInfo.BootID)
+		framework.ExpectNoError(err, "Error converting bootID to int")
+		framework.Logf("current BootID: %d", currentbootID)
+		gomega.Expect(currentbootID).To(gomega.Equal(bootID+1), "BootID should be incremented by 1 after reboot")
 
 		ginkgo.By("Checking whether agn-test-pod is rebooted")
 		gomega.Expect(restartCount).To(gomega.Equal(1), "restart count of agn-test-pod is 1")

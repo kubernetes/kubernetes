@@ -62,7 +62,12 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 	items, err := indexer.Index(NamespaceIndex, &metav1.ObjectMeta{Namespace: namespace})
 	if err != nil {
 		// Ignore error; do slow search without index.
-		klog.Warningf("can not retrieve list of objects using index : %v", err)
+		//
+		// ListAllByNamespace is called by generated code
+		// (k8s.io/client-go/listers) and probably not worth converting
+		// to contextual logging, which would require changing all of
+		// those APIs.
+		klog.TODO().Info("Warning: can not retrieve list of objects using index", "err", err)
 		for _, m := range indexer.List() {
 			metadata, err := meta.Accessor(m)
 			if err != nil {

@@ -311,12 +311,12 @@ var plugins = map[string]map[string]plugin{
 		},
 		"v3": plugin{
 			namedOptions: map[string]option{
-				"type":        {},
-				"class":       {},
-				"name":        {},
-				"answer name": {},
-				"edns0":       {},
-				"ttl":         {}, 
+				"type":         {},
+				"class":        {},
+				"name":         {},
+				"answer name":  {},
+				"edns0":        {},
+				"ttl":          {},
 				"cname_target": {}, // new option
 			},
 		},
@@ -351,7 +351,19 @@ var plugins = map[string]map[string]plugin{
 				"success":     {},
 				"denial":      {},
 				"prefetch":    {},
-				"serve_stale": {}, 
+				"serve_stale": {},
+				"disable":     {}, // v1.9.4 new option
+				"servfail":    {}, // v1.9.4 new option
+			},
+		},
+		"v4": plugin{
+			namedOptions: map[string]option{
+				"success":     {},
+				"denial":      {},
+				"prefetch":    {},
+				"serve_stale": {},
+				"disable":     {},
+				"servfail":    {},
 				"keepttl":     {}, // new option
 			},
 		},
@@ -417,6 +429,21 @@ var plugins = map[string]map[string]plugin{
 				},
 			},
 		},
+		"v4": plugin{
+			namedOptions: map[string]option{
+				"except":         {},
+				"force_tcp":      {},
+				"prefer_udp":     {},
+				"expire":         {},
+				"max_fails":      {},
+				"tls":            {},
+				"tls_servername": {},
+				"policy":         {},
+				"health_check":   {},
+				"max_concurrent": {},
+				"next":           {}, // new option
+			},
+		},
 	},
 
 	"k8s_external": {
@@ -428,8 +455,8 @@ var plugins = map[string]map[string]plugin{
 		},
 		"v2": plugin{
 			namedOptions: map[string]option{
-				"apex": {},
-				"ttl":  {},
+				"apex":        {},
+				"ttl":         {},
 				"fallthrough": {}, // new option
 			},
 		},

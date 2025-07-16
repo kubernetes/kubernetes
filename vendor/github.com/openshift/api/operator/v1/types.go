@@ -124,6 +124,7 @@ type OperatorStatus struct {
 	Version string `json:"version,omitempty"`
 
 	// readyReplicas indicates how many replicas are ready and at the desired state
+	// +optional
 	ReadyReplicas int32 `json:"readyReplicas"`
 
 	// latestAvailableRevision is the deploymentID of the most recent deployment
@@ -207,7 +208,7 @@ type OperatorCondition struct {
 	// +required
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Format=date-time
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 
 	Reason string `json:"reason,omitempty"`
 
@@ -258,15 +259,21 @@ type StaticPodOperatorStatus struct {
 
 // NodeStatus provides information about the current state of a particular node managed by this operator.
 // +kubebuilder:validation:XValidation:rule="has(self.currentRevision) || !has(oldSelf.currentRevision)",message="cannot be unset once set",fieldPath=".currentRevision"
+// +kubebuilder:validation:XValidation:rule="oldSelf.hasValue() || !has(self.currentRevision)",message="currentRevision can not be set on creation of a nodeStatus",optionalOldSelf=true,fieldPath=.currentRevision
+// +kubebuilder:validation:XValidation:rule="oldSelf.hasValue() || !has(self.targetRevision)",message="targetRevision can not be set on creation of a nodeStatus",optionalOldSelf=true,fieldPath=.targetRevision
 type NodeStatus struct {
 	// nodeName is the name of the node
 	// +required
 	NodeName string `json:"nodeName"`
 
-	// currentRevision is the generation of the most recently successful deployment
+	// currentRevision is the generation of the most recently successful deployment.
+	// Can not be set on creation of a nodeStatus. Updates must only increase the value.
 	// +kubebuilder:validation:XValidation:rule="self >= oldSelf",message="must only increase"
-	CurrentRevision int32 `json:"currentRevision"`
-	// targetRevision is the generation of the deployment we're trying to apply
+	// +optional
+	CurrentRevision int32 `json:"currentRevision,omitempty"`
+	// targetRevision is the generation of the deployment we're trying to apply.
+	// Can not be set on creation of a nodeStatus.
+	// +optional
 	TargetRevision int32 `json:"targetRevision,omitempty"`
 
 	// lastFailedRevision is the generation of the deployment we tried and failed to deploy.

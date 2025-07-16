@@ -24,39 +24,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 )
 
 func TestValidateStructuralMetadataInvariants(t *testing.T) {
-	fuzzer := fuzz.New()
+	fuzzer := randfill.New()
 	fuzzer.Funcs(
-		func(s *JSON, c fuzz.Continue) {
-			if c.RandBool() {
+		func(s *JSON, c randfill.Continue) {
+			if c.Bool() {
 				s.Object = float64(42.0)
 			}
 		},
-		func(s **StructuralOrBool, c fuzz.Continue) {
-			if c.RandBool() {
+		func(s **StructuralOrBool, c randfill.Continue) {
+			if c.Bool() {
 				*s = &StructuralOrBool{}
 			}
 		},
-		func(s **Structural, c fuzz.Continue) {
-			if c.RandBool() {
+		func(s **Structural, c randfill.Continue) {
+			if c.Bool() {
 				*s = &Structural{}
 			}
 		},
-		func(s *Structural, c fuzz.Continue) {
-			if c.RandBool() {
+		func(s *Structural, c randfill.Continue) {
+			if c.Bool() {
 				*s = Structural{}
 			}
 		},
-		func(vv **NestedValueValidation, c fuzz.Continue) {
-			if c.RandBool() {
+		func(vv **NestedValueValidation, c randfill.Continue) {
+			if c.Bool() {
 				*vv = &NestedValueValidation{}
 			}
 		},
-		func(vv *NestedValueValidation, c fuzz.Continue) {
-			if c.RandBool() {
+		func(vv *NestedValueValidation, c randfill.Continue) {
+			if c.Bool() {
 				*vv = NestedValueValidation{}
 			}
 		},
@@ -114,7 +114,7 @@ func TestValidateStructuralMetadataInvariants(t *testing.T) {
 	for i := 0; i < tt.NumField(); i++ {
 		s := Structural{}
 		x := reflect.ValueOf(&s).Elem()
-		fuzzer.Fuzz(x.Field(i).Addr().Interface())
+		fuzzer.Fill(x.Field(i).Addr().Interface())
 		s.Type = "object"
 		s.Properties = map[string]Structural{
 			"name":         {},
@@ -384,15 +384,15 @@ func TestValidateStructuralCompleteness(t *testing.T) {
 }
 
 func TestValidateNestedValueValidationComplete(t *testing.T) {
-	fuzzer := fuzz.New()
+	fuzzer := randfill.New()
 	fuzzer.Funcs(
-		func(s *JSON, c fuzz.Continue) {
-			if c.RandBool() {
+		func(s *JSON, c randfill.Continue) {
+			if c.Bool() {
 				s.Object = float64(42.0)
 			}
 		},
-		func(s **NestedValueValidation, c fuzz.Continue) {
-			if c.RandBool() {
+		func(s **NestedValueValidation, c randfill.Continue) {
+			if c.Bool() {
 				*s = &NestedValueValidation{}
 			}
 		},
@@ -404,7 +404,7 @@ func TestValidateNestedValueValidationComplete(t *testing.T) {
 	for i := 0; i < tt.NumField(); i++ {
 		vv := &NestedValueValidation{}
 		x := reflect.ValueOf(&vv.ForbiddenGenerics).Elem()
-		fuzzer.Fuzz(x.Field(i).Addr().Interface())
+		fuzzer.Fill(x.Field(i).Addr().Interface())
 
 		errs := validateNestedValueValidation(vv, false, false, fieldLevel, nil, ValidationOptions{})
 		if len(errs) == 0 && !reflect.DeepEqual(vv.ForbiddenGenerics, Generic{}) {
@@ -417,7 +417,7 @@ func TestValidateNestedValueValidationComplete(t *testing.T) {
 	for i := 0; i < tt.NumField(); i++ {
 		vv := &NestedValueValidation{}
 		x := reflect.ValueOf(&vv.ForbiddenExtensions).Elem()
-		fuzzer.Fuzz(x.Field(i).Addr().Interface())
+		fuzzer.Fill(x.Field(i).Addr().Interface())
 
 		errs := validateNestedValueValidation(vv, false, false, fieldLevel, nil, ValidationOptions{})
 		if len(errs) == 0 && !reflect.DeepEqual(vv.ForbiddenExtensions, Extensions{}) {
@@ -433,7 +433,7 @@ func TestValidateNestedValueValidationComplete(t *testing.T) {
 			}
 
 			vv := NestedValueValidation{}
-			fuzzer.Fuzz(&vv.ValidationExtensions.XValidations)
+			fuzzer.Fill(&vv.ValidationExtensions.XValidations)
 			errs := validateNestedValueValidation(&vv, false, false, fieldLevel, nil, opts)
 			if allowedNestedXValidations {
 				if len(errs) != 0 {
@@ -444,7 +444,7 @@ func TestValidateNestedValueValidationComplete(t *testing.T) {
 			}
 
 			vv = NestedValueValidation{}
-			fuzzer.Fuzz(&vv.AdditionalProperties)
+			fuzzer.Fill(&vv.AdditionalProperties)
 			errs = validateNestedValueValidation(&vv, false, false, fieldLevel, nil, opts)
 			if allowedNestedAdditionalProperties {
 				if len(errs) != 0 {

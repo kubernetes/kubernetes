@@ -245,19 +245,19 @@ type DeploymentStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
 
-	// Total number of non-terminated pods targeted by this deployment (their labels match the selector).
+	// Total number of non-terminating pods targeted by this deployment (their labels match the selector).
 	// +optional
 	Replicas int32 `json:"replicas,omitempty" protobuf:"varint,2,opt,name=replicas"`
 
-	// Total number of non-terminated pods targeted by this deployment that have the desired template spec.
+	// Total number of non-terminating pods targeted by this deployment that have the desired template spec.
 	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty" protobuf:"varint,3,opt,name=updatedReplicas"`
 
-	// Total number of ready pods targeted by this deployment.
+	// Total number of non-terminating pods targeted by this Deployment with a Ready Condition.
 	// +optional
 	ReadyReplicas int32 `json:"readyReplicas,omitempty" protobuf:"varint,7,opt,name=readyReplicas"`
 
-	// Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
+	// Total number of available non-terminating pods (ready for at least minReadySeconds) targeted by this deployment.
 	// +optional
 	AvailableReplicas int32 `json:"availableReplicas,omitempty" protobuf:"varint,4,opt,name=availableReplicas"`
 
@@ -266,6 +266,13 @@ type DeploymentStatus struct {
 	// either be pods that are running but not yet available or pods that still have not been created.
 	// +optional
 	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty" protobuf:"varint,5,opt,name=unavailableReplicas"`
+
+	// Total number of terminating pods targeted by this deployment. Terminating pods have a non-null
+	// .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
+	//
+	// This is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.
+	// +optional
+	TerminatingReplicas *int32 `json:"terminatingReplicas,omitempty" protobuf:"varint,9,opt,name=terminatingReplicas"`
 
 	// Represents the latest available observations of a deployment's current state.
 	// +patchMergeKey=type
@@ -941,16 +948,16 @@ type ReplicaSetList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// List of ReplicaSets.
-	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
 	Items []ReplicaSet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // ReplicaSetSpec is the specification of a ReplicaSet.
 type ReplicaSetSpec struct {
-	// Replicas is the number of desired replicas.
+	// Replicas is the number of desired pods.
 	// This is a pointer to distinguish between explicit zero and unspecified.
 	// Defaults to 1.
-	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
@@ -969,28 +976,35 @@ type ReplicaSetSpec struct {
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
-	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/#pod-template
 	// +optional
 	Template v1.PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 type ReplicaSetStatus struct {
-	// Replicas is the most recently observed number of replicas.
-	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
+	// Replicas is the most recently observed number of non-terminating pods.
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
 	Replicas int32 `json:"replicas" protobuf:"varint,1,opt,name=replicas"`
 
-	// The number of pods that have labels matching the labels of the pod template of the replicaset.
+	// The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.
 	// +optional
 	FullyLabeledReplicas int32 `json:"fullyLabeledReplicas,omitempty" protobuf:"varint,2,opt,name=fullyLabeledReplicas"`
 
-	// The number of ready replicas for this replica set.
+	// The number of non-terminating pods targeted by this ReplicaSet with a Ready Condition.
 	// +optional
 	ReadyReplicas int32 `json:"readyReplicas,omitempty" protobuf:"varint,4,opt,name=readyReplicas"`
 
-	// The number of available replicas (ready for at least minReadySeconds) for this replica set.
+	// The number of available non-terminating pods (ready for at least minReadySeconds) for this replica set.
 	// +optional
 	AvailableReplicas int32 `json:"availableReplicas,omitempty" protobuf:"varint,5,opt,name=availableReplicas"`
+
+	// The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp
+	// and have not yet reached the Failed or Succeeded .status.phase.
+	//
+	// This is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.
+	// +optional
+	TerminatingReplicas *int32 `json:"terminatingReplicas,omitempty" protobuf:"varint,7,opt,name=terminatingReplicas"`
 
 	// ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
 	// +optional

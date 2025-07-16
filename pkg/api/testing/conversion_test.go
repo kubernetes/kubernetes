@@ -36,7 +36,7 @@ func BenchmarkPodConversion(b *testing.B) {
 	apiObjectFuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs)
 	items := make([]api.Pod, 4)
 	for i := range items {
-		apiObjectFuzzer.Fuzz(&items[i])
+		apiObjectFuzzer.Fill(&items[i])
 		items[i].Spec.InitContainers = nil
 		items[i].Status.InitContainerStatuses = nil
 	}

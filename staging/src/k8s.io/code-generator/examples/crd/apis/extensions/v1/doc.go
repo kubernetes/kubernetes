@@ -19,4 +19,4 @@ limitations under the License.
 // +groupName=extensions.test.crd.code-generator.k8s.io
 // +groupGoName=ExtensionsExample
 
-package v1 // import "k8s.io/code-generator/examples/crd/apis/extensions/v1"
+package v1

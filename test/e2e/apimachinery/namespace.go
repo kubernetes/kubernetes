@@ -20,10 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/kubernetes/pkg/features"
 	"strings"
 	"sync"
 	"time"
+
+	"k8s.io/kubernetes/pkg/features"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -481,7 +482,7 @@ var _ = SIGDescribe("OrderedNamespaceDeletion", func() {
 	f := framework.NewDefaultFramework("namespacedeletion")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	f.It("namespace deletion should delete pod first", feature.OrderedNamespaceDeletion, framework.WithFeatureGate(features.OrderedNamespaceDeletion), func(ctx context.Context) {
+	f.It("namespace deletion should delete pod first", feature.OrderedNamespaceDeletion, framework.WithFeatureGate(features.OrderedNamespaceDeletion), framework.WithSerial(), func(ctx context.Context) {
 		ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx, f)
 	})
 })

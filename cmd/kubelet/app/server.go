@@ -86,6 +86,8 @@ import (
 	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	nodeutil "k8s.io/component-helpers/node/util"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -132,14 +134,9 @@ func init() {
 	otel.SetMeterProvider(noop.NewMeterProvider())
 }
 
-const (
-	// Kubelet component name
-	componentKubelet = "kubelet"
-)
-
 // NewKubeletCommand creates a *cobra.Command object with default parameters
 func NewKubeletCommand() *cobra.Command {
-	cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)
+	cleanFlagSet := pflag.NewFlagSet(server.ComponentKubelet, pflag.ContinueOnError)
 	cleanFlagSet.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	kubeletFlags := options.NewKubeletFlags()
 
@@ -151,7 +148,7 @@ func NewKubeletCommand() *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use: componentKubelet,
+		Use: server.ComponentKubelet,
 		Long: `The kubelet is the primary "node agent" that runs on each
 node. It can register the node with the apiserver using one of: the hostname; a flag to
 override the hostname; or specific logic for a cloud provider.
@@ -270,6 +267,13 @@ is checked every 20 seconds (also configurable with a flag).`,
 			kubeletDeps, err := UnsecuredDependencies(kubeletServer, utilfeature.DefaultFeatureGate)
 			if err != nil {
 				return fmt.Errorf("failed to construct kubelet dependencies: %w", err)
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+				if cleanFlagSet != nil {
+					namedFlagSet := map[string]*pflag.FlagSet{server.ComponentKubelet: cleanFlagSet}
+					kubeletDeps.Flagz = flagz.NamedFlagSetsReader{FlagSets: cliflag.NamedFlagSets{FlagSets: namedFlagSet}}
+				}
 			}
 
 			if err := checkPermissions(); err != nil {
@@ -448,6 +452,12 @@ func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, e
 	// See: https://github.com/kubernetes/kubernetes/pull/110263
 	if kc.EvictionHard == nil {
 		kc.EvictionHard = eviction.DefaultEvictionHard
+	} else if kc.MergeDefaultEvictionSettings {
+		for k, v := range eviction.DefaultEvictionHard {
+			if _, exists := kc.EvictionHard[k]; !exists {
+				kc.EvictionHard[k] = v
+			}
+		}
 	}
 	return kc, err
 }
@@ -562,7 +572,7 @@ func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, node
 		return
 	}
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	kubeDeps.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: componentKubelet, Host: string(nodeName)})
+	kubeDeps.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: server.ComponentKubelet, Host: string(nodeName)})
 	eventBroadcaster.StartStructuredLogging(3)
 	if kubeDeps.EventClient != nil {
 		klog.V(4).InfoS("Sending events to api server")
@@ -822,14 +832,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("--qos-reserved value failed to parse: %w", err)
 		}
 
-		var cpuManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
-			cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
-		} else if s.CPUManagerPolicyOptions != nil {
-			return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
-				s.CPUManagerPolicyOptions, features.CPUManager, features.CPUManagerPolicyOptions)
-		}
-
 		var topologyManagerPolicyOptions map[string]string
 		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
 			topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
@@ -838,7 +840,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
-			if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == kubelettypes.LimitedSwap {
+			if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == string(kubelettypes.LimitedSwap) {
 				// This feature is not supported for cgroupv1 so we are failing early.
 				return fmt.Errorf("swap feature is enabled and LimitedSwap but it is only supported with cgroupv2")
 			}
@@ -871,18 +873,18 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 					ReservedSystemCPUs:       reservedSystemCPUs,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
-				QOSReserved:                             *experimentalQOSReserved,
-				CPUManagerPolicy:                        s.CPUManagerPolicy,
-				CPUManagerPolicyOptions:                 cpuManagerPolicyOptions,
-				CPUManagerReconcilePeriod:               s.CPUManagerReconcilePeriod.Duration,
-				ExperimentalMemoryManagerPolicy:         s.MemoryManagerPolicy,
-				ExperimentalMemoryManagerReservedMemory: s.ReservedMemory,
-				PodPidsLimit:                            s.PodPidsLimit,
-				EnforceCPULimits:                        s.CPUCFSQuota,
-				CPUCFSQuotaPeriod:                       s.CPUCFSQuotaPeriod.Duration,
-				TopologyManagerPolicy:                   s.TopologyManagerPolicy,
-				TopologyManagerScope:                    s.TopologyManagerScope,
-				TopologyManagerPolicyOptions:            topologyManagerPolicyOptions,
+				QOSReserved:                  *experimentalQOSReserved,
+				CPUManagerPolicy:             s.CPUManagerPolicy,
+				CPUManagerPolicyOptions:      s.CPUManagerPolicyOptions,
+				CPUManagerReconcilePeriod:    s.CPUManagerReconcilePeriod.Duration,
+				MemoryManagerPolicy:          s.MemoryManagerPolicy,
+				MemoryManagerReservedMemory:  s.ReservedMemory,
+				PodPidsLimit:                 s.PodPidsLimit,
+				EnforceCPULimits:             s.CPUCFSQuota,
+				CPUCFSQuotaPeriod:            s.CPUCFSQuotaPeriod.Duration,
+				TopologyManagerPolicy:        s.TopologyManagerPolicy,
+				TopologyManagerScope:         s.TopologyManagerScope,
+				TopologyManagerPolicyOptions: topologyManagerPolicyOptions,
 			},
 			s.FailSwapOn,
 			kubeDeps.Recorder,
@@ -1392,7 +1394,7 @@ func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, erro
 	}
 	resourceOpts := []otelsdkresource.Option{
 		otelsdkresource.WithAttributes(
-			semconv.ServiceNameKey.String(componentKubelet),
+			semconv.ServiceNameKey.String(server.ComponentKubelet),
 			semconv.HostNameKey.String(hostname),
 		),
 	}

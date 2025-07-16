@@ -72,7 +72,7 @@ func (c *shareListerContract) StorageInfos() framework.StorageInfoLister {
 
 type resourceSliceListerContract struct{}
 
-func (c *resourceSliceListerContract) List() ([]*resourceapi.ResourceSlice, error) {
+func (c *resourceSliceListerContract) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error) {
 	return nil, nil
 }
 

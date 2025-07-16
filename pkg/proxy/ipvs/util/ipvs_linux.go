@@ -28,8 +28,8 @@ import (
 	"time"
 
 	libipvs "github.com/moby/ipvs"
-
 	"golang.org/x/sys/unix"
+
 	"k8s.io/klog/v2"
 )
 

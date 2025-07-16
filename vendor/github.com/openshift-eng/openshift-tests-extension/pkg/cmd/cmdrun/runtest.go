@@ -63,7 +63,7 @@ func NewRunTestCommand(registry *extension.Registry) *cobra.Command {
 				return err
 			}
 
-			w, err := extensiontests.NewResultWriter(os.Stdout, extensiontests.ResultFormat(opts.outputFlags.Output))
+			w, err := extensiontests.NewJSONResultWriter(os.Stdout, extensiontests.ResultFormat(opts.outputFlags.Output))
 			if err != nil {
 				return err
 			}

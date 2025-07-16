@@ -9,8 +9,9 @@ import (
 // GatherConfigApplyConfiguration represents a declarative configuration of the GatherConfig type for use
 // with apply.
 type GatherConfigApplyConfiguration struct {
-	DataPolicy        *configv1alpha1.DataPolicy `json:"dataPolicy,omitempty"`
-	DisabledGatherers []string                   `json:"disabledGatherers,omitempty"`
+	DataPolicy        *configv1alpha1.DataPolicy        `json:"dataPolicy,omitempty"`
+	DisabledGatherers []configv1alpha1.DisabledGatherer `json:"disabledGatherers,omitempty"`
+	StorageSpec       *StorageApplyConfiguration        `json:"storage,omitempty"`
 }
 
 // GatherConfigApplyConfiguration constructs a declarative configuration of the GatherConfig type for use with
@@ -30,9 +31,17 @@ func (b *GatherConfigApplyConfiguration) WithDataPolicy(value configv1alpha1.Dat
 // WithDisabledGatherers adds the given value to the DisabledGatherers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the DisabledGatherers field.
-func (b *GatherConfigApplyConfiguration) WithDisabledGatherers(values ...string) *GatherConfigApplyConfiguration {
+func (b *GatherConfigApplyConfiguration) WithDisabledGatherers(values ...configv1alpha1.DisabledGatherer) *GatherConfigApplyConfiguration {
 	for i := range values {
 		b.DisabledGatherers = append(b.DisabledGatherers, values[i])
 	}
+	return b
+}
+
+// WithStorageSpec sets the StorageSpec field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the StorageSpec field is set to the value of the last call.
+func (b *GatherConfigApplyConfiguration) WithStorageSpec(value *StorageApplyConfiguration) *GatherConfigApplyConfiguration {
+	b.StorageSpec = value
 	return b
 }

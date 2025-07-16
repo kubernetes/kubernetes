@@ -21,11 +21,12 @@ package v1alpha3
 // DeviceRequestAllocationResultApplyConfiguration represents a declarative configuration of the DeviceRequestAllocationResult type for use
 // with apply.
 type DeviceRequestAllocationResultApplyConfiguration struct {
-	Request     *string `json:"request,omitempty"`
-	Driver      *string `json:"driver,omitempty"`
-	Pool        *string `json:"pool,omitempty"`
-	Device      *string `json:"device,omitempty"`
-	AdminAccess *bool   `json:"adminAccess,omitempty"`
+	Request     *string                              `json:"request,omitempty"`
+	Driver      *string                              `json:"driver,omitempty"`
+	Pool        *string                              `json:"pool,omitempty"`
+	Device      *string                              `json:"device,omitempty"`
+	AdminAccess *bool                                `json:"adminAccess,omitempty"`
+	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
 }
 
 // DeviceRequestAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceRequestAllocationResult type for use with
@@ -71,5 +72,18 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithDevice(value strin
 // If called multiple times, the AdminAccess field is set to the value of the last call.
 func (b *DeviceRequestAllocationResultApplyConfiguration) WithAdminAccess(value bool) *DeviceRequestAllocationResultApplyConfiguration {
 	b.AdminAccess = &value
+	return b
+}
+
+// WithTolerations adds the given value to the Tolerations field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Tolerations field.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithTolerations(values ...*DeviceTolerationApplyConfiguration) *DeviceRequestAllocationResultApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithTolerations")
+		}
+		b.Tolerations = append(b.Tolerations, *values[i])
+	}
 	return b
 }

@@ -28,9 +28,6 @@ import (
 	"time"
 
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/component-base/zpages/features"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -41,7 +38,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/zpages/features"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -168,6 +168,36 @@ Warning: This endpoint is not meant to be machine parseable, has no formatting c
 	}
 	if !found {
 		t.Fatalf("Expected flag --emulated-version=[1.32] to be reflected in /flagz output, got:\n%s", string(raw))
+	}
+}
+
+func TestStatusz(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentStatusz, true)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	res := client.CoreV1().RESTClient().Get().RequestURI("/statusz").Do(context.TODO())
+	var status int
+	res.StatusCode(&status)
+	if status != http.StatusOK {
+		t.Fatalf("statusz/ should be healthy, got %v", status)
+	}
+
+	expectedHeader := `
+kube-apiserver statusz
+Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.`
+
+	raw, err := res.Raw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(raw, []byte(expectedHeader)) {
+		t.Fatalf("Header mismatch!\nExpected:\n%s\n\nGot:\n%s", expectedHeader, string(raw))
 	}
 }
 

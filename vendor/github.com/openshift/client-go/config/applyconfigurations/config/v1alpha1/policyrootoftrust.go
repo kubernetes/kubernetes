@@ -12,6 +12,7 @@ type PolicyRootOfTrustApplyConfiguration struct {
 	PolicyType        *configv1alpha1.PolicyType           `json:"policyType,omitempty"`
 	PublicKey         *PublicKeyApplyConfiguration         `json:"publicKey,omitempty"`
 	FulcioCAWithRekor *FulcioCAWithRekorApplyConfiguration `json:"fulcioCAWithRekor,omitempty"`
+	PKI               *PKIApplyConfiguration               `json:"pki,omitempty"`
 }
 
 // PolicyRootOfTrustApplyConfiguration constructs a declarative configuration of the PolicyRootOfTrust type for use with
@@ -41,5 +42,13 @@ func (b *PolicyRootOfTrustApplyConfiguration) WithPublicKey(value *PublicKeyAppl
 // If called multiple times, the FulcioCAWithRekor field is set to the value of the last call.
 func (b *PolicyRootOfTrustApplyConfiguration) WithFulcioCAWithRekor(value *FulcioCAWithRekorApplyConfiguration) *PolicyRootOfTrustApplyConfiguration {
 	b.FulcioCAWithRekor = value
+	return b
+}
+
+// WithPKI sets the PKI field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PKI field is set to the value of the last call.
+func (b *PolicyRootOfTrustApplyConfiguration) WithPKI(value *PKIApplyConfiguration) *PolicyRootOfTrustApplyConfiguration {
+	b.PKI = value
 	return b
 }

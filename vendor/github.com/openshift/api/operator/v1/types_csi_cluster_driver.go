@@ -169,7 +169,6 @@ type AWSCSIDriverConfigSpec struct {
 	KMSKeyARN string `json:"kmsKeyARN,omitempty"`
 
 	// efsVolumeMetrics sets the configuration for collecting metrics from EFS volumes used by the EFS CSI Driver.
-	// +openshift:enable:FeatureGate=AWSEFSDriverVolumeMetrics
 	// +optional
 	EFSVolumeMetrics *AWSEFSVolumeMetrics `json:"efsVolumeMetrics,omitempty"`
 }
@@ -348,7 +347,6 @@ type VSphereCSIDriverConfigSpec struct {
 	// Volume snapshot documentation: https://docs.vmware.com/en/VMware-vSphere-Container-Storage-Plug-in/3.0/vmware-vsphere-csp-getting-started/GUID-E0B41C69-7EEB-450F-A73D-5FD2FF39E891.html
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=32
-	// +openshift:enable:FeatureGate=VSphereDriverConfiguration
 	// +optional
 	GlobalMaxSnapshotsPerBlockVolume *uint32 `json:"globalMaxSnapshotsPerBlockVolume,omitempty"`
 
@@ -357,7 +355,6 @@ type VSphereCSIDriverConfigSpec struct {
 	// Snapshots for VSAN can not be disabled using this parameter.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=32
-	// +openshift:enable:FeatureGate=VSphereDriverConfiguration
 	// +optional
 	GranularMaxSnapshotsPerBlockVolumeInVSAN *uint32 `json:"granularMaxSnapshotsPerBlockVolumeInVSAN,omitempty"`
 
@@ -366,9 +363,23 @@ type VSphereCSIDriverConfigSpec struct {
 	// Snapshots for VVOL can not be disabled using this parameter.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=32
-	// +openshift:enable:FeatureGate=VSphereDriverConfiguration
 	// +optional
 	GranularMaxSnapshotsPerBlockVolumeInVVOL *uint32 `json:"granularMaxSnapshotsPerBlockVolumeInVVOL,omitempty"`
+
+	// maxAllowedBlockVolumesPerNode is an optional configuration parameter that allows setting a custom value for the
+	// limit of the number of PersistentVolumes attached to a node. In vSphere version 7 this limit was set to 59 by
+	// default, however in vSphere version 8 this limit was increased to 255.
+	// Before increasing this value above 59 the cluster administrator needs to ensure that every node forming the
+	// cluster is updated to ESXi version 8 or higher and that all nodes are running the same version.
+	// The limit must be between 1 and 255, which matches the vSphere version 8 maximum.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to
+	// change over time.
+	// The current default is 59, which matches the limit for vSphere version 7.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=255
+	// +openshift:enable:FeatureGate=VSphereConfigurableMaxAllowedBlockVolumesPerNode
+	// +optional
+	MaxAllowedBlockVolumesPerNode int32 `json:"maxAllowedBlockVolumesPerNode,omitempty"`
 }
 
 // ClusterCSIDriverStatus is the observed status of CSI driver operator

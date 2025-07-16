@@ -35,6 +35,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -74,7 +75,7 @@ import (
 // Non-cluster IPs:     203.0.113.0/24
 // LB Source Range:     203.0.113.0/25
 
-const testHostname = "test-hostname"
+const testNodeName = "test-node"
 const testNodeIP = "192.168.0.2"
 const testNodeIPAlt = "192.168.1.2"
 const testExternalIP = "192.168.99.11"
@@ -116,15 +117,15 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	p := &Proxier{
 		ipFamily:                 ipfamily,
 		svcPortMap:               make(proxy.ServicePortMap),
-		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipfamily, nil, nil),
+		serviceChanges:           proxy.NewServiceChangeTracker(ipfamily, newServiceInfo, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointsChangeTracker(testHostname, newEndpointInfo, ipfamily, nil, nil),
+		endpointsChanges:         proxy.NewEndpointsChangeTracker(ipfamily, testNodeName, newEndpointInfo, nil),
 		needFullSync:             true,
 		iptables:                 ipt,
 		masqueradeMark:           "0x4000",
 		conntrack:                conntrack.NewFake(),
 		localDetector:            detectLocal,
-		hostname:                 testHostname,
+		nodeName:                 testNodeName,
 		serviceHealthServer:      healthcheck.NewFakeServiceHealthServer(),
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
@@ -413,8 +414,8 @@ func countRules(logger klog.Logger, tableName utiliptables.Table, ruleData strin
 	return rules
 }
 
-func countRulesFromMetric(logger klog.Logger, tableName utiliptables.Table) int {
-	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IPTablesRulesTotal.WithLabelValues(string(tableName)))
+func countRulesFromMetric(logger klog.Logger, tableName utiliptables.Table, ipFamily string) int {
+	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IPTablesRulesTotal.WithLabelValues(string(tableName), ipFamily))
 	if err != nil {
 		logger.Error(err, "metrics are not registered?")
 		return -1
@@ -422,8 +423,8 @@ func countRulesFromMetric(logger klog.Logger, tableName utiliptables.Table) int 
 	return int(numRulesFloat)
 }
 
-func countRulesFromLastSyncMetric(logger klog.Logger, tableName utiliptables.Table) int {
-	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IPTablesRulesLastSync.WithLabelValues(string(tableName)))
+func countRulesFromLastSyncMetric(logger klog.Logger, tableName utiliptables.Table, ipFamily string) int {
+	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IPTablesRulesLastSync.WithLabelValues(string(tableName), ipFamily))
 	if err != nil {
 		logger.Error(err, "metrics are not registered?")
 		return -1
@@ -1685,7 +1686,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 				Addresses: []string{"10.180.0.4"},
 			}, {
 				Addresses: []string{"10.180.0.5"},
-				NodeName:  ptr.To(testHostname),
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("p80"),
@@ -1809,7 +1810,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
-	nNatRules := countRulesFromMetric(logger, utiliptables.TableNAT)
+	nNatRules := countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	expectedNatRules := countRules(logger, utiliptables.TableNAT, fp.iptablesData.String())
 
 	if nNatRules != expectedNatRules {
@@ -1951,7 +1952,7 @@ func TestClusterIPGeneral(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{"10.180.0.1"},
-				NodeName:  ptr.To(testHostname),
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To("http"),
@@ -1964,11 +1965,11 @@ func TestClusterIPGeneral(t *testing.T) {
 			eps.Endpoints = []discovery.Endpoint{
 				{
 					Addresses: []string{"10.180.0.1"},
-					NodeName:  ptr.To(testHostname),
+					NodeName:  ptr.To(testNodeName),
 				},
 				{
 					Addresses: []string{"10.180.2.1"},
-					NodeName:  ptr.To("host2"),
+					NodeName:  ptr.To("node2"),
 				},
 			}
 			eps.Ports = []discovery.EndpointPort{
@@ -2113,7 +2114,7 @@ func TestOpenShiftDNSHackTCP(t *testing.T) {
 				NodeName:  ptr.To("node2"),
 			}, {
 				Addresses: []string{"10.180.0.1"},
-				NodeName:  ptr.To(testHostname),
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2168,7 +2169,7 @@ func TestOpenShiftDNSHackUDP(t *testing.T) {
 				NodeName:  ptr.To("node2"),
 			}, {
 				Addresses: []string{"10.180.0.1"},
-				NodeName:  ptr.To(testHostname),
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2547,7 +2548,7 @@ func TestNodePorts(t *testing.T) {
 						NodeName:  nil,
 					}, {
 						Addresses: []string{epIP2},
-						NodeName:  ptr.To(testHostname),
+						NodeName:  ptr.To(testNodeName),
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
@@ -2837,7 +2838,7 @@ func TestExternalTrafficPolicyLocal(t *testing.T) {
 				Addresses: []string{epIP1},
 			}, {
 				Addresses: []string{epIP2},
-				NodeName:  ptr.To(testHostname),
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2954,7 +2955,7 @@ func TestExternalTrafficPolicyCluster(t *testing.T) {
 				NodeName:  nil,
 			}, {
 				Addresses: []string{epIP2},
-				NodeName:  ptr.To(testHostname),
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -3393,7 +3394,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
 					Addresses: []string{"10.1.1.1"},
-					NodeName:  ptr.To(testHostname),
+					NodeName:  ptr.To(testNodeName),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -3441,7 +3442,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 					Addresses: []string{"10.1.1.1"},
 				}, {
 					Addresses: []string{"10.1.1.2"},
-					NodeName:  ptr.To(testHostname),
+					NodeName:  ptr.To(testNodeName),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -3462,7 +3463,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
@@ -3478,7 +3479,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.1.1.1"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -3511,7 +3512,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.1.1.1"},
 		}, {
 			Addresses: []string{"10.1.1.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -3529,7 +3530,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.1.1.3"},
 		}, {
 			Addresses: []string{"10.1.1.4"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
@@ -3547,7 +3548,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 			Addresses: []string{"10.2.2.1"},
 		}, {
 			Addresses: []string{"10.2.2.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p21"),
@@ -3568,10 +3569,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.2.2.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"10.2.2.22"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p22"),
@@ -3583,7 +3584,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.2.2.3"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p23"),
@@ -3595,10 +3596,10 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.4.4.4"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"10.4.4.5"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -3610,7 +3611,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.4.4.6"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p45"),
@@ -3661,7 +3662,7 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"10.4.4.4"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -4057,7 +4058,6 @@ func TestUpdateEndpointsMap(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ipt := iptablestest.NewFake()
 			fp := NewFakeProxier(ipt)
-			fp.hostname = testHostname
 
 			// First check that after adding all previous versions of endpoints,
 			// the fp.oldEndpoints is as we expect.
@@ -4133,19 +4133,19 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}, {
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}, { // not ready endpoints should be ignored
 			Addresses:  []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}},
 	}
 
@@ -4176,7 +4176,7 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(true),
 				Terminating: ptr.To(false),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{
@@ -4184,7 +4184,7 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(true),
 				Terminating: ptr.To(true),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{
@@ -4192,7 +4192,7 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(true),
 				Terminating: ptr.To(true),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}, { // not ready endpoints should be ignored
 			Addresses: []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{
@@ -4200,7 +4200,7 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(false),
 				Terminating: ptr.To(true),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}},
 	}
 
@@ -4242,14 +4242,14 @@ func TestProxierMetricsIPTablesTotalRules(t *testing.T) {
 	fp.syncProxyRules()
 	iptablesData := fp.iptablesData.String()
 
-	nFilterRules := countRulesFromMetric(logger, utiliptables.TableFilter)
+	nFilterRules := countRulesFromMetric(logger, utiliptables.TableFilter, string(fp.ipFamily))
 	expectedFilterRules := countRules(logger, utiliptables.TableFilter, iptablesData)
 
 	if nFilterRules != expectedFilterRules {
 		t.Fatalf("Wrong number of filter rule: expected %d got %d\n%s", expectedFilterRules, nFilterRules, iptablesData)
 	}
 
-	nNatRules := countRulesFromMetric(logger, utiliptables.TableNAT)
+	nNatRules := countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	expectedNatRules := countRules(logger, utiliptables.TableNAT, iptablesData)
 
 	if nNatRules != expectedNatRules {
@@ -4275,14 +4275,14 @@ func TestProxierMetricsIPTablesTotalRules(t *testing.T) {
 	fp.syncProxyRules()
 	iptablesData = fp.iptablesData.String()
 
-	nFilterRules = countRulesFromMetric(logger, utiliptables.TableFilter)
+	nFilterRules = countRulesFromMetric(logger, utiliptables.TableFilter, string(fp.ipFamily))
 	expectedFilterRules = countRules(logger, utiliptables.TableFilter, iptablesData)
 
 	if nFilterRules != expectedFilterRules {
 		t.Fatalf("Wrong number of filter rule: expected %d got %d\n%s", expectedFilterRules, nFilterRules, iptablesData)
 	}
 
-	nNatRules = countRulesFromMetric(logger, utiliptables.TableNAT)
+	nNatRules = countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	expectedNatRules = countRules(logger, utiliptables.TableNAT, iptablesData)
 
 	if nNatRules != expectedNatRules {
@@ -4297,7 +4297,7 @@ func TestProxierMetricsIPTablesTotalRules(t *testing.T) {
 func TestInternalTrafficPolicy(t *testing.T) {
 	type endpoint struct {
 		ip       string
-		hostname string
+		nodeName string
 	}
 
 	testCases := []struct {
@@ -4312,9 +4312,9 @@ func TestInternalTrafficPolicy(t *testing.T) {
 			line:                  getLine(),
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			flowTests: []packetFlowTest{
 				{
@@ -4332,9 +4332,9 @@ func TestInternalTrafficPolicy(t *testing.T) {
 			line:                  getLine(),
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			flowTests: []packetFlowTest{
 				{
@@ -4352,9 +4352,9 @@ func TestInternalTrafficPolicy(t *testing.T) {
 			line:                  getLine(),
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", testHostname},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", testNodeName},
+				{"10.0.1.3", "node2"},
 			},
 			flowTests: []packetFlowTest{
 				{
@@ -4372,9 +4372,9 @@ func TestInternalTrafficPolicy(t *testing.T) {
 			line:                  getLine(),
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			flowTests: []packetFlowTest{
 				{
@@ -4429,7 +4429,7 @@ func TestInternalTrafficPolicy(t *testing.T) {
 				endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
 					Addresses:  []string{ep.ip},
 					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-					NodeName:   ptr.To(ep.hostname),
+					NodeName:   ptr.To(ep.nodeName),
 				})
 			}
 
@@ -4509,7 +4509,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(false),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
@@ -4518,7 +4518,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(false),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// this endpoint should be ignored for external since there are ready non-terminating endpoints
@@ -4528,7 +4528,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// this endpoint should be ignored for external since there are ready non-terminating endpoints
@@ -4538,7 +4538,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(false),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// this endpoint should be ignored for external since it's not local
@@ -4548,7 +4548,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(false),
 						},
-						NodeName: ptr.To("host-1"),
+						NodeName: ptr.To("node-1"),
 					},
 				},
 			},
@@ -4595,7 +4595,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// this endpoint should be used since there are only ready terminating endpoints
@@ -4605,7 +4605,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// this endpoint should not be used since it is both terminating and not ready.
@@ -4615,7 +4615,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(false),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// this endpoint should be ignored for external since it's not local
@@ -4625,7 +4625,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(false),
 						},
-						NodeName: ptr.To("host-1"),
+						NodeName: ptr.To("node-1"),
 					},
 				},
 			},
@@ -4673,7 +4673,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To("host-1"),
+						NodeName: ptr.To("node-1"),
 					},
 				},
 			},
@@ -4718,7 +4718,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(false),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// Remote and not ready or serving
@@ -4728,7 +4728,7 @@ func TestTerminatingEndpointsTrafficPolicyLocal(t *testing.T) {
 							Serving:     ptr.To(false),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To("host-1"),
+						NodeName: ptr.To("node-1"),
 					},
 				},
 			},
@@ -4843,7 +4843,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(false),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						Addresses: []string{"10.0.1.2"},
@@ -4852,7 +4852,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(false),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// this endpoint should be ignored since there are ready non-terminating endpoints
@@ -4862,7 +4862,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To("another-host"),
+						NodeName: ptr.To("another-node"),
 					},
 					{
 						// this endpoint should be ignored since it is not "serving"
@@ -4872,7 +4872,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(false),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To("another-host"),
+						NodeName: ptr.To("another-node"),
 					},
 					{
 						Addresses: []string{"10.0.1.5"},
@@ -4881,7 +4881,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(false),
 						},
-						NodeName: ptr.To("another-host"),
+						NodeName: ptr.To("another-node"),
 					},
 				},
 			},
@@ -4928,7 +4928,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// this endpoint should be used since there are only ready terminating endpoints
@@ -4938,7 +4938,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// this endpoint should not be used since it is both terminating and not ready.
@@ -4948,7 +4948,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(false),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To("another-host"),
+						NodeName: ptr.To("another-node"),
 					},
 					{
 						// this endpoint should be used since there are only ready terminating endpoints
@@ -4958,7 +4958,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To("another-host"),
+						NodeName: ptr.To("another-node"),
 					},
 				},
 			},
@@ -5004,7 +5004,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(true),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To("host-1"),
+						NodeName: ptr.To("node-1"),
 					},
 				},
 			},
@@ -5051,7 +5051,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(false),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To(testHostname),
+						NodeName: ptr.To(testNodeName),
 					},
 					{
 						// Remote, not ready or serving
@@ -5061,7 +5061,7 @@ func TestTerminatingEndpointsTrafficPolicyCluster(t *testing.T) {
 							Serving:     ptr.To(false),
 							Terminating: ptr.To(true),
 						},
-						NodeName: ptr.To("host-1"),
+						NodeName: ptr.To("node-1"),
 					},
 				},
 			},
@@ -5177,7 +5177,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				eps.Endpoints = []discovery.Endpoint{
 					{
 						Addresses: []string{"10.180.0.1"},
-						NodeName:  ptr.To(testHostname),
+						NodeName:  ptr.To(testNodeName),
 					},
 					{
 						Addresses: []string{"10.180.1.1"},
@@ -5195,7 +5195,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				eps.Endpoints = []discovery.Endpoint{
 					{
 						Addresses: []string{"10.180.0.2"},
-						NodeName:  ptr.To(testHostname),
+						NodeName:  ptr.To(testNodeName),
 					},
 					{
 						Addresses: []string{"10.180.1.2"},
@@ -5213,7 +5213,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 				eps.Endpoints = []discovery.Endpoint{
 					{
 						Addresses: []string{"10.180.0.3"},
-						NodeName:  ptr.To(testHostname),
+						NodeName:  ptr.To(testNodeName),
 					},
 					{
 						Addresses: []string{"10.180.1.3"},
@@ -5994,13 +5994,13 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertIPTablesRulesEqual(t, getLine(), true, expected, fp.iptablesData.String())
 
 	rulesSynced := countRules(logger, utiliptables.TableNAT, expected)
-	rulesSyncedMetric := countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
+	rulesSyncedMetric := countRulesFromLastSyncMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
 
 	rulesTotal := rulesSynced
-	rulesTotalMetric := countRulesFromMetric(logger, utiliptables.TableNAT)
+	rulesTotalMetric := countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6072,7 +6072,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
 	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
@@ -6080,7 +6080,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// We added 1 KUBE-SERVICES rule, 2 KUBE-SVC-X27LE4BHSL4DOUIK rules, and 2
 	// KUBE-SEP-BSWRHOQ77KEXZLNL rules.
 	rulesTotal += 5
-	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6123,7 +6123,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
 	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
@@ -6131,7 +6131,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// We deleted 1 KUBE-SERVICES rule, 2 KUBE-SVC-2VJB64SDSIJUP5T6 rules, and 2
 	// KUBE-SEP-UHEGFW77JX3KXTOV rules
 	rulesTotal -= 5
-	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6183,14 +6183,14 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
 	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
 
 	// The REJECT rule is in "filter", not NAT, so the number of NAT rules hasn't
 	// changed.
-	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6246,7 +6246,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
 	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
@@ -6254,7 +6254,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// We added 1 KUBE-SERVICES rule, 2 KUBE-SVC-4SW47YFZTEDKD3PK rules, and
 	// 2 KUBE-SEP-AYCN5HPXMIRJNJXU rules
 	rulesTotal += 5
-	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6305,13 +6305,13 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
 	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
 
 	// We rewrote existing rules but did not change the overall number of rules.
-	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6363,7 +6363,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
 	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
@@ -6372,7 +6372,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// jumping to the new SEP chain. The other rules related to svc3 got rewritten,
 	// but that does not change the count of rules.
 	rulesTotal += 3
-	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6411,13 +6411,13 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
 	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
 
 	// (No changes)
-	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6426,7 +6426,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	if fp.needFullSync {
 		t.Fatalf("Proxier unexpectedly already needs a full sync?")
 	}
-	partialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IPTablesPartialRestoreFailuresTotal)
+	partialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IPTablesPartialRestoreFailuresTotal.WithLabelValues(string(fp.ipFamily)))
 	if err != nil {
 		t.Fatalf("Could not get partial restore failures metric: %v", err)
 	}
@@ -6460,7 +6460,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	if !fp.needFullSync {
 		t.Errorf("Proxier did not fail on previous partial resync?")
 	}
-	updatedPartialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IPTablesPartialRestoreFailuresTotal)
+	updatedPartialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IPTablesPartialRestoreFailuresTotal.WithLabelValues(string(fp.ipFamily)))
 	if err != nil {
 		t.Errorf("Could not get partial restore failures metric: %v", err)
 	}
@@ -6521,7 +6521,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
 
 	rulesSynced = countRules(logger, utiliptables.TableNAT, expected)
-	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT)
+	rulesSyncedMetric = countRulesFromLastSyncMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesSyncedMetric != rulesSynced {
 		t.Errorf("metric shows %d rules synced but iptables data shows %d", rulesSyncedMetric, rulesSynced)
 	}
@@ -6529,7 +6529,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	// We deleted 1 KUBE-SERVICES rule, 2 KUBE-SVC-4SW47YFZTEDKD3PK rules, and 2
 	// KUBE-SEP-AYCN5HPXMIRJNJXU rules
 	rulesTotal -= 5
-	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT)
+	rulesTotalMetric = countRulesFromMetric(logger, utiliptables.TableNAT, string(fp.ipFamily))
 	if rulesTotalMetric != rulesTotal {
 		t.Errorf("metric shows %d rules total but expected %d", rulesTotalMetric, rulesTotal)
 	}
@@ -6538,7 +6538,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 func TestNoEndpointsMetric(t *testing.T) {
 	type endpoint struct {
 		ip       string
-		hostname string
+		nodeName string
 	}
 
 	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
@@ -6554,18 +6554,18 @@ func TestNoEndpointsMetric(t *testing.T) {
 			name:                  "internalTrafficPolicy is set and there are local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 		},
 		{
 			name:                  "externalTrafficPolicy is set and there are local endpoints",
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 		},
 		{
@@ -6573,18 +6573,18 @@ func TestNoEndpointsMetric(t *testing.T) {
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 		},
 		{
 			name:                  "internalTrafficPolicy is set and there are no local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 		},
@@ -6592,9 +6592,9 @@ func TestNoEndpointsMetric(t *testing.T) {
 			name:                  "externalTrafficPolicy is set and there are no local endpoints",
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
 		},
@@ -6603,9 +6603,9 @@ func TestNoEndpointsMetric(t *testing.T) {
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
@@ -6665,13 +6665,13 @@ func TestNoEndpointsMetric(t *testing.T) {
 				endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
 					Addresses:  []string{ep.ip},
 					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-					NodeName:   ptr.To(ep.hostname),
+					NodeName:   ptr.To(ep.nodeName),
 				})
 			}
 
 			fp.OnEndpointSliceAdd(endpointSlice)
 			fp.syncProxyRules()
-			syncProxyRulesNoLocalEndpointsTotalInternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal"))
+			syncProxyRulesNoLocalEndpointsTotalInternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal", string(fp.ipFamily)))
 			if err != nil {
 				t.Errorf("failed to get %s value, err: %v", metrics.SyncProxyRulesNoLocalEndpointsTotal.Name, err)
 			}
@@ -6680,7 +6680,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 				t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(internal): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalInternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalInternal)
 			}
 
-			syncProxyRulesNoLocalEndpointsTotalExternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external"))
+			syncProxyRulesNoLocalEndpointsTotalExternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external", string(fp.ipFamily)))
 			if err != nil {
 				t.Errorf("failed to get %s value(external), err: %v", metrics.SyncProxyRulesNoLocalEndpointsTotal.Name, err)
 			}

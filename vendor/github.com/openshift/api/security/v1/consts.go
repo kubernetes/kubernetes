@@ -13,4 +13,9 @@ const (
 
 	// MinimallySufficientPodSecurityStandard indicates the PodSecurityStandard that matched the SCCs available to the users of the namespace.
 	MinimallySufficientPodSecurityStandard = "security.openshift.io/MinimallySufficientPodSecurityStandard"
+
+	// ValidatedSCCSubjectTypeAnnotation indicates the subject type that allowed the
+	// SCC admission. This can be used by controllers to detect potential issues
+	// between user-driven SCC usage and the ServiceAccount-driven SCC usage.
+	ValidatedSCCSubjectTypeAnnotation = "security.openshift.io/validated-scc-subject-type"
 )

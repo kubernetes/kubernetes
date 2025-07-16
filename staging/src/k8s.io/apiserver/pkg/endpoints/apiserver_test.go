@@ -4463,7 +4463,7 @@ func benchmarkItems(b *testing.B) []example.Pod {
 	clientapiObjectFuzzer := fuzzer.FuzzerFor(examplefuzzer.Funcs, rand.NewSource(benchmarkSeed), codecs)
 	items := make([]example.Pod, 3)
 	for i := range items {
-		clientapiObjectFuzzer.Fuzz(&items[i])
+		clientapiObjectFuzzer.Fill(&items[i])
 	}
 	return items
 }

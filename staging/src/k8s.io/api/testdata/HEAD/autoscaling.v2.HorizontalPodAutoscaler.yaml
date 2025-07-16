@@ -41,6 +41,7 @@ spec:
         value: 2
       selectPolicy: selectPolicyValue
       stabilizationWindowSeconds: 3
+      tolerance: "0"
     scaleUp:
       policies:
       - periodSeconds: 3
@@ -48,6 +49,7 @@ spec:
         value: 2
       selectPolicy: selectPolicyValue
       stabilizationWindowSeconds: 3
+      tolerance: "0"
   maxReplicas: 3
   metrics:
   - containerResource:

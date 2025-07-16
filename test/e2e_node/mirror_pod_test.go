@@ -231,7 +231,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			}
 
 			ginkgo.By("Stopping the NFS server")
-			e2evolume.StopNFSServer(f, nfsServerPod)
+			e2evolume.StopNFSServer(ctx, f, nfsServerPod)
 
 			ginkgo.By(fmt.Sprintf("Deleting the static nfs test pod: %s", staticPodName))
 			err = deleteStaticPod(podPath, staticPodName, ns)
@@ -243,7 +243,7 @@ var _ = SIGDescribe("MirrorPod", func() {
 			}, 5*time.Minute, 10*time.Second).Should(gomega.BeTrueBecause("pod volume should exist while nfs server is stopped"))
 
 			ginkgo.By("Start the NFS server")
-			e2evolume.RestartNFSServer(f, nfsServerPod)
+			e2evolume.RestartNFSServer(ctx, f, nfsServerPod)
 
 			ginkgo.By("Waiting for the pod volume to deleted after the NFS server is started")
 			gomega.Eventually(func() bool {

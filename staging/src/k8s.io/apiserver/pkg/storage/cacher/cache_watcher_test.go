@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -288,10 +287,6 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 }
 
 func TestResourceVersionAfterInitEvents(t *testing.T) {
-	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, error) {
-		return nil, nil, nil
-	}
-
 	const numObjects = 10
 	store := cache.NewIndexer(storeElementKey, storeElementIndexers(nil))
 
@@ -300,7 +295,7 @@ func TestResourceVersionAfterInitEvents(t *testing.T) {
 		store.Add(elem)
 	}
 
-	wci, err := newCacheIntervalFromStore(numObjects, store, getAttrsFunc, "", false)
+	wci, err := newCacheIntervalFromStore(numObjects, store, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}

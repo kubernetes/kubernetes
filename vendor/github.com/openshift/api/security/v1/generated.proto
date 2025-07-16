@@ -73,6 +73,7 @@ message PodSecurityPolicyReviewSpec {
 // PodSecurityPolicyReviewStatus represents the status of PodSecurityPolicyReview.
 message PodSecurityPolicyReviewStatus {
   // allowedServiceAccounts returns the list of service accounts in *this* namespace that have the power to create the PodTemplateSpec.
+  // +optional
   repeated ServiceAccountPodSecurityPolicyReviewStatus allowedServiceAccounts = 1;
 }
 
@@ -134,14 +135,17 @@ message PodSecurityPolicySubjectReviewStatus {
   // allowedBy is a reference to the rule that allows the PodTemplateSpec.
   // A rule can be a SecurityContextConstraint or a PodSecurityPolicy
   // A `nil`, indicates that it was denied.
+  // +optional
   optional .k8s.io.api.core.v1.ObjectReference allowedBy = 1;
 
   // A machine-readable description of why this operation is in the
   // "Failure" status. If this value is empty there
   // is no information available.
+  // +optional
   optional string reason = 2;
 
   // template is the PodTemplateSpec after the defaulting is applied.
+  // +optional
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 }
 

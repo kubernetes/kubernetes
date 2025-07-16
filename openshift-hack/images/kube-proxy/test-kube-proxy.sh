@@ -87,6 +87,13 @@ rules:
   - get
   - list
   - watch
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - servicecidrs
+  verbs:
+  - get
+  - list
+  - watch
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -185,7 +192,12 @@ oc wait --for=condition=Ready -n kube-proxy-test pod/kube-proxy
 echo "Waiting for kube-proxy to program initial ${PROXY_MODE} rules..."
 function kube_proxy_synced() {
     oc exec -n kube-proxy-test kube-proxy -- curl -s http://127.0.0.1:10249/metrics > "${TMPDIR}/metrics.txt"
-    grep -q '^kubeproxy_sync_proxy_rules_duration_seconds_count [^0]' "${TMPDIR}/metrics.txt"
+    # kube-proxy < 1.33 has a single sync_proxy_rules_duration_seconds_count metric.
+    # kube-proxy >= 1.33 has the metric labeled by IP family, so we wait until both
+    # the IPv4 and IPv6 syncs have happened.
+    sync_metrics="$(grep -c '^kubeproxy_sync_proxy_rules_duration_seconds_count' "${TMPDIR}/metrics.txt")" || return 1
+    nonzero_sync_metrics="$(grep -c '^kubeproxy_sync_proxy_rules_duration_seconds_count[^ ]* [^0]' "${TMPDIR}/metrics.txt")" || return 1
+    [[ "${sync_metrics}" -eq "${nonzero_sync_metrics}" ]]
 }
 synced=false
 for count in $(seq 1 10); do

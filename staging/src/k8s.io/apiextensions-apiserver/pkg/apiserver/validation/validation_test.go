@@ -76,7 +76,7 @@ func TestRoundTrip(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		// fuzz internal types
 		internal := &apiextensions.JSONSchemaProps{}
-		f.Fuzz(internal)
+		f.Fill(internal)
 
 		// internal -> go-openapi
 		openAPITypes := &kubeopenapispec.Schema{}

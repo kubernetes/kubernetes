@@ -27,7 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp" //nolint:depguard
 	"github.com/spf13/pflag"
 
 	"k8s.io/klog/v2"
@@ -153,7 +153,7 @@ func Validate(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldP
 		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
 	} else if format != nil {
 		if format.feature != LoggingStableOptions {
-			enabled := featureGates()[format.feature].Default
+			enabled := featureGates()[format.feature][len(featureGates()[format.feature])-1].Default
 			if featureGate != nil {
 				enabled = featureGate.Enabled(format.feature)
 			}
@@ -228,7 +228,7 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 	p := &parameters{
 		C:                        c,
 		Options:                  options,
-		ContextualLoggingEnabled: contextualLoggingDefault,
+		ContextualLoggingEnabled: true,
 	}
 	if featureGate != nil {
 		p.ContextualLoggingEnabled = featureGate.Enabled(ContextualLogging)

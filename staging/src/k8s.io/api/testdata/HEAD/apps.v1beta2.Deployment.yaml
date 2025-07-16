@@ -285,6 +285,7 @@ spec:
             tcpSocket:
               host: hostValue
               port: portValue
+          stopSignal: stopSignalValue
         livenessProbe:
           exec:
             command:
@@ -501,6 +502,7 @@ spec:
             tcpSocket:
               host: hostValue
               port: portValue
+          stopSignal: stopSignalValue
         livenessProbe:
           exec:
             command:
@@ -719,6 +721,7 @@ spec:
             tcpSocket:
               host: hostValue
               port: portValue
+          stopSignal: stopSignalValue
         livenessProbe:
           exec:
             command:
@@ -1244,5 +1247,6 @@ status:
   observedGeneration: 1
   readyReplicas: 7
   replicas: 2
+  terminatingReplicas: 9
   unavailableReplicas: 5
   updatedReplicas: 3

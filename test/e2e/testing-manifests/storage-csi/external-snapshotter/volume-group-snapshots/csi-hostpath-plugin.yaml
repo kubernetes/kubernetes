@@ -219,7 +219,7 @@ spec:
       serviceAccountName: csi-hostpathplugin-sa
       containers:
         - name: hostpath
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.15.0
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.16.1
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
@@ -276,7 +276,7 @@ spec:
               mountPath: /csi
 
         - name: node-driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.10.1
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -304,13 +304,13 @@ spec:
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
-          image: registry.k8s.io/sig-storage/livenessprobe:v2.12.0
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.15.0
           args:
           - --csi-address=/csi/csi.sock
           - --health-port=9898
 
         - name: csi-attacher
-          image: registry.k8s.io/sig-storage/csi-attacher:v4.6.1
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.8.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -324,7 +324,7 @@ spec:
             name: socket-dir
 
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v5.0.1
+          image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
@@ -340,7 +340,7 @@ spec:
               name: socket-dir
 
         - name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v1.11.1
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.13.1
           args:
             - -v=5
             - -csi-address=/csi/csi.sock

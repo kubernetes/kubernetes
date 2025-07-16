@@ -19,4 +19,4 @@ limitations under the License.
 
 // +groupName=node.k8s.io
 
-package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/node/v1alpha1"
+package v1alpha1

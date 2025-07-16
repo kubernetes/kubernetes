@@ -104,7 +104,7 @@ var (
 		},
 		[]string{
 			"topology",             // either "Auto" or "Disabled"
-			"traffic_distribution", // "PreferClose" or <empty>
+			"traffic_distribution", // a trafficDistribution value or <empty>
 		},
 	)
 
@@ -129,7 +129,7 @@ var (
 			Help:           "Number of Services using some specific trafficDistribution",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"traffic_distribution"}, // One of ["PreferClose", "ImplementationSpecific"]
+		[]string{"traffic_distribution"}, // A trafficDistribution value
 	)
 )
 

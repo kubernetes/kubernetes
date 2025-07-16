@@ -21,4 +21,4 @@ limitations under the License.
 
 // +groupName=certificates.k8s.io
 
-package v1 // import "k8s.io/kubernetes/pkg/apis/certificates/v1"
+package v1

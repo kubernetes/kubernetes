@@ -1508,7 +1508,7 @@ func (p *podWorkers) completeWork(podUID types.UID, phaseTransition bool, syncEr
 		if status.pendingUpdate != nil {
 			select {
 			case p.podUpdates[podUID] <- struct{}{}:
-				klog.V(4).InfoS("Requeueing pod due to pending update", "podUID", podUID)
+				klog.V(4).InfoS("Requeuing pod due to pending update", "podUID", podUID)
 			default:
 				klog.V(4).InfoS("Pending update already queued", "podUID", podUID)
 			}

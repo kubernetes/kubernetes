@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -200,23 +199,23 @@ func (sf selectableFieldTestCase) Name() string {
 }
 
 func TestSelectableFields(t *testing.T) {
+	// start a conversion webhook
+	handler := conversion.NewObjectConverterWebhookHandler(t, crdConverter)
+	upCh, handler := closeOnCall(handler)
+	whTearDown, webhookClientConfig, err := conversion.StartConversionWebhookServer(handler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(whTearDown)
+
 	_, ctx := ktesting.NewTestContext(t)
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tearDown()
+	t.Cleanup(tearDown)
 
 	crd := selectableFieldFixture.DeepCopy()
-
-	// start a conversion webhook
-	handler := conversion.NewObjectConverterWebhookHandler(t, crdConverter)
-	upCh, handler := closeOnCall(handler)
-	tearDown, webhookClientConfig, err := conversion.StartConversionWebhookServer(handler)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tearDown()
 
 	if webhookClientConfig != nil {
 		crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
@@ -593,9 +592,7 @@ func TestFieldSelectorOpenAPI(t *testing.T) {
 
 func TestFieldSelectorDropFields(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceFieldSelectors, false)
-	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
+	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t, "--emulated-version=1.31", "--feature-gates=CustomResourceFieldSelectors=false")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -675,9 +672,8 @@ func TestFieldSelectorDropFields(t *testing.T) {
 }
 
 func TestFieldSelectorDisablement(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
 	_, ctx := ktesting.NewTestContext(t)
-	tearDown, config, _, err := fixtures.StartDefaultServer(t)
+	tearDown, config, _, err := fixtures.StartDefaultServer(t, "--emulated-version=1.31")
 	if err != nil {
 		t.Fatal(err)
 	}

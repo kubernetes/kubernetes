@@ -53,7 +53,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.15.0
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.16.1
           args:
             - -v=5
             - -nodeid=$(KUBE_NODE_NAME)
@@ -77,7 +77,7 @@ spec:
         # test for directories or create them. It needs additional privileges
         # for that.
         - name: busybox
-          image: registry.k8s.io/e2e-test-images/busybox:1.29-2
+          image: registry.k8s.io/e2e-test-images/busybox:1.36.1-1
           securityContext:
             privileged: true
           command:

@@ -143,10 +143,10 @@ func (ch *channel) recv() (messageHeader, []byte, error) {
 }
 
 func (ch *channel) send(streamID uint32, t messageType, flags uint8, p []byte) error {
-	// TODO: Error on send rather than on recv
-	//if len(p) > messageLengthMax {
-	//	return status.Errorf(codes.InvalidArgument, "refusing to send, message length %v exceed maximum message size of %v", len(p), messageLengthMax)
-	//}
+	if len(p) > messageLengthMax {
+		return OversizedMessageError(len(p))
+	}
+
 	if err := writeMessageHeader(ch.bw, ch.hwbuf[:], messageHeader{Length: uint32(len(p)), StreamID: streamID, Type: t, Flags: flags}); err != nil {
 		return err
 	}

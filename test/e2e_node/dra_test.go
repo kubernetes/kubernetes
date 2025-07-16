@@ -18,7 +18,7 @@ limitations under the License.
 E2E Node test for DRA (Dynamic Resource Allocation)
 This test covers node-specific aspects of DRA
 The test can be run locally on Linux this way:
-  make test-e2e-node FOCUS='\[NodeAlphaFeature:DynamicResourceAllocation\]' SKIP='\[Flaky\]' PARALLELISM=1 \
+  make test-e2e-node FOCUS='\[Feature:DynamicResourceAllocation\]' SKIP='\[Flaky\]' PARALLELISM=1 \
        TEST_ARGS='--feature-gates="DynamicResourceAllocation=true" --service-feature-gates="DynamicResourceAllocation=true" --runtime-config=api/all=true'
 */
 
@@ -29,7 +29,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -62,8 +61,6 @@ const (
 	kubeletPlugin1Name        = "test-driver1.cdi.k8s.io"
 	kubeletPlugin2Name        = "test-driver2.cdi.k8s.io"
 	cdiDir                    = "/var/run/cdi"
-	endpointTemplate          = "/var/lib/kubelet/plugins/%s/dra.sock"
-	pluginRegistrationPath    = "/var/lib/kubelet/plugins_registry"
 	pluginRegistrationTimeout = time.Second * 60 // how long to wait for a node plugin to be registered
 	podInPendingStateTimeout  = time.Second * 60 // how long to wait for a pod to stay in pending state
 
@@ -83,7 +80,7 @@ const (
 	retryTestTimeout = kubeletRetryPeriod + 30*time.Second
 )
 
-var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, "[NodeAlphaFeature:DynamicResourceAllocation]", func() {
+var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, func() {
 	f := framework.NewDefaultFramework("dra-node")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -554,9 +551,9 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 	// creating those directories.
 	err := os.MkdirAll(cdiDir, os.FileMode(0750))
 	framework.ExpectNoError(err, "create CDI directory")
-	endpoint := fmt.Sprintf(endpointTemplate, pluginName)
-	err = os.MkdirAll(filepath.Dir(endpoint), 0750)
-	framework.ExpectNoError(err, "create socket directory")
+	datadir := path.Join(kubeletplugin.KubeletPluginsDir, pluginName) // The default, not set below.
+	err = os.MkdirAll(datadir, 0750)
+	framework.ExpectNoError(err, "create DRA socket directory")
 
 	plugin, err := testdriver.StartPlugin(
 		ctx,
@@ -565,9 +562,6 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 		clientSet,
 		nodeName,
 		testdriver.FileOperations{},
-		kubeletplugin.PluginSocketPath(endpoint),
-		kubeletplugin.RegistrarSocketPath(path.Join(pluginRegistrationPath, pluginName+"-reg.sock")),
-		kubeletplugin.KubeletPluginSocketPath(endpoint),
 	)
 	framework.ExpectNoError(err)
 

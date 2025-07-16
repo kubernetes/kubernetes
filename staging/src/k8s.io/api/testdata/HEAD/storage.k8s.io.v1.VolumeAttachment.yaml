@@ -239,11 +239,13 @@ spec:
     persistentVolumeName: persistentVolumeNameValue
 status:
   attachError:
+    errorCode: 3
     message: messageValue
     time: "2001-01-01T01:01:01Z"
   attached: true
   attachmentMetadata:
     attachmentMetadataKey: attachmentMetadataValue
   detachError:
+    errorCode: 3
     message: messageValue
     time: "2001-01-01T01:01:01Z"

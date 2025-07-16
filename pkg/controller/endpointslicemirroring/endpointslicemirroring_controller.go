@@ -62,9 +62,9 @@ const (
 	// maxSyncBackOff is the max backoff period for syncEndpoints calls.
 	maxSyncBackOff = 100 * time.Second
 
-	// controllerName is a unique value used with LabelManagedBy to indicated
+	// ControllerName is a unique value used with LabelManagedBy to indicated
 	// the component managing an EndpointSlice.
-	controllerName = "endpointslicemirroring-controller.k8s.io"
+	ControllerName = "endpointslicemirroring-controller.k8s.io"
 )
 
 // NewController creates and initializes a new Controller
@@ -537,7 +537,7 @@ func (c *Controller) deleteMirroredSlices(namespace, name string) error {
 func endpointSlicesMirroredForService(endpointSliceLister discoverylisters.EndpointSliceLister, namespace, name string) ([]*discovery.EndpointSlice, error) {
 	esLabelSelector := labels.Set(map[string]string{
 		discovery.LabelServiceName: name,
-		discovery.LabelManagedBy:   controllerName,
+		discovery.LabelManagedBy:   ControllerName,
 	}).AsSelectorPreValidated()
 	return endpointSliceLister.EndpointSlices(namespace).List(esLabelSelector)
 }

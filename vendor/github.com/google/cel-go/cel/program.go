@@ -100,6 +100,9 @@ type EvalDetails struct {
 // State of the evaluation, non-nil if the OptTrackState or OptExhaustiveEval is specified
 // within EvalOptions.
 func (ed *EvalDetails) State() interpreter.EvalState {
+	if ed == nil {
+		return interpreter.NewEvalState()
+	}
 	return ed.state
 }
 

@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package fake provides a fake audit.Backend interface implementation for testing.
-package fake // import "k8s.io/apiserver/plugin/pkg/audit/fake"
+package fake

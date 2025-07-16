@@ -18,4 +18,4 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/cloud-provider/controllers/node/config
 // +k8s:conversion-gen=k8s.io/cloud-provider/controllers/node/config/v1alpha1
 
-package v1alpha1 // import "k8s.io/cloud-provider/controllers/node/config/v1alpha1"
+package v1alpha1

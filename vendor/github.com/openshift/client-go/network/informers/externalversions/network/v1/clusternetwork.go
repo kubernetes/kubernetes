@@ -45,13 +45,25 @@ func NewFilteredClusterNetworkInformer(client versioned.Interface, resyncPeriod 
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NetworkV1().ClusterNetworks().List(context.TODO(), options)
+				return client.NetworkV1().ClusterNetworks().List(context.Background(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NetworkV1().ClusterNetworks().Watch(context.TODO(), options)
+				return client.NetworkV1().ClusterNetworks().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.NetworkV1().ClusterNetworks().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.NetworkV1().ClusterNetworks().Watch(ctx, options)
 			},
 		},
 		&apinetworkv1.ClusterNetwork{},

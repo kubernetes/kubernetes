@@ -386,14 +386,17 @@ type PodSecurityPolicySubjectReviewStatus struct {
 	// allowedBy is a reference to the rule that allows the PodTemplateSpec.
 	// A rule can be a SecurityContextConstraint or a PodSecurityPolicy
 	// A `nil`, indicates that it was denied.
+	// +optional
 	AllowedBy *corev1.ObjectReference `json:"allowedBy,omitempty" protobuf:"bytes,1,opt,name=allowedBy"`
 
 	// A machine-readable description of why this operation is in the
 	// "Failure" status. If this value is empty there
 	// is no information available.
+	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
 
 	// template is the PodTemplateSpec after the defaulting is applied.
+	// +optional
 	Template corev1.PodTemplateSpec `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
 }
 
@@ -465,6 +468,7 @@ type PodSecurityPolicyReviewSpec struct {
 // PodSecurityPolicyReviewStatus represents the status of PodSecurityPolicyReview.
 type PodSecurityPolicyReviewStatus struct {
 	// allowedServiceAccounts returns the list of service accounts in *this* namespace that have the power to create the PodTemplateSpec.
+	// +optional
 	AllowedServiceAccounts []ServiceAccountPodSecurityPolicyReviewStatus `json:"allowedServiceAccounts" protobuf:"bytes,1,rep,name=allowedServiceAccounts"`
 }
 

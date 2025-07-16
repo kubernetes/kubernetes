@@ -19,6 +19,8 @@ package unstructured
 import (
 	"io/ioutil"
 	"math"
+	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -289,6 +291,93 @@ func TestNestedNumberAsFloat64(t *testing.T) {
 				if gotErr == nil {
 					t.Errorf("got nil error, wanted %s", tc.wantErrMessage)
 				} else if gotErrMessage := gotErr.Error(); gotErrMessage != tc.wantErrMessage {
+					t.Errorf("wanted error %q, got: %v", gotErrMessage, tc.wantErrMessage)
+				}
+			} else if gotErr != nil {
+				t.Errorf("wanted nil error, got %v", gotErr)
+			}
+		})
+	}
+}
+
+func TestNestedNullCoercingStringMap(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		obj            map[string]interface{}
+		path           []string
+		wantObj        map[string]string
+		wantFound      bool
+		wantErrMessage string
+	}{
+		{
+			name:           "missing map",
+			obj:            nil,
+			path:           []string{"path"},
+			wantObj:        nil,
+			wantFound:      false,
+			wantErrMessage: "",
+		},
+		{
+			name:           "null map",
+			obj:            map[string]interface{}{"path": nil},
+			path:           []string{"path"},
+			wantObj:        nil,
+			wantFound:      true,
+			wantErrMessage: "",
+		},
+		{
+			name:           "non map",
+			obj:            map[string]interface{}{"path": 0},
+			path:           []string{"path"},
+			wantObj:        nil,
+			wantFound:      false,
+			wantErrMessage: "type int",
+		},
+		{
+			name:           "empty map",
+			obj:            map[string]interface{}{"path": map[string]interface{}{}},
+			path:           []string{"path"},
+			wantObj:        map[string]string{},
+			wantFound:      true,
+			wantErrMessage: "",
+		},
+		{
+			name:           "string value",
+			obj:            map[string]interface{}{"path": map[string]interface{}{"a": "1", "b": "2"}},
+			path:           []string{"path"},
+			wantObj:        map[string]string{"a": "1", "b": "2"},
+			wantFound:      true,
+			wantErrMessage: "",
+		},
+		{
+			name:           "null value",
+			obj:            map[string]interface{}{"path": map[string]interface{}{"a": "1", "b": nil}},
+			path:           []string{"path"},
+			wantObj:        map[string]string{"a": "1", "b": ""},
+			wantFound:      true,
+			wantErrMessage: "",
+		},
+		{
+			name:           "invalid value",
+			obj:            map[string]interface{}{"path": map[string]interface{}{"a": "1", "b": nil, "c": 0}},
+			path:           []string{"path"},
+			wantObj:        nil,
+			wantFound:      false,
+			wantErrMessage: `key "c": 0`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gotObj, gotFound, gotErr := NestedNullCoercingStringMap(tc.obj, tc.path...)
+			if !reflect.DeepEqual(gotObj, tc.wantObj) {
+				t.Errorf("got %#v, wanted %#v", gotObj, tc.wantObj)
+			}
+			if gotFound != tc.wantFound {
+				t.Errorf("got %v, wanted %v", gotFound, tc.wantFound)
+			}
+			if tc.wantErrMessage != "" {
+				if gotErr == nil {
+					t.Errorf("got nil error, wanted %s", tc.wantErrMessage)
+				} else if gotErrMessage := gotErr.Error(); !strings.Contains(gotErrMessage, tc.wantErrMessage) {
 					t.Errorf("wanted error %q, got: %v", gotErrMessage, tc.wantErrMessage)
 				}
 			} else if gotErr != nil {

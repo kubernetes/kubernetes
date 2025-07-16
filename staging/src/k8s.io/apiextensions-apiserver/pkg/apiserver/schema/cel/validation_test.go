@@ -277,7 +277,7 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1.lowerAscii() == 'rook takes 👑'",
 
 				"'%d %s %f %s %s'.format([1, 'abc', 1.0, duration('1m'), timestamp('2000-01-01T00:00:00.000Z')]) == '1 abc 1.000000 60s 2000-01-01T00:00:00Z'",
-				"'%e'.format([3.14]) == '3.140000 × 10⁰⁰'",
+				"'%e'.format([3.14]) == '3.140000×10⁰⁰'",
 				"'%o %o %o'.format([7, 8, 9]) == '7 10 11'",
 				"'%b %b %b'.format([7, 8, 9]) == '111 1000 1001'",
 			},

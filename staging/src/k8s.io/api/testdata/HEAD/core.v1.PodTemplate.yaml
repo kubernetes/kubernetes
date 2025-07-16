@@ -266,6 +266,7 @@ template:
           tcpSocket:
             host: hostValue
             port: portValue
+        stopSignal: stopSignalValue
       livenessProbe:
         exec:
           command:
@@ -482,6 +483,7 @@ template:
           tcpSocket:
             host: hostValue
             port: portValue
+        stopSignal: stopSignalValue
       livenessProbe:
         exec:
           command:
@@ -700,6 +702,7 @@ template:
           tcpSocket:
             host: hostValue
             port: portValue
+        stopSignal: stopSignalValue
       livenessProbe:
         exec:
           command:

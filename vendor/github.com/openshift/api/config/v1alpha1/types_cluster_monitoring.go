@@ -72,7 +72,6 @@ type ClusterMonitoringList struct {
 }
 
 // ClusterMonitoringSpec defines the desired state of Cluster Monitoring Operator
-// +required
 type ClusterMonitoringSpec struct {
 	// userDefined set the deployment mode for user-defined monitoring in addition to the default platform monitoring.
 	// +required
@@ -80,7 +79,6 @@ type ClusterMonitoringSpec struct {
 }
 
 // UserDefinedMonitoring config for user-defined projects.
-// +required
 type UserDefinedMonitoring struct {
 	// mode defines the different configurations of UserDefinedMonitoring
 	// Valid values are Disabled and NamespaceIsolated

@@ -334,6 +334,7 @@ func (r *raftNode) start(rh *raftReadyHandler) {
 					notifyc <- struct{}{}
 				}
 
+				// gofail: var raftBeforeAdvance struct{}
 				r.Advance()
 			case <-r.stopped:
 				return

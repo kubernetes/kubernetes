@@ -19,15 +19,11 @@ package request
 import (
 	"math"
 	"net/http"
-	"net/url"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/storage"
-	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/klog/v2"
 )
 
@@ -86,8 +82,13 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 			return WorkEstimate{InitialSeats: e.config.MinimumSeats}
 		}
 	}
-
-	isListFromCache := requestInfo.Verb == "watch" || !shouldListFromStorage(query, &listOptions)
+	// TODO: Check whether watchcache is enabled.
+	result, err := delegator.ShouldDelegateListMeta(&listOptions, delegator.CacheWithoutSnapshots{})
+	if err != nil {
+		return WorkEstimate{InitialSeats: maxSeats}
+	}
+	listFromStorage := result.ShouldDelegate
+	isListFromCache := requestInfo.Verb == "watch" || !listFromStorage
 
 	numStored, err := e.countGetterFn(key(requestInfo))
 	switch {
@@ -158,25 +159,4 @@ func key(requestInfo *apirequest.RequestInfo) string {
 		Resource: requestInfo.Resource,
 	}
 	return groupResource.String()
-}
-
-// NOTICE: Keep in sync with shouldDelegateList function in
-//
-//	staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
-func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
-	resourceVersion := opts.ResourceVersion
-	match := opts.ResourceVersionMatch
-	consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
-	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-
-	// Serve consistent reads from storage if ConsistentListFromCache is disabled
-	consistentReadFromStorage := resourceVersion == "" && !(consistentListFromCacheEnabled && requestWatchProgressSupported)
-	// Watch cache doesn't support continuations, so serve them from etcd.
-	hasContinuation := len(opts.Continue) > 0
-	// Watch cache only supports ResourceVersionMatchNotOlderThan (default).
-	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
-	isLegacyExactMatch := opts.Limit > 0 && match == "" && len(resourceVersion) > 0 && resourceVersion != "0"
-	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan || isLegacyExactMatch
-
-	return consistentReadFromStorage || hasContinuation || unsupportedMatch
 }

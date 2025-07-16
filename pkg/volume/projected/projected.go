@@ -229,7 +229,8 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 	setPerms := func(_ string) error {
 		// This may be the first time writing and new files get created outside the timestamp subdirectory:
 		// change the permissions on the whole volume and not only in the timestamp directory.
-		return volume.SetVolumeOwnership(s, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(s.plugin, nil))
+		ownershipChanger := volume.NewVolumeOwnership(s, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(s.plugin, nil))
+		return ownershipChanger.ChangePermissions()
 	}
 	err = writer.Write(data, setPerms)
 	if err != nil {

@@ -10,8 +10,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
-	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 	"github.com/pkg/errors"
+
+	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 
 	ext "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 )
@@ -40,8 +41,12 @@ func configureGinkgo() (*types.SuiteConfig, *types.ReporterConfig, error) {
 	return &suiteConfig, &reporterConfig, nil
 }
 
-func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite() (ext.ExtensionTestSpecs, error) {
-	var tests []*ext.ExtensionTestSpec
+// BuildExtensionTestSpecsFromOpenShiftGinkgoSuite generates OTE specs for Gingko tests. While OTE isn't limited to
+// calling ginkgo tests, anything that implements the ExtensionTestSpec interface can be used, it's the most common
+// course of action.  The typical use case is to omit selectFns, but if provided, these will filter the returned list
+// of specs, applied in the order provided.
+func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns ...ext.SelectFunction) (ext.ExtensionTestSpecs, error) {
+	var specs ext.ExtensionTestSpecs
 	var enforceSerialExecutionForGinkgo sync.Mutex // in-process parallelization for ginkgo is impossible so far
 
 	if _, _, err := configureGinkgo(); err != nil {
@@ -54,10 +59,16 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite() (ext.ExtensionTestSpecs, 
 	}
 
 	ginkgo.GetSuite().WalkTests(func(name string, spec types.TestSpec) {
+		var codeLocations []string
+		for _, cl := range spec.CodeLocations() {
+			codeLocations = append(codeLocations, cl.String())
+		}
+
 		testCase := &ext.ExtensionTestSpec{
-			Name:      spec.Text(),
-			Labels:    sets.New[string](spec.Labels()...),
-			Lifecycle: GetLifecycle(spec.Labels()),
+			Name:          spec.Text(),
+			Labels:        sets.New[string](spec.Labels()...),
+			CodeLocations: codeLocations,
+			Lifecycle:     GetLifecycle(spec.Labels()),
 			Run: func() *ext.ExtensionTestResult {
 				enforceSerialExecutionForGinkgo.Lock()
 				defer enforceSerialExecutionForGinkgo.Unlock()
@@ -85,6 +96,23 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite() (ext.ExtensionTestSpecs, 
 					result.Result = ext.ResultPassed
 				case summary.State == types.SpecStateSkipped:
 					result.Result = ext.ResultSkipped
+					if len(summary.Failure.Message) > 0 {
+						result.Output = fmt.Sprintf(
+							"%s\n skip [%s:%d]: %s\n",
+							result.Output,
+							lastFilenameSegment(summary.Failure.Location.FileName),
+							summary.Failure.Location.LineNumber,
+							summary.Failure.Message,
+						)
+					} else if len(summary.Failure.ForwardedPanic) > 0 {
+						result.Output = fmt.Sprintf(
+							"%s\n skip [%s:%d]: %s\n",
+							result.Output,
+							lastFilenameSegment(summary.Failure.Location.FileName),
+							summary.Failure.Location.LineNumber,
+							summary.Failure.ForwardedPanic,
+						)
+					}
 				case summary.State == types.SpecStateFailed, summary.State == types.SpecStatePanicked, summary.State == types.SpecStateInterrupted:
 					result.Result = ext.ResultFailed
 					var errors []string
@@ -103,10 +131,23 @@ func BuildExtensionTestSpecsFromOpenShiftGinkgoSuite() (ext.ExtensionTestSpecs, 
 				return result
 			},
 		}
-		tests = append(tests, testCase)
+		specs = append(specs, testCase)
 	})
 
-	return tests, nil
+	// Default select function is to exclude vendored specs.  When relying on Kubernetes test framework for its helpers,
+	// it also unfortunately ends up importing *all* Gingko specs.  This is unsafe: it would potentially override the
+	// kube specs already present in origin.  The best course of action is enforce this behavior on everyone.  If for
+	// some reason, you must include vendored specs, you can opt-in directly by supplying your own SelectFunctions or using
+	// AllTestsIncludedVendored().
+	if len(selectFns) == 0 {
+		selectFns = []ext.SelectFunction{ext.ModuleTestsOnly()}
+	}
+
+	for _, selectFn := range selectFns {
+		specs = specs.Select(selectFn)
+	}
+
+	return specs, nil
 }
 
 func Informing() ginkgo.Labels {

@@ -19,11 +19,13 @@ package resourceconfig
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	cliflag "k8s.io/component-base/cli/flag"
 )
@@ -36,6 +38,8 @@ type GroupVersionRegistry interface {
 	IsVersionRegistered(v schema.GroupVersion) bool
 	// PrioritizedVersionsAllGroups returns all registered group versions.
 	PrioritizedVersionsAllGroups() []schema.GroupVersion
+	// PrioritizedVersionsForGroup returns versions for a single group in priority order
+	PrioritizedVersionsForGroup(group string) []schema.GroupVersion
 }
 
 // MergeResourceEncodingConfigs merges the given defaultResourceConfig with specific GroupVersionResource overrides.
@@ -100,7 +104,17 @@ func MergeAPIResourceConfigs(
 			}
 		}
 	}
+	if err := applyVersionAndResourcePreferences(resourceConfig, overrides, registry); err != nil {
+		return nil, err
+	}
+	return resourceConfig, nil
+}
 
+func applyVersionAndResourcePreferences(
+	resourceConfig *serverstore.ResourceConfig,
+	overrides cliflag.ConfigurationMap,
+	registry GroupVersionRegistry,
+) error {
 	type versionEnablementPreference struct {
 		key          string
 		enabled      bool
@@ -130,7 +144,7 @@ func MergeAPIResourceConfigs(
 		groupVersionString := tokens[0] + "/" + tokens[1]
 		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
 		if err != nil {
-			return nil, fmt.Errorf("invalid key %s", key)
+			return fmt.Errorf("invalid key %s", key)
 		}
 
 		// Exclude group not registered into the registry.
@@ -140,11 +154,11 @@ func MergeAPIResourceConfigs(
 
 		// Verify that the groupVersion is registered into registry.
 		if !registry.IsVersionRegistered(groupVersion) {
-			return nil, fmt.Errorf("group version %s that has not been registered", groupVersion.String())
+			return fmt.Errorf("group version %s that has not been registered", groupVersion.String())
 		}
 		enabled, err := getRuntimeConfigValue(overrides, key, false)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		switch len(tokens) {
@@ -156,7 +170,7 @@ func MergeAPIResourceConfigs(
 			})
 		case 3:
 			if strings.ToLower(tokens[2]) != tokens[2] {
-				return nil, fmt.Errorf("invalid key %v: group/version/resource and resource is always lowercase plural, not %q", key, tokens[2])
+				return fmt.Errorf("invalid key %v: group/version/resource and resource is always lowercase plural, not %q", key, tokens[2])
 			}
 			resourcePreferences = append(resourcePreferences, resourceEnablementPreference{
 				key:                  key,
@@ -170,11 +184,11 @@ func MergeAPIResourceConfigs(
 	for _, versionPreference := range versionPreferences {
 		if versionPreference.enabled {
 			// enable the groupVersion for "group/version=true"
-			resourceConfig.EnableVersions(versionPreference.groupVersion)
+			resourceConfig.ExplicitlyEnableVersions(versionPreference.groupVersion)
 
 		} else {
 			// disable the groupVersion only for "group/version=false"
-			resourceConfig.DisableVersions(versionPreference.groupVersion)
+			resourceConfig.ExplicitlyDisableVersions(versionPreference.groupVersion)
 		}
 	}
 
@@ -182,13 +196,12 @@ func MergeAPIResourceConfigs(
 	for _, resourcePreference := range resourcePreferences {
 		if resourcePreference.enabled {
 			// enable the resource for "group/version/resource=true"
-			resourceConfig.EnableResources(resourcePreference.groupVersionResource)
+			resourceConfig.ExplicitlyEnableResources(resourcePreference.groupVersionResource)
 		} else {
-			resourceConfig.DisableResources(resourcePreference.groupVersionResource)
+			resourceConfig.ExplicitlyDisableResources(resourcePreference.groupVersionResource)
 		}
 	}
-
-	return resourceConfig, nil
+	return nil
 }
 
 func getRuntimeConfigValue(overrides cliflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
@@ -226,4 +239,62 @@ func ParseGroups(resourceConfig cliflag.ConfigurationMap) ([]string, error) {
 	}
 
 	return groups, nil
+}
+
+// EmulationForwardCompatibleResourceConfig creates a new ResourceConfig that besides all the enabled resources in resourceConfig,
+// enables all higher priority versions of enabled resources, excluding alpha versions.
+// This is useful for ensuring forward compatibility when a new version of an API is introduced.
+func EmulationForwardCompatibleResourceConfig(
+	resourceConfig *serverstore.ResourceConfig,
+	resourceConfigOverrides cliflag.ConfigurationMap,
+	registry GroupVersionRegistry,
+) (*serverstore.ResourceConfig, error) {
+	ret := serverstore.NewResourceConfig()
+	for gv, enabled := range resourceConfig.GroupVersionConfigs {
+		ret.GroupVersionConfigs[gv] = enabled
+		if !enabled {
+			continue
+		}
+		// emulation forward compatibility is not applicable to alpha apis.
+		if alphaPattern.MatchString(gv.Version) {
+			continue
+		}
+		// if a gv is enabled, all the versions with higher priority (all the versions before gv in PrioritizedVersionsForGroup) are also implicitly enabled for emulation forward compatibility.
+		prioritizedVersions := registry.PrioritizedVersionsForGroup(gv.Group)
+		sort.Slice(prioritizedVersions, func(i, j int) bool {
+			return version.CompareKubeAwareVersionStrings(prioritizedVersions[i].Version, prioritizedVersions[j].Version) > 0
+		})
+		for _, pgv := range prioritizedVersions {
+			if pgv.Version == gv.Version {
+				break
+			}
+			ret.EnableVersions(pgv)
+		}
+	}
+	for gvr, enabled := range resourceConfig.ResourceConfigs {
+		ret.ResourceConfigs[gvr] = enabled
+		if !enabled {
+			continue
+		}
+		// emulation forward compatibility is not applicable to alpha apis.
+		if alphaPattern.MatchString(gvr.Version) {
+			continue
+		}
+		// if a gvr is enabled, all the versions with the same resource name and higher priority (all the versions before gv in PrioritizedVersionsForGroup) are also implicitly enabled for emulation forward compatibility.
+		prioritizedVersions := registry.PrioritizedVersionsForGroup(gvr.Group)
+		sort.Slice(prioritizedVersions, func(i, j int) bool {
+			return version.CompareKubeAwareVersionStrings(prioritizedVersions[i].Version, prioritizedVersions[j].Version) > 0
+		})
+		for _, pgv := range prioritizedVersions {
+			if pgv.Version == gvr.Version {
+				break
+			}
+			ret.EnableResources(pgv.WithResource(gvr.Resource))
+		}
+	}
+	// need to reapply the version preferences if there is an override of a higher priority version.
+	if err := applyVersionAndResourcePreferences(ret, resourceConfigOverrides, registry); err != nil {
+		return nil, err
+	}
+	return ret, nil
 }

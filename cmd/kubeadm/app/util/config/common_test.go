@@ -29,8 +29,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/version"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	"sigs.k8s.io/yaml"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -40,6 +42,14 @@ import (
 )
 
 const KubeadmGroupName = "kubeadm.k8s.io"
+
+var formats = []struct {
+	name    string
+	marshal func(interface{}) ([]byte, error)
+}{
+	{name: "JSON", marshal: json.Marshal},
+	{name: "YAML", marshal: yaml.Marshal},
+}
 
 func TestValidateSupportedVersion(t *testing.T) {
 	tests := []struct {

@@ -77,7 +77,11 @@ var (
 )
 
 func ValidateRoute(ctx context.Context, route *routev1.Route, sarCreator routecommon.SubjectAccessReviewCreator, secretsGetter corev1client.SecretsGetter, opts routecommon.RouteValidationOptions) field.ErrorList {
-	return validateRoute(ctx, route, true, sarCreator, secretsGetter, opts)
+	allErrs := field.ErrorList{}
+	pathFieldPath := field.NewPath("spec", "path")
+	allErrs = append(allErrs, validatePath(route.Spec.Path, pathFieldPath)...)
+	allErrs = append(allErrs, validateRoute(ctx, route, true, sarCreator, secretsGetter, opts)...)
+	return allErrs
 }
 
 // validLabels - used in the ValidateRouteUpdate function to check if "older" routes conform to DNS1123Labels or not
@@ -215,11 +219,29 @@ func validateRoute(ctx context.Context, route *routev1.Route, checkHostname bool
 	return result
 }
 
+// validatePath tests the spec.path field for invalid syntax when the
+// rewrite-target annotation is set. This addresses OCPBUGS-47773 by rejecting invalid spec.path
+// values, while preserving compatibility for users who may have depended on the unintended
+// behavior caused by the bug.
+func validatePath(pathValue string, fldPath *field.Path) field.ErrorList {
+	result := field.ErrorList{}
+
+	if strings.ContainsAny(pathValue, "# ") {
+		result = append(result, field.Invalid(fldPath, pathValue, "cannot contain # or spaces"))
+	}
+
+	return result
+}
+
 func ValidateRouteUpdate(ctx context.Context, route *routev1.Route, older *routev1.Route, sarc routecommon.SubjectAccessReviewCreator, secrets corev1client.SecretsGetter, opts routecommon.RouteValidationOptions) field.ErrorList {
 	allErrs := validateObjectMetaUpdate(&route.ObjectMeta, &older.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(route.Spec.WildcardPolicy, older.Spec.WildcardPolicy, field.NewPath("spec", "wildcardPolicy"))...)
 	hostnameUpdated := route.Spec.Host != older.Spec.Host
 	allErrs = append(allErrs, validateRoute(ctx, route, hostnameUpdated && validLabels(older.Spec.Host), sarc, secrets, opts)...)
+	if route.Spec.Path != older.Spec.Path {
+		pathFieldPath := field.NewPath("spec", "path")
+		allErrs = append(allErrs, validatePath(route.Spec.Path, pathFieldPath)...)
+	}
 	return allErrs
 }
 

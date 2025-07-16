@@ -268,7 +268,6 @@ func NewVersionedFeatureGate(emulationVersion *version.Version) *featureGate {
 	f.enabledRaw.Store(map[string]bool{})
 	f.emulationVersion.Store(emulationVersion)
 	f.queriedFeatures.Store(sets.Set[Feature]{})
-	klog.V(1).Infof("new feature gate with emulationVersion=%s", f.emulationVersion.Load().String())
 	return f
 }
 
@@ -319,7 +318,6 @@ func (f *featureGate) unsafeSetFromMap(enabled map[Feature]bool, m map[string]bo
 	// Copy existing state
 	known := map[Feature]VersionedSpecs{}
 	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
-		sort.Sort(v)
 		known[k] = v
 	}
 
@@ -421,18 +419,51 @@ func (f *featureGate) AddVersioned(features map[Feature]VersionedSpecs) error {
 	if f.closed {
 		return fmt.Errorf("cannot add a feature gate after adding it to the flag set")
 	}
-
 	// Copy existing state
 	known := f.GetAllVersioned()
 
 	for name, specs := range features {
-		sort.Sort(specs)
 		if existingSpec, found := known[name]; found {
-			sort.Sort(existingSpec)
 			if reflect.DeepEqual(existingSpec, specs) {
 				continue
 			}
 			return fmt.Errorf("feature gate %q with different spec already exists: %v", name, existingSpec)
+		}
+		// Validate new specs are well-formed
+		var lastVersion *version.Version
+		var wasBeta, wasGA, wasDeprecated bool
+		for i, spec := range specs {
+			if spec.Version == nil {
+				return fmt.Errorf("feature %q did not provide a version", name)
+			}
+			if len(spec.Version.Components()) != 2 {
+				return fmt.Errorf("feature %q specified patch version: %s", name, spec.Version.String())
+
+			}
+			// gates that begin as deprecated must indicate their prior state
+			if i == 0 && spec.PreRelease == Deprecated && spec.Version.Minor() != 0 {
+				return fmt.Errorf("feature %q introduced as deprecated must provide a 1.0 entry indicating initial state", name)
+			}
+			if i > 0 {
+				// versions must strictly increase
+				if !lastVersion.LessThan(spec.Version) {
+					return fmt.Errorf("feature %q lists version transitions in non-increasing order (%s <= %s)", name, spec.Version, lastVersion)
+				}
+				// stability must not regress from ga --> {beta,alpha} or beta --> alpha, and
+				// Deprecated state must be the terminal state
+				switch {
+				case spec.PreRelease != Deprecated && wasDeprecated:
+					return fmt.Errorf("deprecated feature %q must not resurrect from its terminal state", name)
+				case spec.PreRelease == Alpha && (wasBeta || wasGA):
+					return fmt.Errorf("feature %q regresses stability from more stable level to %s in %s", name, spec.PreRelease, spec.Version)
+				case spec.PreRelease == Beta && wasGA:
+					return fmt.Errorf("feature %q regresses stability from more stable level to %s in %s", name, spec.PreRelease, spec.Version)
+				}
+			}
+			lastVersion = spec.Version
+			wasBeta = wasBeta || spec.PreRelease == Beta
+			wasGA = wasGA || spec.PreRelease == GA
+			wasDeprecated = wasDeprecated || spec.PreRelease == Deprecated
 		}
 		known[name] = specs
 	}

@@ -251,27 +251,39 @@ again:
 // RemovePath aims to remove cgroup path. It does so recursively,
 // by removing any subdirectories (sub-cgroups) first.
 func RemovePath(path string) error {
-	// Try the fast path first.
+	// Try the fast path first; don't retry on EBUSY yet.
 	if err := rmdir(path, false); err == nil {
 		return nil
 	}
 
+	// There are many reasons why rmdir can fail, including:
+	// 1. cgroup have existing sub-cgroups;
+	// 2. cgroup (still) have some processes (that are about to vanish);
+	// 3. lack of permission (one example is read-only /sys/fs/cgroup mount,
+	//    in which case rmdir returns EROFS even for for a non-existent path,
+	//    see issue 4518).
+	//
+	// Using os.ReadDir here kills two birds with one stone: check if
+	// the directory exists (handling scenario 3 above), and use
+	// directory contents to remove sub-cgroups (handling scenario 1).
 	infos, err := os.ReadDir(path)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
+	// Let's remove sub-cgroups, if any.
 	for _, info := range infos {
 		if info.IsDir() {
-			// We should remove subcgroup first.
 			if err = RemovePath(filepath.Join(path, info.Name())); err != nil {
-				break
+				return err
 			}
 		}
 	}
-	if err == nil {
-		err = rmdir(path, true)
-	}
-	return err
+	// Finally, try rmdir again, this time with retries on EBUSY,
+	// which may help with scenario 2 above.
+	return rmdir(path, true)
 }
 
 // RemovePaths iterates over the provided paths removing them.

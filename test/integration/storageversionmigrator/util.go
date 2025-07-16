@@ -275,6 +275,7 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 		"--audit-log-mode", "blocking",
 		"--audit-log-path", logFile.Name(),
 		"--authorization-mode=RBAC",
+		fmt.Sprintf("--runtime-config=%s=true", svmv1alpha1.SchemeGroupVersion),
 	}
 	storageConfig := framework.SharedEtcd()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, storageConfig)
@@ -387,9 +388,9 @@ func (svm *svmTest) createSecret(ctx context.Context, t *testing.T, name, namesp
 	return svm.client.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, metav1.CreateOptions{})
 }
 
-func (svm *svmTest) getRawSecretFromETCD(t *testing.T, name, namespace string) ([]byte, error) {
+func (svm *svmTest) getRawSecretFromETCD(t *testing.T, namespace, name string) ([]byte, error) {
 	t.Helper()
-	secretETCDPath := svm.getETCDPathForResource(t, svm.storageConfig.Prefix, "", "secrets", name, namespace)
+	secretETCDPath := getETCDPathForResource(t, svm.storageConfig.Prefix, "", "secrets", namespace, name)
 	etcdResponse, err := svm.readRawRecordFromETCD(t, secretETCDPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s from etcd: %w", secretETCDPath, err)
@@ -397,7 +398,7 @@ func (svm *svmTest) getRawSecretFromETCD(t *testing.T, name, namespace string) (
 	return etcdResponse.Kvs[0].Value, nil
 }
 
-func (svm *svmTest) getETCDPathForResource(t *testing.T, storagePrefix, group, resource, name, namespaceName string) string {
+func getETCDPathForResource(t *testing.T, storagePrefix, group, resource, namespaceName, name string) string {
 	t.Helper()
 	groupResource := resource
 	if group != "" {
@@ -431,9 +432,9 @@ func (svm *svmTest) readRawRecordFromETCD(t *testing.T, path string) (*clientv3.
 	return response, nil
 }
 
-func (svm *svmTest) getRawCRFromETCD(t *testing.T, name, namespace, crdGroup, crdName string) ([]byte, error) {
+func (svm *svmTest) getRawCRFromETCD(t *testing.T, crdGroup, crdName, namespace, name string) ([]byte, error) {
 	t.Helper()
-	crdETCDPath := svm.getETCDPathForResource(t, svm.storageConfig.Prefix, crdGroup, crdName, name, namespace)
+	crdETCDPath := getETCDPathForResource(t, svm.storageConfig.Prefix, crdGroup, crdName, namespace, name)
 	etcdResponse, err := svm.readRawRecordFromETCD(t, crdETCDPath)
 	if err != nil {
 		t.Fatalf("failed to read %s from etcd: %v", crdETCDPath, err)
@@ -807,29 +808,30 @@ func (svm *svmTest) waitForCRDUpdate(
 				return false, fmt.Errorf("failed to get server groups and resources: %w", err)
 			}
 			for _, api := range apiGroups {
-				if api.Name == crdGroup {
-					var servingVersions []string
-					for _, apiVersion := range api.Versions {
-						servingVersions = append(servingVersions, apiVersion.Version)
-					}
-					sort.Strings(servingVersions)
+				if api.Name != crdGroup {
+					continue
+				}
+				var servingVersions []string
+				for _, apiVersion := range api.Versions {
+					servingVersions = append(servingVersions, apiVersion.Version)
+				}
+				sort.Strings(servingVersions)
 
-					// Check if the serving versions are as expected
-					if reflect.DeepEqual(expectedServingVersions, servingVersions) {
-						expectedHash := endpointsdiscovery.StorageVersionHash(crdGroup, expectedStorageVersion, crdKind)
-						resourceList, err := svm.discoveryClient.ServerResourcesForGroupVersion(crdGroup + "/" + api.PreferredVersion.Version)
-						if err != nil {
-							return false, fmt.Errorf("failed to get server resources for group version: %w", err)
-						}
+				// Check if the serving versions are as expected
+				if !reflect.DeepEqual(expectedServingVersions, servingVersions) {
+					continue
+				}
 
-						// Check if the storage version is as expected
-						for _, resource := range resourceList.APIResources {
-							if resource.Kind == crdKind {
-								if resource.StorageVersionHash == expectedHash {
-									return true, nil
-								}
-							}
-						}
+				expectedHash := endpointsdiscovery.StorageVersionHash(crdGroup, expectedStorageVersion, crdKind)
+				resourceList, err := svm.discoveryClient.ServerResourcesForGroupVersion(crdGroup + "/" + api.PreferredVersion.Version)
+				if err != nil {
+					return false, fmt.Errorf("failed to get server resources for group version: %w", err)
+				}
+
+				// Check if the storage version is as expected
+				for _, resource := range resourceList.APIResources {
+					if resource.Kind == crdKind && resource.StorageVersionHash == expectedHash {
+						return true, nil
 					}
 				}
 			}
@@ -1055,7 +1057,7 @@ func (svm *svmTest) setupServerCert(t *testing.T) *certContext {
 func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bool {
 	t.Helper()
 
-	data, err := svm.getRawCRFromETCD(t, crName, defaultNamespace, crdGroup, crdName+"s")
+	data, err := svm.getRawCRFromETCD(t, crdGroup, crdName+"s", defaultNamespace, crName)
 	if err != nil {
 		t.Fatalf("Failed to get CR from etcd: %v", err)
 	}
@@ -1134,7 +1136,7 @@ func (svm *svmTest) validateRVAndGeneration(ctx context.Context, t *testing.T, c
 
 	for crName, version := range crVersions {
 		// get CR from etcd
-		data, err := svm.getRawCRFromETCD(t, crName, defaultNamespace, crdGroup, crdName+"s")
+		data, err := svm.getRawCRFromETCD(t, crdGroup, crdName+"s", defaultNamespace, crName)
 		if err != nil {
 			t.Fatalf("Failed to get CR from etcd: %v", err)
 		}

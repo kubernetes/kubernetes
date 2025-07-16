@@ -93,31 +93,34 @@ type NetworkSpec struct {
 type NetworkStatus struct {
 	// IP address pool to use for pod IPs.
 	// +listType=atomic
+	// +optional
 	ClusterNetwork []ClusterNetworkEntry `json:"clusterNetwork,omitempty"`
 
 	// IP address pool for services.
 	// Currently, we only support a single entry here.
 	// +listType=atomic
+	// +optional
 	ServiceNetwork []string `json:"serviceNetwork,omitempty"`
 
 	// networkType is the plugin that is deployed (e.g. OVNKubernetes).
+	// +optional
 	NetworkType string `json:"networkType,omitempty"`
 
 	// clusterNetworkMTU is the MTU for inter-pod networking.
+	// +optional
 	ClusterNetworkMTU int `json:"clusterNetworkMTU,omitempty"`
 
 	// migration contains the cluster network migration configuration.
+	// +optional
 	Migration *NetworkMigration `json:"migration,omitempty"`
 
 	// conditions represents the observations of a network.config current state.
 	// Known .status.conditions.type are: "NetworkDiagnosticsAvailable"
 	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
 	// +openshift:enable:FeatureGate=NetworkDiagnosticsConfig
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // ClusterNetworkEntry is a contiguous block of IP addresses from which pod IPs

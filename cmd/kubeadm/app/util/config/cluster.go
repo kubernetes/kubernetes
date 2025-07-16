@@ -60,7 +60,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	}
 	_, _ = printer.Printf("[%s] Reading configuration from the %q ConfigMap in namespace %q...\n",
 		logPrefix, constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config --config your-config.yaml' to re-upload it.\n", logPrefix)
+	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config --config your-config-file' to re-upload it.\n", logPrefix)
 
 	// Fetch the actual config from cluster
 	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
@@ -214,7 +214,7 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 
 // getNodeNameFromKubeletConfig gets the node name from a kubelet config file
 // TODO: in future we want to switch to a more canonical way for doing this e.g. by having this
-// information in the local kubelet config.yaml
+// information in the local kubelet config configuration file.
 func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 	// loads the kubelet.conf file
 	config, err := clientcmd.LoadFromFile(fileName)

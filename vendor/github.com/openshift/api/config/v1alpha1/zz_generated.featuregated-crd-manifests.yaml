@@ -29,6 +29,7 @@ clusterimagepolicies.config.openshift.io:
   Category: ""
   FeatureGates:
   - SigstoreImageVerification
+  - SigstoreImageVerificationPKI
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
@@ -76,6 +77,7 @@ imagepolicies.config.openshift.io:
   Category: ""
   FeatureGates:
   - SigstoreImageVerification
+  - SigstoreImageVerificationPKI
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"

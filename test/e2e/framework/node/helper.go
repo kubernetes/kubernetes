@@ -188,10 +188,15 @@ func AddExtendedResource(ctx context.Context, clientSet clientset.Interface, nod
 	extendedResourceList := v1.ResourceList{
 		extendedResource: extendedResourceQuantity,
 	}
-	patchPayload, err := json.Marshal(v1.Node{
-		Status: v1.NodeStatus{
-			Capacity:    extendedResourceList,
-			Allocatable: extendedResourceList,
+
+	// This is a workaround for the fact that we shouldn't marshal a Node struct to JSON
+	// because it wipes out some fields from node status like the daemonEndpoints and
+	// nodeInfo which should not be changed at this time. We need to use a map instead.
+	// See https://github.com/kubernetes/kubernetes/issues/131229
+	patchPayload, err := json.Marshal(map[string]any{
+		"status": map[string]any{
+			"capacity":    extendedResourceList,
+			"allocatable": extendedResourceList,
 		},
 	})
 	framework.ExpectNoError(err, "Failed to marshal node JSON")

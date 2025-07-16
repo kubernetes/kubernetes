@@ -410,7 +410,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			name:   "pod's tolerations are updated",
 			newPod: st.MakePod().Toleration("key").Toleration("key2").Obj(),
 			oldPod: st.MakePod().Toleration("key").Obj(),
-			want:   []ClusterEvent{{Resource: unschedulablePod, ActionType: UpdatePodTolerations}},
+			want:   []ClusterEvent{{Resource: unschedulablePod, ActionType: UpdatePodToleration}},
 		},
 		{
 			name:        "pod claim statuses change, feature disabled",

@@ -178,6 +178,7 @@ func (p *HelmChartInflationGeneratorPlugin) runHelmCommand(
 	}
 	if err != nil {
 		helm := p.h.GeneralConfig().HelmConfig.Command
+		//nolint:govet
 		err = errors.WrapPrefixf(
 			fmt.Errorf(
 				"unable to run: '%s %s' with env=%s (is '%s' installed?): %w",
@@ -300,7 +301,7 @@ func (p *HelmChartInflationGeneratorPlugin) Generate() (rm resmap.ResMap, err er
 	}
 	// try to remove the contents before first "---" because
 	// helm may produce messages to stdout before it
-	r := &kio.ByteReader{Reader: bytes.NewBufferString(string(stdout)), OmitReaderAnnotations: true}
+	r := &kio.ByteReader{Reader: bytes.NewBuffer(stdout), OmitReaderAnnotations: true}
 	nodes, err := r.Read()
 	if err != nil {
 		return nil, fmt.Errorf("error reading helm output: %w", err)

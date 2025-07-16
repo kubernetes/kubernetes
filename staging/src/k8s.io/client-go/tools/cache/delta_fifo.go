@@ -55,6 +55,9 @@ type DeltaFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+
+	// If set, log output will go to this logger instead of klog.Background().
+	Logger *klog.Logger
 }
 
 // DeltaFIFO is like FIFO, but differs in two ways.  One is that the
@@ -136,6 +139,10 @@ type DeltaFIFO struct {
 
 	// Called with every object if non-nil.
 	transformer TransformFunc
+
+	// logger is a per-instance logger. This gets chosen when constructing
+	// the instance, with klog.Background() as default.
+	logger klog.Logger
 }
 
 // TransformFunc allows for transforming an object before it will be processed.
@@ -253,6 +260,10 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 
 		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
 		transformer:           opts.Transformer,
+		logger:                klog.Background(),
+	}
+	if opts.Logger != nil {
+		f.logger = *opts.Logger
 	}
 	f.cond.L = &f.lock
 	return f
@@ -358,43 +369,6 @@ func (f *DeltaFIFO) Delete(obj interface{}) error {
 	return f.queueActionLocked(Deleted, obj)
 }
 
-// AddIfNotPresent inserts an item, and puts it in the queue. If the item is already
-// present in the set, it is neither enqueued nor added to the set.
-//
-// This is useful in a single producer/consumer scenario so that the consumer can
-// safely retry items without contending with the producer and potentially enqueueing
-// stale items.
-//
-// Important: obj must be a Deltas (the output of the Pop() function). Yes, this is
-// different from the Add/Update/Delete functions.
-func (f *DeltaFIFO) AddIfNotPresent(obj interface{}) error {
-	deltas, ok := obj.(Deltas)
-	if !ok {
-		return fmt.Errorf("object must be of type deltas, but got: %#v", obj)
-	}
-	id, err := f.KeyOf(deltas)
-	if err != nil {
-		return KeyError{obj, err}
-	}
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.addIfNotPresent(id, deltas)
-	return nil
-}
-
-// addIfNotPresent inserts deltas under id if it does not exist, and assumes the caller
-// already holds the fifo lock.
-func (f *DeltaFIFO) addIfNotPresent(id string, deltas Deltas) {
-	f.populated = true
-	if _, exists := f.items[id]; exists {
-		return
-	}
-
-	f.queue = append(f.queue, id)
-	f.items[id] = deltas
-	f.cond.Broadcast()
-}
-
 // re-listing and watching can deliver the same update multiple times in any
 // order. This will combine the most recent two deltas if they are the same.
 func dedupDeltas(deltas Deltas) Deltas {
@@ -487,69 +461,14 @@ func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType Del
 		// when given a non-empty list (as it is here).
 		// If somehow it happens anyway, deal with it but complain.
 		if oldDeltas == nil {
-			klog.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; ignoring", id, oldDeltas, obj)
+			f.logger.Error(nil, "Impossible dedupDeltas, ignoring", "id", id, "oldDeltas", oldDeltas, "obj", obj)
 			return nil
 		}
-		klog.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; breaking invariant by storing empty Deltas", id, oldDeltas, obj)
+		f.logger.Error(nil, "Impossible dedupDeltas, breaking invariant by storing empty Deltas", "id", id, "oldDeltas", oldDeltas, "obj", obj)
 		f.items[id] = newDeltas
 		return fmt.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; broke DeltaFIFO invariant by storing empty Deltas", id, oldDeltas, obj)
 	}
 	return nil
-}
-
-// List returns a list of all the items; it returns the object
-// from the most recent Delta.
-// You should treat the items returned inside the deltas as immutable.
-func (f *DeltaFIFO) List() []interface{} {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	return f.listLocked()
-}
-
-func (f *DeltaFIFO) listLocked() []interface{} {
-	list := make([]interface{}, 0, len(f.items))
-	for _, item := range f.items {
-		list = append(list, item.Newest().Object)
-	}
-	return list
-}
-
-// ListKeys returns a list of all the keys of the objects currently
-// in the FIFO.
-func (f *DeltaFIFO) ListKeys() []string {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	list := make([]string, 0, len(f.queue))
-	for _, key := range f.queue {
-		list = append(list, key)
-	}
-	return list
-}
-
-// Get returns the complete list of deltas for the requested item,
-// or sets exists=false.
-// You should treat the items returned inside the deltas as immutable.
-func (f *DeltaFIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	key, err := f.KeyOf(obj)
-	if err != nil {
-		return nil, false, KeyError{obj, err}
-	}
-	return f.GetByKey(key)
-}
-
-// GetByKey returns the complete list of deltas for the requested item,
-// setting exists=false if that list is empty.
-// You should treat the items returned inside the deltas as immutable.
-func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	d, exists := f.items[key]
-	if exists {
-		// Copy item's slice so operations on this slice
-		// won't interfere with the object we return.
-		d = copyDeltas(d)
-	}
-	return d, exists, nil
 }
 
 // IsClosed checks if the queue is closed
@@ -565,9 +484,7 @@ func (f *DeltaFIFO) IsClosed() bool {
 // is returned, so if you don't successfully process it, you need to add it back
 // with AddIfNotPresent().
 // process function is called under lock, so it is safe to update data structures
-// in it that need to be in sync with the queue (e.g. knownKeys). The PopProcessFunc
-// may return an instance of ErrRequeue with a nested error to indicate the current
-// item should be requeued (equivalent to calling AddIfNotPresent under the lock).
+// in it that need to be in sync with the queue (e.g. knownKeys).
 // process should avoid expensive I/O operation so that other queue operations, i.e.
 // Add() and Get(), won't be blocked for too long.
 //
@@ -597,7 +514,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		item, ok := f.items[id]
 		if !ok {
 			// This should never happen
-			klog.Errorf("Inconceivable! %q was in f.queue but not f.items; ignoring.", id)
+			f.logger.Error(nil, "Inconceivable! Item was in f.queue but not f.items; ignoring", "id", id)
 			continue
 		}
 		delete(f.items, id)
@@ -614,10 +531,6 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			defer trace.LogIfLong(100 * time.Millisecond)
 		}
 		err := process(item, isInInitialList)
-		if e, ok := err.(ErrRequeue); ok {
-			f.addIfNotPresent(id, item)
-			err = e.Err
-		}
 		// Don't need to copyDeltas here, because we're transferring
 		// ownership to the caller.
 		return item, err
@@ -694,10 +607,10 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 			deletedObj, exists, err := f.knownObjects.GetByKey(k)
 			if err != nil {
 				deletedObj = nil
-				klog.Errorf("Unexpected error %v during lookup of key %v, placing DeleteFinalStateUnknown marker without object", err, k)
+				f.logger.Error(err, "Unexpected error during lookup, placing DeleteFinalStateUnknown marker without object", "key", k)
 			} else if !exists {
 				deletedObj = nil
-				klog.Infof("Key %v does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", k)
+				f.logger.Info("Key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", "key", k)
 			}
 			queuedDeletions++
 			if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
@@ -737,10 +650,10 @@ func (f *DeltaFIFO) Resync() error {
 func (f *DeltaFIFO) syncKeyLocked(key string) error {
 	obj, exists, err := f.knownObjects.GetByKey(key)
 	if err != nil {
-		klog.Errorf("Unexpected error %v during lookup of key %v, unable to queue object for sync", err, key)
+		f.logger.Error(err, "Unexpected error during lookup, unable to queue object for sync", "key", key)
 		return nil
 	} else if !exists {
-		klog.Infof("Key %v does not exist in known objects store, unable to queue object for sync", key)
+		f.logger.Info("Key does not exist in known objects store, unable to queue object for sync", "key", key)
 		return nil
 	}
 

@@ -113,6 +113,7 @@ const (
 	CPUManagerPinningErrorsTotalKey           = "cpu_manager_pinning_errors_total"
 	CPUManagerSharedPoolSizeMilliCoresKey     = "cpu_manager_shared_pool_size_millicores"
 	CPUManagerExclusiveCPUsAllocationCountKey = "cpu_manager_exclusive_cpu_allocation_count"
+	CPUManagerAllocationPerNUMAKey            = "cpu_manager_allocation_per_numa"
 
 	// Metrics to track the Memory manager behavior
 	MemoryManagerPinningRequestsTotalKey = "memory_manager_pinning_requests_total"
@@ -132,6 +133,7 @@ const (
 
 	// Metric for tracking aligment of compute resources
 	ContainerAlignedComputeResourcesNameKey          = "container_aligned_compute_resources_count"
+	ContainerAlignedComputeResourcesFailureNameKey   = "container_aligned_compute_resources_failure_count"
 	ContainerAlignedComputeResourcesScopeLabelKey    = "scope"
 	ContainerAlignedComputeResourcesBoundaryLabelKey = "boundary"
 
@@ -149,9 +151,15 @@ const (
 
 	AlignedPhysicalCPU = "physical_cpu"
 	AlignedNUMANode    = "numa_node"
+	AlignedUncoreCache = "uncore_cache"
 
 	// Metrics to track kubelet admission rejections.
 	AdmissionRejectionsTotalKey = "admission_rejections_total"
+
+	// Image Volume metrics
+	ImageVolumeRequestedTotalKey      = "image_volume_requested_total"
+	ImageVolumeMountedSucceedTotalKey = "image_volume_mounted_succeed_total"
+	ImageVolumeMountedErrorsTotalKey  = "image_volume_mounted_errors_total"
 )
 
 type imageSizeBucket struct {
@@ -808,6 +816,17 @@ var (
 		},
 	)
 
+	// CPUManagerAllocationPerNUMA tracks the count of CPUs allocated per NUMA node
+	CPUManagerAllocationPerNUMA = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CPUManagerAllocationPerNUMAKey,
+			Help:           "Number of CPUs allocated per NUMA node",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{AlignedNUMANode},
+	)
+
 	// ContainerAlignedComputeResources reports the count of resources allocation which granted aligned resources, per alignment boundary
 	ContainerAlignedComputeResources = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -818,7 +837,18 @@ var (
 		},
 		[]string{ContainerAlignedComputeResourcesScopeLabelKey, ContainerAlignedComputeResourcesBoundaryLabelKey},
 	)
-	// MemoryManagerPinningRequestTotal tracks the number of times the pod spec required the memory manager to pin memory pages
+
+	// ContainerAlignedComputeResourcesFailure reports the count of resources allocation attempts which failed to align resources, per alignment boundary
+	ContainerAlignedComputeResourcesFailure = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ContainerAlignedComputeResourcesFailureNameKey,
+			Help:           "Cumulative number of failures to allocate aligned compute resources to containers by alignment type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{ContainerAlignedComputeResourcesScopeLabelKey, ContainerAlignedComputeResourcesBoundaryLabelKey},
+	)
+
 	MemoryManagerPinningRequestTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1008,6 +1038,36 @@ var (
 		},
 		[]string{"reason"},
 	)
+
+	// ImageVolumeRequestedTotal trakcs the number of requested image volumes.
+	ImageVolumeRequestedTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImageVolumeRequestedTotalKey,
+			Help:           "Number of requested image volumes.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// ImageVolumeMountedSucceedTotal tracks the number of successful image volume mounts.
+	ImageVolumeMountedSucceedTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImageVolumeMountedSucceedTotalKey,
+			Help:           "Number of successful image volume mounts.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// ImageVolumeMountedErrorsTotal tracks the number of failed image volume mounts.
+	ImageVolumeMountedErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImageVolumeMountedErrorsTotalKey,
+			Help:           "Number of failed image volume mounts.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1078,7 +1138,9 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
 		legacyregistry.MustRegister(CPUManagerSharedPoolSizeMilliCores)
 		legacyregistry.MustRegister(CPUManagerExclusiveCPUsAllocationCount)
+		legacyregistry.MustRegister(CPUManagerAllocationPerNUMA)
 		legacyregistry.MustRegister(ContainerAlignedComputeResources)
+		legacyregistry.MustRegister(ContainerAlignedComputeResourcesFailure)
 		legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
 		legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
@@ -1107,6 +1169,12 @@ func Register(collectors ...metrics.StableCollector) {
 		}
 
 		legacyregistry.MustRegister(AdmissionRejectionsTotal)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
+			legacyregistry.MustRegister(ImageVolumeRequestedTotal)
+			legacyregistry.MustRegister(ImageVolumeMountedSucceedTotal)
+			legacyregistry.MustRegister(ImageVolumeMountedErrorsTotal)
+		}
 	})
 }
 

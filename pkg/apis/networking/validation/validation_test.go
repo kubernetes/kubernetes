@@ -25,8 +25,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -248,11 +251,27 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	// Success cases are expected to pass validation.
+	for _, v := range successCases {
+		t.Run("", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			if errs := ValidateNetworkPolicy(v, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) != 0 {
+				t.Errorf("Expected success, got %v", errs)
+			}
+		})
+	}
 
-	for k, v := range successCases {
-		if errs := ValidateNetworkPolicy(v, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) != 0 {
-			t.Errorf("Expected success for the success validation test number %d, got %v", k, errs)
-		}
+	legacyValidationCases := []*networking.NetworkPolicy{
+		makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
+			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "001.002.003.000/0"
+		}),
+	}
+	for _, v := range legacyValidationCases {
+		t.Run("", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
+			if errs := ValidateNetworkPolicy(v, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) != 0 {
+				t.Errorf("Expected success, got %v", errs)
+			}
+		})
 	}
 
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
@@ -299,6 +318,9 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		"invalid ipv6 cidr format": makeNetworkPolicyCustom(setIngressFromIPBlockIPV6, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "fd00:192:168::"
 		}),
+		"legacy cidr format with strict validation": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
+			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "001.002.003.000/0"
+		}),
 		"except field is an empty string": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.Except = []string{""}
 		}),
@@ -311,7 +333,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		"except IP is outside of CIDR range": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
 				CIDR:   "192.168.8.0/24",
-				Except: []string{"192.168.9.1/24"},
+				Except: []string{"192.168.9.1/32"},
 			}
 		}),
 		"except IP is not strictly within CIDR range": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
@@ -367,9 +389,12 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	// Error cases are not expected to pass validation.
 	for testName, networkPolicy := range errorCases {
-		if errs := ValidateNetworkPolicy(networkPolicy, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) == 0 {
-			t.Errorf("Expected failure for test: %s", testName)
-		}
+		t.Run(testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			if errs := ValidateNetworkPolicy(networkPolicy, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) == 0 {
+				t.Errorf("Expected failure")
+			}
+		})
 	}
 }
 
@@ -417,14 +442,98 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 				},
 			},
 		},
+		"fix pre-existing invalid CIDR": {
+			old: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.1/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+			update: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.0/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+		},
+		"fail to fix pre-existing invalid CIDR": {
+			old: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.1/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+			update: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.1.0/24",
+									"192.168.2.0/24",
+									"192.168.3.1/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+		},
 	}
 
 	for testName, successCase := range successCases {
-		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{false}); len(errs) != 0 {
-			t.Errorf("expected success (%s): %v", testName, errs)
-		}
+		t.Run(testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			successCase.old.ObjectMeta.ResourceVersion = "1"
+			successCase.update.ObjectMeta.ResourceVersion = "1"
+			if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{}); len(errs) != 0 {
+				t.Errorf("expected success, but got %v", errs)
+			}
+		})
 	}
 
 	errorCases := map[string]npUpdateTest{
@@ -444,14 +553,58 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 				},
 			},
 		},
+		"add new invalid CIDR": {
+			old: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.2.0/24",
+									"192.168.3.0/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+			update: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						From: []networking.NetworkPolicyPeer{{
+							IPBlock: &networking.IPBlock{
+								CIDR: "192.168.0.0/16",
+								Except: []string{
+									"192.168.1.1/24",
+									"192.168.2.0/24",
+									"192.168.3.0/24",
+								},
+							},
+						}},
+					}},
+				},
+			},
+		},
 	}
 
 	for testName, errorCase := range errorCases {
-		errorCase.old.ObjectMeta.ResourceVersion = "1"
-		errorCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{false}); len(errs) == 0 {
-			t.Errorf("expected failure: %s", testName)
-		}
+		t.Run(testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			errorCase.old.ObjectMeta.ResourceVersion = "1"
+			errorCase.update.ObjectMeta.ResourceVersion = "1"
+			if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{}); len(errs) == 0 {
+				t.Errorf("expected failure")
+			}
+		})
 	}
 }
 
@@ -1805,6 +1958,14 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 			},
 		},
 	}
+	legacyIP := newValid()
+	legacyIP.Status = networking.IngressStatus{
+		LoadBalancer: networking.IngressLoadBalancerStatus{
+			Ingress: []networking.IngressLoadBalancerIngress{
+				{IP: "001.002.003.004", Hostname: "foo.com"},
+			},
+		},
+	}
 	invalidHostname := newValid()
 	invalidHostname.Status = networking.IngressStatus{
 		LoadBalancer: networking.IngressLoadBalancerStatus{
@@ -1814,26 +1975,56 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 		},
 	}
 
-	errs := ValidateIngressStatusUpdate(&newValue, &oldValue)
-	if len(errs) != 0 {
-		t.Errorf("Unexpected error %v", errs)
+	successCases := map[string]struct {
+		oldValue  networking.Ingress
+		newValue  networking.Ingress
+		legacyIPs bool
+	}{
+		"success": {
+			oldValue: oldValue,
+			newValue: newValue,
+		},
+		"legacy IPs with legacy validation": {
+			oldValue:  oldValue,
+			newValue:  legacyIP,
+			legacyIPs: true,
+		},
+		"legacy IPs unchanged in update": {
+			oldValue: legacyIP,
+			newValue: legacyIP,
+		},
+	}
+	for k, tc := range successCases {
+		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
+
+			errs := ValidateIngressStatusUpdate(&tc.newValue, &tc.oldValue)
+			if len(errs) != 0 {
+				t.Errorf("Unexpected error %v", errs)
+			}
+		})
 	}
 
 	errorCases := map[string]networking.Ingress{
-		"status.loadBalancer.ingress[0].ip: Invalid value":       invalidIP,
-		"status.loadBalancer.ingress[0].hostname: Invalid value": invalidHostname,
+		"status.loadBalancer.ingress[0].ip: must be a valid IP address": invalidIP,
+		"status.loadBalancer.ingress[0].ip: must not have leading 0s":   legacyIP,
+		"status.loadBalancer.ingress[0].hostname: must be a DNS name":   invalidHostname,
 	}
 	for k, v := range errorCases {
-		errs := ValidateIngressStatusUpdate(&v, &oldValue)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		} else {
-			s := strings.Split(k, ":")
-			err := errs[0]
-			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %q, expected: %q", err, k)
+		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+
+			errs := ValidateIngressStatusUpdate(&v, &oldValue)
+			if len(errs) == 0 {
+				t.Errorf("expected failure")
+			} else {
+				s := strings.SplitN(k, ":", 2)
+				err := errs[0]
+				if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+					t.Errorf("unexpected error: %q, expected: %q", err, k)
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -2150,13 +2341,13 @@ func TestValidateServiceCIDR(t *testing.T) {
 			},
 		},
 		"badip-iprange-caps-ipv6": {
-			expectedErrors: 2,
+			expectedErrors: 1,
 			ipRange: &networking.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-name",
 				},
 				Spec: networking.ServiceCIDRSpec{
-					CIDRs: []string{"FD00:1234::2/64"},
+					CIDRs: []string{"FD00:1234::0/64"},
 				},
 			},
 		},
@@ -2182,6 +2373,17 @@ func TestValidateServiceCIDR(t *testing.T) {
 				},
 			},
 		},
+		"bad-iprange-ipv6-bad-ipv4": {
+			expectedErrors: 2,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					CIDRs: []string{"192.168.007.0/24", "MN00:1234::/64"},
+				},
+			},
+		},
 	}
 
 	for name, testCase := range testCases {
@@ -2195,9 +2397,27 @@ func TestValidateServiceCIDR(t *testing.T) {
 }
 
 func TestValidateServiceCIDRUpdate(t *testing.T) {
-	oldServiceCIDR := &networking.ServiceCIDR{
+	oldServiceCIDRv4 := &networking.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            "mysvc",
+			Name:            "mysvc-v4",
+			ResourceVersion: "1",
+		},
+		Spec: networking.ServiceCIDRSpec{
+			CIDRs: []string{"192.168.0.0/24"},
+		},
+	}
+	oldServiceCIDRv6 := &networking.ServiceCIDR{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "mysvc-v6",
+			ResourceVersion: "1",
+		},
+		Spec: networking.ServiceCIDRSpec{
+			CIDRs: []string{"fd00:1234::/64"},
+		},
+	}
+	oldServiceCIDRDual := &networking.ServiceCIDR{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "mysvc-dual",
 			ResourceVersion: "1",
 		},
 		Spec: networking.ServiceCIDRSpec{
@@ -2205,45 +2425,196 @@ func TestValidateServiceCIDRUpdate(t *testing.T) {
 		},
 	}
 
+	// Define expected immutable field error for convenience
+	cidrsPath := field.NewPath("spec").Child("cidrs")
+	cidr0Path := cidrsPath.Index(0)
+	cidr1Path := cidrsPath.Index(1)
+
 	testCases := []struct {
-		name      string
-		svc       func(svc *networking.ServiceCIDR) *networking.ServiceCIDR
-		expectErr bool
+		name         string
+		old          *networking.ServiceCIDR
+		new          *networking.ServiceCIDR
+		expectedErrs field.ErrorList
 	}{
 		{
-			name: "Successful update, no changes",
-			svc: func(svc *networking.ServiceCIDR) *networking.ServiceCIDR {
-				out := svc.DeepCopy()
-				return out
-			},
-			expectErr: false,
+			name: "Successful update, no changes (dual)",
+			old:  oldServiceCIDRDual,
+			new:  oldServiceCIDRDual.DeepCopy(),
 		},
-
 		{
-			name: "Failed update, update spec.CIDRs single stack",
-			svc: func(svc *networking.ServiceCIDR) *networking.ServiceCIDR {
-				out := svc.DeepCopy()
+			name: "Successful update, no changes (v4)",
+			old:  oldServiceCIDRv4,
+			new:  oldServiceCIDRv4.DeepCopy(),
+		},
+		{
+			name: "Successful update, single IPv4 to dual stack upgrade",
+			old:  oldServiceCIDRv4,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRv4.DeepCopy()
+				out.Spec.CIDRs = []string{"192.168.0.0/24", "fd00:1234::/64"} // Add IPv6
+				return out
+			}(),
+		},
+		{
+			name: "Successful update, single IPv6 to dual stack upgrade",
+			old:  oldServiceCIDRv6,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRv6.DeepCopy()
+				out.Spec.CIDRs = []string{"fd00:1234::/64", "192.168.0.0/24"} // Add IPv4
+				return out
+			}(),
+		},
+		{
+			name: "Failed update, change CIDRs (dual)",
+			old:  oldServiceCIDRDual,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRDual.DeepCopy()
+				out.Spec.CIDRs = []string{"10.0.0.0/16", "fd00:abcd::/64"}
+				return out
+			}(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(cidr0Path, "10.0.0.0/16", apimachineryvalidation.FieldImmutableErrorMsg),
+				field.Invalid(cidr1Path, "fd00:abcd::/64", apimachineryvalidation.FieldImmutableErrorMsg),
+			},
+		},
+		{
+			name: "Failed update, change CIDRs (single)",
+			old:  oldServiceCIDRv4,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRv4.DeepCopy()
 				out.Spec.CIDRs = []string{"10.0.0.0/16"}
 				return out
-			}, expectErr: true,
+			}(),
+			expectedErrs: field.ErrorList{field.Invalid(cidr0Path, "10.0.0.0/16", apimachineryvalidation.FieldImmutableErrorMsg)},
 		},
 		{
-			name: "Failed update, update spec.CIDRs dual stack",
-			svc: func(svc *networking.ServiceCIDR) *networking.ServiceCIDR {
-				out := svc.DeepCopy()
-				out.Spec.CIDRs = []string{"10.0.0.0/24", "fd00:1234::/64"}
+			name: "Failed update, single IPv4 to dual stack upgrade with primary change",
+			old:  oldServiceCIDRv4,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRv4.DeepCopy()
+				// Change primary CIDR during upgrade
+				out.Spec.CIDRs = []string{"10.0.0.0/16", "fd00:1234::/64"}
 				return out
-			}, expectErr: true,
+			}(),
+			expectedErrs: field.ErrorList{field.Invalid(cidr0Path, "10.0.0.0/16", apimachineryvalidation.FieldImmutableErrorMsg)},
+		},
+		{
+			name: "Failed update, single IPv6 to dual stack upgrade with primary change",
+			old:  oldServiceCIDRv6,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRv6.DeepCopy()
+				// Change primary CIDR during upgrade
+				out.Spec.CIDRs = []string{"fd00:abcd::/64", "192.168.0.0/24"}
+				return out
+			}(),
+			expectedErrs: field.ErrorList{field.Invalid(cidr0Path, "fd00:abcd::/64", apimachineryvalidation.FieldImmutableErrorMsg)},
+		},
+		{
+			name: "Failed update, dual stack downgrade to single",
+			old:  oldServiceCIDRDual,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRDual.DeepCopy()
+				out.Spec.CIDRs = []string{"192.168.0.0/24"} // Remove IPv6
+				return out
+			}(),
+			expectedErrs: field.ErrorList{field.Invalid(cidrsPath, []string{"192.168.0.0/24"}, apimachineryvalidation.FieldImmutableErrorMsg)},
+		},
+		{
+			name: "Failed update, dual stack reorder",
+			old:  oldServiceCIDRDual,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRDual.DeepCopy()
+				// Swap order
+				out.Spec.CIDRs = []string{"fd00:1234::/64", "192.168.0.0/24"}
+				return out
+			}(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(cidr0Path, "fd00:1234::/64", apimachineryvalidation.FieldImmutableErrorMsg),
+				field.Invalid(cidr1Path, "192.168.0.0/24", apimachineryvalidation.FieldImmutableErrorMsg),
+			},
+		},
+		{
+			name: "Failed update, add invalid CIDR during upgrade",
+			old:  oldServiceCIDRv4,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRv4.DeepCopy()
+				out.Spec.CIDRs = []string{"192.168.0.0/24", "invalid-cidr"}
+				return out
+			}(),
+			expectedErrs: field.ErrorList{field.Invalid(cidrsPath.Index(1), "invalid-cidr", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)")},
+		},
+		{
+			name: "Failed update, add duplicate family CIDR during upgrade",
+			old:  oldServiceCIDRv4,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRv4.DeepCopy()
+				out.Spec.CIDRs = []string{"192.168.0.0/24", "10.0.0.0/16"}
+				return out
+			}(),
+			expectedErrs: field.ErrorList{field.Invalid(cidrsPath, []string{"192.168.0.0/24", "10.0.0.0/16"}, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64")},
+		},
+		{
+			name: "Failed update, dual stack remove one cidr",
+			old:  oldServiceCIDRDual,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRDual.DeepCopy()
+				out.Spec.CIDRs = out.Spec.CIDRs[0:1]
+				return out
+			}(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(cidrsPath, []string{"192.168.0.0/24"}, apimachineryvalidation.FieldImmutableErrorMsg),
+			},
+		},
+		{
+			name: "Failed update, dual stack remove all cidrs",
+			old:  oldServiceCIDRDual,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRDual.DeepCopy()
+				out.Spec.CIDRs = []string{}
+				return out
+			}(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(cidrsPath, []string{}, apimachineryvalidation.FieldImmutableErrorMsg),
+			},
+		},
+		{
+			name: "Failed update, single stack remove cidr",
+			old:  oldServiceCIDRv4,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRv4.DeepCopy()
+				out.Spec.CIDRs = []string{}
+				return out
+			}(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(cidrsPath, []string{}, apimachineryvalidation.FieldImmutableErrorMsg),
+			},
+		},
+		{
+			name: "Failed update, add additional cidrs",
+			old:  oldServiceCIDRDual,
+			new: func() *networking.ServiceCIDR {
+				out := oldServiceCIDRDual.DeepCopy()
+				out.Spec.CIDRs = append(out.Spec.CIDRs, "172.16.0.0/24")
+				return out
+			}(),
+			expectedErrs: field.ErrorList{
+				field.Invalid(cidrsPath, []string{"192.168.0.0/24", "fd00:1234::/64", "172.16.0.0/24"}, apimachineryvalidation.FieldImmutableErrorMsg),
+			},
 		},
 	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			err := ValidateServiceCIDRUpdate(testCase.svc(oldServiceCIDR), oldServiceCIDR)
-			if !testCase.expectErr && err != nil {
-				t.Errorf("ValidateServiceCIDRUpdate must be successful for test '%s', got %v", testCase.name, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Ensure ResourceVersion is set for update validation
+			tc.new.ResourceVersion = tc.old.ResourceVersion
+			errs := ValidateServiceCIDRUpdate(tc.new, tc.old)
+
+			if len(errs) != len(tc.expectedErrs) {
+				t.Fatalf("Expected %d errors, got %d errors: %v", len(tc.expectedErrs), len(errs), errs)
 			}
-			if testCase.expectErr && err == nil {
-				t.Errorf("ValidateServiceCIDRUpdate must return error for test: %s, but got nil", testCase.name)
+			for i, expectedErr := range tc.expectedErrs {
+				if errs[i].Error() != expectedErr.Error() {
+					t.Errorf("Expected error %d: %v, got: %v", i, expectedErr, errs[i])
+				}
 			}
 		})
 	}

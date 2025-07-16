@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package modes_test
+package modes
 
 import (
 	"encoding"
 	"encoding/json"
+	"reflect"
+	"sync"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
 
 	"github.com/fxamacker/cbor/v2"
 )
@@ -132,7 +132,7 @@ func TestCheckUnsupportedMarshalers(t *testing.T) {
 			SafeCyclicTypeA{},
 			SafeCyclicTypeB{},
 		} {
-			if err := modes.RejectCustomMarshalers(v); err != nil {
+			if err := RejectCustomMarshalers(v); err != nil {
 				t.Errorf("%#v: unexpected non-nil error: %v", v, err)
 			}
 		}
@@ -161,9 +161,38 @@ func TestCheckUnsupportedMarshalers(t *testing.T) {
 			UnsafeCyclicTypeA{Bs: []UnsafeCyclicTypeB{{}}},
 			UnsafeCyclicTypeB{},
 		} {
-			if err := modes.RejectCustomMarshalers(v); err == nil {
+			if err := RejectCustomMarshalers(v); err == nil {
 				t.Errorf("%#v: unexpected nil error", v)
 			}
 		}
 	})
+}
+
+// With -test.race, retrieves a custom marshaler checker for a cyclic type concurrently from many
+// goroutines to root out data races in checker lazy initialization.
+func TestLazyCheckerInitializationDataRace(t *testing.T) {
+	cache := checkers{
+		cborInterface: reflect.TypeFor[cbor.Marshaler](),
+		nonCBORInterfaces: []reflect.Type{
+			reflect.TypeFor[json.Marshaler](),
+			reflect.TypeFor[encoding.TextMarshaler](),
+		},
+	}
+
+	rt := reflect.TypeFor[SafeCyclicTypeA]()
+
+	begin := make(chan struct{})
+
+	var wg sync.WaitGroup
+	for range 32 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-begin
+			cache.getChecker(rt)
+		}()
+	}
+
+	close(begin)
+	wg.Wait()
 }

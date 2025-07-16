@@ -366,6 +366,7 @@ message RouteStatus {
   // ingress points may contain duplicate Host or RouterName values. Routes
   // are considered live once they are `Ready`
   // +listType=atomic
+  // +optional
   repeated RouteIngress ingress = 1;
 }
 

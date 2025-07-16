@@ -94,7 +94,10 @@ func (g *graphPopulator) updatePod(oldObj, obj interface{}) {
 		return
 	}
 	if oldPod, ok := oldObj.(*corev1.Pod); ok && oldPod != nil {
+		// Ephemeral containers can add new secret or config map references to the pod.
+		hasNewEphemeralContainers := len(pod.Spec.EphemeralContainers) > len(oldPod.Spec.EphemeralContainers)
 		if (pod.Spec.NodeName == oldPod.Spec.NodeName) && (pod.UID == oldPod.UID) &&
+			!hasNewEphemeralContainers &&
 			resourceclaim.PodStatusEqual(oldPod.Status.ResourceClaimStatuses, pod.Status.ResourceClaimStatuses) {
 			// Node and uid are unchanged, all object references in the pod spec are immutable respectively unmodified (claim statuses).
 			klog.V(5).Infof("updatePod %s/%s, node unchanged", pod.Namespace, pod.Name)

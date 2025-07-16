@@ -28,10 +28,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // resourceSliceStrategy implements behavior for ResourceSlice objects
@@ -49,6 +51,8 @@ func (resourceSliceStrategy) NamespaceScoped() bool {
 func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	slice := obj.(*resource.ResourceSlice)
 	slice.Generation = 1
+
+	dropDisabledFields(slice, nil)
 }
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -75,6 +79,8 @@ func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	if !apiequality.Semantic.DeepEqual(oldSlice.Spec, slice.Spec) {
 		slice.Generation = oldSlice.Generation + 1
 	}
+
+	dropDisabledFields(slice, oldSlice)
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -96,7 +102,12 @@ var TriggerFunc = map[string]storage.IndexerFunc{
 }
 
 func nodeNameTriggerFunc(obj runtime.Object) string {
-	return obj.(*resource.ResourceSlice).Spec.NodeName
+	rs := obj.(*resource.ResourceSlice)
+	if rs.Spec.NodeName == nil {
+		return ""
+	} else {
+		return *rs.Spec.NodeName
+	}
 }
 
 // Indexers returns the indexers for ResourceSlice.
@@ -111,7 +122,10 @@ func nodeNameIndexFunc(obj interface{}) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("not a ResourceSlice")
 	}
-	return []string{slice.Spec.NodeName}, nil
+	if slice.Spec.NodeName == nil {
+		return []string{""}, nil
+	}
+	return []string{*slice.Spec.NodeName}, nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
@@ -141,9 +155,78 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
 	fields := make(fields.Set, 3)
-	fields[resource.ResourceSliceSelectorNodeName] = slice.Spec.NodeName
+	if slice.Spec.NodeName == nil {
+		fields[resource.ResourceSliceSelectorNodeName] = ""
+	} else {
+		fields[resource.ResourceSliceSelectorNodeName] = *slice.Spec.NodeName
+	}
 	fields[resource.ResourceSliceSelectorDriver] = slice.Spec.Driver
 
 	// Adds one field.
 	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)
+}
+
+// dropDisabledFields removes fields which are covered by a feature gate.
+func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
+	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
+	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
+}
+
+func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) || draDeviceTaintsFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].Taints = nil
+	}
+}
+
+func draDeviceTaintsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		if len(device.Taints) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices) || draPartitionableDevicesFeatureInUse(oldSlice) {
+		return
+	}
+
+	newSlice.Spec.SharedCounters = nil
+	newSlice.Spec.PerDeviceNodeSelection = nil
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].ConsumesCounters = nil
+		newSlice.Spec.Devices[i].NodeName = nil
+		newSlice.Spec.Devices[i].NodeSelector = nil
+		newSlice.Spec.Devices[i].AllNodes = nil
+	}
+}
+
+func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	spec := slice.Spec
+	if len(spec.SharedCounters) > 0 || spec.PerDeviceNodeSelection != nil {
+		return true
+	}
+
+	for _, device := range spec.Devices {
+		if len(device.ConsumesCounters) > 0 {
+			return true
+		}
+		if device.NodeName != nil || device.NodeSelector != nil || device.AllNodes != nil {
+			return true
+		}
+	}
+	return false
 }

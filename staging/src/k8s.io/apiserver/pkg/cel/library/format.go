@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/asaskevich/govalidator"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/decls"
 	"github.com/google/cel-go/common/types"
@@ -30,6 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
+)
+
+var (
+	// base64_length estimate for base64 regex size from github.com/asaskevich/govalidator
+	base64Length = 84
+	// url_length estimate for url regex size from github.com/asaskevich/govalidator
+	urlLength = 1103
 )
 
 // Format provides a CEL library exposing common named Kubernetes string
@@ -193,7 +199,7 @@ var ConstantFormats = map[string]apiservercel.Format{
 		},
 		// Use govalidator url regex to estimate, since ParseRequestURI
 		// doesnt use regex
-		MaxRegexSize: len(govalidator.URL),
+		MaxRegexSize: urlLength,
 	},
 	"uuid": {
 		Name: "uuid",
@@ -213,7 +219,7 @@ var ConstantFormats = map[string]apiservercel.Format{
 			}
 			return nil
 		},
-		MaxRegexSize: len(govalidator.Base64),
+		MaxRegexSize: base64Length,
 	},
 	"date": {
 		Name: "date",

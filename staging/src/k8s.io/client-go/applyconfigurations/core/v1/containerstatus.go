@@ -39,6 +39,7 @@ type ContainerStatusApplyConfiguration struct {
 	VolumeMounts             []VolumeMountStatusApplyConfiguration   `json:"volumeMounts,omitempty"`
 	User                     *ContainerUserApplyConfiguration        `json:"user,omitempty"`
 	AllocatedResourcesStatus []ResourceStatusApplyConfiguration      `json:"allocatedResourcesStatus,omitempty"`
+	StopSignal               *corev1.Signal                          `json:"stopSignal,omitempty"`
 }
 
 // ContainerStatusApplyConfiguration constructs a declarative configuration of the ContainerStatus type for use with
@@ -166,5 +167,13 @@ func (b *ContainerStatusApplyConfiguration) WithAllocatedResourcesStatus(values 
 		}
 		b.AllocatedResourcesStatus = append(b.AllocatedResourcesStatus, *values[i])
 	}
+	return b
+}
+
+// WithStopSignal sets the StopSignal field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the StopSignal field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithStopSignal(value corev1.Signal) *ContainerStatusApplyConfiguration {
+	b.StopSignal = &value
 	return b
 }

@@ -21,9 +21,9 @@ package testing
 
 import (
 	"fmt"
-	"k8s.io/utils/net"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/net"
 )
 
 // FakeNetlinkHandle mock implementation of proxy NetlinkHandle

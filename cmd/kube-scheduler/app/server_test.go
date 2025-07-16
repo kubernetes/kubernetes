@@ -29,19 +29,18 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/feature"
+	basecompatibility "k8s.io/component-base/compatibility"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	utilversion "k8s.io/component-base/version"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -221,19 +220,6 @@ leaderElection:
 		wantErr              bool
 		wantFeaturesGates    map[string]bool
 	}{
-		{
-			name: "default config with an alpha feature enabled",
-			flags: []string{
-				"--kubeconfig", configKubeconfig,
-				"--feature-gates=VolumeCapacityPriority=true",
-			},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": defaults.ExpandedPluginsV1,
-			},
-			restoreFeatures: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: false,
-			},
-		},
 		{
 			name: "component configuration v1 with only scheduler name configured",
 			flags: []string{
@@ -434,29 +420,22 @@ leaderElection:
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			for k, v := range tc.restoreFeatures {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
-			}
-			componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
-			t.Cleanup(func() {
-				componentGlobalsRegistry.Reset()
-			})
-			componentGlobalsRegistry.Reset()
-			verKube := utilversion.NewEffectiveVersion("1.32")
+			componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
+			verKube := basecompatibility.NewEffectiveVersionFromString("1.32", "1.31", "1.31")
 			fg := feature.DefaultFeatureGate.DeepCopy()
 			utilruntime.Must(fg.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
 				"kubeA": {
-					{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 					{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+					{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 				},
 				"kubeB": {
 					{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 				},
 			}))
-			utilruntime.Must(componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, verKube, fg))
+			utilruntime.Must(componentGlobalsRegistry.Register(basecompatibility.DefaultKubeComponent, verKube, fg))
 
 			fs := pflag.NewFlagSet("test", pflag.PanicOnError)
-			opts := options.NewOptions()
+			opts := options.NewOptionsWithComponentGlobalsRegistry(componentGlobalsRegistry)
 
 			// use listeners instead of static ports so parallel test runs don't conflict
 			opts.SecureServing.Listener = makeListener(t)

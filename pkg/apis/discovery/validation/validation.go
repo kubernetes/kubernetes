@@ -18,8 +18,10 @@ package validation
 
 import (
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,24 +30,26 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/discovery"
+	netutils "k8s.io/utils/net"
 )
 
 var (
-	supportedAddressTypes = sets.NewString(
-		string(discovery.AddressTypeIPv4),
-		string(discovery.AddressTypeIPv6),
-		string(discovery.AddressTypeFQDN),
+	supportedAddressTypes = sets.New(
+		discovery.AddressTypeIPv4,
+		discovery.AddressTypeIPv6,
+		discovery.AddressTypeFQDN,
 	)
-	supportedPortProtocols = sets.NewString(
-		string(api.ProtocolTCP),
-		string(api.ProtocolUDP),
-		string(api.ProtocolSCTP),
+	supportedPortProtocols = sets.New(
+		api.ProtocolTCP,
+		api.ProtocolUDP,
+		api.ProtocolSCTP,
 	)
 	maxTopologyLabels = 16
 	maxAddresses      = 100
 	maxPorts          = 20000
 	maxEndpoints      = 1000
 	maxZoneHints      = 8
+	maxNodeHints      = 8
 )
 
 // ValidateEndpointSliceName can be used to check whether the given endpoint
@@ -54,23 +58,34 @@ var (
 var ValidateEndpointSliceName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateEndpointSlice validates an EndpointSlice.
-func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice) field.ErrorList {
+func ValidateEndpointSlice(endpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&endpointSlice.ObjectMeta, true, ValidateEndpointSliceName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateAddressType(endpointSlice.AddressType)...)
-	allErrs = append(allErrs, validateEndpoints(endpointSlice.Endpoints, endpointSlice.AddressType, field.NewPath("endpoints"))...)
 	allErrs = append(allErrs, validatePorts(endpointSlice.Ports, field.NewPath("ports"))...)
+
+	endpointsErrs := validateEndpoints(endpointSlice.Endpoints, endpointSlice.AddressType, field.NewPath("endpoints"))
+	if len(endpointsErrs) != 0 {
+		// If this is an update, and Endpoints was unchanged, then ignore the
+		// validation errors, since apparently older versions of Kubernetes
+		// considered the data valid. (We only check this after getting a
+		// validation error since Endpoints may be large and DeepEqual is slow.)
+		if oldEndpointSlice != nil && apiequality.Semantic.DeepEqual(oldEndpointSlice.Endpoints, endpointSlice.Endpoints) {
+			endpointsErrs = nil
+		}
+	}
+	allErrs = append(allErrs, endpointsErrs...)
 
 	return allErrs
 }
 
 // ValidateEndpointSliceCreate validates an EndpointSlice when it is created.
 func ValidateEndpointSliceCreate(endpointSlice *discovery.EndpointSlice) field.ErrorList {
-	return ValidateEndpointSlice(endpointSlice)
+	return ValidateEndpointSlice(endpointSlice, nil)
 }
 
 // ValidateEndpointSliceUpdate validates an EndpointSlice when it is updated.
 func ValidateEndpointSliceUpdate(newEndpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
-	allErrs := ValidateEndpointSlice(newEndpointSlice)
+	allErrs := ValidateEndpointSlice(newEndpointSlice, oldEndpointSlice)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType"))...)
 
 	return allErrs
@@ -99,11 +114,25 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 			// and do not get validated.
 			switch addrType {
 			case discovery.AddressTypeIPv4:
-				allErrs = append(allErrs, validation.IsValidIPv4Address(addressPath.Index(i), address)...)
-				allErrs = append(allErrs, apivalidation.ValidateNonSpecialIP(address, addressPath.Index(i))...)
+				ipErrs := apivalidation.IsValidIPForLegacyField(addressPath.Index(i), address, nil)
+				if len(ipErrs) > 0 {
+					allErrs = append(allErrs, ipErrs...)
+				} else {
+					if !netutils.IsIPv4String(address) {
+						allErrs = append(allErrs, field.Invalid(addressPath, address, "must be an IPv4 address"))
+					}
+					allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
+				}
 			case discovery.AddressTypeIPv6:
-				allErrs = append(allErrs, validation.IsValidIPv6Address(addressPath.Index(i), address)...)
-				allErrs = append(allErrs, apivalidation.ValidateNonSpecialIP(address, addressPath.Index(i))...)
+				ipErrs := validation.IsValidIP(addressPath.Index(i), address)
+				if len(ipErrs) > 0 {
+					allErrs = append(allErrs, ipErrs...)
+				} else {
+					if !netutils.IsIPv6String(address) {
+						allErrs = append(allErrs, field.Invalid(addressPath, address, "must be an IPv6 address"))
+					}
+					allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
+				}
 			case discovery.AddressTypeFQDN:
 				allErrs = append(allErrs, validation.IsFullyQualifiedDomainName(addressPath.Index(i), address)...)
 			}
@@ -145,7 +174,9 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		return allErrs
 	}
 
-	portNames := sets.String{}
+	// Even though a sets.Set would be more idiomatic, we use a []string here to avoid
+	// extra allocations (especially since there are presumably only a few ports anyway).
+	portNames := make([]string, 0, len(endpointPorts))
 	for i, endpointPort := range endpointPorts {
 		idxPath := fldPath.Index(i)
 
@@ -153,16 +184,16 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 			allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(*endpointPort.Name, idxPath.Child("name"))...)
 		}
 
-		if portNames.Has(*endpointPort.Name) {
+		if slices.Contains(portNames, *endpointPort.Name) {
 			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), endpointPort.Name))
 		} else {
-			portNames.Insert(*endpointPort.Name)
+			portNames = append(portNames, *endpointPort.Name)
 		}
 
 		if endpointPort.Protocol == nil {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
-		} else if !supportedPortProtocols.Has(string(*endpointPort.Protocol)) {
-			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), *endpointPort.Protocol, supportedPortProtocols.List()))
+		} else if !supportedPortProtocols.Has(*endpointPort.Protocol) {
+			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), *endpointPort.Protocol, sets.List(supportedPortProtocols)))
 		}
 
 		if endpointPort.AppProtocol != nil {
@@ -178,8 +209,8 @@ func validateAddressType(addressType discovery.AddressType) field.ErrorList {
 
 	if addressType == "" {
 		allErrs = append(allErrs, field.Required(field.NewPath("addressType"), ""))
-	} else if !supportedAddressTypes.Has(string(addressType)) {
-		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, supportedAddressTypes.List()))
+	} else if !supportedAddressTypes.Has(addressType) {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("addressType"), addressType, sets.List(supportedAddressTypes)))
 	}
 
 	return allErrs
@@ -194,17 +225,39 @@ func validateHints(endpointHints *discovery.EndpointHints, fldPath *field.Path) 
 		return allErrs
 	}
 
-	zoneNames := sets.String{}
+	// Even though a sets.Set would be more idiomatic, we use a []string here to avoid
+	// extra allocations (especially since there is normally only one zone anyway).
+	zoneNames := make([]string, 0, len(endpointHints.ForZones))
 	for i, forZone := range endpointHints.ForZones {
 		zonePath := fzPath.Index(i).Child("name")
-		if zoneNames.Has(forZone.Name) {
+		if slices.Contains(zoneNames, forZone.Name) {
 			allErrs = append(allErrs, field.Duplicate(zonePath, forZone.Name))
 		} else {
-			zoneNames.Insert(forZone.Name)
+			zoneNames = append(zoneNames, forZone.Name)
 		}
 
 		for _, msg := range validation.IsValidLabelValue(forZone.Name) {
 			allErrs = append(allErrs, field.Invalid(zonePath, forZone.Name, msg))
+		}
+	}
+
+	fnPath := fldPath.Child("forNodes")
+	if len(endpointHints.ForNodes) > maxNodeHints {
+		allErrs = append(allErrs, field.TooMany(fnPath, len(endpointHints.ForNodes), maxNodeHints))
+		return allErrs
+	}
+
+	nodeNames := make([]string, 0, len(endpointHints.ForNodes))
+	for i, forNode := range endpointHints.ForNodes {
+		nodePath := fnPath.Index(i).Child("name")
+		if slices.Contains(nodeNames, forNode.Name) {
+			allErrs = append(allErrs, field.Duplicate(nodePath, forNode.Name))
+		} else {
+			nodeNames = append(nodeNames, forNode.Name)
+		}
+
+		for _, msg := range apivalidation.ValidateNodeName(forNode.Name, false) {
+			allErrs = append(allErrs, field.Invalid(nodePath, forNode.Name, msg))
 		}
 	}
 

@@ -208,9 +208,11 @@ type SubjectRulesReviewSpec struct {
 // SubjectRulesReviewStatus is contains the result of a rules check
 type SubjectRulesReviewStatus struct {
 	// rules is the list of rules (no particular sort) that are allowed for the subject
+	// +optional
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,1,rep,name=rules"`
 	// evaluationError can appear in combination with Rules.  It means some error happened during evaluation
 	// that may have prevented additional rules from being populated.
+	// +optional
 	EvaluationError string `json:"evaluationError,omitempty" protobuf:"bytes,2,opt,name=evaluationError"`
 }
 

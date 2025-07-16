@@ -86,6 +86,7 @@ ginkgo \
   --output-interceptor-mode=none \
   -nodes "${NODES}" -no-color ${KUBE_E2E_TEST_ARGS} \
   "$( which k8s-e2e.test )" -- \
+  -node-os-distro "custom" \
   -report-dir "${test_report_dir}" \
   -host "${SERVER}" \
   -allowed-not-ready-nodes ${unschedulable} \

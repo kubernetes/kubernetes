@@ -177,7 +177,6 @@ func (h *groupSnapshotHostpathCSIDriver) PrepareTest(ctx context.Context, f *fra
 	// Create secondary namespace which will be used for creating driver
 	driverNamespace := utils.CreateDriverNamespace(ctx, f)
 	driverns := driverNamespace.Name
-	testns := f.Namespace.Name
 
 	ginkgo.By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
 	cancelLogging := utils.StartPodLogs(ctx, f, driverNamespace)
@@ -276,7 +275,6 @@ func (h *groupSnapshotHostpathCSIDriver) PrepareTest(ctx context.Context, f *fra
 	cleanupFunc := generateDriverCleanupFunc(
 		f,
 		h.driverInfo.Name,
-		testns,
 		driverns,
 		cancelLogging)
 	ginkgo.DeferCleanup(cleanupFunc)

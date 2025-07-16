@@ -258,7 +258,7 @@ func (pl *FakePreScoreAndScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *FakePreScoreAndScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (pl *FakePreScoreAndScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	return pl.score, pl.scoreStatus
 }
 

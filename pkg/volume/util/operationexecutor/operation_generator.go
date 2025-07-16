@@ -584,6 +584,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			FsGroup:             fsGroup,
 			DesiredSize:         volumeToMount.DesiredSizeLimit,
 			FSGroupChangePolicy: fsGroupChangePolicy,
+			Recorder:            og.recorder,
 			SELinuxLabel:        volumeToMount.SELinuxLabel,
 		})
 		// Update actual state of world
@@ -1473,6 +1474,13 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 				}
 				actualStateOfWorld.InitializeClaimSize(logger, volumeToMount.VolumeName, claimSize)
 				return volumetypes.NewOperationContext(nil, nil, migrated)
+			}
+		}
+
+		// Volume is not attached - check if this is due to resource exhaustion before returning the error
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+			if attachablePlugin, pluginErr := og.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec); pluginErr == nil && attachablePlugin != nil {
+				attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec, nodeName)
 			}
 		}
 

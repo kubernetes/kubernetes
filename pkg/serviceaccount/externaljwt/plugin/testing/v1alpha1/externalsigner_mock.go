@@ -161,9 +161,10 @@ func (m *MockSigner) FetchKeys(ctx context.Context, req *v1alpha1.FetchKeysReque
 	m.supportedKeysFetched.Broadcast()
 	m.supportedKeysLock.RUnlock()
 
+	now := time.Now()
 	return &v1alpha1.FetchKeysResponse{
 		RefreshHintSeconds: 5,
-		DataTimestamp:      &timestamppb.Timestamp{Seconds: time.Now().Unix()},
+		DataTimestamp:      &timestamppb.Timestamp{Seconds: now.Unix(), Nanos: int32(now.Nanosecond())},
 		Keys:               keys,
 	}, nil
 }

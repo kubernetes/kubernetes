@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/jwt"
+	"gopkg.in/go-jose/go-jose.v2/jwt"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -440,7 +440,7 @@ func TestTokenCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 
 			// Re-seed to reset name generation
 			utilrand.Seed(1)
@@ -455,7 +455,7 @@ func TestTokenCreation(t *testing.T) {
 			secretInformer := informers.Core().V1().Secrets().Informer()
 			secrets := secretInformer.GetStore()
 			serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
-			controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+			controller, err := NewTokensController(logger, informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
 			if err != nil {
 				t.Fatalf("error creating Tokens controller: %v", err)
 			}

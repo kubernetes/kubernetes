@@ -20,6 +20,7 @@ package v2
 
 import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
 // HPAScalingRulesApplyConfiguration represents a declarative configuration of the HPAScalingRules type for use
@@ -28,6 +29,7 @@ type HPAScalingRulesApplyConfiguration struct {
 	StabilizationWindowSeconds *int32                               `json:"stabilizationWindowSeconds,omitempty"`
 	SelectPolicy               *autoscalingv2.ScalingPolicySelect   `json:"selectPolicy,omitempty"`
 	Policies                   []HPAScalingPolicyApplyConfiguration `json:"policies,omitempty"`
+	Tolerance                  *resource.Quantity                   `json:"tolerance,omitempty"`
 }
 
 // HPAScalingRulesApplyConfiguration constructs a declarative configuration of the HPAScalingRules type for use with
@@ -62,5 +64,13 @@ func (b *HPAScalingRulesApplyConfiguration) WithPolicies(values ...*HPAScalingPo
 		}
 		b.Policies = append(b.Policies, *values[i])
 	}
+	return b
+}
+
+// WithTolerance sets the Tolerance field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Tolerance field is set to the value of the last call.
+func (b *HPAScalingRulesApplyConfiguration) WithTolerance(value resource.Quantity) *HPAScalingRulesApplyConfiguration {
+	b.Tolerance = &value
 	return b
 }

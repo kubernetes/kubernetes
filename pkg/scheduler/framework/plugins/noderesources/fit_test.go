@@ -19,7 +19,6 @@ package noderesources
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -47,6 +46,10 @@ var (
 	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
 	hugePageResourceA     = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
 )
+
+var clusterEventCmpOpts = []cmp.Option{
+	cmpopts.EquateComparable(framework.ClusterEvent{}),
+}
 
 func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.ResourceList {
 	return v1.ResourceList{
@@ -542,6 +545,45 @@ func TestEnoughRequests(t *testing.T) {
 		},
 		{
 			podLevelResourcesEnabled: true,
+			pod: newPodLevelResourcesPod(
+				newResourcePod(),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("2"), hugePageResourceA: *resource.NewQuantity(5, resource.BinarySI)},
+				},
+			),
+			nodeInfo:                  framework.NewNodeInfo(),
+			name:                      "pod-level hugepages resource fit",
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			podLevelResourcesEnabled: true,
+			pod: newPodLevelResourcesPod(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}}),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("2"), hugePageResourceA: *resource.NewQuantity(5, resource.BinarySI)},
+				},
+			),
+			nodeInfo:                  framework.NewNodeInfo(),
+			name:                      "both pod-level and container-level hugepages resource fit",
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			podLevelResourcesEnabled: true,
+			pod: newPodLevelResourcesPod(
+				newResourcePod(),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("2"), hugePageResourceA: *resource.NewQuantity(10, resource.BinarySI)},
+				},
+			),
+			nodeInfo:   framework.NewNodeInfo(),
+			name:       "pod-level hugepages resource not fit",
+			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(hugePageResourceA)),
+			wantInsufficientResources: []InsufficientResource{
+				{ResourceName: hugePageResourceA, Reason: getErrReason(hugePageResourceA), Requested: 10, Used: 0, Capacity: 5},
+			},
+		},
+		{
+			podLevelResourcesEnabled: true,
 			pod: newResourceInitPod(newPodLevelResourcesPod(
 				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
 				v1.ResourceRequirements{
@@ -584,13 +626,13 @@ func TestEnoughRequests(t *testing.T) {
 			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("status does not match (-want,+got):\n%s", diff)
 			}
 
 			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod, ResourceRequestsOptions{EnablePodLevelResources: test.podLevelResourcesEnabled}), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
-			if !reflect.DeepEqual(gotInsufficientResources, test.wantInsufficientResources) {
-				t.Errorf("insufficient resources do not match: %+v, want: %v", gotInsufficientResources, test.wantInsufficientResources)
+			if diff := cmp.Diff(test.wantInsufficientResources, gotInsufficientResources); diff != "" {
+				t.Errorf("insufficient resources do not match (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -610,9 +652,9 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterNodeResourcesFit" from cycleState: %w`, framework.ErrNotFound))
-	if !reflect.DeepEqual(gotStatus, wantStatus) {
-		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	wantStatus := framework.AsStatus(framework.ErrNotFound)
+	if diff := cmp.Diff(wantStatus, gotStatus); diff != "" {
+		t.Errorf("status does not match (-want,+got):\n%s", diff)
 	}
 }
 
@@ -668,8 +710,8 @@ func TestNotEnoughRequests(t *testing.T) {
 			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("status does not match (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -729,8 +771,8 @@ func TestStorageRequests(t *testing.T) {
 			}
 
 			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("status does not match (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -1103,14 +1145,18 @@ func TestFitScore(t *testing.T) {
 						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 					}
 				}
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
+				nodeInfo, err := snapshot.Get(n.Name)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", n.Name, err)
+				}
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
 				gotPriorities = append(gotPriorities, framework.NodeScore{Name: n.Name, Score: score})
 			}
 
-			if !reflect.DeepEqual(test.expectedPriorities, gotPriorities) {
+			if diff := cmp.Diff(test.expectedPriorities, gotPriorities); diff != "" {
 				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedPriorities, gotPriorities)
 			}
 		})
@@ -1218,12 +1264,16 @@ func BenchmarkTestFitScore(b *testing.B) {
 			var nodeResourcesFunc = runtime.FactoryAdapter(plfeature.Features{}, NewFit)
 			pl := plugintesting.SetupPlugin(ctx, b, nodeResourcesFunc, &test.nodeResourcesFitArgs, cache.NewSnapshot(existingPods, nodes))
 			p := pl.(*Fit)
+			nodeInfo, err := p.handle.SnapshotSharedLister().NodeInfos().Get(nodes[0].Name)
+			if err != nil {
+				b.Errorf("failed to get node %q from snapshot: %v", nodes[0].Name, err)
+			}
 
 			b.ResetTimer()
 
 			requestedPod := st.MakePod().Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj()
 			for i := 0; i < b.N; i++ {
-				_, status := p.Score(ctx, state, requestedPod, nodes[0].Name)
+				_, status := p.Score(ctx, state, requestedPod, nodeInfo)
 				if !status.IsSuccess() {
 					b.Errorf("unexpected status: %v", status)
 				}
@@ -1276,7 +1326,7 @@ func TestEventsToRegister(t *testing.T) {
 			for i := range actualClusterEvents {
 				actualClusterEvents[i].QueueingHintFn = nil
 			}
-			if diff := cmp.Diff(test.expectedClusterEvents, actualClusterEvents, cmpopts.EquateComparable(framework.ClusterEvent{})); diff != "" {
+			if diff := cmp.Diff(test.expectedClusterEvents, actualClusterEvents, clusterEventCmpOpts...); diff != "" {
 				t.Error("Cluster Events doesn't match extected events (-expected +actual):\n", diff)
 			}
 		})
@@ -1536,8 +1586,25 @@ func TestIsFit(t *testing.T) {
 			pod: st.MakePod().Resources(
 				v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
 			).Obj(),
-			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
-			expected: true,
+			node:                     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			podLevelResourcesEnabled: true,
+			expected:                 true,
+		},
+		"sufficient pod-level resource hugepages": {
+			pod: st.MakePod().Resources(
+				v1.ResourceRequirements{Requests: v1.ResourceList{hugePageResourceA: resource.MustParse("2Mi")}},
+			).Obj(),
+			node:                     st.MakeNode().Capacity(map[v1.ResourceName]string{hugePageResourceA: "2Mi"}).Obj(),
+			podLevelResourcesEnabled: true,
+			expected:                 true,
+		},
+		"insufficient pod-level resource hugepages": {
+			pod: st.MakePod().Resources(
+				v1.ResourceRequirements{Requests: v1.ResourceList{hugePageResourceA: resource.MustParse("4Mi")}},
+			).Obj(),
+			node:                     st.MakeNode().Capacity(map[v1.ResourceName]string{hugePageResourceA: "2Mi"}).Obj(),
+			podLevelResourcesEnabled: true,
+			expected:                 false,
 		},
 	}
 

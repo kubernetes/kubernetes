@@ -179,9 +179,11 @@ func (t ExtraValue) String() string {
 type TemplateInstanceStatus struct {
 	// conditions represent the latest available observations of a
 	// TemplateInstance's current state.
+	// +optional
 	Conditions []TemplateInstanceCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// objects references the objects created by the TemplateInstance.
+	// +optional
 	Objects []TemplateInstanceObject `json:"objects,omitempty" protobuf:"bytes,2,rep,name=objects"`
 }
 

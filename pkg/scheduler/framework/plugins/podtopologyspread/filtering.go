@@ -19,6 +19,7 @@ package podtopologyspread
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,7 +32,7 @@ import (
 const preFilterStateKey = "PreFilter" + Name
 
 // preFilterState computed at PreFilter and used at Filter.
-// It combines TpKeyToCriticalPaths and TpPairToMatchNum to represent:
+// It combines CriticalPaths and TpValueToMatchNum to represent:
 // (1) critical paths where the least pods are matched on each spread constraint.
 // (2) number of pods matched on each spread constraint.
 // A nil preFilterState denotes it's not set at all (in PreFilter phase);
@@ -39,29 +40,23 @@ const preFilterStateKey = "PreFilter" + Name
 // Fields are exported for comparison during testing.
 type preFilterState struct {
 	Constraints []topologySpreadConstraint
-	// We record 2 critical paths instead of all critical paths here.
-	// criticalPaths[0].MatchNum always holds the minimum matching number.
-	// criticalPaths[1].MatchNum is always greater or equal to criticalPaths[0].MatchNum, but
+	// CriticalPaths is a slice indexed by constraint index.
+	// Per each entry, we record 2 critical paths instead of all critical paths.
+	// CriticalPaths[i][0].MatchNum always holds the minimum matching number.
+	// CriticalPaths[i][1].MatchNum is always greater or equal to CriticalPaths[i][0].MatchNum, but
 	// it's not guaranteed to be the 2nd minimum match number.
-	TpKeyToCriticalPaths map[string]*criticalPaths
-	// TpKeyToDomainsNum is keyed with topologyKey, and valued with the number of domains.
-	TpKeyToDomainsNum map[string]int
-	// TpPairToMatchNum is keyed with topologyPair, and valued with the number of matching pods.
-	TpPairToMatchNum map[topologyPair]int
+	CriticalPaths []*criticalPaths
+	// TpValueToMatchNum is a slice indexed by constraint index.
+	// Each entry is keyed with topology value, and valued with the number of matching pods.
+	TpValueToMatchNum []map[string]int
 }
 
 // minMatchNum returns the global minimum for the calculation of skew while taking MinDomains into account.
-func (s *preFilterState) minMatchNum(tpKey string, minDomains int32) (int, error) {
-	paths, ok := s.TpKeyToCriticalPaths[tpKey]
-	if !ok {
-		return 0, fmt.Errorf("failed to retrieve path by topology key")
-	}
+func (s *preFilterState) minMatchNum(constraintID int, minDomains int32) (int, error) {
+	paths := s.CriticalPaths[constraintID]
 
 	minMatchNum := paths[0].MatchNum
-	domainsNum, ok := s.TpKeyToDomainsNum[tpKey]
-	if !ok {
-		return 0, fmt.Errorf("failed to retrieve the number of domains by topology key")
-	}
+	domainsNum := len(s.TpValueToMatchNum[constraintID])
 
 	if domainsNum < int(minDomains) {
 		// When the number of eligible domains with matching topology keys is less than `minDomains`,
@@ -79,17 +74,15 @@ func (s *preFilterState) Clone() framework.StateData {
 	}
 	copy := preFilterState{
 		// Constraints are shared because they don't change.
-		Constraints:          s.Constraints,
-		TpKeyToCriticalPaths: make(map[string]*criticalPaths, len(s.TpKeyToCriticalPaths)),
-		// The number of domains does not change as a result of AddPod/RemovePod methods on PreFilter Extensions
-		TpKeyToDomainsNum: s.TpKeyToDomainsNum,
-		TpPairToMatchNum:  make(map[topologyPair]int, len(s.TpPairToMatchNum)),
+		Constraints:       s.Constraints,
+		CriticalPaths:     make([]*criticalPaths, len(s.CriticalPaths)),
+		TpValueToMatchNum: make([]map[string]int, len(s.TpValueToMatchNum)),
 	}
-	for tpKey, paths := range s.TpKeyToCriticalPaths {
-		copy.TpKeyToCriticalPaths[tpKey] = &criticalPaths{paths[0], paths[1]}
+	for i, paths := range s.CriticalPaths {
+		copy.CriticalPaths[i] = &criticalPaths{paths[0], paths[1]}
 	}
-	for tpPair, matchNum := range s.TpPairToMatchNum {
-		copy.TpPairToMatchNum[tpPair] = matchNum
+	for i, tpMap := range s.TpValueToMatchNum {
+		copy.TpValueToMatchNum[i] = maps.Clone(tpMap)
 	}
 	return &copy
 }
@@ -200,7 +193,7 @@ func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemp
 	}
 
 	podLabelSet := labels.Set(updatedPod.Labels)
-	for _, constraint := range s.Constraints {
+	for i, constraint := range s.Constraints {
 		if !constraint.Selector.Matches(podLabelSet) {
 			continue
 		}
@@ -210,10 +203,9 @@ func (pl *PodTopologySpread) updateWithPod(s *preFilterState, updatedPod, preemp
 			continue
 		}
 
-		k, v := constraint.TopologyKey, node.Labels[constraint.TopologyKey]
-		pair := topologyPair{key: k, value: v}
-		s.TpPairToMatchNum[pair] += delta
-		s.TpKeyToCriticalPaths[k].update(v, s.TpPairToMatchNum[pair])
+		v := node.Labels[constraint.TopologyKey]
+		s.TpValueToMatchNum[i][v] += delta
+		s.CriticalPaths[i].update(v, s.TpValueToMatchNum[i][v])
 	}
 }
 
@@ -232,6 +224,12 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 	return s, nil
 }
 
+type topologyCount struct {
+	topologyValue string
+	constraintID  int
+	count         int
+}
+
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
 func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod) (*preFilterState, error) {
 	constraints, err := pl.getConstraints(pod)
@@ -248,15 +246,18 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 	}
 
 	s := preFilterState{
-		Constraints:          constraints,
-		TpKeyToCriticalPaths: make(map[string]*criticalPaths, len(constraints)),
-		TpPairToMatchNum:     make(map[topologyPair]int, sizeHeuristic(len(allNodes), constraints)),
+		Constraints:       constraints,
+		CriticalPaths:     make([]*criticalPaths, len(constraints)),
+		TpValueToMatchNum: make([]map[string]int, len(constraints)),
+	}
+	for i := 0; i < len(constraints); i++ {
+		s.TpValueToMatchNum[i] = make(map[string]int, sizeHeuristic(len(allNodes), constraints[i]))
 	}
 
-	tpCountsByNode := make([]map[topologyPair]int, len(allNodes))
+	tpCountsByNode := make([][]topologyCount, len(allNodes))
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
-	processNode := func(i int) {
-		nodeInfo := allNodes[i]
+	processNode := func(n int) {
+		nodeInfo := allNodes[n]
 		node := nodeInfo.Node()
 
 		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
@@ -272,38 +273,39 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 			return
 		}
 
-		tpCounts := make(map[topologyPair]int, len(constraints))
-		for _, c := range constraints {
+		tpCounts := make([]topologyCount, 0, len(constraints))
+		for i, c := range constraints {
 			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
 				!c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity) {
 				continue
 			}
 
-			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
+			value := node.Labels[c.TopologyKey]
 			count := countPodsMatchSelector(nodeInfo.Pods, c.Selector, pod.Namespace)
-			tpCounts[pair] = count
+			tpCounts = append(tpCounts, topologyCount{
+				topologyValue: value,
+				constraintID:  i,
+				count:         count,
+			})
 		}
-		tpCountsByNode[i] = tpCounts
+		tpCountsByNode[n] = tpCounts
 	}
 	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
 
 	for _, tpCounts := range tpCountsByNode {
-		for tp, count := range tpCounts {
-			s.TpPairToMatchNum[tp] += count
+		// tpCounts might not hold all the constraints, so index can't be used here as constraintID.
+		for _, tpCount := range tpCounts {
+			s.TpValueToMatchNum[tpCount.constraintID][tpCount.topologyValue] += tpCount.count
 		}
 	}
-	s.TpKeyToDomainsNum = make(map[string]int, len(constraints))
-	for tp := range s.TpPairToMatchNum {
-		s.TpKeyToDomainsNum[tp.key]++
-	}
 
-	// calculate min match for each topology pair
+	// calculate min match for each constraint and topology value
 	for i := 0; i < len(constraints); i++ {
-		key := constraints[i].TopologyKey
-		s.TpKeyToCriticalPaths[key] = newCriticalPaths()
-	}
-	for pair, num := range s.TpPairToMatchNum {
-		s.TpKeyToCriticalPaths[pair.key].update(pair.value, num)
+		s.CriticalPaths[i] = newCriticalPaths()
+
+		for value, num := range s.TpValueToMatchNum[i] {
+			s.CriticalPaths[i].update(value, num)
+		}
 	}
 
 	return &s, nil
@@ -325,19 +327,19 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 
 	logger := klog.FromContext(ctx)
 	podLabelSet := labels.Set(pod.Labels)
-	for _, c := range s.Constraints {
+	for i, c := range s.Constraints {
 		tpKey := c.TopologyKey
-		tpVal, ok := node.Labels[c.TopologyKey]
+		tpVal, ok := node.Labels[tpKey]
 		if !ok {
-			logger.V(5).Info("Node doesn't have required label", "node", klog.KObj(node), "label", tpKey)
+			logger.V(5).Info("Node doesn't have required topology label for spread constraint", "node", klog.KObj(node), "topologyKey", tpKey)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
 		}
 
 		// judging criteria:
 		// 'existing matching num' + 'if self-match (1 or 0)' - 'global minimum' <= 'maxSkew'
-		minMatchNum, err := s.minMatchNum(tpKey, c.MinDomains)
+		minMatchNum, err := s.minMatchNum(i, c.MinDomains)
 		if err != nil {
-			logger.Error(err, "Internal error occurred while retrieving value precalculated in PreFilter", "topologyKey", tpKey, "paths", s.TpKeyToCriticalPaths)
+			logger.Error(err, "Internal error occurred while retrieving value precalculated in PreFilter", "topologyKey", tpKey, "paths", s.CriticalPaths[i])
 			continue
 		}
 
@@ -346,11 +348,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 			selfMatchNum = 1
 		}
 
-		pair := topologyPair{key: tpKey, value: tpVal}
-		matchNum := 0
-		if tpCount, ok := s.TpPairToMatchNum[pair]; ok {
-			matchNum = tpCount
-		}
+		matchNum := s.TpValueToMatchNum[i][tpVal]
 		skew := matchNum + selfMatchNum - minMatchNum
 		if skew > int(c.MaxSkew) {
 			logger.V(5).Info("Node failed spreadConstraint: matchNum + selfMatchNum - minMatchNum > maxSkew", "node", klog.KObj(node), "topologyKey", tpKey, "matchNum", matchNum, "selfMatchNum", selfMatchNum, "minMatchNum", minMatchNum, "maxSkew", c.MaxSkew)
@@ -361,11 +359,9 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	return nil
 }
 
-func sizeHeuristic(nodes int, constraints []topologySpreadConstraint) int {
-	for _, c := range constraints {
-		if c.TopologyKey == v1.LabelHostname {
-			return nodes
-		}
+func sizeHeuristic(nodes int, constraint topologySpreadConstraint) int {
+	if constraint.TopologyKey == v1.LabelHostname {
+		return nodes
 	}
 	return 0
 }

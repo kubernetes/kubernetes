@@ -53,6 +53,8 @@ type ClusterOperatorStatus struct {
 	// conditions describes the state of the operator's managed and monitored components.
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	// +optional
 	Conditions []ClusterOperatorStatusCondition `json:"conditions,omitempty"  patchStrategy:"merge" patchMergeKey:"type"`
 

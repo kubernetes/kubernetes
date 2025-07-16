@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -77,7 +78,7 @@ var _ = common.SIGDescribe("DNS", func() {
 
 	// Added due to #8512. This is critical for GCE and GKE deployments.
 	ginkgo.It("should provide DNS for the cluster [Provider:GCE]", func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce")
 
 		namesToResolve := []string{"google.com"}
 		// Windows containers do not have a route to the GCE metadata server by default.
@@ -628,8 +629,7 @@ var _ = common.SIGDescribe("DNS", func() {
 	})
 })
 
-// TODO replace WithLabel by framework.WithFeatureGate(features.RelaxedDNSSearchValidation) once https://github.com/kubernetes/kubernetes/pull/126977 is solved
-var _ = common.SIGDescribe("DNS", feature.RelaxedDNSSearchValidation, framework.WithLabel("Feature:Alpha"), func() {
+var _ = common.SIGDescribe("DNS", feature.RelaxedDNSSearchValidation, framework.WithFeatureGate(features.RelaxedDNSSearchValidation), func() {
 	f := framework.NewDefaultFramework("dns")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

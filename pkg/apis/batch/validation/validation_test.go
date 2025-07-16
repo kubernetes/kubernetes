@@ -48,7 +48,7 @@ var (
 	timeZoneEmptySpace = " "
 )
 
-var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
+var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail", "Origin")
 
 func getValidManualSelector() *metav1.LabelSelector {
 	return &metav1.LabelSelector{

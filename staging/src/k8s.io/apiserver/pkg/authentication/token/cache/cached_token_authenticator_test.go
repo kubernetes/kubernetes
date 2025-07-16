@@ -552,7 +552,6 @@ func withAudit(ctx context.Context) context.Context {
 }
 
 func TestUnsafeConversions(t *testing.T) {
-	t.Parallel()
 
 	// needs to be large to force allocations so we pick a random value between [1024, 2048]
 	size := utilrand.IntnRange(1024, 2048+1)
@@ -574,7 +573,6 @@ func TestUnsafeConversions(t *testing.T) {
 	})
 
 	t.Run("toBytes allocations", func(t *testing.T) {
-		t.Parallel()
 
 		s := utilrand.String(size)
 		f := func() {
@@ -606,7 +604,6 @@ func TestUnsafeConversions(t *testing.T) {
 	})
 
 	t.Run("toString allocations", func(t *testing.T) {
-		t.Parallel()
 
 		b := make([]byte, size)
 		if _, err := rand.Read(b); err != nil {

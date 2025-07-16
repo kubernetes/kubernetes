@@ -45,31 +45,41 @@ func TestNewBuilder(t *testing.T) {
 		wantedSchema      string
 		wantedItemsSchema string
 
-		v2 bool // produce OpenAPIv2
+		v2                bool // produce OpenAPIv2
+		includeSelectable bool // include selectable fields
+		version           string
 	}{
 		{
 			"nil",
 			"",
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`, `{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+			false,
+			"v1",
 		},
 		{"with properties",
 			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+			false,
+			"v1",
 		},
 		{"type only",
 			`{"type":"object"}`,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+			false,
+			"v1",
 		},
 		{"preserve unknown at root v2",
 			`{"type":"object","x-kubernetes-preserve-unknown-fields":true}`,
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+			false,
+			"v1",
 		},
 		{"with extensions",
 			`
@@ -173,6 +183,17 @@ func TestNewBuilder(t *testing.T) {
 }`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
 			true,
+			false,
+			"v1",
+		},
+		{
+			"include selectable fields with different version",
+			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v2"}]}`,
+			`{"$ref":"#/definitions/io.k8s.bar.v2.Foo"}`,
+			true,
+			true,
+			"v2",
 		},
 	}
 	for _, tt := range tests {
@@ -212,7 +233,7 @@ func TestNewBuilder(t *testing.T) {
 					},
 					Scope: apiextensionsv1.NamespaceScoped,
 				},
-			}, "v1", schema, Options{V2: tt.v2})
+			}, tt.version, schema, Options{V2: tt.v2, IncludeSelectableFields: tt.includeSelectable})
 
 			var wantedSchema, wantedItemsSchema spec.Schema
 			if err := json.Unmarshal([]byte(tt.wantedSchema), &wantedSchema); err != nil {
