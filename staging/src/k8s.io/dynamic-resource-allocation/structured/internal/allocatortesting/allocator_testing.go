@@ -637,7 +637,11 @@ func TestAllocator(t *testing.T,
 		node             *v1.Node
 
 		expectResults []any
-		expectError   types.GomegaMatcher // can be used to check for no error or match specific error types
+		expectError   types.GomegaMatcher // can be used to check for no error or match specific error
+
+		// Test case setting expectNumAllocateOneInvocations do not run against the "stable" variant of the allocator,
+		// which doesn't provide the stats and also falls over with excessive runtime for them.
+		expectNumAllocateOneInvocations int64
 	}{
 
 		"empty": {},
@@ -3487,6 +3491,67 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req1, driverA, pool1, device1, false),
 			)},
 		},
+		"prioritized-list-max-allocation-limit-request": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, resourceapi.AllocationResultsMaxSize),
+						subRequest(subReq1, classA, resourceapi.AllocationResultsMaxSize/2),
+					),
+					requestWithPrioritizedList(req1,
+						subRequest(subReq0, classA, resourceapi.AllocationResultsMaxSize),
+						subRequest(subReq1, classA, resourceapi.AllocationResultsMaxSize/2),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices:  unwrap(sliceWithMultipleDevices(slice1, node1, pool1, driverA, resourceapi.AllocationResultsMaxSize*2)),
+			node:    node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				slices.Concat(
+					multipleDeviceAllocationResults(req0SubReq1, driverA, pool1, resourceapi.AllocationResultsMaxSize/2, 0),
+					multipleDeviceAllocationResults(req1SubReq1, driverA, pool1, resourceapi.AllocationResultsMaxSize/2, resourceapi.AllocationResultsMaxSize/2),
+				)...,
+			)},
+			expectNumAllocateOneInvocations: 75,
+		},
+		"prioritized-list-max-allocation-allocation-mode-all": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					requestWithPrioritizedList(req0,
+						resourceapi.DeviceSubRequest{
+							Name:            subReq0,
+							AllocationMode:  resourceapi.DeviceAllocationModeAll,
+							DeviceClassName: classA,
+						},
+						subRequest(subReq1, classA, 2),
+					),
+					request(req1, classB, 2),
+				),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: unwrap(
+				sliceWithMultipleDevices(slice1, node1, pool1, driverA, resourceapi.AllocationResultsMaxSize-1),
+				sliceWithMultipleDevices(slice2, node1, pool2, driverB, 2),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, "device-0", false),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, "device-1", false),
+				deviceAllocationResult(req1, driverB, pool2, "device-0", false),
+				deviceAllocationResult(req1, driverB, pool2, "device-1", false),
+			)},
+			expectNumAllocateOneInvocations: 42,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -3517,6 +3582,10 @@ func TestAllocator(t *testing.T,
 			allocator, err := newAllocator(ctx, tc.features, unwrap(claimsToAllocate...), sets.New(allocatedDevices...), classLister, slices, cel.NewCache(1))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
+			if _, ok := allocator.(internal.AllocatorExtended); tc.expectNumAllocateOneInvocations > 0 && !ok {
+				t.Skipf("%T does not support the AllocatorStats interface", allocator)
+			}
+
 			results, err := allocator.Allocate(ctx, tc.node)
 			matchError := tc.expectError
 			if matchError == nil {
@@ -3530,6 +3599,11 @@ func TestAllocator(t *testing.T,
 			g.Expect(allocatedDevices).To(gomega.HaveExactElements(tc.allocatedDevices))
 			g.Expect(slices).To(gomega.ConsistOf(tc.slices))
 			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
+
+			if tc.expectNumAllocateOneInvocations > 0 {
+				stats := allocator.(internal.AllocatorExtended).GetStats()
+				g.Expect(stats.NumAllocateOneInvocations).To(gomega.Equal(tc.expectNumAllocateOneInvocations))
+			}
 		})
 	}
 }

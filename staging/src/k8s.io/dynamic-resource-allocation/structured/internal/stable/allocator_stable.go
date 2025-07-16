@@ -39,6 +39,7 @@ import (
 type DeviceClassLister = internal.DeviceClassLister
 type Features = internal.Features
 type DeviceID = internal.DeviceID
+type Stats = internal.Stats
 
 func MakeDeviceID(driver, pool, device string) DeviceID {
 	return internal.MakeDeviceID(driver, pool, device)
@@ -359,6 +360,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	}
 
 	return result, nil
+}
+
+func (a *Allocator) GetStats() *Stats {
+	// Not implemented.
+	return nil
 }
 
 func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentRequest requestAccessor, requestKey requestIndices, pools []*Pool) (requestData, error) {
