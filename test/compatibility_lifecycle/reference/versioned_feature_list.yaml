@@ -969,6 +969,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: NominatedNodeNameForExpectation
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: OpenAPIEnums
   versionedSpecs:
   - default: false
