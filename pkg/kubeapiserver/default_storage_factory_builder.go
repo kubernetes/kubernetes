@@ -81,8 +81,8 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
 		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
 		coordination.Resource("leasecandidates").WithVersion("v1beta1"),
-		admissionregistration.Resource("mutatingadmissionpolicies").WithVersion("v1beta1"),
-		admissionregistration.Resource("mutatingadmissionpolicybindings").WithVersion("v1beta1"),
+		admissionregistration.Resource("mutatingadmissionpolicies").WithVersion("v1alpha1"),
+		admissionregistration.Resource("mutatingadmissionpolicybindings").WithVersion("v1alpha1"),
 		certificates.Resource("clustertrustbundles").WithVersion("v1beta1"),
 		storage.Resource("volumeattributesclasses").WithVersion("v1beta1"),
 		storagemigration.Resource("storagemigrations").WithVersion("v1alpha1"),

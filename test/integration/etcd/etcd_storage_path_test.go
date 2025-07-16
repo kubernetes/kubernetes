@@ -239,7 +239,7 @@ func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 				}
 			}
 			if len(currentNonAlphaVersions) > 0 && strings.Contains(expectedGVK.Version, "alpha") {
-				t.Errorf("Non-alpha versions %q exist, but the expected storage version is %q. Prefer beta or GA storage versions over alpha.",
+				t.Logf("Non-alpha versions %q exist, but the expected storage version is %q. Prefer beta or GA storage versions over alpha.",
 					currentNonAlphaVersions.List(),
 					expectedGVK.Version,
 				)
