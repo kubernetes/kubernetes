@@ -417,34 +417,11 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 		true,
 		vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
 
-	if err != nil && utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
-		volumesToMount := vm.desiredStateOfWorld.GetVolumesToMount()
-		// Iterate through the desired volumes to find the specific ones for this pod that failed.
-		for _, volumeToMount := range volumesToMount {
-			if volumeToMount.PodName != uniquePodName {
-				continue
-			}
-			// If the volume is already mounted, it wasn't the cause of the timeout.
-			if _, found := vm.actualStateOfWorld.GetMountedVolumeForPodByOuterVolumeSpecName(uniquePodName, volumeToMount.OuterVolumeSpecName); found {
-				continue
-			}
-			attachablePlugin, findErr := vm.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
-			if findErr != nil || attachablePlugin == nil {
-				// This volume type doesn't support the attachable interface, so we can skip our check.
-				continue
-			}
-			if attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec) {
-				// Return error to the kubelet, which will then trigger the pod termination logic.
-				return ErrVolumeAttachLimitExceeded
-			}
-		}
-	}
-
 	if err != nil {
 		unmountedVolumes :=
 			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
 		// Also get unattached volumes and volumes not in dsw for error message
-		unattachedVolumes :=
+		unattachedVolumeMounts :=
 			vm.getUnattachedVolumes(uniquePodName)
 		volumesNotInDSW :=
 			vm.getVolumesNotInDSW(uniquePodName, expectedVolumes)
@@ -452,6 +429,26 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 		if len(unmountedVolumes) == 0 {
 			return nil
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+			for _, volumeToMount := range unattachedVolumeMounts {
+				attachablePlugin, findErr := vm.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+				if findErr != nil || attachablePlugin == nil {
+					// This volume type doesn't support the attachable interface, so we can skip our check.
+					continue
+				}
+				if attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec) {
+					// Return error to the kubelet, which will then trigger the pod termination logic.
+					return ErrVolumeAttachLimitExceeded
+				}
+			}
+		}
+
+		unattachedVolumes := []string{}
+		for _, volumeToMount := range unattachedVolumeMounts {
+			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
+		}
+		slices.Sort(unattachedVolumes)
 
 		return fmt.Errorf(
 			"unmounted volumes=%v, unattached volumes=%v, failed to process volumes=%v: %w",
@@ -534,17 +531,15 @@ func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, e
 
 // getUnattachedVolumes returns a list of the volumes that are expected to be attached but
 // are not currently attached to the node
-func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName) []string {
-	unattachedVolumes := []string{}
+func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName) []cache.VolumeToMount {
+	unattachedVolumes := []cache.VolumeToMount{}
 	for _, volumeToMount := range vm.desiredStateOfWorld.GetVolumesToMount() {
 		if volumeToMount.PodName == uniquePodName &&
 			volumeToMount.PluginIsAttachable &&
 			!vm.actualStateOfWorld.VolumeExists(volumeToMount.VolumeName) {
-			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
+			unattachedVolumes = append(unattachedVolumes, volumeToMount)
 		}
 	}
-	slices.Sort(unattachedVolumes)
-
 	return unattachedVolumes
 }
 
