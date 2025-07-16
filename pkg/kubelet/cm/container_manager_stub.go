@@ -148,6 +148,7 @@ func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
 }
 
 func (cm *containerManagerStub) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+	// TODO: Replace with real context during container manager migration.
 	return topologymanager.NewFakeManager(context.TODO())
 }
 
