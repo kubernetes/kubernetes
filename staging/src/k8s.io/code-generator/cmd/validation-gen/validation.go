@@ -627,9 +627,9 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		context := validators.Context{
 			Scope:      validators.ScopeField,
 			Type:       childType,
-			ParentPath: fldPath,
-			Member:     &memb,
 			Path:       childPath,
+			Member:     &memb,
+			ParentPath: fldPath,
 		}
 
 		tags, err := td.validator.ExtractTags(context, memb.CommentLines)

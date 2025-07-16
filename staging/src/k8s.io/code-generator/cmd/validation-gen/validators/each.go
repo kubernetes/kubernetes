@@ -401,13 +401,15 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	switch nt.Kind {
 	case types.Slice, types.Array, types.Map:
 	default:
-		return Validations{}, fmt.Errorf("can only be used on list or map types (%s)", t.Kind)
+		return Validations{}, fmt.Errorf("can only be used on list or map types (%s)", nt.Kind)
 	}
 
 	elemContext := Context{
+		// Scope is initialized below.
 		Type:       nt.Elem,
+		Path:       context.Path.Key("(vals)"),
+		Member:     nil, // NA for list/map values
 		ParentPath: context.Path,
-		Path:       context.Path.Key("*"),
 	}
 	switch nt.Kind {
 	case types.Slice, types.Array:
@@ -571,16 +573,18 @@ var (
 
 func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	t := util.NativeType(context.Type)
-	if t.Kind != types.Map {
-		return Validations{}, fmt.Errorf("can only be used on map types (%s)", t.Kind)
+	t := context.Type
+	nt := util.NativeType(t)
+	if nt.Kind != types.Map {
+		return Validations{}, fmt.Errorf("can only be used on map types (%s)", nt.Kind)
 	}
 
 	elemContext := Context{
 		Scope:      ScopeMapKey,
-		Type:       t.Elem,
+		Type:       nt.Elem,
+		Path:       context.Path.Key("(keys)"),
+		Member:     nil, // NA for map keys
 		ParentPath: context.Path,
-		Path:       context.Path.Child("(keys)"),
 	}
 
 	if validations, err := ektv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
@@ -595,12 +599,13 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 }
 
 func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Validations) (Validations, error) {
+	nt := util.NativeType(t)
 	result := Validations{}
 	result.OpaqueKeyType = validations.OpaqueType
 	for _, vfn := range validations.Functions {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{vfn, t.Key}).WithComments(comm...)
+		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{vfn, nt.Key}).WithComments(comm...)
 		result.AddFunction(f)
 	}
 	return result, nil
