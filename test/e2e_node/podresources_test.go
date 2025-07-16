@@ -993,7 +993,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 
 				ginkgo.Context("with KubeletPodResourcesGet feature gate enabled", func() {
 					ginkgo.BeforeEach(func() {
-						framework.SkipUnlessFeatureGateEnabled("KubeletPodResourcesGet")
+						e2eskipper.SkipUnlessFeatureGateEnabled("KubeletPodResourcesGet")
 					})
 
 					ginkgo.It("should succeed when calling Get for a valid pod", func(ctx context.Context) {
@@ -1002,7 +1002,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 
 						cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 						framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
-						defer conn.Close()
+						defer framework.ExpectNoError(conn.Close())
 
 						ginkgo.By("checking Get succeeds when the feature gate is enabled")
 						pd := podDesc{
@@ -1013,7 +1013,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 						pod := makePodResourcesTestPod(pd)
 						pod = e2epod.NewPodClient(f).Create(ctx, pod)
 						defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Running", 2*time.Minute, testutils.PodRunning)
+						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
 						framework.ExpectNoError(err)
 
 						res, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{
@@ -1028,7 +1028,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 						container := res.PodResources.Containers[0]
 						gomega.Expect(container.Name).To(gomega.Equal(pd.cntName), "expected container name match")
 						gomega.Expect(container.CpuIds).ToNot(gomega.BeEmpty(), "expected CPU IDs to be reported")
-						gomega.Expect(len(container.CpuIds)).To(gomega.Equal(pd.CpuRequestExclusive()), "expected one exclusive CPU")
+						gomega.Expect(container.CpuIds).To(gomega.HaveLen(pd.CpuRequestExclusive()), "expected one exclusive CPU")
 						gomega.Expect(container.Devices).To(gomega.BeEmpty(), "expected no devices")
 					})
 				})
