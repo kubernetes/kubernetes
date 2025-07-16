@@ -40,6 +40,8 @@ type StatefulSetValidationOptions struct {
 	AllowInvalidServiceName bool
 	// Skip validating pod template spec, which is used for StatefulSet update
 	SkipValidatePodTemplateSpec bool
+	// Skip validating volume claim templates, which is used for StatefulSet update
+	SkipValidateVolumeClaimTemplates bool
 }
 
 // ValidateStatefulSetName can be used to check whether the given StatefulSet name is valid.
@@ -112,6 +114,15 @@ func volumesToAddForTemplates(spec *apps.StatefulSetSpec) map[string]api.Volume 
 	return volumes
 }
 
+func validateVolumeClaimTemplates(volumeClaimTemplates []api.PersistentVolumeClaim, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	opts := apivalidation.ValidationOptionsForPersistentVolumeClaimCreate()
+	for i, pvc := range volumeClaimTemplates {
+		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeClaimSpec(&pvc.Spec, fldPath.Index(i).Child("spec"), opts)...)
+	}
+	return allErrs
+}
+
 // ValidateStatefulSetSpec tests if required fields in the StatefulSet spec are set.
 func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, opts apivalidation.PodValidationOptions, setOpts StatefulSetValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -150,6 +161,9 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 	}
 
 	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(spec.PersistentVolumeClaimRetentionPolicy, fldPath.Child("persistentVolumeClaimRetentionPolicy"))...)
+	if !setOpts.SkipValidateVolumeClaimTemplates {
+		allErrs = append(allErrs, validateVolumeClaimTemplates(spec.VolumeClaimTemplates, fldPath.Child("volumeClaimTemplates"))...)
+	}
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
@@ -230,7 +244,8 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 	// would need to pass update validation.  Name can't change anyway.
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
 	setOpts := StatefulSetValidationOptions{
-		AllowInvalidServiceName: true, // serviceName is immutable, tolerate existing invalid names on update
+		AllowInvalidServiceName:          true, // serviceName is immutable, tolerate existing invalid names on update
+		SkipValidateVolumeClaimTemplates: true, // volumeClaimTemplates are immutable, tolerate previously persisted invalid values on update
 	}
 	// In order to tolerate the existing sts, we choose to skip the validation error of old sts podTemplateSpec.
 	if len(ValidateStatefulSetSpec(&oldStatefulSet.Spec, nil, opts, setOpts)) > 0 {

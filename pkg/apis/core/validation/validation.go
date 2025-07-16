@@ -2185,12 +2185,16 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 	EnableVolumeAttributesClass bool
 }
 
-func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
-	opts := PersistentVolumeClaimSpecValidationOptions{
+func ValidationOptionsForPersistentVolumeClaimCreate() PersistentVolumeClaimSpecValidationOptions {
+	return PersistentVolumeClaimSpecValidationOptions{
 		EnableRecoverFromExpansionFailure: utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
 		AllowInvalidLabelValueInSelector:  false,
 		EnableVolumeAttributesClass:       utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
 	}
+}
+
+func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
+	opts := ValidationOptionsForPersistentVolumeClaimCreate()
 	if oldPvc == nil {
 		// If there's no old PVC, use the options based solely on feature enablement
 		return opts
