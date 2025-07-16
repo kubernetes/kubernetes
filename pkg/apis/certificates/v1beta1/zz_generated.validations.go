@@ -92,7 +92,7 @@ func Validate_CertificateSigningRequestList(ctx context.Context, op operation.Op
 	return errs
 }
 
-var zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1beta1_CertificateSigningRequestStatus_Conditions_ = validate.NewUnionMembership([2]string{"Conditions[{\"type\": \"Approved\"}]", ""}, [2]string{"Conditions[{\"type\": \"Denied\"}]", ""})
+var zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1beta1_CertificateSigningRequestStatus_conditions_ = validate.NewUnionMembership([2]string{"conditions[{\"type\": \"Approved\"}]", ""}, [2]string{"conditions[{\"type\": \"Denied\"}]", ""})
 
 func Validate_CertificateSigningRequestStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *certificatesv1beta1.CertificateSigningRequestStatus) (errs field.ErrorList) {
 	// field certificatesv1beta1.CertificateSigningRequestStatus.Conditions
@@ -104,7 +104,7 @@ func Validate_CertificateSigningRequestStatus(ctx context.Context, op operation.
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1beta1_CertificateSigningRequestStatus_Conditions_, func(list []certificatesv1beta1.CertificateSigningRequestCondition) bool {
+			errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1beta1_CertificateSigningRequestStatus_conditions_, func(list []certificatesv1beta1.CertificateSigningRequestCondition) bool {
 				for i := range list {
 					if list[i].Type == "Approved" {
 						return true
