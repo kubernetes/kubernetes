@@ -124,50 +124,44 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 	tests := []struct {
 		name         string
 		pod          *v1.Pod
-		allocs       state.PodResourceInfoMap
+		allocated    state.PodResourceInfo
 		expectPod    *v1.Pod
 		expectUpdate bool
 	}{{
 		name: "steady state",
 		pod:  pod,
-		allocs: state.PodResourceInfoMap{
-			pod.UID: state.PodResourceInfo{
-				ContainerResources: map[string]v1.ResourceRequirements{
-					"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
-					"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
-					"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
-					"c1-init":             *pod.Spec.InitContainers[1].Resources.DeepCopy(),
-				},
+		allocated: state.PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
+				"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
+				"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
+				"c1-init":             *pod.Spec.InitContainers[1].Resources.DeepCopy(),
 			},
 		},
 		expectUpdate: false,
 	}, {
 		name:         "no allocations",
 		pod:          pod,
-		allocs:       state.PodResourceInfoMap{},
+		allocated:    state.PodResourceInfo{},
 		expectUpdate: false,
 	}, {
 		name: "missing container allocation",
 		pod:  pod,
-		allocs: state.PodResourceInfoMap{
-			pod.UID: state.PodResourceInfo{
-				ContainerResources: map[string]v1.ResourceRequirements{
-					"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
-				},
+		allocated: state.PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
 			},
 		},
 		expectUpdate: false,
 	}, {
 		name: "resized container",
 		pod:  pod,
-		allocs: state.PodResourceInfoMap{
-			pod.UID: state.PodResourceInfo{
-				ContainerResources: map[string]v1.ResourceRequirements{
-					"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-					"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-					"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
-					"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
-				},
+		allocated: state.PodResourceInfo{
+			ContainerResources: map[string]v1.ResourceRequirements{
+				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
+				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
+				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),
+				"c1-init":             *resizedPod.Spec.InitContainers[1].Resources.DeepCopy(),
 			},
 		},
 		expectUpdate: true,
@@ -177,7 +171,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			pod := test.pod.DeepCopy()
-			allocatedPod, updated := updatePodFromAllocation(pod, test.allocs)
+			allocatedPod, updated := updatePodFromAllocation(pod, test.allocated)
 
 			if test.expectUpdate {
 				assert.True(t, updated, "updated")
