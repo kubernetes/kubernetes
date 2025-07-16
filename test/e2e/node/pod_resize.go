@@ -24,7 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -382,10 +381,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		waitForPodDeferred(ctx, f, testPod1)
 
 		ginkgo.By("deleting pods 2 and 3")
-		delErr2 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod2)
-		framework.ExpectNoError(delErr2, "failed to delete pod %s", testPod2.Name)
-		delErr3 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod3)
-		framework.ExpectNoError(delErr3, "failed to delete pod %s", testPod3.Name)
+		e2epod.DeletePodsWithWait(ctx, f.ClientSet, []*v1.Pod{testPod2, testPod3})
 
 		ginkgo.By(fmt.Sprintf("TEST3: Verify pod '%s' is resized successfully after pod deletion '%s' and '%s", testPod1.Name, testPod2.Name, testPod3.Name))
 		expected := []podresize.ResizableContainerInfo{
@@ -538,12 +534,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 
 		ginkgo.By("deleting pods")
-		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod1)
-		framework.ExpectNoError(delErr1, "failed to delete pod %s", testPod1.Name)
-		delErr2 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod2)
-		framework.ExpectNoError(delErr2, "failed to delete pod %s", testPod2.Name)
-		delErr3 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod3)
-		framework.ExpectNoError(delErr3, "failed to delete pod %s", testPod3.Name)
+		e2epod.DeletePodsWithWait(ctx, f.ClientSet, []*v1.Pod{testPod1, testPod2, testPod3})
 	})
 
 	ginkgo.It("pod-resize-retry-deferred-test-2", func(ctx context.Context) {
@@ -905,15 +896,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		podresize.ExpectPodResized(ctx, f, resizedPod, expectedTestPod4Resized)
 
 		ginkgo.By("deleting pods")
-		for _, testPod := range testPods {
-			delErr := f.ClientSet.CoreV1().Pods(testPod.Namespace).Delete(ctx, testPod.Name, metav1.DeleteOptions{})
-			if delErr != nil && !apierrors.IsNotFound(delErr) {
-				framework.ExpectNoError(delErr, "failed to delete pod %s", testPod.Name)
-			}
-		}
-		for _, testPod := range testPods {
-			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, testPod.Name, testPod.Namespace, e2epod.PodDeleteTimeout))
-		}
+		e2epod.DeletePodsWithWait(ctx, f.ClientSet, testPods)
 	})
 }
 
