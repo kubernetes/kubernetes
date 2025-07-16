@@ -275,7 +275,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		manager)
 
 	// delayed claim binding
-	go delayClaimBecomesBound(t, kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
+	go delayClaimBecomesBound(t, kubeClient, claim.GetNamespace(), claim.Name)
 
 	err = wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
 		err = manager.WaitForAttachAndMount(ctx, pod)
