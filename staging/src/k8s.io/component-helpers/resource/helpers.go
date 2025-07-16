@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -38,10 +39,16 @@ type PodResourcesOptions struct {
 	// Reuse, if provided will be reused to accumulate resources and returned by the PodRequests or PodLimits
 	// functions. All existing values in Reuse will be lost.
 	Reuse v1.ResourceList
-	// UseStatusResources indicates whether resources reported by the PodStatus should be considered
-	// when evaluating the pod resources. This MUST be false if the InPlacePodVerticalScaling
-	// feature is not enabled.
+	// UseStatusResources indicates whether resources reported by the
+	// ContainerStatuses in PodStatus should be considered
+	// when evaluating the pod resources. This MUST be false if the
+	// InPlacePodVerticalScaling feature is not enabled.
 	UseStatusResources bool
+	// UseStatusResources indicates whether resources reported by the
+	// PodStatus should be considered when evaluating the pod resources.
+	// This MUST be false if the InPlacePodLevelResourcesVerticalScaling
+	// feature is not enabled.
+	UsePodStatusResources bool
 	// ExcludeOverhead controls if pod overhead is excluded from the calculation.
 	ExcludeOverhead bool
 	// ContainerFn is called with the effective resources required for each container within the pod.
@@ -125,6 +132,9 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		for resourceName, quantity := range pod.Spec.Resources.Requests {
 			if IsSupportedPodLevelResource(resourceName) {
 				reqs[resourceName] = quantity
+				if opts.UsePodStatusResources {
+					reqs[resourceName] = determinePodResourceReqs(pod, resourceName)
+				}
 			}
 		}
 	}
@@ -239,6 +249,20 @@ func determineContainerLimits(pod *v1.Pod, container *v1.Container, cs *v1.Conta
 	return max(container.Resources.Limits, cs.Resources.Limits)
 }
 
+func determinePodResourceReqs(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
+	if IsPodResizeInfeasible(pod) {
+		return maxQuantity(pod.Status.Resources.Requests[resourceName], pod.Status.AllocatedResources[resourceName])
+	}
+	return maxQuantity(pod.Status.Resources.Requests[resourceName], pod.Status.Resources.Requests[resourceName], pod.Status.AllocatedResources[resourceName])
+}
+
+func determinePodResourceLimits(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
+	if IsPodResizeInfeasible(pod) {
+		return pod.Spec.Resources.Limits[resourceName]
+	}
+	return maxQuantity(pod.Spec.Resources.Limits[resourceName], pod.Status.Resources.Limits[resourceName])
+}
+
 // IsPodResizeInfeasible returns true if the pod condition PodResizePending is set to infeasible.
 func IsPodResizeInfeasible(pod *v1.Pod) bool {
 	for _, condition := range pod.Status.Conditions {
@@ -286,6 +310,9 @@ func PodLimits(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 		for resourceName, quantity := range pod.Spec.Resources.Limits {
 			if IsSupportedPodLevelResource(resourceName) {
 				limits[resourceName] = quantity
+				if opts.UsePodStatusResources {
+					limits[resourceName] = determinePodResourceLimits(pod, resourceName)
+				}
 			}
 		}
 	}
@@ -409,6 +436,19 @@ func max(a v1.ResourceList, b ...v1.ResourceList) v1.ResourceList {
 		maxResourceList(result, other)
 	}
 	return result
+}
+
+func maxQuantity(quantities ...resource.Quantity) resource.Quantity {
+	if len(quantities) == 0 {
+		return resource.Quantity{}
+	}
+	max := quantities[0]
+	for _, quantity := range quantities {
+		if quantity.Cmp(max) > 0 {
+			max = quantity
+		}
+	}
+	return max
 }
 
 // reuseOrClearResourceList is a helper for avoiding excessive allocations of

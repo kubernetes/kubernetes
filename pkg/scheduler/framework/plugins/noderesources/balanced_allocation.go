@@ -136,9 +136,10 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h framework
 			Name:                            BalancedAllocationName,
 			enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
 			enablePodLevelResources:         fts.EnablePodLevelResources,
-			scorer:                          balancedResourceScorer,
-			useRequested:                    true,
-			resources:                       args.Resources,
+			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
+			scorer:       balancedResourceScorer,
+			useRequested: true,
+			resources:    args.Resources,
 		},
 	}, nil
 }

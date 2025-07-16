@@ -961,8 +961,10 @@ func (pi *PodInfo) calculateResource() podResource {
 	}
 	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
 	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
-		UseStatusResources: inPlacePodVerticalScalingEnabled,
+		UseStatusResources:    inPlacePodVerticalScalingEnabled,
+		UsePodStatusResources: inPlacePodLevelResourcesVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources: !podLevelResourcesEnabled,
 	})
@@ -971,7 +973,8 @@ func (pi *PodInfo) calculateResource() podResource {
 	non0Requests := requests
 	if len(nonMissingContainerRequests) > 0 {
 		non0Requests = resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
-			UseStatusResources: inPlacePodVerticalScalingEnabled,
+			UseStatusResources:    inPlacePodVerticalScalingEnabled,
+			UsePodStatusResources: inPlacePodLevelResourcesVerticalScalingEnabled,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 			SkipPodLevelResources:       !podLevelResourcesEnabled,
 			NonMissingContainerRequests: nonMissingContainerRequests,
