@@ -329,21 +329,44 @@ claims:
 		claims, err := draManager.ResourceClaims().List()
 		tCtx.ExpectNoError(err, "list claims")
 		allocatedDevices := sets.New[structured.DeviceID]()
+		allocatedSharedDeviceIDs := sets.New[structured.SharedDeviceID]()
+		aggregatedCapacity := structured.NewConsumedCapacityCollection()
 		for _, claim := range claims {
 			if claim.Status.Allocation == nil {
 				continue
 			}
 			for _, result := range claim.Status.Allocation.Devices.Results {
-				allocatedDevices.Insert(structured.MakeDeviceID(result.Driver, result.Pool, result.Device))
+				deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+				allocatedDevices.Insert(deviceID)
+				if result.ShareID == nil {
+					allocatedDevices.Insert(deviceID)
+					continue
+				}
+				sharedDeviceID := structured.MakeSharedDeviceID(deviceID, *result.ShareID)
+				allocatedSharedDeviceIDs.Insert(sharedDeviceID)
+				claimedCapacity := result.ConsumedCapacities
+				if claimedCapacity != nil {
+					allocatedCapacity := structured.NewDeviceConsumedCapacity(deviceID, claimedCapacity)
+					if _, found := aggregatedCapacity[deviceID]; found {
+						aggregatedCapacity[deviceID].Add(allocatedCapacity.ConsumedCapacity)
+					} else {
+						aggregatedCapacity[deviceID] = allocatedCapacity.ConsumedCapacity.Clone()
+					}
+				}
 			}
 		}
-
+		allocatedState := structured.AllocatedState{
+			AllocatedDevices:         allocatedDevices,
+			AllocatedSharedDeviceIDs: allocatedSharedDeviceIDs,
+			AggregatedCapacity:       aggregatedCapacity,
+		}
 		allocator, err := structured.NewAllocator(tCtx, structured.Features{
 			PrioritizedList:      utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
 			AdminAccess:          utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
-		}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
+			ConsumableCapacity:   utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		}, allocatedState, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {

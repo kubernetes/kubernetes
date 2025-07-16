@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/dynamic-resource-allocation/structured/internal/experimental"
@@ -86,7 +85,7 @@ type Allocator interface {
 // The returned Allocator can be used multiple times and is thread-safe.
 func NewAllocator(ctx context.Context,
 	features Features,
-	allocatedDevices sets.Set[DeviceID],
+	allocatedState AllocatedState,
 	classLister DeviceClassLister,
 	slices []*resourceapi.ResourceSlice,
 	celCache *cel.Cache,
@@ -118,7 +117,7 @@ func NewAllocator(ctx context.Context,
 		// All required features supported?
 		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
 			// Use it!
-			return allocator.newAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
+			return allocator.newAllocator(ctx, features, allocatedState, classLister, slices, celCache)
 		}
 	}
 	return nil, fmt.Errorf("internal error: no allocator available for feature set %v", features)
@@ -128,7 +127,7 @@ var availableAllocators = []struct {
 	supportedFeatures Features
 	newAllocator      func(ctx context.Context,
 		features Features,
-		allocatedDevices sets.Set[DeviceID],
+		allocatedState AllocatedState,
 		classLister DeviceClassLister,
 		slices []*resourceapi.ResourceSlice,
 		celCache *cel.Cache,
@@ -139,37 +138,38 @@ var availableAllocators = []struct {
 		supportedFeatures: stable.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			allocatedDevices sets.Set[DeviceID],
+			allocatedState AllocatedState,
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return stable.NewAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
+			return stable.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
 	},
 	{
 		supportedFeatures: incubating.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			allocatedDevices sets.Set[DeviceID],
+			allocatedState AllocatedState,
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return incubating.NewAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
+			return incubating.NewAllocator(ctx, features, allocatedState.AllocatedDevices, classLister, slices, celCache)
 		},
 	},
 	{
 		supportedFeatures: experimental.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			claimsToAllocate []*resourceapi.ResourceClaim,
-			allocatedDevices sets.Set[DeviceID],
+			allocatedState AllocatedState,
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return incubating.NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+			shareIDFactory := NewUniqueHexStringFactory(resourceapi.ShareIDNBytes)
+			shareIDFactory.SetUsedShareIDs(allocatedState.AllocatedSharedDeviceIDs)
+			return experimental.NewAllocator(ctx, features, allocatedState, shareIDFactory, classLister, slices, celCache)
 		},
 	},
 }

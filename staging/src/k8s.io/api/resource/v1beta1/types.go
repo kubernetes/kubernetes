@@ -1406,6 +1406,9 @@ type DeviceAllocationResult struct {
 // entries in allocation.devices.results.
 const AllocationResultsMaxSize = 32
 
+// Byte length of random ID for ShareUID; String length will be twice characters.
+const ShareIDNBytes = 3
+
 // DeviceRequestAllocationResult contains the allocation result for one request.
 type DeviceRequestAllocationResult struct {
 	// Request is the name of the request in the claim which caused this

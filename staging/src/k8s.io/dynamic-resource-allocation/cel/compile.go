@@ -46,6 +46,7 @@ import (
 const (
 	deviceVar     = "device"
 	driverVar     = "driver"
+	multiAllocVar = "allowMultipleAllocations"
 	attributesVar = "attributes"
 	capacityVar   = "capacity"
 )
@@ -62,6 +63,9 @@ var (
 	domainType = withMaxElements(apiservercel.StringType, resourceapi.DeviceMaxDomainLength)
 	idType     = withMaxElements(apiservercel.StringType, resourceapi.DeviceMaxIDLength)
 	driverType = withMaxElements(apiservercel.StringType, resourceapi.DriverNameMaxLength)
+
+	// A variant of BoolType with a known maximum size.
+	allowMultipleAllocationsType = withMaxElements(apiservercel.BoolType, 1)
 
 	// Each map is bound by the maximum number of different attributes.
 	innerAttributesMapType = apiservercel.NewMapType(idType, attributeType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)
@@ -99,9 +103,10 @@ type Device struct {
 	// Driver gets used as domain for any attribute which does not already
 	// have a domain prefix. If set, then it is also made available as a
 	// string attribute.
-	Driver     string
-	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+	Driver                   string
+	AllowMultipleAllocations *bool
+	Attributes               map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+	Capacity                 map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 }
 
 type compiler struct {
@@ -250,9 +255,15 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
 	}
 
+	multiAlloc := false
+	if input.AllowMultipleAllocations != nil {
+		multiAlloc = *input.AllowMultipleAllocations
+	}
+
 	variables := map[string]any{
 		deviceVar: map[string]any{
 			driverVar:     input.Driver,
+			multiAllocVar: multiAlloc,
 			attributesVar: newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), attributes, c.emptyMapVal),
 			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
 		},
@@ -291,7 +302,13 @@ func newCompiler() *compiler {
 		return result
 	}
 
-	deviceType := apiservercel.NewObjectType("kubernetes.DRADevice", fields(
+	deviceTypeV134 := apiservercel.NewObjectType("kubernetes.DRADevice", fields(
+		field(driverVar, driverType, true),
+		field(multiAllocVar, allowMultipleAllocationsType, true),
+		field(attributesVar, outerAttributesMapType, true),
+		field(capacityVar, outerCapacityMapType, true),
+	))
+	deviceTypeV131 := apiservercel.NewObjectType("kubernetes.DRADevice", fields(
 		field(driverVar, driverType, true),
 		field(attributesVar, outerAttributesMapType, true),
 		field(capacityVar, outerCapacityMapType, true),
@@ -301,7 +318,7 @@ func newCompiler() *compiler {
 		{
 			IntroducedVersion: version.MajorMinor(1, 31),
 			EnvOptions: []cel.EnvOption{
-				cel.Variable(deviceVar, deviceType.CelType()),
+				cel.Variable(deviceVar, deviceTypeV131.CelType()),
 
 				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
 				//
@@ -312,7 +329,7 @@ func newCompiler() *compiler {
 				ext.Bindings(ext.BindingsVersion(0)),
 			},
 			DeclTypes: []*apiservercel.DeclType{
-				deviceType,
+				deviceTypeV131,
 			},
 		},
 		{
@@ -331,12 +348,30 @@ func newCompiler() *compiler {
 				library.SemverLib(library.SemverVersion(0)),
 			},
 		},
+		{
+			IntroducedVersion: version.MajorMinor(1, 34),
+			EnvOptions: []cel.EnvOption{
+				cel.Variable(deviceVar, deviceTypeV134.CelType()),
+
+				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
+				//
+				// This is useful to simplify attribute lookups because the
+				// domain only needs to be given once:
+				//
+				//    cel.bind(dra, device.attributes["dra.example.com"], dra.oneBool && dra.anotherBool)
+				ext.Bindings(ext.BindingsVersion(0)),
+			},
+			DeclTypes: []*apiservercel.DeclType{
+				deviceTypeV134,
+			},
+		},
 	}
 	envset, err := envset.Extend(versioned...)
 	if err != nil {
 		panic(fmt.Errorf("internal error building CEL environment: %w", err))
 	}
-	return &compiler{envset: envset, deviceType: deviceType}
+	// return newest deviceType
+	return &compiler{envset: envset, deviceType: deviceTypeV134}
 }
 
 func withMaxElements(in *apiservercel.DeclType, maxElements uint64) *apiservercel.DeclType {
