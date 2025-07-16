@@ -20,6 +20,8 @@ package options
 // This should probably be part of some configuration fed into the build for a
 // given binary target.
 import (
+	"github.com/spf13/pflag"
+
 	mutatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 
@@ -105,6 +107,12 @@ var AllOrderedPlugins = []string{
 	validatingwebhook.PluginName,         // ValidatingAdmissionWebhook
 	resourcequota.PluginName,             // ResourceQuota
 	deny.PluginName,                      // AlwaysDeny
+}
+
+// registerAllAdmissionPluginFlags registers legacy CLI flag options for admission plugins.
+// No new plugins should use CLI flags to configure themselves.
+func registerAllAdmissionPluginFlags(fs *pflag.FlagSet) {
+	defaulttolerationseconds.RegisterFlags(fs)
 }
 
 // RegisterAllAdmissionPlugins registers all admission plugins.
