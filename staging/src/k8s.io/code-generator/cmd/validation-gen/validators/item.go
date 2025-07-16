@@ -254,11 +254,11 @@ func (iv itemValidator) GetValidations(context Context) (Validations, error) {
 		// Extract validations from the stored tag
 		subContextPath := generateFieldPathForMap(item.criteria)
 		subContext := Context{
-			Scope:  ScopeListVal,
-			Type:   elemT,
-			Parent: context.Type,
-			Path:   context.Path.Key(subContextPath),
-			Member: nil,
+			Scope:      ScopeListVal,
+			Type:       elemT,
+			Path:       context.Path.Key(subContextPath),
+			ParentPath: context.Path,
+			Member:     nil,
 		}
 
 		validations, err := iv.validator.ExtractValidations(subContext, item.valueTag)
