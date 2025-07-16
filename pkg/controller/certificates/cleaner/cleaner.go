@@ -107,7 +107,12 @@ func (ccc *CSRCleanerController) worker(ctx context.Context) {
 
 func (ccc *CSRCleanerController) handle(ctx context.Context, csr *capi.CertificateSigningRequest) error {
 	logger := klog.FromContext(ctx)
-	if isIssuedPastDeadline(logger, csr) || isDeniedPastDeadline(logger, csr) || isFailedPastDeadline(logger, csr) || isPendingPastDeadline(logger, csr) || isIssuedExpired(logger, csr) {
+	if isIssuedPastDeadline(logger, csr) ||
+		isDeniedPastDeadline(logger, csr) ||
+		isFailedPastDeadline(logger, csr) ||
+		isPendingPastDeadline(logger, csr) ||
+		isApprovedButNotIssuedPastDeadline(logger, csr) ||
+		isIssuedExpired(logger, csr) {
 		if err := ccc.csrClient.Delete(ctx, csr.Name, metav1.DeleteOptions{}); err != nil {
 			return fmt.Errorf("unable to delete CSR %q: %v", csr.Name, err)
 		}
@@ -173,6 +178,19 @@ func isIssuedPastDeadline(logger klog.Logger, csr *capi.CertificateSigningReques
 	for _, c := range csr.Status.Conditions {
 		if c.Type == capi.CertificateApproved && isIssued(csr) && isOlderThan(c.LastUpdateTime, approvedExpiration) {
 			logger.Info("Cleaning CSR as it is more than approvedExpiration duration old and approved.", "csr", csr.Name, "approvedExpiration", approvedExpiration)
+			return true
+		}
+	}
+	return false
+}
+
+// isApprovedButNotIssuedPastDeadline checks if the certificate has an Approved status
+// but no certificate has been issued, and the creation time of the CSR is passed
+// the deadline that such requests are maintained for.
+func isApprovedButNotIssuedPastDeadline(logger klog.Logger, csr *capi.CertificateSigningRequest) bool {
+	for _, c := range csr.Status.Conditions {
+		if c.Type == capi.CertificateApproved && !isIssued(csr) && isOlderThan(c.LastUpdateTime, pendingExpiration) {
+			logger.Info("Cleaning CSR as it is more than pendingExpiration duration old, approved but not issued.", "csr", csr.Name, "pendingExpiration", pendingExpiration)
 			return true
 		}
 	}
