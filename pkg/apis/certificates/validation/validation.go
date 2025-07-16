@@ -242,12 +242,12 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 			case certificates.CertificateApproved:
 				hasApproved = true
 				if hasDenied {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("type"), c.Type, "Approved and Denied conditions are mutually exclusive"))
+					allErrs = append(allErrs, field.Invalid(fldPath, c.Type, "Approved and Denied conditions are mutually exclusive").WithOrigin("zeroOrOneOf").MarkCoveredByDeclarative())
 				}
 			case certificates.CertificateDenied:
 				hasDenied = true
 				if hasApproved {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("type"), c.Type, "Approved and Denied conditions are mutually exclusive"))
+					allErrs = append(allErrs, field.Invalid(fldPath, c.Type, "Approved and Denied conditions are mutually exclusive").WithOrigin("zeroOrOneOf").MarkCoveredByDeclarative())
 				}
 			}
 		}
