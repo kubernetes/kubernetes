@@ -171,6 +171,7 @@ func (cm *FakeContainerManager) InternalContainerLifecycle() InternalContainerLi
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "InternalContainerLifecycle")
+	// TODO: Replace with real context during container manager migration.
 	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager(context.TODO())}
 }
 
@@ -206,6 +207,7 @@ func (cm *FakeContainerManager) GetAllocateResourcesPodAdmitHandler() lifecycle.
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocateResourcesPodAdmitHandler")
+	// TODO: Replace with real context during container manager migration.
 	return topologymanager.NewFakeManager(context.TODO())
 }
 
