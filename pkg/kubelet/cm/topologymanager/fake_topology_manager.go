@@ -19,7 +19,7 @@ package topologymanager
 import (
 	"context"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -54,6 +54,7 @@ func NewFakeManagerWithPolicy(ctx context.Context, policy Policy) Manager {
 }
 
 func (m *fakeManager) GetAffinity(podUID string, containerName string) TopologyHint {
+	// TODO: Replace with real context during container manager migration.
 	klog.TODO().Info("GetAffinity", "podUID", podUID, "containerName", containerName)
 	if m.hint == nil {
 		return TopologyHint{}
@@ -67,19 +68,23 @@ func (m *fakeManager) GetPolicy() Policy {
 }
 
 func (m *fakeManager) AddHintProvider(h HintProvider) {
+	// TODO: Replace with real context during container manager migration.
 	klog.TODO().Info("AddHintProvider", "hintProvider", h)
 }
 
 func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+	// TODO: Replace with real context during container manager migration.
 	klog.TODO().Info("AddContainer", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
 func (m *fakeManager) RemoveContainer(containerID string) error {
+	// TODO: Replace with real context during container manager migration.
 	klog.TODO().Info("RemoveContainer", "containerID", containerID)
 	return nil
 }
 
 func (m *fakeManager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	// TODO: Replace with real context during container manager migration.
 	klog.TODO().Info("Topology Admit Handler")
 	return admission.GetPodAdmitResult(nil)
 }

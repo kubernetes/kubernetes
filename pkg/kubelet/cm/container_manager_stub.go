@@ -127,6 +127,7 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulerframework.NodeIn
 }
 
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
+	// TODO: Replace with real context during container manager migration.
 	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager(context.TODO())}
 }
 
