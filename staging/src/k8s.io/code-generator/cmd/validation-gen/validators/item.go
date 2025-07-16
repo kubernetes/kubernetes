@@ -64,6 +64,10 @@ func (itemTagValidator) ValidScopes() sets.Set[Scope] {
 	return itemTagValidScopes
 }
 
+// LateTagValidator indicates that this validator has to run AFTER the listType
+// and listMapKey tags.
+func (itemTagValidator) LateTagValidator() {}
+
 func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// TODO: Support regular maps with syntax like:
 	// +k8s:item("map-key")=+k8s:immutable
@@ -321,26 +325,35 @@ func validateTypeMatch(fieldType *types.Type, value any) error {
 	return nil
 }
 
-func createMatchFn(elemT *types.Type, criteria []keyValuePair) (FunctionLiteral, error) {
+func buildMatchConditions(elemT *types.Type, criteria []keyValuePair, itemRef string) (string, error) {
 	var conditions []string
 
 	for _, fld := range criteria {
 		member := util.GetMemberByJSON(elemT, fld.key)
 		if member == nil {
-			return FunctionLiteral{}, fmt.Errorf("no field with JSON name %q", fld.key)
+			return "", fmt.Errorf("no field with JSON name %q", fld.key)
 		}
 		// Generate the comparison based on the field's actual type
 		rhs, err := generateComparisonRHS(member, fld.value)
 		if err != nil {
-			return FunctionLiteral{}, err
+			return "", err
 		}
-		conditions = append(conditions, fmt.Sprintf("item.%s == %s", member.Name, rhs))
+		conditions = append(conditions, fmt.Sprintf("%s.%s == %s", itemRef, member.Name, rhs))
+	}
+
+	return strings.Join(conditions, " && "), nil
+}
+
+func createMatchFn(elemT *types.Type, criteria []keyValuePair) (FunctionLiteral, error) {
+	condition, err := buildMatchConditions(elemT, criteria, "item")
+	if err != nil {
+		return FunctionLiteral{}, err
 	}
 
 	return FunctionLiteral{
 		Parameters: []ParamResult{{"item", types.PointerTo(elemT)}},
 		Results:    []ParamResult{{"", types.Bool}},
-		Body:       fmt.Sprintf("return %s", strings.Join(conditions, " && ")),
+		Body:       fmt.Sprintf("return %s", condition),
 	}, nil
 }
 
