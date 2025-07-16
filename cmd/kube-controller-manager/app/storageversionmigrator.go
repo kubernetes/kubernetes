@@ -31,9 +31,9 @@ import (
 
 func newStorageVersionMigratorControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.StorageVersionMigratorController,
-		aliases:  []string{"svm"},
-		initFunc: newSVMController,
+		name:        names.StorageVersionMigratorController,
+		aliases:     []string{"svm"},
+		constructor: newSVMController,
 	}
 }
 

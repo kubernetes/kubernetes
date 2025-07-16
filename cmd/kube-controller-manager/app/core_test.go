@@ -148,7 +148,7 @@ func TestController_DiscoveryError(t *testing.T) {
 				InformersStarted:                make(chan struct{}),
 			}
 			for controllerName, controllerDesc := range controllerDescriptorMap {
-				_, err := controllerDesc.GetInitFunc()(ctx, controllerContext, controllerName)
+				_, err := controllerDesc.GetControllerConstructor()(ctx, controllerContext, controllerName)
 				if test.expectedErr != (err != nil) {
 					t.Errorf("%v test failed for use case: %v", controllerName, name)
 				}

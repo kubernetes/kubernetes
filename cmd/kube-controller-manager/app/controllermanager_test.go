@@ -205,7 +205,7 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 			initFuncCalled := false
 
 			taintEvictionControllerDescriptor := NewControllerDescriptors()[names.TaintEvictionController]
-			taintEvictionControllerDescriptor.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+			taintEvictionControllerDescriptor.constructor = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 				initFuncCalled = true
 				return newNamedRunnableFunc(func(ctx context.Context) {}, controllerName), nil
 			}
@@ -238,7 +238,7 @@ func TestNoCloudProviderControllerStarted(t *testing.T) {
 			continue
 		}
 
-		controller.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+		controller.constructor = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 			return newNamedRunnableFunc(func(ctx context.Context) {
 				t.Error("Controller should not be started:", controllerName)
 			}, controllerName), nil

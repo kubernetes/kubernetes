@@ -33,7 +33,7 @@ import (
 func newValidatingAdmissionPolicyStatusControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                 names.ValidatingAdmissionPolicyStatusController,
-		initFunc:             newValidatingAdmissionPolicyStatusController,
+		constructor:          newValidatingAdmissionPolicyStatusController,
 		requiredFeatureGates: []featuregate.Feature{},
 	}
 }

@@ -30,8 +30,8 @@ import (
 
 func newServiceCIDRsControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.ServiceCIDRController,
-		initFunc: newServiceCIDRsController,
+		name:        names.ServiceCIDRController,
+		constructor: newServiceCIDRsController,
 		requiredFeatureGates: []featuregate.Feature{
 			features.MultiCIDRServiceAllocator,
 		},

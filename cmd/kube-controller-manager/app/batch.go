@@ -30,9 +30,9 @@ import (
 
 func newJobControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.JobController,
-		aliases:  []string{"job"},
-		initFunc: newJobController,
+		name:        names.JobController,
+		aliases:     []string{"job"},
+		constructor: newJobController,
 	}
 }
 
@@ -59,9 +59,9 @@ func newJobController(ctx context.Context, controllerContext ControllerContext, 
 
 func newCronJobControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.CronJobController,
-		aliases:  []string{"cronjob"},
-		initFunc: newCronJobController,
+		name:        names.CronJobController,
+		aliases:     []string{"cronjob"},
+		constructor: newCronJobController,
 	}
 }
 

@@ -34,9 +34,9 @@ import (
 
 func newDaemonSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.DaemonSetController,
-		aliases:  []string{"daemonset"},
-		initFunc: newDaemonSetController,
+		name:        names.DaemonSetController,
+		aliases:     []string{"daemonset"},
+		constructor: newDaemonSetController,
 	}
 }
 
@@ -66,9 +66,9 @@ func newDaemonSetController(ctx context.Context, controllerContext ControllerCon
 
 func newStatefulSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.StatefulSetController,
-		aliases:  []string{"statefulset"},
-		initFunc: newStatefulSetController,
+		name:        names.StatefulSetController,
+		aliases:     []string{"statefulset"},
+		constructor: newStatefulSetController,
 	}
 }
 
@@ -93,9 +93,9 @@ func newStatefulSetController(ctx context.Context, controllerContext ControllerC
 
 func newReplicaSetControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.ReplicaSetController,
-		aliases:  []string{"replicaset"},
-		initFunc: newReplicaSetController,
+		name:        names.ReplicaSetController,
+		aliases:     []string{"replicaset"},
+		constructor: newReplicaSetController,
 	}
 }
 
@@ -119,9 +119,9 @@ func newReplicaSetController(ctx context.Context, controllerContext ControllerCo
 
 func newDeploymentControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.DeploymentController,
-		aliases:  []string{"deployment"},
-		initFunc: newDeploymentController,
+		name:        names.DeploymentController,
+		aliases:     []string{"deployment"},
+		constructor: newDeploymentController,
 	}
 }
 

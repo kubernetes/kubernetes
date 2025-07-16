@@ -28,7 +28,7 @@ func newBootstrapSignerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                names.BootstrapSignerController,
 		aliases:             []string{"bootstrapsigner"},
-		initFunc:            newBootstrapSignerController,
+		constructor:         newBootstrapSignerController,
 		isDisabledByDefault: true,
 	}
 }
@@ -56,7 +56,7 @@ func newTokenCleanerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                names.TokenCleanerController,
 		aliases:             []string{"tokencleaner"},
-		initFunc:            newTokenCleanerController,
+		constructor:         newTokenCleanerController,
 		isDisabledByDefault: true,
 	}
 }

@@ -25,9 +25,9 @@ import (
 
 func newClusterRoleAggregrationControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.ClusterRoleAggregationController,
-		aliases:  []string{"clusterrole-aggregation"},
-		initFunc: newClusterRoleAggregationController,
+		name:        names.ClusterRoleAggregationController,
+		aliases:     []string{"clusterrole-aggregation"},
+		constructor: newClusterRoleAggregationController,
 	}
 }
 

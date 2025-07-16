@@ -29,9 +29,9 @@ import (
 
 func newDisruptionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.DisruptionController,
-		aliases:  []string{"disruption"},
-		initFunc: newDisruptionController,
+		name:        names.DisruptionController,
+		aliases:     []string{"disruption"},
+		constructor: newDisruptionController,
 	}
 }
 

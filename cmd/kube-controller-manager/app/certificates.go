@@ -42,9 +42,9 @@ import (
 
 func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.CertificateSigningRequestSigningController,
-		aliases:  []string{"csrsigning"},
-		initFunc: newCertificateSigningRequestSigningController,
+		name:        names.CertificateSigningRequestSigningController,
+		aliases:     []string{"csrsigning"},
+		constructor: newCertificateSigningRequestSigningController,
 	}
 }
 
@@ -183,9 +183,9 @@ func getLegacyUnknownSignerFiles(config csrsigningconfig.CSRSigningControllerCon
 
 func newCertificateSigningRequestApprovingControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.CertificateSigningRequestApprovingController,
-		aliases:  []string{"csrapproving"},
-		initFunc: newCertificateSigningRequestApprovingController,
+		name:        names.CertificateSigningRequestApprovingController,
+		aliases:     []string{"csrapproving"},
+		constructor: newCertificateSigningRequestApprovingController,
 	}
 }
 func newCertificateSigningRequestApprovingController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
@@ -206,9 +206,9 @@ func newCertificateSigningRequestApprovingController(ctx context.Context, contro
 
 func newCertificateSigningRequestCleanerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.CertificateSigningRequestCleanerController,
-		aliases:  []string{"csrcleaner"},
-		initFunc: newCertificateSigningRequestCleanerController,
+		name:        names.CertificateSigningRequestCleanerController,
+		aliases:     []string{"csrcleaner"},
+		constructor: newCertificateSigningRequestCleanerController,
 	}
 }
 func newCertificateSigningRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
@@ -228,9 +228,9 @@ func newCertificateSigningRequestCleanerController(ctx context.Context, controll
 
 func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.RootCACertificatePublisherController,
-		aliases:  []string{"root-ca-cert-publisher"},
-		initFunc: newRootCACertificatePublisherController,
+		name:        names.RootCACertificatePublisherController,
+		aliases:     []string{"root-ca-cert-publisher"},
+		constructor: newRootCACertificatePublisherController,
 	}
 }
 
@@ -263,7 +263,7 @@ func newRootCACertificatePublisherController(ctx context.Context, controllerCont
 func newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                 names.KubeAPIServerClusterTrustBundlePublisherController,
-		initFunc:             newKubeAPIServerSignerClusterTrustBundledPublisherController,
+		constructor:          newKubeAPIServerSignerClusterTrustBundledPublisherController,
 		requiredFeatureGates: []featuregate.Feature{features.ClusterTrustBundle},
 	}
 }

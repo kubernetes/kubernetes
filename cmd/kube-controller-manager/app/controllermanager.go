@@ -295,11 +295,11 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		leaderMigrator = leadermigration.NewLeaderMigrator(&c.ComponentConfig.Generic.LeaderMigration,
 			kubeControllerManager)
 
-		// startSATokenControllerInit is the original InitFunc.
-		saTokenControllerInit := saTokenControllerDescriptor.GetInitFunc()
+		// startSATokenControllerInit is the original constructor.
+		saTokenControllerInit := saTokenControllerDescriptor.GetControllerConstructor()
 
 		// Wrap saTokenControllerDescriptor to signal readiness for migration after starting the controller.
-		saTokenControllerDescriptor.initFunc = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+		saTokenControllerDescriptor.constructor = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 			ctrl, err := saTokenControllerInit(ctx, controllerContext, controllerName)
 			if err != nil {
 				return nil, err
@@ -527,13 +527,13 @@ func newNamedRunnableFunc(fnc func(context.Context), name string) *namedRunnable
 	return newNamedRunnable(runnableFunc(fnc), name)
 }
 
-// InitFunc is a constructor for a controller.
+// ControllerContructor is a constructor for a controller.
 // A nil Controller returned means that the associated controller is disabled.
-type InitFunc func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error)
+type ControllerContructor func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error)
 
 type ControllerDescriptor struct {
 	name                      string
-	initFunc                  InitFunc
+	constructor               ControllerContructor
 	requiredFeatureGates      []featuregate.Feature
 	aliases                   []string
 	isDisabledByDefault       bool
@@ -545,8 +545,8 @@ func (r *ControllerDescriptor) Name() string {
 	return r.name
 }
 
-func (r *ControllerDescriptor) GetInitFunc() InitFunc {
-	return r.initFunc
+func (r *ControllerDescriptor) GetControllerConstructor() ControllerContructor {
+	return r.constructor
 }
 
 func (r *ControllerDescriptor) GetRequiredFeatureGates() []featuregate.Feature {
@@ -573,7 +573,7 @@ func (r *ControllerDescriptor) RequiresSpecialHandling() bool {
 }
 
 // BuildController creates a controller based on the given descriptor.
-// The associated controller's InitFunc is called at the end, so the same contract applies for the return values here.
+// The associated controller's constructor is called at the end, so the same contract applies for the return values here.
 func (r *ControllerDescriptor) BuildController(ctx context.Context, controllerCtx ControllerContext) (Controller, error) {
 	logger := klog.FromContext(ctx)
 	controllerName := r.Name()
@@ -598,7 +598,7 @@ func (r *ControllerDescriptor) BuildController(ctx context.Context, controllerCt
 	}
 
 	ctx = klog.NewContext(ctx, klog.LoggerWithName(logger, controllerName))
-	return r.GetInitFunc()(ctx, controllerCtx, controllerName)
+	return r.GetControllerConstructor()(ctx, controllerCtx, controllerName)
 }
 
 // KnownControllers returns all known controllers' name
@@ -632,7 +632,7 @@ func ControllersDisabledByDefault() []string {
 }
 
 // NewControllerDescriptors is a public map of named controller groups (you can start more than one in an init func)
-// paired to their ControllerDescriptor wrapper object that includes InitFunc.
+// paired to their ControllerDescriptor wrapper object that includes the associated controller constructor.
 // This allows for structured downstream composition and subdivision.
 func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	controllers := map[string]*ControllerDescriptor{}
@@ -650,8 +650,8 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 		if _, found := controllers[name]; found {
 			panic(fmt.Sprintf("controller name %q was registered twice", name))
 		}
-		if controllerDesc.GetInitFunc() == nil {
-			panic(fmt.Sprintf("controller %q does not have an init function", name))
+		if controllerDesc.GetControllerConstructor() == nil {
+			panic(fmt.Sprintf("controller %q does not have a constructor specified", name))
 		}
 
 		for _, alias := range controllerDesc.GetAliases() {
@@ -931,7 +931,7 @@ func newServiceAccountTokenControllerDescriptor(rootClientBuilder clientbuilder.
 	return &ControllerDescriptor{
 		name:    names.ServiceAccountTokenController,
 		aliases: []string{"serviceaccount-token"},
-		initFunc: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 			return newServiceAccountTokenController(ctx, controllerContext, controllerName, rootClientBuilder)
 		},
 		// This controller is started manually before any other controller.

@@ -34,9 +34,9 @@ import (
 
 func newHorizontalPodAutoscalerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.HorizontalPodAutoscalerController,
-		aliases:  []string{"horizontalpodautoscaling"},
-		initFunc: newHorizontalPodAutoscalerController,
+		name:        names.HorizontalPodAutoscalerController,
+		aliases:     []string{"horizontalpodautoscaling"},
+		constructor: newHorizontalPodAutoscalerController,
 	}
 }
 

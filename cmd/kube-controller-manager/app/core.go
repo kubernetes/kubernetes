@@ -85,7 +85,7 @@ func newServiceLBControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:    cpnames.ServiceLBController,
 		aliases: []string{"service"},
-		initFunc: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 			logger := klog.FromContext(ctx)
 			logger.Info("Warning: service-controller is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure service controller.")
 			return nil, nil
@@ -96,9 +96,9 @@ func newServiceLBControllerDescriptor() *ControllerDescriptor {
 
 func newNodeIpamControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.NodeIpamController,
-		aliases:  []string{"nodeipam"},
-		initFunc: newNodeIpamController,
+		name:        names.NodeIpamController,
+		aliases:     []string{"nodeipam"},
+		constructor: newNodeIpamController,
 	}
 }
 
@@ -180,9 +180,9 @@ func newNodeIpamController(ctx context.Context, controllerContext ControllerCont
 
 func newNodeLifecycleControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.NodeLifecycleController,
-		aliases:  []string{"nodelifecycle"},
-		initFunc: newNodeLifecycleController,
+		name:        names.NodeLifecycleController,
+		aliases:     []string{"nodelifecycle"},
+		constructor: newNodeLifecycleController,
 	}
 }
 
@@ -219,8 +219,8 @@ func newNodeLifecycleController(ctx context.Context, controllerContext Controlle
 
 func newTaintEvictionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.TaintEvictionController,
-		initFunc: newTaintEvictionController,
+		name:        names.TaintEvictionController,
+		constructor: newTaintEvictionController,
 		requiredFeatureGates: []featuregate.Feature{
 			features.SeparateTaintEvictionController,
 		},
@@ -250,8 +250,8 @@ func newTaintEvictionController(ctx context.Context, controllerContext Controlle
 
 func newDeviceTaintEvictionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.DeviceTaintEvictionController,
-		initFunc: newDeviceTaintEvictionController,
+		name:        names.DeviceTaintEvictionController,
+		constructor: newDeviceTaintEvictionController,
 		requiredFeatureGates: []featuregate.Feature{
 			// TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing these feature gates.
 			features.DynamicResourceAllocation,
@@ -287,7 +287,7 @@ func newCloudNodeLifecycleControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:    cpnames.CloudNodeLifecycleController,
 		aliases: []string{"cloud-node-lifecycle"},
-		initFunc: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 			logger := klog.FromContext(ctx)
 			logger.Info("Warning: node-controller is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure node lifecyle controller.")
 			return nil, nil
@@ -300,7 +300,7 @@ func newNodeRouteControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:    cpnames.NodeRouteController,
 		aliases: []string{"route"},
-		initFunc: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
 			logger := klog.FromContext(ctx)
 			logger.Info("Warning: configure-cloud-routes is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure cloud provider routes.")
 			return nil, nil
@@ -311,9 +311,9 @@ func newNodeRouteControllerDescriptor() *ControllerDescriptor {
 
 func newPersistentVolumeBinderControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.PersistentVolumeBinderController,
-		aliases:  []string{"persistentvolume-binder"},
-		initFunc: newPersistentVolumeBinderController,
+		name:        names.PersistentVolumeBinderController,
+		aliases:     []string{"persistentvolume-binder"},
+		constructor: newPersistentVolumeBinderController,
 	}
 }
 
@@ -350,9 +350,9 @@ func newPersistentVolumeBinderController(ctx context.Context, controllerContext 
 
 func newPersistentVolumeAttachDetachControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.PersistentVolumeAttachDetachController,
-		aliases:  []string{"attachdetach"},
-		initFunc: newPersistentVolumeAttachDetachController,
+		name:        names.PersistentVolumeAttachDetachController,
+		aliases:     []string{"attachdetach"},
+		constructor: newPersistentVolumeAttachDetachController,
 	}
 }
 
@@ -398,9 +398,9 @@ func newPersistentVolumeAttachDetachController(ctx context.Context, controllerCo
 
 func newPersistentVolumeExpanderControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.PersistentVolumeExpanderController,
-		aliases:  []string{"persistentvolume-expander"},
-		initFunc: newPersistentVolumeExpanderController,
+		name:        names.PersistentVolumeExpanderController,
+		aliases:     []string{"persistentvolume-expander"},
+		constructor: newPersistentVolumeExpanderController,
 	}
 }
 
@@ -434,9 +434,9 @@ func newPersistentVolumeExpanderController(ctx context.Context, controllerContex
 
 func newEphemeralVolumeControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.EphemeralVolumeController,
-		aliases:  []string{"ephemeral-volume"},
-		initFunc: newEphemeralVolumeController,
+		name:        names.EphemeralVolumeController,
+		aliases:     []string{"ephemeral-volume"},
+		constructor: newEphemeralVolumeController,
 	}
 }
 
@@ -464,9 +464,9 @@ const defaultResourceClaimControllerWorkers = 10
 
 func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.ResourceClaimController,
-		aliases:  []string{"resource-claim-controller"},
-		initFunc: newResourceClaimController,
+		name:        names.ResourceClaimController,
+		aliases:     []string{"resource-claim-controller"},
+		constructor: newResourceClaimController,
 		requiredFeatureGates: []featuregate.Feature{
 			features.DynamicResourceAllocation, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
 		},
@@ -500,9 +500,9 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 
 func newEndpointsControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.EndpointsController,
-		aliases:  []string{"endpoint"},
-		initFunc: newEndpointsController,
+		name:        names.EndpointsController,
+		aliases:     []string{"endpoint"},
+		constructor: newEndpointsController,
 	}
 }
 
@@ -527,9 +527,9 @@ func newEndpointsController(ctx context.Context, controllerContext ControllerCon
 
 func newReplicationControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.ReplicationControllerController,
-		aliases:  []string{"replicationcontroller"},
-		initFunc: newReplicationController,
+		name:        names.ReplicationControllerController,
+		aliases:     []string{"replicationcontroller"},
+		constructor: newReplicationController,
 	}
 }
 
@@ -554,9 +554,9 @@ func newReplicationController(ctx context.Context, controllerContext ControllerC
 
 func newPodGarbageCollectorControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.PodGarbageCollectorController,
-		aliases:  []string{"podgc"},
-		initFunc: newPodGarbageCollectorController,
+		name:        names.PodGarbageCollectorController,
+		aliases:     []string{"podgc"},
+		constructor: newPodGarbageCollectorController,
 	}
 }
 
@@ -578,9 +578,9 @@ func newPodGarbageCollectorController(ctx context.Context, controllerContext Con
 
 func newResourceQuotaControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.ResourceQuotaController,
-		aliases:  []string{"resourcequota"},
-		initFunc: newResourceQuotaController,
+		name:        names.ResourceQuotaController,
+		aliases:     []string{"resourcequota"},
+		constructor: newResourceQuotaController,
 	}
 }
 
@@ -628,9 +628,9 @@ func newResourceQuotaController(ctx context.Context, controllerContext Controlle
 
 func newNamespaceControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.NamespaceController,
-		aliases:  []string{"namespace"},
-		initFunc: newNamespaceController,
+		name:        names.NamespaceController,
+		aliases:     []string{"namespace"},
+		constructor: newNamespaceController,
 	}
 }
 
@@ -681,9 +681,9 @@ func newModifiedNamespaceController(
 
 func newServiceAccountControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.ServiceAccountController,
-		aliases:  []string{"serviceaccount"},
-		initFunc: newServiceAccountController,
+		name:        names.ServiceAccountController,
+		aliases:     []string{"serviceaccount"},
+		constructor: newServiceAccountController,
 	}
 }
 
@@ -710,9 +710,9 @@ func newServiceAccountController(ctx context.Context, controllerContext Controll
 
 func newTTLControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.TTLController,
-		aliases:  []string{"ttl"},
-		initFunc: newTTLController,
+		name:        names.TTLController,
+		aliases:     []string{"ttl"},
+		constructor: newTTLController,
 	}
 }
 
@@ -734,9 +734,9 @@ func newTTLController(ctx context.Context, controllerContext ControllerContext, 
 
 func newGarbageCollectorControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.GarbageCollectorController,
-		aliases:  []string{"garbagecollector"},
-		initFunc: newGarbageCollectorController,
+		name:        names.GarbageCollectorController,
+		aliases:     []string{"garbagecollector"},
+		constructor: newGarbageCollectorController,
 	}
 }
 
@@ -819,9 +819,9 @@ func (c *garbageCollectorController) Run(ctx context.Context) {
 
 func newPersistentVolumeClaimProtectionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.PersistentVolumeClaimProtectionController,
-		aliases:  []string{"pvc-protection"},
-		initFunc: newPersistentVolumeClaimProtectionController,
+		name:        names.PersistentVolumeClaimProtectionController,
+		aliases:     []string{"pvc-protection"},
+		constructor: newPersistentVolumeClaimProtectionController,
 	}
 }
 
@@ -848,9 +848,9 @@ func newPersistentVolumeClaimProtectionController(ctx context.Context, controlle
 
 func newPersistentVolumeProtectionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.PersistentVolumeProtectionController,
-		aliases:  []string{"pv-protection"},
-		initFunc: newPersistentVolumeProtectionController,
+		name:        names.PersistentVolumeProtectionController,
+		aliases:     []string{"pv-protection"},
+		constructor: newPersistentVolumeProtectionController,
 	}
 }
 
@@ -872,8 +872,8 @@ func newPersistentVolumeProtectionController(ctx context.Context, controllerCont
 
 func newVolumeAttributesClassProtectionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.VolumeAttributesClassProtectionController,
-		initFunc: newVolumeAttributesClassProtectionController,
+		name:        names.VolumeAttributesClassProtectionController,
+		constructor: newVolumeAttributesClassProtectionController,
 		requiredFeatureGates: []featuregate.Feature{
 			features.VolumeAttributesClass,
 		},
@@ -904,9 +904,9 @@ func newVolumeAttributesClassProtectionController(ctx context.Context, controlle
 
 func newTTLAfterFinishedControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.TTLAfterFinishedController,
-		aliases:  []string{"ttl-after-finished"},
-		initFunc: newTTLAfterFinishedController,
+		name:        names.TTLAfterFinishedController,
+		aliases:     []string{"ttl-after-finished"},
+		constructor: newTTLAfterFinishedController,
 	}
 }
 
@@ -928,9 +928,9 @@ func newTTLAfterFinishedController(ctx context.Context, controllerContext Contro
 
 func newLegacyServiceAccountTokenCleanerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.LegacyServiceAccountTokenCleanerController,
-		aliases:  []string{"legacy-service-account-token-cleaner"},
-		initFunc: newLegacyServiceAccountTokenCleanerController,
+		name:        names.LegacyServiceAccountTokenCleanerController,
+		aliases:     []string{"legacy-service-account-token-cleaner"},
+		constructor: newLegacyServiceAccountTokenCleanerController,
 	}
 }
 
@@ -1077,9 +1077,9 @@ func setNodeCIDRMaskSizes(cfg nodeipamconfig.NodeIPAMControllerConfiguration, cl
 
 func newStorageVersionGarbageCollectorControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
-		name:     names.StorageVersionGarbageCollectorController,
-		aliases:  []string{"storage-version-gc"},
-		initFunc: newStorageVersionGarbageCollectorController,
+		name:        names.StorageVersionGarbageCollectorController,
+		aliases:     []string{"storage-version-gc"},
+		constructor: newStorageVersionGarbageCollectorController,
 		requiredFeatureGates: []featuregate.Feature{
 			genericfeatures.APIServerIdentity,
 			genericfeatures.StorageVersionAPI,
@@ -1105,7 +1105,7 @@ func newStorageVersionGarbageCollectorController(ctx context.Context, controller
 func newSELinuxWarningControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                names.SELinuxWarningController,
-		initFunc:            newSELinuxWarningController,
+		constructor:         newSELinuxWarningController,
 		isDisabledByDefault: true,
 		requiredFeatureGates: []featuregate.Feature{
 			features.SELinuxChangePolicy,
