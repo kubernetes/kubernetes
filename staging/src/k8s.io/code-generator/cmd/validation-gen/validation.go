@@ -607,8 +607,14 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			jsonName = commentTags.Name
 		}
 
+		var childPath *field.Path
+		if jsonName != "" {
+			childPath = fldPath.Child(jsonName)
+		} else {
+			childPath = fldPath.Child(name)
+		}
+
 		// Discover the field type.
-		childPath := fldPath.Child(name)
 		klog.V(5).InfoS("field", "name", name, "jsonName", jsonName, "type", memb.Type, "path", childPath)
 		childType := memb.Type
 		var child *childNode
