@@ -55,8 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-var ErrVolumeAttachLimitExceeded = errors.New("node has reached its volume attachment limit")
-
 const (
 	// reconcilerLoopSleepPeriod is the amount of time the reconciler loop waits
 	// between successive executions
@@ -284,6 +282,18 @@ type volumeManager struct {
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
 
+type VolumeAttachLimitExceededError struct {
+	UnmountedVolumes  []string
+	UnattachedVolumes []string
+	VolumesNotInDSW   []string
+	OriginalError     error
+}
+
+func (e *VolumeAttachLimitExceededError) Error() string {
+	return fmt.Sprintf("Node has reached its volume attachment limit, rejecting pod. unmounted volumes=%v, unattached volumes=%v, failed to process volumes=%v: %v",
+		e.UnmountedVolumes, e.UnattachedVolumes, e.VolumesNotInDSW, e.OriginalError)
+}
+
 func (vm *volumeManager) Run(ctx context.Context, sourcesReady config.SourcesReady) {
 	defer runtime.HandleCrash()
 
@@ -430,6 +440,12 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 			return nil
 		}
 
+		unattachedVolumes := []string{}
+		for _, volumeToMount := range unattachedVolumeMounts {
+			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
+		}
+		slices.Sort(unattachedVolumes)
+
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
 			for _, volumeToMount := range unattachedVolumeMounts {
 				attachablePlugin, findErr := vm.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
@@ -439,16 +455,15 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 				}
 				if attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec) {
 					// Return error to the kubelet, which will then trigger the pod termination logic.
-					return ErrVolumeAttachLimitExceeded
+					return &VolumeAttachLimitExceededError{
+						UnmountedVolumes:  unmountedVolumes,
+						UnattachedVolumes: unattachedVolumes,
+						VolumesNotInDSW:   volumesNotInDSW,
+						OriginalError:     err,
+					}
 				}
 			}
 		}
-
-		unattachedVolumes := []string{}
-		for _, volumeToMount := range unattachedVolumeMounts {
-			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
-		}
-		slices.Sort(unattachedVolumes)
 
 		return fmt.Errorf(
 			"unmounted volumes=%v, unattached volumes=%v, failed to process volumes=%v: %w",
