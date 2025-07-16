@@ -261,8 +261,8 @@ func (iv itemValidator) GetValidations(context Context) (Validations, error) {
 			Scope:      ScopeListVal,
 			Type:       elemT,
 			Path:       context.Path.Key(subContextPath),
+			Member:     nil, // NA for list items
 			ParentPath: context.Path,
-			Member:     nil,
 		}
 
 		validations, err := iv.validator.ExtractValidations(subContext, item.valueTag)

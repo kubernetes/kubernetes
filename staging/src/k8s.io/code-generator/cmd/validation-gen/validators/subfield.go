@@ -59,12 +59,13 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	args := tag.Args
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	t := util.NonPointer(util.NativeType(context.Type))
-	if t.Kind != types.Struct {
-		return Validations{}, fmt.Errorf("can only be used on struct types")
+	t := context.Type
+	nt := util.NonPointer(util.NativeType(t))
+	if nt.Kind != types.Struct {
+		return Validations{}, fmt.Errorf("can only be used on struct types: %v", nt.Kind)
 	}
 	subname := args[0].Value
-	submemb := util.GetMemberByJSON(t, subname)
+	submemb := util.GetMemberByJSON(nt, subname)
 	if submemb == nil {
 		return Validations{}, fmt.Errorf("no field for json name %q", subname)
 	}
@@ -72,9 +73,9 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	subContext := Context{
 		Scope:      ScopeField,
 		Type:       submemb.Type,
-		ParentPath: context.Path,
-		Member:     submemb,
 		Path:       context.Path.Child(subname),
+		Member:     submemb,
+		ParentPath: context.Path,
 	}
 	if validations, err := stv.validator.ExtractValidations(subContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
