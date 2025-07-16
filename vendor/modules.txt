@@ -432,8 +432,6 @@ github.com/munnerz/goautoneg
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 ## explicit
 github.com/mxk/go-flowrate/flowrate
-# github.com/onsi/ginkgo/v2 v2.20.1 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20250416174521-4eb003743b54
-## explicit; go 1.22.0
 # github.com/onsi/ginkgo/v2 v2.21.0 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20250416174521-4eb003743b54
 ## explicit; go 1.22.0
 github.com/onsi/ginkgo/v2
@@ -1304,15 +1302,23 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
+# k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
+## explicit; go 1.24.0
 # k8s.io/api v0.33.2 => ./staging/src/k8s.io/api
 ## explicit; go 1.24.0
 # k8s.io/apiextensions-apiserver v0.33.2 => ./staging/src/k8s.io/apiextensions-apiserver
 ## explicit; go 1.24.0
+# k8s.io/apimachinery v0.0.0 => ./staging/src/k8s.io/apimachinery
+## explicit; go 1.24.0
 # k8s.io/apimachinery v0.33.2 => ./staging/src/k8s.io/apimachinery
+## explicit; go 1.24.0
+# k8s.io/apiserver v0.0.0 => ./staging/src/k8s.io/apiserver
 ## explicit; go 1.24.0
 # k8s.io/apiserver v0.33.2 => ./staging/src/k8s.io/apiserver
 ## explicit; go 1.24.0
 # k8s.io/cli-runtime v0.0.0 => ./staging/src/k8s.io/cli-runtime
+## explicit; go 1.24.0
+# k8s.io/client-go v0.0.0 => ./staging/src/k8s.io/client-go
 ## explicit; go 1.24.0
 # k8s.io/client-go v0.33.2 => ./staging/src/k8s.io/client-go
 ## explicit; go 1.24.0
@@ -1320,11 +1326,19 @@ gopkg.in/yaml.v3
 ## explicit; go 1.24.0
 # k8s.io/cluster-bootstrap v0.0.0 => ./staging/src/k8s.io/cluster-bootstrap
 ## explicit; go 1.24.0
+# k8s.io/code-generator v0.0.0 => ./staging/src/k8s.io/code-generator
+## explicit; go 1.24.0
 # k8s.io/code-generator v0.33.2 => ./staging/src/k8s.io/code-generator
+## explicit; go 1.24.0
+# k8s.io/component-base v0.0.0 => ./staging/src/k8s.io/component-base
 ## explicit; go 1.24.0
 # k8s.io/component-base v0.33.2 => ./staging/src/k8s.io/component-base
 ## explicit; go 1.24.0
+# k8s.io/component-helpers v0.0.0 => ./staging/src/k8s.io/component-helpers
+## explicit; go 1.24.0
 # k8s.io/component-helpers v0.32.1 => ./staging/src/k8s.io/component-helpers
+## explicit; go 1.24.0
+# k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
 ## explicit; go 1.24.0
 # k8s.io/controller-manager v0.32.1 => ./staging/src/k8s.io/controller-manager
 ## explicit; go 1.24.0
