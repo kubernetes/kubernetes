@@ -741,9 +741,9 @@ func newGarbageCollectorControllerDescriptor() *ControllerDescriptor {
 }
 
 type garbageCollectorController struct {
-	named
 	*garbagecollector.GarbageCollector
 	controllerContext ControllerContext
+	controllerName    string
 	discoveryClient   discovery.DiscoveryInterface
 }
 
@@ -790,8 +790,8 @@ func newGarbageCollectorController(ctx context.Context, controllerContext Contro
 	}
 
 	return &garbageCollectorController{
-		named:             newNamed(controllerName),
 		GarbageCollector:  garbageCollector,
+		controllerName:    controllerName,
 		controllerContext: controllerContext,
 		discoveryClient:   discoveryClient,
 	}, nil
@@ -799,7 +799,7 @@ func newGarbageCollectorController(ctx context.Context, controllerContext Contro
 
 // Name must be implemented explicitly as it collides with the embedded controller.
 func (c *garbageCollectorController) Name() string {
-	return c.named.Name()
+	return c.controllerName
 }
 
 func (c *garbageCollectorController) Run(ctx context.Context) {

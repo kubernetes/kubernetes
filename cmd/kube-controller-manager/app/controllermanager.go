@@ -505,28 +505,21 @@ func runRunnables(ctx context.Context, rx ...Runnable) {
 	runnables(rx).Run(ctx)
 }
 
-// named can be easily embedded to implement Name() for a struct.
-type named string
-
-func (n named) Name() string {
-	return string(n)
-}
-
-func newNamed(name string) named {
-	return named(name)
-}
-
 // namedRunnable implements the Controller interface.
 type namedRunnable struct {
-	named
 	Runnable
+	name string
 }
 
 func newNamedRunnable(runnable Runnable, name string) *namedRunnable {
 	return &namedRunnable{
-		named:    newNamed(name),
 		Runnable: runnable,
+		name:     name,
 	}
+}
+
+func (r *namedRunnable) Name() string {
+	return r.name
 }
 
 // newNamedRunnableFunc makes it easy to turn a single function into a Controller.
