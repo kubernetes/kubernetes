@@ -219,16 +219,15 @@ type dummyCacher struct {
 	dummyStorage
 	ready bool
 
-	lastCompactedResourceVersion string
+	consistent bool
 }
 
 func (d *dummyCacher) Ready() bool {
 	return d.ready
 }
 
-func (d *dummyCacher) Compact(resourceVersion string) error {
-	d.lastCompactedResourceVersion = resourceVersion
-	return nil
+func (d *dummyCacher) MarkConsistent(consistent bool) {
+	d.consistent = consistent
 }
 
 func TestShouldDelegateList(t *testing.T) {

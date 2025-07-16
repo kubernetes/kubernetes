@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/rand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -218,6 +219,94 @@ func TestCompactRevision(t *testing.T) {
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
 	storagetesting.RunTestCompactRevision(ctx, t, cacher, increaseRV(server.V3Client.Client), compactStore(cacher, server.V3Client.Client))
+}
+
+func TestMarkConsistent(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+	t.Cleanup(terminate)
+	recorder := server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder)
+
+	t.Log("New cache collects snapshots, list skips etcd")
+	resourceVersion1 := createObject(t, ctx, cacher)
+	etcdRequests := etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion1,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 0 {
+		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 2 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 2, cacher.cacher.watchCache.snapshots.Len())
+	}
+
+	t.Log("Inconsistent cache clears old snapshots, list hits etcd")
+	cacher.cacher.MarkConsistent(false)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion1,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 1 {
+		t.Errorf("Expected request to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 0 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 0, cacher.cacher.watchCache.snapshots.Len())
+	}
+
+	t.Log("Inconsistent cache doesn't collect new snapshot, list hits etcd")
+	resourceVersion2 := createObject(t, ctx, cacher)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion2,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 1 {
+		t.Errorf("Expected request to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 0 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 0, cacher.cacher.watchCache.snapshots.Len())
+	}
+
+	t.Log("Marking cache consistent allows it to collect new snapshots, list skips etcd")
+	cacher.cacher.MarkConsistent(true)
+	resourceVersion3 := createObject(t, ctx, cacher)
+	etcdRequests = etcdListRequests(t, ctx, cacher, recorder, storage.ListOptions{
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+		ResourceVersion:      resourceVersion3,
+		Recursive:            true,
+	})
+	if len(etcdRequests) != 0 {
+		t.Errorf("Expected no requests to etcd, got: %+v", etcdRequests)
+	}
+	if cacher.cacher.watchCache.snapshots.Len() != 1 {
+		t.Errorf("Expected cache %d snapshots, got: %d", 1, cacher.cacher.watchCache.snapshots.Len())
+	}
+}
+
+func createObject(t *testing.T, ctx context.Context, store storage.Interface) string {
+	var out example.Pod
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: rand.String(10)}}
+	err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out.ResourceVersion
+}
+
+func etcdListRequests(t *testing.T, ctx context.Context, store storage.Interface, recorder *storagetesting.KubernetesRecorder, opts storage.ListOptions) []storagetesting.RecordedList {
+	key := rand.String(10)
+	listCtx := context.WithValue(ctx, storagetesting.RecorderContextKey, key)
+	listOut := &example.PodList{}
+	if err := store.GetList(listCtx, "/pods", opts, listOut); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	return recorder.ListRequestForKey(key)
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {

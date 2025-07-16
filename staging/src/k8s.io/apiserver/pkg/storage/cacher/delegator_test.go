@@ -40,16 +40,17 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 		cacherItems     []example.Pod
 		etcdItems       []example.Pod
 
-		expectListKey                  string
-		expectDigest                   storageDigest
-		expectErr                      bool
-		expectCompactedResourceVersion string
+		expectListKey    string
+		expectDigest     storageDigest
+		expectErr        bool
+		expectConsistent bool
 	}{
 		{
-			desc:            "not ready",
-			cacherReady:     false,
-			resourceVersion: "1",
-			expectErr:       true,
+			desc:             "not ready",
+			cacherReady:      false,
+			resourceVersion:  "1",
+			expectErr:        true,
+			expectConsistent: true,
 		},
 		{
 			desc:            "empty",
@@ -60,6 +61,7 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				CacheDigest:     "cbf29ce484222325",
 				EtcdDigest:      "cbf29ce484222325",
 			},
+			expectConsistent: true,
 		},
 		{
 			desc:            "with one element equal",
@@ -76,6 +78,7 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				CacheDigest:     "86bf3a5e80d1c5cb",
 				EtcdDigest:      "86bf3a5e80d1c5cb",
 			},
+			expectConsistent: true,
 		},
 		{
 			desc:            "namespace changes digest",
@@ -92,7 +95,7 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				CacheDigest:     "4ae4e750bd825b17",
 				EtcdDigest:      "f940a60af965b03",
 			},
-			expectCompactedResourceVersion: "2",
+			expectConsistent: false,
 		},
 		{
 			desc:            "name changes digest",
@@ -109,7 +112,7 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				CacheDigest:     "c9120494e4c1897d",
 				EtcdDigest:      "c9156494e4c46274",
 			},
-			expectCompactedResourceVersion: "2",
+			expectConsistent: false,
 		},
 		{
 			desc:            "resourceVersion changes digest",
@@ -126,7 +129,7 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				CacheDigest:     "86bf3a5e80d1c5ca",
 				EtcdDigest:      "86bf3a5e80d1c5cd",
 			},
-			expectCompactedResourceVersion: "4",
+			expectConsistent: false,
 		},
 		{
 			desc:            "watch missed write event",
@@ -144,7 +147,7 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				CacheDigest:     "1859bac707c2cb2b",
 				EtcdDigest:      "11d147fc800df0e0",
 			},
-			expectCompactedResourceVersion: "3",
+			expectConsistent: false,
 		},
 	}
 
@@ -168,7 +171,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				},
 			}
 			cacher := &dummyCacher{
-				ready: tc.cacherReady,
+				ready:      tc.cacherReady,
+				consistent: true,
 				dummyStorage: dummyStorage{
 					getListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 						if key != tc.expectListKey {
@@ -200,8 +204,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 			}
 
 			checker.check(context.Background())
-			if cacher.lastCompactedResourceVersion != tc.expectCompactedResourceVersion {
-				t.Errorf("Expect: %+v Got: %+v", tc.expectCompactedResourceVersion, cacher.lastCompactedResourceVersion)
+			if cacher.consistent != tc.expectConsistent {
+				t.Errorf("Expect: %+v Got: %+v", tc.expectConsistent, cacher.consistent)
 			}
 		})
 	}

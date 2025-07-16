@@ -1672,7 +1672,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Recursive:            true,
 			}
 			recorderKey := t.Name()
-			listCtx := context.WithValue(ctx, recorderContextKey, recorderKey)
+			listCtx := context.WithValue(ctx, RecorderContextKey, recorderKey)
 			err := store.GetList(listCtx, tt.prefix, storageOpts, out)
 			if tt.expectRVTooLarge {
 				if !storage.IsTooLargeResourceVersion(err) {
