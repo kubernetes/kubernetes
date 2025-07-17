@@ -71,8 +71,8 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
-			maxSeats:             10,
-			initialSeatsExpected: 10,
+			maxSeats:             20,
+			initialSeatsExpected: 20,
 		},
 		{
 			name:       "request verb is list, has limit and resource version is 1",
@@ -194,16 +194,28 @@ func TestWorkEstimator(t *testing.T) {
 			initialSeatsExpected: 8,
 		},
 		{
-			name:       "request verb is list, maximum is capped",
+			name:       "request verb is list, capped by watchcache max",
 			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=foo",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			stats:                storage.Stats{ObjectCount: 1999, EstimatedAverageObjectSizeBytes: 1_000},
-			maxSeats:             10,
+			stats:                storage.Stats{ObjectCount: 5000, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             20,
 			initialSeatsExpected: 10,
+		},
+		{
+			name:       "request verb is list, maximum is capped",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=foo&resourceVersionMatch=Exact",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			stats:                storage.Stats{ObjectCount: 5000, EstimatedAverageObjectSizeBytes: 1_000},
+			maxSeats:             20,
+			initialSeatsExpected: 20,
 		},
 		{
 			name:       "request verb is list, maximum is capped, lower max seats",
@@ -239,8 +251,8 @@ func TestWorkEstimator(t *testing.T) {
 			},
 			stats:                storage.Stats{ObjectCount: 1999, EstimatedAverageObjectSizeBytes: 1_000},
 			statsErr:             ObjectCountStaleErr,
-			maxSeats:             10,
-			initialSeatsExpected: 10,
+			maxSeats:             20,
+			initialSeatsExpected: 20,
 		},
 		{
 			name:       "request verb is list, object count is not found",
@@ -263,8 +275,8 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			statsErr:             errors.New("unknown error"),
-			maxSeats:             10,
-			initialSeatsExpected: 10,
+			maxSeats:             20,
+			initialSeatsExpected: 20,
 		},
 		{
 			name:       "request verb is list, metadata.name specified",
@@ -289,7 +301,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000_000},
-			maxSeats:             10,
+			maxSeats:             20,
 			initialSeatsExpected: 10,
 		},
 		{
@@ -314,7 +326,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
-			initialSeatsExpected: minimumSeats,
+			initialSeatsExpected: 1,
 		},
 		{
 			name:       "request verb is watch, sendInitialEvents is false",
@@ -325,7 +337,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			stats:                storage.Stats{ObjectCount: 799, EstimatedAverageObjectSizeBytes: 1_000},
-			initialSeatsExpected: minimumSeats,
+			initialSeatsExpected: 1,
 		},
 		{
 			name:       "request verb is watch, sendInitialEvents is true",
@@ -380,7 +392,7 @@ func TestWorkEstimator(t *testing.T) {
 			additionalLatencyExpected: 0,
 		},
 		{
-			name:       "request verb is create, watches registered, maximum is capped",
+			name:       "request verb is create, watches registered, capped by watch cache",
 			requestURI: "http://server/apis/foo.bar/v1/foos",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "create",
@@ -512,7 +524,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "serviceaccounts",
 			},
 			watchCount:                1000,
-			maxSeats:                  10,
+			maxSeats:                  20,
 			initialSeatsExpected:      1,
 			finalSeatsExpected:        10,
 			additionalLatencyExpected: 50 * time.Millisecond,
