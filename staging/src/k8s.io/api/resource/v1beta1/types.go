@@ -31,6 +31,17 @@ const (
 	// Reserved for use by Kubernetes, DRA driver controllers must
 	// use their own finalizer.
 	Finalizer = "resource.kubernetes.io/delete-protection"
+	// ExtendedResourceClaimAnnotation is the annotation that generated special
+	// ResourceClaim get. Its single valid value is "true".
+	// This is used only inside the scheduler.
+	ExtendedResourceClaimAnnotation = "resource.kubernetes.io/extended-resource-claim"
+	// Resource device class prefix is for generating implicit extended resource
+	// name for a device class when its ExtendedResourceName field is not
+	// specified. The generated name is this prefix + the device class name.
+	// The generated name may not be a valid extended resource name for use
+	// in pod.Spec.Resources.Requests, in that case, a valid name has to be specified
+	// explicitly in device class.
+	ResourceDeviceClassPrefix string = "deviceclass.resource.kubernetes.io/"
 )
 
 // +genclient
@@ -1387,6 +1398,20 @@ type DeviceClassSpec struct {
 	// it got removed. May be reused once decoding v1alpha3 is no longer
 	// supported.
 	// SuitableNodes *v1.NodeSelector `json:"suitableNodes,omitempty" protobuf:"bytes,3,opt,name=suitableNodes"`
+
+	// ExtendedResourceName is the extended resource name for the devices of this class.
+	// The devices of this class can be used to satisfy a pod's extended resource requests.
+	// It has the same format as the name of a pod's extended resource.
+	// It should be unique among all the device classes in a cluster.
+	// If two device classes have the same name, then the class created later
+	// is picked to satisfy a pod's extended resource requests.
+	// If two classes are created at the same time, then the name of the class
+	// lexicographically sorted first is picked.
+	//
+	// This is an alpha field.
+	// +optional
+	// +featureGate=DRAExtendedResource
+	ExtendedResourceName *string `json:"extendedResourceName,omitempty" protobuf:"bytes,4,opt,name=extendedResourceName"`
 }
 
 // DeviceClassConfiguration is used in DeviceClass.
