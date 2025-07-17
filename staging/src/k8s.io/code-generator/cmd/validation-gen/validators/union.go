@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/parser/tags"
@@ -287,7 +288,7 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 			if u.discriminator != nil {
 				supportVar := Variable(supportVarName,
 					Function(tagName, DefaultFlags, newDiscriminatedUnionMembership,
-						append([]any{*u.discriminator}, getDisplayFields(u, context, true)...)...))
+						append([]any{*u.discriminator}, getMemberArgs(u, context, true)...)...))
 				result.Variables = append(result.Variables, supportVar)
 
 				discriminatorExtractor := FunctionLiteral{
@@ -300,7 +301,7 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...)
 				result.Functions = append(result.Functions, fn)
 			} else {
-				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getDisplayFields(u, context, false)...))
+				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getMemberArgs(u, context, false)...))
 				result.Variables = append(result.Variables, supportVar)
 
 				extraArgs := append([]any{supportVarName}, extractorArgs...)
@@ -457,8 +458,10 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 		return fmt.Errorf("list-item union member has no list selector in context")
 	}
 
-	// It's not really a "field", but close enough.
-	fieldName := context.Path.String() // eg: "<path>/Pipeline.Tasks[{"name": "succeeded"}]"
+	// It's not really a "field", but close enough. We don't really NEED the
+	// field name, since it is present in the error message, but it is more
+	// human-friendly. eg: `field[{"name": "succeeded"}]`
+	fieldName := lastPathElement(context.Path)
 
 	if shared[context.ParentPath.String()] == nil {
 		shared[context.ParentPath.String()] = unions{}
@@ -482,34 +485,27 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 	return nil
 }
 
-// getDisplayFields formats union field names for user-friendly error messages.
-// For list item unions, it converts paths like "<path>/Pipeline.Tasks[{\"name\": \"succeeded\"}]"
-// to readable formats like "Tasks[{\"name\": \"succeeded\"}]".
-func getDisplayFields(u *union, context Context, discrim bool) []any {
-	displayFields := make([]any, len(u.members))
-	listFieldName := context.Path.String()
-	pathParts := strings.Split(listFieldName, ".")
-	if len(pathParts) > 0 {
-		listFieldName = pathParts[len(pathParts)-1]
+func lastPathElement(path *field.Path) string {
+	parts := strings.Split(path.String(), ".")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
 	}
-	for i, f := range u.members {
+	return ""
+}
+
+// getMemberArgs gets a list of arguments which construct union members.
+func getMemberArgs(u *union, context Context, discrim bool) []any {
+	members := make([]any, 0, len(u.members))
+	for _, f := range u.members {
 		fieldName := f.fieldName
 		memberName := f.discriminatorValue
-		if _, isItem := u.itemMatchers[fieldName]; isItem {
-			// Extract the JSON part from the input
-			bracketIndex := strings.Index(fieldName, "[")
-			if bracketIndex != -1 {
-				jsonPart := fieldName[bracketIndex:]
-				fieldName = listFieldName + jsonPart
-			}
-		}
 		if discrim {
-			displayFields[i] = Function("xx", 0, newDiscriminatedUnionMember, fieldName, memberName)
+			members = append(members, Function("unused", 0, newDiscriminatedUnionMember, fieldName, memberName))
 		} else {
-			displayFields[i] = Function("xx", 0, newUnionMember, fieldName)
+			members = append(members, Function("unused", 0, newUnionMember, fieldName))
 		}
 	}
-	return displayFields
+	return members
 }
 
 // sanitizeName converts a string into a valid Go identifier
