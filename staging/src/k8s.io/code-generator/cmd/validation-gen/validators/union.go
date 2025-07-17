@@ -17,7 +17,6 @@ limitations under the License.
 package validators
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
@@ -193,7 +192,7 @@ type union struct {
 	// key is the virtual field path (eg: "<path>/Pipeline.Tasks[{"name": "succeeded"}]"),
 	// value is the parsed matcher map (eg: {"name": "succeeded"}).
 	// Represents union members that are list items matching specific criteria
-	itemMatchers map[string]map[string]any
+	itemMatchers map[string][]ListSelectorTerm
 }
 
 type unionMember struct {
@@ -207,7 +206,8 @@ type unions map[string]*union
 // newUnion initializes a new union instance
 func newUnion() *union {
 	return &union{
-		itemMatchers: make(map[string]map[string]any),
+		// slice fields can be nil
+		itemMatchers: make(map[string][]ListSelectorTerm),
 	}
 }
 
@@ -332,12 +332,12 @@ func createMemberExtractor(ptrType *types.Type, member *types.Member) FunctionLi
 
 // createItemExtractor creates an extractor function for list item union members.
 // It generates code that loops through the list to check if an item matching the criteria exists.
-func createItemExtractor(listType *types.Type, elemType *types.Type, matcher map[string]any) (FunctionLiteral, error) {
+func createItemExtractor(listType *types.Type, elemType *types.Type, matcher []ListSelectorTerm) (FunctionLiteral, error) {
 	var criteria []keyValuePair
-	for key, value := range matcher {
+	for _, term := range matcher {
 		criteria = append(criteria, keyValuePair{
-			key:   key,
-			value: fmt.Sprint(value),
+			key:   term.Field,
+			value: fmt.Sprint(term.Value),
 		})
 	}
 
@@ -354,12 +354,13 @@ func createItemExtractor(listType *types.Type, elemType *types.Type, matcher map
 	extractor := FunctionLiteral{
 		Parameters: []ParamResult{{Name: "list", Type: listType}},
 		Results:    []ParamResult{{Type: types.Bool}},
-		Body: fmt.Sprintf(`for i := range list {
-	if %s {
-		return true
-	}
-}
-return false`, condition),
+		Body: fmt.Sprintf(
+			`for i := range list {
+				if %s {
+					return true
+				}
+			 }
+			 return false`, condition),
 	}
 
 	return extractor, nil
@@ -433,11 +434,13 @@ func processMemberValidations(shared map[string]unions, context Context, tag cod
 	u.fields = append(u.fields, unionMember{fieldName, memberName})
 
 	if context.Scope == ScopeListVal {
-		matcher, err := extractMatcherFromPath(fieldName)
-		if err != nil {
-			return fmt.Errorf("failed to extract matcher from path %s: %w", fieldName, err)
+		if context.ListSelector == nil {
+			return fmt.Errorf("list-item union member has no list selector in context")
 		}
-		u.itemMatchers[fieldName] = matcher
+		if _, found := u.itemMatchers[fieldName]; found {
+			return fmt.Errorf("list-item union member %q already exists", fieldName)
+		}
+		u.itemMatchers[fieldName] = context.ListSelector
 	} else {
 		u.fieldMembers = append(u.fieldMembers, context.Member)
 	}
@@ -480,19 +483,4 @@ func sanitizeName(name string) string {
 	name = strings.ReplaceAll(name, ".", "_")
 	re := regexp.MustCompile(`[^a-zA-Z0-9_]`)
 	return re.ReplaceAllString(name, "_")
-}
-
-// extractMatcherFromPath extracts the matcher criteria from a path like "Pipeline.Tasks[{"name": "succeeded"}]"
-func extractMatcherFromPath(path string) (map[string]any, error) {
-	re := regexp.MustCompile(`\[({.*?})\]`)
-	matches := re.FindStringSubmatch(path)
-	if len(matches) < 2 {
-		return nil, fmt.Errorf("no matcher criteria found in path")
-	}
-
-	var matcher map[string]any
-	if err := json.Unmarshal([]byte(matches[1]), &matcher); err != nil {
-		return nil, fmt.Errorf("failed to parse matcher JSON: %w", err)
-	}
-	return matcher, nil
 }
