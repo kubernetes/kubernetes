@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -60,9 +60,9 @@ func TestCompilation(t *testing.T) {
 	}{
 		{
 			name: "applyConfiguration then jsonPatch",
-			policy: mutations(policy("d1"), v1alpha1.Mutation{
-				PatchType: v1alpha1.PatchTypeApplyConfiguration,
-				ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+			policy: mutations(policy("d1"), v1beta1.Mutation{
+				PatchType: v1beta1.PatchTypeApplyConfiguration,
+				ApplyConfiguration: &v1beta1.ApplyConfiguration{
 					Expression: `Object{
 									spec: Object.spec{
 										replicas: object.spec.replicas + 100
@@ -70,9 +70,9 @@ func TestCompilation(t *testing.T) {
 								}`,
 				},
 			},
-				v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeJSONPatch,
-					JSONPatch: &v1alpha1.JSONPatch{
+				v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeJSONPatch,
+					JSONPatch: &v1beta1.JSONPatch{
 						Expression: `[
 							JSONPatch{op: "replace", path: "/spec/replicas", value: object.spec.replicas + 10}
 						]`,
@@ -85,17 +85,17 @@ func TestCompilation(t *testing.T) {
 		{
 			name: "jsonPatch then applyConfiguration",
 			policy: mutations(policy("d1"),
-				v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeJSONPatch,
-					JSONPatch: &v1alpha1.JSONPatch{
+				v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeJSONPatch,
+					JSONPatch: &v1beta1.JSONPatch{
 						Expression: `[
 							JSONPatch{op: "replace", path: "/spec/replicas", value: object.spec.replicas + 10}
 						]`,
 					},
 				},
-				v1alpha1.Mutation{
-					PatchType: v1alpha1.PatchTypeApplyConfiguration,
-					ApplyConfiguration: &v1alpha1.ApplyConfiguration{
+				v1beta1.Mutation{
+					PatchType: v1beta1.PatchTypeApplyConfiguration,
+					ApplyConfiguration: &v1beta1.ApplyConfiguration{
 						Expression: `Object{
 									spec: Object.spec{
 										replicas: object.spec.replicas + 100
@@ -109,7 +109,7 @@ func TestCompilation(t *testing.T) {
 		},
 		{
 			name: "jsonPatch with variable",
-			policy: jsonPatches(variables(policy("d1"), v1alpha1.Variable{Name: "desired", Expression: "10"}), v1alpha1.JSONPatch{
+			policy: jsonPatches(variables(policy("d1"), v1beta1.Variable{Name: "desired", Expression: "10"}), v1beta1.JSONPatch{
 				Expression: `[
 					JSONPatch{op: "replace", path: "/spec/replicas", value: variables.desired + 1}, 
 				]`,
@@ -120,7 +120,7 @@ func TestCompilation(t *testing.T) {
 		},
 		{
 			name: "apply configuration with variable",
-			policy: applyConfigurations(variables(policy("d1"), v1alpha1.Variable{Name: "desired", Expression: "10"}),
+			policy: applyConfigurations(variables(policy("d1"), v1beta1.Variable{Name: "desired", Expression: "10"}),
 				`Object{
 					spec: Object.spec{
 						replicas: variables.desired + 1
@@ -137,7 +137,7 @@ func TestCompilation(t *testing.T) {
 					spec: Object.spec{
 						replicas: int(params.data['k1'])
 					}
-				}`), &v1alpha1.ParamKind{Kind: "ConfigMap", APIVersion: "v1"}),
+				}`), &v1beta1.ParamKind{Kind: "ConfigMap", APIVersion: "v1"}),
 			params:         &corev1.ConfigMap{Data: map[string]string{"k1": "100"}},
 			gvr:            deploymentGVR,
 			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
@@ -145,7 +145,7 @@ func TestCompilation(t *testing.T) {
 		},
 		{
 			name: "jsonPatch with excessive cost",
-			policy: jsonPatches(variables(policy("d1"), v1alpha1.Variable{Name: "list", Expression: "[0,1,2,3,4,5,6,7,8,9]"}), v1alpha1.JSONPatch{
+			policy: jsonPatches(variables(policy("d1"), v1beta1.Variable{Name: "list", Expression: "[0,1,2,3,4,5,6,7,8,9]"}), v1beta1.JSONPatch{
 				Expression: `[
 					JSONPatch{op: "replace", path: "/spec/replicas", 
 						value: variables.list.all(x1, variables.list.all(x2, variables.list.all(x3, variables.list.all(x4, variables.list.all(x5, variables.list.all(x5, "0123456789" == "0123456789"))))))? 1 : 0
@@ -163,14 +163,14 @@ func TestCompilation(t *testing.T) {
 					spec: Object.spec{
 						replicas: variables.list.all(x1, variables.list.all(x2, variables.list.all(x3, variables.list.all(x4, variables.list.all(x5, variables.list.all(x5, "0123456789" == "0123456789"))))))? 1 : 0
 					}
-				}`), v1alpha1.Variable{Name: "list", Expression: "[0,1,2,3,4,5,6,7,8,9]"}),
+				}`), v1beta1.Variable{Name: "list", Expression: "[0,1,2,3,4,5,6,7,8,9]"}),
 			gvr:         deploymentGVR,
 			object:      &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
 			expectedErr: "operation cancelled: actual cost limit exceeded",
 		},
 		{
 			name: "request variable",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
+			policy: jsonPatches(policy("d1"), v1beta1.JSONPatch{
 				Expression: `[
 					JSONPatch{op: "replace", path: "/spec/replicas", 
 						value: request.kind.group == 'apps' && request.kind.version == 'v1' && request.kind.kind == 'Deployment' ? 10 : 0
@@ -182,7 +182,7 @@ func TestCompilation(t *testing.T) {
 		},
 		{
 			name: "namespace request variable",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
+			policy: jsonPatches(policy("d1"), v1beta1.JSONPatch{
 				Expression: `[
 					JSONPatch{op: "replace", path: "/spec/replicas", 
 						value: namespaceObject.metadata.name == 'ns1' ? 10 : 0
@@ -195,7 +195,7 @@ func TestCompilation(t *testing.T) {
 		},
 		{
 			name: "authorizer check",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
+			policy: jsonPatches(policy("d1"), v1beta1.JSONPatch{
 				Expression: `[
 					JSONPatch{op: "replace", path: "/spec/replicas", 
 						value: authorizer.group('').resource('endpoints').check('create').allowed() ? 10 : 0
@@ -208,7 +208,7 @@ func TestCompilation(t *testing.T) {
 		},
 		{
 			name: "object type has field access",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
+			policy: jsonPatches(policy("d1"), v1beta1.JSONPatch{
 				Expression: `[
 					JSONPatch{
 						op: "add", path: "/metadata/labels",
@@ -226,7 +226,7 @@ func TestCompilation(t *testing.T) {
 		},
 		{
 			name: "object type has field testing",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
+			policy: jsonPatches(policy("d1"), v1beta1.JSONPatch{
 				Expression: `[
 					JSONPatch{
 						op: "add", path: "/metadata/labels",
@@ -246,7 +246,7 @@ func TestCompilation(t *testing.T) {
 		},
 		{
 			name: "object type equality",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
+			policy: jsonPatches(policy("d1"), v1beta1.JSONPatch{
 				Expression: `[
 					JSONPatch{
 						op: "add", path: "/metadata/labels",
@@ -274,7 +274,7 @@ func TestCompilation(t *testing.T) {
 			// recompile all expressions with fully bound types before evaluation and report
 			// errors if invalid Object types like this are initialized.
 			name: "object types are not fully type checked",
-			policy: jsonPatches(policy("d1"), v1alpha1.JSONPatch{
+			policy: jsonPatches(policy("d1"), v1beta1.JSONPatch{
 				Expression: `[
 					JSONPatch{
 						op: "add", path: "/spec",
@@ -400,52 +400,52 @@ func TestCompilation(t *testing.T) {
 	}
 }
 
-func policy(name string) *v1alpha1.MutatingAdmissionPolicy {
-	return &v1alpha1.MutatingAdmissionPolicy{
+func policy(name string) *v1beta1.MutatingAdmissionPolicy {
+	return &v1beta1.MutatingAdmissionPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: v1alpha1.MutatingAdmissionPolicySpec{},
+		Spec: v1beta1.MutatingAdmissionPolicySpec{},
 	}
 }
 
-func variables(policy *v1alpha1.MutatingAdmissionPolicy, variables ...v1alpha1.Variable) *v1alpha1.MutatingAdmissionPolicy {
+func variables(policy *v1beta1.MutatingAdmissionPolicy, variables ...v1beta1.Variable) *v1beta1.MutatingAdmissionPolicy {
 	policy.Spec.Variables = append(policy.Spec.Variables, variables...)
 	return policy
 }
 
-func jsonPatches(policy *v1alpha1.MutatingAdmissionPolicy, jsonPatches ...v1alpha1.JSONPatch) *v1alpha1.MutatingAdmissionPolicy {
+func jsonPatches(policy *v1beta1.MutatingAdmissionPolicy, jsonPatches ...v1beta1.JSONPatch) *v1beta1.MutatingAdmissionPolicy {
 	for _, jsonPatch := range jsonPatches {
-		policy.Spec.Mutations = append(policy.Spec.Mutations, v1alpha1.Mutation{
+		policy.Spec.Mutations = append(policy.Spec.Mutations, v1beta1.Mutation{
 			JSONPatch: &jsonPatch,
-			PatchType: v1alpha1.PatchTypeJSONPatch,
+			PatchType: v1beta1.PatchTypeJSONPatch,
 		})
 	}
 
 	return policy
 }
 
-func applyConfigurations(policy *v1alpha1.MutatingAdmissionPolicy, expressions ...string) *v1alpha1.MutatingAdmissionPolicy {
+func applyConfigurations(policy *v1beta1.MutatingAdmissionPolicy, expressions ...string) *v1beta1.MutatingAdmissionPolicy {
 	for _, expression := range expressions {
-		policy.Spec.Mutations = append(policy.Spec.Mutations, v1alpha1.Mutation{
-			ApplyConfiguration: &v1alpha1.ApplyConfiguration{Expression: expression},
-			PatchType:          v1alpha1.PatchTypeApplyConfiguration,
+		policy.Spec.Mutations = append(policy.Spec.Mutations, v1beta1.Mutation{
+			ApplyConfiguration: &v1beta1.ApplyConfiguration{Expression: expression},
+			PatchType:          v1beta1.PatchTypeApplyConfiguration,
 		})
 	}
 	return policy
 }
 
-func paramKind(policy *v1alpha1.MutatingAdmissionPolicy, paramKind *v1alpha1.ParamKind) *v1alpha1.MutatingAdmissionPolicy {
+func paramKind(policy *v1beta1.MutatingAdmissionPolicy, paramKind *v1beta1.ParamKind) *v1beta1.MutatingAdmissionPolicy {
 	policy.Spec.ParamKind = paramKind
 	return policy
 }
 
-func mutations(policy *v1alpha1.MutatingAdmissionPolicy, mutations ...v1alpha1.Mutation) *v1alpha1.MutatingAdmissionPolicy {
+func mutations(policy *v1beta1.MutatingAdmissionPolicy, mutations ...v1beta1.Mutation) *v1beta1.MutatingAdmissionPolicy {
 	policy.Spec.Mutations = append(policy.Spec.Mutations, mutations...)
 	return policy
 }
 
-func matchConstraints(policy *v1alpha1.MutatingAdmissionPolicy, matchConstraints *v1alpha1.MatchResources) *v1alpha1.MutatingAdmissionPolicy {
+func matchConstraints(policy *v1beta1.MutatingAdmissionPolicy, matchConstraints *v1beta1.MatchResources) *v1beta1.MutatingAdmissionPolicy {
 	policy.Spec.MatchConstraints = matchConstraints
 	return policy
 }

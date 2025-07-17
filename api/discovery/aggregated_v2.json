@@ -1454,6 +1454,58 @@
               ]
             }
           ],
+          "version": "v1beta1"
+        },
+        {
+          "freshness": "Current",
+          "resources": [
+            {
+              "categories": [
+                "api-extensions"
+              ],
+              "resource": "mutatingadmissionpolicies",
+              "responseKind": {
+                "group": "",
+                "kind": "MutatingAdmissionPolicy",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "mutatingadmissionpolicy",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "categories": [
+                "api-extensions"
+              ],
+              "resource": "mutatingadmissionpolicybindings",
+              "responseKind": {
+                "group": "",
+                "kind": "MutatingAdmissionPolicyBinding",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "mutatingadmissionpolicybinding",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            }
+          ],
           "version": "v1alpha1"
         }
       ]

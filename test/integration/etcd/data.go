@@ -483,6 +483,20 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			IntroducedVersion: "1.28",
 			RemovedVersion:    "1.34",
 		},
+		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicies"): {
+			Stub:              `{"metadata":{"name":"map1b1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
+			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicies/map1b1",
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1alpha1", "MutatingAdmissionPolicy"),
+			IntroducedVersion: "1.34",
+			RemovedVersion:    "1.40",
+		},
+		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicybindings"): {
+			Stub:              `{"metadata":{"name":"mpb1b1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com", "parameterNotFoundAction": "Allow"}}}`,
+			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1b1",
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1alpha1", "MutatingAdmissionPolicyBinding"),
+			IntroducedVersion: "1.34",
+			RemovedVersion:    "1.40",
+		},
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1
@@ -493,7 +507,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			RemovedVersion:    "1.38",
 		},
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicybindings"): {
-			Stub:              `{"metadata":{"name":"mpb1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"}}}`,
+			Stub:              `{"metadata":{"name":"mpb1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com", "parameterNotFoundAction": "Allow"}}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1",
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
