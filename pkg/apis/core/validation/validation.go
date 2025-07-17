@@ -5845,31 +5845,6 @@ func validateContainerResize(newRequirements, oldRequirements *core.ResourceRequ
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("limits"), "resource limits cannot be removed"))
 	}
 
-	// Special case: memory limits may not be decreased if resize policy is NotRequired.
-	var memRestartPolicy core.ResourceResizeRestartPolicy
-	for _, policy := range resizePolicies {
-		if policy.ResourceName == core.ResourceMemory {
-			memRestartPolicy = policy.RestartPolicy
-			break
-		}
-	}
-	if memRestartPolicy == core.NotRequired || memRestartPolicy == "" {
-		newLimit, hasNewLimit := newRequirements.Limits[core.ResourceMemory]
-		oldLimit, hasOldLimit := oldRequirements.Limits[core.ResourceMemory]
-		if hasNewLimit && hasOldLimit {
-			if newLimit.Cmp(oldLimit) < 0 {
-				allErrs = append(allErrs, field.Forbidden(
-					fldPath.Child("limits").Key(core.ResourceMemory.String()),
-					fmt.Sprintf("memory limits cannot be decreased unless resizePolicy is %s", core.RestartContainer)))
-			}
-		} else if hasNewLimit && !hasOldLimit {
-			// Adding a memory limit is implicitly decreasing the memory limit (from 'max')
-			allErrs = append(allErrs, field.Forbidden(
-				fldPath.Child("limits").Key(core.ResourceMemory.String()),
-				fmt.Sprintf("memory limits cannot be added unless resizePolicy is %s", core.RestartContainer)))
-		}
-	}
-
 	// TODO(tallclair): Move resizable resource checks here.
 
 	return allErrs
