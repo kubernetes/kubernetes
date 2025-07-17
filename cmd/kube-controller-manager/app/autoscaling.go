@@ -46,20 +46,20 @@ func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext
 		return nil, err
 	}
 
-	client, err := controllerContext.NewClient("horizontal-pod-autoscaler")
+	hpaClient, err := controllerContext.NewClient("horizontal-pod-autoscaler")
 	if err != nil {
 		return nil, err
 	}
 
 	// we don't use cached discovery because DiscoveryScaleKindResolver does its own caching,
 	// so we want to re-fetch every time when we actually ask for it
-	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(hpaClient.Discovery())
 	scaleClient, err := scale.NewForConfig(clientConfig, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init HPA scale client: %w", err)
 	}
 
-	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(client.Discovery())
+	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(hpaClient.Discovery())
 
 	resourceClient, err := resourceclient.NewForConfig(clientConfig)
 	if err != nil {
@@ -79,9 +79,9 @@ func newHorizontalPodAutoscalerController(ctx context.Context, controllerContext
 
 	pas := podautoscaler.NewHorizontalController(
 		ctx,
-		client.CoreV1(),
+		hpaClient.CoreV1(),
 		scaleClient,
-		client.AutoscalingV2(),
+		hpaClient.AutoscalingV2(),
 		controllerContext.RESTMapper,
 		metricsClient,
 		controllerContext.InformerFactory.Autoscaling().V2().HorizontalPodAutoscalers(),
