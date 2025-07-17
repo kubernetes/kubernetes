@@ -54,10 +54,15 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 	}
 
 	// Start the server with the desired feature enablement
-	server, err := apiservertesting.StartTestServer(t, nil, []string{
+	args := []string{
 		fmt.Sprintf("--feature-gates=AuthorizeNodeWithSelectors=%v,AuthorizeWithSelectors=%v", featureEnabled, featureEnabled),
-		fmt.Sprintf("--runtime-config=%s=true", resourceapi.SchemeGroupVersion),
-	}, framework.SharedEtcd())
+		fmt.Sprintf("--runtime-config=%s=true", resourceapi.SchemeGroupVersion), // For ResourceClaim test case below.
+	}
+	if !featureEnabled {
+		// Without this, resource.k8s.io/v1 cannot be enabled in the emulated 1.33.
+		args = append(args, "--runtime-config-emulation-forward-compatible")
+	}
+	server, err := apiservertesting.StartTestServer(t, nil, args, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
