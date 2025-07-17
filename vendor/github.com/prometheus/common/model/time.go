@@ -201,6 +201,7 @@ var unitMap = map[string]struct {
 
 // ParseDuration parses a string into a time.Duration, assuming that a year
 // always has 365d, a week always has 7d, and a day always has 24h.
+// Negative durations are not supported.
 func ParseDuration(s string) (Duration, error) {
 	switch s {
 	case "0":
@@ -253,16 +254,34 @@ func ParseDuration(s string) (Duration, error) {
 			return 0, errors.New("duration out of range")
 		}
 	}
+
 	return Duration(dur), nil
+}
+
+// ParseDurationAllowNegative is like ParseDuration but also accepts negative durations.
+func ParseDurationAllowNegative(s string) (Duration, error) {
+	if s == "" || s[0] != '-' {
+		return ParseDuration(s)
+	}
+
+	d, err := ParseDuration(s[1:])
+
+	return -d, err
 }
 
 func (d Duration) String() string {
 	var (
-		ms = int64(time.Duration(d) / time.Millisecond)
-		r  = ""
+		ms   = int64(time.Duration(d) / time.Millisecond)
+		r    = ""
+		sign = ""
 	)
+
 	if ms == 0 {
 		return "0s"
+	}
+
+	if ms < 0 {
+		sign, ms = "-", -ms
 	}
 
 	f := func(unit string, mult int64, exact bool) {
@@ -286,7 +305,7 @@ func (d Duration) String() string {
 	f("s", 1000, false)
 	f("ms", 1, false)
 
-	return r
+	return sign + r
 }
 
 // MarshalJSON implements the json.Marshaler interface.
