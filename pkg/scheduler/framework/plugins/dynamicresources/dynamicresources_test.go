@@ -39,7 +39,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
+	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -96,8 +99,9 @@ var (
 					Obj()
 
 	// Node with "instance-1" device and no device attributes.
-	workerNode      = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
-	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+	workerNode           = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
+	workerNodeSlice      = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+	largeWorkerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Device("instance-2").Device("instance-3").Device("instance-4").Obj()
 
 	// Node with same device, but now with a "healthy" boolean attribute.
 	workerNode2      = &st.MakeNode().Name(node2Name).Label("kubernetes.io/hostname", node2Name).Node
@@ -119,6 +123,15 @@ var (
 		Namespace(namespace).
 		Request(className).
 		Obj()
+	largeClaim = st.MakeResourceClaim().
+			Name(claimName).
+			Namespace(namespace).
+			Request(className).
+			Request(className).
+			Request(className).
+			Request(className).
+			Request(className).
+			Obj()
 	claimWithPrioritzedList = st.MakeResourceClaim().
 				Name(claimName).
 				Namespace(namespace).
@@ -263,6 +276,14 @@ func updateDeviceClassName(claim *resourceapi.ResourceClaim, deviceClassName str
 	return claim
 }
 
+func getDefaultDynamicResourcesArgs() *config.DynamicResourcesArgs {
+	v1dra := &kubeschedulerconfigv1.DynamicResourcesArgs{}
+	configv1.SetDefaults_DynamicResourcesArgs(v1dra)
+	dra := &config.DynamicResourcesArgs{}
+	_ = configv1.Convert_v1_DynamicResourcesArgs_To_config_DynamicResourcesArgs(v1dra, dra, nil)
+	return dra
+}
+
 // result defines the expected outcome of some operation. It covers
 // operation's status and the state of the world (= objects).
 type result struct {
@@ -341,6 +362,7 @@ type prepare struct {
 
 func TestPlugin(t *testing.T) {
 	testcases := map[string]struct {
+		args    *config.DynamicResourcesArgs
 		nodes   []*v1.Node // default if unset is workerNode
 		pod     *v1.Pod
 		claims  []*resourceapi.ResourceClaim
@@ -353,14 +375,18 @@ func TestPlugin(t *testing.T) {
 		prepare prepare
 		want    want
 
+		// Invoke Filter with a canceled context.
+		cancelFilter bool
+
 		// enableDRAAdminAccess is set to true if the DRAAdminAccess feature gate is enabled.
 		enableDRAAdminAccess bool
 		// Feature gates. False is chosen so that the uncommon case
 		// doesn't need to be set.
 		disableDRA bool
 
-		enableDRAPrioritizedList bool
-		enableDRADeviceTaints    bool
+		enableDRAPrioritizedList         bool
+		enableDRADeviceTaints            bool
+		disableDRASchedulerFilterTimeout bool
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -977,6 +1003,108 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"canceled": {
+			cancelFilter: true,
+			args: &config.DynamicResourcesArgs{
+				FilterTimeout: &metav1.Duration{Duration: time.Nanosecond},
+			},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{largeClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{largeWorkerNodeSlice},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `asked by caller to stop allocating devices: test canceling Filter`),
+					},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+				},
+			},
+		},
+		"timeout": {
+			args: &config.DynamicResourcesArgs{
+				FilterTimeout: &metav1.Duration{Duration: time.Nanosecond},
+			},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{largeClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{largeWorkerNodeSlice},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `timed out trying to allocate devices`),
+					},
+				},
+				postfilter: result{
+					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
+				},
+			},
+		},
+		"timeout_disabled": {
+			// This variant uses the normal test objects to avoid excessive runtime.
+			// It could theoretically pass even though the 1 ns limit is enforced
+			// although it shouldn't be (which then would be a false positive),
+			// but that's unlikely.
+			disableDRASchedulerFilterTimeout: true,
+			args:                             &config.DynamicResourcesArgs{},
+			pod:                              podWithClaimName,
+			claims:                           []*resourceapi.ResourceClaim{pendingClaim},
+			classes:                          []*resourceapi.DeviceClass{deviceClass},
+			objs:                             []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: allocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
+				},
+			},
+		},
+		"timeout_zero": {
+			args: &config.DynamicResourcesArgs{
+				FilterTimeout: &metav1.Duration{Duration: 0},
+			},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{pendingClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: allocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
+				},
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -991,10 +1119,11 @@ func TestPlugin(t *testing.T) {
 			features := feature.Features{
 				EnableDRAAdminAccess:            tc.enableDRAAdminAccess,
 				EnableDRADeviceTaints:           tc.enableDRADeviceTaints,
+				EnableDRASchedulerFilterTimeout: !tc.disableDRASchedulerFilterTimeout,
 				EnableDynamicResourceAllocation: !tc.disableDRA,
 				EnableDRAPrioritizedList:        tc.enableDRAPrioritizedList,
 			}
-			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.objs, features)
+			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, features)
 			initialObjects := testCtx.listAll(t)
 
 			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
@@ -1019,7 +1148,13 @@ func TestPlugin(t *testing.T) {
 			if !unschedulable {
 				for _, nodeInfo := range testCtx.nodeInfos {
 					initialObjects = testCtx.listAll(t)
-					status := testCtx.p.Filter(testCtx.ctx, testCtx.state, tc.pod, nodeInfo)
+					ctx := testCtx.ctx
+					if tc.cancelFilter {
+						c, cancel := context.WithCancelCause(ctx)
+						ctx = c
+						cancel(errors.New("test canceling Filter"))
+					}
+					status := testCtx.p.Filter(ctx, testCtx.state, tc.pod, nodeInfo)
 					nodeName := nodeInfo.Node().Name
 					t.Run(fmt.Sprintf("filter/%s", nodeInfo.Node().Name), func(t *testing.T) {
 						testCtx.verify(t, tc.want.filter.forNode(nodeName), initialObjects, nil, status)
@@ -1253,7 +1388,7 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 	return updated
 }
 
-func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features) (result *testContext) {
+func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features) (result *testContext) {
 	t.Helper()
 
 	tc := &testContext{}
@@ -1285,7 +1420,10 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 		t.Fatal(err)
 	}
 
-	pl, err := New(tCtx, nil, fh, features)
+	if args == nil {
+		args = getDefaultDynamicResourcesArgs()
+	}
+	pl, err := New(tCtx, args, fh, features)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1474,9 +1612,10 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, tCtx := ktesting.NewTestContext(t)
 			features := feature.Features{
+				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, tc.claims, nil, nil, features)
+			testCtx := setup(t, nil, nil, tc.claims, nil, nil, features)
 			oldObj := tc.oldObj
 			newObj := tc.newObj
 			if claim, ok := tc.newObj.(*resourceapi.ResourceClaim); ok {
@@ -1597,9 +1736,10 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			features := feature.Features{
+				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, tc.claims, nil, tc.objs, features)
+			testCtx := setup(t, nil, nil, tc.claims, nil, tc.objs, features)
 			gotHint, err := testCtx.p.isSchedulableAfterPodChange(logger, tc.pod, nil, tc.obj)
 			if tc.wantErr {
 				if err == nil {

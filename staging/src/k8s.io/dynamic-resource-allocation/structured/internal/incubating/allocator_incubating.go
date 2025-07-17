@@ -698,6 +698,11 @@ func lookupAttribute(device *draapi.BasicDevice, deviceID DeviceID, attributeNam
 // device index without causing infinite recursion.
 func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (bool, error) {
 	alloc.numAllocateOneInvocations.Add(1)
+
+	if alloc.ctx.Err() != nil {
+		return false, fmt.Errorf("filter operation aborted: %w", context.Cause(alloc.ctx))
+	}
+
 	if r.claimIndex >= len(alloc.claimsToAllocate) {
 		// Done! If we were doing scoring, we would compare the current allocation result
 		// against the previous one, keep the best, and continue. Without scoring, we stop

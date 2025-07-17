@@ -72,6 +72,10 @@ type Allocator interface {
 	// additional value. A name can also be useful because log messages do not
 	// have a common prefix. V(5) is used for one-time log entries, V(6) for important
 	// progress reports, and V(7) for detailed debug output.
+	//
+	//
+	// Context cancellation is supported. An error wrapping the context's error will
+	// be returned in case of cancellation.
 	Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error)
 }
 
