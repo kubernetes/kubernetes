@@ -29247,11 +29247,31 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							},
 						},
 					},
+					"allocatedResources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllocatedResources is the total requests allocated for this pod by the node. Kubelet sets this to the accepted requests when a pod (or resize) is admitted. If pod-level requests are not set, this will be the total requests aggregated across containers in the pod.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+					"resources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Resources represents the compute resource requests and limits that have been applied at the pod level. If pod-level resources are not explicitly specified, then these will be the aggregate resources computed from containers. If limits are not defined for all containers (and pod-level limits are also not set), those containers remain unrestricted, and no aggregate pod-level limits will be applied. Pod-level limit aggregation is only performed, and is meaningful only, when all containers have defined limits.",
+							Ref:         ref("k8s.io/api/core/v1.ResourceRequirements"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.ContainerStatus", "k8s.io/api/core/v1.HostIP", "k8s.io/api/core/v1.PodCondition", "k8s.io/api/core/v1.PodIP", "k8s.io/api/core/v1.PodResourceClaimStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"k8s.io/api/core/v1.ContainerStatus", "k8s.io/api/core/v1.HostIP", "k8s.io/api/core/v1.PodCondition", "k8s.io/api/core/v1.PodIP", "k8s.io/api/core/v1.PodResourceClaimStatus", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 

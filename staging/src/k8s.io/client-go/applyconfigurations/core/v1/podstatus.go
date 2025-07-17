@@ -43,6 +43,8 @@ type PodStatusApplyConfiguration struct {
 	EphemeralContainerStatuses []ContainerStatusApplyConfiguration        `json:"ephemeralContainerStatuses,omitempty"`
 	Resize                     *corev1.PodResizeStatus                    `json:"resize,omitempty"`
 	ResourceClaimStatuses      []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
+	AllocatedResources         *corev1.ResourceList                       `json:"allocatedResources,omitempty"`
+	Resources                  *ResourceRequirementsApplyConfiguration    `json:"resources,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs a declarative configuration of the PodStatus type for use with
@@ -219,5 +221,21 @@ func (b *PodStatusApplyConfiguration) WithResourceClaimStatuses(values ...*PodRe
 		}
 		b.ResourceClaimStatuses = append(b.ResourceClaimStatuses, *values[i])
 	}
+	return b
+}
+
+// WithAllocatedResources sets the AllocatedResources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllocatedResources field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithAllocatedResources(value corev1.ResourceList) *PodStatusApplyConfiguration {
+	b.AllocatedResources = &value
+	return b
+}
+
+// WithResources sets the Resources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Resources field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithResources(value *ResourceRequirementsApplyConfiguration) *PodStatusApplyConfiguration {
+	b.Resources = value
 	return b
 }

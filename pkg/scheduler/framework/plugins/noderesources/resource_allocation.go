@@ -35,9 +35,10 @@ type scorer func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer
 
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
-	Name                            string
-	enableInPlacePodVerticalScaling bool
-	enablePodLevelResources         bool
+	Name                                          string
+	enableInPlacePodVerticalScaling               bool
+	enablePodLevelResources                       bool
+	enableInPlacePodLevelResourcesVerticalScaling bool
 	// used to decide whether to use Requested or NonZeroRequested for
 	// cpu and memory.
 	useRequested bool
@@ -119,7 +120,8 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(logger kl
 func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName) int64 {
 
 	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: r.enableInPlacePodVerticalScaling,
+		UseStatusResources:    r.enableInPlacePodVerticalScaling,
+		UsePodStatusResources: r.enableInPlacePodLevelResourcesVerticalScaling,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
 		SkipPodLevelResources: !r.enablePodLevelResources,
 	}

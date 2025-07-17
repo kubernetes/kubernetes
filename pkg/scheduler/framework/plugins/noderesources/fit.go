@@ -85,13 +85,14 @@ var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
 
 // Fit is a plugin that checks if a node has sufficient resources.
 type Fit struct {
-	ignoredResources                sets.Set[string]
-	ignoredResourceGroups           sets.Set[string]
-	enableInPlacePodVerticalScaling bool
-	enableSidecarContainers         bool
-	enableSchedulingQueueHint       bool
-	enablePodLevelResources         bool
-	handle                          framework.Handle
+	ignoredResources                              sets.Set[string]
+	ignoredResourceGroups                         sets.Set[string]
+	enableInPlacePodVerticalScaling               bool
+	enableSidecarContainers                       bool
+	enableSchedulingQueueHint                     bool
+	enablePodLevelResources                       bool
+	enableInPlacePodLevelResourcesVerticalScaling bool
+	handle                                        framework.Handle
 	resourceAllocationScorer
 }
 
@@ -171,14 +172,15 @@ func NewFit(_ context.Context, plArgs runtime.Object, h framework.Handle, fts fe
 	}
 
 	return &Fit{
-		ignoredResources:                sets.New(args.IgnoredResources...),
-		ignoredResourceGroups:           sets.New(args.IgnoredResourceGroups...),
-		enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
-		enableSidecarContainers:         fts.EnableSidecarContainers,
-		enableSchedulingQueueHint:       fts.EnableSchedulingQueueHint,
-		handle:                          h,
-		enablePodLevelResources:         fts.EnablePodLevelResources,
-		resourceAllocationScorer:        *scorePlugin(args),
+		ignoredResources:                              sets.New(args.IgnoredResources...),
+		ignoredResourceGroups:                         sets.New(args.IgnoredResourceGroups...),
+		enableInPlacePodVerticalScaling:               fts.EnableInPlacePodVerticalScaling,
+		enableSidecarContainers:                       fts.EnableSidecarContainers,
+		enableSchedulingQueueHint:                     fts.EnableSchedulingQueueHint,
+		handle:                                        h,
+		enablePodLevelResources:                       fts.EnablePodLevelResources,
+		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
+		resourceAllocationScorer:                      *scorePlugin(args),
 	}, nil
 }
 
@@ -341,11 +343,20 @@ func (f *Fit) isSchedulableAfterPodScaleDown(targetPod, originalPod, modifiedPod
 
 	// the other pod was scheduled, so modification or deletion may free up some resources.
 	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
-	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, resource.PodResourcesOptions{UseStatusResources: f.enableInPlacePodVerticalScaling}))
-	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, resource.PodResourcesOptions{UseStatusResources: f.enableInPlacePodVerticalScaling}))
+	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, resource.PodResourcesOptions{
+		UseStatusResources:    f.enableInPlacePodVerticalScaling,
+		UsePodStatusResources: f.enableInPlacePodLevelResourcesVerticalScaling,
+	}))
+	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, resource.PodResourcesOptions{
+		UseStatusResources:    f.enableInPlacePodVerticalScaling,
+		UsePodStatusResources: f.enableInPlacePodLevelResourcesVerticalScaling,
+	}))
 
 	// check whether the resource request of the modified pod is less than the original pod.
-	podRequests := resource.PodRequests(targetPod, resource.PodResourcesOptions{UseStatusResources: f.enableInPlacePodVerticalScaling})
+	podRequests := resource.PodRequests(targetPod, resource.PodResourcesOptions{
+		UseStatusResources:    f.enableInPlacePodVerticalScaling,
+		UsePodStatusResources: f.enableInPlacePodLevelResourcesVerticalScaling,
+	})
 	for rName, rValue := range podRequests {
 		if rValue.IsZero() {
 			// We only care about the resources requested by the pod we are trying to schedule.

@@ -4350,6 +4350,27 @@ type PodStatus struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaimStatuses []PodResourceClaimStatus
+
+	// AllocatedResources is the total requests allocated for this pod by the node.
+	// Kubelet sets this to the accepted requests when a pod (or resize) is admitted.
+	// If pod-level requests are not set, this will be the total requests aggregated
+	// across containers in the pod.
+	// +featureGate=InPlacePodVerticalScaling
+	// +featureGate=PodLevelResources
+	// +optional
+	AllocatedResources ResourceList
+
+	// Resources represents the compute resource requests and limits that have been
+	// applied at the pod level. If pod-level resources are not explicitly specified,
+	// then these will be the aggregate resources computed from containers. If limits are
+	// not defined for all containers (and pod-level limits are also not set), those
+	// containers remain unrestricted, and no aggregate pod-level limits will be applied.
+	// Pod-level limit aggregation is only performed, and is meaningful only, when all
+	// containers have defined limits.
+	// +featureGate=InPlacePodVerticalScaling
+	// +featureGate=PodLevelResources
+	// +optional
+	Resources *ResourceRequirements
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

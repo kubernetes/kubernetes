@@ -4479,6 +4479,18 @@ func (in *PodStatus) DeepCopyInto(out *PodStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.AllocatedResources != nil {
+		in, out := &in.AllocatedResources, &out.AllocatedResources
+		*out = make(ResourceList, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	}
+	if in.Resources != nil {
+		in, out := &in.Resources, &out.Resources
+		*out = new(ResourceRequirements)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

@@ -4677,6 +4677,27 @@ message PodStatus {
   // +featureGate=DynamicResourceAllocation
   // +optional
   repeated PodResourceClaimStatus resourceClaimStatuses = 15;
+
+  // AllocatedResources is the total requests allocated for this pod by the node.
+  // Kubelet sets this to the accepted requests when a pod (or resize) is admitted.
+  // If pod-level requests are not set, this will be the total requests aggregated
+  // across containers in the pod.
+  // +featureGate=InPlacePodVerticalScaling
+  // +featureGate=PodLevelResources
+  // +optional
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> allocatedResources = 18;
+
+  // Resources represents the compute resource requests and limits that have been
+  // applied at the pod level. If pod-level resources are not explicitly specified,
+  // then these will be the aggregate resources computed from containers. If limits are
+  // not defined for all containers (and pod-level limits are also not set), those
+  // containers remain unrestricted, and no aggregate pod-level limits will be applied.
+  // Pod-level limit aggregation is only performed, and is meaningful only, when all
+  // containers have defined limits.
+  // +featureGate=InPlacePodVerticalScaling
+  // +featureGate=PodLevelResources
+  // +optional
+  optional ResourceRequirements resources = 19;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
