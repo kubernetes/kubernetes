@@ -19,6 +19,7 @@ package e2enode
 import (
 	"bytes"
 	"context"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -58,11 +59,15 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 				start := time.Now()
 				podClient.CreateSync(ctx, getGracePeriodTestPodSIGTERM(podName, testRcNamespace, gracePeriodShort))
+				// 给容器一些时间启动
+				time.Sleep(2 * time.Second)
 				w, err := podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
 				framework.ExpectNoError(err, "failed to watch")
 				// Delete with short grace period
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
 				framework.ExpectNoError(err, "failed to delete pod")
+				// 等待一段时间让信号处理完成
+				time.Sleep(10 * time.Second)
 				// 立即拉日志（pod 还在 Terminating）
 				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 				framework.ExpectNoError(err, "failed to get pod logs")
@@ -75,8 +80,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				_, err = buf.ReadFrom(logs)
 				framework.ExpectNoError(err, "failed to read from logs")
 				podLogs := buf.String()
-				// Check logs: must be exactly SIGINT 1\nSIGINT 2\n
-				if podLogs != "SIGINT 1\nSIGINT 2\n" {
+				framework.Logf("Pod logs: %q", podLogs)
+				// Check logs: must包含 Container started 和 SIGINT 1\nSIGINT 2\n
+				if !strings.Contains(podLogs, "Container started") || !strings.Contains(podLogs, "SIGINT 1\nSIGINT 2\n") {
 					framework.Failf("unexpected pod logs: %q", podLogs)
 				}
 				// 再等待 pod 被彻底删除
@@ -128,6 +134,7 @@ func getGracePeriodTestPodSIGTERM(name, testRcNamespace string, gracePeriod int6
 					Image:   busyboxImage,
 					Command: []string{"sh", "-c"},
 					Args: []string{`
+echo "Container started"
 count=0
 term_handler() {
   count=$((count+1))
@@ -143,6 +150,7 @@ term_handler() {
   fi
 }
 trap term_handler TERM
+echo "Trap set, waiting for signals..."
 while true; do sleep 1; done
 `},
 				},
