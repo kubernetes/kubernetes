@@ -4,17 +4,6 @@ syntax = "proto3";
 package v1beta1;
 option go_package = "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1";
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-
-option (gogoproto.goproto_stringer_all) = false;
-option (gogoproto.stringer_all) =  true;
-option (gogoproto.goproto_getters_all) = true;
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_unrecognized_all) = false;
-
-
 // Registration is the service advertised by the Kubelet
 // Only when Kubelet answers with a success code to a Register Request
 // may Device Plugins start their service
@@ -115,7 +104,7 @@ message Device {
 // - PreStartContainer allows Device Plugin to run device specific operations on
 //   the Devices requested
 message PreStartContainerRequest {
-	repeated string devices_ids = 1 [(gogoproto.customname) = "DevicesIDs"];
+	repeated string devices_ids = 1;
 }
 
 // PreStartContainerResponse will be send by plugin in response to PreStartContainerRequest
@@ -161,7 +150,7 @@ message AllocateRequest {
 }
 
 message ContainerAllocateRequest {
-	repeated string devices_ids = 1 [(gogoproto.customname) = "DevicesIDs"];
+	repeated string devices_ids = 1;
 }
 
 // CDIDevice specifies a CDI device information.
@@ -195,7 +184,7 @@ message ContainerAllocateResponse {
 	// Container annotations to pass to the container runtime
 	map<string, string> annotations = 4;
 	// CDI devices for the container.
-	repeated CDIDevice cdi_devices = 5 [(gogoproto.customname) = "CDIDevices"];
+	repeated CDIDevice cdi_devices = 5;
 }
 
 // Mount specifies a host volume to mount into a container.
