@@ -154,6 +154,7 @@ func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOpt
 	switch {
 	case matchesSingle:
 		estimatedObjectsToBeProcessed = 1
+
 	case isListFromCache:
 		// TODO: For resources that implement indexes at the watchcache level,
 		//  we need to adjust the cost accordingly
