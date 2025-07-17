@@ -453,7 +453,7 @@ func (m *SequenceMatcher) GetGroupedOpCodes(n int) [][]OpCode {
 		}
 		group = append(group, OpCode{c.Tag, i1, i2, j1, j2})
 	}
-	if len(group) > 0 && !(len(group) == 1 && group[0].Tag == 'e') {
+	if len(group) > 0 && (len(group) != 1 || group[0].Tag != 'e') {
 		groups = append(groups, group)
 	}
 	return groups
@@ -568,7 +568,7 @@ func WriteUnifiedDiff(writer io.Writer, diff UnifiedDiff) error {
 	buf := bufio.NewWriter(writer)
 	defer buf.Flush()
 	wf := func(format string, args ...interface{}) error {
-		_, err := buf.WriteString(fmt.Sprintf(format, args...))
+		_, err := fmt.Fprintf(buf, format, args...)
 		return err
 	}
 	ws := func(s string) error {

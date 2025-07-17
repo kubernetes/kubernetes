@@ -33,7 +33,7 @@ GOHOSTOS     ?= $(shell $(GO) env GOHOSTOS)
 GOHOSTARCH   ?= $(shell $(GO) env GOHOSTARCH)
 
 GO_VERSION        ?= $(shell $(GO) version)
-GO_VERSION_NUMBER ?= $(word 3, $(GO_VERSION))
+GO_VERSION_NUMBER ?= $(word 3, $(GO_VERSION))Error Parsing File
 PRE_GO_111        ?= $(shell echo $(GO_VERSION_NUMBER) | grep -E 'go1\.(10|[0-9])\.')
 
 PROMU        := $(FIRST_GOPATH)/bin/promu
@@ -61,7 +61,7 @@ PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_
 SKIP_GOLANGCI_LINT :=
 GOLANGCI_LINT :=
 GOLANGCI_LINT_OPTS ?=
-GOLANGCI_LINT_VERSION ?= v1.59.0
+GOLANGCI_LINT_VERSION ?= v2.0.2
 # golangci-lint only supports linux, darwin and windows platforms on i386/amd64/arm64.
 # windows isn't included here because of the path separator being different.
 ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux darwin))
@@ -275,3 +275,9 @@ $(1)_precheck:
 		exit 1; \
 	fi
 endef
+
+govulncheck: install-govulncheck
+	govulncheck ./...
+
+install-govulncheck:
+	command -v govulncheck > /dev/null || go install golang.org/x/vuln/cmd/govulncheck@latest
