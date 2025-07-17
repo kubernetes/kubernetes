@@ -221,12 +221,13 @@ func (iv itemValidator) GetValidations(context Context) (Validations, error) {
 	result := Validations{}
 
 	for _, item := range itemMeta.items {
-		if len(item.criteria) != len(listMeta.keyNames) {
-			return Validations{}, fmt.Errorf("number of arguments does not match number of listMapKey fields")
+		if narg, nkey := len(item.criteria), len(listMeta.keyNames); narg != nkey {
+			return Validations{}, fmt.Errorf("number of arguments (%d) does not match number of listMapKey fields (%d)", narg, nkey)
 		}
 
 		// Validate that all listMapKeys are provided and types match
 		foundKeys := make(map[string]bool)
+		sorted := make([]keyValuePair, 0, len(listMeta.keyNames))
 		for _, keyName := range listMeta.keyNames {
 			for _, pair := range item.criteria {
 				if pair.key == keyName {
@@ -238,6 +239,7 @@ func (iv itemValidator) GetValidations(context Context) (Validations, error) {
 						return Validations{}, fmt.Errorf("key %q: %w", pair.key, err)
 					}
 					foundKeys[keyName] = true
+					sorted = append(sorted, pair)
 					break
 				}
 			}
@@ -251,6 +253,7 @@ func (iv itemValidator) GetValidations(context Context) (Validations, error) {
 			}
 			return Validations{}, fmt.Errorf("missing required listMapKey fields: %v", missing)
 		}
+		item.criteria = sorted
 
 		// Extract validations from the stored tag
 		itemKey := selectorString(item.criteria)
