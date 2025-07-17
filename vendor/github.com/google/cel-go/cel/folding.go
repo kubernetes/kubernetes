@@ -38,6 +38,23 @@ func MaxConstantFoldIterations(limit int) ConstantFoldingOption {
 	}
 }
 
+// Adds an Activation which provides known values for the folding evaluator
+//
+// Any values the activation provides will be used by the constant folder and turned into
+// literals in the AST.
+//
+// Defaults to the NoVars() Activation
+func FoldKnownValues(knownValues Activation) ConstantFoldingOption {
+	return func(opt *constantFoldingOptimizer) (*constantFoldingOptimizer, error) {
+		if knownValues != nil {
+			opt.knownValues = knownValues
+		} else {
+			opt.knownValues = NoVars()
+		}
+		return opt, nil
+	}
+}
+
 // NewConstantFoldingOptimizer creates an optimizer which inlines constant scalar an aggregate
 // literal values within function calls and select statements with their evaluated result.
 func NewConstantFoldingOptimizer(opts ...ConstantFoldingOption) (ASTOptimizer, error) {
@@ -56,6 +73,7 @@ func NewConstantFoldingOptimizer(opts ...ConstantFoldingOption) (ASTOptimizer, e
 
 type constantFoldingOptimizer struct {
 	maxFoldIterations int
+	knownValues       Activation
 }
 
 // Optimize queries the expression graph for scalar and aggregate literal expressions within call and
@@ -68,7 +86,7 @@ func (opt *constantFoldingOptimizer) Optimize(ctx *OptimizerContext, a *ast.AST)
 	// Walk the list of foldable expression and continue to fold until there are no more folds left.
 	// All of the fold candidates returned by the constantExprMatcher should succeed unless there's
 	// a logic bug with the selection of expressions.
-	constantExprMatcherCapture := func(e ast.NavigableExpr) bool { return constantExprMatcher(ctx, a, e) }
+	constantExprMatcherCapture := func(e ast.NavigableExpr) bool { return opt.constantExprMatcher(ctx, a, e) }
 	foldableExprs := ast.MatchDescendants(root, constantExprMatcherCapture)
 	foldCount := 0
 	for len(foldableExprs) != 0 && foldCount < opt.maxFoldIterations {
@@ -83,8 +101,10 @@ func (opt *constantFoldingOptimizer) Optimize(ctx *OptimizerContext, a *ast.AST)
 				continue
 			}
 			// Otherwise, assume all context is needed to evaluate the expression.
-			err := tryFold(ctx, a, fold)
-			if err != nil {
+			err := opt.tryFold(ctx, a, fold)
+			// Ignore errors for identifiers, since there is no guarantee that the environment
+			// has a value for them.
+			if err != nil && fold.Kind() != ast.IdentKind {
 				ctx.ReportErrorAtID(fold.ID(), "constant-folding evaluation failed: %v", err.Error())
 				return a
 			}
@@ -96,7 +116,7 @@ func (opt *constantFoldingOptimizer) Optimize(ctx *OptimizerContext, a *ast.AST)
 	// one last time. In this case, there's no guarantee they'll run, so we only update the
 	// target comprehension node with the literal value if the evaluation succeeds.
 	for _, compre := range ast.MatchDescendants(root, ast.KindMatcher(ast.ComprehensionKind)) {
-		tryFold(ctx, a, compre)
+		opt.tryFold(ctx, a, compre)
 	}
 
 	// If the output is a list, map, or struct which contains optional entries, then prune it
@@ -126,7 +146,7 @@ func (opt *constantFoldingOptimizer) Optimize(ctx *OptimizerContext, a *ast.AST)
 //
 // If the evaluation succeeds, the input expr value will be modified to become a literal, otherwise
 // the method will return an error.
-func tryFold(ctx *OptimizerContext, a *ast.AST, expr ast.Expr) error {
+func (opt *constantFoldingOptimizer) tryFold(ctx *OptimizerContext, a *ast.AST, expr ast.Expr) error {
 	// Assume all context is needed to evaluate the expression.
 	subAST := &Ast{
 		impl: ast.NewCheckedAST(ast.NewAST(expr, a.SourceInfo()), a.TypeMap(), a.ReferenceMap()),
@@ -135,7 +155,11 @@ func tryFold(ctx *OptimizerContext, a *ast.AST, expr ast.Expr) error {
 	if err != nil {
 		return err
 	}
-	out, _, err := prg.Eval(NoVars())
+	activation := opt.knownValues
+	if activation == nil {
+		activation = NoVars()
+	}
+	out, _, err := prg.Eval(activation)
 	if err != nil {
 		return err
 	}
@@ -469,13 +493,15 @@ func adaptLiteral(ctx *OptimizerContext, val ref.Val) (ast.Expr, error) {
 // Only comprehensions which are not nested are included as possible constant folds, and only
 // if all variables referenced in the comprehension stack exist are only iteration or
 // accumulation variables.
-func constantExprMatcher(ctx *OptimizerContext, a *ast.AST, e ast.NavigableExpr) bool {
+func (opt *constantFoldingOptimizer) constantExprMatcher(ctx *OptimizerContext, a *ast.AST, e ast.NavigableExpr) bool {
 	switch e.Kind() {
 	case ast.CallKind:
 		return constantCallMatcher(e)
 	case ast.SelectKind:
 		sel := e.AsSelect() // guaranteed to be a navigable value
 		return constantMatcher(sel.Operand().(ast.NavigableExpr))
+	case ast.IdentKind:
+		return opt.knownValues != nil && a.ReferenceMap()[e.ID()] != nil
 	case ast.ComprehensionKind:
 		if isNestedComprehension(e) {
 			return false
