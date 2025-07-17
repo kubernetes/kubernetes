@@ -81,8 +81,19 @@ import (
 )
 
 type Nodes struct {
+	// NodeNames has the main set of node names.
 	NodeNames []string
 	tempDir   string
+	// NumReservedNodes specifies the desired number of
+	// extra nodes that get set aside. That many node names
+	// will be stored in ExtraNodeNames.
+	//
+	// Must be <= the minimum number of requested nodes.
+	NumReservedNodes int
+	// ExtraNodeNames has exactly as many node names as
+	// requested via NumReservedNodes. Those nodes are
+	// different than the nodes listed in NodeNames.
+	ExtraNodeNames []string
 }
 
 // NewNodes selects nodes to run the test on.
@@ -117,10 +128,14 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 	framework.ExpectNoError(err, "get nodes")
 	numNodes := int32(len(nodeList.Items))
 	if int(numNodes) < minNodes {
-		e2eskipper.Skipf("%d ready nodes required, only have %d", minNodes, numNodes)
+		e2eskipper.Skipf("%d ready nodes required, only have %d", minNodes+nodes.NumReservedNodes, numNodes)
 	}
 	nodes.NodeNames = nil
-	for _, node := range nodeList.Items {
+	for i, node := range nodeList.Items {
+		if i < nodes.NumReservedNodes {
+			nodes.ExtraNodeNames = append(nodes.ExtraNodeNames, node.Name)
+			continue
+		}
 		nodes.NodeNames = append(nodes.NodeNames, node.Name)
 	}
 	sort.Strings(nodes.NodeNames)

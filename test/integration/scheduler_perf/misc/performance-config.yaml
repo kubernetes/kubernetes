@@ -617,3 +617,72 @@
       initNodes: 1000
       deletingPods: 1000
       measurePods: 1000
+
+## SchedulingWithExtendedResource uses pods with extended resources requests.
+- name: SchedulingWithExtendedResource
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutExtendedResource
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-extended-resource.yaml
+    countParam: $nodesWithExtendedResource
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-with-extended-resource.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      DRAExtendedResource: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithExtendedResource: 10
+      nodesWithoutExtendedResource: 1
+      measurePods: 10
+  - name: fast_DRAExtendedResourceEnabled
+    featureGates:
+      DRAExtendedResource: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithExtendedResource: 10
+      nodesWithoutExtendedResource: 1
+      measurePods: 10
+  - name: 500pods_500nodes
+    featureGates:
+      DRAExtendedResource: false
+    labels: [performance, short]
+    params:
+      nodesWithExtendedResource: 500
+      nodesWithoutExtendedResource: 0
+      measurePods: 500
+  - name: 500pods_500nodes_DRAExtendedResourceEnabled
+    featureGates:
+      DRAExtendedResource: true
+    labels: [performance, short]
+    params:
+      nodesWithExtendedResource: 500
+      nodesWithoutExtendedResource: 0
+      measurePods: 500
+  - name: 5000pods_5000nodes
+    featureGates:
+      DRAExtendedResource: false
+    labels: [performance]
+    params:
+      nodesWithExtendedResource: 5000
+      nodesWithoutExtendedResource: 0
+      measurePods: 5000
+  - name: 5000pods_5000nodes_DRAExtendedResourceEnabled
+    featureGates:
+      DRAExtendedResource: true
+    labels: [performance]
+    params:
+      nodesWithExtendedResource: 5000
+      nodesWithoutExtendedResource: 0
+      measurePods: 5000
