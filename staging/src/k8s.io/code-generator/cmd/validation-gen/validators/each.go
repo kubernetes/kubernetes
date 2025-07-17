@@ -53,21 +53,8 @@ func init() {
 	RegisterFieldValidator(listValidator{byPath: listMeta})
 	RegisterTypeValidator(listValidator{byPath: listMeta})
 
-	// List-map item validator uses shared listType and listMapKey information
-	itemMeta := make(map[string]*itemMetadata) // keyed by the fieldpath
-
-	// Accumulate item metadata via tags.
-	RegisterTagValidator(&itemTagValidator{byPath: itemMeta})
-
-	// Finish work on the accumulated item metadata.
-	RegisterTypeValidator(&itemValidator{
-		listByPath: listMeta,
-		itemByPath: itemMeta,
-	})
-	RegisterFieldValidator(&itemValidator{
-		listByPath: listMeta,
-		itemByPath: itemMeta,
-	})
+	// Processing item tags requires the list metadata.
+	RegisterTagValidator(&itemTagValidator{listByPath: listMeta})
 
 	// Iterating values of lists and maps is a special tag, which can be called
 	// directly by the code-generator logic.
