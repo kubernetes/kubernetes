@@ -174,16 +174,17 @@ func (umtv unionMemberTagValidator) Docs() TagDoc {
 // union defines how a union validation will be generated, based
 // on +k8s:unionMember and +k8s:unionDiscriminator tags found in a go struct.
 type union struct {
-	// fields provides field information about all the members of the union.
-	// Each item provides a fieldName and memberName pair, where [0] identifies
-	// the field name and [1] identifies the union member Name. fields is index
-	// aligned with fieldMembers.
-	// If member name is not set, it defaults to the go struct field name.
-	fields []unionMember
+	// members provides field information about all the members of the union.
+	// Each item provides a fieldName and discriminatorValue pair, where the
+	// name identifies the field or selector (for use in errors) and the
+	// discriminatorValue indicates the value which should be used in a
+	// discriminated union to name this member.
+	members []unionMember
+
 	// fieldMembers describes all the members of the union.
 	fieldMembers []*types.Member
 
-	// discriminator is the name of the discriminator field
+	// discriminator is the name of the discriminator field.
 	discriminator *string
 	// discriminatorMember describes the discriminator field.
 	discriminatorMember *types.Member
@@ -441,7 +442,7 @@ func processFieldMemberValidations(shared map[string]unions, context Context, ta
 
 	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
-	u.fields = append(u.fields, unionMember{fieldName, memberName})
+	u.members = append(u.members, unionMember{fieldName, memberName})
 
 	u.fieldMembers = append(u.fieldMembers, context.Member)
 
@@ -471,7 +472,7 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 
 	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
-	u.fields = append(u.fields, unionMember{fieldName, memberName})
+	u.members = append(u.members, unionMember{fieldName, memberName})
 
 	if _, found := u.itemMatchers[fieldName]; found {
 		return fmt.Errorf("list-item union member %q already exists", fieldName)
@@ -485,13 +486,13 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 // For list item unions, it converts paths like "<path>/Pipeline.Tasks[{\"name\": \"succeeded\"}]"
 // to readable formats like "Tasks[{\"name\": \"succeeded\"}]".
 func getDisplayFields(u *union, context Context, discrim bool) []any {
-	displayFields := make([]any, len(u.fields))
+	displayFields := make([]any, len(u.members))
 	listFieldName := context.Path.String()
 	pathParts := strings.Split(listFieldName, ".")
 	if len(pathParts) > 0 {
 		listFieldName = pathParts[len(pathParts)-1]
 	}
-	for i, f := range u.fields {
+	for i, f := range u.members {
 		fieldName := f.fieldName
 		memberName := f.discriminatorValue
 		if _, isItem := u.itemMatchers[fieldName]; isItem {
