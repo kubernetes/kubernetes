@@ -33,6 +33,11 @@ import (
 const (
 	bytesPerSeat                     = 100_000
 	cacheWithStreamingMaxMemoryUsage = 1_000_000
+	// 1.5MB is the recommended client request size in byte
+	// the etcd server should accept. See
+	// https://github.com/etcd-io/etcd/blob/release-3.4/embed/config.go#L56.
+	maxObjectSize       = 1_500_000
+	infiniteObjectCount = 1_000_000_000
 )
 
 func newListWorkEstimator(countFn statsGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) *listWorkEstimator {
@@ -89,21 +94,24 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		}
 	}
 	// TODO: Check whether watchcache is enabled.
+	var listFromStorage bool
 	result, err := delegator.ShouldDelegateListMeta(&listOptions, delegator.CacheWithoutSnapshots{})
 	if err != nil {
-		return WorkEstimate{InitialSeats: maxSeats}
+		// Assume worse case where we need to reach to etcd.
+		listFromStorage = true
+	} else {
+		listFromStorage = result.ShouldDelegate
 	}
-	listFromStorage := result.ShouldDelegate
 	isListFromCache := requestInfo.Verb == "watch" || !listFromStorage
 
 	stats, err := e.statsGetterFn(key(requestInfo))
 	switch {
 	case err == ObjectCountStaleErr:
 		// object count going stale is indicative of degradation, so we should
-		// be conservative here and allocate maximum seats to this list request.
+		// be conservative here and return maximum object count and size.
 		// NOTE: if a CRD is removed, its count will go stale first and then the
 		// pruner will eventually remove the CRD from the cache.
-		return WorkEstimate{InitialSeats: maxSeats}
+		stats = storage.Stats{ObjectCount: infiniteObjectCount, EstimatedAverageObjectSizeBytes: maxObjectSize}
 	case err == ObjectCountNotFoundErr:
 		// there are multiple scenarios in which we can see this error:
 		//  a. the type is truly unknown, a typo on the caller's part.
@@ -120,9 +128,9 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		return WorkEstimate{InitialSeats: minSeats}
 	case err != nil:
 		// we should never be here since Get returns either ObjectCountStaleErr or
-		// ObjectCountNotFoundErr, return maximumSeats to be on the safe side.
+		// ObjectCountNotFoundErr, return maximum object count and size.
 		klog.ErrorS(err, "Unexpected error from object count tracker")
-		return WorkEstimate{InitialSeats: maxSeats}
+		stats = storage.Stats{ObjectCount: infiniteObjectCount, EstimatedAverageObjectSizeBytes: maxObjectSize}
 	}
 
 	var seats uint64
@@ -172,9 +180,8 @@ func (e *listWorkEstimator) seatsBasedOnObjectCount(stats storage.Stats, listOpt
 }
 
 func (e *listWorkEstimator) seatsBasedOnObjectSize(stats storage.Stats, listOptions metav1.ListOptions, isListFromCache bool, matchesSingle bool) uint64 {
-	// Size not available, fallback to count based estimate
 	if stats.EstimatedAverageObjectSizeBytes <= 0 && stats.ObjectCount != 0 {
-		return e.seatsBasedOnObjectCount(stats, listOptions, isListFromCache, matchesSingle)
+		stats.EstimatedAverageObjectSizeBytes = maxObjectSize
 	}
 	limited := stats.ObjectCount
 	if listOptions.Limit > 0 && listOptions.Limit < limited {

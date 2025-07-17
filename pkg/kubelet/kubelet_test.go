@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	goruntime "runtime"
 	"sort"
 	"strconv"
@@ -35,6 +36,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
+	"k8s.io/component-base/metrics/legacyregistry"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -87,6 +89,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
@@ -175,10 +178,10 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/, false /*enableResizing*/)
 }
 
-func newTestKubeletExcludeAdmitHandlers(t *testing.T, controllerAttachDetachEnabled bool) *TestKubelet {
+func newTestKubeletExcludeAdmitHandlers(t *testing.T, controllerAttachDetachEnabled, sourcesReady bool) *TestKubelet {
 	imageList := []kubecontainer.Image{
 		{
 			ID:       "abc",
@@ -191,7 +194,7 @@ func newTestKubeletExcludeAdmitHandlers(t *testing.T, controllerAttachDetachEnab
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, true /*excludePodAdmitHandlers*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, true /*excludePodAdmitHandlers*/, sourcesReady)
 }
 
 func newTestKubeletWithImageList(
@@ -201,6 +204,7 @@ func newTestKubeletWithImageList(
 	initFakeVolumePlugin bool,
 	localStorageCapacityIsolation bool,
 	excludeAdmitHandlers bool,
+	enableResizing bool,
 ) *TestKubelet {
 	logger, _ := ktesting.NewTestContext(t)
 
@@ -295,6 +299,7 @@ func newTestKubeletWithImageList(
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker)
 	kubelet.nodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker()
+	kubelet.podCertificateManager = &podcertificate.NoOpManager{}
 
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
@@ -326,7 +331,7 @@ func newTestKubeletWithImageList(
 		func(pod *v1.Pod) { kubelet.HandlePodSyncs([]*v1.Pod{pod}) },
 		kubelet.GetActivePods,
 		kubelet.podManager.GetPodByUID,
-		config.NewSourcesReady(func(_ sets.Set[string]) bool { return false }),
+		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }),
 	)
 	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)
 	volumeStatsAggPeriod := time.Second * 10
@@ -1071,7 +1076,7 @@ func TestHandleMemExceeded(t *testing.T) {
 // Tests that we handle result of interface UpdatePluginResources correctly
 // by setting corresponding status in status map.
 func TestHandlePluginResources(t *testing.T) {
-	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */, false /*enableResizing*/)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
@@ -2366,6 +2371,210 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 	}
 }
 
+// Test generateAPIPodStatus with different container-level restart policies.
+func TestGenerateAPIPodStatusWithContainerRestartPolicies(t *testing.T) {
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+	testErrorReason := fmt.Errorf("test-error")
+	emptyContainerID := (&kubecontainer.ContainerID{}).String()
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	pod := podWithUIDNameNs("12345678", "foo", "new")
+	podStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:     "succeed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			{
+				Name:     "failed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 1,
+			},
+			{
+				Name:     "succeed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 2,
+			},
+			{
+				Name:     "failed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 3,
+			},
+		},
+	}
+	kubelet.reasonCache.add(pod.UID, "succeed", testErrorReason, "")
+	kubelet.reasonCache.add(pod.UID, "failed", testErrorReason, "")
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	for _, test := range []struct {
+		desc                         string
+		containers                   []v1.Container
+		expectedState                map[string]v1.ContainerState
+		expectedLastTerminationState map[string]v1.ContainerState
+	}{
+		{
+			desc: "container restart policy rules match",
+			containers: []v1.Container{
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyNever,
+					RestartPolicyRules: []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{1},
+						},
+					}},
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"failed": {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy rules not match",
+			containers: []v1.Container{
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyNever,
+					RestartPolicyRules: []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{2},
+						},
+					}},
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    3,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy never",
+			containers: []v1.Container{
+				{
+					Name:          "succeed",
+					RestartPolicy: &containerRestartPolicyNever,
+				},
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyNever,
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    2,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    3,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy OnFailure",
+			containers: []v1.Container{
+				{
+					Name:          "succeed",
+					RestartPolicy: &containerRestartPolicyOnFailure,
+				},
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyOnFailure,
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    2,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy Always",
+			containers: []v1.Container{
+				{
+					Name:          "succeed",
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"succeed": {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+				"failed":  {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+	} {
+		pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+		// Test normal containers
+		pod.Spec.Containers = test.containers
+		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false)
+		expectedState, expectedLastTerminationState := test.expectedState, test.expectedLastTerminationState
+		verifyContainerStatuses(t, apiStatus.ContainerStatuses, expectedState, expectedLastTerminationState, test.desc)
+		pod.Spec.Containers = nil
+	}
+}
+
 // testPodAdmitHandler is a lifecycle.PodAdmitHandler for testing.
 type testPodAdmitHandler struct {
 	// list of pods to reject.
@@ -3003,6 +3212,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	crOptions := &config.ContainerRuntimeOptions{}
 
 	testMainKubelet, err := NewMainKubelet(
+		tCtx,
 		kubeCfg,
 		kubeDep,
 		crOptions,
@@ -3062,6 +3272,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 }
 
 func TestSyncPodSpans(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testKubelet := newTestKubelet(t, false)
 	kubelet := testKubelet.kubelet
 
@@ -3102,6 +3313,7 @@ func TestSyncPodSpans(t *testing.T) {
 	assert.NoError(t, err)
 
 	kubelet.containerRuntime, _, err = kuberuntime.NewKubeGenericRuntimeManager(
+		tCtx,
 		kubelet.recorder,
 		kubelet.livenessManager,
 		kubelet.readinessManager,
@@ -3110,6 +3322,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.podLogsDirectory,
 		kubelet.machineInfo,
 		kubelet.podWorkers,
+		kubeCfg.MaxPods,
 		kubelet.os,
 		kubelet,
 		nil,
@@ -3209,6 +3422,15 @@ func TestRecordAdmissionRejection(t *testing.T) {
 				# HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
 				# TYPE kubelet_admission_rejections_total counter
 				kubelet_admission_rejections_total{reason="AppArmor"} 1
+			`,
+		},
+		{
+			name:   "VolumeAttachmentLimitExceeded",
+			reason: kubeletvolume.VolumeAttachmentLimitExceededReason,
+			wants: `
+				# HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+				# TYPE kubelet_admission_rejections_total counter
+				kubelet_admission_rejections_total{reason="VolumeAttachmentLimitExceeded"} 1
 			`,
 		},
 		{
@@ -3372,6 +3594,15 @@ func TestRecordAdmissionRejection(t *testing.T) {
                 # TYPE kubelet_admission_rejections_total counter
                 kubelet_admission_rejections_total{reason="OutOfExtendedResources"} 1
             `,
+		},
+		{
+			name:   "PodLevelResources",
+			reason: lifecycle.PodLevelResourcesNotAdmittedReason,
+			wants: `
+				# HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+				# TYPE kubelet_admission_rejections_total counter
+				kubelet_admission_rejections_total{reason="PodLevelResourcesNotSupported"} 1
+			`,
 		},
 		{
 			name:   "OtherReason",
@@ -3580,6 +3811,784 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 				c.LastTransitionTime = metav1.Time{}
 			}
 			require.Equal(t, tc.expectedResizeConditions, gotResizeConditions)
+		})
+	}
+}
+
+func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
+	metrics.Register()
+	metrics.ContainerRequestedResizes.Reset()
+
+	type expectedMetricsStruct struct {
+		memoryLimitsCounter   map[string]int
+		memoryRequestsCounter map[string]int
+		cpuLimitsCounter      map[string]int
+		cpuRequestsCounter    map[string]int
+	}
+	expectedMetrics := expectedMetricsStruct{
+		memoryLimitsCounter:   make(map[string]int),
+		memoryRequestsCounter: make(map[string]int),
+		cpuLimitsCounter:      make(map[string]int),
+		cpuRequestsCounter:    make(map[string]int),
+	}
+
+	for _, tc := range []struct {
+		name               string
+		initialAllocation  *v1.Pod
+		updatedPod         *v1.Pod
+		updateExpectedFunc func(*expectedMetricsStruct)
+	}{
+		// Memory requests
+		{
+			name: "add memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryRequestsCounter["add"]++
+			},
+		},
+		{
+			name: "remove memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryRequestsCounter["remove"]++
+			},
+		},
+		{
+			name: "increase memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						}},
+					},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryRequestsCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryRequestsCounter["decrease"]++
+			},
+		},
+
+		// Memory limits
+		{
+			name: "add memory limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryLimitsCounter["add"]++
+			},
+		},
+		{
+			name: "remove memory limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryLimitsCounter["remove"]++
+			},
+		},
+		{
+			name: "increase memory limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryLimitsCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease memory limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryLimitsCounter["decrease"]++
+			},
+		},
+
+		// CPU requests
+		{
+			name: "add cpu requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["add"]++
+			},
+		},
+		{
+			name: "remove cpu requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["remove"]++
+			},
+		},
+		{
+			name: "increase cpu requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease cpu requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["decrease"]++
+			},
+		},
+
+		// CPU limits
+		{
+			name: "add cpu limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["add"]++
+			},
+		},
+		{
+			name: "remove cpu limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["remove"]++
+			},
+		},
+		{
+			name: "increase cpu limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease cpu limits",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["decrease"]++
+			},
+		},
+
+		// Some combinations of things
+		{
+			name: "add cpu limits + increase memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+							Requests: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["add"]++
+				e.memoryRequestsCounter["increase"]++
+			},
+		},
+		{
+			name: "remove memory limits + decrease cpu requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.memoryLimitsCounter["remove"]++
+				e.cpuRequestsCounter["decrease"]++
+			},
+		},
+		{
+			name: "increase cpu requests + memory requests",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("90"),
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("110"),
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuRequestsCounter["increase"]++
+				e.memoryRequestsCounter["increase"]++
+			},
+		},
+		{
+			name: "decrease all possible values",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("110"),
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("110"),
+								v1.ResourceMemory: resource.MustParse("110"),
+							},
+						},
+					}},
+				},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("90"),
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("90"),
+								v1.ResourceMemory: resource.MustParse("90"),
+							},
+						},
+					}},
+				},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {
+				e.cpuLimitsCounter["decrease"]++
+				e.cpuRequestsCounter["decrease"]++
+				e.memoryLimitsCounter["decrease"]++
+				e.memoryRequestsCounter["decrease"]++
+			},
+		},
+		{
+			name: "no resize request",
+			initialAllocation: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updatedPod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{}}},
+			},
+			updateExpectedFunc: func(e *expectedMetricsStruct) {},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testPod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  "12345",
+				},
+			}
+			initialPod := testPod.DeepCopy()
+			updatedPod := testPod.DeepCopy()
+
+			initialPod.Spec = tc.initialAllocation.Spec
+			updatedPod.Spec = tc.updatedPod.Spec
+
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			t.Cleanup(func() { testKubelet.Cleanup() })
+			kubelet := testKubelet.kubelet
+
+			kubelet.podManager.AddPod(initialPod)
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(initialPod))
+			kubelet.HandlePodUpdates([]*v1.Pod{updatedPod})
+
+			tc.updateExpectedFunc(&expectedMetrics)
+
+			expectedFormat := `
+				# HELP kubelet_container_requested_resizes_total [ALPHA] Number of requested resizes, counted at the container level. Different resources on the same container are counted separately. The 'requirement' label refers to 'memory' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.
+				# TYPE kubelet_container_requested_resizes_total counter
+				kubelet_container_requested_resizes_total{operation="add",requirement="requests",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="add",requirement="requests",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="add",requirement="limits",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="add",requirement="limits",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="decrease",requirement="requests",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="decrease",requirement="requests",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="decrease",requirement="limits",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="decrease",requirement="limits",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="increase",requirement="requests",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="increase",requirement="requests",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="increase",requirement="limits",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="increase",requirement="limits",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="remove",requirement="requests",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="remove",requirement="requests",resource="cpu"} %d
+				kubelet_container_requested_resizes_total{operation="remove",requirement="limits",resource="memory"} %d
+				kubelet_container_requested_resizes_total{operation="remove",requirement="limits",resource="cpu"} %d
+			`
+
+			expected := fmt.Sprintf(expectedFormat,
+				expectedMetrics.memoryRequestsCounter["add"],
+				expectedMetrics.cpuRequestsCounter["add"],
+				expectedMetrics.memoryLimitsCounter["add"],
+				expectedMetrics.cpuLimitsCounter["add"],
+
+				expectedMetrics.memoryRequestsCounter["decrease"],
+				expectedMetrics.cpuRequestsCounter["decrease"],
+				expectedMetrics.memoryLimitsCounter["decrease"],
+				expectedMetrics.cpuLimitsCounter["decrease"],
+
+				expectedMetrics.memoryRequestsCounter["increase"],
+				expectedMetrics.cpuRequestsCounter["increase"],
+				expectedMetrics.memoryLimitsCounter["increase"],
+				expectedMetrics.cpuLimitsCounter["increase"],
+
+				expectedMetrics.memoryRequestsCounter["remove"],
+				expectedMetrics.cpuRequestsCounter["remove"],
+				expectedMetrics.memoryLimitsCounter["remove"],
+				expectedMetrics.cpuLimitsCounter["remove"],
+			)
+
+			// Omit lines from the expected metrics string where the count is "0"
+			re := regexp.MustCompile("(?m)[\r\n]+^.*} 0.*$")
+			expected = re.ReplaceAllString(expected, "")
+
+			require.NoError(t, testutil.GatherAndCompare(
+				legacyregistry.DefaultGatherer, strings.NewReader(expected), "kubelet_container_requested_resizes_total",
+			))
+		})
+	}
+}
+
+func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */, true /*enableResizing*/)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	lowCPU := resource.MustParse("500m")
+	highCPU := resource.MustParse("1")
+	lowMem := resource.MustParse("500Mi")
+	highMem := resource.MustParse("1Gi")
+
+	// Set desired resources to some huge value to verify that they are being ignored in the aggregate check.
+	enormousCPU := resource.MustParse("2000m")
+	enormousMem := resource.MustParse("2000Mi")
+
+	makePodWithResources := func(name string, requests v1.ResourceList, status v1.ResourceList) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+				UID:  types.UID(name),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "c1",
+						Image: "i1",
+						Resources: v1.ResourceRequirements{
+							Requests: requests,
+						},
+					},
+				},
+			},
+			Status: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					{
+						Name: "c1",
+						Resources: &v1.ResourceRequirements{
+							Requests: status,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	pendingResizeAllocated := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod-pending-resize",
+			UID:  types.UID("pod-pending-resize"),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem},
+					},
+				},
+			},
+		},
+	}
+
+	pendingResizeDesired := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod-pending-resize",
+			UID:  types.UID("pod-pending-resize"),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem},
+					},
+				},
+			},
+		},
+	}
+
+	testCases := []struct {
+		name                     string
+		oldPod                   *v1.Pod
+		newPod                   *v1.Pod
+		shouldRetryPendingResize bool
+	}{
+		{
+			name:                     "requests are increasing",
+			oldPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			newPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: enormousCPU, v1.ResourceMemory: enormousMem}, v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem}),
+			shouldRetryPendingResize: false,
+		},
+		{
+			name:                     "requests are unchanged",
+			oldPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			newPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: enormousCPU, v1.ResourceMemory: enormousMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			shouldRetryPendingResize: false,
+		},
+		{
+			name:                     "requests are decreasing",
+			oldPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}, v1.ResourceList{v1.ResourceCPU: highCPU, v1.ResourceMemory: highMem}),
+			newPod:                   makePodWithResources("updated-pod", v1.ResourceList{v1.ResourceCPU: enormousCPU, v1.ResourceMemory: enormousMem}, v1.ResourceList{v1.ResourceCPU: lowCPU, v1.ResourceMemory: lowMem}),
+			shouldRetryPendingResize: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// For the sake of this test, just reject all resize requests.
+			handler := &testPodAdmitHandler{podsToReject: []*v1.Pod{pendingResizeAllocated}}
+			kubelet.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
+
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(pendingResizeAllocated))
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(tc.oldPod))
+
+			// We only expect status resources to change in HandlePodReconcile.
+			tc.oldPod.Spec = tc.newPod.Spec
+
+			kubelet.podManager.AddPod(pendingResizeDesired)
+			kubelet.podManager.AddPod(tc.oldPod)
+			kubelet.allocationManager.PushPendingResize(pendingResizeDesired.UID)
+
+			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID)
+			kubelet.HandlePodReconcile([]*v1.Pod{tc.newPod})
+			require.Equal(t, tc.shouldRetryPendingResize, kubelet.statusManager.IsPodResizeDeferred(pendingResizeDesired.UID))
+
+			kubelet.allocationManager.RemovePod(pendingResizeDesired.UID)
+			kubelet.podManager.RemovePod((pendingResizeDesired))
+			kubelet.podManager.RemovePod(tc.oldPod)
 		})
 	}
 }

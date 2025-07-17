@@ -522,8 +522,9 @@ func (c *RaftCluster) PromoteMember(id types.ID, shouldApplyV3 ShouldApplyV3) {
 	defer c.Unlock()
 
 	if c.v2store != nil {
-		if _, ok := c.members[id]; ok {
-			m := *(c.members[id])
+		membersMap, _ := membersFromStore(c.lg, c.v2store)
+		if _, ok := membersMap[id]; ok {
+			m := *(membersMap[id])
 			m.RaftAttributes.IsLearner = false
 			mustUpdateMemberInStore(c.lg, c.v2store, &m)
 		} else {

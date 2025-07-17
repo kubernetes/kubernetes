@@ -176,10 +176,6 @@
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go"
       ],
-      "github.com/google/shlex": [
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5"
-      ],
       "github.com/gregjones/httpcache": [
         "k8s.io/client-go"
       ],
@@ -285,7 +281,6 @@
       "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
-      "github.com/google/shlex",
       "github.com/gregjones/httpcache",
       "github.com/grpc-ecosystem/go-grpc-prometheus",
       "github.com/json-iterator/go",

@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -230,7 +231,7 @@ type AttachableVolumePlugin interface {
 	NewDetacher() (Detacher, error)
 	// CanAttach tests if provided volume spec is attachable
 	CanAttach(spec *Spec) (bool, error)
-	VerifyExhaustedResource(spec *Spec, nodeName types.NodeName)
+	VerifyExhaustedResource(spec *Spec) bool
 }
 
 // DeviceMountableVolumePlugin is an extended interface of VolumePlugin and is used
@@ -312,6 +313,9 @@ type KubeletVolumeHost interface {
 	// Returns trust anchors from the ClusterTrustBundles selected by signer
 	// name and label selector.
 	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
+
+	// Returns the credential bundle for the specified podCertificate projected volume source.
+	GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error)
 }
 
 // CSIDriverVolumeHost is a volume host that has access to CSIDriverLister

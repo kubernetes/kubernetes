@@ -114,6 +114,10 @@ type Cache interface {
 
 	// Dump produces a dump of the current cache.
 	Dump() *Dump
+
+	// BindPod handles the pod binding by adding a bind API call to the dispatcher.
+	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+	BindPod(binding *v1.Binding) (<-chan error, error)
 }
 
 // Dump is a dump of the cache state.

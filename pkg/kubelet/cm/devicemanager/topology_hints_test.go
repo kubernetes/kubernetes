@@ -43,8 +43,8 @@ func (m *mockAffinityStore) GetPolicy() topologymanager.Policy {
 	return nil
 }
 
-func makeNUMADevice(id string, numa int) pluginapi.Device {
-	return pluginapi.Device{
+func makeNUMADevice(id string, numa int) *pluginapi.Device {
+	return &pluginapi.Device{
 		ID:       id,
 		Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: int64(numa)}}},
 	}
@@ -113,7 +113,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 		description                 string
 		resource                    string
 		request                     int
-		devices                     []pluginapi.Device
+		devices                     []*pluginapi.Device
 		allocatedDevices            []string
 		hint                        topologymanager.TopologyHint
 		getPreferredAllocationFunc  func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error)
@@ -124,7 +124,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Single Request, no alignment",
 			resource:    "resource",
 			request:     1,
-			devices: []pluginapi.Device{
+			devices: []*pluginapi.Device{
 				{ID: "Dev1"},
 				{ID: "Dev2"},
 			},
@@ -138,7 +138,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 1, partial alignment",
 			resource:    "resource",
 			request:     1,
-			devices: []pluginapi.Device{
+			devices: []*pluginapi.Device{
 				{ID: "Dev1"},
 				makeNUMADevice("Dev2", 1),
 			},
@@ -152,7 +152,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Single Request, socket 0",
 			resource:    "resource",
 			request:     1,
-			devices: []pluginapi.Device{
+			devices: []*pluginapi.Device{
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 1),
 			},
@@ -166,7 +166,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Single Request, socket 1",
 			resource:    "resource",
 			request:     1,
-			devices: []pluginapi.Device{
+			devices: []*pluginapi.Device{
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 1),
 			},
@@ -180,7 +180,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 2, socket 0",
 			resource:    "resource",
 			request:     2,
-			devices: []pluginapi.Device{
+			devices: []*pluginapi.Device{
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 1),
 				makeNUMADevice("Dev3", 0),
@@ -196,7 +196,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 2, socket 1",
 			resource:    "resource",
 			request:     2,
-			devices: []pluginapi.Device{
+			devices: []*pluginapi.Device{
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 1),
 				makeNUMADevice("Dev3", 0),
@@ -212,7 +212,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 4, unsatisfiable, prefer socket 0",
 			resource:    "resource",
 			request:     4,
-			devices: []pluginapi.Device{
+			devices: []*pluginapi.Device{
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 1),
 				makeNUMADevice("Dev3", 0),
@@ -230,7 +230,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 4, unsatisfiable, prefer socket 1",
 			resource:    "resource",
 			request:     4,
-			devices: []pluginapi.Device{
+			devices: []*pluginapi.Device{
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 1),
 				makeNUMADevice("Dev3", 0),
@@ -248,7 +248,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 4, multisocket",
 			resource:    "resource",
 			request:     4,
-			devices: []pluginapi.Device{
+			devices: []*pluginapi.Device{
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 1),
 				makeNUMADevice("Dev3", 2),
@@ -268,8 +268,8 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 5, socket 0, preferred aligned accepted",
 			resource:    "resource",
 			request:     5,
-			devices: func() []pluginapi.Device {
-				devices := []pluginapi.Device{}
+			devices: func() []*pluginapi.Device {
+				devices := []*pluginapi.Device{}
 				for i := 0; i < 100; i++ {
 					id := fmt.Sprintf("Dev%d", i)
 					devices = append(devices, makeNUMADevice(id, 0))
@@ -298,8 +298,8 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 5, socket 0, preferred aligned accepted, unaligned ignored",
 			resource:    "resource",
 			request:     5,
-			devices: func() []pluginapi.Device {
-				devices := []pluginapi.Device{}
+			devices: func() []*pluginapi.Device {
+				devices := []*pluginapi.Device{}
 				for i := 0; i < 100; i++ {
 					id := fmt.Sprintf("Dev%d", i)
 					devices = append(devices, makeNUMADevice(id, 0))
@@ -328,8 +328,8 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 5, socket 1, preferred aligned accepted, bogus ignored",
 			resource:    "resource",
 			request:     5,
-			devices: func() []pluginapi.Device {
-				devices := []pluginapi.Device{}
+			devices: func() []*pluginapi.Device {
+				devices := []*pluginapi.Device{}
 				for i := 0; i < 100; i++ {
 					id := fmt.Sprintf("Dev%d", i)
 					devices = append(devices, makeNUMADevice(id, 1))
@@ -354,8 +354,8 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 5, multisocket, preferred accepted",
 			resource:    "resource",
 			request:     5,
-			devices: func() []pluginapi.Device {
-				devices := []pluginapi.Device{}
+			devices: func() []*pluginapi.Device {
+				devices := []*pluginapi.Device{}
 				for i := 0; i < 3; i++ {
 					id := fmt.Sprintf("Dev%d", i)
 					devices = append(devices, makeNUMADevice(id, 0))
@@ -384,8 +384,8 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 			description: "Request for 5, multisocket, preferred unaligned accepted, bogus ignored",
 			resource:    "resource",
 			request:     5,
-			devices: func() []pluginapi.Device {
-				devices := []pluginapi.Device{}
+			devices: func() []*pluginapi.Device {
+				devices := []*pluginapi.Device{}
 				for i := 0; i < 3; i++ {
 					id := fmt.Sprintf("Dev%d", i)
 					devices = append(devices, makeNUMADevice(id, 0))
@@ -475,7 +475,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 		description         string
 		resource            string
 		request             int
-		allDevices          []pluginapi.Device
+		allDevices          []*pluginapi.Device
 		allocatedDevices    []string
 		reusableDevices     []string
 		hint                topologymanager.TopologyHint
@@ -487,7 +487,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			description: "Request for 1, socket 0, 0 already allocated, 0 reusable",
 			resource:    "resource",
 			request:     1,
-			allDevices: []pluginapi.Device{
+			allDevices: []*pluginapi.Device{
 				makeNUMADevice("Dev0", 0),
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 0),
@@ -507,7 +507,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			description: "Request for 4, socket 0, 2 already allocated, 2 reusable",
 			resource:    "resource",
 			request:     4,
-			allDevices: []pluginapi.Device{
+			allDevices: []*pluginapi.Device{
 				makeNUMADevice("Dev0", 0),
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 0),
@@ -531,7 +531,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			description: "Request for 4, socket 0, 4 already allocated, 2 reusable",
 			resource:    "resource",
 			request:     4,
-			allDevices: []pluginapi.Device{
+			allDevices: []*pluginapi.Device{
 				makeNUMADevice("Dev0", 0),
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 0),
@@ -555,7 +555,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			description: "Request for 6, multisocket, 2 already allocated, 2 reusable",
 			resource:    "resource",
 			request:     6,
-			allDevices: []pluginapi.Device{
+			allDevices: []*pluginapi.Device{
 				makeNUMADevice("Dev0", 0),
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 0),
@@ -579,7 +579,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			description: "Request for 6, multisocket, 4 already allocated, 2 reusable",
 			resource:    "resource",
 			request:     6,
-			allDevices: []pluginapi.Device{
+			allDevices: []*pluginapi.Device{
 				makeNUMADevice("Dev0", 0),
 				makeNUMADevice("Dev1", 0),
 				makeNUMADevice("Dev2", 0),
@@ -976,7 +976,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 type topologyHintTestCase struct {
 	description      string
 	pod              *v1.Pod
-	devices          map[string][]pluginapi.Device
+	devices          map[string][]*pluginapi.Device
 	allocatedDevices map[string]map[string]map[string][]string
 	expectedHints    map[string][]topologymanager.TopologyHint
 }
@@ -1002,7 +1002,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice": {
 					{ID: "Dev1"},
 					{ID: "Dev2"},
@@ -1033,7 +1033,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice": {
 					{ID: "Dev1"},
 					makeNUMADevice("Dev2", 1),
@@ -1071,7 +1071,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 1),
@@ -1113,7 +1113,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 1),
@@ -1147,7 +1147,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 1),
@@ -1191,7 +1191,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 1),
@@ -1235,7 +1235,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice1": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 1),
@@ -1292,7 +1292,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 0),
@@ -1323,7 +1323,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 0),
@@ -1368,7 +1368,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 0),
@@ -1406,7 +1406,7 @@ func getCommonTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 0),
@@ -1465,7 +1465,7 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice1": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 0),
@@ -1565,7 +1565,7 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice1": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 0),
@@ -1647,7 +1647,7 @@ func getPodScopeTestCases() []topologyHintTestCase {
 					},
 				},
 			},
-			devices: map[string][]pluginapi.Device{
+			devices: map[string][]*pluginapi.Device{
 				"testdevice1": {
 					makeNUMADevice("Dev1", 0),
 					makeNUMADevice("Dev2", 0),

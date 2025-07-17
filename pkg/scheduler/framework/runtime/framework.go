@@ -37,6 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -86,6 +87,8 @@ type frameworkImpl struct {
 	extenders []framework.Extender
 	framework.PodNominator
 	framework.PodActivator
+	apiDispatcher *apidispatcher.APIDispatcher
+	apiCacher     framework.APICacher
 
 	parallelizer parallelize.Parallelizer
 }
@@ -138,6 +141,7 @@ type frameworkOptions struct {
 	captureProfile         CaptureProfile
 	parallelizer           parallelize.Parallelizer
 	waitingPods            *waitingPodsMap
+	apiDispatcher          *apidispatcher.APIDispatcher
 	logger                 *klog.Logger
 }
 
@@ -223,6 +227,13 @@ func WithParallelism(parallelism int) Option {
 	}
 }
 
+// WithAPIDispatcher sets API dispatcher for the scheduling frameworkImpl.
+func WithAPIDispatcher(apiDispatcher *apidispatcher.APIDispatcher) Option {
+	return func(o *frameworkOptions) {
+		o.apiDispatcher = apiDispatcher
+	}
+}
+
 // CaptureProfile is a callback to capture a finalized profile.
 type CaptureProfile func(config.KubeSchedulerProfile)
 
@@ -289,6 +300,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		extenders:            options.extenders,
 		PodNominator:         options.podNominator,
 		PodActivator:         options.podActivator,
+		apiDispatcher:        options.apiDispatcher,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
 	}
@@ -439,6 +451,10 @@ func (f *frameworkImpl) SetPodNominator(n framework.PodNominator) {
 
 func (f *frameworkImpl) SetPodActivator(a framework.PodActivator) {
 	f.PodActivator = a
+}
+
+func (f *frameworkImpl) SetAPICacher(c framework.APICacher) {
+	f.apiCacher = c
 }
 
 // Close closes each plugin, when they implement io.Closer interface.
@@ -690,7 +706,7 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 	if f == nil {
 		// If frameworkImpl is nil, simply keep their order unchanged.
 		// NOTE: this is primarily for tests.
-		return func(_, _ *framework.QueuedPodInfo) bool { return false }
+		return func(_, _ fwk.QueuedPodInfo) bool { return false }
 	}
 
 	if len(f.queueSortPlugins) == 0 {
@@ -770,7 +786,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state fwk.Cycle
 	return result, returnStatus, pluginsWithNodes
 }
 
-func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilter(ctx, state, pod, nodes)
 	}
@@ -787,8 +803,8 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 	ctx context.Context,
 	state fwk.CycleState,
 	podToSchedule *v1.Pod,
-	podInfoToAdd *framework.PodInfo,
-	nodeInfo *framework.NodeInfo,
+	podInfoToAdd fwk.PodInfo,
+	nodeInfo fwk.NodeInfo,
 ) (status *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -815,7 +831,7 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 	return nil
 }
 
-func (f *frameworkImpl) runPreFilterExtensionAddPod(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (f *frameworkImpl) runPreFilterExtensionAddPod(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilterExtensions().AddPod(ctx, state, podToSchedule, podInfoToAdd, nodeInfo)
 	}
@@ -832,8 +848,8 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 	ctx context.Context,
 	state fwk.CycleState,
 	podToSchedule *v1.Pod,
-	podInfoToRemove *framework.PodInfo,
-	nodeInfo *framework.NodeInfo,
+	podInfoToRemove fwk.PodInfo,
+	nodeInfo fwk.NodeInfo,
 ) (status *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -852,7 +868,11 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 		status = f.runPreFilterExtensionRemovePod(ctx, pl, state, podToSchedule, podInfoToRemove, nodeInfo)
 		if !status.IsSuccess() {
 			err := status.AsError()
-			logger.Error(err, "Plugin failed", "node", klog.KObj(nodeInfo.Node()), "operation", "removePod", "plugin", pl.Name(), "pod", klog.KObj(podToSchedule))
+			var node *v1.Node
+			if nodeInfo != nil {
+				node = nodeInfo.Node()
+			}
+			logger.Error(err, "Plugin failed", "node", klog.KObj(node), "operation", "removePod", "plugin", pl.Name(), "pod", klog.KObj(podToSchedule))
 			return fwk.AsStatus(fmt.Errorf("running RemovePod on PreFilter plugin %q: %w", pl.Name(), err))
 		}
 	}
@@ -860,7 +880,7 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 	return nil
 }
 
-func (f *frameworkImpl) runPreFilterExtensionRemovePod(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (f *frameworkImpl) runPreFilterExtensionRemovePod(ctx context.Context, pl framework.PreFilterPlugin, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreFilterExtensions().RemovePod(ctx, state, podToSchedule, podInfoToRemove, nodeInfo)
 	}
@@ -878,7 +898,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 	ctx context.Context,
 	state fwk.CycleState,
 	pod *v1.Pod,
-	nodeInfo *framework.NodeInfo,
+	nodeInfo fwk.NodeInfo,
 ) *fwk.Status {
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
@@ -909,7 +929,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 	return nil
 }
 
-func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.FilterPlugin, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.FilterPlugin, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.Filter(ctx, state, pod, nodeInfo)
 	}
@@ -986,7 +1006,7 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.Po
 // and add the nominated pods. Removal of the victims is done by
 // SelectVictimsOnNode(). Preempt removes victims from PreFilter state and
 // NodeInfo before calling this function.
-func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info *framework.NodeInfo) *fwk.Status {
+func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info fwk.NodeInfo) *fwk.Status {
 	var status *fwk.Status
 
 	podsAdded := false
@@ -1036,7 +1056,7 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 // addGENominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
 // 3) augmented nodeInfo.
-func addGENominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, state fwk.CycleState, nodeInfo *framework.NodeInfo) (bool, fwk.CycleState, *framework.NodeInfo, error) {
+func addGENominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, state fwk.CycleState, nodeInfo fwk.NodeInfo) (bool, fwk.CycleState, fwk.NodeInfo, error) {
 	if fh == nil {
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
@@ -1049,7 +1069,7 @@ func addGENominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, s
 	stateOut := state.Clone()
 	podsAdded := false
 	for _, pi := range nominatedPodInfos {
-		if corev1.PodPriority(pi.Pod) >= corev1.PodPriority(pod) && pi.Pod.UID != pod.UID {
+		if corev1.PodPriority(pi.GetPod()) >= corev1.PodPriority(pod) && pi.GetPod().UID != pod.UID {
 			nodeInfoOut.AddPodInfo(pi)
 			status := fh.RunPreFilterExtensionAddPod(ctx, stateOut, pod, pi, nodeInfoOut)
 			if !status.IsSuccess() {
@@ -1069,7 +1089,7 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	ctx context.Context,
 	state fwk.CycleState,
 	pod *v1.Pod,
-	nodes []*framework.NodeInfo,
+	nodes []fwk.NodeInfo,
 ) (status *fwk.Status) {
 	startTime := time.Now()
 	skipPlugins := sets.New[string]()
@@ -1100,7 +1120,7 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	return nil
 }
 
-func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreScorePlugin, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreScorePlugin, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PreScore(ctx, state, pod, nodes)
 	}
@@ -1114,7 +1134,7 @@ func (f *frameworkImpl) runPreScorePlugin(ctx context.Context, pl framework.PreS
 // It returns a list that stores scores from each plugin and total score for each Node.
 // It also returns *Status, which is set to non-success if any of the plugins returns
 // a non-success status.
-func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (ns []framework.NodePluginScores, status *fwk.Status) {
+func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (ns []framework.NodePluginScores, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
@@ -1223,7 +1243,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 	return allNodePluginScores, nil
 }
 
-func (f *frameworkImpl) runScorePlugin(ctx context.Context, pl framework.ScorePlugin, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (f *frameworkImpl) runScorePlugin(ctx context.Context, pl framework.ScorePlugin, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.Score(ctx, state, pod, nodeInfo)
 	}
@@ -1258,6 +1278,10 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
 	for _, pl := range f.preBindPlugins {
+		if state.GetSkipPreBindPlugins().Has(pl.Name()) {
+			continue
+		}
+
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -1285,6 +1309,60 @@ func (f *frameworkImpl) runPreBindPlugin(ctx context.Context, pl framework.PreBi
 	startTime := time.Now()
 	status := pl.PreBind(ctx, state, pod, nodeName)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.PreBind, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+	return status
+}
+
+// RunPreBindPreFlights runs the set of configured PreBindPreFlight functions from PreBind plugins.
+// The returning value is:
+// - Success: one or more plugins return success, meaning, some PreBind plugins will work for this pod.
+// - Skip: all plugins return skip.
+// - Error: any plugin return error.
+func (f *frameworkImpl) RunPreBindPreFlights(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreBindPreFlight, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+	logger := klog.FromContext(ctx)
+	verboseLogs := logger.V(4).Enabled()
+	if verboseLogs {
+		logger = klog.LoggerWithName(logger, "PreBindPreFlight")
+		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
+	}
+	skipPlugins := sets.New[string]()
+	returningStatus := fwk.NewStatus(fwk.Skip)
+	for _, pl := range f.preBindPlugins {
+		ctx := ctx
+		if verboseLogs {
+			logger := klog.LoggerWithName(logger, pl.Name())
+			ctx = klog.NewContext(ctx, logger)
+		}
+		status = f.runPreBindPreFlight(ctx, pl, state, pod, nodeName)
+		switch {
+		case status.Code() == fwk.Error:
+			err := status.AsError()
+			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
+			return fwk.AsStatus(fmt.Errorf("running PreBindPreFlight %q: %w", pl.Name(), err))
+		case status.IsSuccess():
+			// We return success when one or more plugins return success.
+			returningStatus = nil
+		case status.IsSkip():
+			skipPlugins.Insert(pl.Name())
+		default:
+			// Other statuses are unexpected
+			return fwk.AsStatus(fmt.Errorf("PreBindPreFlight %s returned %q, which is unsupported. It is supposed to return Success, Skip, or Error status", pl.Name(), status.Code()))
+		}
+	}
+	state.SetSkipPreBindPlugins(skipPlugins)
+	return returningStatus
+}
+
+func (f *frameworkImpl) runPreBindPreFlight(ctx context.Context, pl framework.PreBindPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	if !state.ShouldRecordPluginMetrics() {
+		return pl.PreBindPreFlight(ctx, state, pod, nodeName)
+	}
+	startTime := time.Now()
+	status := pl.PreBindPreFlight(ctx, state, pod, nodeName)
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.PreBindPreFlight, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return status
 }
 
@@ -1516,6 +1594,10 @@ func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl framework.Permit
 	return status, timeout
 }
 
+func (f *frameworkImpl) WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool {
+	return f.waitingPods.get(pod.UID) != nil
+}
+
 // WaitOnPermit will block, if the pod is a waiting pod, until the waiting pod is rejected or allowed.
 func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *fwk.Status {
 	waitingPod := f.waitingPods.get(pod.UID)
@@ -1674,4 +1756,23 @@ func (f *frameworkImpl) PercentageOfNodesToScore() *int32 {
 // Parallelizer returns a parallelizer holding parallelism for scheduler.
 func (f *frameworkImpl) Parallelizer() parallelize.Parallelizer {
 	return f.parallelizer
+}
+
+// APIDispatcher returns an apiDispatcher that can be used to dispatch API calls.
+// This requires SchedulerAsyncAPICalls feature gate to be enabled.
+func (f *frameworkImpl) APIDispatcher() fwk.APIDispatcher {
+	if f.apiDispatcher == nil {
+		return nil
+	}
+	return f.apiDispatcher
+}
+
+// APICacher returns an apiCacher that can be used to dispatch API calls through scheduler's cache
+// instead of directly using APIDispatcher().
+// This requires SchedulerAsyncAPICalls feature gate to be enabled.
+func (f *frameworkImpl) APICacher() framework.APICacher {
+	if f.apiCacher == nil {
+		return nil
+	}
+	return f.apiCacher
 }

@@ -53,7 +53,7 @@ type NodeToStatusReader interface {
 	Get(nodeName string) *fwk.Status
 	// NodesForStatusCode returns a list of NodeInfos for the nodes that have a given status code.
 	// It returns the NodeInfos for all matching nodes denoted by AbsentNodesStatus as well.
-	NodesForStatusCode(nodeLister NodeInfoLister, code fwk.Code) ([]*NodeInfo, error)
+	NodesForStatusCode(nodeLister NodeInfoLister, code fwk.Code) ([]fwk.NodeInfo, error)
 }
 
 // NodeToStatusMap is an alias for NodeToStatusReader to keep partial backwards compatibility.
@@ -128,8 +128,8 @@ func (m *NodeToStatus) ForEachExplicitNode(fn func(nodeName string, status *fwk.
 // and filtered using NodeToStatus.Get.
 // If the absentNodesStatus doesn't match the code, nodeToStatus map is used to create a list of nodes
 // and nodeLister.Get is used to obtain NodeInfo for each.
-func (m *NodeToStatus) NodesForStatusCode(nodeLister NodeInfoLister, code fwk.Code) ([]*NodeInfo, error) {
-	var resultNodes []*NodeInfo
+func (m *NodeToStatus) NodesForStatusCode(nodeLister NodeInfoLister, code fwk.Code) ([]fwk.NodeInfo, error) {
+	var resultNodes []fwk.NodeInfo
 
 	if m.AbsentNodesStatus().Code() == code {
 		allNodes, err := nodeLister.List()
@@ -244,7 +244,7 @@ type PreEnqueuePlugin interface {
 }
 
 // LessFunc is the function to sort pod info
-type LessFunc func(podInfo1, podInfo2 *QueuedPodInfo) bool
+type LessFunc func(podInfo1, podInfo2 fwk.QueuedPodInfo) bool
 
 // QueueSortPlugin is an interface that must be implemented by "QueueSort" plugins.
 // These plugins are used to sort pods in the scheduling queue. Only one queue sort
@@ -252,7 +252,7 @@ type LessFunc func(podInfo1, podInfo2 *QueuedPodInfo) bool
 type QueueSortPlugin interface {
 	Plugin
 	// Less are used to sort pods in the scheduling queue.
-	Less(*QueuedPodInfo, *QueuedPodInfo) bool
+	Less(fwk.QueuedPodInfo, fwk.QueuedPodInfo) bool
 }
 
 // EnqueueExtensions is an optional interface that plugins can implement to efficiently
@@ -294,10 +294,10 @@ type EnqueueExtensions interface {
 type PreFilterExtensions interface {
 	// AddPod is called by the framework while trying to evaluate the impact
 	// of adding podToAdd to the node while scheduling podToSchedule.
-	AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *fwk.Status
+	AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status
 	// RemovePod is called by the framework while trying to evaluate the impact
 	// of removing podToRemove from the node while scheduling podToSchedule.
-	RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *fwk.Status
+	RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status
 }
 
 // PreFilterPlugin is an interface that must be implemented by "PreFilter" plugins.
@@ -313,7 +313,7 @@ type PreFilterPlugin interface {
 	//
 	// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 	// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
-	PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []*NodeInfo) (*PreFilterResult, *fwk.Status)
+	PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*PreFilterResult, *fwk.Status)
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
 	// modify its pre-processed info. The framework guarantees that the extensions
@@ -354,7 +354,7 @@ type FilterPlugin interface {
 	// context gets canceled when a sufficient number of suitable
 	// nodes have been found and searching for more isn't necessary
 	// anymore.
-	Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *fwk.Status
+	Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status
 }
 
 // PostFilterPlugin is an interface for "PostFilter" plugins. These plugins are called
@@ -392,7 +392,7 @@ type PreScorePlugin interface {
 	// the pod will be rejected
 	// When it returns Skip status, other fields in status are just ignored,
 	// and coupled Score plugin will be skipped in this scheduling cycle.
-	PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*NodeInfo) *fwk.Status
+	PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status
 }
 
 // ScoreExtensions is an interface for Score extended functionality.
@@ -410,7 +410,7 @@ type ScorePlugin interface {
 	// Score is called on each filtered node. It must return success and an integer
 	// indicating the rank of the node. All scoring plugins must return success or
 	// the pod will be rejected.
-	Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *NodeInfo) (int64, *fwk.Status)
+	Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status)
 
 	// ScoreExtensions returns a ScoreExtensions interface if it implements one, or nil if does not.
 	ScoreExtensions() ScoreExtensions
@@ -440,12 +440,12 @@ type ReservePlugin interface {
 // These plugins are called before a pod being scheduled.
 type PreBindPlugin interface {
 	Plugin
-	// PreBindPreFlight is called before PreBind, and the plugin is supposed to return Success, Skip, or Error status.
+	// PreBindPreFlight is called before PreBind, and the plugin is supposed to return Success, Skip, or Error status
+	// to tell the scheduler whether the plugin will do something in PreBind or not.
 	// If it returns Success, it means this PreBind plugin will handle this pod.
 	// If it returns Skip, it means this PreBind plugin has nothing to do with the pod, and PreBind will be skipped.
 	// This function should be lightweight, and shouldn't do any actual operation, e.g., creating a volume etc.
 	PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status
-
 	// PreBind is called before binding a pod. All prebind plugins must return
 	// success or the pod will be rejected and won't be sent for binding.
 	PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status
@@ -526,6 +526,10 @@ type Framework interface {
 	// internal error. In either case the pod is not going to be bound.
 	RunPreBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
 
+	// RunPreBindPreFlights runs the set of configured PreBindPreFlight functions from PreBind plugins.
+	// It returns immediately if any of the plugins returns a non-skip status.
+	RunPreBindPreFlights(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+
 	// RunPostBindPlugins runs the set of configured PostBind plugins.
 	RunPostBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
 
@@ -546,6 +550,9 @@ type Framework interface {
 	// to a map of currently waiting pods and return status with "Wait" code.
 	// Pod will remain waiting pod for the minimum duration returned by the Permit plugins.
 	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+
+	// WillWaitOnPermit returns whether this pod will wait on permit by checking if the pod is a waiting pod.
+	WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool
 
 	// WaitOnPermit will block, if the pod is a waiting pod, until the waiting pod is rejected or allowed.
 	WaitOnPermit(ctx context.Context, pod *v1.Pod) *fwk.Status
@@ -579,6 +586,8 @@ type Framework interface {
 	SetPodNominator(nominator PodNominator)
 	// SetPodActivator sets the PodActivator
 	SetPodActivator(activator PodActivator)
+	// SetAPICacher sets the APICacher
+	SetAPICacher(apiCacher APICacher)
 
 	// Close calls Close method of each plugin.
 	Close() error
@@ -635,13 +644,56 @@ type Handle interface {
 	SharedDRAManager() SharedDRAManager
 
 	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.
-	RunFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info *NodeInfo) *fwk.Status
+	RunFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info fwk.NodeInfo) *fwk.Status
 
 	// Extenders returns registered scheduler extenders.
 	Extenders() []Extender
 
 	// Parallelizer returns a parallelizer holding parallelism for scheduler.
 	Parallelizer() parallelize.Parallelizer
+
+	// APIDispatcher returns a fwk.APIDispatcher that can be used to dispatch API calls directly.
+	// This is non-nil if the SchedulerAsyncAPICalls feature gate is enabled.
+	APIDispatcher() fwk.APIDispatcher
+
+	// APICacher returns an APICacher that coordinates API calls with the scheduler's internal cache.
+	// Use this to ensure the scheduler's view of the cluster remains consistent.
+	// This is non-nil if the SchedulerAsyncAPICalls feature gate is enabled.
+	APICacher() APICacher
+}
+
+// APICacher defines methods that send API calls through the scheduler's cache
+// before they are executed asynchronously by the APIDispatcher.
+// This ensures the scheduler's internal state is updated optimistically,
+// reflecting the intended outcome of the call.
+// This methods should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+type APICacher interface {
+	// PatchPodStatus sends a patch request for a Pod's status.
+	// The patch could be first applied to the cached Pod object and then the API call is executed asynchronously.
+	// It returns a channel that can be used to wait for the call's completion.
+	PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *NominatingInfo) (<-chan error, error)
+
+	// BindPod sends a binding request. The binding could be first applied to the cached Pod object
+	// and then the API call is executed asynchronously.
+	// It returns a channel that can be used to wait for the call's completion.
+	BindPod(binding *v1.Binding) (<-chan error, error)
+
+	// WaitOnFinish blocks until the result of an API call is sent to the given onFinish channel
+	// (returned by methods BindPod or PreemptPod).
+	//
+	// It returns the error received from the channel.
+	// It also returns nil if the call was skipped or overwritten,
+	// as these are considered successful lifecycle outcomes.
+	// Direct onFinish channel read can be used to access these results.
+	WaitOnFinish(ctx context.Context, onFinish <-chan error) error
+}
+
+// APICallImplementations define constructors for each fwk.APICall that is used by the scheduler internally.
+type APICallImplementations[T, K fwk.APICall] struct {
+	// PodStatusPatch is a constructor used to create fwk.APICall object for pod status patch.
+	PodStatusPatch func(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *NominatingInfo) T
+	// PodBinding is a constructor used to create fwk.APICall object for pod binding.
+	PodBinding func(binding *v1.Binding) K
 }
 
 // PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
@@ -721,13 +773,13 @@ type PodActivator interface {
 type PodNominator interface {
 	// AddNominatedPod adds the given pod to the nominator or
 	// updates it if it already exists.
-	AddNominatedPod(logger klog.Logger, pod *PodInfo, nominatingInfo *NominatingInfo)
+	AddNominatedPod(logger klog.Logger, pod fwk.PodInfo, nominatingInfo *NominatingInfo)
 	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache. It's a no-op if it doesn't exist.
 	DeleteNominatedPodIfExists(pod *v1.Pod)
 	// UpdateNominatedPod updates the <oldPod> with <newPod>.
-	UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo *PodInfo)
+	UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo fwk.PodInfo)
 	// NominatedPodsForNode returns nominatedPods on the given node.
-	NominatedPodsForNode(nodeName string) []*PodInfo
+	NominatedPodsForNode(nodeName string) []fwk.PodInfo
 }
 
 // PluginsRunner abstracts operations to run some plugins.
@@ -736,12 +788,12 @@ type PodNominator interface {
 type PluginsRunner interface {
 	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.
-	RunPreScorePlugins(context.Context, fwk.CycleState, *v1.Pod, []*NodeInfo) *fwk.Status
+	RunPreScorePlugins(context.Context, fwk.CycleState, *v1.Pod, []fwk.NodeInfo) *fwk.Status
 	// RunScorePlugins runs the set of configured scoring plugins.
 	// It returns a list that stores scores from each plugin and total score for each Node.
 	// It also returns *fwk.Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunScorePlugins(context.Context, fwk.CycleState, *v1.Pod, []*NodeInfo) ([]NodePluginScores, *fwk.Status)
+	RunScorePlugins(context.Context, fwk.CycleState, *v1.Pod, []fwk.NodeInfo) ([]NodePluginScores, *fwk.Status)
 	// RunFilterPlugins runs the set of configured Filter plugins for pod on
 	// the given node. Note that for the node being evaluated, the passed nodeInfo
 	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods
@@ -749,13 +801,13 @@ type PluginsRunner interface {
 	// preemption, we may pass a copy of the original nodeInfo object that has some pods
 	// removed from it to evaluate the possibility of preempting them to
 	// schedule the target pod.
-	RunFilterPlugins(context.Context, fwk.CycleState, *v1.Pod, *NodeInfo) *fwk.Status
+	RunFilterPlugins(context.Context, fwk.CycleState, *v1.Pod, fwk.NodeInfo) *fwk.Status
 	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
-	RunPreFilterExtensionAddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *fwk.Status
+	RunPreFilterExtensionAddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status
 	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
-	RunPreFilterExtensionRemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *fwk.Status
+	RunPreFilterExtensionRemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status
 }

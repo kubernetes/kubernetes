@@ -196,7 +196,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					volumeHandle := volume.(map[string]interface{})["volumeHandle"].(string)
 					err = framework.Gomega().Expect(volumeHandle).NotTo(gomega.BeNil())
 					framework.ExpectNoError(err, "failed to get volume handle from volume")
-					uid := snapshot.VGSContent.Object["metadata"].(map[string]interface{})["uid"].(string)
+					uid := snapshot.VGS.Object["metadata"].(map[string]interface{})["uid"].(string)
 					err = framework.Gomega().Expect(uid).NotTo(gomega.BeNil())
 					framework.ExpectNoError(err, "failed to get uuid from content")
 					volumeSnapshotName := fmt.Sprintf("snapshot-%x", sha256.Sum256([]byte(

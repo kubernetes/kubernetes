@@ -29,6 +29,7 @@ type AllocatedDeviceStatusApplyConfiguration struct {
 	Driver      *string                              `json:"driver,omitempty"`
 	Pool        *string                              `json:"pool,omitempty"`
 	Device      *string                              `json:"device,omitempty"`
+	ShareID     *string                              `json:"shareID,omitempty"`
 	Conditions  []v1.ConditionApplyConfiguration     `json:"conditions,omitempty"`
 	Data        *runtime.RawExtension                `json:"data,omitempty"`
 	NetworkData *NetworkDeviceDataApplyConfiguration `json:"networkData,omitempty"`
@@ -61,6 +62,14 @@ func (b *AllocatedDeviceStatusApplyConfiguration) WithPool(value string) *Alloca
 // If called multiple times, the Device field is set to the value of the last call.
 func (b *AllocatedDeviceStatusApplyConfiguration) WithDevice(value string) *AllocatedDeviceStatusApplyConfiguration {
 	b.Device = &value
+	return b
+}
+
+// WithShareID sets the ShareID field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ShareID field is set to the value of the last call.
+func (b *AllocatedDeviceStatusApplyConfiguration) WithShareID(value string) *AllocatedDeviceStatusApplyConfiguration {
+	b.ShareID = &value
 	return b
 }
 

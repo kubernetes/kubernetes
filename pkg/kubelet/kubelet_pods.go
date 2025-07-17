@@ -34,6 +34,8 @@ import (
 	"strconv"
 	"strings"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	envutil "k8s.io/kubernetes/pkg/kubelet/util/env"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -570,6 +573,18 @@ func (kl *Kubelet) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler 
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
 	clusterDomain := kl.dnsConfigurer.ClusterDomain
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.HostnameOverride) && pod.Spec.HostnameOverride != nil {
+		hostname := *pod.Spec.HostnameOverride
+		if msgs := utilvalidation.IsDNS1123Subdomain(hostname); len(msgs) != 0 {
+			return "", "", fmt.Errorf("pod HostnameOverride %q is not a valid DNS subdomain: %s", hostname, strings.Join(msgs, ";"))
+		}
+		truncatedHostname, err := truncatePodHostnameIfNeeded(pod.Name, hostname)
+		if err != nil {
+			return "", "", err
+		}
+		return truncatedHostname, "", nil
+	}
+
 	hostname := pod.Name
 	if len(pod.Spec.Hostname) > 0 {
 		if msgs := utilvalidation.IsDNS1123Label(pod.Spec.Hostname); len(msgs) != 0 {
@@ -626,7 +641,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 	}
 	opts.Devices = append(opts.Devices, blkVolumes...)
 
-	envs, err := kl.makeEnvironmentVariables(pod, container, podIP, podIPs)
+	envs, err := kl.makeEnvironmentVariables(pod, container, podIP, podIPs, volumes)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -708,7 +723,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 }
 
 // Make the environment variables for a pod in the given namespace.
-func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error) {
+func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.EnvVar, error) {
 	if pod.Spec.EnableServiceLinks == nil {
 		return nil, fmt.Errorf("nil pod.spec.enableServiceLinks encountered, cannot construct envvars")
 	}
@@ -896,6 +911,54 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, fmt.Errorf("couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
 				}
 				runtimeVal = string(runtimeValBytes)
+			case utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles) && envVar.ValueFrom.FileKeyRef != nil:
+				f := envVar.ValueFrom.FileKeyRef
+				key := f.Key
+				volume := f.VolumeName
+				optional := f.Optional != nil && *f.Optional
+				vol, ok := podVolumes[volume]
+				if !ok || vol.Mounter == nil {
+					return result, fmt.Errorf("cannot find the volume %q referenced by FileKeyRef", volume)
+				}
+
+				hostPath, err := volumeutil.GetPath(vol.Mounter)
+				if err != nil {
+					return result, fmt.Errorf("failed to get host path for volume %q: %w", volume, err)
+				}
+
+				// Validate key length, must not exceed 128 characters.
+				// TODO: @HirazawaUi This limit will be relaxed after the EnvFiles feature gate beta stage.
+				if len(key) > 128 {
+					return result, fmt.Errorf("environment variable key %q exceeds maximum length of 128 characters", key)
+				}
+
+				// Construct the full path to the environment variable file
+				// by combining hostPath with the specified path in FileKeyRef
+				envFilePath, err := securejoin.SecureJoin(hostPath, f.Path)
+				if err != nil {
+					return result, err
+				}
+
+				runtimeVal, err = envutil.ParseEnv(envFilePath, key)
+				if err != nil {
+					klog.ErrorS(err, "Failed to parse env file", "pod", klog.KObj(pod))
+					return result, fmt.Errorf("couldn't parse env file")
+				}
+
+				// Validate value size, must not exceed 32KB.
+				// TODO: @HirazawaUi This limit will be relaxed after the EnvFiles feature gate beta stage.
+				if len(runtimeVal) > 32*1024 {
+					return result, fmt.Errorf("environment variable value for key %q exceeds maximum size of 32KB", key)
+				}
+
+				// If the key was not found, and it's not optional, return an error
+				if runtimeVal == "" {
+					if optional {
+						// If the key doesn't exist, and it's optional, skip this environment variable
+						continue
+					}
+					return result, fmt.Errorf("environment variable key %q not found in file %q", key, envFilePath)
+				}
 			}
 		}
 
@@ -1245,7 +1308,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	klog.V(3).InfoS("Clean up orphaned mirror pods")
 	for _, podFullname := range orphanedMirrorPodFullnames {
 		if !kl.podWorkers.IsPodForMirrorPodTerminatingByFullName(podFullname) {
-			_, err := kl.mirrorPodClient.DeleteMirrorPod(podFullname, nil)
+			_, err := kl.mirrorPodClient.DeleteMirrorPod(ctx, podFullname, nil)
 			if err != nil {
 				klog.ErrorS(err, "Encountered error when deleting mirror pod", "podName", podFullname)
 			} else {
@@ -1581,6 +1644,7 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 	pendingRestartableInitContainers := 0
 	pendingRegularInitContainers := 0
 	failedInitialization := 0
+	failedInitializationNotRestartable := 0
 
 	// regular init containers
 	for _, container := range spec.InitContainers {
@@ -1601,13 +1665,25 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 		case containerStatus.State.Running != nil:
 			pendingRegularInitContainers++
 		case containerStatus.State.Terminated != nil:
-			if containerStatus.State.Terminated.ExitCode != 0 {
+			exitCode := containerStatus.State.Terminated.ExitCode
+			if exitCode != 0 {
 				failedInitialization++
+				if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+					if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+						failedInitializationNotRestartable++
+					}
+				}
 			}
 		case containerStatus.State.Waiting != nil:
 			if containerStatus.LastTerminationState.Terminated != nil {
-				if containerStatus.LastTerminationState.Terminated.ExitCode != 0 {
+				exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
+				if exitCode != 0 {
 					failedInitialization++
+					if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+						if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+							failedInitializationNotRestartable++
+						}
+					}
 				}
 			} else {
 				pendingRegularInitContainers++
@@ -1622,9 +1698,10 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 	running := 0
 	waiting := 0
 	stopped := 0
+	stoppedNotRestartable := 0
 	succeeded := 0
 
-	// restartable init containers
+	// sidecar init containers
 	for _, container := range spec.InitContainers {
 		if !podutil.IsRestartableInitContainer(&container) {
 			// Skip the regular init containers, as they have been handled above.
@@ -1671,12 +1748,24 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 			running++
 		case containerStatus.State.Terminated != nil:
 			stopped++
-			if containerStatus.State.Terminated.ExitCode == 0 {
+			exitCode := containerStatus.State.Terminated.ExitCode
+			if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+				if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+					stoppedNotRestartable++
+				}
+			}
+			if exitCode == 0 {
 				succeeded++
 			}
 		case containerStatus.State.Waiting != nil:
 			if containerStatus.LastTerminationState.Terminated != nil {
 				stopped++
+				if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+					exitCode := containerStatus.LastTerminationState.Terminated.ExitCode
+					if !podutil.ContainerShouldRestart(container, pod.Spec, exitCode) {
+						stoppedNotRestartable++
+					}
+				}
 			} else {
 				waiting++
 			}
@@ -1685,8 +1774,14 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 		}
 	}
 
-	if failedInitialization > 0 && spec.RestartPolicy == v1.RestartPolicyNever {
-		return v1.PodFailed
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+		if failedInitializationNotRestartable > 0 {
+			return v1.PodFailed
+		}
+	} else {
+		if failedInitialization > 0 && spec.RestartPolicy == v1.RestartPolicyNever {
+			return v1.PodFailed
+		}
 	}
 
 	switch {
@@ -1721,6 +1816,16 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal, podHasIniti
 			}
 		}
 		// All containers are terminated
+		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+			if stopped != stoppedNotRestartable {
+				// At least one containers are in the process of restarting
+				return v1.PodRunning
+			}
+			if stopped == succeeded {
+				return v1.PodSucceeded
+			}
+			return v1.PodFailed
+		}
 		if spec.RestartPolicy == v1.RestartPolicyAlways {
 			// All containers are in the process of restarting
 			return v1.PodRunning

@@ -565,6 +565,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newCertificateSigningRequestSigningControllerDescriptor())
 	register(newCertificateSigningRequestApprovingControllerDescriptor())
 	register(newCertificateSigningRequestCleanerControllerDescriptor())
+	register(newPodCertificateRequestCleanerControllerDescriptor())
 	register(newTTLControllerDescriptor())
 	register(newBootstrapSignerControllerDescriptor())
 	register(newTokenCleanerControllerDescriptor())

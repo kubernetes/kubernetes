@@ -43,7 +43,6 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1367,6 +1366,74 @@ func TestDescribeResources(t *testing.T) {
 
 			if !reflect.DeepEqual(gotElements, testCase.expectedElements) {
 				t.Errorf("Expected %v, got %v in output string: %q", testCase.expectedElements, gotElements, output)
+			}
+		})
+	}
+}
+
+func TestDescribeContainerPorts(t *testing.T) {
+	testCases := []struct {
+		name              string
+		ports             []corev1.ContainerPort
+		expectedContainer string
+		expectedHost      string
+	}{
+		{
+			name:              "no ports",
+			ports:             []corev1.ContainerPort{},
+			expectedContainer: "",
+			expectedHost:      "",
+		},
+		{
+			name: "container and host port, with name",
+			ports: []corev1.ContainerPort{
+				{Name: "web", ContainerPort: 8080, HostPort: 8080, Protocol: corev1.ProtocolTCP},
+			},
+			expectedContainer: "8080/TCP (web)",
+			expectedHost:      "8080/TCP (web)",
+		},
+		{
+			name: "container and host port, no name",
+			ports: []corev1.ContainerPort{
+				{ContainerPort: 8080, HostPort: 8080, Protocol: corev1.ProtocolTCP},
+			},
+			expectedContainer: "8080/TCP",
+			expectedHost:      "8080/TCP",
+		},
+		{
+			name: "multiple ports with mixed configuration",
+			ports: []corev1.ContainerPort{
+				{Name: "controller", ContainerPort: 9093, HostPort: 9093, Protocol: corev1.ProtocolTCP},
+				{ContainerPort: 9092, Protocol: corev1.ProtocolTCP},
+				{Name: "interbroker", ContainerPort: 9094, HostPort: 9094, Protocol: corev1.ProtocolTCP},
+			},
+			expectedContainer: "9093/TCP (controller), 9092/TCP, 9094/TCP (interbroker)",
+			expectedHost:      "9093/TCP (controller), 0/TCP, 9094/TCP (interbroker)",
+		},
+		{
+			name: "all ports with mixed configuration",
+			ports: []corev1.ContainerPort{
+				{Name: "controller", ContainerPort: 9093, HostPort: 9093, Protocol: corev1.ProtocolTCP},
+				{Name: "client", ContainerPort: 9092, HostPort: 9092, Protocol: corev1.ProtocolTCP},
+				{Name: "interbroker", ContainerPort: 9094, HostPort: 9094, Protocol: corev1.ProtocolTCP},
+			},
+			expectedContainer: "9093/TCP (controller), 9092/TCP (client), 9094/TCP (interbroker)",
+			expectedHost:      "9093/TCP (controller), 9092/TCP (client), 9094/TCP (interbroker)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name+" - container ports", func(t *testing.T) {
+			result := describeContainerPorts(tc.ports)
+			if result != tc.expectedContainer {
+				t.Errorf("describeContainerPorts: expected %q, got %q", tc.expectedContainer, result)
+			}
+		})
+
+		t.Run(tc.name+" - host ports", func(t *testing.T) {
+			result := describeContainerHostPorts(tc.ports)
+			if result != tc.expectedHost {
+				t.Errorf("describeContainerHostPorts: expected %q, got %q", tc.expectedHost, result)
 			}
 		})
 	}
@@ -3964,7 +4031,7 @@ Parameters:   param1=value1,param2=value2
 Events:       <none>
 `
 
-	f := fake.NewSimpleClientset(&storagev1beta1.VolumeAttributesClass{
+	f := fake.NewSimpleClientset(&storagev1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "4",

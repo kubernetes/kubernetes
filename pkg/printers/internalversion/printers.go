@@ -31,6 +31,7 @@ import (
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1" // should this change, too? there are still certv1beta1.CSR printers, but not their v1 versions
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
@@ -40,10 +41,9 @@ import (
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -425,6 +425,17 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundle)
 	h.TableHandler(clusterTrustBundleColumnDefinitions, printClusterTrustBundleList)
 
+	podCertificateRequestColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "PodName", Type: "string", Description: certificatesv1alpha1.PodCertificateRequestSpec{}.SwaggerDoc()["podName"]},
+		{Name: "ServiceAccountName", Type: "string", Description: certificatesv1alpha1.PodCertificateRequestSpec{}.SwaggerDoc()["serviceAccountName"]},
+		{Name: "NodeName", Type: "string", Description: certificatesv1alpha1.PodCertificateRequestSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "SignerName", Type: "string", Description: certificatesv1alpha1.PodCertificateRequestSpec{}.SwaggerDoc()["signerName"]},
+		{Name: "State", Type: "string", Description: "Is the request Pending, Issued, Denied, or Failed?"},
+	}
+	h.TableHandler(podCertificateRequestColumnDefinitions, printPodCertificateRequest)
+	h.TableHandler(podCertificateRequestColumnDefinitions, printPodCertificateRequestList)
+
 	leaseColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Holder", Type: "string", Description: coordinationv1.LeaseSpec{}.SwaggerDoc()["holderIdentity"]},
@@ -457,7 +468,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	volumeAttributesClassColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "DriverName", Type: "string", Description: storagev1beta1.VolumeAttributesClass{}.SwaggerDoc()["driverName"]},
+		{Name: "DriverName", Type: "string", Description: storagev1.VolumeAttributesClass{}.SwaggerDoc()["driverName"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 
@@ -2320,6 +2331,41 @@ func printClusterTrustBundleList(list *certificates.ClusterTrustBundleList, opti
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printClusterTrustBundle(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printPodCertificateRequest(obj *certificates.PodCertificateRequest, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	// "Issued", "Denied", and "Failed" are all mutually-exclusive states, and
+	// they must have Status "True".
+	state := "Pending"
+	for _, cond := range obj.Status.Conditions {
+		switch cond.Type {
+		case certificates.PodCertificateRequestConditionTypeIssued:
+			state = "Issued"
+		case certificates.PodCertificateRequestConditionTypeDenied:
+			state = "Denied"
+		case certificates.PodCertificateRequestConditionTypeFailed:
+			state = "Failed"
+		}
+	}
+
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.PodName, obj.Spec.ServiceAccountName, string(obj.Spec.NodeName), obj.Spec.SignerName, state)
+	return []metav1.TableRow{row}, nil
+}
+
+func printPodCertificateRequestList(list *certificates.PodCertificateRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPodCertificateRequest(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

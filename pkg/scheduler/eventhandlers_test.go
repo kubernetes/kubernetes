@@ -28,30 +28,30 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	resourceapi "k8s.io/api/resource/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	dyfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
@@ -162,16 +162,22 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				client := fake.NewClientset(objs...)
 				informerFactory := informers.NewSharedInformerFactory(client, 0)
 
+				// apiDispatcher is unused in the test, but intializing it anyway.
+				apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
+				apiDispatcher.Run(logger)
+				defer apiDispatcher.Close()
+
 				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
 				queue := internalqueue.NewPriorityQueue(
 					newDefaultQueueSort(),
 					informerFactory,
 					internalqueue.WithMetricsRecorder(*recorder),
 					internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+					internalqueue.WithAPIDispatcher(apiDispatcher),
 					// disable backoff queue
 					internalqueue.WithPodInitialBackoffDuration(0),
 					internalqueue.WithPodMaxBackoffDuration(0))
-				schedulerCache := internalcache.New(ctx, 30*time.Second)
+				schedulerCache := internalcache.New(ctx, 30*time.Second, nil)
 
 				// Put test pods into unschedulable queue
 				for _, pod := range unschedulablePods {
@@ -186,7 +192,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 					}
 				}
 
-				s, _, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
+				s, _, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
 				if err != nil {
 					t.Fatalf("Failed to initialize test scheduler: %v", err)
 				}
@@ -242,7 +248,7 @@ func TestUpdatePodInCache(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, ttl),
+				Cache:           internalcache.New(ctx, ttl, nil),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
@@ -572,16 +578,16 @@ func TestAddAllEventHandlers(t *testing.T) {
 			var resourceClaimCache *assumecache.AssumeCache
 			var resourceSliceTracker *resourceslicetracker.Tracker
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
+				resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 				var err error
 				opts := resourceslicetracker.Options{
 					EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-					SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+					SliceInformer:      informerFactory.Resource().V1().ResourceSlices(),
 				}
 				if opts.EnableDeviceTaints {
 					opts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
-					opts.ClassInformer = informerFactory.Resource().V1beta1().DeviceClasses()
+					opts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 
 				}
 				resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, opts)

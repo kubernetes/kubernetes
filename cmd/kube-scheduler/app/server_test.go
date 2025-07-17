@@ -105,6 +105,7 @@ profiles:
       - name: NodePorts
       - name: InterPodAffinity
       - name: TaintToleration
+      - name: DynamicResources
       disabled:
       - name: "*"
     preFilter:
@@ -249,13 +250,18 @@ leaderElection:
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": func() *config.Plugins {
 					plugins := defaults.ExpandedPluginsV1.DeepCopy()
+					// With this (and only this?!) config comes DynamicResources after DefaultPreemption.
+					plugins.PreEnqueue.Enabled[1], plugins.PreEnqueue.Enabled[2] = plugins.PreEnqueue.Enabled[2], plugins.PreEnqueue.Enabled[1]
+					plugins.PostFilter.Enabled[0], plugins.PostFilter.Enabled[1] = plugins.PostFilter.Enabled[1], plugins.PostFilter.Enabled[0]
 					plugins.Filter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
+						{Name: "DynamicResources"},
 					}
 					plugins.PreFilter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
+						{Name: "DynamicResources"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
 						{Name: "VolumeBinding"},
@@ -515,7 +521,7 @@ func newFoo(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.
 	return &foo{}, nil
 }
 
-func (*foo) PreFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (*foo) PreFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	return nil, nil
 }
 
@@ -523,6 +529,6 @@ func (*foo) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
-func (*foo) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (*foo) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	return nil
 }

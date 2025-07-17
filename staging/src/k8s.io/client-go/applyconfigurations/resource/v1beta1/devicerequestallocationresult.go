@@ -18,15 +18,25 @@ limitations under the License.
 
 package v1beta1
 
+import (
+	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	resource "k8s.io/apimachinery/pkg/api/resource"
+	types "k8s.io/apimachinery/pkg/types"
+)
+
 // DeviceRequestAllocationResultApplyConfiguration represents a declarative configuration of the DeviceRequestAllocationResult type for use
 // with apply.
 type DeviceRequestAllocationResultApplyConfiguration struct {
-	Request     *string                              `json:"request,omitempty"`
-	Driver      *string                              `json:"driver,omitempty"`
-	Pool        *string                              `json:"pool,omitempty"`
-	Device      *string                              `json:"device,omitempty"`
-	AdminAccess *bool                                `json:"adminAccess,omitempty"`
-	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
+	Request                  *string                                             `json:"request,omitempty"`
+	Driver                   *string                                             `json:"driver,omitempty"`
+	Pool                     *string                                             `json:"pool,omitempty"`
+	Device                   *string                                             `json:"device,omitempty"`
+	AdminAccess              *bool                                               `json:"adminAccess,omitempty"`
+	Tolerations              []DeviceTolerationApplyConfiguration                `json:"tolerations,omitempty"`
+	BindingConditions        []string                                            `json:"bindingConditions,omitempty"`
+	BindingFailureConditions []string                                            `json:"bindingFailureConditions,omitempty"`
+	ShareID                  *types.UID                                          `json:"shareID,omitempty"`
+	ConsumedCapacity         map[resourcev1beta1.QualifiedName]resource.Quantity `json:"consumedCapacity,omitempty"`
 }
 
 // DeviceRequestAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceRequestAllocationResult type for use with
@@ -84,6 +94,48 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithTolerations(values
 			panic("nil value passed to WithTolerations")
 		}
 		b.Tolerations = append(b.Tolerations, *values[i])
+	}
+	return b
+}
+
+// WithBindingConditions adds the given value to the BindingConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BindingConditions field.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithBindingConditions(values ...string) *DeviceRequestAllocationResultApplyConfiguration {
+	for i := range values {
+		b.BindingConditions = append(b.BindingConditions, values[i])
+	}
+	return b
+}
+
+// WithBindingFailureConditions adds the given value to the BindingFailureConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BindingFailureConditions field.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithBindingFailureConditions(values ...string) *DeviceRequestAllocationResultApplyConfiguration {
+	for i := range values {
+		b.BindingFailureConditions = append(b.BindingFailureConditions, values[i])
+	}
+	return b
+}
+
+// WithShareID sets the ShareID field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ShareID field is set to the value of the last call.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithShareID(value types.UID) *DeviceRequestAllocationResultApplyConfiguration {
+	b.ShareID = &value
+	return b
+}
+
+// WithConsumedCapacity puts the entries into the ConsumedCapacity field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the ConsumedCapacity field,
+// overwriting an existing map entries in ConsumedCapacity field with the same key.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithConsumedCapacity(entries map[resourcev1beta1.QualifiedName]resource.Quantity) *DeviceRequestAllocationResultApplyConfiguration {
+	if b.ConsumedCapacity == nil && len(entries) > 0 {
+		b.ConsumedCapacity = make(map[resourcev1beta1.QualifiedName]resource.Quantity, len(entries))
+	}
+	for k, v := range entries {
+		b.ConsumedCapacity[k] = v
 	}
 	return b
 }

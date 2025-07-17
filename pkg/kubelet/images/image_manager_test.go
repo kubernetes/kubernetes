@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -27,14 +28,16 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	crierrors "k8s.io/cri-api/pkg/errors"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/credentialprovider"
@@ -58,17 +61,26 @@ type pullerExpects struct {
 }
 
 type pullerTestCase struct {
-	testName           string
-	containerImage     string
-	policy             v1.PullPolicy
-	pullSecrets        []v1.Secret
-	allowedCredentials map[string][]kubeletconfiginternal.ImagePullSecret // image -> allowedCredentials; nil means allow all
-	inspectErr         error
-	pullerErr          error
-	qps                float32
-	burst              int
-	expected           []pullerExpects
-	enableFeatures     []featuregate.Feature
+	testName            string
+	containerImage      string
+	policy              v1.PullPolicy
+	pullSecrets         []v1.Secret
+	allowedCredentials  *mockImagePullManagerConfig                       // controls what the image pull manager considers "allowed"
+	serviceAccountName  string                                            // for testing service account coordinates
+	registryCredentials map[string][]credentialprovider.TrackedAuthConfig // image -> registry credentials (obtained from credential providers using SA tokens)
+	inspectErr          error
+	pullerErr           error
+	qps                 float32
+	burst               int
+	expected            []pullerExpects
+	enableFeatures      []featuregate.Feature
+}
+
+// mockImagePullManagerConfig configures what credentials the mock pull manager considers "allowed"
+type mockImagePullManagerConfig struct {
+	allowAll               bool
+	allowedSecrets         map[string][]kubeletconfiginternal.ImagePullSecret         // image -> allowed secrets
+	allowedServiceAccounts map[string][]kubeletconfiginternal.ImagePullServiceAccount // image -> allowed service accounts
 }
 
 func pullerTestCases() []pullerTestCase {
@@ -361,8 +373,11 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			testName:       "[KubeletEnsureSecretPulledImages] image present, unknown to image pull manager, pull",
 			containerImage: "present_image",
 			policy:         v1.PullIfNotPresent,
-			allowedCredentials: map[string][]kubeletconfiginternal.ImagePullSecret{
-				"another_image": {{Namespace: "testns", Name: "testname", UID: "testuid"}},
+			allowedCredentials: &mockImagePullManagerConfig{
+				allowAll: false,
+				allowedSecrets: map[string][]kubeletconfiginternal.ImagePullSecret{
+					"another_image": {{Namespace: "testns", Name: "testname", UID: "testuid"}},
+				},
 			},
 			pullSecrets:    []v1.Secret{makeDockercfgSecretForRepo(metav1.ObjectMeta{Namespace: "testns", Name: "testname", UID: "testuid"}, "docker.io/library/present_image")},
 			inspectErr:     nil,
@@ -391,8 +406,11 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			testName:       "[KubeletEnsureSecretPulledImages] image present, unknown secret to image pull manager, pull",
 			containerImage: "present_image",
 			policy:         v1.PullIfNotPresent,
-			allowedCredentials: map[string][]kubeletconfiginternal.ImagePullSecret{
-				"present_image": {{Namespace: "testns", Name: "testname", UID: "testuid"}},
+			allowedCredentials: &mockImagePullManagerConfig{
+				allowAll: false,
+				allowedSecrets: map[string][]kubeletconfiginternal.ImagePullSecret{
+					"present_image": {{Namespace: "testns", Name: "testname", UID: "testuid"}},
+				},
 			},
 			pullSecrets:    []v1.Secret{makeDockercfgSecretForRepo(metav1.ObjectMeta{Namespace: "testns", Name: "testname", UID: "someothertestuid"}, "docker.io/library/present_image")},
 			inspectErr:     nil,
@@ -422,8 +440,11 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			testName:       "[KubeletEnsureSecretPulledImages] image present, unknown secret to image pull manager, never pull policy -> fail",
 			containerImage: "present_image",
 			policy:         v1.PullNever,
-			allowedCredentials: map[string][]kubeletconfiginternal.ImagePullSecret{
-				"present_image": {{Namespace: "testns", Name: "testname", UID: "testuid"}},
+			allowedCredentials: &mockImagePullManagerConfig{
+				allowAll: false,
+				allowedSecrets: map[string][]kubeletconfiginternal.ImagePullSecret{
+					"present_image": {{Namespace: "testns", Name: "testname", UID: "testuid"}},
+				},
 			},
 			pullSecrets:    []v1.Secret{makeDockercfgSecretForRepo(metav1.ObjectMeta{Namespace: "testns", Name: "testname", UID: "someothertestuid"}, "docker.io/library/present_image")},
 			inspectErr:     nil,
@@ -450,8 +471,11 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 			testName:       "[KubeletEnsureSecretPulledImages] image present, a secret matches one of known to the image pull manager, don't pull",
 			containerImage: "present_image",
 			policy:         v1.PullIfNotPresent,
-			allowedCredentials: map[string][]kubeletconfiginternal.ImagePullSecret{
-				"present_image": {{Namespace: "testns", Name: "testname", UID: "testuid"}},
+			allowedCredentials: &mockImagePullManagerConfig{
+				allowAll: false,
+				allowedSecrets: map[string][]kubeletconfiginternal.ImagePullSecret{
+					"present_image": {{Namespace: "testns", Name: "testname", UID: "testuid"}},
+				},
 			},
 			pullSecrets: []v1.Secret{
 				makeDockercfgSecretForRepo(metav1.ObjectMeta{Namespace: "testns", Name: "testname", UID: "someothertestuid"}, "docker.io/library/present_image"),
@@ -471,6 +495,157 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "Pulled"},
 					}, ""},
+				{[]string{"GetImageRef"}, nil, false, false,
+					[]v1.Event{
+						{Reason: "Pulled"},
+					}, ""},
+			},
+		},
+		{
+			testName:           "[KubeletEnsureSecretPulledImages] image present, service account credentials available, don't pull",
+			containerImage:     "present_image",
+			policy:             v1.PullIfNotPresent,
+			serviceAccountName: "test-service-account",
+			registryCredentials: map[string][]credentialprovider.TrackedAuthConfig{
+				"docker.io/library/present_image": {
+					{
+						AuthConfig: credentialprovider.AuthConfig{
+							Username: "sa-user",
+							Password: "sa-token",
+						},
+						Source: &credentialprovider.CredentialSource{
+							ServiceAccount: &credentialprovider.ServiceAccountCoordinates{
+								Namespace: "test-ns",
+								Name:      "test-service-account",
+								UID:       "sa-uid-123",
+							},
+						},
+						AuthConfigHash: "sa-hash-123",
+					},
+				},
+			},
+			inspectErr:     nil,
+			pullerErr:      nil,
+			qps:            0.0,
+			burst:          0,
+			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
+			expected: []pullerExpects{
+				{[]string{"GetImageRef"}, nil, false, false,
+					[]v1.Event{
+						{Reason: "Pulled"},
+					}, ""},
+			},
+		},
+		{
+			testName:           "[KubeletEnsureSecretPulledImages] image present, service account allowed by pull manager, don't pull",
+			containerImage:     "present_image",
+			policy:             v1.PullIfNotPresent,
+			serviceAccountName: "test-service-account",
+			allowedCredentials: &mockImagePullManagerConfig{
+				allowAll: false,
+				allowedServiceAccounts: map[string][]kubeletconfiginternal.ImagePullServiceAccount{
+					"present_image": {{
+						Namespace: "test-ns",
+						Name:      "test-service-account",
+						UID:       "sa-uid-123",
+					}},
+				},
+			},
+			registryCredentials: map[string][]credentialprovider.TrackedAuthConfig{
+				"docker.io/library/present_image": {
+					{
+						AuthConfig: credentialprovider.AuthConfig{
+							Username: "sa-user",
+							Password: "sa-token",
+						},
+						Source: &credentialprovider.CredentialSource{
+							ServiceAccount: &credentialprovider.ServiceAccountCoordinates{
+								Namespace: "test-ns",
+								Name:      "test-service-account",
+								UID:       "sa-uid-123",
+							},
+						},
+						AuthConfigHash: "sa-hash-123",
+					},
+				},
+			},
+			inspectErr:     nil,
+			pullerErr:      nil,
+			qps:            0.0,
+			burst:          0,
+			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
+			expected: []pullerExpects{
+				{[]string{"GetImageRef"}, nil, false, false,
+					[]v1.Event{
+						{Reason: "Pulled"},
+					}, ""},
+			},
+		},
+		{
+			testName:           "[KubeletEnsureSecretPulledImages] image present, mixed credentials (secrets + service accounts), pull required",
+			containerImage:     "present_image",
+			policy:             v1.PullIfNotPresent,
+			serviceAccountName: "test-service-account",
+			pullSecrets:        []v1.Secret{makeDockercfgSecretForRepo(metav1.ObjectMeta{Namespace: "testns", Name: "testname", UID: "secret-uid"}, "docker.io/library/present_image")},
+			registryCredentials: map[string][]credentialprovider.TrackedAuthConfig{
+				"docker.io/library/present_image": {
+					{
+						AuthConfig: credentialprovider.AuthConfig{
+							Username: "sa-user",
+							Password: "sa-token",
+						},
+						Source: &credentialprovider.CredentialSource{
+							ServiceAccount: &credentialprovider.ServiceAccountCoordinates{
+								Namespace: "test-ns",
+								Name:      "test-service-account",
+								UID:       "sa-uid-456",
+							},
+						},
+						AuthConfigHash: "sa-hash-456",
+					},
+				},
+			},
+			allowedCredentials: &mockImagePullManagerConfig{
+				allowAll: false,
+				allowedSecrets: map[string][]kubeletconfiginternal.ImagePullSecret{
+					"present_image": {{Namespace: "testns", Name: "testname", UID: "different-secret-uid"}},
+				},
+			},
+			inspectErr:     nil,
+			pullerErr:      nil,
+			qps:            0.0,
+			burst:          0,
+			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
+			expected: []pullerExpects{
+				{[]string{"GetImageRef", "PullImage", "GetImageSize"}, nil, true, true,
+					[]v1.Event{
+						{Reason: "Pulling"},
+						{Reason: "Pulled"},
+					}, ""},
+			},
+		},
+		{
+			testName:       "[KubeletEnsureSecretPulledImages] image present, only node credentials (no source), proceed without tracking",
+			containerImage: "present_image",
+			policy:         v1.PullIfNotPresent,
+			registryCredentials: map[string][]credentialprovider.TrackedAuthConfig{
+				"docker.io/library/present_image": {
+					{
+						AuthConfig: credentialprovider.AuthConfig{
+							Username: "node-user",
+							Password: "node-pass",
+						},
+						Source:         nil, // No source means node-accessible
+						AuthConfigHash: "node-hash-123",
+					},
+				},
+			},
+			inspectErr:     nil,
+			pullerErr:      nil,
+			qps:            0.0,
+			burst:          0,
+			enableFeatures: []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
+			expected: []pullerExpects{
 				{[]string{"GetImageRef"}, nil, false, false,
 					[]v1.Event{
 						{Reason: "Pulled"},
@@ -516,28 +691,82 @@ func (m *mockPodPullingTimeRecorder) reset() {
 type mockImagePullManager struct {
 	pullmanager.NoopImagePullManager
 
-	imageAllowlist map[string]sets.Set[kubeletconfiginternal.ImagePullSecret]
-	allowAll       bool
+	config *mockImagePullManagerConfig
 }
 
-func (m *mockImagePullManager) MustAttemptImagePull(image, _ string, podSecrets []kubeletconfiginternal.ImagePullSecret) bool {
-	if m.allowAll == true {
+func (m *mockImagePullManager) MustAttemptImagePull(image, _ string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
+	if m.config == nil || m.config.allowAll {
 		return false
 	}
 
-	cachedSecrets, ok := m.imageAllowlist[image]
-	if !ok {
-		return true
+	// Check secrets
+	if allowedSecrets, ok := m.config.allowedSecrets[image]; ok {
+		for _, s := range podSecrets {
+			for _, allowed := range allowedSecrets {
+				if s.Namespace == allowed.Namespace && s.Name == allowed.Name && s.UID == allowed.UID {
+					return false
+				}
+			}
+		}
 	}
 
-	// cut off all the hashes and only determine the match based on the secret coords to simplify testing
-	for _, s := range podSecrets {
-		if cachedSecrets.Has(kubeletconfiginternal.ImagePullSecret{Namespace: s.Namespace, Name: s.Name, UID: s.UID}) {
-			return false
+	// Check service accounts
+	if podServiceAccount != nil {
+		if allowedServiceAccounts, ok := m.config.allowedServiceAccounts[image]; ok {
+			if slices.Contains(allowedServiceAccounts, *podServiceAccount) {
+				return false
+			}
 		}
 	}
 
 	return true
+}
+
+// mockImagePullManagerWithTracking tracks calls to MustAttemptImagePull for service account testing
+type mockImagePullManagerWithTracking struct {
+	pullmanager.NoopImagePullManager
+
+	allowAll            bool
+	mustAttemptReturn   bool
+	mustAttemptCalled   bool
+	lastImage           string
+	lastImageRef        string
+	lastSecrets         []kubeletconfiginternal.ImagePullSecret
+	lastServiceAccounts []kubeletconfiginternal.ImagePullServiceAccount
+	recordedCredentials *kubeletconfiginternal.ImagePullCredentials
+}
+
+func (m *mockImagePullManagerWithTracking) MustAttemptImagePull(image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
+	m.mustAttemptCalled = true
+	m.lastImage = image
+	m.lastImageRef = imageRef
+	m.lastSecrets = podSecrets
+	if podServiceAccount != nil {
+		m.lastServiceAccounts = []kubeletconfiginternal.ImagePullServiceAccount{*podServiceAccount}
+	}
+
+	if m.allowAll {
+		return false
+	}
+	return m.mustAttemptReturn
+}
+
+func (m *mockImagePullManagerWithTracking) RecordImagePulled(image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) {
+	m.recordedCredentials = credentials
+}
+
+// mockDockerKeyringWithTrackedCreds provides tracked credentials for testing
+type mockDockerKeyringWithTrackedCreds struct {
+	credentialprovider.BasicDockerKeyring
+	trackedCreds map[string][]credentialprovider.TrackedAuthConfig
+}
+
+func (m *mockDockerKeyringWithTrackedCreds) Lookup(image string) ([]credentialprovider.TrackedAuthConfig, bool) {
+	if creds, ok := m.trackedCreds[image]; ok {
+		return creds, true
+	}
+	// Fall back to basic keyring lookup - it already returns TrackedAuthConfig
+	return m.BasicDockerKeyring.Lookup(image)
 }
 
 func pullerTestEnv(
@@ -572,31 +801,34 @@ func pullerTestEnv(
 
 	fakePodPullingTimeRecorder = &mockPodPullingTimeRecorder{}
 
-	pullManager := &mockImagePullManager{allowAll: true}
-	if c.allowedCredentials != nil {
-		pullManager.allowAll = false
-		pullManager.imageAllowlist = make(map[string]sets.Set[kubeletconfiginternal.ImagePullSecret])
-		for image, secrets := range c.allowedCredentials {
-			pullManager.imageAllowlist[image] = sets.New(secrets...)
-		}
+	pullManager := &mockImagePullManager{
+		config: c.allowedCredentials,
+	}
+	if pullManager.config == nil {
+		pullManager.config = &mockImagePullManagerConfig{allowAll: true}
 	}
 
 	for _, fg := range c.enableFeatures {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, true)
 	}
-	puller = NewImageManager(fakeRecorder, &credentialprovider.BasicDockerKeyring{}, fakeRuntime, pullManager, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
+
+	// Create appropriate keyring based on whether registry credentials are provided
+	var keyring credentialprovider.DockerKeyring
+	if c.registryCredentials != nil {
+		// Use mock keyring with tracked credentials for service account testing
+		keyring = &mockDockerKeyringWithTrackedCreds{
+			trackedCreds: c.registryCredentials,
+		}
+	} else {
+		// Use basic keyring for non-service account tests
+		keyring = &credentialprovider.BasicDockerKeyring{}
+	}
+
+	puller = NewImageManager(fakeRecorder, keyring, fakeRuntime, pullManager, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder)
 	return
 }
 
 func TestParallelPuller(t *testing.T) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "test_pod",
-			Namespace:       "test-ns",
-			UID:             "bar",
-			ResourceVersion: "42",
-		}}
-
 	cases := pullerTestCases()
 
 	useSerializedEnv := false
@@ -605,11 +837,32 @@ func TestParallelPuller(t *testing.T) {
 			ctx := context.Background()
 			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test_pod",
+					Namespace:       "test-ns",
+					UID:             "bar",
+					ResourceVersion: "42",
+				},
+				Spec: v1.PodSpec{},
+			}
+			if c.serviceAccountName != "" {
+				pod.Spec.ServiceAccountName = c.serviceAccountName
+			}
+
+			podSandboxConfig := &runtimeapi.PodSandboxConfig{
+				Metadata: &runtimeapi.PodSandboxMetadata{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					Uid:       string(pod.UID),
+				},
+			}
+
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 
-				_, msg, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, nil, "", container.ImagePullPolicy)
+				_, msg, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
@@ -622,14 +875,6 @@ func TestParallelPuller(t *testing.T) {
 }
 
 func TestSerializedPuller(t *testing.T) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "test_pod",
-			Namespace:       "test-ns",
-			UID:             "bar",
-			ResourceVersion: "42",
-		}}
-
 	cases := pullerTestCases()
 
 	useSerializedEnv := true
@@ -638,11 +883,32 @@ func TestSerializedPuller(t *testing.T) {
 			ctx := context.Background()
 			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test_pod",
+					Namespace:       "test-ns",
+					UID:             "bar",
+					ResourceVersion: "42",
+				},
+				Spec: v1.PodSpec{},
+			}
+			if c.serviceAccountName != "" {
+				pod.Spec.ServiceAccountName = c.serviceAccountName
+			}
+
+			podSandboxConfig := &runtimeapi.PodSandboxConfig{
+				Metadata: &runtimeapi.PodSandboxMetadata{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					Uid:       string(pod.UID),
+				},
+			}
+
 			for _, expected := range c.expected {
 				fakeRuntime.CalledFunctions = nil
 				fakeClock.Step(time.Second)
 
-				_, msg, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, nil, "", container.ImagePullPolicy)
+				_, msg, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 				fakeRuntime.AssertCalls(expected.calls)
 				assert.Equal(t, expected.err, err)
 				assert.Equal(t, expected.shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
@@ -688,6 +954,15 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 				"kubernetes.io/runtimehandler": "handler_name",
 			},
 		}}
+
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Uid:       string(pod.UID),
+		},
+	}
+
 	c := pullerTestCase{ // pull missing image
 		testName:       "test pull and list image with pod annotations",
 		containerImage: "missing_image",
@@ -706,7 +981,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		fakeRuntime.ImageList = []Image{}
 		fakeClock.Step(time.Second)
 
-		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, nil, "", container.ImagePullPolicy)
+		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
 		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
@@ -744,6 +1019,13 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 			RuntimeClassName: &runtimeHandler,
 		},
 	}
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Uid:       string(pod.UID),
+		},
+	}
 	c := pullerTestCase{ // pull missing image
 		testName:       "test pull and list image with pod annotations",
 		containerImage: "missing_image",
@@ -763,7 +1045,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 		fakeRuntime.ImageList = []Image{}
 		fakeClock.Step(time.Second)
 
-		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, nil, runtimeHandler, container.ImagePullPolicy)
+		_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, c.pullSecrets, podSandboxConfig, runtimeHandler, container.ImagePullPolicy)
 		fakeRuntime.AssertCalls(c.expected[0].calls)
 		assert.Equal(t, c.expected[0].err, err, "tick=%d", 0)
 		assert.Equal(t, c.expected[0].shouldRecordStartedPullingTime, fakePodPullingTimeRecorder.startedPullingRecorded)
@@ -797,6 +1079,13 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 			UID:             "bar",
 			ResourceVersion: "42",
 		}}
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Uid:       string(pod.UID),
+		},
+	}
 
 	testCase := &pullerTestCase{
 		containerImage: "present_image",
@@ -822,7 +1111,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < maxParallelImagePulls; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, testCase.pullSecrets, nil, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}()
@@ -834,7 +1123,7 @@ func TestMaxParallelImagePullsLimit(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
-			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, testCase.pullSecrets, nil, "", container.ImagePullPolicy)
+			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, testCase.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 			assert.NoError(t, err)
 			wg.Done()
 		}()
@@ -921,6 +1210,13 @@ func TestImagePullPrecheck(t *testing.T) {
 			UID:             "bar",
 			ResourceVersion: "42",
 		}}
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Uid:       string(pod.UID),
+		},
+	}
 
 	cases := pullerTestCases()
 
@@ -935,7 +1231,7 @@ func TestImagePullPrecheck(t *testing.T) {
 				fakeRecorder.Events = []*v1.Event{}
 				fakeClock.Step(time.Second)
 
-				_, _, err := puller.EnsureImageExists(ctx, &v1.ObjectReference{}, pod, container.Image, c.pullSecrets, nil, "", container.ImagePullPolicy)
+				_, _, err := puller.EnsureImageExists(ctx, &v1.ObjectReference{}, pod, container.Image, c.pullSecrets, podSandboxConfig, "", container.ImagePullPolicy)
 				fakeRuntime.AssertCalls(expected.calls)
 				var recorderEvents []v1.Event
 				for _, event := range fakeRecorder.Events {
@@ -960,4 +1256,224 @@ func makeDockercfgSecretForRepo(sMeta metav1.ObjectMeta, repo string) v1.Secret 
 			v1.DockerConfigJsonKey: []byte(`{"auths": {"` + repo + `": {"auth": "dXNlcjpwYXNzd29yZA=="}}}`),
 		},
 	}
+}
+
+func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test_pod",
+			Namespace:       "test-ns",
+			UID:             "pod-uid-123",
+			ResourceVersion: "42",
+		},
+		Spec: v1.PodSpec{
+			ServiceAccountName: "test-service-account",
+		},
+	}
+
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Uid:       string(pod.UID),
+		},
+	}
+
+	cases := []struct {
+		name                      string
+		containerImage            string
+		policy                    v1.PullPolicy
+		enableEnsureSecretImages  bool
+		expectedServiceAccounts   []kubeletconfiginternal.ImagePullServiceAccount
+		shouldCallMustAttemptPull bool
+		mustAttemptPullReturn     bool
+		expectedImagePull         bool
+	}{
+		{
+			name:                     "service account credentials passed to image pull manager",
+			containerImage:           "present_image",
+			policy:                   v1.PullIfNotPresent,
+			enableEnsureSecretImages: true,
+			expectedServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
+				{
+					Namespace: "test-ns",
+					Name:      "test-service-account",
+					UID:       "sa-uid-123",
+				},
+			},
+			shouldCallMustAttemptPull: true,
+			mustAttemptPullReturn:     false, // Image doesn't need to be pulled
+			expectedImagePull:         false,
+		},
+		{
+			name:                     "service account credentials require image pull",
+			containerImage:           "present_image",
+			policy:                   v1.PullIfNotPresent,
+			enableEnsureSecretImages: true,
+			expectedServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
+				{
+					Namespace: "test-ns",
+					Name:      "test-service-account",
+					UID:       "sa-uid-456",
+				},
+			},
+			shouldCallMustAttemptPull: true,
+			mustAttemptPullReturn:     true, // Image needs to be pulled
+			expectedImagePull:         true,
+		},
+		{
+			name:                      "feature gate disabled - no service account check",
+			containerImage:            "present_image",
+			policy:                    v1.PullIfNotPresent,
+			enableEnsureSecretImages:  false,
+			shouldCallMustAttemptPull: false,
+			expectedImagePull:         false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.enableEnsureSecretImages {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, true)
+			}
+
+			ctx := context.Background()
+			fakeClock := testingclock.NewFakeClock(time.Now())
+			fakeRuntime := &ctest.FakeRuntime{T: t}
+			fakeRecorder := testutil.NewFakeRecorder()
+			fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{}
+
+			fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
+
+			mockPullManager := &mockImagePullManagerWithTracking{
+				allowAll:          !tc.enableEnsureSecretImages,
+				mustAttemptReturn: tc.mustAttemptPullReturn,
+			}
+
+			keyring := &mockDockerKeyringWithTrackedCreds{
+				trackedCreds: map[string][]credentialprovider.TrackedAuthConfig{},
+			}
+
+			if tc.enableEnsureSecretImages && len(tc.expectedServiceAccounts) > 0 {
+				repoToPull := "docker.io/library/present_image"
+				saCoords := tc.expectedServiceAccounts[0]
+				keyring.trackedCreds[repoToPull] = []credentialprovider.TrackedAuthConfig{
+					{
+						AuthConfig: credentialprovider.AuthConfig{
+							Username: "user",
+							Password: "token",
+						},
+						Source: &credentialprovider.CredentialSource{
+							ServiceAccount: &credentialprovider.ServiceAccountCoordinates{
+								Namespace: saCoords.Namespace,
+								Name:      saCoords.Name,
+								UID:       saCoords.UID,
+							},
+						},
+						AuthConfigHash: "hash123",
+					},
+				}
+			}
+
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			backOff.Clock = fakeClock
+
+			puller := NewImageManager(fakeRecorder, keyring, fakeRuntime, mockPullManager, backOff, true, nil, 0.0, 0, fakePodPullingTimeRecorder)
+
+			container := &v1.Container{
+				Name:            "container_name",
+				Image:           tc.containerImage,
+				ImagePullPolicy: tc.policy,
+			}
+
+			_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, []v1.Secret{}, podSandboxConfig, "", container.ImagePullPolicy)
+			require.NoError(t, err)
+
+			if tc.shouldCallMustAttemptPull {
+				assert.True(t, mockPullManager.mustAttemptCalled, "MustAttemptImagePull should have been called")
+				assert.Equal(t, tc.expectedServiceAccounts, mockPullManager.lastServiceAccounts, "Service accounts should match")
+			} else {
+				assert.False(t, mockPullManager.mustAttemptCalled, "MustAttemptImagePull should not have been called")
+			}
+
+			if tc.expectedImagePull {
+				fakeRuntime.AssertCalls([]string{"GetImageRef", "PullImage", "GetImageSize"})
+			} else {
+				fakeRuntime.AssertCalls([]string{"GetImageRef"})
+			}
+		})
+	}
+}
+
+func TestEnsureImageExistsWithNodeCredentialsOnly(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, true)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test_pod",
+			Namespace:       "test-ns",
+			UID:             "pod-uid-123",
+			ResourceVersion: "42",
+		},
+	}
+
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Uid:       string(pod.UID),
+		},
+	}
+
+	ctx := context.Background()
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	fakeRuntime := &ctest.FakeRuntime{T: t}
+	fakeRecorder := testutil.NewFakeRecorder()
+	fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{}
+
+	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
+
+	mockPullManager := &mockImagePullManagerWithTracking{
+		allowAll:          false,
+		mustAttemptReturn: false, // Don't force pull
+	}
+
+	repoToPull := "docker.io/library/present_image"
+	keyring := &mockDockerKeyringWithTrackedCreds{
+		trackedCreds: map[string][]credentialprovider.TrackedAuthConfig{
+			repoToPull: {
+				{
+					AuthConfig: credentialprovider.AuthConfig{
+						Username: "nodeuser",
+						Password: "nodepass",
+					},
+					Source:         nil, // No source means node-accessible
+					AuthConfigHash: "node-hash-123",
+				},
+			},
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	backOff.Clock = fakeClock
+
+	puller := NewImageManager(fakeRecorder, keyring, fakeRuntime, mockPullManager, backOff, true, nil, 0.0, 0, fakePodPullingTimeRecorder)
+
+	container := &v1.Container{
+		Name:            "container_name",
+		Image:           "present_image",
+		ImagePullPolicy: v1.PullIfNotPresent,
+	}
+
+	_, _, err := puller.EnsureImageExists(ctx, nil, pod, container.Image, []v1.Secret{}, podSandboxConfig, "", container.ImagePullPolicy)
+	require.NoError(t, err)
+
+	// Verify that MustAttemptImagePull was called with empty secrets and service accounts
+	// since node credentials don't need to be tracked
+	assert.True(t, mockPullManager.mustAttemptCalled, "MustAttemptImagePull should have been called")
+	assert.Empty(t, mockPullManager.lastSecrets, "No secrets should be passed for node credentials")
+	assert.Empty(t, mockPullManager.lastServiceAccounts, "No service accounts should be passed for node credentials")
+
+	// Image should not be pulled since it's present and accessible
+	fakeRuntime.AssertCalls([]string{"GetImageRef"})
 }

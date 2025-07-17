@@ -38,13 +38,15 @@ type v1PodResourcesServer struct {
 	memoryProvider           MemoryProvider
 	dynamicResourcesProvider DynamicResourcesProvider
 	useActivePods            bool
+	podresourcesv1.UnsafePodResourcesListerServer
 }
 
 // NewV1PodResourcesServer returns a PodResourcesListerServer which lists pods provided by the PodsProvider
 // with device information provided by the DevicesProvider
-func NewV1PodResourcesServer(providers PodResourcesProviders) podresourcesv1.PodResourcesListerServer {
+func NewV1PodResourcesServer(ctx context.Context, providers PodResourcesProviders) podresourcesv1.PodResourcesListerServer {
+	logger := klog.FromContext(ctx)
 	useActivePods := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesListUseActivePods)
-	klog.InfoS("podresources", "method", "list", "useActivePods", useActivePods)
+	logger.Info("podresources", "method", "list", "useActivePods", useActivePods)
 	return &v1PodResourcesServer{
 		podsProvider:             providers.Pods,
 		devicesProvider:          providers.Devices,

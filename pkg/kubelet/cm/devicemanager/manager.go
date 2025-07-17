@@ -257,21 +257,17 @@ func (m *ManagerImpl) PluginDisconnected(resourceName string) {
 // is captured. Also, registered device and device to container allocation
 // information is checkpointed to the disk.
 func (m *ManagerImpl) PluginListAndWatchReceiver(resourceName string, resp *pluginapi.ListAndWatchResponse) {
-	var devices []pluginapi.Device
-	for _, d := range resp.Devices {
-		devices = append(devices, *d)
-	}
-	m.genericDeviceUpdateCallback(resourceName, devices)
+	m.genericDeviceUpdateCallback(resourceName, resp.Devices)
 }
 
-func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices []pluginapi.Device) {
+func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices []*pluginapi.Device) {
 	healthyCount := 0
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.New[string]()
 	m.unhealthyDevices[resourceName] = sets.New[string]()
 	oldDevices := m.allDevices[resourceName]
 	podsToUpdate := sets.New[string]()
-	m.allDevices[resourceName] = make(map[string]pluginapi.Device)
+	m.allDevices[resourceName] = make(map[string]*pluginapi.Device)
 	for _, dev := range devices {
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {

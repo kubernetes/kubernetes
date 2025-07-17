@@ -413,6 +413,7 @@ func CheckTestingNSDeletedExcept(ctx context.Context, c clientset.Interface, ski
 // WaitForServiceEndpointsNum waits until there are EndpointSlices for serviceName
 // containing a total of expectNum endpoints. (If the service is dual-stack, expectNum
 // must count the endpoints of both IP families.)
+// Deprecated: use e2eendpointslice.WaitForEndpointCount or other related functions.
 func WaitForServiceEndpointsNum(ctx context.Context, c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)

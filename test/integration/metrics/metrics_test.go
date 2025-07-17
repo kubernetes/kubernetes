@@ -645,8 +645,8 @@ func TestWatchCacheConsistencyCheckMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do at least 2 scrape cycles to require 2 successes
-	delay := 2 * period
+	// wait 3 periods to for 2 scrape cycles (takes 1-1.5 period) and require 2 successes
+	delay := 3 * period
 	time.Sleep(delay)
 	resp, err := rt.RoundTrip(req)
 	if err != nil {

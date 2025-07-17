@@ -59,6 +59,8 @@ type server struct {
 
 	// isStarted indicates whether the service has started successfully.
 	isStarted bool
+
+	api.UnsafeRegistrationServer
 }
 
 // NewServer returns an initialized device plugin registration server.

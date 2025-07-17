@@ -25,8 +25,9 @@ import (
 // DeviceConstraintApplyConfiguration represents a declarative configuration of the DeviceConstraint type for use
 // with apply.
 type DeviceConstraintApplyConfiguration struct {
-	Requests       []string                            `json:"requests,omitempty"`
-	MatchAttribute *resourcev1beta2.FullyQualifiedName `json:"matchAttribute,omitempty"`
+	Requests          []string                            `json:"requests,omitempty"`
+	MatchAttribute    *resourcev1beta2.FullyQualifiedName `json:"matchAttribute,omitempty"`
+	DistinctAttribute *resourcev1beta2.FullyQualifiedName `json:"distinctAttribute,omitempty"`
 }
 
 // DeviceConstraintApplyConfiguration constructs a declarative configuration of the DeviceConstraint type for use with
@@ -50,5 +51,13 @@ func (b *DeviceConstraintApplyConfiguration) WithRequests(values ...string) *Dev
 // If called multiple times, the MatchAttribute field is set to the value of the last call.
 func (b *DeviceConstraintApplyConfiguration) WithMatchAttribute(value resourcev1beta2.FullyQualifiedName) *DeviceConstraintApplyConfiguration {
 	b.MatchAttribute = &value
+	return b
+}
+
+// WithDistinctAttribute sets the DistinctAttribute field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DistinctAttribute field is set to the value of the last call.
+func (b *DeviceConstraintApplyConfiguration) WithDistinctAttribute(value resourcev1beta2.FullyQualifiedName) *DeviceConstraintApplyConfiguration {
+	b.DistinctAttribute = &value
 	return b
 }

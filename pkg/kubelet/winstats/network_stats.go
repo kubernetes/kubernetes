@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
@@ -107,52 +108,52 @@ func newNetworkCounters() (*networkCounter, error) {
 	}, nil
 }
 
-func (n *networkCounter) getData() ([]cadvisorapi.InterfaceStats, error) {
+func (n *networkCounter) getData(logger klog.Logger) ([]cadvisorapi.InterfaceStats, error) {
 	packetsReceivedPerSecondData, err := n.packetsReceivedPerSecondCounter.getDataList()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get packetsReceivedPerSecond perf counter data")
+		logger.Error(err, "Unable to get packetsReceivedPerSecond perf counter data")
 		return nil, err
 	}
 
 	packetsSentPerSecondData, err := n.packetsSentPerSecondCounter.getDataList()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get packetsSentPerSecond perf counter data")
+		logger.Error(err, "Unable to get packetsSentPerSecond perf counter data")
 		return nil, err
 	}
 
 	bytesReceivedPerSecondData, err := n.bytesReceivedPerSecondCounter.getDataList()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get bytesReceivedPerSecond perf counter data")
+		logger.Error(err, "Unable to get bytesReceivedPerSecond perf counter data")
 		return nil, err
 	}
 
 	bytesSentPerSecondData, err := n.bytesSentPerSecondCounter.getDataList()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get bytesSentPerSecond perf counter data")
+		logger.Error(err, "Unable to get bytesSentPerSecond perf counter data")
 		return nil, err
 	}
 
 	packetsReceivedDiscardedData, err := n.packetsReceivedDiscardedCounter.getDataList()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get packetsReceivedDiscarded perf counter data")
+		logger.Error(err, "Unable to get packetsReceivedDiscarded perf counter data")
 		return nil, err
 	}
 
 	packetsReceivedErrorsData, err := n.packetsReceivedErrorsCounter.getDataList()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get packetsReceivedErrors perf counter data")
+		logger.Error(err, "Unable to get packetsReceivedErrors perf counter data")
 		return nil, err
 	}
 
 	packetsOutboundDiscardedData, err := n.packetsOutboundDiscardedCounter.getDataList()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get packetsOutboundDiscarded perf counter data")
+		logger.Error(err, "Unable to get packetsOutboundDiscarded perf counter data")
 		return nil, err
 	}
 
 	packetsOutboundErrorsData, err := n.packetsOutboundErrorsCounter.getDataList()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get packetsOutboundErrors perf counter data")
+		logger.Error(err, "Unable to get packetsOutboundErrors perf counter data")
 		return nil, err
 	}
 

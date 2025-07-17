@@ -241,6 +241,10 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 			return nil, fmt.Errorf("pod %v has non-empty .spec.schedulingGates", pod.Name)
 		}
 		pod.Spec.NodeName = machine
+		// Clear nomination hint to prevent stale information affecting external components.
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ClearingNominatedNodeNameAfterBinding) {
+			pod.Status.NominatedNodeName = ""
+		}
 		if pod.Annotations == nil {
 			pod.Annotations = make(map[string]string)
 		}
@@ -256,6 +260,7 @@ func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UI
 			Type:   api.PodScheduled,
 			Status: api.ConditionTrue,
 		})
+
 		finalPod = pod
 		return pod, nil
 	}), dryRun, nil)

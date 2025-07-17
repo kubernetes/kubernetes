@@ -130,7 +130,7 @@ func (pl *NodeUnschedulable) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *NodeUnschedulable) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	node := nodeInfo.Node()
 
 	if !node.Spec.Unschedulable {

@@ -136,6 +136,20 @@ func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 	sched.SchedulingQueue.Add(logger, pod)
 }
 
+func (sched *Scheduler) syncPodWithDispatcher(pod *v1.Pod) *v1.Pod {
+	enrichedObj, err := sched.APIDispatcher.SyncObject(pod)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to sync pod %s/%s with API dispatcher: %w", pod.Namespace, pod.Name, err))
+		return pod
+	}
+	enrichedPod, ok := enrichedObj.(*v1.Pod)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("cannot convert enrichedObj of type %T to *v1.Pod", enrichedObj))
+		return pod
+	}
+	return enrichedPod
+}
+
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	start := time.Now()
 	logger := sched.logger
@@ -153,9 +167,15 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 		}
 	}
 
+	if sched.APIDispatcher != nil {
+		// If the API dispatcher is available, sync the new pod with the details.
+		// However, at the moment the updated newPod is discarded and this logic will be handled in the future releases.
+		_ = sched.syncPodWithDispatcher(newPod)
+	}
+
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", newPod.Namespace, newPod.Name, err))
+		utilruntime.HandleErrorWithLogger(logger, err, "Failed to check whether pod is assumed", "pod", klog.KObj(newPod))
 	}
 	if isAssumed {
 		return
@@ -188,11 +208,11 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		var ok bool
 		pod, ok = t.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
+			utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
 			return
 		}
 	default:
-		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unable to handle object", "objType", fmt.Sprintf("%T", obj), "obj", obj)
 		return
 	}
 
@@ -274,6 +294,12 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		return
 	}
 
+	if sched.APIDispatcher != nil {
+		// If the API dispatcher is available, sync the new pod with the details.
+		// However, at the moment the updated newPod is discarded and this logic will be handled in the future releases.
+		_ = sched.syncPodWithDispatcher(newPod)
+	}
+
 	logger.V(4).Info("Update event for scheduled pod", "pod", klog.KObj(oldPod))
 	if err := sched.Cache.UpdatePod(logger, oldPod, newPod); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
@@ -322,7 +348,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 			return
 		}
 	default:
-		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t)
+		utilruntime.HandleErrorWithLogger(logger, nil, "Unable to handle object", "objType", fmt.Sprintf("%T", obj), "obj", obj)
 		return
 	}
 
@@ -377,6 +403,8 @@ func addAllEventHandlers(
 		err                 error
 		handlers            []cache.ResourceEventHandlerRegistration
 	)
+
+	logger := sched.logger
 	// scheduled pod cache
 	if handlerRegistration, err = informerFactory.Core().V1().Pods().Informer().AddEventHandler(
 		cache.FilteringResourceEventHandler{
@@ -390,10 +418,10 @@ func addAllEventHandlers(
 						// it's assigned or not. Attempting to cleanup anyways.
 						return true
 					}
-					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
+					utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
 					return false
 				default:
-					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
+					utilruntime.HandleErrorWithLogger(logger, nil, "Unable to handle object", "objType", fmt.Sprintf("%T", obj), "obj", obj)
 					return false
 				}
 			},
@@ -421,10 +449,10 @@ func addAllEventHandlers(
 						// it's assigned or not.
 						return responsibleForPod(pod, sched.Profiles)
 					}
-					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
+					utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1.Pod", "obj", t.Obj)
 					return false
 				default:
-					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
+					utilruntime.HandleErrorWithLogger(logger, nil, "Unable to handle object", "objType", fmt.Sprintf("%T", obj), "obj", obj)
 					return false
 				}
 			},
@@ -450,7 +478,6 @@ func addAllEventHandlers(
 	}
 	handlers = append(handlers, handlerRegistration)
 
-	logger := sched.logger
 	buildEvtResHandler := func(at fwk.ActionType, resource fwk.EventResource) cache.ResourceEventHandlerFuncs {
 		funcs := cache.ResourceEventHandlerFuncs{}
 		if at&fwk.Add != 0 {
@@ -568,7 +595,7 @@ func addAllEventHandlers(
 			}
 		case fwk.DeviceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1beta1().DeviceClasses().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(
 					buildEvtResHandler(at, fwk.DeviceClass),
 				); err != nil {
 					return err
@@ -649,7 +676,8 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures bool) []AdmissionResult {
 	var admissionResults []AdmissionResult
 	insufficientResources := noderesources.Fits(pod, nodeInfo, noderesources.ResourceRequestsOptions{
-		EnablePodLevelResources: utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		EnablePodLevelResources:   utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		EnableDRAExtendedResource: utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
 	})
 	if len(insufficientResources) != 0 {
 		for i := range insufficientResources {

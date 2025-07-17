@@ -27,7 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
@@ -114,6 +114,7 @@ func toSelectableFields(template *resource.ResourceClaimTemplate) fields.Set {
 func dropDisabledFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
 	dropDisabledDRAPrioritizedListFields(newClaimTemplate, oldClaimTemplate)
 	dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate)
+	dropDisabledDRAResourceClaimConsumableCapacityFields(newClaimTemplate, oldClaimTemplate)
 }
 
 func dropDisabledDRAPrioritizedListFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
@@ -173,4 +174,53 @@ func draAdminAccessFeatureInUse(claimTemplate *resource.ResourceClaimTemplate) b
 	}
 
 	return false
+}
+
+func draConsumableCapacityFeatureInUse(claimTemplate *resource.ResourceClaimTemplate) bool {
+	if claimTemplate == nil {
+		return false
+	}
+
+	for _, constaint := range claimTemplate.Spec.Spec.Devices.Constraints {
+		if constaint.DistinctAttribute != nil {
+			return true
+		}
+	}
+
+	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
+		if request.Exactly != nil && request.Exactly.Capacity != nil {
+			return true
+		}
+		for _, subRequest := range request.FirstAvailable {
+			if subRequest.Capacity != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// dropDisabledDRAResourceClaimConsumableCapacityFields drops any new feature field
+// from the newClaimTemplate if they were not used in the oldClaimTemplate.
+func dropDisabledDRAResourceClaimConsumableCapacityFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) ||
+		draConsumableCapacityFeatureInUse(oldClaimTemplate) {
+		// No need to drop anything.
+		return
+	}
+
+	for _, constaint := range newClaimTemplate.Spec.Spec.Devices.Constraints {
+		constaint.DistinctAttribute = nil
+	}
+
+	for i := range newClaimTemplate.Spec.Spec.Devices.Requests {
+		if newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly != nil {
+			newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly.Capacity = nil
+		}
+		request := newClaimTemplate.Spec.Spec.Devices.Requests[i]
+		for j := range request.FirstAvailable {
+			newClaimTemplate.Spec.Spec.Devices.Requests[i].FirstAvailable[j].Capacity = nil
+		}
+	}
 }

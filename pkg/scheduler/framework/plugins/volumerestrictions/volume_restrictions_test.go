@@ -57,7 +57,7 @@ func TestGCEDiskConflicts(t *testing.T) {
 	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
 		preFilterWantStatus *fwk.Status
 		wantStatus          *fwk.Status
@@ -139,7 +139,7 @@ func TestAWSDiskConflicts(t *testing.T) {
 	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
 		wantStatus          *fwk.Status
 		preFilterWantStatus *fwk.Status
@@ -220,7 +220,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
 		wantStatus          *fwk.Status
 		preFilterWantStatus *fwk.Status
@@ -301,7 +301,7 @@ func TestISCSIDiskConflicts(t *testing.T) {
 	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
 		wantStatus          *fwk.Status
 		preFilterWantStatus *fwk.Status
@@ -405,7 +405,7 @@ func TestAccessModeConflicts(t *testing.T) {
 	tests := []struct {
 		name                string
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		existingPods        []*v1.Pod
 		existingNodes       []*v1.Node
 		existingPVCs        []*v1.PersistentVolumeClaim

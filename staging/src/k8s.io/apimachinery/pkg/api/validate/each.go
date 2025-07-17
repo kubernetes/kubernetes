@@ -146,7 +146,7 @@ func Unique[T any](_ context.Context, _ operation.Operation, fldPath *field.Path
 		// the key(s). Unfortunately, the way errors are rendered, it comes out
 		// as something like "map[string]any{...}" which is not very nice. Once
 		// that is fixed, we can consider adding a way for this function to
-		// specify that just the keys should be renderted in the error.
+		// specify that just the keys should be rendered in the error.
 		errs = append(errs, field.Duplicate(fldPath.Index(i), val))
 	}
 	return errs

@@ -29,8 +29,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -197,13 +197,10 @@ var (
 		return device
 	}
 	deviceWithTaints = func(device resourceapi.Device, taints []resourceapi.DeviceTaint) resourceapi.Device {
-		if device.Basic != nil {
-			device.Basic = device.Basic.DeepCopy()
-			device.Basic.Taints = taints
-		}
+		device.Taints = taints
 		return device
 	}
-	emptyDevice = resourceapi.Device{Basic: &resourceapi.BasicDevice{}}
+	emptyDevice = resourceapi.Device{}
 	device0     = deviceWithName(emptyDevice, device0Name)
 	device1     = deviceWithName(emptyDevice, device1Name)
 	device2     = deviceWithName(emptyDevice, device2Name)
@@ -630,9 +627,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 
 		opts := Options{
 			EnableDeviceTaints: true,
-			SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+			SliceInformer:      informerFactory.Resource().V1().ResourceSlices(),
 			TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-			ClassInformer:      informerFactory.Resource().V1beta1().DeviceClasses(),
+			ClassInformer:      informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:         kubeClient,
 		}
 		tracker, err := newTracker(ctx, opts)
@@ -812,7 +809,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Name: "slice-" + strconv.Itoa(i),
 						},
 						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+							Devices: slices.Repeat([]resourceapi.Device{}, 64),
 						},
 					}
 				}
@@ -831,7 +828,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Name: "slice-" + strconv.Itoa(i),
 						},
 						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+							Devices: slices.Repeat([]resourceapi.Device{{}}, 64),
 						},
 					}
 				}
@@ -866,7 +863,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Name: "slice-" + strconv.Itoa(i),
 						},
 						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+							Devices: slices.Repeat([]resourceapi.Device{{}}, 64),
 						},
 					}
 				}
@@ -910,8 +907,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 								devices := make([]resourceapi.Device, nDevices)
 								for j := range devices {
 									devices[j] = resourceapi.Device{
-										Name:  "device-" + strconv.Itoa(j),
-										Basic: &resourceapi.BasicDevice{},
+										Name: "device-" + strconv.Itoa(j),
 									}
 								}
 								return devices
@@ -958,7 +954,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							},
 							Devices: func() []resourceapi.Device {
 								nDevices := 64
-								devices := slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, nDevices)
+								devices := slices.Repeat([]resourceapi.Device{{}}, nDevices)
 								devices[nDevices/2].Name = "patchme"
 								return devices
 							}(),
@@ -1002,7 +998,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 							Pool: resourceapi.ResourcePool{
 								Name: "pool-" + strconv.Itoa(i),
 							},
-							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+							Devices: slices.Repeat([]resourceapi.Device{{}}, 64),
 						},
 					}
 				}
@@ -1041,9 +1037,9 @@ func BenchmarkEventHandlers(b *testing.B) {
 		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 		opts := Options{
 			EnableDeviceTaints: true,
-			SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+			SliceInformer:      informerFactory.Resource().V1().ResourceSlices(),
 			TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-			ClassInformer:      informerFactory.Resource().V1beta1().DeviceClasses(),
+			ClassInformer:      informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:         kubeClient,
 		}
 		tracker, err := newTracker(ctx, opts)

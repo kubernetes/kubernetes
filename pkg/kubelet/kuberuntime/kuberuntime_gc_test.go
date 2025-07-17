@@ -17,7 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,10 +28,12 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestSandboxGC(t *testing.T) {
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
@@ -160,7 +161,7 @@ func TestSandboxGC(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			ctx := context.Background()
+			tCtx := ktesting.Init(t)
 			podStateProvider.removed = make(map[types.UID]struct{})
 			podStateProvider.terminated = make(map[types.UID]struct{})
 			fakeSandboxes := makeFakePodSandboxes(t, m, test.sandboxes)
@@ -176,13 +177,13 @@ func TestSandboxGC(t *testing.T) {
 			fakeRuntime.SetFakeSandboxes(fakeSandboxes)
 			fakeRuntime.SetFakeContainers(fakeContainers)
 
-			err := m.containerGC.evictSandboxes(ctx, test.evictTerminatingPods)
+			err := m.containerGC.evictSandboxes(tCtx, test.evictTerminatingPods)
 			assert.NoError(t, err)
-			realRemain, err := fakeRuntime.ListPodSandbox(ctx, nil)
+			realRemain, err := fakeRuntime.ListPodSandbox(tCtx, nil)
 			assert.NoError(t, err)
 			assert.Len(t, realRemain, len(test.remain))
 			for _, remain := range test.remain {
-				resp, err := fakeRuntime.PodSandboxStatus(ctx, fakeSandboxes[remain].Id, false)
+				resp, err := fakeRuntime.PodSandboxStatus(tCtx, fakeSandboxes[remain].Id, false)
 				assert.NoError(t, err)
 				assert.Equal(t, &fakeSandboxes[remain].PodSandboxStatus, resp.Status)
 			}
@@ -203,7 +204,8 @@ func makeGCContainer(podName, containerName string, attempt int, createdAt int64
 }
 
 func TestContainerGC(t *testing.T) {
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
@@ -388,7 +390,7 @@ func TestContainerGC(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			ctx := context.Background()
+			tCtx := ktesting.Init(t)
 			podStateProvider.removed = make(map[types.UID]struct{})
 			podStateProvider.terminated = make(map[types.UID]struct{})
 			fakeContainers := makeFakeContainers(t, m, test.containers)
@@ -405,13 +407,13 @@ func TestContainerGC(t *testing.T) {
 			if test.policy == nil {
 				test.policy = &defaultGCPolicy
 			}
-			err := m.containerGC.evictContainers(ctx, *test.policy, test.allSourcesReady, test.evictTerminatingPods)
+			err := m.containerGC.evictContainers(tCtx, *test.policy, test.allSourcesReady, test.evictTerminatingPods)
 			assert.NoError(t, err)
-			realRemain, err := fakeRuntime.ListContainers(ctx, nil)
+			realRemain, err := fakeRuntime.ListContainers(tCtx, nil)
 			assert.NoError(t, err)
 			assert.Len(t, realRemain, len(test.remain))
 			for _, remain := range test.remain {
-				resp, err := fakeRuntime.ContainerStatus(ctx, fakeContainers[remain].Id, false)
+				resp, err := fakeRuntime.ContainerStatus(tCtx, fakeContainers[remain].Id, false)
 				assert.NoError(t, err)
 				assert.Equal(t, &fakeContainers[remain].ContainerStatus, resp.Status)
 			}
@@ -421,8 +423,8 @@ func TestContainerGC(t *testing.T) {
 
 // Notice that legacy container symlink is not tested since it may be deprecated soon.
 func TestPodLogDirectoryGC(t *testing.T) {
-	ctx := context.Background()
-	_, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
@@ -450,20 +452,20 @@ func TestPodLogDirectoryGC(t *testing.T) {
 	}
 
 	// allSourcesReady == true, pod log directories without corresponding pod should be removed.
-	err = m.containerGC.evictPodLogsDirectories(ctx, true)
+	err = m.containerGC.evictPodLogsDirectories(tCtx, true)
 	assert.NoError(t, err)
 	assert.Equal(t, removed, fakeOS.Removes)
 
 	// allSourcesReady == false, pod log directories should not be removed.
 	fakeOS.Removes = []string{}
-	err = m.containerGC.evictPodLogsDirectories(ctx, false)
+	err = m.containerGC.evictPodLogsDirectories(tCtx, false)
 	assert.NoError(t, err)
 	assert.Empty(t, fakeOS.Removes)
 }
 
 func TestUnknownStateContainerGC(t *testing.T) {
-	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	// podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
@@ -474,13 +476,13 @@ func TestUnknownStateContainerGC(t *testing.T) {
 	})
 	fakeRuntime.SetFakeContainers(fakeContainers)
 
-	err = m.containerGC.evictContainers(ctx, defaultGCPolicy, true, false)
+	err = m.containerGC.evictContainers(tCtx, defaultGCPolicy, true, false)
 	assert.NoError(t, err)
 
 	assert.Contains(t, fakeRuntime.GetCalls(), "StopContainer", "RemoveContainer",
 		"container in unknown state should be stopped before being removed")
 
-	remain, err := fakeRuntime.ListContainers(ctx, nil)
+	remain, err := fakeRuntime.ListContainers(tCtx, nil)
 	assert.NoError(t, err)
 	assert.Empty(t, remain)
 }

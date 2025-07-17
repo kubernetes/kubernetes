@@ -250,7 +250,7 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 				return Validations{}, fmt.Errorf("slice type cannot have field members")
 			}
 
-			// TODO: Avoid the "local" here. This was added to to avoid errors caused when the package is an empty string.
+			// TODO: Avoid the "local" here. This was added to avoid errors caused when the package is an empty string.
 			//       The correct package would be the output package but is not known here. This does not show up in generated code.
 			// TODO: Append a consistent hash suffix to avoid generated name conflicts?
 			varBaseName := sanitizeName(context.Path.String() + "_" + unionName) // unionName can be ""

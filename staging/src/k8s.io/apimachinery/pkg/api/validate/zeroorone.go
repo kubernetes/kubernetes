@@ -31,8 +31,8 @@ import (
 //
 // For example:
 //
-//	var ZeroOrOneOfMembershipFor := validate.NewUnionMembership([2]string{"a", "A"}, [2]string{"b", "B"}, [2]string{"c", "C"})
-//	func ValidateABC(ctx context.Context, op operation.Operation, fldPath *field.Path, in *ABC) (errs fields.ErrorList) {
+//	var ZeroOrOneOfMembershipForABC = validate.NewUnionMembership([2]string{"a", "A"}, [2]string{"b", "B"}, [2]string{"c", "C"})
+//	func ValidateABC(ctx context.Context, op operation.Operation, fldPath *field.Path, in *ABC) (errs field.ErrorList) {
 //		errs = append(errs, ZeroOrOneOfUnion(ctx, op, fldPath, in, oldIn, UnionMembershipForABC,
 //			func(in *ABC) bool { return in.A != nil },
 //			func(in *ABC) bool { return in.B != ""},

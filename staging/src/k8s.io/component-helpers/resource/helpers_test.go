@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodRequestsAndLimits(t *testing.T) {
@@ -1554,6 +1555,58 @@ func TestIsPodLevelResourcesSet(t *testing.T) {
 
 }
 
+func TestIsPodLevelLimitsSet(t *testing.T) {
+	testCases := []struct {
+		name         string
+		podResources *v1.ResourceRequirements
+		expected     bool
+	}{
+		{
+			name:     "nil resources struct",
+			expected: false,
+		},
+		{
+			name:         "empty resources struct",
+			podResources: &v1.ResourceRequirements{},
+			expected:     false,
+		},
+		{
+			name: "only resource requests set",
+			podResources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("100Mi")},
+			},
+			expected: false,
+		},
+		{
+			name: "only unsupported resource limits set",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("1Mi")},
+			},
+			expected: false,
+		},
+		{
+			name: "unsupported and suported resources limits set",
+			podResources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceEphemeralStorage: resource.MustParse("1Mi"),
+					v1.ResourceCPU:              resource.MustParse("1m"),
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testPod := &v1.Pod{Spec: v1.PodSpec{Resources: tc.podResources}}
+			if got := IsPodLevelLimitsSet(testPod); got != tc.expected {
+				t.Errorf("got=%t, want=%t", got, tc.expected)
+			}
+		})
+	}
+
+}
+
 func TestPodLevelResourceRequests(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 	testCases := []struct {
@@ -1967,11 +2020,14 @@ func TestIsSupportedPodLevelResource(t *testing.T) {
 func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 	restartAlways := v1.ContainerRestartPolicyAlways
 	cases := []struct {
-		containers       []v1.Container
-		initContainers   []v1.Container
-		name             string
-		expectedRequests v1.ResourceList
-		expectedLimits   v1.ResourceList
+		options               PodResourcesOptions
+		containers            []v1.Container
+		containerStatuses     []v1.ContainerStatus
+		initContainers        []v1.Container
+		initContainerStatuses []v1.ContainerStatus
+		name                  string
+		expectedRequests      v1.ResourceList
+		expectedLimits        v1.ResourceList
 	}{
 		{
 			name: "one container with limits",
@@ -2135,20 +2191,74 @@ func TestAggregateContainerRequestsAndLimits(t *testing.T) {
 				v1.ResourceName(v1.ResourceCPU): resource.MustParse("17"),
 			},
 		},
+		{
+			name:    "regularcontainers with empty requests, but status with non-empty requests",
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name:      "container-1",
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("2"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			name:    "always-restart init containers with empty requests, but status with non-empty requests",
+			options: PodResourcesOptions{UseStatusResources: true},
+			initContainers: []v1.Container{
+				{
+					Name:          "container-1",
+					RestartPolicy: ptr.To[v1.ContainerRestartPolicy](v1.ContainerRestartPolicyAlways),
+					Resources:     v1.ResourceRequirements{},
+				},
+			},
+			initContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("2"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
 	}
 
 	for idx, tc := range cases {
-		testPod := &v1.Pod{Spec: v1.PodSpec{Containers: tc.containers, InitContainers: tc.initContainers}}
-		resRequests := AggregateContainerRequests(testPod, PodResourcesOptions{})
-		resLimits := AggregateContainerLimits(testPod, PodResourcesOptions{})
+		t.Run(tc.name, func(t *testing.T) {
+			testPod := &v1.Pod{
+				Spec:   v1.PodSpec{Containers: tc.containers, InitContainers: tc.initContainers},
+				Status: v1.PodStatus{ContainerStatuses: tc.containerStatuses, InitContainerStatuses: tc.initContainerStatuses},
+			}
+			resRequests := AggregateContainerRequests(testPod, tc.options)
+			resLimits := AggregateContainerLimits(testPod, tc.options)
 
-		if !equality.Semantic.DeepEqual(tc.expectedRequests, resRequests) {
-			t.Errorf("test case failure[%d]: %v, requests:\n expected:\t%v\ngot\t\t%v", idx, tc.name, tc.expectedRequests, resRequests)
-		}
+			if !equality.Semantic.DeepEqual(tc.expectedRequests, resRequests) {
+				t.Errorf("test case failure[%d]: %v, requests:\n expected:\t%v\ngot\t\t%v", idx, tc.name, tc.expectedRequests, resRequests)
+			}
 
-		if !equality.Semantic.DeepEqual(tc.expectedLimits, resLimits) {
-			t.Errorf("test case failure[%d]: %v, limits:\n expected:\t%v\ngot\t\t%v", idx, tc.name, tc.expectedLimits, resLimits)
-		}
+			if !equality.Semantic.DeepEqual(tc.expectedLimits, resLimits) {
+				t.Errorf("test case failure[%d]: %v, limits:\n expected:\t%v\ngot\t\t%v", idx, tc.name, tc.expectedLimits, resLimits)
+			}
+		})
 	}
 }
 

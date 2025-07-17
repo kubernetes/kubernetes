@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -40,10 +40,13 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	apicache "k8s.io/kubernetes/pkg/scheduler/backend/api_cache"
+	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/backend/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
@@ -93,6 +96,12 @@ type Scheduler struct {
 	// SchedulingQueue holds pods to be scheduled
 	SchedulingQueue internalqueue.SchedulingQueue
 
+	// If possible, indirect operation on APIDispatcher, e.g. through SchedulingQueue, is preferred.
+	// Is nil iff SchedulerAsyncAPICalls feature gate is disabled.
+	// Adding a call to APIDispatcher should not be done directly by in-tree usages.
+	// framework.APICache should be used instead.
+	APIDispatcher *apidispatcher.APIDispatcher
+
 	// Profiles are the scheduling profiles.
 	Profiles profile.Map
 
@@ -111,6 +120,8 @@ type Scheduler struct {
 
 	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
 	registeredHandlers []cache.ResourceEventHandlerRegistration
+
+	nominatedNodeNameForExpectationEnabled bool
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
@@ -311,25 +322,30 @@ func New(ctx context.Context,
 	var resourceClaimCache *assumecache.AssumeCache
 	var resourceSliceTracker *resourceslicetracker.Tracker
 	var draManager framework.SharedDRAManager
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
+	if feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 		resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 		resourceSliceTrackerOpts := resourceslicetracker.Options{
-			EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-			SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
-			KubeClient:         client,
+			EnableDeviceTaints:       feature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
+			EnableConsumableCapacity: feature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+			SliceInformer:            informerFactory.Resource().V1().ResourceSlices(),
+			KubeClient:               client,
 		}
 		// If device taints are disabled, the additional informers are not needed and
 		// the tracker turns into a simple wrapper around the slice informer.
 		if resourceSliceTrackerOpts.EnableDeviceTaints {
 			resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
-			resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1beta1().DeviceClasses()
+			resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 		}
 		resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, resourceSliceTrackerOpts)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't start resource slice tracker: %w", err)
 		}
 		draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, informerFactory)
+	}
+	var apiDispatcher *apidispatcher.APIDispatcher
+	if feature.DefaultFeatureGate.Enabled(features.SchedulerAsyncAPICalls) {
+		apiDispatcher = apidispatcher.New(client, int(options.parallelism), apicalls.Relevances)
 	}
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
@@ -344,6 +360,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithExtenders(extenders),
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
 		frameworkruntime.WithWaitingPods(waitingPods),
+		frameworkruntime.WithAPIDispatcher(apiDispatcher),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
@@ -385,29 +402,38 @@ func New(ctx context.Context,
 		internalqueue.WithQueueingHintMapPerProfile(queueingHintsPerProfile),
 		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
 		internalqueue.WithMetricsRecorder(*metricsRecorder),
+		internalqueue.WithAPIDispatcher(apiDispatcher),
 	)
+
+	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod, apiDispatcher)
+
+	var apiCache framework.APICacher
+	if apiDispatcher != nil {
+		apiCache = apicache.New(podQueue, schedulerCache)
+	}
 
 	for _, fwk := range profiles {
 		fwk.SetPodNominator(podQueue)
 		fwk.SetPodActivator(podQueue)
+		fwk.SetAPICacher(apiCache)
 	}
-
-	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod)
 
 	// Setup cache debugger.
 	debugger := cachedebugger.New(nodeLister, podLister, schedulerCache, podQueue)
 	debugger.ListenForSignal(ctx)
 
 	sched := &Scheduler{
-		Cache:                    schedulerCache,
-		client:                   client,
-		nodeInfoSnapshot:         snapshot,
-		percentageOfNodesToScore: options.percentageOfNodesToScore,
-		Extenders:                extenders,
-		StopEverything:           stopEverything,
-		SchedulingQueue:          podQueue,
-		Profiles:                 profiles,
-		logger:                   logger,
+		Cache:                                  schedulerCache,
+		client:                                 client,
+		nodeInfoSnapshot:                       snapshot,
+		percentageOfNodesToScore:               options.percentageOfNodesToScore,
+		Extenders:                              extenders,
+		StopEverything:                         stopEverything,
+		SchedulingQueue:                        podQueue,
+		Profiles:                               profiles,
+		logger:                                 logger,
+		APIDispatcher:                          apiDispatcher,
+		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
 	}
 	sched.NextPod = podQueue.Pop
 	sched.applyDefaultHandlers()
@@ -450,7 +476,7 @@ func buildQueueingHintMap(ctx context.Context, es []framework.EnqueueExtensions)
 		registerNodeTaintUpdated := false
 		for _, event := range events {
 			fn := event.QueueingHintFn
-			if fn == nil || !utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+			if fn == nil || !feature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 				fn = defaultQueueingHintFn
 			}
 
@@ -499,6 +525,10 @@ func (sched *Scheduler) Run(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	sched.SchedulingQueue.Run(logger)
 
+	if sched.APIDispatcher != nil {
+		sched.APIDispatcher.Run(logger)
+	}
+
 	// We need to start scheduleOne loop in a dedicated goroutine,
 	// because scheduleOne function hangs on getting the next item
 	// from the SchedulingQueue.
@@ -508,6 +538,9 @@ func (sched *Scheduler) Run(ctx context.Context) {
 	go wait.UntilWithContext(ctx, sched.ScheduleOne, 0)
 
 	<-ctx.Done()
+	if sched.APIDispatcher != nil {
+		sched.APIDispatcher.Close()
+	}
 	sched.SchedulingQueue.Close()
 
 	// If the plugins satisfy the io.Closer interface, they are closed.

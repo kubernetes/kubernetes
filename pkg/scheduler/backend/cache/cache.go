@@ -28,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -40,9 +42,9 @@ var (
 // It automatically starts a go routine that manages expiration of assumed pods.
 // "ttl" is how long the assumed pod will get expired.
 // "ctx" is the context that would close the background goroutine.
-func New(ctx context.Context, ttl time.Duration) Cache {
+func New(ctx context.Context, ttl time.Duration, apiDispatcher fwk.APIDispatcher) Cache {
 	logger := klog.FromContext(ctx)
-	cache := newCache(ctx, ttl, cleanAssumedPeriod)
+	cache := newCache(ctx, ttl, cleanAssumedPeriod, apiDispatcher)
 	cache.run(logger)
 	return cache
 }
@@ -74,7 +76,11 @@ type cacheImpl struct {
 	headNode *nodeInfoListItem
 	nodeTree *nodeTree
 	// A map from image name to its ImageStateSummary.
-	imageStates map[string]*framework.ImageStateSummary
+	imageStates map[string]*fwk.ImageStateSummary
+
+	// apiDispatcher is used for the methods that are expected to send API calls.
+	// It's non-nil only if the SchedulerAsyncAPICalls feature gate is enabled.
+	apiDispatcher fwk.APIDispatcher
 }
 
 type podState struct {
@@ -86,18 +92,19 @@ type podState struct {
 	bindingFinished bool
 }
 
-func newCache(ctx context.Context, ttl, period time.Duration) *cacheImpl {
+func newCache(ctx context.Context, ttl, period time.Duration, apiDispatcher fwk.APIDispatcher) *cacheImpl {
 	logger := klog.FromContext(ctx)
 	return &cacheImpl{
 		ttl:    ttl,
 		period: period,
 		stop:   ctx.Done(),
 
-		nodes:       make(map[string]*nodeInfoListItem),
-		nodeTree:    newNodeTree(logger, nil),
-		assumedPods: sets.New[string](),
-		podStates:   make(map[string]*podState),
-		imageStates: make(map[string]*framework.ImageStateSummary),
+		nodes:         make(map[string]*nodeInfoListItem),
+		nodeTree:      newNodeTree(logger, nil),
+		assumedPods:   sets.New[string](),
+		podStates:     make(map[string]*podState),
+		imageStates:   make(map[string]*fwk.ImageStateSummary),
+		apiDispatcher: apiDispatcher,
 	}
 }
 
@@ -169,7 +176,7 @@ func (cache *cacheImpl) Dump() *Dump {
 
 	nodes := make(map[string]*framework.NodeInfo, len(cache.nodes))
 	for k, v := range cache.nodes {
-		nodes[k] = v.info.Snapshot()
+		nodes[k] = v.info.SnapshotConcrete()
 	}
 
 	return &Dump{
@@ -220,7 +227,7 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 				existing = &framework.NodeInfo{}
 				nodeSnapshot.nodeInfoMap[np.Name] = existing
 			}
-			clone := node.info.Snapshot()
+			clone := node.info.SnapshotConcrete()
 			// We track nodes that have pods with affinity, here we check if this node changed its
 			// status from having pods with affinity to NOT having pods with affinity or the other
 			// way around.
@@ -281,12 +288,12 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 }
 
 func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot *Snapshot, updateAll bool) {
-	snapshot.havePodsWithAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
-	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+	snapshot.havePodsWithAffinityNodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
+	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.usedPVCSet = sets.New[string]()
 	if updateAll {
 		// Take a snapshot of the nodes order in the tree
-		snapshot.nodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+		snapshot.nodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 		nodesList, err := cache.nodeTree.list()
 		if err != nil {
 			utilruntime.HandleErrorWithLogger(logger, err, "Error occurred while retrieving the list of names of the nodes from node tree")
@@ -309,13 +316,13 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot 
 		}
 	} else {
 		for _, nodeInfo := range snapshot.nodeInfoList {
-			if len(nodeInfo.PodsWithAffinity) > 0 {
+			if len(nodeInfo.GetPodsWithAffinity()) > 0 {
 				snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, nodeInfo)
 			}
-			if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
+			if len(nodeInfo.GetPodsWithRequiredAntiAffinity()) > 0 {
 				snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 			}
-			for key := range nodeInfo.PVCRefCounts {
+			for key := range nodeInfo.GetPVCRefCounts() {
 				snapshot.usedPVCSet.Insert(key)
 			}
 		}
@@ -615,7 +622,7 @@ func (cache *cacheImpl) AddNode(logger klog.Logger, node *v1.Node) *framework.No
 	cache.nodeTree.addNode(logger, node)
 	cache.addNodeImageStates(node, n.info)
 	n.info.SetNode(node)
-	return n.info.Snapshot()
+	return n.info.SnapshotConcrete()
 }
 
 func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo {
@@ -634,7 +641,7 @@ func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node
 	cache.nodeTree.updateNode(logger, oldNode, newNode)
 	cache.addNodeImageStates(newNode, n.info)
 	n.info.SetNode(newNode)
-	return n.info.Snapshot()
+	return n.info.SnapshotConcrete()
 }
 
 // RemoveNode removes a node from the cache's tree.
@@ -671,14 +678,14 @@ func (cache *cacheImpl) RemoveNode(logger klog.Logger, node *v1.Node) error {
 // addNodeImageStates adds states of the images on given node to the given nodeInfo and update the imageStates in
 // scheduler cache. This function assumes the lock to scheduler cache has been acquired.
 func (cache *cacheImpl) addNodeImageStates(node *v1.Node, nodeInfo *framework.NodeInfo) {
-	newSum := make(map[string]*framework.ImageStateSummary)
+	newSum := make(map[string]*fwk.ImageStateSummary)
 
 	for _, image := range node.Status.Images {
 		for _, name := range image.Names {
 			// update the entry in imageStates
 			state, ok := cache.imageStates[name]
 			if !ok {
-				state = &framework.ImageStateSummary{
+				state = &fwk.ImageStateSummary{
 					Size:  image.SizeBytes,
 					Nodes: sets.New(node.Name),
 				}
@@ -757,4 +764,18 @@ func (cache *cacheImpl) updateMetrics() {
 	metrics.CacheSize.WithLabelValues("assumed_pods").Set(float64(len(cache.assumedPods)))
 	metrics.CacheSize.WithLabelValues("pods").Set(float64(len(cache.podStates)))
 	metrics.CacheSize.WithLabelValues("nodes").Set(float64(len(cache.nodes)))
+}
+
+// BindPod handles the pod binding by adding a bind API call to the dispatcher.
+// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+func (cache *cacheImpl) BindPod(binding *v1.Binding) (<-chan error, error) {
+	// Don't store anything in the cache, as the pod is already assumed, and in case of a binding failure, it will be forgotten.
+	onFinish := make(chan error, 1)
+	err := cache.apiDispatcher.Add(apicalls.Implementations.PodBinding(binding), fwk.APICallOptions{
+		OnFinish: onFinish,
+	})
+	if fwk.IsUnexpectedError(err) {
+		return onFinish, err
+	}
+	return onFinish, nil
 }

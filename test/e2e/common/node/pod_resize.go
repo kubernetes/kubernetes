@@ -1322,6 +1322,13 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod, viableLoweredLimit)
 		podresize.ExpectPodResized(ctx, f, resizedPod, viableLoweredLimit)
 
+		// There is some latency after container startup before memory usage is scraped. On CRI-O
+		// this latency is much higher, so wait enough time for cAdvisor to scrape metrics twice.
+		ginkgo.By("Waiting for stats scraping")
+		const scrapingDelay = 30 * time.Second // 2 * maxHousekeepingInterval
+		startTime := testPod.Status.StartTime
+		time.Sleep(time.Until(startTime.Add(scrapingDelay)))
+
 		// 2. Decrease the limit down to a tiny amount - should fail
 		const nonViableMemoryLimit = "10Ki"
 		ginkgo.By("Patching pod with a greatly lowered memory limit")
@@ -1340,7 +1347,7 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 			Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
 				// If VerifyPodStatusResources succeeds, it means the resize completed.
 				if podresize.VerifyPodStatusResources(pod, nonViableLoweredLimit) == nil {
-					return nil, fmt.Errorf("non-viable resize unexpectedly completed")
+					return nil, gomega.StopTrying("non-viable resize unexpectedly completed")
 				}
 
 				var inProgressCondition *v1.PodCondition

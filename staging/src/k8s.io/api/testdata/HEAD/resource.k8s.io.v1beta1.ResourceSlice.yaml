@@ -37,14 +37,28 @@ spec:
   devices:
   - basic:
       allNodes: true
+      allowMultipleAllocations: true
       attributes:
         attributesKey:
           bool: true
           int: 2
           string: stringValue
           version: versionValue
+      bindingConditions:
+      - bindingConditionsValue
+      bindingFailureConditions:
+      - bindingFailureConditionsValue
+      bindsToNode: true
       capacity:
         capacityKey:
+          requestPolicy:
+            default: "0"
+            validRange:
+              max: "0"
+              min: "0"
+              step: "0"
+            validValues:
+            - "0"
           value: "0"
       consumesCounters:
       - counterSet: counterSetValue

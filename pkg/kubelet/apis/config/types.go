@@ -892,10 +892,15 @@ type ImagePullCredentials struct {
 	// +optional
 	KubernetesSecrets []ImagePullSecret
 
+	// KubernetesServiceAccounts is an index of coordinates of all the kubernetes
+	// service accounts that were used to pull the image.
+	// +optional
+	KubernetesServiceAccounts []ImagePullServiceAccount
+
 	// NodePodsAccessible is a flag denoting the pull credentials are accessible
 	// by all the pods on the node, or that no credentials are needed for the pull.
 	//
-	// If true, it is mutually exclusive with the `kubernetesSecrets` field.
+	// If true, it is mutually exclusive with the `kubernetesSecrets` and `kubernetesServiceAccounts` fields.
 	// +optional
 	NodePodsAccessible bool
 }
@@ -910,6 +915,14 @@ type ImagePullSecret struct {
 	// CredentialHash is a SHA-256 retrieved by hashing the image pull credentials
 	// content of the secret specified by the UID/Namespace/Name coordinates.
 	CredentialHash string
+}
+
+// ImagePullServiceAccount is a representation of a Kubernetes service account object coordinates
+// for which the kubelet sent service account token to the credential provider plugin for image pull credentials.
+type ImagePullServiceAccount struct {
+	UID       string
+	Namespace string
+	Name      string
 }
 
 // UserNamespaces contains User Namespace configurations.

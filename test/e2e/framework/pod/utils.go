@@ -62,6 +62,9 @@ func GetDefaultTestImage() string {
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
 // If the node OS is linux, return busybox image
 func GetDefaultTestImageID() imageutils.ImageID {
+	if framework.NodeOSDistroIs("windows") {
+		return GetTestImageID(imageutils.Agnhost)
+	}
 	return GetTestImageID(imageutils.BusyBox)
 }
 
