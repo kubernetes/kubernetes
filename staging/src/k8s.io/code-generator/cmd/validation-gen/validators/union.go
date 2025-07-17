@@ -172,8 +172,9 @@ func (umtv unionMemberTagValidator) Docs() TagDoc {
 	}
 }
 
-// union defines how a union validation will be generated, based
-// on +k8s:unionMember and +k8s:unionDiscriminator tags found in a go struct.
+// union defines how a union validation will be generated. Unions can be
+// composed of either a set of struct fields (with an optional disctriminator),
+// or a set of list items (stored as selection criteria).
 type union struct {
 	// members provides field information about all the members of the union.
 	// Each item provides a fieldName and discriminatorValue pair, where the
@@ -182,7 +183,8 @@ type union struct {
 	// discriminated union to name this member.
 	members []unionMember
 
-	// fieldMembers describes all the members of the union.
+	// fieldMembers describes all the members of a struct-field union.  This is
+	// mutually exclusive with itemMembers.
 	fieldMembers []*types.Member
 
 	// discriminator is the name of the discriminator field.
@@ -190,11 +192,11 @@ type union struct {
 	// discriminatorMember describes the discriminator field.
 	discriminatorMember *types.Member
 
-	// itemMatchers stores matcher criteria for list item unions.
-	// key is the virtual field path (eg: "<path>/Pipeline.Tasks[{"name": "succeeded"}]"),
-	// value is the parsed matcher map (eg: {"name": "succeeded"}).
-	// Represents union members that are list items matching specific criteria
-	itemMatchers map[string][]ListSelectorTerm
+	// itemMembers stores selection criteria for all the members of a list-item
+	// union. This is mutually exclusive with fieldMembers. The map key is the
+	// "field name" (eg: `field[{"name": "succeeded"}]`), and the value is a
+	// list of selection criteria.
+	itemMembers map[string][]ListSelectorTerm
 }
 
 type unionMember struct {
@@ -209,7 +211,7 @@ type unions map[string]*union
 func newUnion() *union {
 	return &union{
 		// slice fields can be nil
-		itemMatchers: make(map[string][]ListSelectorTerm),
+		itemMembers: make(map[string][]ListSelectorTerm),
 	}
 }
 
@@ -237,13 +239,13 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 	slices.Sort(keys)
 	for _, unionName := range keys {
 		u := unions[unionName]
-		if len(u.fieldMembers) > 0 || u.discriminator != nil || len(u.itemMatchers) > 0 {
-			if len(u.fieldMembers) > 0 && len(u.itemMatchers) > 0 {
-				return Validations{}, fmt.Errorf("cannot have both field members and item matchers")
+		if len(u.fieldMembers) > 0 || u.discriminator != nil || len(u.itemMembers) > 0 {
+			if len(u.fieldMembers) > 0 && len(u.itemMembers) > 0 {
+				return Validations{}, fmt.Errorf("cannot have both field members and item members")
 			}
 			nativeType := util.NonPointer(util.NativeType(context.Type))
-			if nativeType.Kind == types.Struct && len(u.itemMatchers) > 0 {
-				return Validations{}, fmt.Errorf("struct type cannot have item matchers")
+			if nativeType.Kind == types.Struct && len(u.itemMembers) > 0 {
+				return Validations{}, fmt.Errorf("struct type cannot have item members")
 			}
 			if nativeType.Kind == types.Slice && len(u.fieldMembers) > 0 {
 				return Validations{}, fmt.Errorf("slice type cannot have field members")
@@ -265,19 +267,19 @@ func processUnionValidations(context Context, unions unions, varPrefix string,
 			}
 
 			// Handle list item unions for lists
-			if nativeType.Kind == types.Slice && len(u.itemMatchers) > 0 {
+			if nativeType.Kind == types.Slice && len(u.itemMembers) > 0 {
 				elemType := util.NonPointer(nativeType.Elem)
 
-				// Sort matcher paths for stable output
-				matcherPaths := make([]string, 0, len(u.itemMatchers))
-				for path := range u.itemMatchers {
-					matcherPaths = append(matcherPaths, path)
+				// Sort keys for stable output
+				keys := make([]string, 0, len(u.itemMembers))
+				for key := range u.itemMembers {
+					keys = append(keys, key)
 				}
-				slices.Sort(matcherPaths)
+				slices.Sort(keys)
 
-				for _, fullPath := range matcherPaths {
-					matcher := u.itemMatchers[fullPath]
-					extractor, err := createItemExtractor(context.Type, elemType, matcher)
+				for _, fullPath := range keys {
+					selector := u.itemMembers[fullPath]
+					extractor, err := createItemExtractor(context.Type, elemType, selector)
 					if err != nil {
 						return Validations{}, err
 					}
@@ -332,11 +334,12 @@ func createMemberExtractor(ptrType *types.Type, member *types.Member) FunctionLi
 	return extractor
 }
 
-// createItemExtractor creates an extractor function for list item union members.
-// It generates code that loops through the list to check if an item matching the criteria exists.
-func createItemExtractor(listType *types.Type, elemType *types.Type, matcher []ListSelectorTerm) (FunctionLiteral, error) {
+// createItemExtractor creates an extractor function for list item union
+// members. It generates code that loops through the list to check if an item
+// matching the criteria exists.
+func createItemExtractor(listType *types.Type, elemType *types.Type, selector []ListSelectorTerm) (FunctionLiteral, error) {
 	var criteria []keyValuePair
-	for _, term := range matcher {
+	for _, term := range selector {
 		criteria = append(criteria, keyValuePair{
 			key:   term.Field,
 			value: fmt.Sprint(term.Value),
@@ -477,10 +480,10 @@ func processListMemberValidations(shared map[string]unions, context Context, tag
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 	u.members = append(u.members, unionMember{fieldName, memberName})
 
-	if _, found := u.itemMatchers[fieldName]; found {
+	if _, found := u.itemMembers[fieldName]; found {
 		return fmt.Errorf("list-item union member %q already exists", fieldName)
 	}
-	u.itemMatchers[fieldName] = context.ListSelector
+	u.itemMembers[fieldName] = context.ListSelector
 
 	return nil
 }
