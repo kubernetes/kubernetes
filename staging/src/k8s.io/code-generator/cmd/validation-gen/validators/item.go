@@ -71,6 +71,19 @@ func (itemTagValidator) LateTagValidator() {}
 func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// TODO: Support regular maps with syntax like:
 	// +k8s:item("map-key")=+k8s:immutable
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	nt := util.NonPointer(util.NativeType(context.Type))
+	if nt.Kind != types.Slice {
+		return Validations{}, fmt.Errorf("can only be used on list types")
+	}
+	elemT := util.NonPointer(util.NativeType(nt.Elem))
+	if elemT.Kind != types.Struct {
+		return Validations{}, fmt.Errorf("can only be used on lists of structs")
+	}
+	if tag.ValueType != codetags.ValueTypeTag || tag.ValueTag == nil {
+		return Validations{}, fmt.Errorf("requires a validation tag as its value payload")
+	}
 
 	// Parse key-value pairs from named args.
 	criteria := []keyValuePair{}
@@ -99,23 +112,6 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 
 	if len(criteria) == 0 {
 		return Validations{}, fmt.Errorf("no selection criteria was specified")
-	}
-
-	if tag.ValueType != codetags.ValueTypeTag || tag.ValueTag == nil {
-		return Validations{}, fmt.Errorf("requires a validation tag as its value payload")
-	}
-
-	// This tag can apply to value and pointer fields, as well as typedefs
-	// (which should never be pointers). We need to check the concrete type.
-	t := util.NonPointer(util.NativeType(context.Type))
-
-	if t.Kind != types.Slice {
-		return Validations{}, fmt.Errorf("can only be used on list types")
-	}
-
-	elemT := util.NonPointer(util.NativeType(t.Elem))
-	if elemT.Kind != types.Struct {
-		return Validations{}, fmt.Errorf("can only be used on lists of structs")
 	}
 
 	// Store metadata for the field validator to use.
@@ -219,8 +215,8 @@ func (iv itemValidator) GetValidations(context Context) (Validations, error) {
 		return Validations{}, fmt.Errorf("found items with no list metadata")
 	}
 
-	t := util.NonPointer(util.NativeType(context.Type))
-	elemT := util.NonPointer(util.NativeType(t.Elem))
+	nt := util.NonPointer(util.NativeType(context.Type))
+	elemT := util.NonPointer(util.NativeType(nt.Elem))
 
 	result := Validations{}
 
@@ -235,10 +231,11 @@ func (iv itemValidator) GetValidations(context Context) (Validations, error) {
 			for _, pair := range item.criteria {
 				if pair.key == keyName {
 					member := util.GetMemberByJSON(elemT, pair.key)
-					if member != nil {
-						if err := validateTypeMatch(member.Type, pair.value); err != nil {
-							return Validations{}, fmt.Errorf("key %q: %w", pair.key, err)
-						}
+					if member == nil {
+						return Validations{}, fmt.Errorf("no field with JSON name %q", pair.key)
+					}
+					if err := validateTypeMatch(member.Type, pair.value); err != nil {
+						return Validations{}, fmt.Errorf("key %q: %w", pair.key, err)
 					}
 					foundKeys[keyName] = true
 					break
@@ -256,7 +253,7 @@ func (iv itemValidator) GetValidations(context Context) (Validations, error) {
 		}
 
 		// Extract validations from the stored tag
-		itemKey := generateFieldPathForMap(item.criteria)
+		itemKey := selectorString(item.criteria)
 		itemPath := context.Path.Key(itemKey)
 		itemSelector := generateSelector(item.criteria)
 		subContext := Context{
@@ -365,21 +362,21 @@ func generateComparisonRHS(member *types.Member, value any) (string, error) {
 	case memberType == types.String:
 		strVal, ok := value.(string)
 		if !ok {
-			return "", fmt.Errorf("type mismatch, field is string but value is not")
+			return "", fmt.Errorf("type mismatch, field is string but value is not: %v", value)
 		}
 		return fmt.Sprintf("%q", strVal), nil
 
 	case memberType == types.Bool:
 		boolVal, ok := value.(bool)
 		if !ok {
-			return "", fmt.Errorf("type mismatch, field is bool but value is not")
+			return "", fmt.Errorf("type mismatch, field is bool but value is not: %v", value)
 		}
 		return fmt.Sprintf("%t", boolVal), nil
 
 	case types.IsInteger(memberType):
 		intVal, ok := value.(int)
 		if !ok {
-			return "", fmt.Errorf("type mismatch, field is int but value is not")
+			return "", fmt.Errorf("type mismatch, field is int but value is not: %v", value)
 		}
 		return fmt.Sprintf("%d", intVal), nil
 
@@ -388,9 +385,10 @@ func generateComparisonRHS(member *types.Member, value any) (string, error) {
 	}
 }
 
-// generateFieldPathForMap creates a field path for list map items using a JSON-like syntax.
-// The format is {"key": "value", "key2": 42, "key3": true} with quoted keys and appropriately formatted values.
-func generateFieldPathForMap(criteria []keyValuePair) string {
+// selectorString creates a field path for list map items using a JSON-like
+// syntax. The format is {"key": "value", "key2": 42, "key3": true} with quoted
+// keys and appropriately formatted values.
+func selectorString(criteria []keyValuePair) string {
 	var pairs []string
 	for _, fld := range criteria {
 		valueStr := formatValueForPath(fld.value)
