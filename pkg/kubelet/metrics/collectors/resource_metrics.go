@@ -69,6 +69,13 @@ var (
 		metrics.ALPHA,
 		"")
 
+	containerSwapLimitDesc = metrics.NewDesc("container_swap_limit_bytes",
+		"Current amount of the container swap limit in bytes. Reported only on non-windows systems",
+		[]string{"container", "pod", "namespace"},
+		nil,
+		metrics.ALPHA,
+		"")
+
 	podCPUUsageDesc = metrics.NewDesc("pod_cpu_usage_seconds_total",
 		"Cumulative cpu time consumed by the pod in core-seconds",
 		[]string{"pod", "namespace"},
@@ -137,6 +144,7 @@ func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Des
 	ch <- containerCPUUsageDesc
 	ch <- containerMemoryUsageDesc
 	ch <- containerSwapUsageDesc
+	ch <- containerSwapLimitDesc
 	ch <- podCPUUsageDesc
 	ch <- podMemoryUsageDesc
 	ch <- podSwapUsageDesc
@@ -235,13 +243,23 @@ func (rc *resourceMetricsCollector) collectContainerMemoryMetrics(ch chan<- metr
 }
 
 func (rc *resourceMetricsCollector) collectContainerSwapMetrics(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
-	if s.Swap == nil || s.Swap.SwapUsageBytes == nil {
+	if s.Swap == nil {
 		return
 	}
 
-	ch <- metrics.NewLazyMetricWithTimestamp(s.Swap.Time.Time,
-		metrics.NewLazyConstMetric(containerSwapUsageDesc, metrics.GaugeValue,
-			float64(*s.Swap.SwapUsageBytes), s.Name, pod.PodRef.Name, pod.PodRef.Namespace))
+	swapUsageBytes := float64(0)
+	if s.Swap.SwapUsageBytes != nil {
+		swapUsageBytes = float64(*s.Swap.SwapUsageBytes)
+		ch <- metrics.NewLazyMetricWithTimestamp(s.Swap.Time.Time,
+			metrics.NewLazyConstMetric(containerSwapUsageDesc, metrics.GaugeValue,
+				swapUsageBytes, s.Name, pod.PodRef.Name, pod.PodRef.Namespace))
+	}
+
+	if s.Swap.SwapAvailableBytes != nil {
+		ch <- metrics.NewLazyMetricWithTimestamp(s.Swap.Time.Time,
+			metrics.NewLazyConstMetric(containerSwapLimitDesc, metrics.GaugeValue,
+				float64(*s.Swap.SwapAvailableBytes)+swapUsageBytes, s.Name, pod.PodRef.Name, pod.PodRef.Namespace))
+	}
 }
 
 func (rc *resourceMetricsCollector) collectPodCPUMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
