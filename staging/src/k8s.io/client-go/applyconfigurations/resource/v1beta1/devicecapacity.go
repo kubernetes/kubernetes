@@ -24,7 +24,10 @@ import (
 
 // DeviceCapacityApplyConfiguration represents a declarative configuration of the DeviceCapacity type for use
 // with apply.
+//
+// DeviceCapacity describes a quantity associated with a device.
 type DeviceCapacityApplyConfiguration struct {
+	// Value defines how much of a certain device capacity is available.
 	Value *resource.Quantity `json:"value,omitempty"`
 }
 

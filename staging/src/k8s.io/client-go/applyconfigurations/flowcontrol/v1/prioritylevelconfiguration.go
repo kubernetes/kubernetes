@@ -29,11 +29,19 @@ import (
 
 // PriorityLevelConfigurationApplyConfiguration represents a declarative configuration of the PriorityLevelConfiguration type for use
 // with apply.
+//
+// PriorityLevelConfiguration represents the configuration of a priority level.
 type PriorityLevelConfigurationApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// `metadata` is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *PriorityLevelConfigurationSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *PriorityLevelConfigurationStatusApplyConfiguration `json:"status,omitempty"`
+	// `spec` is the specification of the desired behavior of a "request-priority".
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *PriorityLevelConfigurationSpecApplyConfiguration `json:"spec,omitempty"`
+	// `status` is the current status of a "request-priority".
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Status *PriorityLevelConfigurationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PriorityLevelConfiguration constructs a declarative configuration of the PriorityLevelConfiguration type for use with

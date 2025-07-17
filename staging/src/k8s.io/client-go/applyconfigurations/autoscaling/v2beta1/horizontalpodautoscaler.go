@@ -29,11 +29,20 @@ import (
 
 // HorizontalPodAutoscalerApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscaler type for use
 // with apply.
+//
+// HorizontalPodAutoscaler is the configuration for a horizontal pod
+// autoscaler, which automatically manages the replica count of any resource
+// implementing the scale subresource based on the metrics specified.
 type HorizontalPodAutoscalerApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata is the standard object metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *HorizontalPodAutoscalerSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *HorizontalPodAutoscalerStatusApplyConfiguration `json:"status,omitempty"`
+	// spec is the specification for the behaviour of the autoscaler.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
+	Spec *HorizontalPodAutoscalerSpecApplyConfiguration `json:"spec,omitempty"`
+	// status is the current information about the autoscaler.
+	Status *HorizontalPodAutoscalerStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // HorizontalPodAutoscaler constructs a declarative configuration of the HorizontalPodAutoscaler type for use with

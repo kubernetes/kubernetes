@@ -27,12 +27,23 @@ import (
 // CertificateSigningRequestConditionApplyConfiguration represents a declarative configuration of the CertificateSigningRequestCondition type for use
 // with apply.
 type CertificateSigningRequestConditionApplyConfiguration struct {
-	Type               *certificatesv1beta1.RequestConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus                       `json:"status,omitempty"`
-	Reason             *string                                   `json:"reason,omitempty"`
-	Message            *string                                   `json:"message,omitempty"`
-	LastUpdateTime     *metav1.Time                              `json:"lastUpdateTime,omitempty"`
-	LastTransitionTime *metav1.Time                              `json:"lastTransitionTime,omitempty"`
+	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
+	Type *certificatesv1beta1.RequestConditionType `json:"type,omitempty"`
+	// Status of the condition, one of True, False, Unknown.
+	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
+	// Defaults to "True".
+	// If unset, should be treated as "True".
+	Status *v1.ConditionStatus `json:"status,omitempty"`
+	// brief reason for the request state
+	Reason *string `json:"reason,omitempty"`
+	// human readable message with details about the request state
+	Message *string `json:"message,omitempty"`
+	// timestamp for the last update to this condition
+	LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
+	// lastTransitionTime is the time the condition last transitioned from one status to another.
+	// If unset, when a new condition type is added or an existing condition's status is changed,
+	// the server defaults this to the current time.
+	LastTransitionTime *metav1.Time `json:"lastTransitionTime,omitempty"`
 }
 
 // CertificateSigningRequestConditionApplyConfiguration constructs a declarative configuration of the CertificateSigningRequestCondition type for use with

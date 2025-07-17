@@ -29,10 +29,20 @@ import (
 
 // IngressClassApplyConfiguration represents a declarative configuration of the IngressClass type for use
 // with apply.
+//
+// IngressClass represents the class of the Ingress, referenced by the Ingress
+// Spec. The `ingressclass.kubernetes.io/is-default-class` annotation can be
+// used to indicate that an IngressClass should be considered default. When a
+// single IngressClass resource has this annotation set to true, new Ingress
+// resources without a class specified will be assigned this default class.
 type IngressClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *IngressClassSpecApplyConfiguration `json:"spec,omitempty"`
+	// spec is the desired state of the IngressClass.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	Spec *IngressClassSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // IngressClass constructs a declarative configuration of the IngressClass type for use with

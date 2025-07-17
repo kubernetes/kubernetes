@@ -29,11 +29,24 @@ import (
 
 // PersistentVolumeApplyConfiguration represents a declarative configuration of the PersistentVolume type for use
 // with apply.
+//
+// PersistentVolume (PV) is a storage resource provisioned by an administrator.
+// It is analogous to a node.
+// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
 type PersistentVolumeApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *PersistentVolumeSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *PersistentVolumeStatusApplyConfiguration `json:"status,omitempty"`
+	// spec defines a specification of a persistent volume owned by the cluster.
+	// Provisioned by an administrator.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes
+	Spec *PersistentVolumeSpecApplyConfiguration `json:"spec,omitempty"`
+	// status represents the current information/status for the persistent volume.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistent-volumes
+	Status *PersistentVolumeStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PersistentVolume constructs a declarative configuration of the PersistentVolume type for use with

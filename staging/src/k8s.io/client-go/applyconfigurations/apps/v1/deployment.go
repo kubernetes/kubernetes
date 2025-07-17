@@ -29,11 +29,17 @@ import (
 
 // DeploymentApplyConfiguration represents a declarative configuration of the Deployment type for use
 // with apply.
+//
+// Deployment enables declarative updates for Pods and ReplicaSets.
 type DeploymentApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                                 *DeploymentSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                               *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the Deployment.
+	Spec *DeploymentSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the Deployment.
+	Status *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // Deployment constructs a declarative configuration of the Deployment type for use with

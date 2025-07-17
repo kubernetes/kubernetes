@@ -20,10 +20,15 @@ package v2beta2
 
 // ObjectMetricSourceApplyConfiguration represents a declarative configuration of the ObjectMetricSource type for use
 // with apply.
+//
+// ObjectMetricSource indicates how to scale on a metric describing a
+// kubernetes object (for example, hits-per-second on an Ingress object).
 type ObjectMetricSourceApplyConfiguration struct {
 	DescribedObject *CrossVersionObjectReferenceApplyConfiguration `json:"describedObject,omitempty"`
-	Target          *MetricTargetApplyConfiguration                `json:"target,omitempty"`
-	Metric          *MetricIdentifierApplyConfiguration            `json:"metric,omitempty"`
+	// target specifies the target value for the given metric
+	Target *MetricTargetApplyConfiguration `json:"target,omitempty"`
+	// metric identifies the target metric by name and selector
+	Metric *MetricIdentifierApplyConfiguration `json:"metric,omitempty"`
 }
 
 // ObjectMetricSourceApplyConfiguration constructs a declarative configuration of the ObjectMetricSource type for use with

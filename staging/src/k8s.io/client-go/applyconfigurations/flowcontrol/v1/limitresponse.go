@@ -24,8 +24,19 @@ import (
 
 // LimitResponseApplyConfiguration represents a declarative configuration of the LimitResponse type for use
 // with apply.
+//
+// LimitResponse defines how to handle requests that can not be executed right now.
 type LimitResponseApplyConfiguration struct {
-	Type    *flowcontrolv1.LimitResponseType        `json:"type,omitempty"`
+	// `type` is "Queue" or "Reject".
+	// "Queue" means that requests that can not be executed upon arrival
+	// are held in a queue until they can be executed or a queuing limit
+	// is reached.
+	// "Reject" means that requests that can not be executed upon arrival
+	// are rejected.
+	// Required.
+	Type *flowcontrolv1.LimitResponseType `json:"type,omitempty"`
+	// `queuing` holds the configuration parameters for queuing.
+	// This field may be non-empty only if `type` is `"Queue"`.
 	Queuing *QueuingConfigurationApplyConfiguration `json:"queuing,omitempty"`
 }
 

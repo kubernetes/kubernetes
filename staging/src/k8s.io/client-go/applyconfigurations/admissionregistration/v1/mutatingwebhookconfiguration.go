@@ -29,10 +29,14 @@ import (
 
 // MutatingWebhookConfigurationApplyConfiguration represents a declarative configuration of the MutatingWebhookConfiguration type for use
 // with apply.
+//
+// MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
 type MutatingWebhookConfigurationApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Webhooks                             []MutatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
+	// Webhooks is a list of webhooks and the affected resources and operations.
+	Webhooks []MutatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
 }
 
 // MutatingWebhookConfiguration constructs a declarative configuration of the MutatingWebhookConfiguration type for use with

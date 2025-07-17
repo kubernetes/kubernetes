@@ -17,6 +17,7 @@ limitations under the License.
 package generators
 
 import (
+	"fmt"
 	"io"
 	"path"
 	"slices"
@@ -97,7 +98,9 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 		OpenAPIType: g.openAPIType,
 	}
 
-	g.generateStruct(sw, typeParams)
+	if err := g.generateStruct(sw, typeParams); err != nil {
+		return fmt.Errorf("failed to generate apply configuration struct for %s: %w", t.Name, err)
+	}
 
 	if typeParams.Tags.GenerateClient {
 		if typeParams.Tags.NonNamespaced {
@@ -241,9 +244,16 @@ func (g *applyConfigurationGenerator) generateWithFuncs(t *types.Type, typeParam
 	}
 }
 
-func (g *applyConfigurationGenerator) generateStruct(sw *generator.SnippetWriter, typeParams TypeParams) {
+func (g *applyConfigurationGenerator) generateStruct(sw *generator.SnippetWriter, typeParams TypeParams) error {
 	sw.Do("// $.ApplyConfig.ApplyConfiguration|public$ represents a declarative configuration of the $.ApplyConfig.Type|public$ type for use\n", typeParams)
 	sw.Do("// with apply.\n", typeParams)
+	structComments := commentsWithoutMarkers(append(typeParams.Struct.SecondClosestCommentLines, typeParams.Struct.CommentLines...))
+	if len(structComments) > 0 {
+		sw.Do("//\n", typeParams)
+		if err := sw.Append(strings.NewReader(structComments)); err != nil {
+			return fmt.Errorf("failed to write comments for struct %s: %w", typeParams.Struct.Name, err)
+		}
+	}
 	sw.Do("type $.ApplyConfig.ApplyConfiguration|public$ struct {\n", typeParams)
 	for _, structMember := range typeParams.Struct.Members {
 		if blocklisted(typeParams.Struct, structMember) {
@@ -259,6 +269,10 @@ func (g *applyConfigurationGenerator) generateStruct(sw *generator.SnippetWriter
 				MemberType: g.refGraph.applyConfigForType(structMember.Type),
 				JSONTags:   structMemberTags,
 			}
+
+			if err := sw.Append(strings.NewReader(commentsWithoutMarkers(structMember.CommentLines))); err != nil {
+				return fmt.Errorf("failed to write comments for member %s: %w", structMember.Name, err)
+			}
 			if structMember.Embedded {
 				if structMemberTags.inline {
 					sw.Do("$.MemberType|raw$ `json:\"$.JSONTags$\"`\n", params)
@@ -273,6 +287,8 @@ func (g *applyConfigurationGenerator) generateStruct(sw *generator.SnippetWriter
 		}
 	}
 	sw.Do("}\n", typeParams)
+
+	return nil
 }
 
 func (g *applyConfigurationGenerator) generateIsApplyConfiguration(t *types.Type, sw *generator.SnippetWriter) {
@@ -288,6 +304,21 @@ func deref(t *types.Type) *types.Type {
 
 func isNillable(t *types.Type) bool {
 	return t.Kind == types.Slice || t.Kind == types.Map
+}
+
+// commentsWithoutMarkers removes comment lines that start with '+' as they are codegen markers
+// and ensures all comments have the proper // prefix
+func commentsWithoutMarkers(comments []string) string {
+	b := strings.Builder{}
+	for _, comment := range comments {
+		trimmed := strings.TrimSpace(comment)
+		if strings.HasPrefix(trimmed, "+") {
+			continue
+		}
+
+		b.WriteString("// " + trimmed + "\n")
+	}
+	return b.String()
 }
 
 func (g *applyConfigurationGenerator) generateMemberWith(sw *generator.SnippetWriter, memberParams memberParams) {

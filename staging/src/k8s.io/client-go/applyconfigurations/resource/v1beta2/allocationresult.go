@@ -24,9 +24,14 @@ import (
 
 // AllocationResultApplyConfiguration represents a declarative configuration of the AllocationResult type for use
 // with apply.
+//
+// AllocationResult contains attributes of an allocated resource.
 type AllocationResultApplyConfiguration struct {
-	Devices      *DeviceAllocationResultApplyConfiguration `json:"devices,omitempty"`
-	NodeSelector *v1.NodeSelectorApplyConfiguration        `json:"nodeSelector,omitempty"`
+	// Devices is the result of allocating devices.
+	Devices *DeviceAllocationResultApplyConfiguration `json:"devices,omitempty"`
+	// NodeSelector defines where the allocated resources are available. If
+	// unset, they are available everywhere.
+	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
 }
 
 // AllocationResultApplyConfiguration constructs a declarative configuration of the AllocationResult type for use with

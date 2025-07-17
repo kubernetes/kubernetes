@@ -29,11 +29,18 @@ import (
 
 // StorageVersionMigrationApplyConfiguration represents a declarative configuration of the StorageVersionMigration type for use
 // with apply.
+//
+// StorageVersionMigration represents a migration of stored data to the latest
+// storage version.
 type StorageVersionMigrationApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *StorageVersionMigrationSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *StorageVersionMigrationStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the migration.
+	Spec *StorageVersionMigrationSpecApplyConfiguration `json:"spec,omitempty"`
+	// Status of the migration.
+	Status *StorageVersionMigrationStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // StorageVersionMigration constructs a declarative configuration of the StorageVersionMigration type for use with

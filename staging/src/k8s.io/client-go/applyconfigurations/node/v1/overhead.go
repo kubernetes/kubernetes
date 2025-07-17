@@ -24,7 +24,10 @@ import (
 
 // OverheadApplyConfiguration represents a declarative configuration of the Overhead type for use
 // with apply.
+//
+// Overhead structure represents the resource overhead associated with running a pod.
 type OverheadApplyConfiguration struct {
+	// podFixed represents the fixed resource overhead associated with running a pod.
 	PodFixed *corev1.ResourceList `json:"podFixed,omitempty"`
 }
 

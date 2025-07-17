@@ -29,11 +29,17 @@ import (
 
 // PodDisruptionBudgetApplyConfiguration represents a declarative configuration of the PodDisruptionBudget type for use
 // with apply.
+//
+// PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudgetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PodDisruptionBudgetSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *PodDisruptionBudgetStatusApplyConfiguration `json:"status,omitempty"`
+	// Specification of the desired behavior of the PodDisruptionBudget.
+	Spec *PodDisruptionBudgetSpecApplyConfiguration `json:"spec,omitempty"`
+	// Most recently observed status of the PodDisruptionBudget.
+	Status *PodDisruptionBudgetStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // PodDisruptionBudget constructs a declarative configuration of the PodDisruptionBudget type for use with

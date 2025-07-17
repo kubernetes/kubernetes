@@ -25,12 +25,23 @@ import (
 
 // ObjectMetricSourceApplyConfiguration represents a declarative configuration of the ObjectMetricSource type for use
 // with apply.
+//
+// ObjectMetricSource indicates how to scale on a metric describing a
+// kubernetes object (for example, hits-per-second on an Ingress object).
 type ObjectMetricSourceApplyConfiguration struct {
-	Target       *CrossVersionObjectReferenceApplyConfiguration `json:"target,omitempty"`
-	MetricName   *string                                        `json:"metricName,omitempty"`
-	TargetValue  *resource.Quantity                             `json:"targetValue,omitempty"`
-	Selector     *v1.LabelSelectorApplyConfiguration            `json:"selector,omitempty"`
-	AverageValue *resource.Quantity                             `json:"averageValue,omitempty"`
+	// target is the described Kubernetes object.
+	Target *CrossVersionObjectReferenceApplyConfiguration `json:"target,omitempty"`
+	// metricName is the name of the metric in question.
+	MetricName *string `json:"metricName,omitempty"`
+	// targetValue is the target value of the metric (as a quantity).
+	TargetValue *resource.Quantity `json:"targetValue,omitempty"`
+	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
+	// When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping
+	// When unset, just the metricName will be used to gather metrics.
+	Selector *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
+	// averageValue is the target value of the average of the
+	// metric across all relevant pods (as a quantity)
+	AverageValue *resource.Quantity `json:"averageValue,omitempty"`
 }
 
 // ObjectMetricSourceApplyConfiguration constructs a declarative configuration of the ObjectMetricSource type for use with

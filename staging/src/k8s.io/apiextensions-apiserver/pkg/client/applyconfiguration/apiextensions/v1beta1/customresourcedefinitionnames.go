@@ -20,12 +20,28 @@ package v1beta1
 
 // CustomResourceDefinitionNamesApplyConfiguration represents a declarative configuration of the CustomResourceDefinitionNames type for use
 // with apply.
+//
+// CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
 type CustomResourceDefinitionNamesApplyConfiguration struct {
-	Plural     *string  `json:"plural,omitempty"`
-	Singular   *string  `json:"singular,omitempty"`
+	// plural is the plural name of the resource to serve.
+	// The custom resources are served under `/apis/<group>/<version>/.../<plural>`.
+	// Must match the name of the CustomResourceDefinition (in the form `<names.plural>.<group>`).
+	// Must be all lowercase.
+	Plural *string `json:"plural,omitempty"`
+	// singular is the singular name of the resource. It must be all lowercase. Defaults to lowercased `kind`.
+	Singular *string `json:"singular,omitempty"`
+	// shortNames are short names for the resource, exposed in API discovery documents,
+	// and used by clients to support invocations like `kubectl get <shortname>`.
+	// It must be all lowercase.
 	ShortNames []string `json:"shortNames,omitempty"`
-	Kind       *string  `json:"kind,omitempty"`
-	ListKind   *string  `json:"listKind,omitempty"`
+	// kind is the serialized kind of the resource. It is normally CamelCase and singular.
+	// Custom resource instances will use this value as the `kind` attribute in API calls.
+	Kind *string `json:"kind,omitempty"`
+	// listKind is the serialized kind of the list for this resource. Defaults to "`kind`List".
+	ListKind *string `json:"listKind,omitempty"`
+	// categories is a list of grouped resources this custom resource belongs to (e.g. 'all').
+	// This is published in API discovery documents, and used by clients to support invocations like
+	// `kubectl get all`.
 	Categories []string `json:"categories,omitempty"`
 }
 
