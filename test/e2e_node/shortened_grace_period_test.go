@@ -57,20 +57,20 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			}
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 				start := time.Now()
-				podClient.CreateSync(ctx, getGracePeriodTestPodSIGTERM(podName, testRcNamespace, 20))
+				podClient.CreateSync(ctx, getGracePeriodTestPodSIGTERM(podName, testRcNamespace, 999))
 				// Wait for the container to start
 				time.Sleep(2 * time.Second)
 				w, err := podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
 				framework.ExpectNoError(err, "failed to watch")
-				// First Delete with 20s grace period
-				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(20))
+				// First Delete with 999s grace period
+				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(999))
 				framework.ExpectNoError(err, "failed to delete pod (first)")
-				// Wait 2 seconds, then Delete again with 5s grace period
-				time.Sleep(2 * time.Second)
-				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(5))
+				// Wait 1 second, then Delete again with 99s grace period
+				time.Sleep(1 * time.Second)
+				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(99))
 				framework.ExpectNoError(err, "failed to delete pod (second)")
-				// Wait 2 seconds to ensure signal handling and log output
-				time.Sleep(2 * time.Second)
+				// Wait 5 seconds to ensure signal handling and log output
+				time.Sleep(5 * time.Second)
 				// Retrieve logs from the pod's main container
 				podLogs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).DoRaw(ctx)
 				framework.ExpectNoError(err, "failed to get pod logs")
@@ -135,7 +135,7 @@ term_handler() {
     echo "SIGINT 1"
   elif [ "$count" -eq 2 ]; then
     echo "SIGINT 2"
-    sleep 5
+    sleep 10
     exit 0
   else
     echo "SIGINT $count"
