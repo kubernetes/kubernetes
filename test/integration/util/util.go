@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -512,6 +513,11 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
 					resourceapi.SchemeGroupVersion.String(): "true",
+				}
+				if utilfeature.DefaultMutableFeatureGate.EmulationVersion().LessThan(version.MustParse("v1.34.0")) {
+					// Cannot enable the resourceapi.SchemeGroupVersion when emulating < 1.34 unless
+					// we enable --runtime-config-emulation-forward-compatible.
+					options.GenericServerRunOptions.RuntimeConfigEmulationForwardCompatible = true
 				}
 			}
 		},
