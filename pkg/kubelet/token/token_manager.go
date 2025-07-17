@@ -170,7 +170,7 @@ func (m *Manager) expired(t *authenticationv1.TokenRequest) bool {
 }
 
 // requiresRefresh returns true if the token is older than 80% of its total
-// ttl, or if the token is older than 24 hours.
+// ttl, or if the token is older than maxTTL, or if there are clock synchronization issues.
 func (m *Manager) requiresRefresh(ctx context.Context, tr *authenticationv1.TokenRequest) bool {
 	if tr.Spec.ExpirationSeconds == nil {
 		cpy := tr.DeepCopy()
@@ -182,6 +182,17 @@ func (m *Manager) requiresRefresh(ctx context.Context, tr *authenticationv1.Toke
 	now := m.clock.Now()
 	exp := tr.Status.ExpirationTimestamp.Time
 	iat := exp.Add(-1 * time.Duration(*tr.Spec.ExpirationSeconds) * time.Second)
+
+	// Handle clock synchronization issues: if the current time is before the token's
+	// issued time, the token is not yet valid and must be refreshed to prevent authentication failures.
+	if now.Before(iat) {
+		logger := klog.FromContext(ctx)
+		logger.Info("Token not yet valid due to clock synchronization issues, requiring refresh",
+			"currentTime", now,
+			"tokenIssuedTime", iat,
+			"clockSkewDuration", iat.Sub(now))
+		return true
+	}
 
 	jitter := time.Duration(rand.Float64()*maxJitter.Seconds()) * time.Second
 	if now.After(iat.Add(maxTTL - jitter)) {
