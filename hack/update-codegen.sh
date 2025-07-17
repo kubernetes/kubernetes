@@ -1020,10 +1020,8 @@ function codegen::protobindings() {
 
     # Each element of this array is a directory containing subdirectories which
     # eventually contain a file named "api.proto".
-    local apis_using_gogo=(
+    local apis=(
         "staging/src/k8s.io/kubelet/pkg/apis/dra"
-    )
-    local apis_using_protoc=(
         "staging/src/k8s.io/kubelet/pkg/apis/deviceplugin"
         "staging/src/k8s.io/kubelet/pkg/apis/podresources"
         "staging/src/k8s.io/kms/apis"
@@ -1034,7 +1032,6 @@ function codegen::protobindings() {
         "staging/src/k8s.io/externaljwt/apis"
         "staging/src/k8s.io/kubelet/pkg/apis/dra-health"
     )
-    local apis=("${apis_using_gogo[@]}" "${apis_using_protoc[@]}")
 
     kube::log::status "protobuf bindings: ${#apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -1050,15 +1047,13 @@ function codegen::protobindings() {
     done
 
     if kube::protoc::check_protoc >/dev/null; then
-      hack/_update-generated-proto-bindings-dockerized.sh gogo   "${apis_using_gogo[@]}"
-      hack/_update-generated-proto-bindings-dockerized.sh protoc "${apis_using_protoc[@]}"
+      hack/_update-generated-proto-bindings-dockerized.sh protoc "${apis[@]}"
     else
       kube::log::status "protoc ${PROTOC_VERSION} not found (can install with hack/install-protoc.sh); generating containerized..."
       # NOTE: All output from this script needs to be copied back to the calling
       # source tree.  This is managed in kube::build::copy_output in build/common.sh.
       # If the output set is changed update that function.
-      build/run.sh hack/_update-generated-proto-bindings-dockerized.sh gogo   "${apis_using_gogo[@]}"
-      build/run.sh hack/_update-generated-proto-bindings-dockerized.sh protoc "${apis_using_protoc[@]}"
+      build/run.sh hack/_update-generated-proto-bindings-dockerized.sh protoc "${apis[@]}"
     fi
 }
 

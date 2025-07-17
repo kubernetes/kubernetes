@@ -40,6 +40,7 @@ import (
 type fakeGRPCServer struct {
 	drapbv1beta1.UnimplementedDRAPluginServer
 	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
+	drapbv1.UnsafeDRAPluginServer
 }
 
 var _ drapbv1.DRAPluginServer = &fakeGRPCServer{}
@@ -49,7 +50,7 @@ func (f *fakeGRPCServer) NodePrepareResources(ctx context.Context, in *drapbv1.N
 		Devices: []*drapbv1.Device{
 			{
 				RequestNames: []string{"test-request"},
-				CDIDeviceIDs: []string{"test-cdi-id"},
+				CdiDeviceIds: []string{"test-cdi-id"},
 			},
 		},
 	}}}, nil
@@ -162,7 +163,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 				Claims: []*drapbv1.Claim{
 					{
 						Namespace: "dummy-namespace",
-						UID:       "dummy-uid",
+						Uid:       "dummy-uid",
 						Name:      "dummy-claim",
 					},
 				},

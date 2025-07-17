@@ -79,17 +79,17 @@ func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req 
 	}
 
 	if s.prepareResourcesResponse == nil {
-		cdiDeviceName := "claim-" + req.Claims[0].UID
+		cdiDeviceName := "claim-" + req.Claims[0].Uid
 		cdiID := s.driverName + "/" + driverClassName + "=" + cdiDeviceName
 		return &drapb.NodePrepareResourcesResponse{
 			Claims: map[string]*drapb.NodePrepareResourceResponse{
-				req.Claims[0].UID: {
+				req.Claims[0].Uid: {
 					Devices: []*drapb.Device{
 						{
 							PoolName:     poolName,
 							DeviceName:   deviceName,
 							RequestNames: []string{req.Claims[0].Name},
-							CDIDeviceIDs: []string{cdiID},
+							CdiDeviceIds: []string{cdiID},
 						},
 					},
 				},
@@ -110,7 +110,7 @@ func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, re
 	if s.unprepareResourcesResponse == nil {
 		return &drapb.NodeUnprepareResourcesResponse{
 			Claims: map[string]*drapb.NodeUnprepareResourceResponse{
-				req.Claims[0].UID: {},
+				req.Claims[0].Uid: {},
 			},
 		}, nil
 	}
@@ -567,7 +567,7 @@ func TestPrepareResources(t *testing.T) {
 							PoolName:     poolName,
 							DeviceName:   deviceName,
 							RequestNames: []string{requestName},
-							CDIDeviceIDs: []string{cdiID},
+							CdiDeviceIds: []string{cdiID},
 						},
 					},
 				},
@@ -587,7 +587,7 @@ func TestPrepareResources(t *testing.T) {
 							PoolName:     poolName,
 							DeviceName:   deviceName,
 							RequestNames: []string{requestName},
-							CDIDeviceIDs: []string{cdiID},
+							CdiDeviceIds: []string{cdiID},
 						},
 					},
 				},
@@ -615,7 +615,7 @@ func TestPrepareResources(t *testing.T) {
 							PoolName:     poolName,
 							DeviceName:   deviceName,
 							RequestNames: []string{requestName},
-							CDIDeviceIDs: []string{cdiID},
+							CdiDeviceIds: []string{cdiID},
 						},
 					},
 				},
@@ -636,7 +636,7 @@ func TestPrepareResources(t *testing.T) {
 							PoolName:     poolName,
 							DeviceName:   deviceName,
 							RequestNames: []string{requestName},
-							CDIDeviceIDs: []string{cdiID},
+							CdiDeviceIds: []string{cdiID},
 						},
 					},
 				},
