@@ -43,8 +43,11 @@ $(TOOLS)/crosslink: PACKAGE=go.opentelemetry.io/build-tools/crosslink
 SEMCONVKIT = $(TOOLS)/semconvkit
 $(TOOLS)/semconvkit: PACKAGE=go.opentelemetry.io/otel/$(TOOLS_MOD_DIR)/semconvkit
 
+VERIFYREADMES = $(TOOLS)/verifyreadmes
+$(TOOLS)/verifyreadmes: PACKAGE=go.opentelemetry.io/otel/$(TOOLS_MOD_DIR)/verifyreadmes
+
 GOLANGCI_LINT = $(TOOLS)/golangci-lint
-$(TOOLS)/golangci-lint: PACKAGE=github.com/golangci/golangci-lint/cmd/golangci-lint
+$(TOOLS)/golangci-lint: PACKAGE=github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 
 MISSPELL = $(TOOLS)/misspell
 $(TOOLS)/misspell: PACKAGE=github.com/client9/misspell/cmd/misspell
@@ -68,7 +71,7 @@ GOVULNCHECK = $(TOOLS)/govulncheck
 $(TOOLS)/govulncheck: PACKAGE=golang.org/x/vuln/cmd/govulncheck
 
 .PHONY: tools
-tools: $(CROSSLINK) $(GOLANGCI_LINT) $(MISSPELL) $(GOCOVMERGE) $(STRINGER) $(PORTO) $(SEMCONVGEN) $(MULTIMOD) $(SEMCONVKIT) $(GOTMPL) $(GORELEASE)
+tools: $(CROSSLINK) $(GOLANGCI_LINT) $(MISSPELL) $(GOCOVMERGE) $(STRINGER) $(PORTO) $(SEMCONVGEN) $(VERIFYREADMES) $(MULTIMOD) $(SEMCONVKIT) $(GOTMPL) $(GORELEASE)
 
 # Virtualized python tools via docker
 
@@ -213,11 +216,8 @@ go-mod-tidy/%: crosslink
 		&& cd $(DIR) \
 		&& $(GO) mod tidy -compat=1.21
 
-.PHONY: lint-modules
-lint-modules: go-mod-tidy
-
 .PHONY: lint
-lint: misspell lint-modules golangci-lint govulncheck
+lint: misspell go-mod-tidy golangci-lint govulncheck
 
 .PHONY: vanity-import-check
 vanity-import-check: $(PORTO)
@@ -319,10 +319,11 @@ add-tags: verify-mods
 	@[ "${MODSET}" ] || ( echo ">> env var MODSET is not set"; exit 1 )
 	$(MULTIMOD) tag -m ${MODSET} -c ${COMMIT}
 
+MARKDOWNIMAGE := $(shell awk '$$4=="markdown" {print $$2}' $(DEPENDENCIES_DOCKERFILE))
 .PHONY: lint-markdown
 lint-markdown:
-	docker run -v "$(CURDIR):$(WORKDIR)" avtodev/markdown-lint:v1 -c $(WORKDIR)/.markdownlint.yaml $(WORKDIR)/**/*.md
+	docker run --rm -u $(DOCKER_USER) -v "$(CURDIR):$(WORKDIR)" $(MARKDOWNIMAGE) -c $(WORKDIR)/.markdownlint.yaml $(WORKDIR)/**/*.md
 
 .PHONY: verify-readmes
-verify-readmes:
-	./verify_readmes.sh
+verify-readmes: $(VERIFYREADMES)
+	$(VERIFYREADMES)

@@ -57,7 +57,7 @@ func (s *FreezerGroup) Set(path string, r *cgroups.Resources) (Err error) {
 		// Alas, this is still a game of chances, since the real fix
 		// belong to the kernel (cgroup v2 do not have this bug).
 
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			if i%50 == 49 {
 				// Occasional thaw and sleep improves
 				// the chances to succeed in freezing

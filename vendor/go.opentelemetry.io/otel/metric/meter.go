@@ -110,7 +110,10 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
-	Int64ObservableUpDownCounter(name string, options ...Int64ObservableUpDownCounterOption) (Int64ObservableUpDownCounter, error)
+	Int64ObservableUpDownCounter(
+		name string,
+		options ...Int64ObservableUpDownCounterOption,
+	) (Int64ObservableUpDownCounter, error)
 
 	// Int64ObservableGauge returns a new Int64ObservableGauge instrument
 	// identified by name and configured with options. The instrument is used
@@ -194,7 +197,10 @@ type Meter interface {
 	// The name needs to conform to the OpenTelemetry instrument name syntax.
 	// See the Instrument Name section of the package documentation for more
 	// information.
-	Float64ObservableUpDownCounter(name string, options ...Float64ObservableUpDownCounterOption) (Float64ObservableUpDownCounter, error)
+	Float64ObservableUpDownCounter(
+		name string,
+		options ...Float64ObservableUpDownCounterOption,
+	) (Float64ObservableUpDownCounter, error)
 
 	// Float64ObservableGauge returns a new Float64ObservableGauge instrument
 	// identified by name and configured with options. The instrument is used

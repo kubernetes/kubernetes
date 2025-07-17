@@ -11,12 +11,12 @@ import (
 	"sync"
 )
 
-// Transport is an http.RoundTripper that makes OAuth 2.0 HTTP requests,
-// wrapping a base RoundTripper and adding an Authorization header
-// with a token from the supplied Sources.
+// Transport is an [http.RoundTripper] that makes OAuth 2.0 HTTP requests,
+// wrapping a base [http.RoundTripper] and adding an Authorization header
+// with a token from the supplied [TokenSource].
 //
 // Transport is a low-level mechanism. Most code will use the
-// higher-level Config.Client method instead.
+// higher-level [Config.Client] method instead.
 type Transport struct {
 	// Source supplies the token to add to outgoing requests'
 	// Authorization headers.
@@ -47,7 +47,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	req2 := cloneRequest(req) // per RoundTripper contract
+	req2 := req.Clone(req.Context())
 	token.SetAuthHeader(req2)
 
 	// req.Body is assumed to be closed by the base RoundTripper.
@@ -72,18 +72,4 @@ func (t *Transport) base() http.RoundTripper {
 		return t.Base
 	}
 	return http.DefaultTransport
-}
-
-// cloneRequest returns a clone of the provided *http.Request.
-// The clone is a shallow copy of the struct and its Header map.
-func cloneRequest(r *http.Request) *http.Request {
-	// shallow copy of the struct
-	r2 := new(http.Request)
-	*r2 = *r
-	// deep copy of the Header
-	r2.Header = make(http.Header, len(r.Header))
-	for k, s := range r.Header {
-		r2.Header[k] = append([]string(nil), s...)
-	}
-	return r2
 }
