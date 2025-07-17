@@ -1865,7 +1865,11 @@ func describeContainerBasicInfo(container corev1.Container, status corev1.Contai
 func describeContainerPorts(cPorts []corev1.ContainerPort) string {
 	ports := make([]string, 0, len(cPorts))
 	for _, cPort := range cPorts {
-		ports = append(ports, fmt.Sprintf("%d/%s", cPort.ContainerPort, cPort.Protocol))
+		portStr := fmt.Sprintf("%d/%s", cPort.ContainerPort, cPort.Protocol)
+		if cPort.Name != "" {
+			portStr = fmt.Sprintf("%s (%s)", portStr, cPort.Name)
+		}
+		ports = append(ports, portStr)
 	}
 	return strings.Join(ports, ", ")
 }
@@ -1873,7 +1877,11 @@ func describeContainerPorts(cPorts []corev1.ContainerPort) string {
 func describeContainerHostPorts(cPorts []corev1.ContainerPort) string {
 	ports := make([]string, 0, len(cPorts))
 	for _, cPort := range cPorts {
-		ports = append(ports, fmt.Sprintf("%d/%s", cPort.HostPort, cPort.Protocol))
+		portStr := fmt.Sprintf("%d/%s", cPort.HostPort, cPort.Protocol)
+		if cPort.Name != "" {
+			portStr = fmt.Sprintf("%s (%s)", portStr, cPort.Name)
+		}
+		ports = append(ports, portStr)
 	}
 	return strings.Join(ports, ", ")
 }
