@@ -133,26 +133,28 @@ func Test(t *testing.T) {
 	st.Value(&structC).OldValue(&structC2).ExpectValid()
 }
 
-func TestUniqueKey(t *testing.T) {
-	st := localSchemeBuilder.Test(t)
+// TODO: enable this once we have a way to either opt-out from this validation
+// or settle the decision on how to handle the ratcheting cases.
+// func TestUniqueKey(t *testing.T) {
+// 	st := localSchemeBuilder.Test(t)
 
-	structA := Struct{
-		ListField: []OtherStruct{
-			{"key1", "one"},
-			{"key1", "two"},
-		},
-		ListTypedefField: []OtherTypedefStruct{
-			{"key1", "one"},
-			{"key1", "two"},
-		},
-		TypedefField: ListType{
-			{"key1", "one"},
-			{"key1", "two"},
-		},
-	}
-	st.Value(&structA).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Duplicate(field.NewPath("listField[1]"), nil),
-		field.Duplicate(field.NewPath("listTypedefField[1]"), nil),
-		field.Duplicate(field.NewPath("typedefField[1]"), nil),
-	})
-}
+// 	structA := Struct{
+// 		ListField: []OtherStruct{
+// 			{"key1", "one"},
+// 			{"key1", "two"},
+// 		},
+// 		ListTypedefField: []OtherTypedefStruct{
+// 			{"key1", "one"},
+// 			{"key1", "two"},
+// 		},
+// 		TypedefField: ListType{
+// 			{"key1", "one"},
+// 			{"key1", "two"},
+// 		},
+// 	}
+// 	st.Value(&structA).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+// 		field.Duplicate(field.NewPath("listField[1]"), nil),
+// 		field.Duplicate(field.NewPath("listTypedefField[1]"), nil),
+// 		field.Duplicate(field.NewPath("typedefField[1]"), nil),
+// 	})
+// }
