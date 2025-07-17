@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -224,6 +225,10 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 			warnings = append(warnings, fmt.Sprintf(`%s: non-functional in v1.27+; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompPodAnnotationKey)))
 		}
 	}
+	var podAppArmorProfile *api.AppArmorProfile
+	if podSpec.SecurityContext != nil {
+		podAppArmorProfile = podSpec.SecurityContext.AppArmorProfile
+	}
 
 	pods.VisitContainersWithPath(podSpec, fieldPath.Child("spec"), func(c *api.Container, p *field.Path) bool {
 		// use of container seccomp annotation without accompanying field
@@ -239,8 +244,11 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		hasAppArmorField := c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != nil
 		if isPodTemplate && !hasAppArmorField {
 			key := api.DeprecatedAppArmorAnnotationKeyPrefix + c.Name
-			if _, exists := meta.Annotations[key]; exists {
-				warnings = append(warnings, fmt.Sprintf(`%s: deprecated since v1.30; use the "appArmorProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(key)))
+			if annotation, exists := meta.Annotations[key]; exists {
+				// Only warn if the annotation doesn't match the pod profile.
+				if podAppArmorProfile == nil || !apiequality.Semantic.DeepEqual(podAppArmorProfile, ApparmorFieldForAnnotation(annotation)) {
+					warnings = append(warnings, fmt.Sprintf(`%s: deprecated since v1.30; use the "appArmorProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(key)))
+				}
 			}
 		}
 

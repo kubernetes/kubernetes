@@ -960,7 +960,7 @@ func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
 
 			// Sync deprecated AppArmor annotations to fields
 			if hasAnnotation && containerProfile == nil {
-				newField := apparmorFieldForAnnotation(annotation)
+				newField := podutil.ApparmorFieldForAnnotation(annotation)
 				if errs := corevalidation.ValidateAppArmorProfileField(newField, &field.Path{}); len(errs) > 0 {
 					// Skip copying invalid value.
 					newField = nil
@@ -990,32 +990,6 @@ func applyAppArmorVersionSkew(ctx context.Context, pod *api.Pod) {
 
 			return true
 		})
-}
-
-// apparmorFieldForAnnotation takes a pod annotation and returns the converted
-// apparmor profile field.
-func apparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
-	if annotation == api.DeprecatedAppArmorAnnotationValueUnconfined {
-		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined}
-	}
-
-	if annotation == api.DeprecatedAppArmorAnnotationValueRuntimeDefault {
-		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeRuntimeDefault}
-	}
-
-	if strings.HasPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix) {
-		localhostProfile := strings.TrimPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix)
-		if localhostProfile != "" {
-			return &api.AppArmorProfile{
-				Type:             api.AppArmorProfileTypeLocalhost,
-				LocalhostProfile: &localhostProfile,
-			}
-		}
-	}
-
-	// we can only reach this code path if the localhostProfile name has a zero
-	// length or if the annotation has an unrecognized value
-	return nil
 }
 
 // updatePodGeneration bumps metadata.generation if needed for any updates
