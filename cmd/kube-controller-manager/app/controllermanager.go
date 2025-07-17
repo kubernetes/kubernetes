@@ -905,6 +905,40 @@ func BuildControllers(ctx context.Context, controllerCtx ControllerContext, cont
 // StartControllers starts all controllers concurrently and blocks until the context is cancelled and all controllers are terminated.
 func StartControllers(ctx context.Context, controllerCtx ControllerContext, controllers []Controller) {
 	logger := klog.FromContext(ctx)
+
+	// We gather running controllers names for logging purposes.
+	// When the context is cancelled, the controllers still running are logged periodically.
+	runningControllers := sets.New[string]()
+	var runningControllersLock sync.Mutex
+
+	loggingCtx, cancelLoggingCtx := context.WithCancel(context.Background())
+	defer cancelLoggingCtx()
+	go func() {
+		// Only start logging when terminating.
+		select {
+		case <-ctx.Done():
+		case <-loggingCtx.Done():
+			return
+		}
+
+		// Regularly print the controllers that still haven't returned.
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				runningControllersLock.Lock()
+				running := sets.List(runningControllers)
+				runningControllersLock.Unlock()
+
+				logger.Info("Still awaiting some controllers to terminate...", "controllers", running)
+
+			case <-loggingCtx.Done():
+				return
+			}
+		}
+	}()
+
 	var wg sync.WaitGroup
 	wg.Add(len(controllers))
 	for _, controller := range controllers {
@@ -918,11 +952,23 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, cont
 			}
 
 			logger.V(1).Info("Controller starting...", "controller", controller.Name())
-			defer logger.V(1).Info("Controller terminated", "controller", controller.Name())
+
+			runningControllersLock.Lock()
+			runningControllers.Insert(controller.Name())
+			runningControllersLock.Unlock()
+
+			defer func() {
+				logger.V(1).Info("Controller terminated", "controller", controller.Name())
+
+				runningControllersLock.Lock()
+				runningControllers.Delete(controller.Name())
+				runningControllersLock.Unlock()
+			}()
 			controller.Run(ctx)
 		}()
 	}
 	wg.Wait()
+	logger.Info("All controllers terminated")
 }
 
 // serviceAccountTokenControllerStarter is special because it must run first to set up permissions for other controllers.
