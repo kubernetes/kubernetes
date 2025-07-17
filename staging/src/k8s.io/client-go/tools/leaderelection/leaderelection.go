@@ -307,9 +307,10 @@ func (le *LeaderElector) renew(ctx context.Context) {
 // release attempts to release the leader lease if we have acquired it.
 func (le *LeaderElector) release() bool {
 	ctx := context.Background()
-
+	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RenewDeadline)
+	defer timeoutCancel()
 	// update the resourceVersion of lease
-	oldLeaderElectionRecord, _, err := le.config.Lock.Get(ctx)
+	oldLeaderElectionRecord, _, err := le.config.Lock.Get(timeoutCtx)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
@@ -329,9 +330,6 @@ func (le *LeaderElector) release() bool {
 		RenewTime:            now,
 		AcquireTime:          now,
 	}
-
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RenewDeadline)
-	defer timeoutCancel()
 	if err := le.config.Lock.Update(timeoutCtx, leaderElectionRecord); err != nil {
 		klog.Errorf("Failed to release lock: %v", err)
 		return false
