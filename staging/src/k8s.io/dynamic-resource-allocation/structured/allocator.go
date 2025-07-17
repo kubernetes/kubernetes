@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
@@ -75,6 +75,10 @@ type Allocator interface {
 	// additional value. A name can also be useful because log messages do not
 	// have a common prefix. V(5) is used for one-time log entries, V(6) for important
 	// progress reports, and V(7) for detailed debug output.
+	//
+	//
+	// Context cancellation is supported. An error wrapping the context's error will
+	// be returned in case of cancellation.
 	Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error)
 }
 

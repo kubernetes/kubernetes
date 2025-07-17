@@ -1,0 +1,86 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "resource.k8s.io/v1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "DeviceClass",
+      "name": "deviceclasses",
+      "namespaced": false,
+      "singularName": "deviceclass",
+      "storageVersionHash": "weQRMT6DeYM=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ResourceClaim",
+      "name": "resourceclaims",
+      "namespaced": true,
+      "singularName": "resourceclaim",
+      "storageVersionHash": "EJAWH5WrAYg=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ResourceClaim",
+      "name": "resourceclaims/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    },
+    {
+      "kind": "ResourceClaimTemplate",
+      "name": "resourceclaimtemplates",
+      "namespaced": true,
+      "singularName": "resourceclaimtemplate",
+      "storageVersionHash": "24m0okHrUtk=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ResourceSlice",
+      "name": "resourceslices",
+      "namespaced": false,
+      "singularName": "resourceslice",
+      "storageVersionHash": "z6Bc9vgk6yE=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    }
+  ]
+}
