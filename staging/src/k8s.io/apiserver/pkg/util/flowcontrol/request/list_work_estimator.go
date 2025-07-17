@@ -53,8 +53,8 @@ type listWorkEstimator struct {
 func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
 	minSeats := e.config.MinimumSeats
 	maxSeats := e.maxSeatsFn(priorityLevelName)
-	if maxSeats == 0 || maxSeats > e.config.MaximumSeatsLimit {
-		maxSeats = e.config.MaximumSeatsLimit
+	if maxSeats == 0 || maxSeats > e.config.MaximumListSeatsLimit {
+		maxSeats = e.config.MaximumListSeatsLimit
 	}
 
 	requestInfo, ok := apirequest.RequestInfoFrom(r.Context())
