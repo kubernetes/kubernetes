@@ -29,11 +29,11 @@ import (
 	"k8s.io/klog/v2"
 
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -504,7 +504,7 @@ type Helper struct {
 	nodeName         string
 	nodeUID          types.UID
 	kubeClient       kubernetes.Interface
-	resourceClient   cgoresource.ResourceV1beta2Interface
+	resourceClient   cgoresource.ResourceV1Interface
 	serialize        bool
 	grpcMutex        sync.Mutex
 	grpcLockFilePath string

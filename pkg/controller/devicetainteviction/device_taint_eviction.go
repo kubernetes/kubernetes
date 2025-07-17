@@ -28,7 +28,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,8 +37,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
-	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -165,11 +165,7 @@ func (p pool) getTaintedDevices() []taintedDevice {
 			continue
 		}
 		for _, device := range slice.Spec.Devices {
-			if device.Basic == nil {
-				// Unknown device type, not supported.
-				continue
-			}
-			for _, taint := range device.Basic.Taints {
+			for _, taint := range device.Taints {
 				if taint.Effect != resourceapi.DeviceTaintEffectNoExecute {
 					continue
 				}
@@ -186,18 +182,14 @@ func (p pool) getTaintedDevices() []taintedDevice {
 }
 
 // getDevice looks up one device by name. Out-dated slices are ignored.
-func (p pool) getDevice(deviceName string) *resourceapi.BasicDevice {
+func (p pool) getDevice(deviceName string) *resourceapi.Device {
 	for slice := range p.slices {
 		if slice.Spec.Pool.Generation != p.maxGeneration {
 			continue
 		}
-		for _, device := range slice.Spec.Devices {
-			if device.Basic == nil {
-				// Unknown device type, not supported.
-				continue
-			}
-			if device.Name == deviceName {
-				return device.Basic
+		for i := range slice.Spec.Devices {
+			if slice.Spec.Devices[i].Name == deviceName {
+				return &slice.Spec.Devices[i]
 			}
 		}
 	}

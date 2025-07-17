@@ -30,13 +30,13 @@ import (
 
 	"google.golang.org/grpc"
 
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
-	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -47,7 +47,7 @@ import (
 type ExamplePlugin struct {
 	stopCh         <-chan struct{}
 	logger         klog.Logger
-	resourceClient cgoresource.ResourceV1beta2Interface
+	resourceClient cgoresource.ResourceV1Interface
 	d              *kubeletplugin.Helper
 	fileOps        FileOperations
 

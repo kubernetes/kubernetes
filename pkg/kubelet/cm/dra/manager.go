@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -246,7 +246,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			continue
 		}
 		// Query claim object from the API server
-		resourceClaim, err := m.kubeClient.ResourceV1beta1().ResourceClaims(pod.Namespace).Get(
+		resourceClaim, err := m.kubeClient.ResourceV1().ResourceClaims(pod.Namespace).Get(
 			ctx,
 			*claimName,
 			metav1.GetOptions{})
