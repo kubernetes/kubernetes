@@ -414,8 +414,10 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	switch nt.Kind {
 	case types.Slice, types.Array:
 		elemContext.Scope = ScopeListVal
+		elemContext.ListSelector = []ListSelectorTerm{} // empty == "all"
 	case types.Map:
 		elemContext.Scope = ScopeMapVal
+		// TODO: We may need map selectors at some point.
 	}
 	if tag.ValueTag == nil {
 		return Validations{}, fmt.Errorf("missing validation tag")
