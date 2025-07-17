@@ -5533,6 +5533,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	// The kubelet will never restart ephemeral containers, so treat them like they have an implicit RestartPolicyNever.
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.EphemeralContainerStatuses, oldPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"), core.RestartPolicyNever)...)
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
+	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, &newPod.Spec, fldPath.Child("extendedResourceClaimStatus"))...)
 
 	if newIPErrs := validatePodIPs(newPod, oldPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)
@@ -5598,6 +5599,58 @@ func validatePodResourceClaimStatuses(statuses []core.PodResourceClaimStatus, po
 		}
 	}
 
+	return allErrs
+}
+
+// validatePodExtendedResourceClaimStatus validates the ExtendedResourceClaimStatus in a pod status.
+func validatePodExtendedResourceClaimStatus(status *core.PodExtendedResourceClaimStatus, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	if status == nil {
+		return nil
+	}
+
+	containers := make(map[string]*core.Container)
+	for _, c := range spec.InitContainers {
+		containers[c.Name] = &c
+	}
+	for _, c := range spec.Containers {
+		containers[c.Name] = &c
+	}
+
+	var allErrs field.ErrorList
+	rmFldPath := fldPath.Child("requestMappings")
+	if len(status.RequestMappings) == 0 {
+		allErrs = append(allErrs, field.Required(rmFldPath, "at least one request mapping is required"))
+	}
+	type key struct {
+		container string
+		resource  string
+	}
+	seen := map[key]struct{}{}
+	for i, rm := range status.RequestMappings {
+		idxPath := rmFldPath.Index(i)
+		c, ok := containers[rm.ContainerName]
+		if ok {
+			if _, ok := c.Resources.Requests[core.ResourceName(rm.ExtendedResourceName)]; !ok {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("extendedResourceName"), rm.ExtendedResourceName, "must match the extended resource name of an entry in spec.initContainers.resources.requests or spec.containers.resources.requests"))
+			}
+		} else {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("containerName"), rm.ContainerName, "must match the name of an entry in spec.initContainers.name or spec.containers.name"))
+		}
+		allErrs = append(allErrs, ValidateDNS1123Label(rm.RequestName, fldPath.Child("requestName"))...)
+		k := key{container: rm.ContainerName, resource: rm.ExtendedResourceName}
+		if _, ok := seen[k]; ok {
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("containerName"), rm.ContainerName))
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("extendedResourceName"), rm.ExtendedResourceName))
+		}
+		seen[k] = struct{}{}
+	}
+	if len(status.ResourceClaimName) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("resourceClaimName"), ""))
+	} else {
+		for _, detail := range ValidateResourceClaimName(status.ResourceClaimName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimName"), status.ResourceClaimName, detail))
+		}
+	}
 	return allErrs
 }
 

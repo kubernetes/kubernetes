@@ -25,6 +25,7 @@ import (
 // This struct allows us to break the dependency of the plugins on
 // the internal k8s features pkg.
 type Features struct {
+	EnableDRAExtendedResource                    bool
 	EnableDRAPrioritizedList                     bool
 	EnableDRAAdminAccess                         bool
 	EnableDRADeviceTaints                        bool
@@ -46,6 +47,7 @@ type Features struct {
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
 func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features {
 	return Features{
+		EnableDRAExtendedResource:                    featureGate.Enabled(features.DRAExtendedResource),
 		EnableDRAPrioritizedList:                     featureGate.Enabled(features.DRAPrioritizedList),
 		EnableDRAAdminAccess:                         featureGate.Enabled(features.DRAAdminAccess),
 		EnableDRADeviceTaints:                        featureGate.Enabled(features.DRADeviceTaints),
