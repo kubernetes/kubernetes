@@ -366,6 +366,9 @@ func createItemExtractor(listType *types.Type, elemType *types.Type, matcher []L
 	return extractor, nil
 }
 
+// processDiscriminatorValidations processes union discriminator tags. It is a
+// free function, rather than a method so that it can be called from other
+// union-like tags.
 func processDiscriminatorValidations(shared map[string]unions, context Context, tag codetags.Tag) error {
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
@@ -388,62 +391,92 @@ func processDiscriminatorValidations(shared map[string]unions, context Context, 
 	return nil
 }
 
+// processMemberValidations processes union member tags for fields and list
+// items.  It is a free function, rather than a method so that it can be called
+// from other union-like tags.
 func processMemberValidations(shared map[string]unions, context Context, tag codetags.Tag) error {
-	var fieldName string
-	var unionArg codetags.Arg
+	switch context.Scope {
+	case ScopeField:
+		return processFieldMemberValidations(shared, context, tag)
+	case ScopeListVal:
+		return processListMemberValidations(shared, context, tag)
+	}
+	return fmt.Errorf("can only be used on fields and list items: %v", context.Scope)
+}
 
-	unionArg, _ = tag.NamedArg("union") // optional
+// processFieldMemberValidations processes union member tags for struct fields.
+// It is a free function, rather than a method so that it can be called from
+// other union-like tags.
+func processFieldMemberValidations(shared map[string]unions, context Context, tag codetags.Tag) error {
+	nt := util.NativeType(context.Member.Type)
+	switch nt.Kind {
+	case types.Pointer, types.Map, types.Slice, types.Builtin:
+		// OK
+	default:
+		// In particular non-pointer structs are not supported.
+		return fmt.Errorf("can only be used on nilable and primitive types (%s)", nt.Kind)
+	}
+	if context.Member == nil {
+		return fmt.Errorf("struct-field union member has no member info in context")
+	}
 
-	if context.Scope == ScopeListVal {
-		if context.Path == nil {
-			return fmt.Errorf("no path for list val union member")
-		}
-		fieldName = context.Path.String() // eg: "<path>/Pipeline.Tasks[{"name": "succeeded"}]"
-	} else {
-		nt := util.NativeType(context.Member.Type)
-		switch nt.Kind {
-		case types.Pointer, types.Map, types.Slice, types.Builtin:
-			// OK
-		default:
-			// In particular non-pointer structs are not supported.
-			return fmt.Errorf("can only be used on nilable and primitive types (%s)", nt.Kind)
-		}
-
-		jsonTag, ok := tags.LookupJSON(*context.Member)
-		if !ok {
-			return fmt.Errorf("field %q is a union member but has no JSON struct field tag", context.Member)
-		}
-		fieldName = jsonTag.Name
-		if len(fieldName) == 0 {
-			return fmt.Errorf("field %q is a union member but has no JSON name", context.Member)
-		}
+	jsonTag, ok := tags.LookupJSON(*context.Member)
+	if !ok {
+		return fmt.Errorf("field %q is a union member but has no JSON struct field tag", context.Member)
+	}
+	fieldName := jsonTag.Name
+	if len(fieldName) == 0 {
+		return fmt.Errorf("field %q is a union member but has no JSON name", context.Member)
 	}
 
 	if shared[context.ParentPath.String()] == nil {
 		shared[context.ParentPath.String()] = unions{}
 	}
 
-	var memberName string
+	// See if the tag specified a member name.
+	memberName := context.Member.Name                        // default
 	if memberNameArg, ok := tag.NamedArg("memberName"); ok { // optional
 		memberName = memberNameArg.Value
-	} else if context.Scope != ScopeListVal {
-		memberName = context.Member.Name // default
 	}
 
+	unionArg, _ := tag.NamedArg("union") // optional
 	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
 	u.fields = append(u.fields, unionMember{fieldName, memberName})
 
-	if context.Scope == ScopeListVal {
-		if context.ListSelector == nil {
-			return fmt.Errorf("list-item union member has no list selector in context")
-		}
-		if _, found := u.itemMatchers[fieldName]; found {
-			return fmt.Errorf("list-item union member %q already exists", fieldName)
-		}
-		u.itemMatchers[fieldName] = context.ListSelector
-	} else {
-		u.fieldMembers = append(u.fieldMembers, context.Member)
+	u.fieldMembers = append(u.fieldMembers, context.Member)
+
+	return nil
+}
+
+// processListMemberValidations processes union member tags for list items.  It
+// is a free function, rather than a method so that it can be called from other
+// union-like tags.
+func processListMemberValidations(shared map[string]unions, context Context, tag codetags.Tag) error {
+	if context.ListSelector == nil {
+		return fmt.Errorf("list-item union member has no list selector in context")
 	}
+
+	// It's not really a "field", but close enough.
+	fieldName := context.Path.String() // eg: "<path>/Pipeline.Tasks[{"name": "succeeded"}]"
+
+	if shared[context.ParentPath.String()] == nil {
+		shared[context.ParentPath.String()] = unions{}
+	}
+
+	// See if the tag specified a member name.
+	memberName := ""
+	if memberNameArg, ok := tag.NamedArg("memberName"); ok { // optional
+		memberName = memberNameArg.Value
+	}
+
+	unionArg, _ := tag.NamedArg("union") // optional
+	u := shared[context.ParentPath.String()].getOrCreate(unionArg.Value)
+	u.fields = append(u.fields, unionMember{fieldName, memberName})
+
+	if _, found := u.itemMatchers[fieldName]; found {
+		return fmt.Errorf("list-item union member %q already exists", fieldName)
+	}
+	u.itemMatchers[fieldName] = context.ListSelector
 
 	return nil
 }
