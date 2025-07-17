@@ -59,37 +59,37 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 				start := time.Now()
 				podClient.CreateSync(ctx, getGracePeriodTestPodSIGTERM(podName, testRcNamespace, 20))
-				// 给容器一些时间启动
+				// Wait for the container to start
 				time.Sleep(2 * time.Second)
 				w, err := podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
 				framework.ExpectNoError(err, "failed to watch")
-				// 第一次 Delete，grace period 20s
+				// First Delete with 20s grace period
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(20))
 				framework.ExpectNoError(err, "failed to delete pod (first)")
-				// 等2秒，再次 Delete，grace period 5s
+				// Wait 2 seconds, then Delete again with 5s grace period
 				time.Sleep(2 * time.Second)
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(5))
 				framework.ExpectNoError(err, "failed to delete pod (second)")
-				// 等待一段时间让信号处理完成
-				time.Sleep(10 * time.Second)
-				// 立即拉日志（pod 还在 Terminating）
+				// Wait 2 seconds to ensure signal handling and log output
+				time.Sleep(2 * time.Second)
+				// Retrieve logs from the pod's main container
 				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 				framework.ExpectNoError(err, "failed to get pod logs")
 				defer func() {
 					if err := logs.Close(); err != nil {
-						framework.ExpectNoError(err, "failed to log close")
+						framework.ExpectNoError(err, "failed to close pod logs stream")
 					}
 				}()
 				buf := new(bytes.Buffer)
 				_, err = buf.ReadFrom(logs)
-				framework.ExpectNoError(err, "failed to read from logs")
+				framework.ExpectNoError(err, "failed to read from pod logs")
 				podLogs := buf.String()
 				framework.Logf("Pod logs: %q", podLogs)
-				// Check logs: 必须包含 SIGINT 1 和 SIGINT 2
+				// Check logs: must contain SIGINT 1 and SIGINT 2
 				if !strings.Contains(podLogs, "SIGINT 1") || !strings.Contains(podLogs, "SIGINT 2") {
 					framework.Failf("unexpected pod logs: %q", podLogs)
 				}
-				// 再等待 pod 被彻底删除
+				// Wait for the pod to be fully deleted
 				ctxUntil, cancel := context.WithTimeout(ctx, 30*time.Second)
 				defer cancel()
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
@@ -138,7 +138,6 @@ func getGracePeriodTestPodSIGTERM(name, testRcNamespace string, gracePeriod int6
 					Image:   busyboxImage,
 					Command: []string{"sh", "-c"},
 					Args: []string{`
-echo "Container started"
 count=0
 term_handler() {
   count=$((count+1))
@@ -154,7 +153,7 @@ term_handler() {
   fi
 }
 trap term_handler TERM
-echo "Trap set, waiting for signals..."
+echo "Container started"
 while true; do sleep 1; done
 `},
 				},
