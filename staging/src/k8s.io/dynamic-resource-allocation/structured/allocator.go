@@ -49,9 +49,6 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 // available and the current state of the cluster (claims, classes, resource
 // slices).
 type Allocator interface {
-	// ClaimsToAllocate returns the claims that the allocator was created for.
-	ClaimsToAllocate() []*resourceapi.ResourceClaim
-
 	// Allocate calculates the allocation(s) for one particular node.
 	//
 	// It returns an error only if some fatal problem occurred. These are errors
@@ -75,7 +72,7 @@ type Allocator interface {
 	// additional value. A name can also be useful because log messages do not
 	// have a common prefix. V(5) is used for one-time log entries, V(6) for important
 	// progress reports, and V(7) for detailed debug output.
-	Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error)
+	Allocate(ctx context.Context, node *v1.Node, claims []*resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error)
 }
 
 // NewAllocator returns an allocator for a certain set of claims or an error if
@@ -84,7 +81,6 @@ type Allocator interface {
 // The returned Allocator can be used multiple times and is thread-safe.
 func NewAllocator(ctx context.Context,
 	features Features,
-	claimsToAllocate []*resourceapi.ResourceClaim,
 	allocatedDevices sets.Set[DeviceID],
 	classLister DeviceClassLister,
 	slices []*resourceapi.ResourceSlice,
@@ -117,7 +113,7 @@ func NewAllocator(ctx context.Context,
 		// All required features supported?
 		if allocator.supportedFeatures.Set().IsSuperset(features.Set()) {
 			// Use it!
-			return allocator.newAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+			return allocator.newAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
 		}
 	}
 	return nil, fmt.Errorf("internal error: no allocator available for feature set %v", features)
@@ -127,7 +123,6 @@ var availableAllocators = []struct {
 	supportedFeatures Features
 	newAllocator      func(ctx context.Context,
 		features Features,
-		claimsToAllocate []*resourceapi.ResourceClaim,
 		allocatedDevices sets.Set[DeviceID],
 		classLister DeviceClassLister,
 		slices []*resourceapi.ResourceSlice,
@@ -139,26 +134,24 @@ var availableAllocators = []struct {
 		supportedFeatures: stable.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			claimsToAllocate []*resourceapi.ResourceClaim,
 			allocatedDevices sets.Set[DeviceID],
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return stable.NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+			return stable.NewAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
 		},
 	},
 	{
 		supportedFeatures: incubating.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			claimsToAllocate []*resourceapi.ResourceClaim,
 			allocatedDevices sets.Set[DeviceID],
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return incubating.NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+			return incubating.NewAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
 		},
 	},
 }
