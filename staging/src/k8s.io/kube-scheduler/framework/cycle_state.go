@@ -59,6 +59,12 @@ type CycleState interface {
 	// SetSkipScorePlugins sets plugins that should be skipped in the Score extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	SetSkipScorePlugins(plugins sets.Set[string])
+	// GetSkipPreBindPlugins returns plugins that will be skipped in the PreBind extension point.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	GetSkipPreBindPlugins() sets.Set[string]
+	// SetSkipPreBindPlugins sets plugins that should be skipped in the PerBind extension point.
+	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
+	SetSkipPreBindPlugins(plugins sets.Set[string])
 	// Read retrieves data with the given "key" from CycleState. If the key is not
 	// present, ErrNotFound is returned.
 	//

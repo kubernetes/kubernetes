@@ -132,8 +132,8 @@ func (cq *callQueue) merge(oldAPICall, apiCall *queuedAPICall) error {
 		return nil
 	}
 
-	// Merge API calls if they are of the same type for the same object.
-	err := apiCall.Merge(oldAPICall)
+	// Send a concrete APICall object to allow for a type assertion.
+	err := apiCall.Merge(oldAPICall.APICall)
 	if err != nil {
 		err := fmt.Errorf("failed to merge API calls: %w", err)
 		apiCall.sendOnFinish(err)

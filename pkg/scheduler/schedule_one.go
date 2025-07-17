@@ -279,6 +279,26 @@ func (sched *Scheduler) bindingCycle(
 
 	assumedPod := assumedPodInfo.Pod
 
+	if sched.nominatedNodeNameForExpectationEnabled {
+		preFlightStatus := schedFramework.RunPreBindPreFlights(ctx, state, assumedPod, scheduleResult.SuggestedHost)
+		if preFlightStatus.Code() == fwk.Error ||
+			// Unschedulable status is not supported in PreBindPreFlight and hence we regard it as an error.
+			preFlightStatus.IsRejected() {
+			return preFlightStatus
+		}
+		if preFlightStatus.IsSuccess() || schedFramework.WillWaitOnPermit(ctx, assumedPod) {
+			// Add NominatedNodeName to tell the external components (e.g., the cluster autoscaler) that the pod is about to be bound to the node.
+			// We only do this when any of WaitOnPermit or PreBind will work because otherwise the pod will be soon bound anyway.
+			if err := updatePod(ctx, sched.client, schedFramework.APICacher(), assumedPod, nil, &framework.NominatingInfo{
+				NominatedNodeName: scheduleResult.SuggestedHost,
+				NominatingMode:    framework.ModeOverride,
+			}); err != nil {
+				logger.Error(err, "Failed to update the nominated node name in the binding cycle", "pod", klog.KObj(assumedPod), "nominatedNodeName", scheduleResult.SuggestedHost)
+				// We continue the processing because it's not critical enough to stop binding cycles here.
+			}
+		}
+	}
+
 	// Run "permit" plugins.
 	if status := schedFramework.WaitOnPermit(ctx, assumedPod); !status.IsSuccess() {
 		if status.IsRejected() {
@@ -1118,12 +1138,21 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher framew
 		return err
 	}
 	logger := klog.FromContext(ctx)
-	logger.V(3).Info("Updating pod condition", "pod", klog.KObj(pod), "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
+	logValues := []any{"pod", klog.KObj(pod)}
+	if condition != nil {
+		logValues = append(logValues, "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
+	}
+	if nominatingInfo != nil {
+		logValues = append(logValues, "nominatedNodeName", nominatingInfo.NominatedNodeName, "nominatingMode", nominatingInfo.Mode())
+	}
+	logger.V(3).Info("Updating pod condition and nominated node name", logValues...)
+
 	podStatusCopy := pod.Status.DeepCopy()
 	// NominatedNodeName is updated only if we are trying to set it, and the value is
 	// different from the existing one.
 	nnnNeedsUpdate := nominatingInfo.Mode() == framework.ModeOverride && pod.Status.NominatedNodeName != nominatingInfo.NominatedNodeName
-	if !podutil.UpdatePodCondition(podStatusCopy, condition) && !nnnNeedsUpdate {
+	podConditionNeedsUpdate := condition != nil && podutil.UpdatePodCondition(podStatusCopy, condition)
+	if !podConditionNeedsUpdate && !nnnNeedsUpdate {
 		return nil
 	}
 	if nnnNeedsUpdate {

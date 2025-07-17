@@ -440,12 +440,12 @@ type ReservePlugin interface {
 // These plugins are called before a pod being scheduled.
 type PreBindPlugin interface {
 	Plugin
-	// PreBindPreFlight is called before PreBind, and the plugin is supposed to return Success, Skip, or Error status.
+	// PreBindPreFlight is called before PreBind, and the plugin is supposed to return Success, Skip, or Error status
+	// to tell the scheduler whether the plugin will do something in PreBind or not.
 	// If it returns Success, it means this PreBind plugin will handle this pod.
 	// If it returns Skip, it means this PreBind plugin has nothing to do with the pod, and PreBind will be skipped.
 	// This function should be lightweight, and shouldn't do any actual operation, e.g., creating a volume etc.
 	PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status
-
 	// PreBind is called before binding a pod. All prebind plugins must return
 	// success or the pod will be rejected and won't be sent for binding.
 	PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status
@@ -526,6 +526,10 @@ type Framework interface {
 	// internal error. In either case the pod is not going to be bound.
 	RunPreBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
 
+	// RunPreBindPreFlights runs the set of configured PreBindPreFlight functions from PreBind plugins.
+	// It returns immediately if any of the plugins returns a non-skip status.
+	RunPreBindPreFlights(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+
 	// RunPostBindPlugins runs the set of configured PostBind plugins.
 	RunPostBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
 
@@ -546,6 +550,9 @@ type Framework interface {
 	// to a map of currently waiting pods and return status with "Wait" code.
 	// Pod will remain waiting pod for the minimum duration returned by the Permit plugins.
 	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
+
+	// WillWaitOnPermit returns whether this pod will wait on permit by checking if the pod is a waiting pod.
+	WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool
 
 	// WaitOnPermit will block, if the pod is a waiting pod, until the waiting pod is rejected or allowed.
 	WaitOnPermit(ctx context.Context, pod *v1.Pod) *fwk.Status
