@@ -115,22 +115,24 @@ func (ps NetProtocolStats) parseLine(rawLine string) (*NetProtocolStatLine, erro
 	if err != nil {
 		return nil, err
 	}
-	if fields[4] == enabled {
+	switch fields[4] {
+	case enabled:
 		line.Pressure = 1
-	} else if fields[4] == disabled {
+	case disabled:
 		line.Pressure = 0
-	} else {
+	default:
 		line.Pressure = -1
 	}
 	line.MaxHeader, err = strconv.ParseUint(fields[5], 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	if fields[6] == enabled {
+	switch fields[6] {
+	case enabled:
 		line.Slab = true
-	} else if fields[6] == disabled {
+	case disabled:
 		line.Slab = false
-	} else {
+	default:
 		return nil, fmt.Errorf("%w: capability for protocol: %s", ErrFileParse, line.Name)
 	}
 	line.ModuleName = fields[7]
@@ -168,11 +170,12 @@ func (pc *NetProtocolCapabilities) parseCapabilities(capabilities []string) erro
 	}
 
 	for i := 0; i < len(capabilities); i++ {
-		if capabilities[i] == "y" {
+		switch capabilities[i] {
+		case "y":
 			*capabilityFields[i] = true
-		} else if capabilities[i] == "n" {
+		case "n":
 			*capabilityFields[i] = false
-		} else {
+		default:
 			return fmt.Errorf("%w: capability block for protocol: position %d", ErrFileParse, i)
 		}
 	}
