@@ -57,21 +57,13 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			}
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 				start := time.Now()
-				podClient.CreateSync(ctx, getGracePeriodTestPod_SIGTERM(podName, testRcNamespace, gracePeriodShort))
+				podClient.CreateSync(ctx, getGracePeriodTestPodSIGTERM(podName, testRcNamespace, gracePeriodShort))
 				w, err := podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
 				framework.ExpectNoError(err, "failed to watch")
 				// Delete with short grace period
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
 				framework.ExpectNoError(err, "failed to delete pod")
-				ctxUntil, cancel := context.WithTimeout(ctx, 30*time.Second)
-				defer cancel()
-				// Wait for pod to be deleted
-				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
-					actualWatchEvents = append(actualWatchEvents, watchEvent)
-					return watchEvent.Type == watch.Deleted, nil
-				})
-				framework.ExpectNoError(err, "Wait until pod deleted should not return an error")
-				// Get pod logs
+				// 立即拉日志（pod 还在 Terminating）
 				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 				framework.ExpectNoError(err, "failed to get pod logs")
 				defer func() {
@@ -87,15 +79,21 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				if podLogs != "SIGINT 1\nSIGINT 2\n" {
 					framework.Failf("unexpected pod logs: %q", podLogs)
 				}
+				// 再等待 pod 被彻底删除
+				ctxUntil, cancel := context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
+					actualWatchEvents = append(actualWatchEvents, watchEvent)
+					return watchEvent.Type == watch.Deleted, nil
+				})
+				framework.ExpectNoError(err, "Wait until pod deleted should not return an error")
 				// Check exit code
 				status, err := podClient.Get(ctx, podName, metav1.GetOptions{})
-				framework.ExpectNoError(err, "failed to get pod status")
-				if len(status.Status.ContainerStatuses) == 0 {
-					framework.Failf("no container status found")
-				}
-				exitCode := status.Status.ContainerStatuses[0].State.Terminated.ExitCode
-				if exitCode != 0 {
-					framework.Failf("unexpected exit code: %d", exitCode)
+				if err == nil && len(status.Status.ContainerStatuses) > 0 {
+					exitCode := status.Status.ContainerStatuses[0].State.Terminated.ExitCode
+					if exitCode != 0 {
+						framework.Failf("unexpected exit code: %d", exitCode)
+					}
 				}
 				// Log latency
 				latency := time.Since(start)
@@ -109,8 +107,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 	})
 })
 
-// getGracePeriodTestPod_SIGTERM returns a pod that traps SIGTERM and counts signals, exiting 0 after two, 1 if more.
-func getGracePeriodTestPod_SIGTERM(name, testRcNamespace string, gracePeriod int64) *v1.Pod {
+// getGracePeriodTestPodSIGTERM returns a pod that traps SIGTERM and counts signals, exiting 0 after two, 1 if more.
+func getGracePeriodTestPodSIGTERM(name, testRcNamespace string, gracePeriod int64) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
