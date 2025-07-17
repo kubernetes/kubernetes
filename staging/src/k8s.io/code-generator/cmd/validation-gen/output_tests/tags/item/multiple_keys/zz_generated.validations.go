@@ -68,5 +68,19 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.Items }))...)
 
+	// field Struct.OutOfOrder
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []Item) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.StringKey == "target" && item.IntKey == 42 && item.BoolKey == true }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item OutOfOrder[boolKey=42,stringKey=target,intKey=42]")
+			})...)
+			return
+		}(fldPath.Child("outOfOrder"), obj.OutOfOrder, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.OutOfOrder }))...)
+
 	return errs
 }
