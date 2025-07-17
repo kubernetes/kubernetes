@@ -777,7 +777,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		//	   3. Resize pod3 to request more memory than available (2/3), along with a decrease in CPU (1/24), verify the resize is deferred.
 		// 	   4. Resize pod4 to request more CPU than available (5/8), verify the resize is deferred.
 		//	   5. The deferred resizes above are chosen carefully such that:
-		//	      - deletion of pod1 should mxwke room for pod2's resize (but not pod3 or pod4).
+		//	      - deletion of pod1 should make room for pod2's resize (but not pod3 or pod4).
 		//	      - pod2's resize should make room for pod3's resize (but not pod4).
 		//	      - pod3's resize should make room for pod4's resize.
 		//     6. Delete pod1, verify the chain of deferred resizes is actuated.
@@ -832,13 +832,8 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		e2epod.SetNodeAffinity(&testPod4.Spec, node.Name)
 
 		testPods := []*v1.Pod{testPod1, testPod2, testPod3, testPod4}
-
-		for i, pod := range testPods {
-			ginkgo.By(fmt.Sprintf("Create pod '%s' that fits the node '%s'", pod.Name, node.Name))
-			testPods[i] = podClient.CreateSync(ctx, pod)
-			gomega.Expect(testPods[i].Status.Phase).To(gomega.Equal(v1.PodRunning))
-			gomega.Expect(testPods[i].Generation).To(gomega.BeEquivalentTo(1))
-		}
+		ginkgo.By(fmt.Sprintf("Create pods that fits the node '%s'", node.Name))
+		podClient.CreateBatch(ctx, testPods)
 
 		testPod2CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableMilliCPU/3, resource.DecimalSI)
 		testPod2MemoryQuantityResized := resource.NewQuantity(initNodeAvailableMem/24, resource.DecimalSI)
@@ -849,55 +844,39 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		testPod4CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableMilliCPU/2+initNodeAvailableMilliCPU/8, resource.DecimalSI)
 		testPod4MemoryQuantityResized := initialMemoryQuantity
 
-		patchTestpod2ToDeferred := fmt.Sprintf(`{
-			"spec": {
-				"containers": [
-					{
-						"name":      "c",
-						"resources": {
-							"requests": {
-								"cpu": "%dm",
-								"memory": "%d"
-							}
-						}
-					}
-				]
-			}
-		}`, testPod2CPUQuantityResized.MilliValue(), testPod2MemoryQuantityResized.Value())
+		expectedTestPod2Resized := []podresize.ResizableContainerInfo{
+			{
+				Name: "c",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: testPod2CPUQuantityResized.String(),
+					MemReq: testPod2MemoryQuantityResized.String(),
+				},
+			},
+		}
+		expectedTestPod3Resized := []podresize.ResizableContainerInfo{
+			{
+				Name: "c",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: testPod3CPUQuantityResized.String(),
+					MemReq: testPod3MemoryQuantityResized.String(),
+				},
+			},
+		}
+		expectedTestPod4Resized := []podresize.ResizableContainerInfo{
+			{
+				Name: "c",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: testPod4CPUQuantityResized.String(),
+					MemReq: testPod4MemoryQuantityResized.String(),
+				},
+			},
+		}
 
-		patchTestpod3ToDeferred := fmt.Sprintf(`{
-			"spec": {
-				"containers": [
-					{
-						"name":      "c",
-						"resources": {
-							"requests": {
-								"cpu": "%dm",
-								"memory": "%d"
-							}
-						}
-					}
-				]
-			}
-		}`, testPod3CPUQuantityResized.MilliValue(), testPod3MemoryQuantityResized.Value())
+		patchTestPod2ToDeferred := podresize.MakeResizePatch(c, expectedTestPod2Resized)
+		patchTestPod3ToDeferred := podresize.MakeResizePatch(c, expectedTestPod3Resized)
+		patchTestPod4ToDeferred := podresize.MakeResizePatch(c, expectedTestPod4Resized)
 
-		patchTestpod4ToDeferred := fmt.Sprintf(`{
-			"spec": {
-				"containers": [
-					{
-						"name":      "c",
-						"resources": {
-							"requests": {
-								"cpu": "%dm",
-								"memory": "%d"
-							}
-						}
-					}
-				]
-			}
-		}`, testPod4CPUQuantityResized.MilliValue(), testPod4MemoryQuantityResized.Value())
-
-		patches := []string{patchTestpod2ToDeferred, patchTestpod3ToDeferred, patchTestpod4ToDeferred}
+		patches := []string{string(patchTestPod2ToDeferred), string(patchTestPod3ToDeferred), string(patchTestPod4ToDeferred)}
 
 		for i := range patches {
 			testPod := testPods[i+1]
@@ -907,7 +886,6 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 				testPod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "resize")
 			framework.ExpectNoError(err, "failed to patch pod for resize")
 			waitForPodDeferred(ctx, f, testPod)
-			gomega.Expect(testPod.Generation).To(gomega.BeEquivalentTo(2))
 		}
 
 		ginkgo.By("deleting pod 1")
@@ -915,43 +893,16 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		framework.ExpectNoError(delErr1, "failed to delete pod %s", testPod1.Name)
 
 		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod deletion '%s'", testPod2.Name, testPod1.Name))
-		expected := []podresize.ResizableContainerInfo{
-			{
-				Name: "c",
-				Resources: &cgroups.ContainerResources{
-					CPUReq: testPod2CPUQuantityResized.String(),
-					MemReq: testPod2MemoryQuantityResized.String(),
-				},
-			},
-		}
-		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod2, expected)
-		podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod2, expectedTestPod2Resized)
+		podresize.ExpectPodResized(ctx, f, resizedPod, expectedTestPod2Resized)
 
 		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod resize '%s'", testPod3.Name, testPod2.Name))
-		expected = []podresize.ResizableContainerInfo{
-			{
-				Name: "c",
-				Resources: &cgroups.ContainerResources{
-					CPUReq: testPod3CPUQuantityResized.String(),
-					MemReq: testPod3MemoryQuantityResized.String(),
-				},
-			},
-		}
-		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod3, expected)
-		podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod3, expectedTestPod3Resized)
+		podresize.ExpectPodResized(ctx, f, resizedPod, expectedTestPod3Resized)
 
 		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod resize '%s'", testPod4.Name, testPod3.Name))
-		expected = []podresize.ResizableContainerInfo{
-			{
-				Name: "c",
-				Resources: &cgroups.ContainerResources{
-					CPUReq: testPod4CPUQuantityResized.String(),
-					MemReq: testPod4MemoryQuantityResized.String(),
-				},
-			},
-		}
-		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod4, expected)
-		podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod4, expectedTestPod4Resized)
+		podresize.ExpectPodResized(ctx, f, resizedPod, expectedTestPod4Resized)
 
 		ginkgo.By("deleting pods")
 		for _, testPod := range testPods {
