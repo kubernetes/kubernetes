@@ -17,7 +17,6 @@ limitations under the License.
 package e2enode
 
 import (
-	"bytes"
 	"context"
 	"strings"
 	"time"
@@ -73,21 +72,12 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				// Wait 2 seconds to ensure signal handling and log output
 				time.Sleep(2 * time.Second)
 				// Retrieve logs from the pod's main container
-				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
+				podLogs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).DoRaw(ctx)
 				framework.ExpectNoError(err, "failed to get pod logs")
-				defer func() {
-					if err := logs.Close(); err != nil {
-						framework.ExpectNoError(err, "failed to close pod logs stream")
-					}
-				}()
-				buf := new(bytes.Buffer)
-				_, err = buf.ReadFrom(logs)
-				framework.ExpectNoError(err, "failed to read from pod logs")
-				podLogs := buf.String()
-				framework.Logf("Pod logs: %q", podLogs)
+				framework.Logf("Pod logs: %q", string(podLogs))
 				// Check logs: must contain SIGINT 1 and SIGINT 2
-				if !strings.Contains(podLogs, "SIGINT 1") || !strings.Contains(podLogs, "SIGINT 2") {
-					framework.Failf("unexpected pod logs: %q", podLogs)
+				if !strings.Contains(string(podLogs), "SIGINT 1") || !strings.Contains(string(podLogs), "SIGINT 2") {
+					framework.Failf("unexpected pod logs: %q", string(podLogs))
 				}
 				// Wait for the pod to be fully deleted
 				ctxUntil, cancel := context.WithTimeout(ctx, 30*time.Second)
