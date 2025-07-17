@@ -99,34 +99,13 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	}
 
 	// Parse key-value pairs from named args.
-	criteria := []keyValuePair{}
-	processedKeys := sets.NewString()
-
-	for _, arg := range tag.Args {
-		if arg.Name == "" {
-			return Validations{}, fmt.Errorf("all arguments must be named (ex: fieldName: value)")
-		}
-		if processedKeys.Has(arg.Name) {
-			return Validations{}, fmt.Errorf("duplicate argument: %q", arg.Name)
-		}
-		processedKeys.Insert(arg.Name)
-
-		parsedValue, valueType, err := parseTypedValue(arg.Value, arg.Type)
-		if err != nil {
-			return Validations{}, fmt.Errorf("invalid value for key %q: %w", arg.Name, err)
-		}
-
-		criteria = append(criteria, keyValuePair{
-			key:       arg.Name,
-			value:     parsedValue,
-			valueType: valueType,
-		})
+	criteria, err := criteriaFromArgs(tag.Args)
+	if err != nil {
+		return Validations{}, err
 	}
-
 	if len(criteria) == 0 {
 		return Validations{}, fmt.Errorf("no selection criteria was specified")
 	}
-
 	if narg, nkey := len(criteria), len(listMeta.keyNames); narg != nkey {
 		return Validations{}, fmt.Errorf("number of arguments (%d) does not match number of listMapKey fields (%d)", narg, nkey)
 	}
@@ -211,6 +190,33 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	return result, nil
 }
 
+func criteriaFromArgs(args []codetags.Arg) ([]keyValuePair, error) {
+	criteria := []keyValuePair{}
+	keysSeen := sets.Set[string]{}
+
+	for _, arg := range args {
+		if arg.Name == "" {
+			return nil, fmt.Errorf("all arguments must be named")
+		}
+		if keysSeen.Has(arg.Name) {
+			return nil, fmt.Errorf("duplicate argument: %q", arg.Name)
+		}
+		keysSeen.Insert(arg.Name)
+
+		parsedValue, valueType, err := parseTypedValue(arg.Value, arg.Type)
+		if err != nil {
+			return nil, fmt.Errorf("invalid value for argument %q: %w", arg.Name, err)
+		}
+
+		criteria = append(criteria, keyValuePair{
+			key:       arg.Name,
+			value:     parsedValue,
+			valueType: valueType,
+		})
+	}
+	return criteria, nil
+}
+
 // parseTypedValue parses a value based on its detected type
 func parseTypedValue(value string, argType codetags.ArgType) (any, codetags.ValueType, error) {
 	switch argType {
@@ -229,8 +235,7 @@ func parseTypedValue(value string, argType codetags.ArgType) (any, codetags.Valu
 		}
 		return boolVal, codetags.ValueTypeBool, nil
 	default:
-		// Default to string
-		return value, codetags.ValueTypeString, nil
+		return nil, "", fmt.Errorf("unsupported argument type: %q", argType)
 	}
 }
 
