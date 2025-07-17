@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,6 +38,7 @@ import (
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -54,7 +55,7 @@ func getSlice(name string) *resourceapi.ResourceSlice {
 	return &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: nodeName,
+			NodeName: ptr.To(nodeName),
 		},
 	}
 }
@@ -104,7 +105,7 @@ func getFakeClient(t *testing.T, nodeName, driverName string, slice *resourceapi
 func requireNoSlices(tCtx ktesting.TContext) {
 	tCtx.Helper()
 	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-		slices, err := tCtx.Client().ResourceV1beta1().ResourceSlices().List(tCtx, metav1.ListOptions{})
+		slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, metav1.ListOptions{})
 		if err != nil {
 			return err
 		}
@@ -117,7 +118,7 @@ func TestRegistrationHandler(t *testing.T) {
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: nodeName,
+			NodeName: ptr.To(nodeName),
 		},
 	}
 
@@ -259,7 +260,7 @@ func TestRegistrationHandler(t *testing.T) {
 			t.Cleanup(func() {
 				if client != nil {
 					// Create the slice as if the plugin had done that while it runs.
-					_, err := client.ResourceV1beta1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+					_, err := client.ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
 					assert.NoError(t, err, "recreate slice")
 				}
 
@@ -325,7 +326,7 @@ func TestConnectionHandling(t *testing.T) {
 			assert.NotNil(t, plugin, "plugin should be present in the plugin store")
 
 			// Create the slice as if the plugin had done that while it runs.
-			_, err = client.ResourceV1beta1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+			_, err = client.ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
 			require.NoError(t, err, "recreate slice")
 
 			// Stop gRPC server.
@@ -353,7 +354,7 @@ func TestConnectionHandling(t *testing.T) {
 				}, time.Minute, time.Second, "wiping should be stopped for plugin %s", driverName)
 
 				// Slice should still be there
-				slices, err := client.ResourceV1beta1().ResourceSlices().List(tCtx, metav1.ListOptions{})
+				slices, err := client.ResourceV1().ResourceSlices().List(tCtx, metav1.ListOptions{})
 				require.NoError(t, err, "list slices")
 				assert.Len(t, slices.Items, 1, "slices")
 			}

@@ -1,6 +1,6 @@
 # One inline resource claim, one pod, two containers.
 # One container uses resource, one does not.
-apiVersion: resource.k8s.io/v1beta1
+apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
 metadata:
   name: test-inline-claim-template
@@ -13,7 +13,8 @@ spec:
     devices:
       requests:
       - name: my-device
-        deviceClassName: example
+        exactly:
+          deviceClassName: example
       config:
       - opaque:
           driver: test-driver.cdi.k8s.io
