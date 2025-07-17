@@ -199,7 +199,8 @@ func NewFakeReservePlugin(status *fwk.Status) frameworkruntime.PluginFactory {
 
 // FakePreBindPlugin is a test prebind plugin.
 type FakePreBindPlugin struct {
-	Status *fwk.Status
+	PreBindPreFlightStatus *fwk.Status
+	PreBindStatus          *fwk.Status
 }
 
 // Name returns name of the plugin.
@@ -209,25 +210,27 @@ func (pl *FakePreBindPlugin) Name() string {
 
 // PreBindPreFlight invoked at the PreBind extension point.
 func (pl *FakePreBindPlugin) PreBindPreFlight(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) *fwk.Status {
-	return pl.Status
+	return pl.PreBindPreFlightStatus
 }
 
 // PreBind invoked at the PreBind extension point.
 func (pl *FakePreBindPlugin) PreBind(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) *fwk.Status {
-	return pl.Status
+	return pl.PreBindStatus
 }
 
 // NewFakePreBindPlugin initializes a fakePreBindPlugin and returns it.
-func NewFakePreBindPlugin(status *fwk.Status) frameworkruntime.PluginFactory {
+func NewFakePreBindPlugin(preBindPreFlightStatus, preBindStatus *fwk.Status) frameworkruntime.PluginFactory {
 	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &FakePreBindPlugin{
-			Status: status,
+			PreBindPreFlightStatus: preBindPreFlightStatus,
+			PreBindStatus:          preBindStatus,
 		}, nil
 	}
 }
 
 // FakePermitPlugin is a test permit plugin.
 type FakePermitPlugin struct {
+	Handle  framework.Handle
 	Status  *fwk.Status
 	Timeout time.Duration
 }
@@ -238,16 +241,17 @@ func (pl *FakePermitPlugin) Name() string {
 }
 
 // Permit invoked at the Permit extension point.
-func (pl *FakePermitPlugin) Permit(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) (*fwk.Status, time.Duration) {
+func (pl *FakePermitPlugin) Permit(_ context.Context, _ fwk.CycleState, p *v1.Pod, _ string) (*fwk.Status, time.Duration) {
 	return pl.Status, pl.Timeout
 }
 
 // NewFakePermitPlugin initializes a fakePermitPlugin and returns it.
 func NewFakePermitPlugin(status *fwk.Status, timeout time.Duration) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, h framework.Handle) (framework.Plugin, error) {
 		return &FakePermitPlugin{
 			Status:  status,
 			Timeout: timeout,
+			Handle:  h,
 		}, nil
 	}
 }
