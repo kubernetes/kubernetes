@@ -265,7 +265,8 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		{Name: "listen-metrics-urls", Value: fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdMetricsPort)))},
 	}
 
-	if len(cfg.KubernetesVersion) > 0 && version.MustParseSemantic(cfg.KubernetesVersion).Minor() >= 34 {
+	etcdImageTag := images.GetEtcdImageTag(cfg)
+	if etcdVersion, err := version.ParseSemantic(etcdImageTag); err == nil && etcdVersion.AtLeast(version.MustParseSemantic("3.6.0")) {
 		// Arguments used by Etcd 3.6.0+.
 		// TODO: Start always using these once kubeadm only supports etcd >= 3.6.0 for all its supported k8s versions.
 		defaultArguments = append(defaultArguments, []kubeadmapi.Arg{
