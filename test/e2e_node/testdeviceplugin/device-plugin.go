@@ -35,7 +35,7 @@ type DevicePlugin struct {
 	server     *grpc.Server
 	uniqueName string
 
-	devices     []kubeletdevicepluginv1beta1.Device
+	devices     []*kubeletdevicepluginv1beta1.Device
 	devicesSync sync.Mutex
 
 	devicesUpdateCh chan struct{}
@@ -44,6 +44,8 @@ type DevicePlugin struct {
 	callsSync sync.Mutex
 
 	errorInjector func(string) error
+
+	kubeletdevicepluginv1beta1.UnsafeDevicePluginServer
 }
 
 func NewDevicePlugin(errorInjector func(string) error) *DevicePlugin {
@@ -71,7 +73,7 @@ func (dp *DevicePlugin) sendDevices(stream kubeletdevicepluginv1beta1.DevicePlug
 
 	dp.devicesSync.Lock()
 	for _, d := range dp.devices {
-		resp.Devices = append(resp.Devices, &d)
+		resp.Devices = append(resp.Devices, d)
 	}
 	dp.devicesSync.Unlock()
 
@@ -123,7 +125,7 @@ func (dp *DevicePlugin) Allocate(ctx context.Context, request *kubeletdeviceplug
 
 	for _, r := range request.ContainerRequests {
 		response := &kubeletdevicepluginv1beta1.ContainerAllocateResponse{}
-		for _, id := range r.DevicesIDs {
+		for _, id := range r.DevicesIds {
 			fpath, err := os.CreateTemp("/tmp", fmt.Sprintf("%s-%s", dp.uniqueName, id))
 			gomega.Expect(err).To(gomega.Succeed())
 
@@ -146,7 +148,7 @@ func (dp *DevicePlugin) GetPreferredAllocation(ctx context.Context, request *kub
 	return nil, nil
 }
 
-func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, resourceName string, devices []kubeletdevicepluginv1beta1.Device) error {
+func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, resourceName string, devices []*kubeletdevicepluginv1beta1.Device) error {
 	ginkgo.GinkgoHelper()
 
 	dp.devicesSync.Lock()
@@ -228,7 +230,7 @@ func (dp *DevicePlugin) Calls() []string {
 	return calls
 }
 
-func (dp *DevicePlugin) UpdateDevices(devices []kubeletdevicepluginv1beta1.Device) {
+func (dp *DevicePlugin) UpdateDevices(devices []*kubeletdevicepluginv1beta1.Device) {
 	// lock the mutex and update the devices
 	dp.devicesSync.Lock()
 	defer dp.devicesSync.Unlock()

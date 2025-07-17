@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
@@ -33,7 +34,7 @@ import (
 // monitorCallback is the function called when a device's health state changes,
 // or new devices are reported, or old devices are deleted.
 // Updated contains the most recent state of the Device.
-type monitorCallback func(resourceName string, devices []pluginapi.Device)
+type monitorCallback func(resourceName string, devices []*pluginapi.Device)
 
 func newMockPluginManager() *mockPluginManager {
 	return &mockPluginManager{
@@ -78,7 +79,7 @@ func TestNewEndpoint(t *testing.T) {
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 	}
 
-	p, e := esetup(t, devs, socket, "mock", func(n string, d []pluginapi.Device) {})
+	p, e := esetup(t, devs, socket, "mock", func(n string, d []*pluginapi.Device) {})
 	defer ecleanup(t, p, e)
 }
 
@@ -99,7 +100,7 @@ func TestRun(t *testing.T) {
 
 	callbackCount := 0
 	callbackChan := make(chan int)
-	callback := func(n string, devices []pluginapi.Device) {
+	callback := func(n string, devices []*pluginapi.Device) {
 		// Should be called twice:
 		// one for plugin registration, one for plugin update.
 		if callbackCount > 2 {
@@ -154,7 +155,7 @@ func TestAllocate(t *testing.T) {
 	}
 	callbackCount := 0
 	callbackChan := make(chan int)
-	p, e := esetup(t, devs, socket, "mock", func(n string, d []pluginapi.Device) {
+	p, e := esetup(t, devs, socket, "mock", func(n string, d []*pluginapi.Device) {
 		callbackCount++
 		callbackChan <- callbackCount
 	})
@@ -182,7 +183,7 @@ func TestAllocate(t *testing.T) {
 
 	resp.ContainerResponses = append(resp.ContainerResponses, contResp)
 
-	p.SetAllocFunc(func(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
+	p.SetAllocFunc(func(r *pluginapi.AllocateRequest, devs map[string]*pluginapi.Device) (*pluginapi.AllocateResponse, error) {
 		return resp, nil
 	})
 
@@ -197,14 +198,14 @@ func TestAllocate(t *testing.T) {
 
 	respOut, err := e.allocate([]string{"ADeviceId"})
 	require.NoError(t, err)
-	require.Equal(t, resp, respOut)
+	require.True(t, proto.Equal(resp, respOut))
 }
 
 func TestGetPreferredAllocation(t *testing.T) {
 	socket := filepath.Join(os.TempDir(), esocketName())
 	callbackCount := 0
 	callbackChan := make(chan int)
-	p, e := esetup(t, []*pluginapi.Device{}, socket, "mock", func(n string, d []pluginapi.Device) {
+	p, e := esetup(t, []*pluginapi.Device{}, socket, "mock", func(n string, d []*pluginapi.Device) {
 		callbackCount++
 		callbackChan <- callbackCount
 	})
@@ -216,7 +217,7 @@ func TestGetPreferredAllocation(t *testing.T) {
 		},
 	}
 
-	p.SetGetPreferredAllocFunc(func(r *pluginapi.PreferredAllocationRequest, devs map[string]pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
+	p.SetGetPreferredAllocFunc(func(r *pluginapi.PreferredAllocationRequest, devs map[string]*pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
 		return resp, nil
 	})
 
@@ -231,16 +232,16 @@ func TestGetPreferredAllocation(t *testing.T) {
 
 	respOut, err := e.getPreferredAllocation([]string{}, []string{}, -1)
 	require.NoError(t, err)
-	require.Equal(t, resp, respOut)
+	require.True(t, proto.Equal(resp, respOut))
 }
 
 func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*plugin.Stub, *endpointImpl) {
 	m := newMockPluginManager()
 
 	m.pluginListAndWatchReceiver = func(r string, resp *pluginapi.ListAndWatchResponse) {
-		var newDevs []pluginapi.Device
+		var newDevs []*pluginapi.Device
 		for _, d := range resp.Devices {
-			newDevs = append(newDevs, *d)
+			newDevs = append(newDevs, d)
 		}
 		callback(resourceName, newDevs)
 	}
