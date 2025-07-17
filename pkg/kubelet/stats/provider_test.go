@@ -30,12 +30,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/randfill"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
@@ -627,6 +629,7 @@ type fakeContainerStatsProvider struct {
 	device      string
 	imageFs     *statsapi.FsStats
 	containerFs *statsapi.FsStats
+	podStats    *statsapi.PodStats
 }
 
 func (p fakeContainerStatsProvider) ListPodStats(context.Context) ([]statsapi.PodStats, error) {
@@ -635,6 +638,13 @@ func (p fakeContainerStatsProvider) ListPodStats(context.Context) ([]statsapi.Po
 
 func (p fakeContainerStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage(context.Context) ([]statsapi.PodStats, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+func (p fakeContainerStatsProvider) PodCPUAndMemoryStats(context.Context, *v1.Pod, *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	if p.podStats != nil {
+		return p.podStats, nil
+	}
+	return nil, fmt.Errorf("no podStats set")
 }
 
 func (p fakeContainerStatsProvider) ListPodCPUAndMemoryStats(context.Context) ([]statsapi.PodStats, error) {
