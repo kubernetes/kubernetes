@@ -1009,6 +1009,10 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		podStatus.ResourceClaimStatuses = nil
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) && !draExendedResourceInUse(oldPodStatus) {
+		podStatus.ExtendedResourceClaimStatus = nil
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !rroInUse(oldPodSpec) {
 		for i := range podStatus.ContainerStatuses {
 			podStatus.ContainerStatuses[i].VolumeMounts = nil
@@ -1064,15 +1068,21 @@ func dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec *api.PodSpe
 	}
 }
 
-func dynamicResourceAllocationInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
+func draExendedResourceInUse(podStatus *api.PodStatus) bool {
+	if podStatus != nil && podStatus.ExtendedResourceClaimStatus != nil {
+		return true
 	}
+	return false
+}
 
+func dynamicResourceAllocationInUse(podSpec *api.PodSpec) bool {
 	// We only need to check this field because the containers cannot have
 	// resource requirements entries for claims without a corresponding
 	// entry at the pod spec level.
-	return len(podSpec.ResourceClaims) > 0
+	if podSpec != nil && len(podSpec.ResourceClaims) > 0 {
+		return true
+	}
+	return false
 }
 
 func dropResourceClaimRequests(containers []api.Container) {

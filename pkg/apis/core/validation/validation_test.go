@@ -15102,6 +15102,239 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		test: "ResourceClaimStatuses okay",
 	}, {
 		new: *podtest.MakePod("foo",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz",
+					RequestMappings: []core.ContainerExtendedResourceRequest{
+						{
+							ContainerName: "ctr",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-0-request-0",
+						},
+					},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  "",
+		test: "ExtendedResourceClaimStatus okay",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetInitContainers(podtest.MakeContainer("initctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz",
+					RequestMappings: []core.ContainerExtendedResourceRequest{
+						{
+							ContainerName: "initctr",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-0-request-0",
+						},
+					},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  "",
+		test: "ExtendedResourceClaimStatus okay",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz",
+					RequestMappings:   []core.ContainerExtendedResourceRequest{},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  "at least one request mapping is required",
+		test: "empty requestMapping in ExtendedResourceClaimStatus",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz",
+					RequestMappings: []core.ContainerExtendedResourceRequest{
+						{
+							ContainerName: "ctr",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-0-request-0",
+						},
+						{
+							ContainerName: "ctr",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-0-request-0",
+						},
+					},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  "Duplicate value: \"ctr\"",
+		test: "invalid container name and extended resource name in requestMapping in ExtendedResourceClaimStatus",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz",
+					RequestMappings: []core.ContainerExtendedResourceRequest{
+						{
+							ContainerName: "abc",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-0-request-0",
+						},
+					},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  `Invalid value: "abc": must match the name of an entry in spec.initContainers.name or spec.containers.name`,
+		test: "invalid container name in ExtendedResourceClaimStatus",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetInitContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz",
+					RequestMappings: []core.ContainerExtendedResourceRequest{
+						{
+							ContainerName: "abc",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-0-request-0",
+						},
+					},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  `Invalid value: "abc": must match the name of an entry in spec.initContainers.name or spec.containers.name`,
+		test: "invalid container name in ExtendedResourceClaimStatus",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz",
+					RequestMappings: []core.ContainerExtendedResourceRequest{
+						{
+							ContainerName: "ctr",
+							ResourceName:  "example.com/cpu",
+							RequestName:   "container-0-request-0",
+						},
+					},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  `Invalid value: "example.com/cpu": must match the extended resource name of an entry in spec.initContainers.resources.requests or spec.containers.resources.requests`,
+		test: "invalid extended resource name in ExtendedResourceClaimStatus",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz",
+					RequestMappings: []core.ContainerExtendedResourceRequest{
+						{
+							ContainerName: "ctr",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "example.com",
+						},
+					},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  `Invalid value: "example.com": must not contain dots`,
+		test: "invalid request name in ExtendedResourceClaimStatus",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
+				podtest.MakeResourceRequirements(
+					map[string]string{
+						string("example.com/gpu"): "1",
+					},
+					map[string]string{
+						string("example.com/gpu"): "1",
+					})))),
+			podtest.SetStatus(core.PodStatus{
+				ExtendedResourceClaimStatus: &core.PodExtendedResourceClaimStatus{
+					ResourceClaimName: "xyz/abc",
+					RequestMappings: []core.ContainerExtendedResourceRequest{
+						{
+							ContainerName: "ctr",
+							ResourceName:  "example.com/gpu",
+							RequestName:   "container-0-request-0",
+						},
+					},
+				},
+			}),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  `status.extendedResourceClaimStatus.resourceClaimName: Invalid value: "xyz/abc": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`,
+		test: "invalid resource claim name in ExtendedResourceClaimStatus",
+	}, {
+		new: *podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("init")),
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{

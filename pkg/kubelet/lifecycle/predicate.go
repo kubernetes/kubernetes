@@ -173,7 +173,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 
 	// Remove the requests of the extended resources that are missing in the
 	// node info. This is required to support cluster-level resources, which
-	// are extended resources unknown to nodes.
+	// are extended resources unknown to nodes, and also extended resources
+	// backed by DRA.
 	//
 	// Caveat: If a pod was manually bound to a node (e.g., static pod) where a
 	// node-level extended resource it requires is not found, then kubelet will

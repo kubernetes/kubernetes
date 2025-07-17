@@ -173,6 +173,21 @@ func TestValidateClass(t *testing.T) {
 				return class
 			}(),
 		},
+		"good-extended-resource-name": {
+			class: func() *resource.DeviceClass {
+				class := testClass(goodName)
+				class.Spec.ExtendedResourceName = ptr.To(string("example.com/gpu"))
+				return class
+			}(),
+		},
+		"bad-extended-resource-name": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "extendedResourceName"), "example.com", "must be a valid extended resource name")},
+			class: func() *resource.DeviceClass {
+				class := testClass(goodName)
+				class.Spec.ExtendedResourceName = ptr.To(string("example.com"))
+				return class
+			}(),
+		},
 		"selectors": {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "selectors").Index(1).Child("cel"), ""),

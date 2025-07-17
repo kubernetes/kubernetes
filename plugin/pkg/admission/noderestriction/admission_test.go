@@ -592,6 +592,9 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	claimpod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
 	claimpod.Spec.ResourceClaims = []api.PodResourceClaim{{Name: "myclaim", ResourceClaimName: ptr.To("myexternalclaim")}}
 
+	extendedResourceClaimPod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
+	extendedResourceClaimPod.Status.ExtendedResourceClaimStatus = &api.PodExtendedResourceClaimStatus{ResourceClaimName: "myclaim"}
+
 	pcrServiceAccountIndex := cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 	pcrServiceAccounts := corev1lister.NewServiceAccountLister(pcrServiceAccountIndex)
 
@@ -1112,6 +1115,12 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(claimpod, nil, podKind, claimpod.Namespace, claimpod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "reference resourceclaim",
+		},
+		{
+			name:       "forbid update of pod's extended resource claim status",
+			podsGetter: existingPods,
+			attributes: admission.NewAttributesRecord(extendedResourceClaimPod, claimpod, podKind, extendedResourceClaimPod.Namespace, extendedResourceClaimPod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "annot update extended resource claim status",
 		},
 
 		// My node object

@@ -353,7 +353,7 @@ func TestIndex2(t *testing.T) {
 		return g
 	}
 
-	pod := func(podName, nodeName, saName string, volumes []corev1.Volume, resourceClaims []corev1.PodResourceClaim) *corev1.Pod {
+	pod := func(podName, nodeName, saName string, volumes []corev1.Volume, resourceClaims []corev1.PodResourceClaim, extendedResourceClaimName string) *corev1.Pod {
 		p := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: "ns", UID: types.UID(fmt.Sprintf("pod%suid", podName))},
 			Spec: corev1.PodSpec{
@@ -369,6 +369,9 @@ func TestIndex2(t *testing.T) {
 		if resourceClaims != nil {
 			p.Spec.ResourceClaims = resourceClaims
 		}
+		if extendedResourceClaimName != "" {
+			p.Status.ExtendedResourceClaimStatus = &corev1.PodExtendedResourceClaimStatus{ResourceClaimName: extendedResourceClaimName}
+		}
 		return p
 	}
 
@@ -380,7 +383,7 @@ func TestIndex2(t *testing.T) {
 			cm("cm1"),
 			cm("cm2"),
 			cm("cm3"),
-		}, nil)
+		}, nil, "")
 	}
 
 	podWithSecrets := func(podName, nodeName string) *corev1.Pod {
@@ -391,7 +394,7 @@ func TestIndex2(t *testing.T) {
 			secret("s1"),
 			secret("s2"),
 			secret("s3"),
-		}, nil)
+		}, nil, "")
 	}
 
 	podWithPVCs := func(podName, nodeName string) *corev1.Pod {
@@ -402,7 +405,7 @@ func TestIndex2(t *testing.T) {
 			pvc("pvc1"),
 			pvc("pvc2"),
 			pvc("pvc3"),
-		}, nil)
+		}, nil, "")
 	}
 
 	podWithResourceClaims := func(podName, nodeName string) *corev1.Pod {
@@ -413,7 +416,7 @@ func TestIndex2(t *testing.T) {
 			rc("rc1"),
 			rc("rc2"),
 			rc("rc3"),
-		})
+		}, "rc4")
 	}
 
 	pv := func(pvName, pvcName, secretName string) *corev1.PersistentVolume {
@@ -721,11 +724,13 @@ func TestIndex2(t *testing.T) {
 				"resourceclaim:ns/rc1": {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
 				"resourceclaim:ns/rc2": {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
 				"resourceclaim:ns/rc3": {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
+				"resourceclaim:ns/rc4": {"pod:ns/pod1", "pod:ns/pod2", "pod:ns/pod3"},
 			},
 			expectedIndex: map[string][]string{
 				"resourceclaim:ns/rc1": {"node:node1=1", "node:node2=1", "node:node3=1"},
 				"resourceclaim:ns/rc2": {"node:node1=1", "node:node2=1", "node:node3=1"},
 				"resourceclaim:ns/rc3": {"node:node1=1", "node:node2=1", "node:node3=1"},
+				"resourceclaim:ns/rc4": {"node:node1=1", "node:node2=1", "node:node3=1"},
 			},
 		},
 		{
@@ -748,6 +753,7 @@ func TestIndex2(t *testing.T) {
 				"resourceclaim:ns/rc1": {"pod:ns/pod2", "pod:ns/pod3"},
 				"resourceclaim:ns/rc2": {"pod:ns/pod2", "pod:ns/pod3"},
 				"resourceclaim:ns/rc3": {"pod:ns/pod2", "pod:ns/pod3"},
+				"resourceclaim:ns/rc4": {"pod:ns/pod2", "pod:ns/pod3"},
 			},
 			expectedIndex: map[string][]string{},
 		},

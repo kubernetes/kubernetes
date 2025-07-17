@@ -380,9 +380,15 @@ func (p *PodWrapper) PodResourceClaims(podResourceClaims ...v1.PodResourceClaim)
 	return p
 }
 
-// PodResourceClaims appends claim statuses into PodSpec of the inner pod.
+// ResourceClaimStatuses appends claim statuses into PodStatus of the inner pod.
 func (p *PodWrapper) ResourceClaimStatuses(resourceClaimStatuses ...v1.PodResourceClaimStatus) *PodWrapper {
 	p.Status.ResourceClaimStatuses = append(p.Status.ResourceClaimStatuses, resourceClaimStatuses...)
+	return p
+}
+
+// ExendedResourceClaimStatus sets ExtendedResourceClaimStatus in PodStatus of the inner pod.
+func (p *PodWrapper) ExtendedResourceClaimStatus(extendedResourceClaimStatus *v1.PodExtendedResourceClaimStatus) *PodWrapper {
+	p.Status.ExtendedResourceClaimStatus = extendedResourceClaimStatus
 	return p
 }
 
@@ -1092,6 +1098,18 @@ func (wrapper *ResourceClaimWrapper) Name(s string) *ResourceClaimWrapper {
 	return wrapper
 }
 
+// GenerateName sets `s` as the GenerateName of the inner object.
+func (wrapper *ResourceClaimWrapper) GenerateName(s string) *ResourceClaimWrapper {
+	wrapper.SetGenerateName(s)
+	return wrapper
+}
+
+// Annotations sets `s` as the annotations of the inner object.
+func (wrapper *ResourceClaimWrapper) Annotations(s map[string]string) *ResourceClaimWrapper {
+	wrapper.SetAnnotations(s)
+	return wrapper
+}
+
 // UID sets `s` as the UID of the inner object.
 func (wrapper *ResourceClaimWrapper) UID(s string) *ResourceClaimWrapper {
 	wrapper.SetUID(types.UID(s))
@@ -1118,6 +1136,12 @@ func (wrapper *ResourceClaimWrapper) OwnerReference(name, uid string, gvk schema
 	return wrapper
 }
 
+// OwnerRef sets `ref` as the owner reference of the object.
+func (wrapper *ResourceClaimWrapper) OwnerRef(ref metav1.OwnerReference) *ResourceClaimWrapper {
+	wrapper.OwnerReferences = []metav1.OwnerReference{ref}
+	return wrapper
+}
+
 // Request adds one device request for the given device class.
 func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceClaimWrapper {
 	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
@@ -1131,6 +1155,21 @@ func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceCl
 			},
 		},
 	)
+	return wrapper
+}
+
+// RequestWithName adds one device request for the given device class with given request name.
+func (wrapper *ResourceClaimWrapper) RequestWithName(name, deviceClassName string) *ResourceClaimWrapper {
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name: name,
+			Exactly: &resourceapi.ExactDeviceRequest{
+				// Cannot rely on defaulting here, this is used in unit tests.
+				AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+				Count:           1,
+				DeviceClassName: deviceClassName,
+			},
+		})
 	return wrapper
 }
 
