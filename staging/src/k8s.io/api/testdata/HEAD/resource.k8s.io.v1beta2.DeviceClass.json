@@ -67,6 +67,7 @@
           }
         }
       }
-    ]
+    ],
+    "extendedResourceName": "extendedResourceNameValue"
   }
 }

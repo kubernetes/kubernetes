@@ -439,6 +439,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.ConfigMapProjection":                                                                schema_k8sio_api_core_v1_ConfigMapProjection(ref),
 		"k8s.io/api/core/v1.ConfigMapVolumeSource":                                                              schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref),
 		"k8s.io/api/core/v1.Container":                                                                          schema_k8sio_api_core_v1_Container(ref),
+		"k8s.io/api/core/v1.ContainerExtendedResourceRequest":                                                   schema_k8sio_api_core_v1_ContainerExtendedResourceRequest(ref),
 		"k8s.io/api/core/v1.ContainerImage":                                                                     schema_k8sio_api_core_v1_ContainerImage(ref),
 		"k8s.io/api/core/v1.ContainerPort":                                                                      schema_k8sio_api_core_v1_ContainerPort(ref),
 		"k8s.io/api/core/v1.ContainerResizePolicy":                                                              schema_k8sio_api_core_v1_ContainerResizePolicy(ref),
@@ -553,6 +554,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.PodDNSConfig":                                                                       schema_k8sio_api_core_v1_PodDNSConfig(ref),
 		"k8s.io/api/core/v1.PodDNSConfigOption":                                                                 schema_k8sio_api_core_v1_PodDNSConfigOption(ref),
 		"k8s.io/api/core/v1.PodExecOptions":                                                                     schema_k8sio_api_core_v1_PodExecOptions(ref),
+		"k8s.io/api/core/v1.PodExtendedResourceClaimStatus":                                                     schema_k8sio_api_core_v1_PodExtendedResourceClaimStatus(ref),
 		"k8s.io/api/core/v1.PodIP":                                                                              schema_k8sio_api_core_v1_PodIP(ref),
 		"k8s.io/api/core/v1.PodList":                                                                            schema_k8sio_api_core_v1_PodList(ref),
 		"k8s.io/api/core/v1.PodLogOptions":                                                                      schema_k8sio_api_core_v1_PodLogOptions(ref),
@@ -22444,6 +22446,44 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 	}
 }
 
+func schema_k8sio_api_core_v1_ContainerExtendedResourceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ContainerExtendedResourceRequest has the mapping of container name, extended resource name to the device request name.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"containerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The name of the container requesting resources.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The name of the extended resource in that container which gets backed by DRA.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"requestName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The name of the request in the special ResourceClaim which corresponds to the extended resource.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"containerName", "resourceName", "requestName"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_core_v1_ContainerImage(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -28952,6 +28992,49 @@ func schema_k8sio_api_core_v1_PodExecOptions(ref common.ReferenceCallback) commo
 	}
 }
 
+func schema_k8sio_api_core_v1_PodExtendedResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodExtendedResourceClaimStatus is stored in the PodStatus for the extended resource requests backed by DRA. It stores the generated name for the corresponding special ResourceClaim created by the scheduler.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"requestMappings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "RequestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request in the generated ResourceClaim.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.ContainerExtendedResourceRequest"),
+									},
+								},
+							},
+						},
+					},
+					"resourceClaimName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaimName is the name of the ResourceClaim that was generated for the Pod in the namespace of the Pod.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"requestMappings", "resourceClaimName"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.ContainerExtendedResourceRequest"},
+	}
+}
+
 func schema_k8sio_api_core_v1_PodIP(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -30213,11 +30296,17 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							},
 						},
 					},
+					"extendedResourceClaimStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status of extended resource claim backed by DRA.",
+							Ref:         ref("k8s.io/api/core/v1.PodExtendedResourceClaimStatus"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.ContainerStatus", "k8s.io/api/core/v1.HostIP", "k8s.io/api/core/v1.PodCondition", "k8s.io/api/core/v1.PodIP", "k8s.io/api/core/v1.PodResourceClaimStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"k8s.io/api/core/v1.ContainerStatus", "k8s.io/api/core/v1.HostIP", "k8s.io/api/core/v1.PodCondition", "k8s.io/api/core/v1.PodExtendedResourceClaimStatus", "k8s.io/api/core/v1.PodIP", "k8s.io/api/core/v1.PodResourceClaimStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 
@@ -48590,6 +48679,13 @@ func schema_k8sio_api_resource_v1_DeviceClassSpec(ref common.ReferenceCallback) 
 							},
 						},
 					},
+					"extendedResourceName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is an alpha field.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -50901,6 +50997,13 @@ func schema_k8sio_api_resource_v1beta1_DeviceClassSpec(ref common.ReferenceCallb
 							},
 						},
 					},
+					"extendedResourceName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is an alpha field.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -52892,6 +52995,13 @@ func schema_k8sio_api_resource_v1beta2_DeviceClassSpec(ref common.ReferenceCallb
 									},
 								},
 							},
+						},
+					},
+					"extendedResourceName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is an alpha field.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},

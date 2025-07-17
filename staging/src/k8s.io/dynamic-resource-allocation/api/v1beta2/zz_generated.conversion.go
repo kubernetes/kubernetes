@@ -824,6 +824,7 @@ func Convert_v1beta2_DeviceClassList_To_v1_DeviceClassList(in *resourcev1beta2.D
 func autoConvert_v1_DeviceClassSpec_To_v1beta2_DeviceClassSpec(in *v1.DeviceClassSpec, out *resourcev1beta2.DeviceClassSpec, s conversion.Scope) error {
 	out.Selectors = *(*[]resourcev1beta2.DeviceSelector)(unsafe.Pointer(&in.Selectors))
 	out.Config = *(*[]resourcev1beta2.DeviceClassConfiguration)(unsafe.Pointer(&in.Config))
+	out.ExtendedResourceName = (*string)(unsafe.Pointer(in.ExtendedResourceName))
 	return nil
 }
 
@@ -835,6 +836,7 @@ func Convert_v1_DeviceClassSpec_To_v1beta2_DeviceClassSpec(in *v1.DeviceClassSpe
 func autoConvert_v1beta2_DeviceClassSpec_To_v1_DeviceClassSpec(in *resourcev1beta2.DeviceClassSpec, out *v1.DeviceClassSpec, s conversion.Scope) error {
 	out.Selectors = *(*[]v1.DeviceSelector)(unsafe.Pointer(&in.Selectors))
 	out.Config = *(*[]v1.DeviceClassConfiguration)(unsafe.Pointer(&in.Config))
+	out.ExtendedResourceName = (*string)(unsafe.Pointer(in.ExtendedResourceName))
 	return nil
 }
 

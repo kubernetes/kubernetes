@@ -6604,6 +6604,29 @@
       ],
       "type": "object"
     },
+    "io.k8s.api.core.v1.ContainerExtendedResourceRequest": {
+      "description": "ContainerExtendedResourceRequest has the mapping of container name, extended resource name to the device request name.",
+      "properties": {
+        "containerName": {
+          "description": "The name of the container requesting resources.",
+          "type": "string"
+        },
+        "requestName": {
+          "description": "The name of the request in the special ResourceClaim which corresponds to the extended resource.",
+          "type": "string"
+        },
+        "resourceName": {
+          "description": "The name of the extended resource in that container which gets backed by DRA.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "containerName",
+        "resourceName",
+        "requestName"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.core.v1.ContainerImage": {
       "description": "Describe a container image",
       "properties": {
@@ -9781,6 +9804,28 @@
       },
       "type": "object"
     },
+    "io.k8s.api.core.v1.PodExtendedResourceClaimStatus": {
+      "description": "PodExtendedResourceClaimStatus is stored in the PodStatus for the extended resource requests backed by DRA. It stores the generated name for the corresponding special ResourceClaim created by the scheduler.",
+      "properties": {
+        "requestMappings": {
+          "description": "RequestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request in the generated ResourceClaim.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.core.v1.ContainerExtendedResourceRequest"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "resourceClaimName": {
+          "description": "ResourceClaimName is the name of the ResourceClaim that was generated for the Pod in the namespace of the Pod.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestMappings",
+        "resourceClaimName"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.core.v1.PodIP": {
       "description": "PodIP represents a single IP address allocated to the pod.",
       "properties": {
@@ -10280,6 +10325,10 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "extendedResourceClaimStatus": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.PodExtendedResourceClaimStatus",
+          "description": "Status of extended resource claim backed by DRA."
         },
         "hostIP": {
           "description": "hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will not be updated even if there is a node is assigned to pod",
@@ -15560,6 +15609,10 @@
           "type": "array",
           "x-kubernetes-list-type": "atomic"
         },
+        "extendedResourceName": {
+          "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is an alpha field.",
+          "type": "string"
+        },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",
           "items": {
@@ -16823,6 +16876,10 @@
           "type": "array",
           "x-kubernetes-list-type": "atomic"
         },
+        "extendedResourceName": {
+          "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is an alpha field.",
+          "type": "string"
+        },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",
           "items": {
@@ -17899,6 +17956,10 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "extendedResourceName": {
+          "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is an alpha field.",
+          "type": "string"
         },
         "selectors": {
           "description": "Each selector must be satisfied by a device which is claimed via this class.",
