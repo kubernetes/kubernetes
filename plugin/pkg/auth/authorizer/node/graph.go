@@ -427,6 +427,12 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 			g.addEdgeLocked(claimVertex, podVertex, nodeVertex)
 		}
 	}
+
+	if pod.Status.ExtendedResourceClaimStatus != nil && len(pod.Status.ExtendedResourceClaimStatus.ResourceClaimName) > 0 {
+		claimVertex := g.getOrCreateVertexLocked(resourceClaimVertexType, pod.Namespace, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
+		// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
+		g.addEdgeLocked(claimVertex, podVertex, nodeVertex)
+	}
 }
 
 // Must be called under a write lock.

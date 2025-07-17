@@ -37,15 +37,19 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -335,6 +339,41 @@ func genTestPod() *v1.Pod {
 	}
 }
 
+// genTestPodWithExtendedResource generates pod object
+func genTestPodWithExtendedResource() *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			UID:       podUID,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: containerName,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							"example.com/gpu": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+				ResourceClaimName: claimName,
+				RequestMappings: []v1.ContainerExtendedResourceRequest{
+					{
+						ContainerName: containerName,
+						ResourceName:  "example.com/gpu",
+						RequestName:   "container-0-request-0",
+					},
+				},
+			},
+		},
+	}
+}
+
 // genTestClaim generates resource claim object
 func genTestClaim(name, driver, device, podUID string) *resourceapi.ResourceClaim {
 	return &resourceapi.ResourceClaim{
@@ -375,6 +414,46 @@ func genTestClaim(name, driver, device, podUID string) *resourceapi.ResourceClai
 	}
 }
 
+// genTestClaimWithExtendedResource generates resource claim object
+func genTestClaimWithExtendedResource(name, driver, device, podUID string) *resourceapi.ResourceClaim {
+	return &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       types.UID(fmt.Sprintf("%s-uid", name)),
+		},
+		Spec: resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{
+					{
+						Name: "container-0-request-0",
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: className,
+						},
+					},
+				},
+			},
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Request: "container-0-request-0",
+							Pool:    poolName,
+							Device:  device,
+							Driver:  driver,
+						},
+					},
+				},
+			},
+			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+				{UID: types.UID(podUID)},
+			},
+		},
+	}
+}
+
 // genTestClaimInfo generates claim info object
 func genTestClaimInfo(claimUID types.UID, podUIDs []string, prepared bool) *ClaimInfo {
 	return &ClaimInfo{
@@ -398,6 +477,29 @@ func genTestClaimInfo(claimUID types.UID, podUIDs []string, prepared bool) *Clai
 	}
 }
 
+// genTestClaimInfoWithExtendedResource generates claim info object
+func genTestClaimInfoWithExtendedResource(podUIDs []string, prepared bool) *ClaimInfo {
+	return &ClaimInfo{
+		ClaimInfoState: state.ClaimInfoState{
+			ClaimUID:  claimUID,
+			ClaimName: claimName,
+			Namespace: namespace,
+			PodUIDs:   sets.New[string](podUIDs...),
+			DriverState: map[string]state.DriverState{
+				driverName: {
+					Devices: []state.Device{{
+						PoolName:     poolName,
+						DeviceName:   deviceName,
+						RequestNames: []string{"container-0-request-0"},
+						CDIDeviceIDs: []string{cdiID},
+					}},
+				},
+			},
+		},
+		prepared: prepared,
+	}
+}
+
 // genClaimInfoState generates claim info state object
 func genClaimInfoState(cdiDeviceID string) state.ClaimInfoState {
 	s := state.ClaimInfoState{
@@ -411,6 +513,22 @@ func genClaimInfoState(cdiDeviceID string) state.ClaimInfoState {
 	}
 	if cdiDeviceID != "" {
 		s.DriverState[driverName] = state.DriverState{Devices: []state.Device{{PoolName: poolName, DeviceName: deviceName, RequestNames: []string{requestName}, CDIDeviceIDs: []string{cdiDeviceID}}}}
+	}
+	return s
+}
+
+func genClaimInfoStateWithExtendedResource(cdiDeviceID string) state.ClaimInfoState {
+	s := state.ClaimInfoState{
+		ClaimUID:  claimUID,
+		ClaimName: claimName,
+		Namespace: namespace,
+		PodUIDs:   sets.New[string](podUID),
+		DriverState: map[string]state.DriverState{
+			driverName: {},
+		},
+	}
+	if cdiDeviceID != "" {
+		s.DriverState[driverName] = state.DriverState{Devices: []state.Device{{PoolName: poolName, DeviceName: deviceName, RequestNames: []string{"container-0-request-0"}, CDIDeviceIDs: []string{cdiDeviceID}}}}
 	}
 	return s
 }
@@ -455,6 +573,19 @@ func TestGetResources(t *testing.T) {
 			pod:     genTestPod(),
 			wantErr: true,
 		},
+		{
+			description: "extended resource claim info with devices",
+			container: &v1.Container{
+				Name: containerName,
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						"example.com/gpu": resource.MustParse("1"),
+					},
+				},
+			},
+			pod:       genTestPodWithExtendedResource(),
+			claimInfo: genTestClaimInfoWithExtendedResource(nil, false),
+		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
@@ -465,6 +596,7 @@ func TestGetResources(t *testing.T) {
 				manager.cache.add(test.claimInfo)
 			}
 
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
 			containerInfo, err := manager.GetResources(test.pod, test.container)
 			if test.wantErr {
 				assert.Error(t, err)
@@ -623,24 +755,24 @@ func TestPrepareResources(t *testing.T) {
 			expectedPrepareCalls: 1,
 		},
 		{
-			description:            "resource already prepared",
+			description:            "should prepare extended resource claim backed by DRA",
 			driverName:             driverName,
-			pod:                    genTestPod(),
-			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
-			expectedClaimInfoState: genClaimInfoState(cdiID),
+			pod:                    genTestPodWithExtendedResource(),
+			claim:                  genTestClaimWithExtendedResource(claimName, driverName, deviceName, podUID),
+			expectedClaimInfoState: genClaimInfoStateWithExtendedResource(cdiID),
 			resp: &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{
 				string(claimUID): {
 					Devices: []*drapb.Device{
 						{
 							PoolName:     poolName,
 							DeviceName:   deviceName,
-							RequestNames: []string{requestName},
+							RequestNames: []string{"container-0-request-0"},
 							CDIDeviceIDs: []string{cdiID},
 						},
 					},
 				},
 			}},
+			expectedPrepareCalls: 1,
 		},
 		{
 			description:    "claim UIDs mismatch",
@@ -691,6 +823,7 @@ func TestPrepareResources(t *testing.T) {
 				manager.cache.add(test.claimInfo)
 			}
 
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
 			err = manager.PrepareResources(backgroundCtx, test.pod)
 
 			assert.Equal(t, test.expectedPrepareCalls, draServerInfo.server.prepareResourceCalls.Load())
@@ -710,8 +843,14 @@ func TestPrepareResources(t *testing.T) {
 			}
 
 			// check the cache contains the expected claim info
-			podClaimName, _, err := resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
-			require.NoError(t, err)
+			var podClaimName *string
+			if len(test.pod.Spec.ResourceClaims) > 0 {
+				podClaimName, _, err = resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
+				require.NoError(t, err)
+			}
+			if podClaimName == nil {
+				podClaimName = &claimName
+			}
 			claimInfoResult, ok := manager.cache.get(*podClaimName, test.pod.Namespace)
 			require.True(t, ok, "claimInfo not found in cache")
 			require.True(t, claimInfoResult.PodUIDs.Has(string(test.pod.UID)), "podUIDs mismatch")
@@ -791,6 +930,14 @@ func TestUnprepareResources(t *testing.T) {
 			expectedErrMsg:         "NodeUnprepareResources skipped 1 ResourceClaims",
 		},
 		{
+			description:            "should unprepare already prepared extended resource backed by DRA",
+			driverName:             driverName,
+			pod:                    genTestPodWithExtendedResource(),
+			claim:                  genTestClaimWithExtendedResource(claimName, driverName, deviceName, podUID),
+			claimInfo:              genTestClaimInfoWithExtendedResource([]string{podUID}, true),
+			expectedUnprepareCalls: 1,
+		},
+		{
 			description:            "should unprepare already prepared resource",
 			driverName:             driverName,
 			pod:                    genTestPod(),
@@ -839,6 +986,7 @@ func TestUnprepareResources(t *testing.T) {
 				manager.cache.add(test.claimInfo)
 			}
 
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
 			err = manager.UnprepareResources(backgroundCtx, test.pod)
 
 			assert.Equal(t, test.expectedUnprepareCalls, draServerInfo.server.unprepareResourceCalls.Load())
@@ -863,8 +1011,15 @@ func TestUnprepareResources(t *testing.T) {
 			}
 
 			// Check cache was cleared only on successful unprepare
-			podClaimName, _, err := resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
-			require.NoError(t, err)
+			var podClaimName *string
+			if len(test.pod.Spec.ResourceClaims) > 0 {
+				podClaimName, _, err = resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
+				require.NoError(t, err)
+			}
+			claimName := claimName
+			if podClaimName == nil {
+				podClaimName = &claimName
+			}
 			assert.False(t, manager.cache.contains(*podClaimName, test.pod.Namespace), "claimInfo should not be found after successful unprepare")
 		})
 	}
@@ -902,6 +1057,12 @@ func TestGetContainerClaimInfos(t *testing.T) {
 			expectedClaimName: claimName,
 			pod:               genTestPod(),
 			claimInfo:         genTestClaimInfo(claimUID, []string{podUID}, false),
+		},
+		{
+			description:       "should get extended resource claim info",
+			expectedClaimName: claimName,
+			pod:               genTestPodWithExtendedResource(),
+			claimInfo:         genTestClaimInfoWithExtendedResource([]string{podUID}, false),
 		},
 		{
 			description:    "should fail when claim info not found",
@@ -955,6 +1116,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 				manager.cache.add(test.claimInfo)
 			}
 
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
 			claimInfos, err := manager.GetContainerClaimInfos(test.pod, &test.pod.Spec.Containers[0])
 
 			if test.expectedErrMsg != "" {
