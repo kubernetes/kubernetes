@@ -1519,8 +1519,14 @@ func (p *podWorkers) completeWork(podUID types.UID, phaseTransition bool, syncEr
 		// Network is not ready; back off for short period of time and retry as network might be ready soon.
 		p.workQueue.Enqueue(podUID, wait.Jitter(backOffOnTransientErrorPeriod, workerBackOffPeriodJitterFactor))
 	default:
-		// Error occurred during the sync; back off and then retry.
-		p.workQueue.Enqueue(podUID, wait.Jitter(p.backOffPeriod, workerBackOffPeriodJitterFactor))
+		// Error occurred during the sync; back off and then retry. If the error includes a backoff duration,
+		// wait by that amount instead of the default to avoid adding extra time to the backoff.
+		var backoff time.Duration
+		var isBackoffErr bool
+		if backoff, isBackoffErr = kubecontainer.MinBackoff(syncErr); !isBackoffErr {
+			backoff = p.backOffPeriod
+		}
+		p.workQueue.Enqueue(podUID, wait.Jitter(backoff, workerBackOffPeriodJitterFactor))
 	}
 
 	// if there is a pending update for this worker, requeue immediately, otherwise

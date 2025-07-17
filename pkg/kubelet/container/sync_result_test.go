@@ -18,7 +18,11 @@ package container
 
 import (
 	"errors"
+	"fmt"
 	"testing"
+	"time"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 func TestPodSyncResult(t *testing.T) {
@@ -64,5 +68,158 @@ func TestPodSyncResult(t *testing.T) {
 	result.AddPodSyncResult(errResult)
 	if result.Error() == nil {
 		t.Errorf("PodSyncResult should be error: %v", result)
+	}
+}
+
+// myCustomError is a custom error type for testing.
+type myCustomError struct {
+	msg string
+}
+
+func (e *myCustomError) Error() string {
+	return e.msg
+}
+
+func TestPodSyncResultPreservesOriginalErrorType(t *testing.T) {
+	t.Run("with custom error in SyncResult", func(t *testing.T) {
+		customErr := &myCustomError{msg: "a special error"}
+		syncResult := NewSyncResult(KillContainer, "container_1")
+		syncResult.Fail(customErr, "a special message")
+		result := &PodSyncResult{
+			SyncResults: []*SyncResult{syncResult},
+		}
+
+		aggErr := result.Error()
+		if aggErr == nil {
+			t.Fatal("expected an aggregate error, but got nil")
+		}
+
+		errs := (aggErr.(utilerrors.Aggregate)).Errors()
+		foundCustomErr := false
+		for _, err := range errs {
+			var ce *myCustomError
+			if errors.As(err, &ce) && ce == customErr {
+				foundCustomErr = true
+			}
+		}
+		if !foundCustomErr {
+			t.Errorf("expected custom error not found in aggregate error. got %q, want %q", aggErr, customErr)
+		}
+	})
+
+	t.Run("with custom error in SyncError", func(t *testing.T) {
+		customErr := &myCustomError{msg: "a special sync error"}
+		result := &PodSyncResult{}
+		result.Fail(customErr)
+
+		aggErr := result.Error()
+		if aggErr == nil {
+			t.Fatal("expected an aggregate error for SyncError, but got nil")
+		}
+
+		errs := (aggErr.(utilerrors.Aggregate)).Errors()
+		foundCustomErr := false
+		for _, err := range errs {
+			var ce *myCustomError
+			if errors.As(err, &ce) && ce == customErr {
+				foundCustomErr = true
+			}
+		}
+		if !foundCustomErr {
+			t.Errorf("expected custom error not found in aggregate error. got %q, want %q", aggErr, customErr)
+		}
+	})
+}
+
+func TestMinBackoff(t *testing.T) {
+	testCases := []struct {
+		name            string
+		err             error
+		expectedBackoff time.Duration
+		expectedFound   bool
+	}{
+		{
+			name:            "nil error",
+			err:             nil,
+			expectedBackoff: 0,
+			expectedFound:   false,
+		},
+		{
+			name:            "simple error",
+			err:             errors.New("generic error"),
+			expectedBackoff: 0,
+			expectedFound:   false,
+		},
+		{
+			name:            "BackoffError",
+			err:             NewBackoffError(errors.New("backoff"), 5*time.Second),
+			expectedBackoff: 5 * time.Second,
+			expectedFound:   true,
+		},
+		{
+			name:            "wrapped BackoffError",
+			err:             fmt.Errorf("wrapped: %w", NewBackoffError(errors.New("backoff"), 3*time.Second)),
+			expectedBackoff: 3 * time.Second,
+			expectedFound:   true,
+		},
+		{
+			name:            "aggregate with no BackoffError",
+			err:             utilerrors.NewAggregate([]error{errors.New("err1"), errors.New("err2")}),
+			expectedBackoff: 0,
+			expectedFound:   false,
+		},
+		{
+			name: "aggregate with one BackoffError",
+			err: utilerrors.NewAggregate([]error{
+				errors.New("err1"),
+				NewBackoffError(errors.New("backoff"), 7*time.Second),
+			}),
+			expectedBackoff: 7 * time.Second,
+			expectedFound:   true,
+		},
+		{
+			name: "aggregate with multiple BackoffErrors, returns minimum",
+			err: utilerrors.NewAggregate([]error{
+				NewBackoffError(errors.New("backoff1"), 10*time.Second),
+				NewBackoffError(errors.New("backoff2"), 3*time.Second),
+				errors.New("err1"),
+				NewBackoffError(errors.New("backoff3"), 5*time.Second),
+			}),
+			expectedBackoff: 3 * time.Second,
+			expectedFound:   true,
+		},
+		{
+			name: "wrapped aggregate with BackoffError",
+			err: fmt.Errorf("wrapped: %w", utilerrors.NewAggregate([]error{
+				NewBackoffError(errors.New("backoff1"), 10*time.Second),
+				NewBackoffError(errors.New("backoff2"), 3*time.Second),
+			})),
+			expectedBackoff: 3 * time.Second,
+			expectedFound:   true,
+		},
+		{
+			name: "nested aggregate with BackoffError",
+			err: utilerrors.NewAggregate([]error{
+				errors.New("err1"),
+				utilerrors.NewAggregate([]error{
+					NewBackoffError(errors.New("backoff nested"), 2*time.Second),
+				}),
+				NewBackoffError(errors.New("backoff outer"), 4*time.Second),
+			}),
+			expectedBackoff: 2 * time.Second,
+			expectedFound:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			backoff, found := MinBackoff(tc.err)
+			if found != tc.expectedFound {
+				t.Errorf("expected found=%t, got %t", tc.expectedFound, found)
+			}
+			if backoff != tc.expectedBackoff {
+				t.Errorf("expected backoff=%v, got %v", tc.expectedBackoff, backoff)
+			}
+		})
 	}
 }
