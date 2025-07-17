@@ -1022,7 +1022,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 						})
 
 						framework.Logf("Get result: %v, err: %v", res, err)
-						gomega.Expect(err).ToNot(gomega.HaveOccurred(), "expected Get to succeed with the feature gate enabled")
+						framework.ExpectNoError(err, "Expected Get to succeed with the feature gate enabled")
 						gomega.Expect(res.PodResources.Name).To(gomega.Equal(pod.Name))
 						gomega.Expect(res.PodResources.Containers).To(gomega.HaveLen(1), "expected one container")
 						container := res.PodResources.Containers[0]
