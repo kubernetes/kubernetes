@@ -212,6 +212,21 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 		},
 		{
+			name: "Burstable QoS pod with memory requests + limits - decrease memory limit",
+			containers: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			expected: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: reducedMemLimit},
+				},
+			},
+		},
+		{
 			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests only",
 			containers: []podresize.ResizableContainerInfo{
 				{
@@ -1207,22 +1222,6 @@ func doPodResizeErrorTests(f *framework.Framework) {
 				},
 			},
 			patchError: "spec.containers[0].name: Forbidden: containers may not be renamed or reordered on resize, spec.containers[1].name: Forbidden: containers may not be renamed or reordered on resize",
-		},
-		{
-			name: "Burstable QoS pod with memory requests + limits - decrease memory limit",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: reducedMemLimit},
-				},
-			},
-			patchError: "memory limits cannot be decreased",
 		},
 	}
 
