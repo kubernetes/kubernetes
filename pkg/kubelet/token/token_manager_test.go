@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestTokenCachingAndExpiration(t *testing.T) {
@@ -95,7 +96,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 					},
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences:         []string{"foo1", "foo2"},
-						ExpirationSeconds: getInt64Point(3600),
+						ExpirationSeconds: ptr.To[int64](3600),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
 							Name: "foo-pod",
@@ -118,7 +119,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 					},
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences:         []string{"foo1", "foo2"},
-						ExpirationSeconds: getInt64Point(3600),
+						ExpirationSeconds: ptr.To[int64](3600),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
 							Name: "foo-pod",
@@ -146,7 +147,7 @@ func TestTokenCachingAndExpiration(t *testing.T) {
 					},
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences:         []string{"foo1", "foo2"},
-						ExpirationSeconds: getInt64Point(3600),
+						ExpirationSeconds: ptr.To[int64](3600),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
 							Name: "foo-pod",
@@ -533,7 +534,7 @@ func TestKeyFunc(t *testing.T) {
 					tr: &authenticationv1.TokenRequest{
 						Spec: authenticationv1.TokenRequestSpec{
 							Audiences:         []string{"foo1", "foo2"},
-							ExpirationSeconds: getInt64Point(2000),
+							ExpirationSeconds: ptr.To[int64](2000),
 							BoundObjectRef: &authenticationv1.BoundObjectReference{
 								Kind: "pod",
 								Name: "foo-pod",
@@ -548,7 +549,7 @@ func TestKeyFunc(t *testing.T) {
 					tr: &authenticationv1.TokenRequest{
 						Spec: authenticationv1.TokenRequestSpec{
 							Audiences:         []string{"ame1", "ame2"},
-							ExpirationSeconds: getInt64Point(2000),
+							ExpirationSeconds: ptr.To[int64](2000),
 							BoundObjectRef: &authenticationv1.BoundObjectReference{
 								Kind: "pod",
 								Name: "ame-pod",
@@ -564,7 +565,7 @@ func TestKeyFunc(t *testing.T) {
 				tr: &authenticationv1.TokenRequest{
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences:         []string{"foo1", "foo2"},
-						ExpirationSeconds: getInt64Point(2000),
+						ExpirationSeconds: ptr.To[int64](2000),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
 							Name: "foo-pod",
@@ -584,7 +585,7 @@ func TestKeyFunc(t *testing.T) {
 					tr: &authenticationv1.TokenRequest{
 						Spec: authenticationv1.TokenRequestSpec{
 							Audiences:         []string{"foo1", "foo2"},
-							ExpirationSeconds: getInt64Point(2000),
+							ExpirationSeconds: ptr.To[int64](2000),
 							BoundObjectRef: &authenticationv1.BoundObjectReference{
 								Kind: "pod",
 								Name: "foo-pod",
@@ -601,7 +602,7 @@ func TestKeyFunc(t *testing.T) {
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences: []string{"foo1", "foo2"},
 						//everthing is same besides ExpirationSeconds
-						ExpirationSeconds: getInt64Point(2001),
+						ExpirationSeconds: ptr.To[int64](2001),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
 							Name: "foo-pod",
@@ -621,7 +622,7 @@ func TestKeyFunc(t *testing.T) {
 					tr: &authenticationv1.TokenRequest{
 						Spec: authenticationv1.TokenRequestSpec{
 							Audiences:         []string{"foo1", "foo2"},
-							ExpirationSeconds: getInt64Point(2000),
+							ExpirationSeconds: ptr.To[int64](2000),
 							BoundObjectRef: &authenticationv1.BoundObjectReference{
 								Kind: "pod",
 								Name: "foo-pod",
@@ -637,7 +638,7 @@ func TestKeyFunc(t *testing.T) {
 				tr: &authenticationv1.TokenRequest{
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences:         []string{"foo1", "foo2"},
-						ExpirationSeconds: getInt64Point(2000),
+						ExpirationSeconds: ptr.To[int64](2000),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
 							//everthing is same besides BoundObjectRef.Name
@@ -661,7 +662,7 @@ func TestKeyFunc(t *testing.T) {
 						},
 						Spec: authenticationv1.TokenRequestSpec{
 							Audiences:         []string{"foo1", "foo2"},
-							ExpirationSeconds: getInt64Point(2000),
+							ExpirationSeconds: ptr.To[int64](2000),
 							BoundObjectRef: &authenticationv1.BoundObjectReference{
 								Kind: "pod",
 								Name: "foo-pod",
@@ -680,7 +681,7 @@ func TestKeyFunc(t *testing.T) {
 					},
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences:         []string{"foo1", "foo2"},
-						ExpirationSeconds: getInt64Point(2000),
+						ExpirationSeconds: ptr.To[int64](2000),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
 							Name: "foo-pod",
@@ -703,7 +704,7 @@ func TestKeyFunc(t *testing.T) {
 						},
 						Spec: authenticationv1.TokenRequestSpec{
 							Audiences:         []string{"foo1", "foo2"},
-							ExpirationSeconds: getInt64Point(2000),
+							ExpirationSeconds: ptr.To[int64](2000),
 							BoundObjectRef: &authenticationv1.BoundObjectReference{
 								Kind: "pod",
 								Name: "foo-pod",
@@ -722,7 +723,7 @@ func TestKeyFunc(t *testing.T) {
 					},
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences:         []string{"foo1", "foo2"},
-						ExpirationSeconds: getInt64Point(2000),
+						ExpirationSeconds: ptr.To[int64](2000),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
 							Name: "foo-pod",
@@ -743,7 +744,7 @@ func TestKeyFunc(t *testing.T) {
 						// No UID set
 						Spec: authenticationv1.TokenRequestSpec{
 							Audiences:         []string{"foo1", "foo2"},
-							ExpirationSeconds: getInt64Point(2000),
+							ExpirationSeconds: ptr.To[int64](2000),
 							BoundObjectRef: &authenticationv1.BoundObjectReference{
 								Kind: "pod",
 								Name: "foo-pod",
@@ -760,7 +761,7 @@ func TestKeyFunc(t *testing.T) {
 					// No UID set
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences:         []string{"foo1", "foo2"},
-						ExpirationSeconds: getInt64Point(2000),
+						ExpirationSeconds: ptr.To[int64](2000),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
 							Name: "foo-pod",
@@ -783,7 +784,7 @@ func TestKeyFunc(t *testing.T) {
 						},
 						Spec: authenticationv1.TokenRequestSpec{
 							Audiences:         []string{"foo1", "foo2"},
-							ExpirationSeconds: getInt64Point(2000),
+							ExpirationSeconds: ptr.To[int64](2000),
 							BoundObjectRef: &authenticationv1.BoundObjectReference{
 								Kind: "pod",
 								Name: "foo-pod",
@@ -800,7 +801,7 @@ func TestKeyFunc(t *testing.T) {
 					// No UID set - should not hit cached entry with UID
 					Spec: authenticationv1.TokenRequestSpec{
 						Audiences:         []string{"foo1", "foo2"},
-						ExpirationSeconds: getInt64Point(2000),
+						ExpirationSeconds: ptr.To[int64](2000),
 						BoundObjectRef: &authenticationv1.BoundObjectReference{
 							Kind: "pod",
 							Name: "foo-pod",
@@ -861,7 +862,7 @@ func TestServiceAccountRecreationCacheInvalidation(t *testing.T) {
 		},
 		Spec: authenticationv1.TokenRequestSpec{
 			Audiences:         []string{"test-audience"},
-			ExpirationSeconds: getInt64Point(3600),
+			ExpirationSeconds: ptr.To[int64](3600),
 		},
 	}
 
@@ -895,7 +896,7 @@ func TestServiceAccountRecreationCacheInvalidation(t *testing.T) {
 		},
 		Spec: authenticationv1.TokenRequestSpec{
 			Audiences:         []string{"test-audience"},
-			ExpirationSeconds: getInt64Point(3600),
+			ExpirationSeconds: ptr.To[int64](3600),
 		},
 	}
 
@@ -927,7 +928,7 @@ func getTokenRequest() *authenticationv1.TokenRequest {
 	return &authenticationv1.TokenRequest{
 		Spec: authenticationv1.TokenRequestSpec{
 			Audiences:         []string{"foo1", "foo2"},
-			ExpirationSeconds: getInt64Point(2000),
+			ExpirationSeconds: ptr.To[int64](2000),
 			BoundObjectRef: &authenticationv1.BoundObjectReference{
 				Kind: "pod",
 				Name: "foo-pod",
@@ -935,8 +936,4 @@ func getTokenRequest() *authenticationv1.TokenRequest {
 			},
 		},
 	}
-}
-
-func getInt64Point(v int64) *int64 {
-	return &v
 }
