@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -768,6 +769,152 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		delErr5 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod5)
 		framework.ExpectNoError(delErr5, "failed to delete pod %s", testPod5.Name)
 	})
+
+	ginkgo.It("pod-resize-retry-deferred-test-3", func(ctx context.Context) {
+		// Deferred resize E2E test case #3:
+		// 	   1. Create pod1, pod2, pod3, and pod4 on node, each starting with 1/4 of the node's allocatable CPU and and 1/5 the memory.
+		// 	   2. Resize pod2 to request more CPU than available (1/3), along with a decrease in memory (1/24), verify the resize is deferred.
+		//	   3. Resize pod3 to request more memory than available (2/3), along with a decrease in CPU (1/24), verify the resize is deferred.
+		// 	   4. Resize pod4 to request more CPU than available (5/8), verify the resize is deferred.
+		//	   5. The deferred resizes above are chosen carefully such that:
+		//	      - deletion of pod1 should make room for pod2's resize (but not pod3 or pod4).
+		//	      - pod2's resize should make room for pod3's resize (but not pod4).
+		//	      - pod3's resize should make room for pod4's resize.
+		//     6. Delete pod1, verify the chain of deferred resizes is actuated.
+
+		podClient := e2epod.NewPodClient(f)
+		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
+		framework.ExpectNoError(err, "failed to get running nodes")
+		gomega.Expect(nodes.Items).ShouldNot(gomega.BeEmpty())
+		framework.Logf("Found %d schedulable nodes", len(nodes.Items))
+
+		ginkgo.By("Find node CPU and memory resources available for allocation!")
+		node := nodes.Items[0]
+
+		nodeAllocatableMilliCPU, initNodeAvailableMilliCPU := getNodeAllocatableAndAvailableMilliCPUValues(ctx, f, &node)
+		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
+			node.Name, nodeAllocatableMilliCPU, initNodeAvailableMilliCPU)
+
+		nodeAllocatableMem, initNodeAvailableMem := getNodeAllocatableAndAvailableMemoryValues(ctx, f, &node)
+		framework.Logf("Node '%s': NodeAllocatable Memory = %d. Memory currently available to allocate = %d.",
+			node.Name, nodeAllocatableMem, initNodeAvailableMem)
+
+		initialCPUQuantity := resource.NewMilliQuantity(initNodeAvailableMilliCPU/4, resource.DecimalSI)
+		initialMemoryQuantity := resource.NewQuantity(initNodeAvailableMem/5, resource.DecimalSI)
+		framework.Logf("initial CPU request is '%dm'", initialCPUQuantity.MilliValue())
+		framework.Logf("initial Memory request is '%d'", initialMemoryQuantity.Value())
+
+		c := []podresize.ResizableContainerInfo{
+			{
+				Name: "c",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: initialCPUQuantity.String(),
+					MemReq: initialMemoryQuantity.String(),
+				},
+			},
+		}
+
+		tStamp := strconv.Itoa(time.Now().Nanosecond())
+		testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, c)
+		testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
+		e2epod.SetNodeAffinity(&testPod1.Spec, node.Name)
+
+		testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, c)
+		testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
+		e2epod.SetNodeAffinity(&testPod2.Spec, node.Name)
+
+		testPod3 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod3", tStamp, c)
+		testPod3 = e2epod.MustMixinRestrictedPodSecurity(testPod3)
+		e2epod.SetNodeAffinity(&testPod3.Spec, node.Name)
+
+		testPod4 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod4", tStamp, c)
+		testPod4 = e2epod.MustMixinRestrictedPodSecurity(testPod4)
+		e2epod.SetNodeAffinity(&testPod4.Spec, node.Name)
+
+		testPods := []*v1.Pod{testPod1, testPod2, testPod3, testPod4}
+		ginkgo.By(fmt.Sprintf("Create pods that fits the node '%s'", node.Name))
+		podClient.CreateBatch(ctx, testPods)
+
+		testPod2CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableMilliCPU/3, resource.DecimalSI)
+		testPod2MemoryQuantityResized := resource.NewQuantity(initNodeAvailableMem/24, resource.DecimalSI)
+
+		testPod3CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableMilliCPU/24, resource.DecimalSI)
+		testPod3MemoryQuantityResized := resource.NewQuantity(2*initNodeAvailableMem/3, resource.DecimalSI)
+
+		testPod4CPUQuantityResized := resource.NewMilliQuantity(initNodeAvailableMilliCPU/2+initNodeAvailableMilliCPU/8, resource.DecimalSI)
+		testPod4MemoryQuantityResized := initialMemoryQuantity
+
+		expectedTestPod2Resized := []podresize.ResizableContainerInfo{
+			{
+				Name: "c",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: testPod2CPUQuantityResized.String(),
+					MemReq: testPod2MemoryQuantityResized.String(),
+				},
+			},
+		}
+		expectedTestPod3Resized := []podresize.ResizableContainerInfo{
+			{
+				Name: "c",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: testPod3CPUQuantityResized.String(),
+					MemReq: testPod3MemoryQuantityResized.String(),
+				},
+			},
+		}
+		expectedTestPod4Resized := []podresize.ResizableContainerInfo{
+			{
+				Name: "c",
+				Resources: &cgroups.ContainerResources{
+					CPUReq: testPod4CPUQuantityResized.String(),
+					MemReq: testPod4MemoryQuantityResized.String(),
+				},
+			},
+		}
+
+		patchTestPod2ToDeferred := podresize.MakeResizePatch(c, expectedTestPod2Resized)
+		patchTestPod3ToDeferred := podresize.MakeResizePatch(c, expectedTestPod3Resized)
+		patchTestPod4ToDeferred := podresize.MakeResizePatch(c, expectedTestPod4Resized)
+
+		patches := []string{string(patchTestPod2ToDeferred), string(patchTestPod3ToDeferred), string(patchTestPod4ToDeferred)}
+
+		for i := range patches {
+			testPod := testPods[i+1]
+			patch := patches[i]
+			ginkgo.By(fmt.Sprintf("Resize pod '%s' that cannot fit node due to insufficient CPU or memory", testPod.Name))
+			testPod, err = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx,
+				testPod.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "resize")
+			framework.ExpectNoError(err, "failed to patch pod for resize")
+			waitForPodDeferred(ctx, f, testPod)
+		}
+
+		ginkgo.By("deleting pod 1")
+		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod1)
+		framework.ExpectNoError(delErr1, "failed to delete pod %s", testPod1.Name)
+
+		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod deletion '%s'", testPod2.Name, testPod1.Name))
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod2, expectedTestPod2Resized)
+		podresize.ExpectPodResized(ctx, f, resizedPod, expectedTestPod2Resized)
+
+		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod resize '%s'", testPod3.Name, testPod2.Name))
+		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod3, expectedTestPod3Resized)
+		podresize.ExpectPodResized(ctx, f, resizedPod, expectedTestPod3Resized)
+
+		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod resize '%s'", testPod4.Name, testPod3.Name))
+		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod4, expectedTestPod4Resized)
+		podresize.ExpectPodResized(ctx, f, resizedPod, expectedTestPod4Resized)
+
+		ginkgo.By("deleting pods")
+		for _, testPod := range testPods {
+			delErr := f.ClientSet.CoreV1().Pods(testPod.Namespace).Delete(ctx, testPod.Name, metav1.DeleteOptions{})
+			if delErr != nil && !apierrors.IsNotFound(delErr) {
+				framework.ExpectNoError(delErr, "failed to delete pod %s", testPod.Name)
+			}
+		}
+		for _, testPod := range testPods {
+			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, testPod.Name, testPod.Namespace, e2epod.PodDeleteTimeout))
+		}
+	})
 }
 
 var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (scheduler-focused)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
@@ -836,6 +983,27 @@ func getNodeAllocatableAndAvailableMilliCPUValues(ctx context.Context, f *framew
 	}
 	nodeAvailableMilliCPU := nodeAllocatableMilliCPU - podAllocatedMilliCPU
 	return nodeAllocatableMilliCPU, nodeAvailableMilliCPU
+}
+
+// Calculate available memory. nodeAvailableMemory = nodeAllocatableMemory - sum(podAllocatedMemory)
+func getNodeAllocatableAndAvailableMemoryValues(ctx context.Context, f *framework.Framework, n *v1.Node) (int64, int64) {
+	nodeAllocatableMem := n.Status.Allocatable.Memory().Value()
+	gomega.Expect(n.Status.Allocatable).ShouldNot(gomega.BeEmpty(), "allocatable")
+	podAllocatedMem := int64(0)
+
+	// Exclude pods that are in the Succeeded or Failed states
+	selector := fmt.Sprintf("spec.nodeName=%s,status.phase!=%v,status.phase!=%v", n.Name, v1.PodSucceeded, v1.PodFailed)
+	listOptions := metav1.ListOptions{FieldSelector: selector}
+	podList, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceAll).List(ctx, listOptions)
+
+	framework.ExpectNoError(err, "failed to get running pods")
+	framework.Logf("Found %d pods on node '%s'", len(podList.Items), n.Name)
+	for _, pod := range podList.Items {
+		podRequestMem := resourceapi.GetResourceRequest(&pod, v1.ResourceMemory)
+		podAllocatedMem += podRequestMem
+	}
+	nodeAvailableMem := nodeAllocatableMem - podAllocatedMem
+	return nodeAllocatableMem, nodeAvailableMem
 }
 
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {

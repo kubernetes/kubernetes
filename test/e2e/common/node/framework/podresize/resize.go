@@ -168,7 +168,7 @@ func VerifyPodResources(gotPod *v1.Pod, wantInfo []ResizableContainerInfo) {
 			if wantCtr.Name != gotCtr.Name {
 				continue
 			}
-			gomega.Expect(v1.Container{Name: gotCtr.Name, Resources: gotCtr.Resources}).To(gomega.Equal(v1.Container{Name: wantCtr.Name, Resources: wantCtr.Resources}))
+			gomega.Expect(gotCtr.Resources).To(gomega.BeComparableTo(wantCtr.Resources))
 		}
 	}
 }
@@ -202,7 +202,8 @@ func verifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wan
 			errs = append(errs, fmt.Errorf("container status %d name %q != expected name %q", i, gotCtrStatus.Name, wantCtr.Name))
 			continue
 		}
-		if err := framework.Gomega().Expect(*gotCtrStatus.Resources).To(gomega.Equal(wantCtr.Resources)); err != nil {
+
+		if err := framework.Gomega().Expect(*gotCtrStatus.Resources).To(gomega.BeComparableTo(wantCtr.Resources)); err != nil {
 			errs = append(errs, fmt.Errorf("container[%s] status resources mismatch: %w", wantCtr.Name, err))
 		}
 	}
