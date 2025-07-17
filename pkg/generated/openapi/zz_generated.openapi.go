@@ -1163,6 +1163,12 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apimachinery/pkg/apis/meta/v1.UpdateOptions":                                                    schema_pkg_apis_meta_v1_UpdateOptions(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.WatchEvent":                                                       schema_pkg_apis_meta_v1_WatchEvent(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.PartialObjectMetadataList":                                   schema_pkg_apis_meta_v1beta1_PartialObjectMetadataList(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.Carp":                                                     schema_pkg_apis_testapigroup_v1_Carp(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpCondition":                                            schema_pkg_apis_testapigroup_v1_CarpCondition(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpInfo":                                                 schema_pkg_apis_testapigroup_v1_CarpInfo(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpList":                                                 schema_pkg_apis_testapigroup_v1_CarpList(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpSpec":                                                 schema_pkg_apis_testapigroup_v1_CarpSpec(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpStatus":                                               schema_pkg_apis_testapigroup_v1_CarpStatus(ref),
 		"k8s.io/apimachinery/pkg/runtime.RawExtension":                                                          schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref),
 		"k8s.io/apimachinery/pkg/runtime.TypeMeta":                                                              schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
 		"k8s.io/apimachinery/pkg/runtime.Unknown":                                                               schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
@@ -59656,6 +59662,425 @@ func schema_pkg_apis_meta_v1beta1_PartialObjectMetadataList(ref common.Reference
 		},
 		Dependencies: []string{
 			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadata"},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_Carp(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Carp is a collection of containers, used as either input (create, update) or as output (list, get).",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specification of the desired behavior of the carp. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Most recently observed status of the carp. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpSpec", "k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpStatus"},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_CarpCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type is the type of the condition. Currently only Ready. More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is the status of the condition. Can be True, False, Unknown. More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastProbeTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time we probed the condition.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time the condition transitioned from one status to another.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Unique, one-word, CamelCase reason for the condition's last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Human-readable message indicating details about last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"type", "status"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_CarpInfo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"a": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A is the first map key.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"b": {
+						SchemaProps: spec.SchemaProps{
+							Description: "B is the second map key.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"c": {
+						SchemaProps: spec.SchemaProps{
+							Description: "C is the third, optional map key",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Some data for each pair of A and B.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"a", "b", "data"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_CarpList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CarpList is a list of Carps.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of carps. More info: http://kubernetes.io/docs/user-guide/carps",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/testapigroup/v1.Carp"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/testapigroup/v1.Carp"},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_CarpSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CarpSpec is a description of a carp",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"restartPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Restart policy for all containers within the carp. One of Always, OnFailure, Never. Default to Always. More info: http://kubernetes.io/docs/user-guide/carp-states#restartpolicy",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"terminationGracePeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional duration in seconds the carp needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the carp are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"activeDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional duration in seconds the carp may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers. Value must be a positive integer.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeSelector is a selector which must be true for the carp to fit on a node. Selector which must match a node's labels for the carp to be scheduled on that node. More info: http://kubernetes.io/docs/user-guide/node-selection/README",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"serviceAccountName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServiceAccountName is the name of the ServiceAccount to use to run this carp. More info: https://kubernetes.io/docs/concepts/security/service-accounts/",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"deprecatedServiceAccount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DeprecatedServiceAccount is a deprecated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeName is a request to schedule this carp onto a specific node. If it is non-empty, the scheduler simply schedules this carp onto that node, assuming that it fits resource requirements.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"hostNetwork": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Host networking requested for this carp. Use the host's network namespace. Default to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"hostPID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Use the host's pid namespace. Optional: Default to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"hostIPC": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Use the host's ipc namespace. Optional: Default to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"hostname": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the hostname of the Carp If not specified, the carp's hostname will be set to a system-defined value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"subdomain": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the fully qualified Carp hostname will be \"<hostname>.<subdomain>.<carp namespace>.svc.<cluster domain>\". If not specified, the carp will not have a domainname at all.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"schedulerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the carp will be dispatched by specified scheduler. If not specified, the carp will be dispatched by default scheduler.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_CarpStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CarpStatus represents information about the status of a carp. Status may trail the actual state of a system.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"phase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Current condition of the carp. More info: http://kubernetes.io/docs/user-guide/carp-states#carp-phase",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Current service state of carp. More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpCondition"),
+									},
+								},
+							},
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A human readable message indicating details about why the carp is in this condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A brief CamelCase message indicating details about why the carp is in this state. e.g. 'DiskPressure'",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"hostIP": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IP address of the host to which the carp is assigned. Empty if not yet scheduled.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"carpIP": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IP address allocated to the carp. Routable at least within the cluster. Empty if not yet allocated.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"startTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the carp.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"infos": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"a",
+									"b",
+									"c",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Carp infos are provided by different clients, hence the map type.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpInfo"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time", "k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpCondition", "k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpInfo"},
 	}
 }
 
