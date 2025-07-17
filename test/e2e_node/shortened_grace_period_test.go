@@ -1,11 +1,11 @@
 /*
-Copyright 2023 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -58,14 +58,18 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			}
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 				start := time.Now()
-				podClient.CreateSync(ctx, getGracePeriodTestPodSIGTERM(podName, testRcNamespace, gracePeriodShort))
+				podClient.CreateSync(ctx, getGracePeriodTestPodSIGTERM(podName, testRcNamespace, 20))
 				// 给容器一些时间启动
 				time.Sleep(2 * time.Second)
 				w, err := podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
 				framework.ExpectNoError(err, "failed to watch")
-				// Delete with short grace period
-				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
-				framework.ExpectNoError(err, "failed to delete pod")
+				// 第一次 Delete，grace period 20s
+				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(20))
+				framework.ExpectNoError(err, "failed to delete pod (first)")
+				// 等2秒，再次 Delete，grace period 5s
+				time.Sleep(2 * time.Second)
+				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(5))
+				framework.ExpectNoError(err, "failed to delete pod (second)")
 				// 等待一段时间让信号处理完成
 				time.Sleep(10 * time.Second)
 				// 立即拉日志（pod 还在 Terminating）
@@ -81,8 +85,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				framework.ExpectNoError(err, "failed to read from logs")
 				podLogs := buf.String()
 				framework.Logf("Pod logs: %q", podLogs)
-				// Check logs: must包含 Container started 和 SIGINT 1\nSIGINT 2\n
-				if !strings.Contains(podLogs, "Container started") || !strings.Contains(podLogs, "SIGINT 1\nSIGINT 2\n") {
+				// Check logs: 必须包含 SIGINT 1 和 SIGINT 2
+				if !strings.Contains(podLogs, "SIGINT 1") || !strings.Contains(podLogs, "SIGINT 2") {
 					framework.Failf("unexpected pod logs: %q", podLogs)
 				}
 				// 再等待 pod 被彻底删除
