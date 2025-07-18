@@ -70,23 +70,37 @@ const (
 )
 
 type EvictionTestConfig struct {
-	Signal                  string
+	Signal                  string //eviction signal (e.g., "memory.available")
 	PressureTimeout         time.Duration
-	ExpectedNodeCondition   v1.NodeConditionType
-	ExpectedStarvedResource v1.ResourceName
-	IsHardEviction          bool                                               // true for hard eviction, false for soft eviction
-	ResourceGetter          func(summary *kubeletstatsv1alpha1.Summary) uint64 // Gets available resources (bytes, inodes, etc.)
-	ResourceThreshold       uint64                                             // Consumed resources that trigger eviction
-	ThresholdPercentage     string                                             // either uint64 or percentage
-	EvictionGracePeriod     string                                             // Used for soft eviction
-	MetricsLogger           func(ctx context.Context)
+	ExpectedNodeCondition   v1.NodeConditionType //  on eviction (e.g., NodeMemoryPressure)
+	ExpectedStarvedResource v1.ResourceName      // (e.g., v1.ResourceMemory)
+	IsHardEviction          bool
+	// Gets available resource value from Kubelet summary
+	ResourceGetter      func(summary *kubeletstatsv1alpha1.Summary) uint64
+	ResourceThreshold   uint64                    // Absolute resource consumption (bytes) triggering eviction
+	ThresholdPercentage string                    // Eviction threshold as a percentage (e.g., "5%"). Use instead of ResourceThreshold.
+	EvictionGracePeriod string                    // for soft evictions
+	MetricsLogger       func(ctx context.Context) // Optional: logs metrics during test
+	PrepullImages       bool                      // Optional: prepull images before running test
 }
 
+// testRunner sets up and executes a Kubelet eviction test.
+// It dynamically configures the Kubelet's eviction thresholds for a specified
+// resource (hard or soft), then induces resource pressure to verify that
+// pods are evicted as expected based on their priority.
 func testRunner(f *framework.Framework, config EvictionTestConfig, specs []podEvictSpec) {
-
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-
 	ginkgo.Context(fmt.Sprintf(testContextFmt, config.ExpectedNodeCondition), func() {
+		if config.PrepullImages {
+			prepull := func(ctx context.Context) {
+				err := PrePullAllImages(ctx)
+				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+			}
+			ginkgo.BeforeEach(prepull)
+			if framework.TestContext.PrepullImages {
+				ginkgo.AfterEach(prepull)
+			}
+		}
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			summary := eventuallyGetSummary(ctx)
 			available := config.ResourceGetter(summary)
@@ -101,7 +115,6 @@ func testRunner(f *framework.Framework, config EvictionTestConfig, specs []podEv
 			} else {
 				thresholdValue = fmt.Sprintf("%d", available-config.ResourceThreshold)
 			}
-
 			if config.IsHardEviction {
 				initialConfig.EvictionHard = map[string]string{config.Signal: thresholdValue}
 			} else {
@@ -162,43 +175,24 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 // Images are pre-pulled before running the test workload to ensure
 // that the image garbage collerctor can remove them to avoid eviction.
 var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
-	f := framework.NewDefaultFramework("image-gc-eviction-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	pressureTimeout := 10 * time.Minute
-	expectedNodeCondition := v1.NodeDiskPressure
-	expectedStarvedResource := resourceInodes
-	inodesConsumed := uint64(100000)
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		prepull := func(ctx context.Context) {
-			// Prepull images for image garbage collector to remove them
-			// when reclaiming resources
-			err := PrePullAllImages(ctx)
-			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-		}
-		ginkgo.BeforeEach(prepull)
-		if framework.TestContext.PrepullImages {
-			ginkgo.AfterEach(prepull)
-		}
-
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
-			summary := eventuallyGetSummary(ctx)
-			inodesFree := *summary.Node.Fs.InodesFree
-			if inodesFree <= inodesConsumed {
-				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
-			}
-			framework.Logf("Setting eviction threshold to %d inodes", inodesFree-inodesConsumed)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-		})
-		// Consume enough inodes to induce disk pressure,
-		// but expect that image garbage collection can reduce it enough to avoid an eviction
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
-			{
-				evictionPriority: 0,
-				pod:              inodeConsumingPod("container-inode", 110000, nil),
-			},
-		})
+	testRunner(framework.NewDefaultFramework("image-gc-eviction-test"), EvictionTestConfig{
+		Signal:                  string(evictionapi.SignalNodeFsInodesFree),
+		PressureTimeout:         10 * time.Minute,
+		ExpectedNodeCondition:   v1.NodeDiskPressure,
+		ExpectedStarvedResource: resourceInodes,
+		IsHardEviction:          true,
+		ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+			return *summary.Node.Fs.InodesFree
+		},
+		ResourceThreshold: uint64(100000),
+		MetricsLogger:     logDiskMetrics,
+		// Prepull images for image garbage collector to remove them when reclaiming resources
+		PrepullImages: true,
+	}, []podEvictSpec{
+		{
+			evictionPriority: 0, // Crucial: P0 pods are not expected to be evicted
+			pod:              inodeConsumingPod("container-inode", 110000, nil),
+		},
 	})
 })
 
@@ -239,40 +233,30 @@ var _ = SIGDescribe("MemoryAllocatableEviction", framework.WithSlow(), framework
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space.
 var _ = SIGDescribe("LocalStorageEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
-	f := framework.NewDefaultFramework("localstorage-eviction-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	pressureTimeout := 15 * time.Minute
-	expectedNodeCondition := v1.NodeDiskPressure
-	expectedStarvedResource := v1.ResourceEphemeralStorage
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			summary := eventuallyGetSummary(ctx)
-
-			diskConsumedByTest := resource.MustParse("4Gi")
-			availableBytesOnSystem := *(summary.Node.Fs.AvailableBytes)
-			evictionThreshold := strconv.FormatUint(availableBytesOnSystem-uint64(diskConsumedByTest.Value()), 10)
-
-			if availableBytesOnSystem <= uint64(diskConsumedByTest.Value()) {
-				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageEviction test to run")
-			}
-
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): evictionThreshold}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-		})
-
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
-			{
-				evictionPriority: 1,
-				// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
-				// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
-				pod: diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
-			},
-			{
-				evictionPriority: 0,
-				pod:              innocentPod(),
-			},
-		})
+	diskConsumed := resource.MustParse("4Gi")
+	testRunner(framework.NewDefaultFramework("localstorage-eviction-test"), EvictionTestConfig{
+		Signal:                  string(evictionapi.SignalNodeFsAvailable),
+		PressureTimeout:         15 * time.Minute,
+		ExpectedNodeCondition:   v1.NodeDiskPressure,
+		ExpectedStarvedResource: v1.ResourceEphemeralStorage,
+		IsHardEviction:          true,
+		ResourceThreshold:       uint64(diskConsumed.Value()), // Pod will consume 4Gi
+		MetricsLogger:           logDiskMetrics,
+		ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+			return *summary.Node.Fs.AvailableBytes
+		},
+		PrepullImages: false, // Not an image GC test, so no pre-pulling needed
+	}, []podEvictSpec{
+		{
+			evictionPriority: 1,
+			// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
+			// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
+			pod: diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
+		},
+		{
+			evictionPriority: 0, // This pod should NOT be evicted
+			pod:              innocentPod(),
+		},
 	})
 })
 
