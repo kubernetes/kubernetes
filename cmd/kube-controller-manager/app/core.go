@@ -806,7 +806,7 @@ func (c *garbageCollectorController) Run(ctx context.Context) {
 	workers := int(c.controllerContext.ComponentConfig.GarbageCollectorController.ConcurrentGCSyncs)
 	const syncPeriod = 30 * time.Second
 
-	runRunnables(ctx,
+	runAll(ctx,
 		runnableFunc(func(ctx context.Context) {
 			c.GarbageCollector.Run(ctx, workers, syncPeriod)
 		}),

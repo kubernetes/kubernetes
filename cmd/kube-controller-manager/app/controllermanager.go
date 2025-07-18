@@ -501,7 +501,7 @@ func (rx runnables) Run(ctx context.Context) {
 	wg.Wait()
 }
 
-func runRunnables(ctx context.Context, rx ...Runnable) {
+func runAll(ctx context.Context, rx ...Runnable) {
 	runnables(rx).Run(ctx)
 }
 
