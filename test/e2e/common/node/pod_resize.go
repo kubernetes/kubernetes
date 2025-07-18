@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -208,6 +209,21 @@ func doPodResizeTests(f *framework.Framework) {
 				{
 					Name:      "c1",
 					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: increasedMemLimit},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod with memory requests + limits - decrease memory limit",
+			containers: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			expected: []podresize.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: reducedMemLimit},
 				},
 			},
 		},
@@ -1208,22 +1224,6 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			},
 			patchError: "spec.containers[0].name: Forbidden: containers may not be renamed or reordered on resize, spec.containers[1].name: Forbidden: containers may not be renamed or reordered on resize",
 		},
-		{
-			name: "Burstable QoS pod with memory requests + limits - decrease memory limit",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: reducedMemLimit},
-				},
-			},
-			patchError: "memory limits cannot be decreased",
-		},
 	}
 
 	for idx := range tests {
@@ -1272,6 +1272,127 @@ func doPodResizeErrorTests(f *framework.Framework) {
 	}
 }
 
+func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
+	// Tests the behavior when decreasing memory limit:
+	// 1. Decrease the limit a little bit - should succeed
+	// 2. Decrease the limit down to a tiny amount - should fail
+	// 3. Revert the limit back to the original value - should succeed
+	ginkgo.It("decrease memory limit below usage", func(ctx context.Context) {
+		podClient := e2epod.NewPodClient(f)
+		var testPod *v1.Pod
+		var pErr error
+
+		original := []podresize.ResizableContainerInfo{{
+			Name:      "c1",
+			Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMem},
+		}}
+
+		tStamp := strconv.Itoa(time.Now().Nanosecond())
+		testPod = podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, original)
+		testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+		ginkgo.By("creating pod")
+		testPod = podClient.CreateSync(ctx, testPod)
+
+		ginkgo.By("verifying initial pod resources are as expected")
+		podresize.VerifyPodResources(testPod, original)
+		ginkgo.By("verifying initial pod resize policy is as expected")
+		podresize.VerifyPodResizePolicy(testPod, original)
+
+		ginkgo.By("verifying initial pod status resources are as expected")
+		framework.ExpectNoError(podresize.VerifyPodStatusResources(testPod, original))
+		ginkgo.By("verifying initial cgroup config are as expected")
+		framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, testPod, original))
+
+		// 1. Decrease the limit a little bit - should succeed
+		ginkgo.By("Patching pod with a slightly lowered memory limit")
+		viableLoweredLimit := []podresize.ResizableContainerInfo{{
+			Name:      "c1",
+			Resources: &cgroups.ContainerResources{MemReq: reducedMem, MemLim: reducedMem},
+		}}
+		patch := podresize.MakeResizePatch(original, viableLoweredLimit)
+		testPod, pErr = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
+			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(pErr, "failed to patch pod for viable lowered limit")
+
+		ginkgo.By("verifying pod patched for viable lowered limit")
+		podresize.VerifyPodResources(testPod, viableLoweredLimit)
+
+		ginkgo.By("waiting for viable lowered limit to be actuated")
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod, viableLoweredLimit)
+		podresize.ExpectPodResized(ctx, f, resizedPod, viableLoweredLimit)
+
+		// 2. Decrease the limit down to a tiny amount - should fail
+		const nonViableMemoryLimit = "10Ki"
+		ginkgo.By("Patching pod with a greatly lowered memory limit")
+		nonViableLoweredLimit := []podresize.ResizableContainerInfo{{
+			Name:      "c1",
+			Resources: &cgroups.ContainerResources{MemReq: nonViableMemoryLimit, MemLim: nonViableMemoryLimit},
+		}}
+		patch = podresize.MakeResizePatch(viableLoweredLimit, nonViableLoweredLimit)
+		testPod, pErr = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
+			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(pErr, "failed to patch pod for viable lowered limit")
+
+		framework.ExpectNoError(framework.Gomega().
+			Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(testPod.Namespace).Get, testPod.Name, metav1.GetOptions{}))).
+			WithTimeout(f.Timeouts.PodStart).
+			Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+				// If VerifyPodStatusResources succeeds, it means the resize completed.
+				if podresize.VerifyPodStatusResources(pod, nonViableLoweredLimit) == nil {
+					return nil, fmt.Errorf("non-viable resize unexpectedly completed")
+				}
+
+				var inProgressCondition *v1.PodCondition
+				for i, condition := range pod.Status.Conditions {
+					switch condition.Type {
+					case v1.PodResizeInProgress:
+						inProgressCondition = &pod.Status.Conditions[i]
+					case v1.PodResizePending:
+						return func() string {
+							return fmt.Sprintf("pod should not be pending, got reason=%s, message=%q", condition.Reason, condition.Message)
+						}, nil
+					}
+				}
+				if inProgressCondition == nil {
+					return func() string { return "resize is not in progress" }, nil
+				}
+
+				if inProgressCondition.Reason != v1.PodReasonError {
+					return func() string { return "in-progress reason is not error" }, nil
+				}
+
+				expectedMsg := regexp.MustCompile(`memory limit \(\d+\) below current usage`)
+				if !expectedMsg.MatchString(inProgressCondition.Message) {
+					return func() string {
+						return fmt.Sprintf("Expected %q to contain %q", inProgressCondition.Message, expectedMsg)
+					}, nil
+				}
+				return nil, nil
+			})),
+		)
+		ginkgo.By("verifying pod status resources still match the viable resize")
+		framework.ExpectNoError(podresize.VerifyPodStatusResources(testPod, viableLoweredLimit))
+
+		// 3. Revert the limit back to the original value - should succeed
+		ginkgo.By("Patching pod to revert to original state")
+		patch = podresize.MakeResizePatch(nonViableLoweredLimit, original)
+		testPod, pErr = f.ClientSet.CoreV1().Pods(testPod.Namespace).Patch(ctx, testPod.Name,
+			types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(pErr, "failed to patch pod back to original values")
+
+		ginkgo.By("verifying pod patched for original values")
+		podresize.VerifyPodResources(testPod, original)
+
+		ginkgo.By("waiting for the original values to be actuated")
+		resizedPod = podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod, original)
+		podresize.ExpectPodResized(ctx, f, resizedPod, original)
+
+		ginkgo.By("deleting pod")
+		podClient.DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+	})
+}
+
 // NOTE: Pod resize scheduler resource quota tests are out of scope in e2e_node tests,
 //       because in e2e_node tests
 //          a) scheduler and controller manager is not running by the Node e2e
@@ -1293,4 +1414,5 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(fe
 
 	doPodResizeTests(f)
 	doPodResizeErrorTests(f)
+	doPodResizeMemoryLimitDecreaseTest(f)
 })
