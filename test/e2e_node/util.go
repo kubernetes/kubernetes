@@ -73,6 +73,7 @@ import (
 
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
+var defaultImage = e2epod.GetDefaultTestImage()
 var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 var agnhostImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
