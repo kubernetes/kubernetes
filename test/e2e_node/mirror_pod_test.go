@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
@@ -279,7 +281,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("mirror pod updates", func() {
-		f.It("pod observedGeneration for mirror pods should stay unset", func(ctx context.Context) {
+		f.It("mirror pod: update activeDeadlineSeconds", f.WithNodeConformance(), func(ctx context.Context) {
 			var ns, podPath, staticPodName, mirrorPodName string
 			ns = f.Namespace.Name
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
@@ -297,55 +299,26 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
-			tests := []struct {
-				name     string
-				updateFn func() error
-			}{
-				{
-					name: "updating ActiveDeadlineSeconds",
-					updateFn: func() error {
-						return createStaticPodWithActiveDeadlineSeconds(podPath, staticPodName, ns, imageutils.GetPauseImageName(), v1.RestartPolicyAlways, 60)
-					},
-				},
+			ginkgo.By("get mirror pod uid")
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			uid := pod.UID
 
-				{
-					name: "updating container image",
-					updateFn: func() error {
-						return createStaticPod(podPath, staticPodName, ns, imageutils.GetPauseImageName(), v1.RestartPolicyAlways)
-					},
-				},
+			ginkgo.By("updating ActiveDeadlineSeconds")
+			framework.ExpectNoError(createStaticPodWithActiveDeadlineSeconds(podPath, staticPodName, ns, imageutils.GetPauseImageName(), v1.RestartPolicyAlways, int64((10 * time.Minute))))
 
-				{
-					name: "updating initContainer image",
-					updateFn: func() error {
-						return createStaticPodWithInitContainer(podPath, staticPodName, ns, imageutils.GetPauseImageName(), imageutils.GetPauseImageName(), v1.RestartPolicyAlways, 60)
-					},
-				},
-			}
+			ginkgo.By("wait for the mirror pod to be updated")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRecreated(ctx, f.ClientSet, mirrorPodName, ns, uid)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
-			expectedPodGeneration := int64(1)
-			for _, test := range tests {
-				ginkgo.By("get mirror pod uid")
-				pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				uid := pod.UID
+			ginkgo.By("check mirror pod generation remains at 1")
+			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(int64(1)))
 
-				ginkgo.By(test.name)
-				framework.ExpectNoError(test.updateFn())
-
-				ginkgo.By("wait for the mirror pod to be updated")
-				gomega.Eventually(ctx, func(ctx context.Context) error {
-					return checkMirrorPodRecreated(ctx, f.ClientSet, mirrorPodName, ns, uid)
-				}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
-
-				ginkgo.By("check mirror pod generation remains at 1")
-				pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
-
-				ginkgo.By("check mirror pod observedGeneration is always empty")
-				gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
-			}
+			ginkgo.By("check mirror pod observedGeneration is always empty")
+			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
 
 			ginkgo.By("delete the static pod")
 			framework.ExpectNoError(deleteStaticPod(podPath, staticPodName, ns))
@@ -354,9 +327,112 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("delete the static pod")
+			framework.ExpectNoError(deleteStaticPod(podPath, staticPodName, ns))
+
+			ginkgo.By("wait for the mirror pod to disappear")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
+		})
+
+		f.It("mirror pod: update container image", f.WithNodeConformance(), func(ctx context.Context) {
+			var ns, podPath, staticPodName, mirrorPodName string
+			ns = f.Namespace.Name
+			staticPodName = "static-pod-" + string(uuid.NewUUID())
+			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+
+			podPath = kubeletCfg.StaticPodPath
+
+			ginkgo.By("create the static pod")
+			err := createStaticPod(podPath, staticPodName, ns,
+				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to be running")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("get mirror pod uid")
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			uid := pod.UID
+
+			ginkgo.By("updating container image")
+			createStaticPod(podPath, staticPodName, ns, imageutils.GetPauseImageName(), v1.RestartPolicyAlways)
+
+			ginkgo.By("wait for the mirror pod to be updated")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRecreated(ctx, f.ClientSet, mirrorPodName, ns, uid)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("check mirror pod generation remains at 1")
+			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(int64(1)))
+
+			ginkgo.By("check mirror pod observedGeneration is always empty")
+			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
+
+			ginkgo.By("delete the static pod")
+			framework.ExpectNoError(deleteStaticPod(podPath, staticPodName, ns))
+
+			ginkgo.By("wait for the mirror pod to disappear")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
+		})
+
+		f.It("mirror pod: update initContainer image", f.WithNodeConformance(), func(ctx context.Context) {
+			var ns, podPath, staticPodName, mirrorPodName string
+			ns = f.Namespace.Name
+			staticPodName = "static-pod-" + string(uuid.NewUUID())
+			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+
+			podPath = kubeletCfg.StaticPodPath
+
+			ginkgo.By("create the static pod")
+			err := createStaticPod(podPath, staticPodName, ns,
+				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to be running")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("get mirror pod uid")
+			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			uid := pod.UID
+
+			ginkgo.By("updating initContainer image")
+			createStaticPodWithInitContainer(podPath, staticPodName, ns, imageutils.GetPauseImageName(), imageutils.GetPauseImageName(), v1.RestartPolicyAlways)
+
+			ginkgo.By("wait for the mirror pod to be updated")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodRecreated(ctx, f.ClientSet, mirrorPodName, ns, uid)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("check mirror pod generation remains at 1")
+			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(int64(1)))
+
+			ginkgo.By("check mirror pod observedGeneration is always empty")
+			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
+
+			ginkgo.By("delete the static pod")
+			framework.ExpectNoError(deleteStaticPod(podPath, staticPodName, ns))
+
+			ginkgo.By("wait for the mirror pod to disappear")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
 		})
 	})
-
 })
 
 func podVolumeDirectoryExists(uid types.UID) bool {
@@ -437,86 +513,83 @@ func staticPodPath(dir, name, namespace string) string {
 }
 
 func createStaticPod(dir, name, namespace, image string, restart v1.RestartPolicy) error {
-	template := `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  containers:
-  - name: test
-    image: %s
-  restartPolicy: %s
-`
+	podSpec := v1.PodSpec{
+		Containers: []v1.Container{{
+			Name:  "test",
+			Image: image,
+		}},
+		RestartPolicy: restart,
+	}
+
+	return createStaticPodWithSpec(dir, name, namespace, podSpec)
+}
+
+func createStaticPodWithSpec(dir, name, namespace string, podSpec v1.PodSpec) error {
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: podSpec,
+	}
+
+	podBytes, err := json.Marshal(pod)
+	if err != nil {
+		return err
+	}
+
+	podYaml, err := yaml.JSONToYAML(podBytes)
+	if err != nil {
+		return err
+	}
+
 	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace, image, string(restart))
 
 	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		// Don't mask other errors.
+		_ = f.Close()
+	}()
 
-	_, err = f.WriteString(podYaml)
+	_, err = f.WriteString(string(podYaml))
+
 	return err
 }
 
 func createStaticPodWithActiveDeadlineSeconds(dir, name, namespace, image string, restart v1.RestartPolicy, activeDeadlineSeconds int64) error {
-	template := `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  containers:
-  - name: test
-    image: %s
-  restartPolicy: %s
-  activeDeadlineSeconds: %d
-`
-	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace, image, string(restart), activeDeadlineSeconds)
-
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
-	if err != nil {
-		return err
+	podSpec := v1.PodSpec{
+		Containers: []v1.Container{{
+			Name:  "test",
+			Image: image,
+		}},
+		RestartPolicy:         restart,
+		ActiveDeadlineSeconds: &activeDeadlineSeconds,
 	}
-	defer f.Close()
 
-	_, err = f.WriteString(podYaml)
-	return err
+	return createStaticPodWithSpec(dir, name, namespace, podSpec)
 }
 
-func createStaticPodWithInitContainer(dir, name, namespace, image, initImage string, restart v1.RestartPolicy, activeDeadlineSeconds int64) error {
-	template := `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  initContainers:
-  - name: init-test
-    image: %s
-  containers:
-  - name: test
-    image: %s
-  restartPolicy: %s
-  activeDeadlineSeconds: %d
-`
-	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace, image, initImage, string(restart), activeDeadlineSeconds)
-
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
-	if err != nil {
-		return err
+func createStaticPodWithInitContainer(dir, name, namespace, image, initImage string, restart v1.RestartPolicy) error {
+	podSpec := v1.PodSpec{
+		InitContainers: []v1.Container{{
+			Name:  "init-test",
+			Image: initImage,
+		}},
+		Containers: []v1.Container{{
+			Name:  "test",
+			Image: image,
+		}},
+		RestartPolicy: restart,
 	}
-	defer f.Close()
 
-	_, err = f.WriteString(podYaml)
-	return err
+	return createStaticPodWithSpec(dir, name, namespace, podSpec)
 }
 
 func deleteStaticPod(dir, name, namespace string) error {

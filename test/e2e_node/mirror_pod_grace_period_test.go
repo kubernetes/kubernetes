@@ -343,41 +343,23 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 })
 
 func createStaticPodWithGracePeriod(dir, name, namespace string) error {
-	template := `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: %s
-  namespace: %s
-spec:
-  terminationGracePeriodSeconds: 20
-  containers:
-  - name: m-test
-    image: %s
-    command:
-      - /bin/sh
-    args:
-      - '-c'
-      - |
-        _term() {
-        echo "Caught SIGTERM signal!"
-        sleep 100
-        }
-        trap _term SIGTERM
-        sleep 1000
-`
-	file := staticPodPath(dir, name, namespace)
-	podYaml := fmt.Sprintf(template, name, namespace, imageutils.GetE2EImage(imageutils.BusyBox))
-
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
-	if err != nil {
-		return err
+	podSpec := v1.PodSpec{
+		Containers: []v1.Container{{
+			Name:    "m-test",
+			Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+			Command: []string{"/bin/sh"},
+			Args: []string{"-c", `_term() {
+echo "Caught SIGTERM signal!"
+sleep 100
+}
+trap _term SIGTERM
+sleep 1000
+`,
+			},
+		}},
 	}
-	defer f.Close()
 
-	_, err = f.WriteString(podYaml)
-	framework.Logf("has written %v", file)
-	return err
+	return createStaticPodWithSpec(dir, name, namespace, podSpec)
 }
 
 func checkMirrorPodRunningWithUID(ctx context.Context, cl clientset.Interface, name, namespace string, oUID types.UID) error {
