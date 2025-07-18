@@ -2824,8 +2824,13 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 					UseStatusResources:    true,
 					SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 				}
-				oldRequest := resourcehelper.PodRequests(oldPod, opts)
-				newRequest := resourcehelper.PodRequests(pod, opts)
+
+				// Ignore desired resources when aggregating the resources.
+				allocatedOldPod, _ := kl.allocationManager.UpdatePodFromAllocation(oldPod)
+				allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
+
+				oldRequest := resourcehelper.PodRequests(allocatedOldPod, opts)
+				newRequest := resourcehelper.PodRequests(allocatedPod, opts)
 
 				// If cpu or memory requests shrank, then retry the pending resizes.
 				retryPendingResizes = newRequest.Memory().Cmp(*oldRequest.Memory()) < 0 ||
