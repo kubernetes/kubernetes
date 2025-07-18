@@ -2333,6 +2333,7 @@ func TestAlphaPVVolumeModeUpdate(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
 	invalidAPIGroup := "^invalid"
@@ -20140,6 +20141,7 @@ func TestValidateLimitRange(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	validClaim := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
