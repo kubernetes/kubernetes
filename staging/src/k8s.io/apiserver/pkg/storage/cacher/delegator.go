@@ -321,13 +321,14 @@ type getLister interface {
 
 func (c consistencyChecker) startChecking(stopCh <-chan struct{}) {
 	klog.V(3).InfoS("Cache consistency check start", "group", c.groupResource.Group, "resource", c.groupResource.Resource)
-	err := wait.PollUntilContextCancel(wait.ContextForChannel(stopCh), ConsistencyCheckPeriod, false, func(ctx context.Context) (done bool, err error) {
-		c.check(ctx)
-		return false, nil
-	})
-	if err != nil {
-		klog.V(3).InfoS("Cache consistency check exiting", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "err", err)
+	jitter := 0.5 // Period between [interval, interval * (1.0 + jitter)]
+	sliding := true
+	// wait.JitterUntilWithContext starts work immediately, so wait first.
+	select {
+	case <-time.After(wait.Jitter(ConsistencyCheckPeriod, jitter)):
+	case <-stopCh:
 	}
+	wait.JitterUntilWithContext(wait.ContextForChannel(stopCh), c.check, ConsistencyCheckPeriod, jitter, sliding)
 }
 
 func (c *consistencyChecker) check(ctx context.Context) {
