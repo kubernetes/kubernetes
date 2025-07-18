@@ -1852,9 +1852,10 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				}
 				claim.Status.Devices = []resource.AllocatedDeviceStatus{
 					{
-						Driver: goodName,
-						Pool:   goodName,
-						Device: "foo/000001",
+						Driver:  goodName,
+						Pool:    goodName,
+						Device:  "foo",
+						ShareID: ptr.To(goodShareID),
 					},
 				}
 				return claim
@@ -1945,9 +1946,10 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				}
 				claim.Status.Devices = []resource.AllocatedDeviceStatus{
 					{
-						Driver: goodName,
-						Pool:   goodName,
-						Device: "foo/000001",
+						Driver:  goodName,
+						Pool:    goodName,
+						Device:  "foo",
+						ShareID: ptr.To(goodShareID),
 					},
 				}
 				return claim

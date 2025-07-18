@@ -313,31 +313,23 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 		return
 	}
 
-	deallocatedDevices := sets.New[structured.DeviceID]()
+	deallocatedDevices := sets.New[structured.SharedDeviceID]()
 
 	if oldClaim.Status.Allocation != nil {
 		// Get all devices in the oldClaim.
 		for _, result := range oldClaim.Status.Allocation.Devices.Results {
-			var deviceID structured.DeviceID
-			if result.ShareID != nil {
-				deviceID = structured.MakeDeviceID(result.Driver, result.Pool, structured.GetSharedDeviceName(result.Device, *result.ShareID))
-			} else {
-				deviceID = structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
-			}
-			deallocatedDevices.Insert(deviceID)
+			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
+			deallocatedDevices.Insert(sharedDeviceID)
 		}
 	}
 
 	// Remove devices from deallocatedDevices that are still in newClaim.
 	if newClaim.Status.Allocation != nil {
 		for _, result := range newClaim.Status.Allocation.Devices.Results {
-			var deviceID structured.DeviceID
-			if result.ShareID != nil {
-				deviceID = structured.MakeDeviceID(result.Driver, result.Pool, structured.GetSharedDeviceName(result.Device, *result.ShareID))
-			} else {
-				deviceID = structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
-			}
-			deallocatedDevices.Delete(deviceID)
+			deviceID := structured.MakeDeviceID(result.Driver, result.Pool, result.Device)
+			sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
+			deallocatedDevices.Delete(sharedDeviceID)
 		}
 	}
 
@@ -345,7 +337,8 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 	n := 0
 	for _, device := range newClaim.Status.Devices {
 		deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
-		if !deallocatedDevices.Has(deviceID) {
+		sharedDeviceID := structured.MakeSharedDeviceID(deviceID, device.ShareID)
+		if !deallocatedDevices.Has(sharedDeviceID) {
 			newClaim.Status.Devices[n] = device
 			n++
 		}

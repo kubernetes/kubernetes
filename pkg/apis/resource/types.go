@@ -964,7 +964,8 @@ type DeviceSubRequest struct {
 
 // CapacityRequirements defines the capacity requirements for a specific device request.
 type CapacityRequirements struct {
-	// Minimum defines the minimum amount of each device capacity required for the request.
+	// Requests represent individual device resource requests for distinct resources which
+	// must all be provided and guaranteed by the device. If empty, nothing needs to be allocated.
 	//
 	// If the capacity has a sharing policy, this value is rounded up to the nearest valid amount
 	// according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.
@@ -972,17 +973,22 @@ type CapacityRequirements struct {
 	// If the quantity does not have a sharing policy, this value is used as an additional filtering
 	// condition against the available capacity on the device.
 	// This is semantically equivalent to a CEL selector with
-	// `device.capacity[<domain>].<name>.compareTo(quantity(<minimum quantity>)) >= 0`
+	// `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0`
 	// For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0
 	//
 	// +optional
-	Minimum map[QualifiedName]resource.Quantity
+	Requests map[QualifiedName]resource.Quantity
 
 	// ^^^
-	// The alternative names proposed were: `Required`, `Reservation`, `Consumption`, and `Requests`.
-	// `Requests` was dropped since it's already used in the DRA API for device requests.
-	// `Minimum` was selected because the actual consumed capacity may be rounded up
-	// based on the sharing policy — for example, to match a defined chunk size or meet a minimum requirement.
+	// The alternative names proposed were: `Required`, `Reservation`, `Consumption`, and `Minimum`.
+	// `Requests` was dropped once since it's already used in the DRA API for device requests.
+	// `Minimum` was selected as an alternative.
+	// `Requests` was selected during API review because
+	// it is more align with the container spec and
+	// matches present semantic definition used elsewhere in the API (minimum guaranteed, must be satisfied).
+	// with the need of clear description to distinguish
+	// between requests for devices and requests for resources which must be provided by those devices.
+	// based on the sharing policy — for example, to match a defined chunk size or meet a requirement.
 
 	// Potential extension:
 	// A `Maximum` or `Limit` field to describe burstable consumption.
@@ -1317,6 +1323,7 @@ type ResourceClaimStatus struct {
 	// +listMapKey=driver
 	// +listMapKey=device
 	// +listMapKey=pool
+	// +listMapKey=shareID
 	// +featureGate=DRAResourceClaimDeviceStatus
 	Devices []AllocatedDeviceStatus
 
@@ -1713,13 +1720,15 @@ type AllocatedDeviceStatus struct {
 	// +required
 	Device string
 
-	// ^^^
-	// ShareID cannot be added here in the same way as in DeviceRequestAllocationResult,
-	// because it is intended to serve as part of a composite key for identifying devices.
-	// Making ShareID required is not an option, as the API feature gate should not introduce required fields.
-	// However, due to limitations with using `listType=map` in ResourceClaimStatus.Devices,
-	// fields used as map keys must be required.
-	// Reference issue: https://github.com/kubernetes/kubernetes/issues/132524
+	// ShareID uniquely identifies an individual allocation share of a device.
+	//
+	// Hex is chosen for its compact representation, ease of generation from binary,
+	// and suitability for identifiers in logs, APIs, and storage.
+	//
+	// +default=""
+	// +optional
+	// +featureGate=DRAConsumableCapacity
+	ShareID *string
 
 	// Conditions contains the latest observation of the device's state.
 	// If the device has been configured according to the class and claim

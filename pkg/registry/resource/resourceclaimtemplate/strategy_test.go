@@ -159,11 +159,11 @@ func addSpecDeviceRequestWithCapacityRequests(resourceClaimTemplate *resource.Re
 	}
 	if capacity != nil {
 		r.Exactly.CapacityRequests = &resource.CapacityRequirements{
-			Minimum: capacity,
+			Requests: capacity,
 		}
 		if prioritizedListFeature {
 			r.FirstAvailable[0].CapacityRequests = &resource.CapacityRequirements{
-				Minimum: capacity,
+				Requests: capacity,
 			}
 		}
 	}

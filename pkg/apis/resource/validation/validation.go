@@ -176,15 +176,13 @@ func gatherRequestNames(deviceClaim *resource.DeviceClaim) requestNames {
 	return requestNames
 }
 
-func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) sets.Set[structured.DeviceID] {
-	allocatedDevices := sets.New[structured.DeviceID]()
+func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) sets.Set[structured.SharedDeviceID] {
+	allocatedDevices := sets.New[structured.SharedDeviceID]()
 	for _, result := range allocationResult.Results {
 		deviceName := result.Device
-		if result.ShareID != nil {
-			deviceName = structured.GetSharedDeviceName(deviceName, *result.ShareID)
-		}
 		deviceID := structured.MakeDeviceID(result.Driver, result.Pool, deviceName)
-		allocatedDevices.Insert(deviceID)
+		sharedID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
+		allocatedDevices.Insert(sharedID)
 	}
 	return allocatedDevices
 }
@@ -395,7 +393,7 @@ func validateResourceClaimStatusUpdate(status, oldStatus *resource.ResourceClaim
 		func(consumer resource.ResourceClaimConsumerReference) (types.UID, string) { return consumer.UID, "uid" },
 		fldPath.Child("reservedFor"))...)
 
-	var allocatedDevices sets.Set[structured.DeviceID]
+	var allocatedDevices sets.Set[structured.SharedDeviceID]
 	if status.Allocation != nil {
 		allocatedDevices = gatherAllocatedDevices(&status.Allocation.Devices)
 	}
@@ -1155,13 +1153,14 @@ func truncateIfTooLong(str string, maxLen int) string {
 	return str[0:(remaining+1)/2] + ellipsis + str[len(str)-remaining/2:]
 }
 
-func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.Path, allocatedDevices sets.Set[structured.DeviceID]) field.ErrorList {
+func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.Path, allocatedDevices sets.Set[structured.SharedDeviceID]) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(device.Driver, fldPath.Child("driver"))...)
 	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
 	allErrs = append(allErrs, validateAllocatedDeviceStatusName(device.Device, fldPath.Child("device"))...)
 	deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
-	if !allocatedDevices.Has(deviceID) {
+	sharedDeviceID := structured.MakeSharedDeviceID(deviceID, device.ShareID)
+	if !allocatedDevices.Has(sharedDeviceID) {
 		allErrs = append(allErrs, field.Invalid(fldPath, deviceID, "must be an allocated device in the claim"))
 	}
 	if len(device.Conditions) > resource.AllocatedDeviceStatusMaxConditions {
