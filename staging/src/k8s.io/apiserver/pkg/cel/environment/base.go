@@ -49,7 +49,7 @@ import (
 // A default version number equal to the current Kubernetes major.minor version
 // indicates fast forward CEL features that can be used when rollback is no longer needed.
 func DefaultCompatibilityVersion() *version.Version {
-	return compatibility.KubeComponentEffectiveVersion().MinCompatibilityVersion()
+	return compatibility.KubeComponentEffectiveVersion(compatibility.DefaultComponentGlobalsRegistry).MinCompatibilityVersion()
 }
 
 var baseOpts = append(baseOptsWithoutStrictCost, StrictCostOpt)

@@ -699,7 +699,7 @@ func convertJSONSchemaProps(in []byte, out *spec.Schema) error {
 		return err
 	}
 	kubeOut := spec.Schema{}
-	formatPostProcessor := validation.StripUnsupportedFormatsPostProcessorForVersion(compatibility.KubeComponentEffectiveVersion().EmulationVersion())
+	formatPostProcessor := validation.StripUnsupportedFormatsPostProcessorForVersion(compatibility.KubeComponentEffectiveVersion(compatibility.DefaultComponentGlobalsRegistry).EmulationVersion())
 	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&internal, &kubeOut, formatPostProcessor); err != nil {
 		return err
 	}

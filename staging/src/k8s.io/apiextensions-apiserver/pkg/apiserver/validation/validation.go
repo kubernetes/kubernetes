@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/common"
-	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -92,13 +91,15 @@ func (s basicSchemaValidator) ValidateUpdate(new, old interface{}, options ...Va
 	return s.Validate(new, options...)
 }
 
-// NewSchemaValidator creates an openapi schema validator for the given CRD validation using environment.DefaultCompatibilityVersion().
+// NewSchemaValidator creates an openapi schema validator for the given CRD validation.
+// The validator is configured to understand only the formats defined for all versions of Kubernetes.
 func NewSchemaValidator(customResourceValidation *apiextensions.JSONSchemaProps) (SchemaValidator, *spec.Schema, error) {
-	return NewSchemaValidatorForVersion(customResourceValidation, compatibility.KubeComponentEffectiveVersion().EmulationVersion())
+	return NewSchemaValidatorForVersion(customResourceValidation, version.MustParse("1.0.0"))
 }
 
 // NewSchemaValidatorForVersion creates an openapi schema validator for the given CRD validation and
-// emulationVersion.
+// emulationVersion. The validator is configured to understand all formats defined in the given
+// emulationVersion of Kubernetes.
 //
 // If feature `CRDValidationRatcheting` is disabled, this returns a validator which
 // validates all `Update`s and `Create`s as a `Create` - without considering old value.
