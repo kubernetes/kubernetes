@@ -4,17 +4,6 @@ syntax = "proto3";
 package deviceplugin; // This should have been v1alpha.
 option go_package = "k8s.io/kubelet/pkg/apis/deviceplugin/v1alpha";
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-
-option (gogoproto.goproto_stringer_all) = false;
-option (gogoproto.stringer_all) =  true;
-option (gogoproto.goproto_getters_all) = true;
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_unrecognized_all) = false;
-
-
 // Registration is the service advertised by the Kubelet
 // Only when Kubelet answers with a success code to a Register Request
 // may Device Plugins start their service

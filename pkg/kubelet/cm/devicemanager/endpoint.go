@@ -105,7 +105,7 @@ func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, err
 	}
 	return e.api.Allocate(context.Background(), &pluginapi.AllocateRequest{
 		ContainerRequests: []*pluginapi.ContainerAllocateRequest{
-			{DevicesIDs: devs},
+			{DevicesIds: devs},
 		},
 	})
 }
@@ -118,6 +118,6 @@ func (e *endpointImpl) preStartContainer(devs []string) (*pluginapi.PreStartCont
 	ctx, cancel := context.WithTimeout(context.Background(), pluginapi.KubeletPreStartContainerRPCTimeoutInSecs*time.Second)
 	defer cancel()
 	return e.api.PreStartContainer(ctx, &pluginapi.PreStartContainerRequest{
-		DevicesIDs: devs,
+		DevicesIds: devs,
 	})
 }
