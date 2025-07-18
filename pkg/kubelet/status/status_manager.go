@@ -175,6 +175,10 @@ type Manager interface {
 
 	// IsPodResizeInfeasible returns true if the pod resize is infeasible.
 	IsPodResizeInfeasible(podUID types.UID) bool
+
+	// BackfillPodResizeConditions backfills the status manager's resize conditions by reading them from the
+	// provided pods' statuses.
+	BackfillPodResizeConditions(pods []*v1.Pod)
 }
 
 const syncPeriod = 10 * time.Second
@@ -269,9 +273,15 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
+	alreadyPending := m.podResizeConditions[podUID].PodResizePending != nil
+
 	m.podResizeConditions[podUID] = podResizeConditions{
 		PodResizePending:    updatedPodResizeCondition(v1.PodResizePending, m.podResizeConditions[podUID].PodResizePending, reason, message, observedGeneration),
 		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
+	}
+
+	if !alreadyPending {
+		m.recordPendingResizeCount()
 	}
 }
 
@@ -281,8 +291,9 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	c := m.podResizeConditions[podUID].PodResizeInProgress
-	if c != nil {
+	alreadyInProgress := m.podResizeConditions[podUID].PodResizeInProgress != nil
+
+	if c := m.podResizeConditions[podUID].PodResizeInProgress; c != nil {
 		// Preserve the old reason, message if they exist.
 		if reason == "" && message == "" {
 			reason = c.Reason
@@ -297,16 +308,27 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message, observedGeneration),
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 	}
+
+	if !alreadyInProgress {
+		m.recordInProgressResizeCount()
+	}
 }
 
 // ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
 func (m *manager) ClearPodResizePendingCondition(podUID types.UID) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
-	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizePending:    nil,
-		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
+
+	if m.podResizeConditions[podUID].PodResizePending == nil {
+		return
 	}
+
+	m.podResizeConditions[podUID] = podResizeConditions{
+		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
+		PodResizePending:    nil,
+	}
+
+	m.recordPendingResizeCount()
 }
 
 // ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
@@ -323,7 +345,40 @@ func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID) bool {
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 		PodResizeInProgress: nil,
 	}
+
+	m.recordInProgressResizeCount()
 	return true
+}
+
+func (m *manager) BackfillPodResizeConditions(pods []*v1.Pod) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	for _, pod := range pods {
+		for _, c := range pod.Status.Conditions {
+			switch c.Type {
+			case v1.PodResizePending:
+				newCondition := updatedPodResizeCondition(v1.PodResizePending, nil, c.Reason, c.Message, c.ObservedGeneration)
+				oldConditions := m.podResizeConditions[pod.UID]
+
+				m.podResizeConditions[pod.UID] = podResizeConditions{
+					PodResizePending:    newCondition,
+					PodResizeInProgress: oldConditions.PodResizeInProgress,
+				}
+
+			case v1.PodResizeInProgress:
+				newCondition := updatedPodResizeCondition(v1.PodResizeInProgress, nil, c.Reason, c.Message, c.ObservedGeneration)
+				oldConditions := m.podResizeConditions[pod.UID]
+
+				m.podResizeConditions[pod.UID] = podResizeConditions{
+					PodResizeInProgress: newCondition,
+					PodResizePending:    oldConditions.PodResizePending,
+				}
+			}
+		}
+	}
+	m.recordPendingResizeCount()
+	m.recordInProgressResizeCount()
 }
 
 // IsPodResizeDeferred returns true if the pod resize is currently deferred.
@@ -818,7 +873,11 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		delete(m.podResizeConditions, uid)
+		if _, exists := m.podResizeConditions[uid]; exists {
+			delete(m.podResizeConditions, uid)
+			m.recordInProgressResizeCount()
+			m.recordPendingResizeCount()
+		}
 	}
 }
 
@@ -831,7 +890,11 @@ func (m *manager) RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.U
 			logger.V(5).Info("Removing pod from status map", "podUID", key)
 			delete(m.podStatuses, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				delete(m.podResizeConditions, key)
+				if _, exists := m.podResizeConditions[key]; exists {
+					delete(m.podResizeConditions, key)
+					m.recordInProgressResizeCount()
+					m.recordPendingResizeCount()
+				}
 			}
 		}
 	}
@@ -1228,4 +1291,30 @@ func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *
 		Reason:             reason,
 		Message:            message,
 	}
+}
+
+// recordPendingResizeCount sets the pending resize metric.
+func (m *manager) recordPendingResizeCount() {
+	pendingResizeCount := make(map[string]int)
+	for _, conditions := range m.podResizeConditions {
+		if conditions.PodResizePending != nil {
+			pendingResizeCount[strings.ToLower(conditions.PodResizePending.Reason)]++
+		}
+	}
+
+	metrics.PodPendingResizes.Reset()
+	for reason, count := range pendingResizeCount {
+		metrics.PodPendingResizes.WithLabelValues(reason).Set(float64(count))
+	}
+}
+
+// recordInProgressResize sets the in-progress resize metric.
+func (m *manager) recordInProgressResizeCount() {
+	inProgressResizeCount := 0
+	for _, conditions := range m.podResizeConditions {
+		if conditions.PodResizeInProgress != nil {
+			inProgressResizeCount++
+		}
+	}
+	metrics.PodInProgressResizes.Set(float64(inProgressResizeCount))
 }
