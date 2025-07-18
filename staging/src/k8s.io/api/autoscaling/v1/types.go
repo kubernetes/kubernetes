@@ -117,7 +117,7 @@ type HorizontalPodAutoscalerList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.2
-// +k8s:isSubresource=/scale
+// +k8s:isSubresource="/scale"
 
 // Scale represents a scaling request for a resource.
 type Scale struct {

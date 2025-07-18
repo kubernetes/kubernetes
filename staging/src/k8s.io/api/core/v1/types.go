@@ -5556,7 +5556,7 @@ type ReplicationControllerCondition struct {
 // +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
-// +k8s:supportsSubresource=/scale
+// +k8s:supportsSubresource="/scale"
 
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {

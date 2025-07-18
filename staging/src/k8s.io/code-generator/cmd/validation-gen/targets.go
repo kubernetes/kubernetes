@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -52,7 +53,26 @@ var (
 	schemeType = types.Name{Package: runtimePkg, Name: "Scheme"}
 )
 
+// extractAndParseTag extracts all the values for a given tag, according to the
+// tag grammar.
+func extractAndParseTag(tagName string, comments []string) ([]codetags.Tag, error) {
+	extracted := codetags.Extract("+", comments)
+	var tags []codetags.Tag
+	for key, lines := range extracted {
+		if key != tagName {
+			continue
+		}
+		t, err := codetags.ParseAll(lines)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse tags: %w: %s", err, lines)
+		}
+		tags = append(tags, t...)
+	}
+	return tags, nil
+}
+
 func extractMainTag(comments []string) ([]string, bool) {
+	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
 	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{mainTagName}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract tags: %v", err)
@@ -70,6 +90,7 @@ func extractMainTag(comments []string) ([]string, bool) {
 }
 
 func extractInputTag(comments []string) []string {
+	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
 	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{inputTagName}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract input tags: %v", err)
@@ -88,6 +109,7 @@ func extractInputTag(comments []string) []string {
 
 // TODO: this can just accept a single bool
 func checkMainTag(comments []string, require ...string) bool {
+	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
 	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{mainTagName}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract tags: %v", err)
@@ -110,6 +132,7 @@ func checkMainTag(comments []string, require ...string) bool {
 }
 
 func schemeRegistryTag(pkg *types.Package) types.Name {
+	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
 	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{schemeRegistryTagName}, pkg.Comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract scheme registry tags: %v", err)
@@ -128,34 +151,32 @@ func isSubresourceTag(t *types.Type) (string, bool) {
 	var comments []string
 	comments = append(comments, t.SecondClosestCommentLines...)
 	comments = append(comments, t.CommentLines...)
-	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{isSubresourceTagName}, comments)
+	tags, err := extractAndParseTag(isSubresourceTagName, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract isSubresource tags: %v", err)
 	}
-	values, found := tags[isSubresourceTagName]
-	if !found || len(values) == 0 {
+	if len(tags) == 0 {
 		return "", false
 	}
-	if len(values) > 1 {
+	if len(tags) > 1 {
 		panic(fmt.Sprintf("Type %q contains more than one usage of %q", t.Name.String(), isSubresourceTagName))
 	}
-	return values[0].Value, true
+	return tags[0].Value, true
 }
 
 func supportedSubresourceTags(t *types.Type) sets.Set[string] {
 	var comments []string
 	comments = append(comments, t.SecondClosestCommentLines...)
 	comments = append(comments, t.CommentLines...)
-	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{supportsSubresourceTagName}, comments)
+	tags, err := extractAndParseTag(supportsSubresourceTagName, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract supportedSubresource tags: %v", err)
 	}
-	values, found := tags[supportsSubresourceTagName]
-	if !found || len(values) == 0 {
+	if len(tags) == 0 {
 		return sets.New[string]()
 	}
 	subresources := sets.New[string]()
-	for _, tag := range values {
+	for _, tag := range tags {
 		subresources.Insert(tag.Value)
 	}
 	return subresources
@@ -165,6 +186,7 @@ var testFixtureTagValues = sets.New("validateFalse")
 
 func testFixtureTag(pkg *types.Package) sets.Set[string] {
 	result := sets.New[string]()
+	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
 	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{testFixtureTagName}, pkg.Comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract test fixture tags: %v", err)
