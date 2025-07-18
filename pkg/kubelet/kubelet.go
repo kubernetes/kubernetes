@@ -2816,20 +2816,21 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 			// Static pods should be reconciled the same way as regular pods
 		}
 
-		// If there are pending resizes, check whether the requests shrank as a result of the status
-		// resources changing.
-		if hasPendingResizes && !retryPendingResizes && oldPod != nil &&
-			utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			opts := resourcehelper.PodResourcesOptions{
-				UseStatusResources:    true,
-				SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-			}
-			oldRequest := resourcehelper.PodRequests(oldPod, opts)
-			newRequest := resourcehelper.PodRequests(pod, opts)
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			// If there are pending resizes, check whether the requests shrank as a result of the status
+			// resources changing.
+			if hasPendingResizes && !retryPendingResizes && oldPod != nil {
+				opts := resourcehelper.PodResourcesOptions{
+					UseStatusResources:    true,
+					SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+				}
+				oldRequest := resourcehelper.PodRequests(oldPod, opts)
+				newRequest := resourcehelper.PodRequests(pod, opts)
 
-			// If memory requests or limits shrank, then retry the pending resizes.
-			retryPendingResizes = newRequest.Memory().Cmp(*oldRequest.Memory()) < 1 ||
-				newRequest.Cpu().Cmp(*oldRequest.Cpu()) < 1
+				// If cpu or memory requests shrank, then retry the pending resizes.
+				retryPendingResizes = newRequest.Memory().Cmp(*oldRequest.Memory()) < 0 ||
+					newRequest.Cpu().Cmp(*oldRequest.Cpu()) < 0
+			}
 		}
 
 		// TODO: reconcile being calculated in the config manager is questionable, and avoiding
@@ -2861,8 +2862,10 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		}
 	}
 
-	if retryPendingResizes {
-		kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonPodResized)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		if retryPendingResizes {
+			kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonPodResized)
+		}
 	}
 }
 
