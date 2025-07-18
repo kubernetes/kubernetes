@@ -4225,3 +4225,90 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 		})
 	}
 }
+
+func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */, true /*sourcesReady*/)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	cpu500m := resource.MustParse("500m")
+	cpu1000m := resource.MustParse("1")
+	mem500M := resource.MustParse("500Mi")
+	mem1000M := resource.MustParse("1Gi")
+
+	makePodWithRequests := func(name string, requests v1.ResourceList) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+				UID:  types.UID(name),
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "c1",
+						Image: "i1",
+						Resources: v1.ResourceRequirements{
+							Requests: requests,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	pendingResizeAllocated := makePodWithRequests("pod-pending-resize", v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M})
+	pendingResizeDesired := makePodWithRequests("pod-pending-resize", v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M})
+
+	testCases := []struct {
+		name                     string
+		oldPod                   *v1.Pod
+		newPod                   *v1.Pod
+		shouldRetryPendingResize bool
+	}{
+		{
+			name:                     "requests are increasing",
+			oldPod:                   makePodWithRequests("updated-pod", v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}),
+			newPod:                   makePodWithRequests("updated-pod", v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}),
+			shouldRetryPendingResize: false,
+		},
+		{
+			name:                     "requests are unchanged",
+			oldPod:                   makePodWithRequests("updated-pod", v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}),
+			newPod:                   makePodWithRequests("updated-pod", v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}),
+			shouldRetryPendingResize: false,
+		},
+		{
+			name:                     "requests are decreasing",
+			oldPod:                   makePodWithRequests("updated-pod", v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M}),
+			newPod:                   makePodWithRequests("updated-pod", v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M}),
+			shouldRetryPendingResize: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// For the sake of this test, just reject all resize requests.
+			handler := &testPodAdmitHandler{podsToReject: []*v1.Pod{pendingResizeAllocated}}
+			kubelet.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
+
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(pendingResizeAllocated))
+			require.NoError(t, kubelet.allocationManager.SetActuatedResources(pendingResizeAllocated, nil))
+			kubelet.podManager.AddPod(pendingResizeDesired)
+			kubelet.podManager.AddPod(tc.oldPod)
+			kubelet.allocationManager.PushPendingResize(pendingResizeDesired.UID)
+
+			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID)
+			kubelet.HandlePodReconcile([]*v1.Pod{tc.newPod})
+			require.Equal(t, tc.shouldRetryPendingResize, kubelet.statusManager.IsPodResizeDeferred(pendingResizeDesired.UID))
+
+			kubelet.allocationManager.RemovePod(pendingResizeDesired.UID)
+			kubelet.podManager.RemovePod((pendingResizeDesired))
+			kubelet.podManager.RemovePod(tc.oldPod)
+		})
+	}
+}
