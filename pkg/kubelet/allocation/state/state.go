@@ -50,6 +50,7 @@ func (pr PodResourceInfoMap) Clone() PodResourceInfoMap {
 type Reader interface {
 	GetContainerResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
 	GetPodResourceInfoMap() PodResourceInfoMap
+	GetPodResourceInfo(podUID types.UID) (PodResourceInfo, bool)
 }
 
 type writer interface {

@@ -397,17 +397,20 @@ func (m *manager) GetContainerResourceAllocation(podUID types.UID, containerName
 // UpdatePodFromAllocation overwrites the pod spec with the allocation.
 // This function does a deep copy only if updates are needed.
 func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
-	// TODO(tallclair): This clones the whole cache, but we only need 1 pod.
-	allocs := m.allocated.GetPodResourceInfoMap()
-	return updatePodFromAllocation(pod, allocs)
-}
-
-func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceInfoMap) (*v1.Pod, bool) {
 	if pod == nil {
 		return pod, false
 	}
-	allocated, found := allocs[pod.UID]
-	if !found {
+
+	allocated, ok := m.allocated.GetPodResourceInfo(pod.UID)
+	if !ok {
+		return pod, false
+	}
+
+	return updatePodFromAllocation(pod, allocated)
+}
+
+func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.Pod, bool) {
+	if pod == nil {
 		return pod, false
 	}
 
