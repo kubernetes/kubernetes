@@ -409,10 +409,6 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	SeccompDefault = framework.WithFeature(framework.ValidFeatures.Add("SeccompDefault"))
 
-	// // SeparateDiskTest (SIG-node, used for testing separate container runtime filesystem)
-	// // The tests need separate disk settings on nodes and separate filesystems in storage.conf
-	// SeparateDisk = framework.WithFeature(framework.ValidFeatures.Add("SeparateDisk"))
-
 	// Owner: sig-auth
 	// Marks tests that require a conforming implementation of
 	// Node claims for serviceaccounts. Typically this means that the
