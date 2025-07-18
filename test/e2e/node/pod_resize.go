@@ -224,7 +224,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 
 		ginkgo.By("Find node CPU resources available for allocation!")
 		node := nodes.Items[0]
-		nodeAllocatableMilliCPU, nodeAvailableMilliCPU := getNodeAllocatableAndAvailableMilliCPUValues(ctx, f, &node)
+		nodeAllocatableMilliCPU, nodeAvailableMilliCPU := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableMilliCPU, nodeAvailableMilliCPU)
 
@@ -298,7 +298,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		//     2. Resize pod1 down so that pod3 gets room to be scheduled.
 		//     3. Verify that pod3 is scheduled and running.
 		//
-		nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2 := getNodeAllocatableAndAvailableMilliCPUValues(ctx, f, &node)
+		nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2 := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
 		framework.Logf("TEST2: Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2)
 		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU2+testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
@@ -428,7 +428,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 
 		ginkgo.By("Find node CPU resources available for allocation!")
 		node := nodes.Items[0]
-		nodeAllocatableMilliCPU, nodeAvailableMilliCPU := getNodeAllocatableAndAvailableMilliCPUValues(ctx, f, &node)
+		nodeAllocatableMilliCPU, nodeAvailableMilliCPU := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableMilliCPU, nodeAvailableMilliCPU)
 
@@ -467,7 +467,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		gomega.Expect(testPod2.Status.Phase).To(gomega.Equal(v1.PodRunning))
 		gomega.Expect(testPod2.Generation).To(gomega.BeEquivalentTo(1))
 
-		nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2 := getNodeAllocatableAndAvailableMilliCPUValues(ctx, f, &node)
+		nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2 := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2)
 
@@ -563,7 +563,7 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		ginkgo.By("Find node CPU and memory resources available for allocation!")
 		node := nodes.Items[0]
 
-		nodeAllocatableMilliCPU, nodeAvailableMilliCPU := getNodeAllocatableAndAvailableMilliCPUValues(ctx, f, &node)
+		nodeAllocatableMilliCPU, nodeAvailableMilliCPU := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableMilliCPU, nodeAvailableMilliCPU)
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
@@ -791,11 +791,11 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		ginkgo.By("Find node CPU and memory resources available for allocation!")
 		node := nodes.Items[0]
 
-		nodeAllocatableMilliCPU, initNodeAvailableMilliCPU := getNodeAllocatableAndAvailableMilliCPUValues(ctx, f, &node)
+		nodeAllocatableMilliCPU, initNodeAvailableMilliCPU := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceCPU)
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableMilliCPU, initNodeAvailableMilliCPU)
 
-		nodeAllocatableMem, initNodeAvailableMem := getNodeAllocatableAndAvailableMemoryValues(ctx, f, &node)
+		nodeAllocatableMem, initNodeAvailableMem := getNodeAllocatableAndAvailableValues(ctx, f, &node, v1.ResourceMemory)
 		framework.Logf("Node '%s': NodeAllocatable Memory = %d. Memory currently available to allocate = %d.",
 			node.Name, nodeAllocatableMem, initNodeAvailableMem)
 
@@ -964,11 +964,18 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 	})).WithTimeout(framework.PollShortTimeout).ShouldNot(gomega.BeEmpty())
 }
 
-// Calculate available CPU. nodeAvailableCPU = nodeAllocatableCPU - sum(podAllocatedCPU)
-func getNodeAllocatableAndAvailableMilliCPUValues(ctx context.Context, f *framework.Framework, n *v1.Node) (int64, int64) {
-	nodeAllocatableMilliCPU := n.Status.Allocatable.Cpu().MilliValue()
+// Calculate available resource. nodeAvailable = nodeAllocatable - sum(podAllocated). If resourceName is "CPU", the values
+// returned are in MilliValues.
+func getNodeAllocatableAndAvailableValues(ctx context.Context, f *framework.Framework, n *v1.Node, resourceName v1.ResourceName) (int64, int64) {
+	var nodeAllocatable int64
+	if resourceName == v1.ResourceCPU {
+		nodeAllocatable = n.Status.Allocatable.Cpu().MilliValue()
+	} else {
+		nodeAllocatable = n.Status.Allocatable.Memory().Value()
+	}
+
 	gomega.Expect(n.Status.Allocatable).ShouldNot(gomega.BeEmpty(), "allocatable")
-	podAllocatedMilliCPU := int64(0)
+	podAllocated := int64(0)
 
 	// Exclude pods that are in the Succeeded or Failed states
 	selector := fmt.Sprintf("spec.nodeName=%s,status.phase!=%v,status.phase!=%v", n.Name, v1.PodSucceeded, v1.PodFailed)
@@ -978,32 +985,11 @@ func getNodeAllocatableAndAvailableMilliCPUValues(ctx context.Context, f *framew
 	framework.ExpectNoError(err, "failed to get running pods")
 	framework.Logf("Found %d pods on node '%s'", len(podList.Items), n.Name)
 	for _, pod := range podList.Items {
-		podRequestMilliCPU := resourceapi.GetResourceRequest(&pod, v1.ResourceCPU)
-		podAllocatedMilliCPU += podRequestMilliCPU
+		podRequest := resourceapi.GetResourceRequest(&pod, resourceName)
+		podAllocated += podRequest
 	}
-	nodeAvailableMilliCPU := nodeAllocatableMilliCPU - podAllocatedMilliCPU
-	return nodeAllocatableMilliCPU, nodeAvailableMilliCPU
-}
-
-// Calculate available memory. nodeAvailableMemory = nodeAllocatableMemory - sum(podAllocatedMemory)
-func getNodeAllocatableAndAvailableMemoryValues(ctx context.Context, f *framework.Framework, n *v1.Node) (int64, int64) {
-	nodeAllocatableMem := n.Status.Allocatable.Memory().Value()
-	gomega.Expect(n.Status.Allocatable).ShouldNot(gomega.BeEmpty(), "allocatable")
-	podAllocatedMem := int64(0)
-
-	// Exclude pods that are in the Succeeded or Failed states
-	selector := fmt.Sprintf("spec.nodeName=%s,status.phase!=%v,status.phase!=%v", n.Name, v1.PodSucceeded, v1.PodFailed)
-	listOptions := metav1.ListOptions{FieldSelector: selector}
-	podList, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceAll).List(ctx, listOptions)
-
-	framework.ExpectNoError(err, "failed to get running pods")
-	framework.Logf("Found %d pods on node '%s'", len(podList.Items), n.Name)
-	for _, pod := range podList.Items {
-		podRequestMem := resourceapi.GetResourceRequest(&pod, v1.ResourceMemory)
-		podAllocatedMem += podRequestMem
-	}
-	nodeAvailableMem := nodeAllocatableMem - podAllocatedMem
-	return nodeAllocatableMem, nodeAvailableMem
+	nodeAvailable := nodeAllocatable - podAllocated
+	return nodeAllocatable, nodeAvailable
 }
 
 func waitForPodDeferred(ctx context.Context, f *framework.Framework, testPod *v1.Pod) {
