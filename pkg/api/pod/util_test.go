@@ -4692,6 +4692,7 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 			expectAllowPodLifecycleSleepActionZeroValue: true,
 		},
 	}
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
