@@ -83,26 +83,27 @@ type ShutdownFunc func()
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler and podInformer. Background goroutines
 // will keep running until the context is canceled.
-func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory) {
+func StartScheduler(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory) {
+	clientSet := tCtx.Client()
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1()})
 	go func() {
-		<-ctx.Done()
+		<-tCtx.Done()
 		evtBroadcaster.Shutdown()
 	}()
 
-	evtBroadcaster.StartRecordingToSink(ctx.Done())
+	evtBroadcaster.StartRecordingToSink(tCtx.Done())
 
-	logger := klog.FromContext(ctx)
+	logger := tCtx.Logger()
 
 	sched, err := scheduler.New(
-		ctx,
+		tCtx,
 		clientSet,
 		informerFactory,
 		nil,
 		profile.NewRecorderFactory(evtBroadcaster),
-		scheduler.WithKubeConfig(kubeConfig),
+		scheduler.WithKubeConfig(tCtx.RESTConfig()),
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
 		scheduler.WithPodMaxBackoffSeconds(cfg.PodMaxBackoffSeconds),
@@ -111,19 +112,14 @@ func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConf
 		scheduler.WithParallelism(cfg.Parallelism),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreePluginRegistry),
 	)
-	if err != nil {
-		logger.Error(err, "Error creating scheduler")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
+	tCtx.ExpectNoError(err, "creating scheduler")
 
-	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(ctx.Done())
-	if err = sched.WaitForHandlersSync(ctx); err != nil {
-		logger.Error(err, "Failed waiting for handlers to sync")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
+	informerFactory.Start(tCtx.Done())
+	informerFactory.WaitForCacheSync(tCtx.Done())
+	err = sched.WaitForHandlersSync(tCtx)
+	tCtx.ExpectNoError(err, "waiting for handlers to sync")
 	logger.V(3).Info("Handlers synced")
-	go sched.Run(ctx)
+	go sched.Run(tCtx)
 
 	return sched, informerFactory
 }

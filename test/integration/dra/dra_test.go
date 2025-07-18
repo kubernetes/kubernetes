@@ -434,7 +434,7 @@ type schedulerSingleton struct {
 	mutex           sync.Mutex
 	usageCount      int
 	informerFactory informers.SharedInformerFactory
-	cancel          func(err error)
+	cancel          func(cause string)
 }
 
 func (scheduler *schedulerSingleton) start(tCtx ktesting.TContext, config string) {
@@ -452,13 +452,14 @@ func (scheduler *schedulerSingleton) start(tCtx ktesting.TContext, config string
 	// Run scheduler with default configuration. This must use the root context because
 	// the per-test tCtx passed to start will get canceled once the test which triggered
 	// starting the scheduler is done.
-	schedulerCtx := scheduler.rootCtx
-	schedulerCtx.Logf("Starting the scheduler for test %s...", tCtx.Name())
-	ctx := klog.NewContext(schedulerCtx, klog.LoggerWithName(schedulerCtx.Logger(), "scheduler"))
-	ctx, scheduler.cancel = context.WithCancelCause(ctx)
+	tCtx = scheduler.rootCtx
+	tCtx.Logf("Starting the scheduler for test %s...", tCtx.Name())
+	tCtx = ktesting.WithLogger(tCtx, klog.LoggerWithName(tCtx.Logger(), "scheduler"))
+	schedulerCtx := ktesting.WithCancel(tCtx)
+	scheduler.cancel = schedulerCtx.Cancel
 	cfg := newSchedulerComponentConfig(schedulerCtx, config)
-	_, scheduler.informerFactory = util.StartScheduler(ctx, schedulerCtx.Client(), schedulerCtx.RESTConfig(), cfg, nil)
-	schedulerCtx.Logf("Started the scheduler for test %s.", tCtx.Name())
+	_, scheduler.informerFactory = util.StartScheduler(schedulerCtx, cfg, nil)
+	tCtx.Logf("Started the scheduler for test %s.", tCtx.Name())
 }
 
 func (scheduler *schedulerSingleton) stop(tCtx ktesting.TContext) {
@@ -473,7 +474,7 @@ func (scheduler *schedulerSingleton) stop(tCtx ktesting.TContext) {
 
 	scheduler.rootCtx.Logf("Stopping the scheduler after test %s...", tCtx.Name())
 	if scheduler.cancel != nil {
-		scheduler.cancel(errors.New("test is done"))
+		scheduler.cancel("test is done")
 	}
 	if scheduler.informerFactory != nil {
 		scheduler.informerFactory.Shutdown()
