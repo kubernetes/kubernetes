@@ -63,12 +63,13 @@ func WithConstrainedImpersonation(handler http.Handler, a authorizer.Authorizer,
 			return
 		}
 
-		impersonateVerb := legacyImpersonateVerb
+		var impersonateVerb string
 		decision, reason, actingAsAttributes, err := authorizeConstrainedImpersonation(ctx, actingAsAttrsList, a)
 		if err != nil || decision != authorizer.DecisionAllow {
 			klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", reason, "err", err)
 			// fallback to use legacy impersonation
 			legacyDecision, legacyReason, err := authorizeLegacyImpersonation(req, actingAsAttrsList, a)
+			impersonateVerb = legacyImpersonateVerb
 			if err != nil || legacyDecision != authorizer.DecisionAllow {
 				klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "reason", legacyReason, "err", err)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
@@ -236,16 +237,10 @@ func newAttributeRecord(requestor user.Info) *authorizer.AttributesRecord {
 }
 
 func authorizeConstrainedImpersonation(ctx context.Context, targetAttributesList []*authorizer.AttributesRecord, a authorizer.Authorizer) (authorizer.Decision, string, authorizer.Attributes, error) {
-	// Get request attributes from the context.
-	requestorAttrs, err := GetAuthorizerAttributes(ctx)
-	if err != nil {
-		return authorizer.DecisionNoOpinion, "", &authorizer.AttributesRecord{}, err
-	}
-
 	for _, actingAsAttributes := range targetAttributesList {
 		decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 
-		if decision == authorizer.DecisionAllow {
+		if err == nil && decision == authorizer.DecisionAllow {
 			continue
 		}
 
@@ -259,6 +254,12 @@ func authorizeConstrainedImpersonation(ctx context.Context, targetAttributesList
 		if err != nil || decision != authorizer.DecisionAllow {
 			return decision, reason, actingAsAttributes, err
 		}
+	}
+
+	// Get request attributes from the context.
+	requestorAttrs, err := GetAuthorizerAttributes(ctx)
+	if err != nil {
+		return authorizer.DecisionNoOpinion, "", &authorizer.AttributesRecord{}, err
 	}
 
 	// Prepend the impersonate-on prefix to the actual verb.

@@ -250,7 +250,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ConstrainedImpersonation)
 		_, err = impersonatorClient.CoreV1().Pods(f.Namespace.Name).GetLogs(podToLog.Name, &v1.PodLogOptions{}).Stream(ctx)
 		o.Expect(apierrors.IsForbidden(err)).To(o.BeTrue())
 
-		// gran permission for sa to impersonate bob
+		// grant permission for sa to impersonate bob
 		impersonterClusterRole, err := f.ClientSet.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: commonName + "-"},
 			Rules: []rbacv1.PolicyRule{
@@ -282,7 +282,7 @@ var _ = SIGDescribe(framework.WithFeatureGate(features.ConstrainedImpersonation)
 		_, err = impersonatorClient.CoreV1().Pods(f.Namespace.Name).GetLogs(podToLog.Name, &v1.PodLogOptions{}).Stream(ctx)
 		o.Expect(apierrors.IsForbidden(err)).To(o.BeTrue())
 
-		// gran permission for sa to impersonate on get log
+		// grant permission for sa to impersonate on get log
 		impersonterOnRole, err := f.ClientSet.RbacV1().Roles(f.Namespace.Name).Create(ctx, &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: commonName + "-"},
 			Rules: []rbacv1.PolicyRule{
