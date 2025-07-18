@@ -1115,6 +1115,48 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 					initialConfig.FeatureGates[string(kubefeatures.KubeletPodResourcesGet)] = true
 				})
 
+				ginkgo.Context("with KubeletPodResourcesGet feature gate enabled", func() {
+					ginkgo.BeforeEach(func() {
+						e2eskipper.SkipUnlessFeatureGateEnabled("KubeletPodResourcesGet")
+					})
+
+					ginkgo.It("should succeed when calling Get for a valid pod", func(ctx context.Context) {
+						endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+						framework.ExpectNoError(err, "LocalEndpoint() faild err: %v", err)
+
+						cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+						framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
+						defer framework.ExpectNoError(conn.Close())
+
+						ginkgo.By("checking Get succeeds when the feature gate is enabled")
+						pd := podDesc{
+							podName:    "fg-enabled-pod",
+							cntName:    "fg-enabled-cnt",
+							cpuRequest: 1000,
+						}
+						pod := makePodResourcesTestPod(pd)
+						pod = e2epod.NewPodClient(f).Create(ctx, pod)
+						defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
+						framework.ExpectNoError(err)
+
+						res, err := cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{
+							PodName:      pod.Name,
+							PodNamespace: pod.Namespace,
+						})
+
+						framework.Logf("Get result: %v, err: %v", res, err)
+						framework.ExpectNoError(err, "Expected Get to succeed with the feature gate enabled")
+						gomega.Expect(res.PodResources.Name).To(gomega.Equal(pod.Name))
+						gomega.Expect(res.PodResources.Containers).To(gomega.HaveLen(1), "expected one container")
+						container := res.PodResources.Containers[0]
+						gomega.Expect(container.Name).To(gomega.Equal(pd.cntName), "expected container name match")
+						gomega.Expect(container.CpuIds).ToNot(gomega.BeEmpty(), "expected CPU IDs to be reported")
+						gomega.Expect(container.CpuIds).To(gomega.HaveLen(pd.CpuRequestExclusive()), "expected one exclusive CPU")
+						gomega.Expect(container.Devices).To(gomega.BeEmpty(), "expected no devices")
+					})
+				})
+
 				ginkgo.It("should return the expected responses", func(ctx context.Context) {
 					onlineCPUs, err := getOnlineCPUs()
 					framework.ExpectNoError(err, "getOnlineCPUs() failed err: %v", err)
