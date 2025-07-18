@@ -1025,6 +1025,9 @@ func TestCalculatePodStatusObservedGeneration(t *testing.T) {
 					Generation: 5,
 				},
 			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: false,
+			},
 			expected: 0,
 		},
 		{
@@ -1048,6 +1051,9 @@ func TestCalculatePodStatusObservedGeneration(t *testing.T) {
 				Status: v1.PodStatus{
 					ObservedGeneration: 5,
 				},
+			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: false,
 			},
 			expected: 5,
 		},
@@ -1097,6 +1103,9 @@ func TestCalculatePodConditionObservedGeneration(t *testing.T) {
 					}},
 				},
 			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: false,
+			},
 			expected: 0,
 		},
 		{
@@ -1128,6 +1137,9 @@ func TestCalculatePodConditionObservedGeneration(t *testing.T) {
 						ObservedGeneration: 5,
 					}},
 				},
+			},
+			features: map[featuregate.Feature]bool{
+				features.PodObservedGenerationTracking: false,
 			},
 			expected: 5,
 		},
