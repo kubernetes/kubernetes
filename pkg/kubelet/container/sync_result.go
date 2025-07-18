@@ -51,13 +51,15 @@ func (e *BackoffError) BackoffTime() time.Duration {
 // MinBackoff recursively searches through err for BackoffErrors and returns
 // the minimum of all found backoff durations.
 func MinBackoff(err error) (time.Duration, bool) {
-	switch x := err.(type) {
-	case *BackoffError:
-		return x.BackoffTime(), true
-	case utilerrors.Aggregate:
+	var ae utilerrors.Aggregate
+	var be *BackoffError
+	switch {
+	case errors.As(err, &be):
+		return be.BackoffTime(), true
+	case errors.As(err, &ae):
 		var min time.Duration
 		found := false
-		for _, e := range x.Errors() {
+		for _, e := range ae.Errors() {
 			if backoff, ok := MinBackoff(e); ok {
 				if !found || backoff < min {
 					min = backoff

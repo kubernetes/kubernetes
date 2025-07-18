@@ -886,7 +886,7 @@ func TestUpdatePod(t *testing.T) {
 }
 
 func TestCompleteWorkWithSyncError(t *testing.T) {
-	var defaultBackoff time.Duration = 10 * time.Second
+	defaultBackoff := 10 * time.Second
 
 	testCases := []struct {
 		name        string

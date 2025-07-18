@@ -94,7 +94,11 @@ func TestPodSyncResultPreservesOriginalErrorType(t *testing.T) {
 			t.Fatal("expected an aggregate error, but got nil")
 		}
 
-		errs := (aggErr.(utilerrors.Aggregate)).Errors()
+		var ae utilerrors.Aggregate
+		if !errors.As(aggErr, &ae) {
+			t.Fatalf("expected an aggregate error, but got %q", aggErr)
+		}
+		errs := ae.Errors()
 		foundCustomErr := false
 		for _, err := range errs {
 			var ce *myCustomError
@@ -117,7 +121,11 @@ func TestPodSyncResultPreservesOriginalErrorType(t *testing.T) {
 			t.Fatal("expected an aggregate error for SyncError, but got nil")
 		}
 
-		errs := (aggErr.(utilerrors.Aggregate)).Errors()
+		var ae utilerrors.Aggregate
+		if !errors.As(aggErr, &ae) {
+			t.Fatalf("expected an aggregate error, but got %q", aggErr)
+		}
+		errs := ae.Errors()
 		foundCustomErr := false
 		for _, err := range errs {
 			var ce *myCustomError
