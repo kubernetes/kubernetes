@@ -968,10 +968,13 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 // returned are in MilliValues.
 func getNodeAllocatableAndAvailableValues(ctx context.Context, f *framework.Framework, n *v1.Node, resourceName v1.ResourceName) (int64, int64) {
 	var nodeAllocatable int64
-	if resourceName == v1.ResourceCPU {
+	switch resourceName {
+	case v1.ResourceCPU:
 		nodeAllocatable = n.Status.Allocatable.Cpu().MilliValue()
-	} else {
+	case v1.ResourceMemory:
 		nodeAllocatable = n.Status.Allocatable.Memory().Value()
+	default:
+		framework.Failf("unexpected resource type %q; expected either 'CPU' or 'Memory'", resourceName)
 	}
 
 	gomega.Expect(n.Status.Allocatable).ShouldNot(gomega.BeEmpty(), "allocatable")
@@ -989,6 +992,10 @@ func getNodeAllocatableAndAvailableValues(ctx context.Context, f *framework.Fram
 		podAllocated += podRequest
 	}
 	nodeAvailable := nodeAllocatable - podAllocated
+	if nodeAvailable < 0 {
+		framework.Failf("unexpected negative value of nodeAvailable %d", nodeAvailable)
+	}
+
 	return nodeAllocatable, nodeAvailable
 }
 
