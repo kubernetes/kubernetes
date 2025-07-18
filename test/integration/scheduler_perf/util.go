@@ -406,7 +406,10 @@ func uniqueLVCombos(lvs []*labelValues) []map[string]string {
 func collectHistogramVec(metric string, labels map[string]string, lvMap map[string]string) *DataItem {
 	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metric, lvMap)
 	if err != nil {
-		klog.Error(err)
+		// "metric ... not found" is pretty normal. Don't spam the output with it!
+		if !strings.HasSuffix(err.Error(), "not found") {
+			klog.Error(err)
+		}
 		return nil
 	}
 
