@@ -11,14 +11,14 @@ spec:
           deviceClassName: test-class
           count: 2
           capacityRequests:
-            minimum:
+            requests:
               memory: 40Gi
       - name: req-1
         exactly:
           deviceClassName: test-class
           count: 2
           capacityRequests:
-            minimum:
+            requests:
               memory: 40Gi
       constraints:
       - requests:

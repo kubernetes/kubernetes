@@ -342,7 +342,7 @@ claims:
 					allocatedDevices.Insert(deviceID)
 					continue
 				}
-				sharedDeviceID := structured.MakeSharedDeviceID(deviceID, *result.ShareID)
+				sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
 				allocatedSharedDeviceIDs.Insert(sharedDeviceID)
 				claimedCapacity := result.ConsumedCapacities
 				if claimedCapacity != nil {

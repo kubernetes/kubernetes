@@ -318,8 +318,6 @@ func newCompiler() *compiler {
 		{
 			IntroducedVersion: version.MajorMinor(1, 31),
 			EnvOptions: []cel.EnvOption{
-				cel.Variable(deviceVar, deviceTypeV131.CelType()),
-
 				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
 				//
 				// This is useful to simplify attribute lookups because the
@@ -327,39 +325,22 @@ func newCompiler() *compiler {
 				//
 				//    cel.bind(dra, device.attributes["dra.example.com"], dra.oneBool && dra.anotherBool)
 				ext.Bindings(ext.BindingsVersion(0)),
+			},
+		},
+		{
+			IntroducedVersion: version.MajorMinor(1, 31),
+			RemovedVersion:    version.MajorMinor(1, 34),
+			EnvOptions: []cel.EnvOption{
+				cel.Variable(deviceVar, deviceTypeV131.CelType()),
 			},
 			DeclTypes: []*apiservercel.DeclType{
 				deviceTypeV131,
 			},
 		},
 		{
-			IntroducedVersion: version.MajorMinor(1, 31),
-			// This library has added to base environment of Kubernetes
-			// in 1.33 at version 1. It will continue to be available for
-			// use in this environment, but does not need to be included
-			// directly since it becomes available indirectly via the base
-			// environment shared across Kubernetes.
-			// In Kubernetes 1.34, version 1 feature of this library will
-			// become available, and will be rollback safe to 1.33.
-			// TODO: In Kubernetes 1.34: Add compile tests that demonstrate that
-			// `isSemver("v1.0.0", true)` and `semver("v1.0.0", true)` are supported.
-			RemovedVersion: version.MajorMinor(1, 33),
-			EnvOptions: []cel.EnvOption{
-				library.SemverLib(library.SemverVersion(0)),
-			},
-		},
-		{
 			IntroducedVersion: version.MajorMinor(1, 34),
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceTypeV134.CelType()),
-
-				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
-				//
-				// This is useful to simplify attribute lookups because the
-				// domain only needs to be given once:
-				//
-				//    cel.bind(dra, device.attributes["dra.example.com"], dra.oneBool && dra.anotherBool)
-				ext.Bindings(ext.BindingsVersion(0)),
 			},
 			DeclTypes: []*apiservercel.DeclType{
 				deviceTypeV134,

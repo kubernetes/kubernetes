@@ -99,8 +99,9 @@ const (
 var (
 	fixedShareID = "000000"
 
-	one = resource.MustParse("1")
-	two = resource.MustParse("2")
+	one  = *resource.NewQuantity(1, resource.BinarySI)
+	two  = *resource.NewQuantity(2, resource.BinarySI)
+	four = *resource.NewQuantity(4, resource.BinarySI)
 )
 
 func init() {
@@ -421,6 +422,7 @@ func (in wrapDevice) withAllowMultipleAllocations() wrapDevice {
 	return wrapDevice{Device: *device}
 }
 
+// withConsumableCapacity adds capacity with default sharing policy (2,2,4)
 func (in wrapDevice) withConsumableCapacity(capacity map[resourceapi.QualifiedName]resource.Quantity) wrapDevice {
 	inDevice := in.Device
 	device := inDevice.DeepCopy()
@@ -431,9 +433,11 @@ func (in wrapDevice) withConsumableCapacity(capacity map[resourceapi.QualifiedNa
 		device.Basic.Capacity[name] = resourceapi.DeviceCapacity{
 			Value: quantity,
 			SharingPolicy: &resourceapi.CapacitySharingPolicy{
-				Default: one,
+				Default: two,
 				ValidRange: &resourceapi.CapacitySharingPolicyRange{
-					Minimum: one,
+					Minimum:   two,
+					ChunkSize: &two,
+					Maximum:   &four,
 				},
 			},
 		}
@@ -554,7 +558,7 @@ func (in wrapDeviceRequestAllocationResult) withConsumedCapacities(shareID strin
 
 func capacityRequests(request *resource.Quantity) *resourceapi.CapacityRequirements {
 	return &resourceapi.CapacityRequirements{
-		Minimum: requirements(request),
+		Requests: requirements(request),
 	}
 }
 
@@ -3711,18 +3715,42 @@ func TestAllocator(t *testing.T,
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
 			slices: unwrap(
 				slice(slice1, node1, pool1, driverA,
-					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{ // both requests allocated to the same device
+				allocationResult(
+					localNodeSelector(node1),
+					// capacity must be rounded up to default minimum (two)
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+				),
+				allocationResult(
+					localNodeSelector(node1),
+					// capacity must be rounded up to default minimum (two)
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+				),
+			},
+		},
+		"consumable-capacity-multi-allocatable-device-with-chunk-consumable-capacity": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(resource.NewQuantity(3, resource.BinarySI))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
 				),
 			),
 			node: node(node1, region1),
 			expectResults: []any{
 				allocationResult(
 					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
-				),
-				allocationResult(
-					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+					// capacity must be rounded up with chunkSize (3 to 2+2 = 4)
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
 				),
 			},
 		},
@@ -3737,19 +3765,19 @@ func TestAllocator(t *testing.T,
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
 			slices: unwrap(
 				slice(slice1, node1, pool1, driverA,
-					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
 				),
 			),
 			node: node(node1, region1),
 
-			expectResults: []any{
+			expectResults: []any{ // both requests applied the default request (two)
 				allocationResult(
 					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
 				allocationResult(
 					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
 			},
 		},
@@ -3771,22 +3799,39 @@ func TestAllocator(t *testing.T,
 
 			expectResults: []any{},
 		},
+		"consumable-capacity-multi-allocatable-device-with-request-over-max-sharing-policy": {
+			features: Features{
+				ConsumableCapacity: true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(resource.NewQuantity(6, resource.BinarySI))),
+			),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: *resource.NewQuantity(10, resource.BinarySI)}),
+				),
+			),
+			node: node(node1, region1),
+
+			expectResults: []any{}, // default max sharing policy is 4, should not allocate even though 6 < 10
+		},
 		"consumable-capacity-multi-allocatable-device-with-some-remaining-consumable-capacity": {
 			features: Features{
 				ConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(
-				claim(claim0, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&one)),
+				claim(claim0, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&two)),
 			),
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					capacity0: &one,
+					capacity0: &two,
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
 			slices: unwrap(
 				slice(slice1, node1, pool1, driverA,
-					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
 				),
 			),
 			node: node(node1, region1),
@@ -3794,7 +3839,7 @@ func TestAllocator(t *testing.T,
 			expectResults: []any{
 				allocationResult(
 					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
 			},
 		},
@@ -3803,12 +3848,12 @@ func TestAllocator(t *testing.T,
 				ConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(
-				// 2 requests with one per each
+				// 2 requests with two per each
 				claim(claim0, "", classA, resourceapi.DeviceConstraint{MatchAttribute: &stringAttribute}).withRequests(
-					deviceRequest(req0, classA, 1).withCapacityRequest(&one),
-					deviceRequest(req1, classA, 1).withCapacityRequest(&one),
+					deviceRequest(req0, classA, 1).withCapacityRequest(&two),
+					deviceRequest(req1, classA, 1).withCapacityRequest(&two),
 				),
-				claim(claim1, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&one)),
+				claim(claim1, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&two)),
 			),
 			classes: objects(class(classA, driverA)),
 			slices: unwrap(
@@ -3816,20 +3861,20 @@ func TestAllocator(t *testing.T,
 					device(device2, nil,
 						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 							"stringAttribute": {StringValue: ptr.To("stringAttributeValue1")},
-						}).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+						}).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 					device(device1, nil,
 						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 							"stringAttribute": {StringValue: ptr.To("stringAttributeValue2")},
-						}).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+						}).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
 				),
 			),
 			node: node(node1, region1),
 			expectResults: []any{
 				allocationResult(localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
-					deviceRequestAllocationResult(req1, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+					deviceRequestAllocationResult(req1, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
-				allocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device2).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one})),
+				allocationResult(localNodeSelector(node1), deviceRequestAllocationResult(req0, driverA, pool1, device2).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two})),
 			},
 		},
 		"consumable-capacity-multi-allocatable-device-with-subrequest": {
@@ -3840,8 +3885,8 @@ func TestAllocator(t *testing.T,
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
 					requestWithPrioritizedList(req0,
-						wrapDeviceSubRequest{subRequest(subReq0, classA, 1)}.withCapacityRequest(&two).obj(),
-						wrapDeviceSubRequest{subRequest(subReq1, classA, 1)}.withCapacityRequest(&one).obj(),
+						wrapDeviceSubRequest{subRequest(subReq0, classA, 1)}.withCapacityRequest(&four).obj(),
+						wrapDeviceSubRequest{subRequest(subReq1, classA, 1)}.withCapacityRequest(&two).obj(),
 						subRequest(subReq1, classA, 1),
 					),
 				),
@@ -3849,14 +3894,14 @@ func TestAllocator(t *testing.T,
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
 			slices: unwrap(
 				slice(slice1, node1, pool1, driverA,
-					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
 			),
 			node: node(node1, region1),
 			expectResults: []any{
 				allocationResult(
 					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0SubReq1, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+					deviceRequestAllocationResult(req0SubReq1, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
 			},
 		},
@@ -3865,17 +3910,17 @@ func TestAllocator(t *testing.T,
 				ConsumableCapacity: true,
 			},
 			claimsToAllocate: objects(
-				claim(claim0, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&one)),
+				claim(claim0, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&two)),
 			),
 			allocatedCapacityDevices: map[DeviceID]ConsumedCapacity{
 				MakeDeviceID(driverA, pool1, device1): {
-					capacity0: &one,
+					capacity0: &two,
 				},
 			},
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
 			slices: unwrap(
 				slice(slice1, node1, pool1, driverA,
-					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+					device(device1, nil, nil).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
 			),
 			node: node(node1, region1),
@@ -3888,28 +3933,18 @@ func TestAllocator(t *testing.T,
 			},
 			claimsToAllocate: objects(
 				claim(claim0, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&one)),
-				claim(claim1, "", classA).withRequests(deviceRequest(req0, classA, 1).withCapacityRequest(&one)),
 			),
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
 			slices: unwrap(
 				slice(slice1, node1, pool1, driverA,
-					device(device1, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}, nil).withAllowMultipleAllocations(),
+					device(device1, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}, nil).withAllowMultipleAllocations(), // no SharingPolicy
 				),
 			),
 			node: node(node1, region1),
 
-			expectResults: []any{
-				allocationResult(
-					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, nil),
-				),
-				allocationResult(
-					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, nil),
-				),
-			},
+			expectResults: []any{}, // should reject since there is no guarantee
 		},
-		"consumable-capacity-dedicated-device-with-single-consumable-capacity-request": {
+		"consumable-capacity-dedicated-device-with-consumable-capacity-request": {
 			features: Features{
 				ConsumableCapacity: true,
 			},
@@ -3919,7 +3954,7 @@ func TestAllocator(t *testing.T,
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, false)),
 			slices: unwrap(
 				slice(slice1, node1, pool1, driverA,
-					device(device1, nil, nil).withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+					device(device1, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}, nil),
 				),
 			),
 			node: node(node1, region1),
@@ -4072,8 +4107,8 @@ func TestAllocator(t *testing.T,
 			},
 			claimsToAllocate: objects(
 				claim(claim0, "", classA, resourceapi.DeviceConstraint{DistinctAttribute: &stringAttribute}).withRequests(
-					deviceRequest(req0, classA, 1).withCapacityRequest(&one),
-					deviceRequest(req1, classA, 1).withCapacityRequest(&one),
+					deviceRequest(req0, classA, 1).withCapacityRequest(&two),
+					deviceRequest(req1, classA, 1).withCapacityRequest(&two),
 				),
 			),
 			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
@@ -4081,12 +4116,12 @@ func TestAllocator(t *testing.T,
 				slice(slice1, node1, pool1, driverA,
 					device(device1, nil,
 						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"stringAttribute": {StringValue: ptr.To("stringAttributeValue1")}},
-					).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+					).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
 				),
 				slice(slice1, node1, pool1, driverA,
 					device(device2, nil,
 						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"stringAttribute": {StringValue: ptr.To("stringAttributeValue2")}},
-					).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+					).withAllowMultipleAllocations().withConsumableCapacity(map[resourceapi.QualifiedName]resource.Quantity{capacity0: four}),
 				),
 			),
 			node: node(node1, region1),
@@ -4094,8 +4129,8 @@ func TestAllocator(t *testing.T,
 			expectResults: []any{
 				allocationResult(
 					localNodeSelector(node1),
-					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
-					deviceRequestAllocationResult(req1, driverA, pool1, device2).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: one}),
+					deviceRequestAllocationResult(req0, driverA, pool1, device1).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
+					deviceRequestAllocationResult(req1, driverA, pool1, device2).withConsumedCapacities(fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{capacity0: two}),
 				),
 			},
 		},

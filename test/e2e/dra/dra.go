@@ -1844,7 +1844,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			// The first pod will use 4Gi of the device.
 			claim := b.ExternalClaim()
 			claim.Spec.Devices.Requests[0].Exactly.CapacityRequests = &resourceapi.CapacityRequirements{
-				Minimum: map[resourceapi.QualifiedName]resource.Quantity{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("4Gi"),
 				},
 			}
@@ -1856,7 +1856,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			// The second pod will be failed to request 8Gi capacity.
 			claim2 := b.ExternalClaim()
 			claim2.Spec.Devices.Requests[0].Exactly.CapacityRequests = &resourceapi.CapacityRequirements{
-				Minimum: map[resourceapi.QualifiedName]resource.Quantity{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("8Gi"),
 				},
 			}
@@ -1867,7 +1867,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			// The third pod should be able to use the rest 4Gi of the device.
 			claim3 := b.ExternalClaim()
 			claim3.Spec.Devices.Requests[0].Exactly.CapacityRequests = &resourceapi.CapacityRequirements{
-				Minimum: map[resourceapi.QualifiedName]resource.Quantity{
+				Requests: map[resourceapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("4Gi"),
 				},
 			}

@@ -68,7 +68,7 @@ func foreachAllocatedDevice(claim *resourceapi.ResourceClaim,
 				dedicatedDeviceCallback(deviceID)
 				continue
 			}
-			sharedDeviceID := structured.MakeSharedDeviceID(deviceID, *result.ShareID)
+			sharedDeviceID := structured.MakeSharedDeviceID(deviceID, result.ShareID)
 			sharedDeviceCallback(sharedDeviceID)
 			if result.ConsumedCapacities != nil {
 				deviceConsumedCapacity := structured.NewDeviceConsumedCapacity(deviceID, result.ConsumedCapacities)

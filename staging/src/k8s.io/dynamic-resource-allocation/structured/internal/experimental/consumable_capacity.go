@@ -31,7 +31,7 @@ type ConsumedCapacity = internal.ConsumedCapacity
 // CmpRequestOverCapacity checks whether the new capacity request can be added within the given capacity,
 // and checks whether the requested value is against the capacity sharing policy.
 func CmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, capacityRequests *resourceapi.CapacityRequirements,
-	capacity map[draapi.QualifiedName]draapi.DeviceCapacity, allocatingCapacity ConsumedCapacity) (bool, error) {
+	allowMultipleAllocations *bool, capacity map[draapi.QualifiedName]draapi.DeviceCapacity, allocatingCapacity ConsumedCapacity) (bool, error) {
 	if requestsContainNonExistCapacity(capacityRequests, capacity) {
 		return false, errors.New("some requested capacity has not been defined")
 	}
@@ -44,8 +44,8 @@ func CmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, capacityRe
 			return false, fmt.Errorf("failed to convert DeviceCapacity %w", err)
 		}
 		var requestedValPtr *resource.Quantity
-		if capacityRequests != nil && capacityRequests.Minimum != nil {
-			if requestedVal, requestedFound := capacityRequests.Minimum[convertedName]; requestedFound {
+		if capacityRequests != nil && capacityRequests.Requests != nil {
+			if requestedVal, requestedFound := capacityRequests.Requests[convertedName]; requestedFound {
 				requestedValPtr = &requestedVal
 			}
 		}
@@ -69,6 +69,11 @@ func CmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, capacityRe
 				return false, nil
 			}
 		} else if requestedValPtr != nil {
+			// request resource of non-consumable capacity
+			if allowMultipleAllocations != nil && *allowMultipleAllocations {
+				// no guarantee
+				return false, fmt.Errorf("device is allowMultipleAllocations without sharingPolicy guarantee on the requested resource")
+			}
 			if (*requestedValPtr).Cmp(cap.Value) > 0 {
 				return false, nil
 			}
@@ -80,10 +85,10 @@ func CmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, capacityRe
 // requestsNonExistCapacity returns true if requests contain non-exist capacity.
 func requestsContainNonExistCapacity(capacityRequests *resourceapi.CapacityRequirements,
 	capacity map[draapi.QualifiedName]draapi.DeviceCapacity) bool {
-	if capacityRequests == nil || capacityRequests.Minimum == nil {
+	if capacityRequests == nil || capacityRequests.Requests == nil {
 		return false
 	}
-	for name := range capacityRequests.Minimum {
+	for name := range capacityRequests.Requests {
 		convertedName := draapi.QualifiedName(name)
 		if _, found := capacity[convertedName]; !found {
 			return true
@@ -139,8 +144,8 @@ func GetConsumedCapacityFromRequest(requestedCapacity *resourceapi.CapacityRequi
 	for name, cap := range consumableCapacity {
 		if isConsumableCapacity(cap) {
 			var requestedValPtr *resource.Quantity
-			if requestedCapacity != nil && requestedCapacity.Minimum != nil {
-				if requestedVal, requestedFound := requestedCapacity.Minimum[name]; requestedFound {
+			if requestedCapacity != nil && requestedCapacity.Requests != nil {
+				if requestedVal, requestedFound := requestedCapacity.Requests[name]; requestedFound {
 					requestedValPtr = &requestedVal
 				}
 			}

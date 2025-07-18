@@ -176,7 +176,7 @@ func TestCalculateConsumedCapacity(t *testing.T) {
 
 func TestGetConsumedCapacityFromRequest(t *testing.T) {
 	requestedCapacity := &resourceapi.CapacityRequirements{
-		Minimum: map[resourceapi.QualifiedName]resource.Quantity{
+		Requests: map[resourceapi.QualifiedName]resource.Quantity{
 			capacity0: one,
 			"dummy":   two,
 		},

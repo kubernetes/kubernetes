@@ -29,16 +29,16 @@ type DeviceConsumedCapacity = internal.DeviceConsumedCapacity
 type ConsumedCapacity = internal.ConsumedCapacity
 type AllocatedState = internal.AllocatedState
 
-func GetSharedDeviceName(device, shareID string) string {
-	return internal.GetSharedDeviceName(device, shareID)
-}
-
 func NewUniqueHexStringFactory(nBytes int) *UniqueHexStringFactory {
 	return internal.NewUniqueHexStringFactory(nBytes)
 }
 
-func MakeSharedDeviceID(deviceID DeviceID, shareID string) SharedDeviceID {
-	return internal.MakeSharedDeviceID(deviceID, shareID)
+func MakeSharedDeviceID(deviceID DeviceID, shareID *string) SharedDeviceID {
+	var shareIDStr string
+	if shareID != nil {
+		shareIDStr = *shareID
+	}
+	return internal.MakeSharedDeviceID(deviceID, shareIDStr)
 }
 
 func NewConsumedCapacityCollection() ConsumedCapacityCollection {
