@@ -1852,7 +1852,7 @@ func TestTemplateOnlyWarnings(t *testing.T) {
 		expected    []string
 	}{
 		{
-			name: "annotations",
+			name: "AppArmor annotations",
 			template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
 					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
@@ -1864,7 +1864,7 @@ func TestTemplateOnlyWarnings(t *testing.T) {
 			},
 		},
 		{
-			name: "AppArmor pod field",
+			name: "AppArmor matching pod field",
 			template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
 					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
@@ -1879,6 +1879,25 @@ func TestTemplateOnlyWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{},
+		},
+		{
+			name: "AppArmor different pod field",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					`container.apparmor.security.beta.kubernetes.io/foo`: `localhost/foo`,
+				}},
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						AppArmorProfile: &api.AppArmorProfile{Type: api.AppArmorProfileTypeLocalhost, LocalhostProfile: ptr.To("bar")},
+					},
+					Containers: []api.Container{{
+						Name: "foo",
+					}},
+				},
+			},
+			expected: []string{
+				`template.metadata.annotations[container.apparmor.security.beta.kubernetes.io/foo]: deprecated since v1.30; use the "appArmorProfile" field instead`,
+			},
 		},
 		{
 			name: "AppArmor container field",
