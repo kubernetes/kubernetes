@@ -22,7 +22,7 @@ import (
 	"github.com/onsi/gomega/types"
 )
 
-const GOMEGA_VERSION = "1.35.1"
+const GOMEGA_VERSION = "1.37.0"
 
 const nilGomegaPanic = `You are trying to make an assertion, but haven't registered Gomega's fail handler.
 If you're using Ginkgo then you probably forgot to put your assertion in an It().
@@ -191,7 +191,7 @@ func ensureDefaultGomegaIsConfigured() {
 // Will succeed only if `MyAmazingThing()` returns `(3, nil)`
 //
 // Ω and Expect are identical
-func Ω(actual interface{}, extra ...interface{}) Assertion {
+func Ω(actual any, extra ...any) Assertion {
 	ensureDefaultGomegaIsConfigured()
 	return Default.Ω(actual, extra...)
 }
@@ -217,7 +217,7 @@ func Ω(actual interface{}, extra ...interface{}) Assertion {
 // Will succeed only if `MyAmazingThing()` returns `(3, nil)`
 //
 // Expect and Ω are identical
-func Expect(actual interface{}, extra ...interface{}) Assertion {
+func Expect(actual any, extra ...any) Assertion {
 	ensureDefaultGomegaIsConfigured()
 	return Default.Expect(actual, extra...)
 }
@@ -233,7 +233,7 @@ func Expect(actual interface{}, extra ...interface{}) Assertion {
 // This is most useful in helper functions that make assertions.  If you want Gomega's
 // error message to refer to the calling line in the test (as opposed to the line in the helper function)
 // set the first argument of `ExpectWithOffset` appropriately.
-func ExpectWithOffset(offset int, actual interface{}, extra ...interface{}) Assertion {
+func ExpectWithOffset(offset int, actual any, extra ...any) Assertion {
 	ensureDefaultGomegaIsConfigured()
 	return Default.ExpectWithOffset(offset, actual, extra...)
 }
@@ -319,19 +319,19 @@ you an also use Eventually().WithContext(ctx) to pass in the context.  Passed-in
 		Eventually(client.FetchCount).WithContext(ctx).WithArguments("/users").Should(BeNumerically(">=", 17))
 	}, SpecTimeout(time.Second))
 
-Either way the context pasesd to Eventually is also passed to the underlying function.  Now, when Ginkgo cancels the context both the FetchCount client and Gomega will be informed and can exit.
+Either way the context passed to Eventually is also passed to the underlying function.  Now, when Ginkgo cancels the context both the FetchCount client and Gomega will be informed and can exit.
 
 By default, when a context is passed to Eventually *without* an explicit timeout, Gomega will rely solely on the context's cancellation to determine when to stop polling.  If you want to specify a timeout in addition to the context you can do so using the .WithTimeout() method.  For example:
 
 	Eventually(client.FetchCount).WithContext(ctx).WithTimeout(10*time.Second).Should(BeNumerically(">=", 17))
 
-now either the context cacnellation or the timeout will cause Eventually to stop polling.
+now either the context cancellation or the timeout will cause Eventually to stop polling.
 
 If, instead, you would like to opt out of this behavior and have Gomega's default timeouts govern Eventuallys that take a context you can call:
 
 	EnforceDefaultTimeoutsWhenUsingContexts()
 
-in the DSL (or on a Gomega instance).  Now all calls to Eventually that take a context will fail if eitehr the context is cancelled or the default timeout elapses.
+in the DSL (or on a Gomega instance).  Now all calls to Eventually that take a context will fail if either the context is cancelled or the default timeout elapses.
 
 **Category 3: Making assertions _in_ the function passed into Eventually**
 
@@ -390,7 +390,7 @@ is equivalent to
 
 	Eventually(...).WithTimeout(10*time.Second).WithPolling(2*time.Second).WithContext(ctx).Should(...)
 */
-func Eventually(actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
+func Eventually(actualOrCtx any, args ...any) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
 	return Default.Eventually(actualOrCtx, args...)
 }
@@ -404,7 +404,7 @@ func Eventually(actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
 // `EventuallyWithOffset` specifying a timeout interval (and an optional polling interval) are
 // the same as `Eventually(...).WithOffset(...).WithTimeout` or
 // `Eventually(...).WithOffset(...).WithTimeout(...).WithPolling`.
-func EventuallyWithOffset(offset int, actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
+func EventuallyWithOffset(offset int, actualOrCtx any, args ...any) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
 	return Default.EventuallyWithOffset(offset, actualOrCtx, args...)
 }
@@ -424,7 +424,7 @@ Consistently is useful in cases where you want to assert that something *does no
 
 This will block for 200 milliseconds and repeatedly check the channel and ensure nothing has been received.
 */
-func Consistently(actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
+func Consistently(actualOrCtx any, args ...any) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
 	return Default.Consistently(actualOrCtx, args...)
 }
@@ -435,13 +435,13 @@ func Consistently(actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
 //
 // `ConsistentlyWithOffset` is the same as `Consistently(...).WithOffset` and
 // optional `WithTimeout` and `WithPolling`.
-func ConsistentlyWithOffset(offset int, actualOrCtx interface{}, args ...interface{}) AsyncAssertion {
+func ConsistentlyWithOffset(offset int, actualOrCtx any, args ...any) AsyncAssertion {
 	ensureDefaultGomegaIsConfigured()
 	return Default.ConsistentlyWithOffset(offset, actualOrCtx, args...)
 }
 
 /*
-StopTrying can be used to signal to Eventually and Consistentlythat they should abort and stop trying.  This always results in a failure of the assertion - and the failure message is the content of the StopTrying signal.
+StopTrying can be used to signal to Eventually and Consistently that they should abort and stop trying.  This always results in a failure of the assertion - and the failure message is the content of the StopTrying signal.
 
 You can send the StopTrying signal by either returning StopTrying("message") as an error from your passed-in function _or_ by calling StopTrying("message").Now() to trigger a panic and end execution.
 

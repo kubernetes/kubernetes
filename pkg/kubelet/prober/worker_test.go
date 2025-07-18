@@ -21,38 +21,45 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/fake"
-	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
-	"k8s.io/kubernetes/pkg/kubelet/status"
-	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
-	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/probe"
+	probe "k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {
 }
 
+func ptrBool(b bool) *bool {
+	return &b
+}
+
 func TestDoProbe(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
 
+	ginkgo.BeforeEach(func() {
+		m = newTestManager()
+		m.statusManager = &fakeStatusManager{podStatuses: make(map[types.UID]v1.PodStatus)}
+		m.prober.exec = fakeExecProber{result: probe.Success, err: nil}
+	})
+
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
-		// Test statuses.
 		runningStatus := getTestRunningStatusWithStarted(probeType != startup)
 		pendingStatus := getTestRunningStatusWithStarted(probeType != startup)
-		pendingStatus.ContainerStatuses[0].State.Running = nil
+		pendingStatus.InitContainerStatuses[0].State.Running = nil
 		terminatedStatus := getTestRunningStatusWithStarted(probeType != startup)
-		terminatedStatus.ContainerStatuses[0].State.Running = nil
-		terminatedStatus.ContainerStatuses[0].State.Terminated = &v1.ContainerStateTerminated{
+		terminatedStatus.InitContainerStatuses[0].State.Running = nil
+		terminatedStatus.InitContainerStatuses[0].State.Terminated = &v1.ContainerStateTerminated{
 			StartedAt: metav1.Now(),
 		}
 		otherStatus := getTestRunningStatusWithStarted(probeType != startup)
-		otherStatus.ContainerStatuses[0].Name = "otherContainer"
+		otherStatus.InitContainerStatuses[0].Name = "otherContainer"
 		failedStatus := getTestRunningStatusWithStarted(probeType != startup)
 		failedStatus.Phase = v1.PodFailed
 
@@ -64,26 +71,56 @@ func TestDoProbe(t *testing.T) {
 			expectedResult       results.Result
 			setDeletionTimestamp bool
 		}{
-			{ // No status.
+			{
+				probe: v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+					},
+				},
+				podStatus: &runningStatus,
 				expectContinue: map[string]bool{
 					liveness.String():  true,
 					readiness.String(): true,
 					startup.String():   true,
 				},
+				expectSet:      true,
+				expectedResult: results.Success,
 			},
-			{ // Pod failed
+			{
+				probe: v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+					},
+				},
 				podStatus: &failedStatus,
+				expectContinue: map[string]bool{
+					liveness.String():  false,
+					readiness.String(): false,
+					startup.String():   false,
+				},
 			},
-			{ // Pod deletion
+			{
+				probe: v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+					},
+				},
 				podStatus:            &runningStatus,
 				setDeletionTimestamp: true,
 				expectSet:            true,
 				expectContinue: map[string]bool{
-					readiness.String(): true,
+					liveness.String():  false, // Pod deleted, liveness stops
+					readiness.String(): true,  // Readiness continues
+					startup.String():   false, // Pod deleted, startup stops
 				},
-				expectedResult: results.Success,
+				expectedResult: results.Success, // Liveness/Startup set Success on deletion
 			},
-			{ // No container status
+			{
+				probe: v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+					},
+				},
 				podStatus: &otherStatus,
 				expectContinue: map[string]bool{
 					liveness.String():  true,
@@ -91,22 +128,42 @@ func TestDoProbe(t *testing.T) {
 					startup.String():   true,
 				},
 			},
-			{ // Container waiting
-				podStatus: &pendingStatus,
-				expectContinue: map[string]bool{
-					liveness.String():  true,
-					readiness.String(): true,
-					startup.String():   true,
+			{
+				probe: v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+					},
 				},
+				podStatus:      &pendingStatus,
 				expectSet:      true,
 				expectedResult: results.Failure,
+				expectContinue: map[string]bool{
+					liveness.String():  true,
+					readiness.String(): false, // Non-running, readiness stops
+					startup.String():   true,
+				},
 			},
-			{ // Container terminated
+			{
+				probe: v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+					},
+				},
 				podStatus:      &terminatedStatus,
 				expectSet:      true,
 				expectedResult: results.Failure,
+				expectContinue: map[string]bool{
+					liveness.String():  false,
+					readiness.String(): false,
+					startup.String():   false,
+				},
 			},
-			{ // Probe successful.
+			{
+				probe: v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+					},
+				},
 				podStatus: &runningStatus,
 				expectContinue: map[string]bool{
 					liveness.String():  true,
@@ -116,10 +173,68 @@ func TestDoProbe(t *testing.T) {
 				expectSet:      true,
 				expectedResult: results.Success,
 			},
-			{ // Initial delay passed
-				podStatus: &runningStatus,
+			{
 				probe: v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+					},
 					InitialDelaySeconds: -100,
+				},
+				podStatus: &runningStatus,
+				expectContinue: map[string]bool{
+					liveness.String():  true,
+					readiness.String(): true,
+					startup.String():   true,
+				},
+				expectSet:      true,
+				expectedResult: results.Success,
+			},
+			{
+				probe: v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+					},
+					InitialDelaySeconds: 0,
+					PeriodSeconds:       1,
+					FailureThreshold:    1,
+				},
+				podStatus: &v1.PodStatus{
+					Phase: v1.PodRunning,
+					InitContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:        testContainerName,
+							ContainerID: testContainerID.String(),
+							State:       v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: metav1.Now()}},
+						},
+					},
+				},
+				expectContinue: map[string]bool{
+					liveness.String():  false, // Terminated init container, stop probing
+					readiness.String(): false, // Terminated init container, stop probing
+					startup.String():   false, // Terminated init container, stop probing
+				},
+				expectSet:      true,
+				expectedResult: results.Failure,
+			},
+			{
+				probe: v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+					},
+					InitialDelaySeconds: 0,
+					PeriodSeconds:       1,
+					FailureThreshold:    1,
+				},
+				podStatus: &v1.PodStatus{
+					Phase: v1.PodRunning,
+					InitContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:        testContainerName,
+							ContainerID: testContainerID.String(),
+							State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()}},
+							Started:     ptrBool(true),
+						},
+					},
 				},
 				expectContinue: map[string]bool{
 					liveness.String():  true,
@@ -132,13 +247,42 @@ func TestDoProbe(t *testing.T) {
 		}
 
 		for i, test := range tests {
-			w := newTestWorker(m, probeType, test.probe)
+			klog.V(4).InfoS("TestDoProbe", "probeType", probeType, "testIndex", i, "podStatus", test.podStatus)
+			// Create pod with InitContainers to match newTestWorker
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testPodName,
+					Namespace: testNamespace,
+					UID:       testPodUID,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					InitContainers: []v1.Container{
+						{
+							Name:          testContainerName,
+							Image:         "foo",
+							RestartPolicy: ptrContainerRestartPolicy(v1.ContainerRestartPolicyAlways),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  "main-container",
+							Image: "bar",
+						},
+					},
+				},
+			}
+			setTestProbe(pod, probeType, test.probe)
+			w := newWorker(m, probeType, pod, pod.Spec.InitContainers[0])
 			if test.podStatus != nil {
 				m.statusManager.SetPodStatus(logger, w.pod, *test.podStatus)
+			} else {
+				// Default to running status if not specified
+				m.statusManager.SetPodStatus(logger, w.pod, runningStatus)
 			}
 			if test.setDeletionTimestamp {
 				now := metav1.Now()
-				w.pod.ObjectMeta.DeletionTimestamp = &now
+				w.pod.DeletionTimestamp = &now
 			}
 			if c := w.doProbe(ctx); c != test.expectContinue[probeType.String()] {
 				t.Errorf("[%s-%d] Expected continue to be %v but got %v", probeType, i, test.expectContinue[probeType.String()], c)
@@ -150,8 +294,6 @@ func TestDoProbe(t *testing.T) {
 			if result != test.expectedResult {
 				t.Errorf("[%s-%d] Expected result: %v but got %v", probeType, i, test.expectedResult, result)
 			}
-
-			m.statusManager = status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 			resultsManager(m, probeType).Remove(testContainerID)
 		}
 	}
@@ -163,12 +305,14 @@ func TestInitialDelay(t *testing.T) {
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		w := newTestWorker(m, probeType, v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+			},
 			InitialDelaySeconds: 10,
 		})
 		m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(probeType != startup))
 
 		expectContinue(t, w, w.doProbe(ctx), "during initial delay")
-		// Default value depends on probe, Success for liveness, Failure for readiness, Unknown for startup
 		switch probeType {
 		case liveness:
 			expectResult(t, w, results.Success, "during initial delay")
@@ -178,13 +322,11 @@ func TestInitialDelay(t *testing.T) {
 			expectResult(t, w, results.Unknown, "during initial delay")
 		}
 
-		// 100 seconds later...
 		laterStatus := getTestRunningStatusWithStarted(probeType != startup)
-		laterStatus.ContainerStatuses[0].State.Running.StartedAt.Time =
+		laterStatus.InitContainerStatuses[0].State.Running.StartedAt.Time =
 			time.Now().Add(-100 * time.Second)
 		m.statusManager.SetPodStatus(logger, w.pod, laterStatus)
 
-		// Second call should succeed (already waited).
 		expectContinue(t, w, w.doProbe(ctx), "after initial delay")
 		expectResult(t, w, results.Success, "after initial delay")
 	}
@@ -193,12 +335,17 @@ func TestInitialDelay(t *testing.T) {
 func TestFailureThreshold(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
-	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
+	w := newTestWorker(m, readiness, v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+		},
+		SuccessThreshold: 1,
+		FailureThreshold: 3,
+	})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
 
 	for i := 0; i < 2; i++ {
-		// First probe should succeed.
-		m.prober.exec = fakeExecProber{probe.Success, nil}
+		m.prober.exec = fakeExecProber{result: probe.Success, err: nil}
 
 		for j := 0; j < 3; j++ {
 			msg := fmt.Sprintf("%d success (%d)", j+1, i)
@@ -206,17 +353,14 @@ func TestFailureThreshold(t *testing.T) {
 			expectResult(t, w, results.Success, msg)
 		}
 
-		// Prober starts failing :(
-		m.prober.exec = fakeExecProber{probe.Failure, nil}
+		m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 
-		// Next 2 probes should still be "success".
 		for j := 0; j < 2; j++ {
 			msg := fmt.Sprintf("%d failing (%d)", j+1, i)
 			expectContinue(t, w, w.doProbe(ctx), msg)
 			expectResult(t, w, results.Success, msg)
 		}
 
-		// Third & following fail.
 		for j := 0; j < 3; j++ {
 			msg := fmt.Sprintf("%d failure (%d)", j+3, i)
 			expectContinue(t, w, w.doProbe(ctx), msg)
@@ -228,35 +372,36 @@ func TestFailureThreshold(t *testing.T) {
 func TestSuccessThreshold(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
-	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 3, FailureThreshold: 1})
+	w := newTestWorker(m, readiness, v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+		},
+		SuccessThreshold: 3,
+		FailureThreshold: 1,
+	})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
 
-	// Start out failure.
 	w.resultsManager.Set(testContainerID, results.Failure, &v1.Pod{})
 
 	for i := 0; i < 2; i++ {
-		// Probe defaults to Failure.
 		for j := 0; j < 2; j++ {
 			msg := fmt.Sprintf("%d success (%d)", j+1, i)
 			expectContinue(t, w, w.doProbe(ctx), msg)
 			expectResult(t, w, results.Failure, msg)
 		}
 
-		// Continuing success!
 		for j := 0; j < 3; j++ {
 			msg := fmt.Sprintf("%d success (%d)", j+3, i)
 			expectContinue(t, w, w.doProbe(ctx), msg)
 			expectResult(t, w, results.Success, msg)
 		}
 
-		// Prober flakes :(
-		m.prober.exec = fakeExecProber{probe.Failure, nil}
+		m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 		msg := fmt.Sprintf("1 failure (%d)", i)
 		expectContinue(t, w, w.doProbe(ctx), msg)
 		expectResult(t, w, results.Failure, msg)
 
-		// Back to success.
-		m.prober.exec = fakeExecProber{probe.Success, nil}
+		m.prober.exec = fakeExecProber{result: probe.Success, err: nil}
 	}
 }
 
@@ -265,14 +410,18 @@ func TestStartupProbeSuccessThreshold(t *testing.T) {
 	m := newTestManager()
 	successThreshold := 1
 	failureThreshold := 3
-	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: int32(successThreshold), FailureThreshold: int32(failureThreshold)})
+	w := newTestWorker(m, startup, v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+		},
+		SuccessThreshold: int32(successThreshold),
+		FailureThreshold: int32(failureThreshold),
+	})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestNotRunningStatus())
-	m.prober.exec = fakeExecProber{probe.Success, nil}
+	m.prober.exec = fakeExecProber{result: probe.Success, err: nil}
 
 	for i := 0; i < successThreshold+1; i++ {
 		if i < successThreshold {
-			// Probe should not be on hold and will continue to be excuted
-			// until successThreshold is met
 			if w.onHold {
 				t.Errorf("Prober should not be on hold")
 			}
@@ -280,12 +429,9 @@ func TestStartupProbeSuccessThreshold(t *testing.T) {
 			expectContinue(t, w, w.doProbe(ctx), msg)
 			expectResult(t, w, results.Success, msg)
 		} else {
-			// Probe should be on hold and will not be executed anymore
-			// when successThreshold is met
 			if !w.onHold {
 				t.Errorf("Prober should be on hold because successThreshold is exceeded")
 			}
-			// Meeting or exceeding successThreshold should cause resultRun to reset to 0
 			if w.resultRun != 0 {
 				t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
 			}
@@ -298,14 +444,18 @@ func TestStartupProbeFailureThreshold(t *testing.T) {
 	m := newTestManager()
 	successThreshold := 1
 	failureThreshold := 3
-	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: int32(successThreshold), FailureThreshold: int32(failureThreshold)})
+	w := newTestWorker(m, startup, v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+		},
+		SuccessThreshold: int32(successThreshold),
+		FailureThreshold: int32(failureThreshold),
+	})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestNotRunningStatus())
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 
 	for i := 0; i < failureThreshold+1; i++ {
 		if i < failureThreshold {
-			// Probe should not be on hold and will continue to be excuted
-			// until failureThreshold is met
 			if w.onHold {
 				t.Errorf("Prober should not be on hold")
 			}
@@ -313,31 +463,20 @@ func TestStartupProbeFailureThreshold(t *testing.T) {
 			expectContinue(t, w, w.doProbe(ctx), msg)
 			switch i {
 			case 0, 1:
-				// At this point, the expected result is Unknown
-				// because w.resultsManager.Set() will be called after FailureThreshold is reached
 				expectResult(t, w, results.Unknown, msg)
-				// resultRun should be incremented until failureThreshold is met
 				if w.resultRun != i+1 {
 					t.Errorf("Prober resultRun should be %d, but %d", i+1, w.resultRun)
 				}
 			case 2:
-				// The expected result is Failure
-				// because w.resultsManager.Set() will be called due to resultRun reaching failureThreshold,
-				// updating the cached result to Failure.
-				// After that, resultRun will be reset to 0.
 				expectResult(t, w, results.Failure, msg)
-				// Meeting failureThreshold should cause resultRun to reset to 0
 				if w.resultRun != 0 {
 					t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
 				}
 			}
 		} else {
-			// Probe should be on hold and will not be executed anymore
-			// when failureThreshold is met
 			if !w.onHold {
 				t.Errorf("Prober should be on hold because failureThreshold is exceeded")
 			}
-			// Exceeding failureThreshold should cause resultRun to reset to 0
 			if w.resultRun != 0 {
 				t.Errorf("Prober resultRun should be 0, but %d", w.resultRun)
 			}
@@ -351,12 +490,15 @@ func TestCleanUp(t *testing.T) {
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		key := probeKey{testPodUID, testContainerName, probeType}
-		w := newTestWorker(m, probeType, v1.Probe{})
+		w := newTestWorker(m, probeType, v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+			},
+		})
 		m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(probeType != startup))
 		go w.run()
 		m.workers[key] = w
 
-		// Wait for worker to run.
 		condition := func() (bool, error) {
 			ready, _ := resultsManager(m, probeType).Get(testContainerID)
 			return ready == results.Success, nil
@@ -368,7 +510,7 @@ func TestCleanUp(t *testing.T) {
 		}
 
 		for i := 0; i < 10; i++ {
-			w.stop() // Stop should be callable multiple times without consequence.
+			w.stop()
 		}
 		if err := waitForWorkerExit(t, m, []probeKey{key}); err != nil {
 			t.Fatalf("[%s] error waiting for worker exit: %v", probeType, err)
@@ -416,21 +558,24 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, startup} {
-		w := newTestWorker(m, probeType, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+		w := newTestWorker(m, probeType, v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+			},
+			SuccessThreshold: 1,
+			FailureThreshold: 1,
+		})
 		status := getTestRunningStatusWithStarted(probeType != startup)
 		m.statusManager.SetPodStatus(logger, w.pod, status)
 
-		// First probe should fail.
-		m.prober.exec = fakeExecProber{probe.Failure, nil}
+		m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 		msg := "first probe"
 		expectContinue(t, w, w.doProbe(ctx), msg)
 		expectResult(t, w, results.Failure, msg)
 		if !w.onHold {
 			t.Errorf("Prober should be on hold due to %s check failure", probeType)
 		}
-		// Set fakeExecProber to return success. However, the result will remain
-		// failure because the worker is on hold and won't probe.
-		m.prober.exec = fakeExecProber{probe.Success, nil}
+		m.prober.exec = fakeExecProber{result: probe.Success, err: nil}
 		msg = "while on hold"
 		expectContinue(t, w, w.doProbe(ctx), msg)
 		expectResult(t, w, results.Failure, msg)
@@ -438,8 +583,7 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 			t.Errorf("Prober should be on hold due to %s check failure", probeType)
 		}
 
-		// Set a new container ID to lift the hold. The next probe will succeed.
-		status.ContainerStatuses[0].ContainerID = "test://newCont_ID"
+		status.InitContainerStatuses[0].ContainerID = "test://newCont_ID"
 		m.statusManager.SetPodStatus(logger, w.pod, status)
 		msg = "hold lifted"
 		expectContinue(t, w, w.doProbe(ctx), msg)
@@ -455,10 +599,16 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
-	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
+	w := newTestWorker(m, liveness, v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+		},
+		SuccessThreshold: 1,
+		FailureThreshold: 3,
+	})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatus())
 
-	m.prober.exec = fakeExecProber{probe.Success, nil}
+	m.prober.exec = fakeExecProber{result: probe.Success, err: nil}
 	msg := "initial probe success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
@@ -466,7 +616,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 		t.Errorf("Prober resultRun should be 1")
 	}
 
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 	msg = "probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
@@ -474,7 +624,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 		t.Errorf("Prober resultRun should be 1")
 	}
 
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 	msg = "2nd probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
@@ -482,10 +632,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 		t.Errorf("Prober resultRun should be 2")
 	}
 
-	// Exceeding FailureThreshold should cause resultRun to
-	// reset to 0 so that the probe on the restarted pod
-	// also gets FailureThreshold attempts to succeed.
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 	msg = "3rd probe failure, result failure"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Failure, msg)
@@ -497,12 +644,16 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 func TestResultRunOnStartupCheckFailure(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
-	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
+	w := newTestWorker(m, startup, v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+		},
+		SuccessThreshold: 1,
+		FailureThreshold: 3,
+	})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(false))
 
-	// Below FailureThreshold leaves probe state unchanged
-	// which is failed for startup at first.
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 	msg := "probe failure, result unknown"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Unknown, msg)
@@ -510,7 +661,7 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 		t.Errorf("Prober resultRun should be 1")
 	}
 
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 	msg = "2nd probe failure, result unknown"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Unknown, msg)
@@ -518,10 +669,7 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 		t.Errorf("Prober resultRun should be 2")
 	}
 
-	// Exceeding FailureThreshold should cause resultRun to
-	// reset to 0 so that the probe on the restarted pod
-	// also gets FailureThreshold attempts to succeed.
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 	msg = "3rd probe failure, result failure"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Failure, msg)
@@ -533,17 +681,20 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 func TestLivenessProbeDisabledByStarted(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
-	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+	w := newTestWorker(m, liveness, v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+		},
+		SuccessThreshold: 1,
+		FailureThreshold: 1,
+	})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(false))
-	// livenessProbe fails, but is disabled
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 	msg := "Not started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
-	// setting started state
 	m.statusManager.SetContainerStartup(logger, w.pod.UID, w.containerID, true)
-	// livenessProbe fails
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 	msg = "Started, probe failure, result failure"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Failure, msg)
@@ -552,22 +703,24 @@ func TestLivenessProbeDisabledByStarted(t *testing.T) {
 func TestStartupProbeDisabledByStarted(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
-	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
+	w := newTestWorker(m, startup, v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
+		},
+		SuccessThreshold: 1,
+		FailureThreshold: 2,
+	})
 	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(false))
-	// startupProbe fails < FailureThreshold, stays unknown
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 	msg := "Not started, probe failure, result unknown"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Unknown, msg)
-	// startupProbe succeeds
-	m.prober.exec = fakeExecProber{probe.Success, nil}
-	msg = "Started, probe success, result success"
+	m.prober.exec = fakeExecProber{result: probe.Success, err: nil}
+	msg = "Not started, probe success, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)
-	// setting started state
-	m.statusManager.SetContainerStartup(logger, w.pod.UID, w.containerID, true)
-	// startupProbe fails, but is disabled
-	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.statusManager.SetPodStatus(logger, w.pod, getTestRunningStatusWithStarted(true))
+	m.prober.exec = fakeExecProber{result: probe.Failure, err: nil}
 	msg = "Started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(ctx), msg)
 	expectResult(t, w, results.Success, msg)

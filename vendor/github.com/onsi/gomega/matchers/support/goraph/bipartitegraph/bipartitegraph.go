@@ -11,7 +11,7 @@ type BipartiteGraph struct {
 	Edges EdgeSet
 }
 
-func NewBipartiteGraph(leftValues, rightValues []interface{}, neighbours func(interface{}, interface{}) (bool, error)) (*BipartiteGraph, error) {
+func NewBipartiteGraph(leftValues, rightValues []any, neighbours func(any, any) (bool, error)) (*BipartiteGraph, error) {
 	left := NodeOrderedSet{}
 	for i, v := range leftValues {
 		left = append(left, Node{ID: i, Value: v})
@@ -41,7 +41,7 @@ func NewBipartiteGraph(leftValues, rightValues []interface{}, neighbours func(in
 
 // FreeLeftRight returns left node values and right node values
 // of the BipartiteGraph's nodes which are not part of the given edges.
-func (bg *BipartiteGraph) FreeLeftRight(edges EdgeSet) (leftValues, rightValues []interface{}) {
+func (bg *BipartiteGraph) FreeLeftRight(edges EdgeSet) (leftValues, rightValues []any) {
 	for _, node := range bg.Left {
 		if edges.Free(node) {
 			leftValues = append(leftValues, node.Value)

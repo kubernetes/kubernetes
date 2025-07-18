@@ -1,0 +1,24 @@
+language: go
+go:
+  - tip
+  - 1.16.x
+  - 1.15.x
+
+cache:
+  directories:
+    - $GOPATH/pkg/mod
+
+# allow internal package imports, necessary for forked repositories
+go_import_path: github.com/onsi/ginkgo
+
+install:
+  - GO111MODULE="off" go get -v -t ./...
+  - GO111MODULE="off" go get golang.org/x/tools/cmd/cover
+  - GO111MODULE="off" go get github.com/onsi/gomega
+  - GO111MODULE="off" go install github.com/onsi/ginkgo/ginkgo
+  - export PATH=$GOPATH/bin:$PATH
+
+script:
+  - GO111MODULE="on" go mod tidy && git diff --exit-code go.mod go.sum
+  - go vet
+  - ginkgo -r --randomizeAllSpecs --randomizeSuites --race --trace

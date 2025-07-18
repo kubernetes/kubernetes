@@ -10,10 +10,10 @@ import (
 )
 
 type AssignableToTypeOfMatcher struct {
-	Expected interface{}
+	Expected any
 }
 
-func (matcher *AssignableToTypeOfMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *AssignableToTypeOfMatcher) Match(actual any) (success bool, err error) {
 	if actual == nil && matcher.Expected == nil {
 		return false, fmt.Errorf("Refusing to compare <nil> to <nil>.\nBe explicit and use BeNil() instead.  This is to avoid mistakes where both sides of an assertion are erroneously uninitialized.")
 	} else if matcher.Expected == nil {
@@ -28,10 +28,10 @@ func (matcher *AssignableToTypeOfMatcher) Match(actual interface{}) (success boo
 	return actualType.AssignableTo(expectedType), nil
 }
 
-func (matcher *AssignableToTypeOfMatcher) FailureMessage(actual interface{}) string {
+func (matcher *AssignableToTypeOfMatcher) FailureMessage(actual any) string {
 	return format.Message(actual, fmt.Sprintf("to be assignable to the type: %T", matcher.Expected))
 }
 
-func (matcher *AssignableToTypeOfMatcher) NegatedFailureMessage(actual interface{}) string {
+func (matcher *AssignableToTypeOfMatcher) NegatedFailureMessage(actual any) string {
 	return format.Message(actual, fmt.Sprintf("not to be assignable to the type: %T", matcher.Expected))
 }

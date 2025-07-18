@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"github.com/onsi/ginkgo/v2/internal/parallel_support"
 	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/ginkgo/v2/types"
-	"golang.org/x/net/context"
 )
 
 type Phase uint
@@ -20,7 +20,7 @@ const (
 	PhaseRun
 )
 
-var PROGRESS_REPORTER_DEADLING = 5 * time.Second
+const ProgressReporterDeadline = 5 * time.Second
 
 type Suite struct {
 	tree               *TreeNode
@@ -370,7 +370,7 @@ func (suite *Suite) generateProgressReport(fullReport bool) types.ProgressReport
 	suite.selectiveLock.Lock()
 	defer suite.selectiveLock.Unlock()
 
-	deadline, cancel := context.WithTimeout(context.Background(), PROGRESS_REPORTER_DEADLING)
+	deadline, cancel := context.WithTimeout(context.Background(), ProgressReporterDeadline)
 	defer cancel()
 	var additionalReports []string
 	if suite.currentSpecContext != nil {

@@ -42,12 +42,7 @@ var ProberResults = metrics.NewCounterVec(
 		Help:           "Cumulative number of a liveness, readiness or startup probe for a container by result.",
 		StabilityLevel: metrics.BETA,
 	},
-	[]string{"probe_type",
-		"result",
-		"container",
-		"pod",
-		"namespace",
-		"pod_uid"},
+	[]string{"probe_type", "result", "container", "pod", "namespace", "pod_uid"},
 )
 
 // ProberDuration stores the duration of a successful probe lifecycle by result as prometheus metrics.
@@ -58,15 +53,12 @@ var ProberDuration = metrics.NewHistogramVec(
 		Help:           "Duration in seconds for a probe response.",
 		StabilityLevel: metrics.ALPHA,
 	},
-	[]string{"probe_type",
-		"container",
-		"pod",
-		"namespace"},
+	[]string{"probe_type", "container", "pod", "namespace"},
 )
 
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
 // probe (AddPod). The worker periodically probes its assigned container and caches the results. The
-// manager use the cached probe results to set the appropriate Ready state in the PodStatus when
+// manager uses the cached probe results to set the appropriate Ready state in the PodStatus when
 // requested (UpdatePodStatus). Updating probe parameters is not currently supported.
 type Manager interface {
 	// AddPod creates new probe workers for every container probe. This should be called for every
@@ -182,8 +174,14 @@ func (m *manager) AddPod(pod *v1.Pod) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
+	containers := append(pod.Spec.Containers, getRestartableInitContainers(pod)...)
+	if len(containers) == 0 {
+		klog.V(4).InfoS("No containers to probe", "pod", klog.KObj(pod))
+		return
+	}
+
 	key := probeKey{podUID: pod.UID}
-	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
+	for _, c := range containers {
 		key.containerName = c.Name
 
 		if c.StartupProbe != nil {
@@ -191,7 +189,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 			if _, ok := m.workers[key]; ok {
 				klog.V(8).ErrorS(nil, "Startup probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
-				return
+				continue
 			}
 			w := newWorker(m, startup, pod, c)
 			m.workers[key] = w
@@ -203,7 +201,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 			if _, ok := m.workers[key]; ok {
 				klog.V(8).ErrorS(nil, "Readiness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
-				return
+				continue
 			}
 			w := newWorker(m, readiness, pod, c)
 			m.workers[key] = w
@@ -215,7 +213,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 			if _, ok := m.workers[key]; ok {
 				klog.V(8).ErrorS(nil, "Liveness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
-				return
+				continue
 			}
 			w := newWorker(m, liveness, pod, c)
 			m.workers[key] = w
@@ -229,7 +227,7 @@ func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
 	defer m.workerLock.RUnlock()
 
 	key := probeKey{podUID: pod.UID}
-	for _, c := range pod.Spec.Containers {
+	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
 		key.containerName = c.Name
 		for _, probeType := range [...]probeType{liveness, startup} {
 			key.probeType = probeType
@@ -276,18 +274,24 @@ func (m *manager) isContainerStarted(pod *v1.Pod, containerStatus *v1.ContainerS
 		return result == results.Success
 	}
 
-	// if there is a startup probe which hasn't run yet, the container is not
-	// started.
+	// If there is a startup probe which hasn't run yet, the container is not started.
 	if _, exists := m.getWorker(pod.UID, containerStatus.Name, startup); exists {
 		return false
 	}
 
-	// there is no startup probe, so the container is started.
+	// No startup probe, so the container is started.
 	return true
 }
 
 func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
+	klog.V(4).InfoS("UpdatePodStatus", "pod", klog.KObj(pod), "containerStatuses", len(podStatus.ContainerStatuses), "initContainerStatuses", len(podStatus.InitContainerStatuses))
+
+	// Process regular containers
 	for i, c := range podStatus.ContainerStatuses {
+		if i >= len(pod.Spec.Containers) {
+			klog.V(4).InfoS("No matching container in pod spec", "pod", klog.KObj(pod), "containerName", c.Name)
+			continue
+		}
 		started := m.isContainerStarted(pod, &podStatus.ContainerStatuses[i])
 		podStatus.ContainerStatuses[i].Started = &started
 
@@ -301,9 +305,9 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 		} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok && result == results.Success {
 			ready = true
 		} else {
-			// The check whether there is a probe which hasn't run yet.
+			// Check whether there is a readiness probe which hasn't run yet.
 			w, exists := m.getWorker(pod.UID, c.Name, readiness)
-			ready = !exists // no readinessProbe -> always ready
+			ready = !exists // No readinessProbe -> always ready
 			if exists {
 				// Trigger an immediate run of the readinessProbe to update ready state
 				select {
@@ -316,21 +320,26 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 		podStatus.ContainerStatuses[i].Ready = ready
 	}
 
+	// Process init containers
 	for i, c := range podStatus.InitContainerStatuses {
-		started := m.isContainerStarted(pod, &podStatus.InitContainerStatuses[i])
-		podStatus.InitContainerStatuses[i].Started = &started
-
-		initContainer, ok := kubeutil.GetContainerByIndex(pod.Spec.InitContainers, podStatus.InitContainerStatuses, i)
+		if i >= len(pod.Spec.InitContainers) {
+			klog.V(4).InfoS("No matching init container in pod spec", "pod", klog.KObj(pod), "containerName", c.Name)
+			continue
+		}
+		_, ok := kubeutil.GetContainerByIndex(pod.Spec.InitContainers, podStatus.InitContainerStatuses, i)
 		if !ok {
 			klog.V(4).InfoS("Mismatch between pod spec and status, likely programmer error", "pod", klog.KObj(pod), "containerName", c.Name)
 			continue
 		}
-		if !podutil.IsRestartableInitContainer(&initContainer) {
+		if !podutil.IsRestartableInitContainer(&pod.Spec.InitContainers[i]) {
 			if c.State.Terminated != nil && c.State.Terminated.ExitCode == 0 {
 				podStatus.InitContainerStatuses[i].Ready = true
 			}
 			continue
 		}
+
+		started := m.isContainerStarted(pod, &podStatus.InitContainerStatuses[i])
+		podStatus.InitContainerStatuses[i].Started = &started
 
 		if !started {
 			continue
@@ -342,9 +351,9 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 		} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok && result == results.Success {
 			ready = true
 		} else {
-			// The check whether there is a probe which hasn't run yet.
+			// Check whether there is a readiness probe which hasn't run yet.
 			w, exists := m.getWorker(pod.UID, c.Name, readiness)
-			ready = !exists // no readinessProbe -> always ready
+			ready = !exists // No readinessProbe -> always ready
 			if exists {
 				// Trigger an immediate run of the readinessProbe to update ready state
 				select {

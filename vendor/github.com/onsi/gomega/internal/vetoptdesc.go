@@ -10,7 +10,7 @@ import (
 // Gomega matcher at the beginning it panics. This allows for rendering Gomega
 // matchers as part of an optional Description, as long as they're not in the
 // first slot.
-func vetOptionalDescription(assertion string, optionalDescription ...interface{}) {
+func vetOptionalDescription(assertion string, optionalDescription ...any) {
 	if len(optionalDescription) == 0 {
 		return
 	}

@@ -8,10 +8,10 @@ import (
 )
 
 type BeKeyOfMatcher struct {
-	Map interface{}
+	Map any
 }
 
-func (matcher *BeKeyOfMatcher) Match(actual interface{}) (success bool, err error) {
+func (matcher *BeKeyOfMatcher) Match(actual any) (success bool, err error) {
 	if !isMap(matcher.Map) {
 		return false, fmt.Errorf("BeKeyOf matcher needs expected to be a map type")
 	}
@@ -36,10 +36,10 @@ func (matcher *BeKeyOfMatcher) Match(actual interface{}) (success bool, err erro
 	return false, lastError
 }
 
-func (matcher *BeKeyOfMatcher) FailureMessage(actual interface{}) (message string) {
+func (matcher *BeKeyOfMatcher) FailureMessage(actual any) (message string) {
 	return format.Message(actual, "to be a key of", presentable(valuesOf(matcher.Map)))
 }
 
-func (matcher *BeKeyOfMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+func (matcher *BeKeyOfMatcher) NegatedFailureMessage(actual any) (message string) {
 	return format.Message(actual, "not to be a key of", presentable(valuesOf(matcher.Map)))
 }

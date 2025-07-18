@@ -344,7 +344,12 @@ func RewriteImport(fset *token.FileSet, f *ast.File, oldPath, newPath string) (r
 }
 
 // UsesImport reports whether a given import is used.
+// The provided File must have been parsed with syntactic object resolution
+// (not using go/parser.SkipObjectResolution).
 func UsesImport(f *ast.File, path string) (used bool) {
+	if f.Scope == nil {
+		panic("file f was not parsed with syntactic object resolution")
+	}
 	spec := importSpec(f, path)
 	if spec == nil {
 		return

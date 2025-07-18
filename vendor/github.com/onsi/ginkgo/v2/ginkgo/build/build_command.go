@@ -44,7 +44,7 @@ func buildSpecs(args []string, cliConfig types.CLIConfig, goFlagsConfig types.Go
 	internal.VerifyCLIAndFrameworkVersion(suites)
 
 	opc := internal.NewOrderedParallelCompiler(cliConfig.ComputedNumCompilers())
-	opc.StartCompiling(suites, goFlagsConfig)
+	opc.StartCompiling(suites, goFlagsConfig, true)
 
 	for {
 		suiteIdx, suite := opc.Next()
@@ -55,18 +55,22 @@ func buildSpecs(args []string, cliConfig types.CLIConfig, goFlagsConfig types.Go
 		if suite.State.Is(internal.TestSuiteStateFailedToCompile) {
 			fmt.Println(suite.CompilationError.Error())
 		} else {
-			if len(goFlagsConfig.O) == 0 {
-				goFlagsConfig.O = path.Join(suite.Path, suite.PackageName+".test")
-			} else {
+			var testBinPath string
+			if len(goFlagsConfig.O) != 0 {
 				stat, err := os.Stat(goFlagsConfig.O)
 				if err != nil {
 					panic(err)
 				}
 				if stat.IsDir() {
-					goFlagsConfig.O += "/" + suite.PackageName + ".test"
+					testBinPath = goFlagsConfig.O + "/" + suite.PackageName + ".test"
+				} else {
+					testBinPath = goFlagsConfig.O
 				}
 			}
-			fmt.Printf("Compiled %s\n", goFlagsConfig.O)
+			if len(testBinPath) == 0 {
+				testBinPath = path.Join(suite.Path, suite.PackageName+".test")
+			}
+			fmt.Printf("Compiled %s\n", testBinPath)
 		}
 	}
 

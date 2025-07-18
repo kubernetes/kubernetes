@@ -1,3 +1,47 @@
+## 1.37.0
+
+### Features
+- add To/ToNot/NotTo aliases for AsyncAssertion [5666f98]
+
+## 1.36.3
+
+### Maintenance
+
+- bump all the things [adb8b49]
+- chore: replace `interface{}` with `any` [7613216]
+- Bump google.golang.org/protobuf from 1.36.1 to 1.36.5 (#822) [9fe5259]
+- remove spurious "toolchain" from go.mod (#819) [a0e85b9]
+- Bump golang.org/x/net from 0.33.0 to 0.35.0 (#823) [604a8b1]
+- Bump activesupport from 6.0.6.1 to 6.1.7.5 in /docs (#772) [36fbc84]
+- Bump github-pages from 231 to 232 in /docs (#778) [ced70d7]
+- Bump rexml from 3.2.6 to 3.3.9 in /docs (#788) [c8b4a07]
+- Bump github.com/onsi/ginkgo/v2 from 2.22.1 to 2.22.2 (#812) [06431b9]
+- Bump webrick from 1.8.1 to 1.9.1 in /docs (#800) [b55a92d]
+- Fix typos (#813) [a1d518b]
+
+## 1.36.2
+
+### Maintenance
+- Bump google.golang.org/protobuf from 1.35.1 to 1.36.1 (#810) [9a7609d]
+- Bump golang.org/x/net from 0.30.0 to 0.33.0 (#807) [b6cb028]
+- Bump github.com/onsi/ginkgo/v2 from 2.20.1 to 2.22.1 (#808) [5756529]
+- Bump nokogiri from 1.16.3 to 1.16.5 in /docs (#757) [dabc12e]
+
+## 1.36.1
+
+### Fixes
+- Fix https://github.com/onsi/gomega/issues/803 [1c6c112]
+- resolves onsi/gomega#696: make HaveField great on pointer receivers given only a non-addressable value [4feb9d7]
+
+## 1.36.0
+
+### Features
+- new: make collection-related matchers Go 1.23 iterator aware [4c964c6]
+
+### Maintenance
+- Replace min/max helpers with built-in min/max [ece6872]
+- Fix some typos in docs [8e924d7]
+
 ## 1.35.1
 
 ### Fixes
@@ -299,7 +343,7 @@ Require Go 1.22+
 
 ### Features
 
-Introducting [gcustom](https://onsi.github.io/gomega/#gcustom-a-convenient-mechanism-for-buildling-custom-matchers) - a convenient mechanism for building custom matchers.
+Introducing [gcustom](https://onsi.github.io/gomega/#gcustom-a-convenient-mechanism-for-buildling-custom-matchers) - a convenient mechanism for building custom matchers.
 
 This is an RC release for `gcustom`.  The external API may be tweaked in response to feedback however it is expected to remain mostly stable.
 
@@ -438,7 +482,7 @@ These improvements are all documented in [Gomega's docs](https://onsi.github.io/
 - Fix max number of samples in experiments on non-64-bit systems. (#528) [1c84497]
 - Remove dependency on ginkgo v1.16.4 (#530) [4dea8d5]
 - Fix for Go 1.18 (#532) [56d2a29]
-- Document precendence of timeouts (#533) [b607941]
+- Document precedence of timeouts (#533) [b607941]
 
 ## 1.18.1
 
@@ -455,7 +499,7 @@ These improvements are all documented in [Gomega's docs](https://onsi.github.io/
 ## Fixes
 - Gomega now uses ioutil for Go 1.15 and lower (#492) - official support is only for the most recent two major versions of Go but this will unblock users who need to stay on older unsupported versions of Go. [c29c1c0]
 
-## Maintenace
+## Maintenance
 - Remove Travis workflow (#491) [72e6040]
 - Upgrade to Ginkgo 2.0.0 GA [f383637]
 - chore: fix description of HaveField matcher (#487) [2b4b2c0]
@@ -703,7 +747,7 @@ Improvements:
 
 - Added `BeSent` which attempts to send a value down a channel and fails if the attempt blocks.  Can be paired with `Eventually` to safely send a value down a channel with a timeout.
 - `Ω`, `Expect`, `Eventually`, and `Consistently` now immediately `panic` if there is no registered fail handler.  This is always a mistake that can hide failing tests.
-- `Receive()` no longer errors when passed a closed channel, it's perfectly fine to attempt to read from a closed channel so Ω(c).Should(Receive()) always fails and Ω(c).ShoudlNot(Receive()) always passes with a closed channel.
+- `Receive()` no longer errors when passed a closed channel, it's perfectly fine to attempt to read from a closed channel so Ω(c).Should(Receive()) always fails and Ω(c).ShouldNot(Receive()) always passes with a closed channel.
 - Added `HavePrefix` and `HaveSuffix` matchers.
 - `ghttp` can now handle concurrent requests.
 - Added `Succeed` which allows one to write `Ω(MyFunction()).Should(Succeed())`.
@@ -713,7 +757,7 @@ Improvements:
 - `ghttp` servers can take an `io.Writer`.  `ghttp` will write a line to the writer when each request arrives.
 - Added `WithTransform` matcher to allow munging input data before feeding into the relevant matcher
 - Added boolean `And`, `Or`, and `Not` matchers to allow creating composite matchers
-- Added `gbytes.TimeoutCloser`, `gbytes.TimeoutReader`, and `gbytes.TimeoutWriter` - these are convenience wrappers that timeout if the underlying Closer/Reader/Writer does not return within the alloted time.
+- Added `gbytes.TimeoutCloser`, `gbytes.TimeoutReader`, and `gbytes.TimeoutWriter` - these are convenience wrappers that timeout if the underlying Closer/Reader/Writer does not return within the allotted time.
 - Added `gbytes.BufferReader` - this constructs a `gbytes.Buffer` that asynchronously reads the passed-in `io.Reader` into its buffer.
 
 Bug Fixes:
@@ -758,7 +802,7 @@ New Matchers:
 
 Updated Matchers:
 
-- `Receive` matcher can take a matcher as an argument and passes only if the channel under test receives an objet that satisfies the passed-in matcher.
+- `Receive` matcher can take a matcher as an argument and passes only if the channel under test receives an object that satisfies the passed-in matcher.
 - Matchers that implement `MatchMayChangeInTheFuture(actual interface{}) bool` can inform `Eventually` and/or `Consistently` when a match has no chance of changing status in the future.  For example, `Receive` returns `false` when a channel is closed.
 
 Misc:

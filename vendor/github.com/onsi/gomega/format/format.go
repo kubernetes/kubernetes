@@ -57,7 +57,7 @@ var Indent = "    "
 
 var longFormThreshold = 20
 
-// GomegaStringer allows for custom formating of objects for gomega.
+// GomegaStringer allows for custom formatting of objects for gomega.
 type GomegaStringer interface {
 	// GomegaString will be used to custom format an object.
 	// It does not follow UseStringerRepresentation value and will always be called regardless.
@@ -73,7 +73,7 @@ If the CustomFormatter does not want to handle the object it should return ("", 
 
 Strings returned by CustomFormatters are not truncated
 */
-type CustomFormatter func(value interface{}) (string, bool)
+type CustomFormatter func(value any) (string, bool)
 type CustomFormatterKey uint
 
 var customFormatterKey CustomFormatterKey = 1
@@ -125,7 +125,7 @@ If expected is omitted, then the message looks like:
 		<pretty printed actual>
 	<message>
 */
-func Message(actual interface{}, message string, expected ...interface{}) string {
+func Message(actual any, message string, expected ...any) string {
 	if len(expected) == 0 {
 		return fmt.Sprintf("Expected\n%s\n%s", Object(actual, 1), message)
 	}
@@ -255,7 +255,7 @@ recursing into the object.
 
 Set PrintContextObjects to true to print the content of objects implementing context.Context
 */
-func Object(object interface{}, indentation uint) string {
+func Object(object any, indentation uint) string {
 	indent := strings.Repeat(Indent, int(indentation))
 	value := reflect.ValueOf(object)
 	commonRepresentation := ""
@@ -392,7 +392,7 @@ func formatValue(value reflect.Value, indentation uint) string {
 	}
 }
 
-func formatString(object interface{}, indentation uint) string {
+func formatString(object any, indentation uint) string {
 	if indentation == 1 {
 		s := fmt.Sprintf("%s", object)
 		components := strings.Split(s, "\n")

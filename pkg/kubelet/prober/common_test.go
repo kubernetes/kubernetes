@@ -22,24 +22,30 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
-	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
-	"k8s.io/kubernetes/pkg/probe"
+	probe "k8s.io/kubernetes/pkg/probe"
 	"k8s.io/utils/exec"
 )
 
 const (
 	testContainerName = "cOnTaInEr_NaMe"
 	testPodUID        = "pOd_UiD"
+	testPodName       = "test-pod"
+	testNamespace     = "test-namespace"
 )
 
 var testContainerID = kubecontainer.ContainerID{Type: "test", ID: "cOnTaInEr_Id"}
+
+func init() {
+	// Register v1.Pod with the scheme to avoid "no kind is registered" errors
+	legacyscheme.Scheme.AddKnownTypes(v1.SchemeGroupVersion, &v1.Pod{})
+}
 
 func getTestRunningStatus() v1.PodStatus {
 	return getTestRunningStatusWithStarted(true)
@@ -54,11 +60,13 @@ func getTestRunningStatusWithStarted(started bool) v1.PodStatus {
 		Name:        testContainerName,
 		ContainerID: testContainerID.String(),
 	}
-	containerStatus.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.Now()}
+	if started {
+		containerStatus.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.Now()}
+	}
 	containerStatus.Started = &started
 	podStatus := v1.PodStatus{
-		Phase:             v1.PodRunning,
-		ContainerStatuses: []v1.ContainerStatus{containerStatus},
+		Phase:                 v1.PodRunning,
+		InitContainerStatuses: []v1.ContainerStatus{containerStatus},
 	}
 	return podStatus
 }
@@ -69,22 +77,20 @@ func getTestPod() *v1.Pod {
 	}
 	pod := v1.Pod{
 		Spec: v1.PodSpec{
-			Containers:    []v1.Container{container},
-			RestartPolicy: v1.RestartPolicyNever,
+			InitContainers: []v1.Container{container},
+			RestartPolicy:  v1.RestartPolicyNever,
 		},
 	}
-	pod.Name = "testPod"
+	pod.Name = testPodName
 	pod.UID = testPodUID
+	pod.Namespace = testNamespace
 	return &pod
 }
 
 func setTestProbe(pod *v1.Pod, probeType probeType, probeSpec v1.Probe) {
-	// All tests rely on the fake exec prober.
 	probeSpec.ProbeHandler = v1.ProbeHandler{
-		Exec: &v1.ExecAction{},
+		Exec: &v1.ExecAction{Command: []string{"/bin/true"}},
 	}
-
-	// Apply test defaults, overwridden for test speed.
 	defaults := map[string]int64{
 		"TimeoutSeconds":   1,
 		"PeriodSeconds":    1,
@@ -97,39 +103,83 @@ func setTestProbe(pod *v1.Pod, probeType probeType, probeSpec v1.Probe) {
 			f.SetInt(value)
 		}
 	}
-
-	switch probeType {
-	case readiness:
-		pod.Spec.Containers[0].ReadinessProbe = &probeSpec
-	case liveness:
-		pod.Spec.Containers[0].LivenessProbe = &probeSpec
-	case startup:
-		pod.Spec.Containers[0].StartupProbe = &probeSpec
+	// Set probe on InitContainers[0] if it matches testContainerName
+	for i, c := range pod.Spec.InitContainers {
+		if c.Name == testContainerName {
+			switch probeType {
+			case readiness:
+				pod.Spec.InitContainers[i].ReadinessProbe = &probeSpec
+			case liveness:
+				pod.Spec.InitContainers[i].LivenessProbe = &probeSpec
+			case startup:
+				pod.Spec.InitContainers[i].StartupProbe = &probeSpec
+			}
+			return
+		}
 	}
+	// Fallback to Containers[0] if no matching init container
+	if len(pod.Spec.Containers) > 0 {
+		switch probeType {
+		case readiness:
+			pod.Spec.Containers[0].ReadinessProbe = &probeSpec
+		case liveness:
+			pod.Spec.Containers[0].LivenessProbe = &probeSpec
+		case startup:
+			pod.Spec.Containers[0].StartupProbe = &probeSpec
+		}
+	}
+}
+
+func ptrContainerRestartPolicy(r v1.ContainerRestartPolicy) *v1.ContainerRestartPolicy {
+	return &r
 }
 
 func newTestManager() *manager {
 	podManager := kubepod.NewBasicPodManager()
-	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
-	// Add test pod to pod manager, so that status manager can get the pod from pod manager if needed.
 	podManager.AddPod(getTestPod())
-	m := NewManager(
-		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
-		results.NewManager(),
-		results.NewManager(),
-		results.NewManager(),
-		nil, // runner
-		&record.FakeRecorder{},
-	).(*manager)
-	// Don't actually execute probes.
+	fakeStatus := &fakeStatusManager{podStatuses: make(map[types.UID]v1.PodStatus)}
+	var _ status.Manager = fakeStatus // Ensure fakeStatusManager satisfies status.Manager
+	m := &manager{
+		livenessManager:  results.NewManager(),
+		readinessManager: results.NewManager(),
+		startupManager:   results.NewManager(),
+		statusManager:    fakeStatus,
+		prober:           newProber(nil, &record.FakeRecorder{}),
+	}
 	m.prober.exec = fakeExecProber{probe.Success, nil}
 	return m
 }
 
 func newTestWorker(m *manager, probeType probeType, probeSpec v1.Probe) *worker {
-	pod := getTestPod()
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testPodName,
+			Namespace: testNamespace,
+			UID:       testPodUID,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			InitContainers: []v1.Container{
+				{
+					Name:           testContainerName,
+					Image:          "foo",
+					RestartPolicy:  ptrContainerRestartPolicy(v1.ContainerRestartPolicyAlways),
+					StartupProbe:   &v1.Probe{},
+					LivenessProbe:  &v1.Probe{},
+					ReadinessProbe: &v1.Probe{},
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name:           "main-container",
+					Image:          "bar",
+					ReadinessProbe: &v1.Probe{},
+				},
+			},
+		},
+	}
 	setTestProbe(pod, probeType, probeSpec)
-	return newWorker(m, probeType, pod, pod.Spec.Containers[0])
+	return newWorker(m, probeType, pod, pod.Spec.InitContainers[0])
 }
 
 type fakeExecProber struct {

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -79,7 +80,7 @@ type DriverResponse struct {
 
 // driver is the type for functions that query the build system for the
 // packages named by the patterns.
-type driver func(cfg *Config, patterns ...string) (*DriverResponse, error)
+type driver func(cfg *Config, patterns []string) (*DriverResponse, error)
 
 // findExternalDriver returns the file path of a tool that supplies
 // the build system package structure, or "" if not found.
@@ -103,7 +104,7 @@ func findExternalDriver(cfg *Config) driver {
 			return nil
 		}
 	}
-	return func(cfg *Config, words ...string) (*DriverResponse, error) {
+	return func(cfg *Config, patterns []string) (*DriverResponse, error) {
 		req, err := json.Marshal(DriverRequest{
 			Mode:       cfg.Mode,
 			Env:        cfg.Env,
@@ -117,7 +118,7 @@ func findExternalDriver(cfg *Config) driver {
 
 		buf := new(bytes.Buffer)
 		stderr := new(bytes.Buffer)
-		cmd := exec.CommandContext(cfg.Context, tool, words...)
+		cmd := exec.CommandContext(cfg.Context, tool, patterns...)
 		cmd.Dir = cfg.Dir
 		// The cwd gets resolved to the real path. On Darwin, where
 		// /tmp is a symlink, this breaks anything that expects the
@@ -131,7 +132,7 @@ func findExternalDriver(cfg *Config) driver {
 		// command.
 		//
 		// (See similar trick in Invocation.run in ../../internal/gocommand/invoke.go)
-		cmd.Env = append(slicesClip(cfg.Env), "PWD="+cfg.Dir)
+		cmd.Env = append(slices.Clip(cfg.Env), "PWD="+cfg.Dir)
 		cmd.Stdin = bytes.NewReader(req)
 		cmd.Stdout = buf
 		cmd.Stderr = stderr
@@ -150,7 +151,3 @@ func findExternalDriver(cfg *Config) driver {
 		return &response, nil
 	}
 }
-
-// slicesClip removes unused capacity from the slice, returning s[:len(s):len(s)].
-// TODO(adonovan): use go1.21 slices.Clip.
-func slicesClip[S ~[]E, E any](s S) S { return s[:len(s):len(s)] }

@@ -22,9 +22,9 @@ Once measurements are complete, an Experiment can generate a comprehensive repor
 
 Users can also access and analyze the resulting Measurements directly.  Use Experiment.Get(NAME) to fetch the Measurement named NAME.  This returned struct will have fields containing
 all the data points and annotations recorded by the experiment.  You can subsequently fetch the Measurement.Stats() to get a Stats struct that contains basic statistical information about the
-Measurement (min, max, median, mean, standard deviation).  You can order these Stats objects using RankStats() to identify best/worst performers across multpile experiments or measurements.
+Measurement (min, max, median, mean, standard deviation).  You can order these Stats objects using RankStats() to identify best/worst performers across multiple experiments or measurements.
 
-gmeasure also supports caching Experiments via an ExperimentCache.  The cache supports storing and retreiving experiments by name and version.  This allows you to rerun code without
+gmeasure also supports caching Experiments via an ExperimentCache.  The cache supports storing and retrieving experiments by name and version.  This allows you to rerun code without
 repeating expensive experiments that may not have changed (which can be controlled by the cache version number).  It also enables you to compare new experiment runs with older runs to detect
 variations in performance/behavior.
 
@@ -66,8 +66,8 @@ type SamplingConfig struct {
 
 // The Units decorator allows you to specify units (an arbitrary string) when recording values.  It is ignored when recording durations.
 //
-//     e := gmeasure.NewExperiment("My Experiment")
-//     e.RecordValue("length", 3.141, gmeasure.Units("inches"))
+//	e := gmeasure.NewExperiment("My Experiment")
+//	e.RecordValue("length", 3.141, gmeasure.Units("inches"))
 //
 // Units are only set the first time a value of a given name is recorded.  In the example above any subsequent calls to e.RecordValue("length", X) will maintain the "inches" units even if a new set of Units("UNIT") are passed in later.
 type Units string
@@ -76,9 +76,9 @@ type Units string
 //
 // For example:
 //
-//     e := gmeasure.NewExperiment("My Experiment")
-//     e.RecordValue("length", 3.141, gmeasure.Annotation("bob"))
-//     e.RecordValue("length", 2.71, gmeasure.Annotation("jane"))
+//	e := gmeasure.NewExperiment("My Experiment")
+//	e.RecordValue("length", 3.141, gmeasure.Annotation("bob"))
+//	e.RecordValue("length", 2.71, gmeasure.Annotation("jane"))
 //
 // ...will result in a Measurement named "length" that records two values )[3.141, 2.71]) annotation with (["bob", "jane"])
 type Annotation string
@@ -88,11 +88,11 @@ type Annotation string
 //
 // For example:
 //
-//     e := gmeasure.NewExperiment("My Experiment")
-//     e.RecordValue("length", 3.141, gmeasure.Style("{{blue}}{{bold}}"))
-//     e.RecordValue("length", 2.71)
-//     e.RecordDuration("cooking time", 3 * time.Second, gmeasure.Style("{{red}}{{underline}}"))
-//     e.RecordDuration("cooking time", 2 * time.Second)
+//	e := gmeasure.NewExperiment("My Experiment")
+//	e.RecordValue("length", 3.141, gmeasure.Style("{{blue}}{{bold}}"))
+//	e.RecordValue("length", 2.71)
+//	e.RecordDuration("cooking time", 3 * time.Second, gmeasure.Style("{{red}}{{underline}}"))
+//	e.RecordDuration("cooking time", 2 * time.Second)
 //
 // will emit a report with blue bold entries for the length measurement and red underlined entries for the cooking time measurement.
 //
@@ -112,12 +112,12 @@ type PrecisionBundle struct {
 //
 // For example:
 //
-//     e := gmeasure.NewExperiment("My Experiment")
-//     e.RecordValue("length", 3.141, gmeasure.Precision(2))
-//     e.RecordValue("length", 2.71)
-//     e.RecordDuration("cooking time", 3214 * time.Millisecond, gmeasure.Precision(100*time.Millisecond))
-//     e.RecordDuration("cooking time", 2623 * time.Millisecond)
-func Precision(p interface{}) PrecisionBundle {
+//	e := gmeasure.NewExperiment("My Experiment")
+//	e.RecordValue("length", 3.141, gmeasure.Precision(2))
+//	e.RecordValue("length", 2.71)
+//	e.RecordDuration("cooking time", 3214 * time.Millisecond, gmeasure.Precision(100*time.Millisecond))
+//	e.RecordDuration("cooking time", 2623 * time.Millisecond)
+func Precision(p any) PrecisionBundle {
 	out := DefaultPrecisionBundle
 	switch reflect.TypeOf(p) {
 	case reflect.TypeOf(time.Duration(0)):
@@ -143,7 +143,7 @@ type extractedDecorations struct {
 	style           Style
 }
 
-func extractDecorations(args []interface{}) extractedDecorations {
+func extractDecorations(args []any) extractedDecorations {
 	var out extractedDecorations
 	out.precisionBundle = DefaultPrecisionBundle
 
@@ -248,7 +248,7 @@ RecordNote records a Measurement of type MeasurementTypeNote - this is simply a 
 
 RecordNote supports the Style() decoration.
 */
-func (e *Experiment) RecordNote(note string, args ...interface{}) {
+func (e *Experiment) RecordNote(note string, args ...any) {
 	decorations := extractDecorations(args)
 
 	e.lock.Lock()
@@ -266,7 +266,7 @@ RecordDuration records the passed-in duration on a Duration Measurement with the
 
 RecordDuration supports the Style(), Precision(), and Annotation() decorations.
 */
-func (e *Experiment) RecordDuration(name string, duration time.Duration, args ...interface{}) {
+func (e *Experiment) RecordDuration(name string, duration time.Duration, args ...any) {
 	decorations := extractDecorations(args)
 	e.recordDuration(name, duration, decorations)
 }
@@ -276,7 +276,7 @@ MeasureDuration runs the passed-in callback and times how long it takes to compl
 
 MeasureDuration supports the Style(), Precision(), and Annotation() decorations.
 */
-func (e *Experiment) MeasureDuration(name string, callback func(), args ...interface{}) time.Duration {
+func (e *Experiment) MeasureDuration(name string, callback func(), args ...any) time.Duration {
 	t := time.Now()
 	callback()
 	duration := time.Since(t)
@@ -292,7 +292,7 @@ The callback is given a zero-based index that increments by one between samples.
 
 SampleDuration supports the Style(), Precision(), and Annotation() decorations.  When passed an Annotation() the same annotation is applied to all sample measurements.
 */
-func (e *Experiment) SampleDuration(name string, callback func(idx int), samplingConfig SamplingConfig, args ...interface{}) {
+func (e *Experiment) SampleDuration(name string, callback func(idx int), samplingConfig SamplingConfig, args ...any) {
 	decorations := extractDecorations(args)
 	e.Sample(func(idx int) {
 		t := time.Now()
@@ -308,11 +308,11 @@ The resulting durations are recorded on a Duration Measurement with the passed-i
 
 The callback is given a zero-based index that increments by one between samples.  The callback must return an Annotation - this annotation is attached to the measured duration.
 
-The Sampling is configured via the passed-in SamplingConfig
+# The Sampling is configured via the passed-in SamplingConfig
 
 SampleAnnotatedDuration supports the Style() and Precision() decorations.
 */
-func (e *Experiment) SampleAnnotatedDuration(name string, callback func(idx int) Annotation, samplingConfig SamplingConfig, args ...interface{}) {
+func (e *Experiment) SampleAnnotatedDuration(name string, callback func(idx int) Annotation, samplingConfig SamplingConfig, args ...any) {
 	decorations := extractDecorations(args)
 	e.Sample(func(idx int) {
 		t := time.Now()
@@ -359,7 +359,7 @@ RecordValue records the passed-in value on a Value Measurement with the passed-i
 
 RecordValue supports the Style(), Units(), Precision(), and Annotation() decorations.
 */
-func (e *Experiment) RecordValue(name string, value float64, args ...interface{}) {
+func (e *Experiment) RecordValue(name string, value float64, args ...any) {
 	decorations := extractDecorations(args)
 	e.recordValue(name, value, decorations)
 }
@@ -369,7 +369,7 @@ MeasureValue runs the passed-in callback and records the return value on a Value
 
 MeasureValue supports the Style(), Units(), Precision(), and Annotation() decorations.
 */
-func (e *Experiment) MeasureValue(name string, callback func() float64, args ...interface{}) float64 {
+func (e *Experiment) MeasureValue(name string, callback func() float64, args ...any) float64 {
 	value := callback()
 	e.RecordValue(name, value, args...)
 	return value
@@ -382,7 +382,7 @@ The callback is given a zero-based index that increments by one between samples.
 
 SampleValue supports the Style(), Units(), Precision(), and Annotation() decorations.  When passed an Annotation() the same annotation is applied to all sample measurements.
 */
-func (e *Experiment) SampleValue(name string, callback func(idx int) float64, samplingConfig SamplingConfig, args ...interface{}) {
+func (e *Experiment) SampleValue(name string, callback func(idx int) float64, samplingConfig SamplingConfig, args ...any) {
 	decorations := extractDecorations(args)
 	e.Sample(func(idx int) {
 		value := callback(idx)
@@ -395,11 +395,11 @@ SampleAnnotatedValue samples the passed-in callback and records the return value
 
 The callback is given a zero-based index that increments by one between samples.  The callback must return a float64 and an Annotation - the annotation is attached to the recorded value.
 
-The Sampling is configured via the passed-in SamplingConfig
+# The Sampling is configured via the passed-in SamplingConfig
 
 SampleValue supports the Style(), Units(), and Precision() decorations.
 */
-func (e *Experiment) SampleAnnotatedValue(name string, callback func(idx int) (float64, Annotation), samplingConfig SamplingConfig, args ...interface{}) {
+func (e *Experiment) SampleAnnotatedValue(name string, callback func(idx int) (float64, Annotation), samplingConfig SamplingConfig, args ...any) {
 	decorations := extractDecorations(args)
 	e.Sample(func(idx int) {
 		var value float64
@@ -463,13 +463,19 @@ func (e *Experiment) Sample(callback func(idx int), samplingConfig SamplingConfi
 	minSamplingInterval := samplingConfig.MinSamplingInterval
 
 	work := make(chan int)
-	defer close(work)
+	var wg sync.WaitGroup
+	defer func() {
+		close(work)
+		wg.Wait()
+	}()
 	if numParallel > 1 {
 		for worker := 0; worker < numParallel; worker++ {
 			go func() {
+				wg.Add(1)
 				for idx := range work {
 					callback(idx)
 				}
+				wg.Done()
 			}()
 		}
 	}

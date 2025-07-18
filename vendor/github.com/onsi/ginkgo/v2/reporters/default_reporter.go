@@ -685,11 +685,11 @@ func (r *DefaultReporter) _emit(s string, block bool, isDelimiter bool) {
 }
 
 /* Rendering text */
-func (r *DefaultReporter) f(format string, args ...interface{}) string {
+func (r *DefaultReporter) f(format string, args ...any) string {
 	return r.formatter.F(format, args...)
 }
 
-func (r *DefaultReporter) fi(indentation uint, format string, args ...interface{}) string {
+func (r *DefaultReporter) fi(indentation uint, format string, args ...any) string {
 	return r.formatter.Fi(indentation, format, args...)
 }
 

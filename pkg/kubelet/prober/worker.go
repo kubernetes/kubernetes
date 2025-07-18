@@ -26,7 +26,6 @@ import (
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
@@ -184,7 +183,8 @@ probeLoop:
 			// Updating the periodic timer to run the probe again at intervals of probeTickerPeriod
 			// starting from the moment a manual run occurs.
 			probeTicker.Reset(probeTickerPeriod)
-			klog.V(4).InfoS("Triggered Probe by manual run", "probeType", w.probeType, "pod", klog.KObj(w.pod), "podUID", w.pod.UID, "containerName", w.container.Name)
+			klog.V(4).Infof("Triggered Probe by manual run, probeType=%s, pod=%s/%s, podUID=%s, containerName=%s",
+				w.probeType, w.pod.Namespace, w.pod.Name, w.pod.UID, w.container.Name)
 			// continue
 		}
 	}
@@ -208,95 +208,115 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	startTime := time.Now()
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
-		// Either the pod has not been created yet, or it was already deleted.
-		klog.V(3).InfoS("No status for pod", "pod", klog.KObj(w.pod))
+		klog.V(3).Infof("No status for pod %s/%s", w.pod.Namespace, w.pod.Name)
 		return true
 	}
 
 	// Worker should terminate if pod is terminated.
 	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
-		klog.V(3).InfoS("Pod is terminated, exiting probe worker",
-			"pod", klog.KObj(w.pod), "phase", status.Phase)
+		klog.V(3).Infof("Pod is terminated, exiting probe worker, pod=%s/%s, phase=%s",
+			w.pod.Namespace, w.pod.Name, status.Phase)
+		if w.probeType == readiness && !w.containerID.IsEmpty() {
+			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
+		}
 		return false
 	}
 
-	// Check if the container is a restartable init container (sidecar).
-	isRestartableInitContainer := false
-	c, ok := podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name)
-	if !ok || len(c.ContainerID) == 0 {
-		c, ok = podutil.GetContainerStatus(status.InitContainerStatuses, w.container.Name)
-		if !ok || len(c.ContainerID) == 0 {
-			// Either the container has not been created yet, or it was deleted.
-			klog.V(3).InfoS("Probe target container not found",
-				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
+	// Check container status
+	isRestartableInitContainer := podutil.IsRestartableInitContainer(&w.container)
+	var c v1.ContainerStatus
+	if c, ok = podutil.GetContainerStatus(status.InitContainerStatuses, w.container.Name); !ok || len(c.ContainerID) == 0 {
+		if c, ok = podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name); !ok || len(c.ContainerID) == 0 {
+			klog.V(3).Infof("Probe target container not found, pod=%s/%s, containerName=%s",
+				w.pod.Namespace, w.pod.Name, w.container.Name)
 			return true // Wait for more information.
 		}
-		isRestartableInitContainer = podutil.IsRestartableInitContainer(&w.container)
 	}
 
 	if w.containerID.String() != c.ContainerID {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
-		w.containerID = container.ParseContainerID(c.ContainerID)
+		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
 		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
 
 	if w.onHold {
-		// Worker is on hold until there is a new container.
+		klog.V(4).Infof("Probe skipped, worker on hold, probeType=%s, pod=%s/%s, containerName=%s",
+			w.probeType, w.pod.Namespace, w.pod.Name, w.container.Name)
 		return true
 	}
 
-	if c.State.Running == nil {
-		klog.V(3).InfoS("Non-running container probed",
-			"pod", klog.KObj(w.pod), "containerName", w.container.Name)
-		if !w.containerID.IsEmpty() {
-			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
-		}
-		// Abort if the container will not be restarted, unless it's a restartable init container.
-		return c.State.Terminated == nil ||
-			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever ||
-			isRestartableInitContainer
-	}
-
-	// Graceful shutdown of the pod.
+	// Handle pod deletion
 	if w.pod.ObjectMeta.DeletionTimestamp != nil && (w.probeType == liveness || w.probeType == startup) {
-		klog.V(3).InfoS("Pod deletion requested, setting probe result to success",
-			"probeType", w.probeType, "pod", klog.KObj(w.pod), "containerName", w.container.Name)
+		klog.V(3).Infof("Pod deletion requested, setting probe result to success, probeType=%s, pod=%s/%s, containerName=%s",
+			w.probeType, w.pod.Namespace, w.pod.Name, w.container.Name)
 		if w.probeType == startup {
-			klog.InfoS("Pod deletion requested before container has fully started",
-				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
+			klog.Infof("Pod deletion requested before container has fully started, pod=%s/%s, containerName=%s",
+				w.pod.Namespace, w.pod.Name, w.container.Name)
 		}
-		// Set a last result to ensure quiet shutdown.
 		w.resultsManager.Set(w.containerID, results.Success, w.pod)
-		// Stop probing at this point.
 		return false
 	}
 
+	// Handle non-running or terminated containers
+	if c.State.Running == nil {
+		klog.V(3).Infof("Non-running container probed, pod=%s/%s, containerName=%s",
+			w.pod.Namespace, w.pod.Name, w.container.Name)
+		if c.State.Terminated != nil {
+			if w.probeType == liveness || w.probeType == readiness {
+				w.resultsManager.Set(w.containerID, results.Failure, w.pod)
+				return false // Stop for liveness/readiness if terminated
+			} else if w.probeType == startup {
+				if isRestartableInitContainer {
+					w.resultsManager.Set(w.containerID, results.Failure, w.pod)
+					return true // Continue for sidecar containers with restartPolicy: Always
+				}
+				w.resultsManager.Set(w.containerID, results.Failure, w.pod)
+				return c.State.Terminated == nil || w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
+			}
+		} else {
+			if w.probeType == liveness || w.probeType == readiness {
+				w.resultsManager.Set(w.containerID, results.Failure, w.pod)
+				return false // Stop for non-running, non-terminated liveness/readiness
+			} else if w.probeType == startup {
+				w.resultsManager.Set(w.containerID, results.Unknown, w.pod)
+				return true // Continue for startup probes
+			}
+		}
+	}
+
 	// Probe disabled for InitialDelaySeconds.
-	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
+	if c.State.Running != nil && int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
+		klog.V(4).Infof("Probe skipped, before initial delay, probeType=%s, pod=%s/%s, containerName=%s",
+			w.probeType, w.pod.Namespace, w.pod.Name, w.container.Name)
+		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
 		return true
 	}
 
-	if c.Started != nil && *c.Started {
-		// Stop probing for startup once container has started.
-		// we keep it running to make sure it will work for restarted container.
-		if w.probeType == startup {
-			return true
-		}
-	} else {
-		// Disable other probes until container has started.
-		if w.probeType != startup {
-			return true
-		}
+	// Handle Started field for startup and other probes
+	if c.Started != nil && *c.Started && w.probeType == startup {
+		klog.V(4).Infof("Startup probe stopped, container started, pod=%s/%s, containerName=%s",
+			w.pod.Namespace, w.pod.Name, w.container.Name)
+		w.resultsManager.Set(w.containerID, results.Success, w.pod)
+		w.onHold = true
+		return false
+	} else if (w.probeType == liveness || w.probeType == readiness) && (c.Started == nil || !*c.Started) {
+		klog.V(4).Infof("Probe skipped, container not started, probeType=%s, pod=%s/%s, containerName=%s",
+			w.probeType, w.pod.Namespace, w.pod.Name, w.container.Name)
+		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		return true
 	}
 
-	// Note, exec probe does NOT have access to pod environment variables or downward API
+	// Execute the probe
 	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	klog.V(4).Infof("Debug probe, pod=%s/%s, containerName=%s, probeType=%s, result=%v, err=%v",
+		w.pod.Namespace, w.pod.Name, w.container.Name, w.probeType, result, err)
 	if err != nil {
-		// Prober error, throw away the result.
+		klog.Errorf("Probe execution failed, probeType=%s, pod=%s/%s, containerName=%s, err=%v",
+			w.probeType, w.pod.Namespace, w.pod.Name, w.container.Name, err)
 		return true
 	}
 
@@ -320,22 +340,18 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 
 	if (result == results.Failure && w.resultRun < int(w.spec.FailureThreshold)) ||
 		(result == results.Success && w.resultRun < int(w.spec.SuccessThreshold)) {
-		// Success or failure is below threshold - leave the probe state unchanged.
 		return true
 	}
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
 
-	if (w.probeType == liveness && result == results.Failure) || w.probeType == startup {
-		// The container fails a liveness/startup check, it will need to be restarted.
-		// Stop probing until we see a new container ID. This is to reduce the
-		// chance of hitting #21751, where running `docker exec` when a
-		// container is being stopped may lead to corrupted container state.
-		// In addition, if the threshold for each result of a startup probe is exceeded, we should stop probing
-		// until the container is restarted.
-		// This is to prevent extra Probe executions #117153.
+	if w.probeType == liveness && result == results.Failure {
 		w.onHold = true
 		w.resultRun = 0
+	} else if w.probeType == startup && (result == results.Success || result == results.Failure) {
+		w.onHold = true
+		w.resultRun = 0
+		return false
 	}
 
 	return true

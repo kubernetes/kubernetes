@@ -123,7 +123,7 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 
 	case probe.Unknown:
 		klog.V(1).InfoS("Probe unknown without error", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result)
-		return results.Failure, nil
+		return results.Unknown, nil // Changed from results.Failure to results.Unknown
 
 	default:
 		klog.V(1).InfoS("Unsupported probe result", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result)

@@ -287,14 +287,6 @@ func (s *Sparse) next(b *block) *block {
 	return b.next
 }
 
-// prev returns the previous block in the list, or end if b is the first block.
-func (s *Sparse) prev(b *block) *block {
-	if b.prev == &s.root {
-		return &none
-	}
-	return b.prev
-}
-
 // IsEmpty reports whether the set s is empty.
 func (s *Sparse) IsEmpty() bool {
 	return s.root.next == nil || s.root.offset == MaxInt
@@ -1077,6 +1069,7 @@ func (s *Sparse) AppendTo(slice []int) []int {
 // -- Testing/debugging ------------------------------------------------
 
 // check returns an error if the representation invariants of s are violated.
+// (unused; retained for debugging)
 func (s *Sparse) check() error {
 	s.init()
 	if s.root.empty() {
