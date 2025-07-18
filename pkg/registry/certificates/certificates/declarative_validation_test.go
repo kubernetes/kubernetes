@@ -42,6 +42,11 @@ type validationStrategy interface {
 	ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList
 }
 
+type validationStrategy interface {
+	Validate(ctx context.Context, obj runtime.Object) field.ErrorList
+	ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList
+}
+
 func TestDeclarativeValidateForDeclarative(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		testDeclarativeValidateForDeclarative(t, apiVersion)
@@ -291,4 +296,18 @@ func withFailedCondition() func(*api.CertificateSigningRequest) {
 			Status: core.ConditionTrue,
 		})
 	}
+}
+
+func createContextForSubresource(apiVersion, subresource string) context.Context {
+	requestInfo := &genericapirequest.RequestInfo{
+		APIGroup:   "certificates.k8s.io",
+		APIVersion: apiVersion,
+	}
+
+	if subresource != "/" {
+		requestInfo.IsResourceRequest = true
+		requestInfo.Subresource = subresource[1:] // Remove leading "/"
+	}
+
+	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), requestInfo)
 }
