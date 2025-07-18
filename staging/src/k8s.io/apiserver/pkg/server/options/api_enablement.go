@@ -106,10 +106,10 @@ func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *
 
 	c.MergedResourceConfig = mergedResourceConfig
 
-	if c.EffectiveVersion.BinaryVersion() != c.EffectiveVersion.EmulationVersion() {
+	if binVersion, emulatedVersion := c.EffectiveVersion.BinaryVersion(), c.EffectiveVersion.EmulationVersion(); !binVersion.EqualTo(emulatedVersion) {
 		for _, version := range registry.PrioritizedVersionsAllGroups() {
 			if strings.Contains(version.Version, "alpha") {
-				klog.Warning("alpha api enabled with emulated groupVersion, this is unsupported, proceed at your own risk: api=", version.String())
+				klog.Warningf("alpha api enabled with emulated version %s instead of the binary's version %s, this is unsupported, proceed at your own risk: api=%s", emulatedVersion, binVersion, version.String())
 			}
 		}
 	}
