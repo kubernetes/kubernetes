@@ -44,7 +44,11 @@ func MakeSharedDeviceID(deviceID DeviceID, shareID string) SharedDeviceID {
 }
 
 func (d SharedDeviceID) String() string {
-	return d.Driver.String() + "/" + d.Pool.String() + "/" + d.Device.String() + "/" + d.ShareID.String()
+	deviceIDStr := d.Driver.String() + "/" + d.Pool.String() + "/" + d.Device.String()
+	if d.ShareID.String() != "" {
+		deviceIDStr += "/" + d.ShareID.String()
+	}
+	return deviceIDStr
 }
 
 // AllocatedState packs information of allocated devices which is gathered from allocated resource claims.

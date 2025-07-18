@@ -334,7 +334,7 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 	} else if constraint.DistinctAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.DistinctAttribute, fldPath.Child("distinctAttribute"))...)
 	} else if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
-		allErrs = append(allErrs, field.Required(fldPath, "`exactly one of `matchAttribute` or `distinctAttribute` is required, but multiple fields are set"))
+		allErrs = append(allErrs, field.Required(fldPath, `exactly one of "matchAttribute" or "distinctAttribute" is required, but multiple fields are set`))
 	} else {
 		allErrs = append(allErrs, field.Required(fldPath.Child("matchAttribute"), ""))
 	}
@@ -743,12 +743,7 @@ func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field
 func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterToCounterNames map[string]sets.Set[string], perDeviceNodeSelection *bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allowMultipleAllocations := device.AllowMultipleAllocations != nil && *device.AllowMultipleAllocations
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) &&
-		allowMultipleAllocations {
-		allErrs = append(allErrs, validateMultiAllocDeviceName(device.Name, fldPath.Child("name"))...)
-	} else {
-		allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
-	}
+	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
 	// Warn about exceeding the maximum length only once. If any individual
 	// field is too large, then so is the combination.
 	attributeAndCapacityLength := len(device.Attributes) + len(device.Capacity)
@@ -757,14 +752,10 @@ func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterTo
 	}
 
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity) {
-		if allowMultipleAllocations {
-			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
-		} else {
-			allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
-		}
+	if allowMultipleAllocations {
+		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateMultiAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
 	} else {
-		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceCapacity, fldPath.Child("capacity"))...)
+		allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateSingleAllocatableDeviceCapacity, fldPath.Child("capacity"))...)
 	}
 	allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength, validateDeviceTaint, fldPath.Child("taints"))...)
 
@@ -1157,11 +1148,14 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDriverName(device.Driver, fldPath.Child("driver"))...)
 	allErrs = append(allErrs, validatePoolName(device.Pool, fldPath.Child("pool"))...)
-	allErrs = append(allErrs, validateAllocatedDeviceStatusName(device.Device, fldPath.Child("device"))...)
+	allErrs = append(allErrs, validateDeviceName(device.Device, fldPath.Child("device"))...)
+	if device.ShareID != nil {
+		allErrs = append(allErrs, validateShareID(*device.ShareID, fldPath.Child("shareID"))...)
+	}
 	deviceID := structured.MakeDeviceID(device.Driver, device.Pool, device.Device)
 	sharedDeviceID := structured.MakeSharedDeviceID(deviceID, device.ShareID)
 	if !allocatedDevices.Has(sharedDeviceID) {
-		allErrs = append(allErrs, field.Invalid(fldPath, deviceID, "must be an allocated device in the claim"))
+		allErrs = append(allErrs, field.Invalid(fldPath, sharedDeviceID, "must be an allocated device in the claim"))
 	}
 	if len(device.Conditions) > resource.AllocatedDeviceStatusMaxConditions {
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(device.Conditions), resource.AllocatedDeviceStatusMaxConditions))
@@ -1171,25 +1165,6 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 		allErrs = append(allErrs, validateRawExtension(*device.Data, fldPath.Child("data"), false, resource.AllocatedDeviceStatusDataMaxLength)...)
 	}
 	allErrs = append(allErrs, validateNetworkDeviceData(device.NetworkData, fldPath.Child("networkData"))...)
-	return allErrs
-}
-
-// validateAllocatedDeviceStatusName validates a shared device name in allocated result.
-// The shared device name is a combination of a shareable device name with a share UID.
-func validateAllocatedDeviceStatusName(name string, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	segments := strings.Split(name, "/")
-	switch len(segments) {
-	case 0:
-		allErrs = append(allErrs, field.Required(fldPath, ""))
-	case 1:
-		allErrs = append(allErrs, validateDeviceName(segments[0], fldPath)...)
-	case 2:
-		allErrs = append(allErrs, validateShareID(segments[1], fldPath)...)
-		allErrs = append(allErrs, validateMultiAllocDeviceName(segments[0], fldPath)...)
-	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, name, "must have at most one `/`"))
-	}
 	return allErrs
 }
 

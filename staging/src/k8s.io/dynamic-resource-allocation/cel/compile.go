@@ -110,9 +110,10 @@ type Device struct {
 }
 
 type compiler struct {
-	// deviceType is a definition for the type of the `device` variable.
-	// This is needed for the cost estimator. Both are currently version-independent.
-	// If that ever changes, some additional logic might be needed to make
+	// deviceType is a definition for the latest type of the `device` variable.
+	// This is needed for the cost estimator.
+	// If that ever changes such as involving type-checking expressions,
+	// some additional logic might be needed to make
 	// cost estimates version-dependent.
 	deviceType *apiservercel.DeclType
 	envset     *environment.EnvSet

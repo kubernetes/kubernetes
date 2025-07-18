@@ -323,7 +323,7 @@ func TestValidateClaim(t *testing.T) {
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), "missing-domain", "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
 				field.Invalid(field.NewPath("spec", "devices", "constraints").Index(0).Child("distinctAttribute"), resource.FullyQualifiedName("missing-domain"), "must include a domain"),
 				field.Required(field.NewPath("spec", "devices", "constraints").Index(1).Child("distinctAttribute"), "name required"),
-				field.Required(field.NewPath("spec", "devices", "constraints").Index(2), "`exactly one of `matchAttribute` or `distinctAttribute` is required, but multiple fields are set")},
+				field.Required(field.NewPath("spec", "devices", "constraints").Index(2), `exactly one of "matchAttribute" or "distinctAttribute" is required, but multiple fields are set`)},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
 				claim.Spec.Devices.Constraints = []resource.DeviceConstraint{
@@ -1440,7 +1440,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-device-status-no-device": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeDeviceID("b", "a", "r"), "must be an allocated device in the claim"),
+				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeSharedDeviceID(structured.MakeDeviceID("b", "a", "r"), nil), "must be an allocated device in the claim"),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1569,7 +1569,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-device-status-no-device-disabled-feature-gate": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeDeviceID("b", "a", "r"), "must be an allocated device in the claim"),
+				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeSharedDeviceID(structured.MakeDeviceID("b", "a", "r"), nil), "must be an allocated device in the claim"),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1865,7 +1865,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-add-allocated-status-no-share-id": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeDeviceID(goodName, goodName, goodName), "must be an allocated device in the claim"),
+				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), nil), "must be an allocated device in the claim"),
 			},
 			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1897,7 +1897,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-add-allocated-status-wrong-share-id": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeDeviceID(goodName, goodName, goodName+"/"+goodShareID2), "must be an allocated device in the claim"),
+				field.Invalid(field.NewPath("status", "devices").Index(0), structured.MakeSharedDeviceID(structured.MakeDeviceID(goodName, goodName, goodName), &goodShareID2), "must be an allocated device in the claim"),
 			},
 			oldClaim: testClaim(goodName, goodNS, validClaimSpec),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1917,9 +1917,10 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				}
 				claim.Status.Devices = []resource.AllocatedDeviceStatus{
 					{
-						Driver: goodName,
-						Pool:   goodName,
-						Device: goodName + "/" + goodShareID2,
+						Driver:  goodName,
+						Pool:    goodName,
+						Device:  goodName,
+						ShareID: &goodShareID2,
 					},
 				}
 				return claim

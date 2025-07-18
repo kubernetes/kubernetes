@@ -332,18 +332,6 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
-		"bad-multi-alloc-devices-too-long": {
-			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("name"), "", 56), // SharedDeviceNameMaxLength
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, 3)
-				slice.Spec.Devices[1].Name = longName
-				slice.Spec.Devices[1].AllowMultipleAllocations = ptr.To(true)
-				return slice
-			}(),
-			consumableCapacityFeatureGate: true,
-		},
 		"bad-attribute": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), badName, "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
