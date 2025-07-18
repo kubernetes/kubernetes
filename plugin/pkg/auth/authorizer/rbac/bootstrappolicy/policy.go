@@ -226,8 +226,11 @@ func NodeRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("persistentvolumeclaims", "persistentvolumes").RuleOrDie(),
 
 		// TODO: add to the Node authorizer and restrict to endpoints referenced by pods or PVs bound to the node
-		// Needed for glusterfs volumes
+		// Needed for glusterfs volumes.
 		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+		// Similarly, as a migration step, we need to allow nodes to read endpoint slices.
+		// Due to split of type (IPv4, IPv6, FQDN), list and watch are also needed for dual stack clusters.
+		rbacv1helpers.NewRule("get", "list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 		// Used to create a certificatesigningrequest for a node-specific client certificate, and watch
 		// for it to be signed. This allows the kubelet to rotate it's own certificate.
 		rbacv1helpers.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),

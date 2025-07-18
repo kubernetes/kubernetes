@@ -1141,6 +1141,14 @@ items:
     verbs:
     - get
   - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
     - certificates.k8s.io
     resources:
     - certificatesigningrequests
