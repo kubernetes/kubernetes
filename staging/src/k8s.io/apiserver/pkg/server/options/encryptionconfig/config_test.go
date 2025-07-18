@@ -1843,7 +1843,7 @@ func errString(err error) string {
 
 func TestComputeEncryptionConfigHash(t *testing.T) {
 	// hash the empty string to be sure that sha256 is being used
-	expect := "k8s:enc:unstable:1:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	expect := "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 	sum := computeEncryptionConfigHash([]byte(""))
 	if expect != sum {
 		t.Errorf("expected hash %q but got %q", expect, sum)
@@ -2220,7 +2220,7 @@ func TestGetEncryptionConfigHash(t *testing.T) {
 		{
 			name:     "valid file",
 			filepath: "testdata/valid-configs/secret-box-first.yaml",
-			wantHash: "k8s:enc:unstable:1:c638c0327dbc3276dd1fcf3e67895d19ebca16b91ae0d19af24ef0759b8e0f66",
+			wantHash: "sha256:c638c0327dbc3276dd1fcf3e67895d19ebca16b91ae0d19af24ef0759b8e0f66",
 			wantErr:  ``,
 		},
 	}

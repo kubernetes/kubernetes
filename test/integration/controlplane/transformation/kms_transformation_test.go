@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/aes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
@@ -352,13 +353,6 @@ resources:
 		t.Fatal(err)
 	}
 
-	// assert that the metrics we collect during the test run match expectations
-	// NOTE: 2 successful automatic reload resulted from 2 config file updates
-	wantMetricStrings := []string{
-		`apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
-		`apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 2`,
-	}
-
 	test.secret, err = test.createSecret(testSecret, testNamespace)
 	if err != nil {
 		t.Fatalf("Failed to create test secret, error: %v", err)
@@ -582,6 +576,15 @@ resources:
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// assert that the metrics we collect during the test run match expectations
+	// NOTE: 2 successful automatic reload resulted from 2 config file updates
+	wantMetricStrings := []string{
+		`apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
+		`apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 2`,
+		fmt.Sprintf(`apiserver_encryption_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s"} 1`, getHash(encryptionConfigWithoutOldProvider)),
+	}
+
 	defer func() {
 		body, err := rc.Get().AbsPath("/metrics").DoRaw(ctx)
 		if err != nil {
@@ -1204,4 +1207,11 @@ resources:
 	// Stage 4 - All kms-plugins are once again up,
 	// the healthz check should be OK.
 	mustBeHealthy(t, "/kms-providers", "ok", test.kubeAPIServer.ClientConfig)
+}
+
+func getHash(data string) string {
+	if len(data) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(data)))
 }

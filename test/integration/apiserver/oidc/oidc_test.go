@@ -22,6 +22,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -1146,6 +1147,7 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_new_config_hash"} 1`,
 			},
 		},
 		{
@@ -1229,6 +1231,7 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_new_config_hash"} 1`,
 			},
 		},
 		{
@@ -1277,6 +1280,7 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_new_config_hash"} 1`,
 			},
 		},
 		{
@@ -1332,6 +1336,7 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_new_config_hash"} 1`,
 			},
 		},
 		{
@@ -1390,6 +1395,7 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_old_config_hash"} 1`,
 			},
 		},
 		{
@@ -1433,6 +1439,7 @@ kind: AuthenticationConfiguration
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_new_config_hash"} 1`,
 			},
 		},
 		{
@@ -1490,6 +1497,7 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_old_config_hash"} 1`,
 			},
 		},
 	}
@@ -1529,8 +1537,9 @@ jwt:
 				_ = tempFile.Close()
 			}()
 
+			newAuthConfig := tt.newAuthConfigFn(t, oidcServer.URL(), string(caCert))
 			// Write the new content to the temporary file
-			_, err = tempFile.Write([]byte(tt.newAuthConfigFn(t, oidcServer.URL(), string(caCert))))
+			_, err = tempFile.Write([]byte(newAuthConfig))
 			require.NoError(t, err)
 
 			// Atomically replace the original file with the temporary file
@@ -1564,6 +1573,16 @@ jwt:
 
 			_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
 			tt.newAssertErrFn(t, err)
+
+			oldAuthConfigHash := getHash(tt.authConfigFn(t, oidcServer.URL(), string(caCert)))
+			newAuthConfigHash := getHash(newAuthConfig)
+			for i := range tt.wantMetricStrings {
+				if strings.Contains(tt.wantMetricStrings[i], "replace_with_new_config_hash") {
+					tt.wantMetricStrings[i] = strings.ReplaceAll(tt.wantMetricStrings[i], "replace_with_new_config_hash", newAuthConfigHash)
+				} else if strings.Contains(tt.wantMetricStrings[i], "replace_with_old_config_hash") {
+					tt.wantMetricStrings[i] = strings.ReplaceAll(tt.wantMetricStrings[i], "replace_with_old_config_hash", oldAuthConfigHash)
+				}
+			}
 
 			adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
 			body, err := adminClient.RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
@@ -2113,4 +2132,11 @@ func testContext(t *testing.T) context.Context {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	t.Cleanup(cancel)
 	return ctx
+}
+
+func getHash(data string) string {
+	if len(data) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(data)))
 }
