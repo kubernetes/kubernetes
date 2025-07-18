@@ -151,6 +151,7 @@ func RunCustomEtcd(logger klog.Logger, dataDir string, customFlags []string) (ur
 	go func() {
 		defer wg.Done()
 		buffer := make([]byte, 100*1024)
+	reading:
 		for {
 			n, err := reader.Read(buffer)
 			// Unfortunately in practice we get an untyped errors.errorString wrapped in an os.Path error,
@@ -177,9 +178,9 @@ func RunCustomEtcd(logger klog.Logger, dataDir string, customFlags []string) (ur
 				if err != nil {
 					offset := int(dec.InputOffset())
 					if offset < n {
-						logger.Info("etcd output", "msg", string(buffer[0:n]))
+						logger.Info("etcd output", "msg", string(buffer[offset:n]))
 					}
-					continue
+					continue reading
 				}
 
 				// Skip harmless messages.
