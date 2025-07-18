@@ -97,9 +97,6 @@ func testRunner(f *framework.Framework, config EvictionTestConfig, specs []podEv
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 			}
 			ginkgo.BeforeEach(prepull)
-			if framework.TestContext.PrepullImages {
-				ginkgo.AfterEach(prepull)
-			}
 		}
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			summary := eventuallyGetSummary(ctx)
@@ -654,10 +651,6 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				return fmt.Errorf("NodeCondition: %s encountered", expectedNodeCondition)
 			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.Succeed())
 
-			// prepull images only if its image-gc-eviction-test
-			if regexp.MustCompile(`(?i)image-gc.*`).MatchString(f.BaseName) {
-				gomega.Expect(PrePullAllImages(ctx)).Should(gomega.Succeed())
-			}
 			ginkgo.By("setting up pods to be used by tests")
 			pods := []*v1.Pod{}
 			for _, spec := range testSpecs {
