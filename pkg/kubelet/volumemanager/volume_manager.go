@@ -86,6 +86,10 @@ const (
 	// operation is waiting it only blocks other operations on the same device,
 	// other devices are not affected.
 	waitForAttachTimeout = 10 * time.Minute
+
+	// VolumeAttachmentLimitExceededReason is the reason for rejecting a pod
+	// when the node has reached its volume attachment limit.
+	VolumeAttachmentLimitExceededReason = "VolumeAttachmentLimitExceeded"
 )
 
 // VolumeManager runs a set of asynchronous loops that figure out which volumes
