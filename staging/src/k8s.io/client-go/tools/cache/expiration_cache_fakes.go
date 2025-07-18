@@ -46,7 +46,9 @@ func (p *FakeExpirationPolicy) IsExpired(obj *TimestampedEntry) bool {
 }
 
 // NewFakeExpirationStore creates a new instance for the ExpirationCache.
-var NewFakeExpirationStore = NewTypedFakeExpirationStore[any]
+func NewFakeExpirationStore[T any](keyFunc KeyFunc, deletedKeys chan<- string, expirationPolicy ExpirationPolicy, cacheClock clock.Clock) Store {
+	return NewTypedFakeExpirationStore[any](keyFunc, deletedKeys, expirationPolicy, cacheClock)
+}
 
 // NewTypedFakeExpirationStore creates a new instance for the ExpirationCache.
 func NewTypedFakeExpirationStore[T any](keyFunc KeyFunc, deletedKeys chan<- string, expirationPolicy TypedExpirationPolicy[T], cacheClock clock.Clock) TypedStore[T] {

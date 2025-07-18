@@ -197,7 +197,7 @@ type WatchErrorHandler func(r *Reflector, err error)
 // Implementations of this handler may display the error message in other
 // ways. Implementations should return quickly - any expensive processing
 // should be offloaded.
-type WatchErrorHandlerWithContext = TypedWatchErrorHandlerWithContext[any]
+type WatchErrorHandlerWithContext func(ctx context.Context, r *Reflector, err error)
 
 // TypedWatchErrorHandlerWithContext is called whenever ListAndWatch drops the
 // connection with an error. After calling this handler, the informer
@@ -212,7 +212,9 @@ type WatchErrorHandlerWithContext = TypedWatchErrorHandlerWithContext[any]
 type TypedWatchErrorHandlerWithContext[T any] func(ctx context.Context, r *TypedReflector[T], err error)
 
 // DefaultWatchErrorHandler is the default implementation of WatchErrorHandlerWithContext.
-var DefaultWatchErrorHandler = DefaultTypedWatchErrorHandler[any]
+func DefaultWatchErrorHandler(ctx context.Context, r *Reflector, err error) {
+	DefaultTypedWatchErrorHandler[any](ctx, r, err)
+}
 
 // DefaultTypedWatchErrorHandler is the default implementation of TypedWatchErrorHandlerWithContext.
 func DefaultTypedWatchErrorHandler[T any](ctx context.Context, r *TypedReflector[T], err error) {
@@ -292,7 +294,9 @@ type ReflectorOptions struct {
 // "yes".  This enables you to use reflectors to periodically process
 // everything as well as incrementally processing the things that
 // change.
-var NewReflectorWithOptions = NewTypedReflectorWithOptions[any]
+func NewReflectorWithOptions(lw ListerWatcher, expectedType any, store ReflectorStore, options ReflectorOptions) *Reflector {
+	return NewTypedReflectorWithOptions[any](lw, expectedType, store, options)
+}
 
 // NewTypedReflectorWithOptions creates a new TypedReflector object which will keep the
 // given store up to date with the server's contents for the given

@@ -223,7 +223,9 @@ func NewTTLStore(keyFunc KeyFunc, ttl time.Duration) Store {
 }
 
 // NewExpirationStore creates and returns a ExpirationCache for a given policy
-var NewExpirationStore = NewTypedExpirationStore[any]
+func NewExpirationStore(keyFunc KeyFunc, expirationPolicy ExpirationPolicy) Store {
+	return NewTypedExpirationStore[any](keyFunc, expirationPolicy)
+}
 
 // NewTypedExpirationStore creates and returns a TypedExpirationCache for a given policy
 func NewTypedExpirationStore[T any](keyFunc KeyFunc, expirationPolicy TypedExpirationPolicy[T]) TypedStore[T] {

@@ -161,7 +161,7 @@ type DeltaFIFO struct {
 // Note that TransformFunc is called while inserting objects into the
 // notification queue and is therefore extremely performance sensitive; please
 // do not do anything that will take a long time.
-type TransformFunc = TypedTransformFunc[any]
+type TransformFunc func(any) (any, error)
 
 // TypedTransformFunc allows for transforming an object before it will be processed.
 //

@@ -314,9 +314,15 @@ func (c *cache[T]) Resync() error {
 	return nil
 }
 
+type StoreOption = func(*cache[any])
+
 type TypedStoreOption[T any] = func(*cache[T])
 
-type StoreOption = TypedStoreOption[any]
+func WithTransformer(transformer TransformFunc) StoreOption {
+	return func(c *cache[any]) {
+		c.transformer = TypedTransformFunc[any](transformer)
+	}
+}
 
 func WithTypedTransformer[T any](transformer TypedTransformFunc[T]) TypedStoreOption[T] {
 	return func(c *cache[T]) {
@@ -324,10 +330,10 @@ func WithTypedTransformer[T any](transformer TypedTransformFunc[T]) TypedStoreOp
 	}
 }
 
-var WithTransformer = WithTypedTransformer[any]
-
 // NewStore returns a Store implemented simply with a map and a lock.
-var NewStore = NewTypedStore[any]
+func NewStore(keyFunc KeyFunc, opts ...StoreOption) Store {
+	return NewTypedStore(keyFunc, opts...)
+}
 
 // NewTypedStore returns a TypedStore implemented simply with a map and a lock.
 func NewTypedStore[T any](keyFunc KeyFunc, opts ...TypedStoreOption[T]) TypedStore[T] {

@@ -391,7 +391,9 @@ func (c *threadSafeMap[T]) Resync() error {
 }
 
 // NewThreadSafeStore creates a new instance of ThreadSafeStore.
-var NewThreadSafeStore = NewThreadSafeTypedStore[any]
+func NewThreadSafeStore(indexers Indexers, indices Indices) ThreadSafeStore {
+	return NewThreadSafeTypedStore[any](indexers, indices)
+}
 
 // NewThreadSafeTypedStore creates a new instance of ThreadSafeStore.
 func NewThreadSafeTypedStore[T any](indexers Indexers, indices Indices) ThreadSafeTypedStore[T] {
