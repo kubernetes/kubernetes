@@ -26,7 +26,7 @@ import (
 // CapacityRequirementsApplyConfiguration represents a declarative configuration of the CapacityRequirements type for use
 // with apply.
 type CapacityRequirementsApplyConfiguration struct {
-	Minimum map[resourcev1beta1.QualifiedName]resource.Quantity `json:"minimum,omitempty"`
+	Requests map[resourcev1beta1.QualifiedName]resource.Quantity `json:"requests,omitempty"`
 }
 
 // CapacityRequirementsApplyConfiguration constructs a declarative configuration of the CapacityRequirements type for use with
@@ -35,16 +35,16 @@ func CapacityRequirements() *CapacityRequirementsApplyConfiguration {
 	return &CapacityRequirementsApplyConfiguration{}
 }
 
-// WithMinimum puts the entries into the Minimum field in the declarative configuration
+// WithRequests puts the entries into the Requests field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, the entries provided by each call will be put on the Minimum field,
-// overwriting an existing map entries in Minimum field with the same key.
-func (b *CapacityRequirementsApplyConfiguration) WithMinimum(entries map[resourcev1beta1.QualifiedName]resource.Quantity) *CapacityRequirementsApplyConfiguration {
-	if b.Minimum == nil && len(entries) > 0 {
-		b.Minimum = make(map[resourcev1beta1.QualifiedName]resource.Quantity, len(entries))
+// If called multiple times, the entries provided by each call will be put on the Requests field,
+// overwriting an existing map entries in Requests field with the same key.
+func (b *CapacityRequirementsApplyConfiguration) WithRequests(entries map[resourcev1beta1.QualifiedName]resource.Quantity) *CapacityRequirementsApplyConfiguration {
+	if b.Requests == nil && len(entries) > 0 {
+		b.Requests = make(map[resourcev1beta1.QualifiedName]resource.Quantity, len(entries))
 	}
 	for k, v := range entries {
-		b.Minimum[k] = v
+		b.Requests[k] = v
 	}
 	return b
 }

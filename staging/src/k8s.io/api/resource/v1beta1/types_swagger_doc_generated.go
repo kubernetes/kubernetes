@@ -32,6 +32,7 @@ var map_AllocatedDeviceStatus = map[string]string{
 	"driver":      "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
 	"pool":        "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
 	"device":      "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.\n\nIf the allocation result includes a ShareID, the Device field is extended with the ShareID, formatted as `<device name>/<share id>`.",
+	"shareID":     "ShareID uniquely identifies an individual allocation share of a device.\n\nHex is chosen for its compact representation, ease of generation from binary, and suitability for identifiers in logs, APIs, and storage.",
 	"conditions":  "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.\n\nMust not contain more than 8 entries.",
 	"data":        "Data contains arbitrary driver-specific data.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
 	"networkData": "NetworkData contains network-related information specific to the device.",
@@ -77,8 +78,8 @@ func (CELDeviceSelector) SwaggerDoc() map[string]string {
 }
 
 var map_CapacityRequirements = map[string]string{
-	"":        "CapacityRequirements defines the capacity requirements for a specific device request.",
-	"minimum": "Minimum defines the minimum amount of each device capacity required for the request.\n\nIf the capacity has a sharing policy, this value is rounded up to the nearest valid amount according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.\n\nIf the quantity does not have a sharing policy, this value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<minimum quantity>)) >= 0` For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0",
+	"":         "CapacityRequirements defines the capacity requirements for a specific device request.",
+	"requests": "Requests represent individual device resource requests for distinct resources which must all be provided and guaranteed by the device. If empty, nothing needs to be allocated.\n\nIf the capacity has a sharing policy, this value is rounded up to the nearest valid amount according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.\n\nIf the quantity does not have a sharing policy, this value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0` For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0",
 }
 
 func (CapacityRequirements) SwaggerDoc() map[string]string {

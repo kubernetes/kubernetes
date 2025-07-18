@@ -479,6 +479,7 @@ func autoConvert_v1beta2_AllocatedDeviceStatus_To_resource_AllocatedDeviceStatus
 	out.Driver = in.Driver
 	out.Pool = in.Pool
 	out.Device = in.Device
+	out.ShareID = (*string)(unsafe.Pointer(in.ShareID))
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = (*runtime.RawExtension)(unsafe.Pointer(in.Data))
 	out.NetworkData = (*resource.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
@@ -494,6 +495,7 @@ func autoConvert_resource_AllocatedDeviceStatus_To_v1beta2_AllocatedDeviceStatus
 	out.Driver = in.Driver
 	out.Pool = in.Pool
 	out.Device = in.Device
+	out.ShareID = (*string)(unsafe.Pointer(in.ShareID))
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = (*runtime.RawExtension)(unsafe.Pointer(in.Data))
 	out.NetworkData = (*resourcev1beta2.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
@@ -552,7 +554,7 @@ func Convert_resource_CELDeviceSelector_To_v1beta2_CELDeviceSelector(in *resourc
 }
 
 func autoConvert_v1beta2_CapacityRequirements_To_resource_CapacityRequirements(in *resourcev1beta2.CapacityRequirements, out *resource.CapacityRequirements, s conversion.Scope) error {
-	out.Minimum = *(*map[resource.QualifiedName]apiresource.Quantity)(unsafe.Pointer(&in.Minimum))
+	out.Requests = *(*map[resource.QualifiedName]apiresource.Quantity)(unsafe.Pointer(&in.Requests))
 	return nil
 }
 
@@ -562,7 +564,7 @@ func Convert_v1beta2_CapacityRequirements_To_resource_CapacityRequirements(in *r
 }
 
 func autoConvert_resource_CapacityRequirements_To_v1beta2_CapacityRequirements(in *resource.CapacityRequirements, out *resourcev1beta2.CapacityRequirements, s conversion.Scope) error {
-	out.Minimum = *(*map[resourcev1beta2.QualifiedName]apiresource.Quantity)(unsafe.Pointer(&in.Minimum))
+	out.Requests = *(*map[resourcev1beta2.QualifiedName]apiresource.Quantity)(unsafe.Pointer(&in.Requests))
 	return nil
 }
 

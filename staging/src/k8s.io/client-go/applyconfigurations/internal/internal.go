@@ -12707,6 +12707,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: shareID
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta1.AllocationResult
   map:
     fields:
@@ -12764,7 +12768,7 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta1.CapacityRequirements
   map:
     fields:
-    - name: minimum
+    - name: requests
       type:
         map:
           elementType:
@@ -13215,6 +13219,7 @@ var schemaYAML = typed.YAMLObject(`types:
           - driver
           - device
           - pool
+          - shareID
     - name: reservedFor
       type:
         list:
@@ -13347,6 +13352,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: shareID
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta2.AllocationResult
   map:
     fields:
@@ -13367,7 +13376,7 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta2.CapacityRequirements
   map:
     fields:
-    - name: minimum
+    - name: requests
       type:
         map:
           elementType:
@@ -13855,6 +13864,7 @@ var schemaYAML = typed.YAMLObject(`types:
           - driver
           - device
           - pool
+          - shareID
     - name: reservedFor
       type:
         list:

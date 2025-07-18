@@ -47550,6 +47550,14 @@ func schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref common.Referenc
 							Format:      "",
 						},
 					},
+					"shareID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ShareID uniquely identifies an individual allocation share of a device.\n\nHex is chosen for its compact representation, ease of generation from binary, and suitability for identifiers in logs, APIs, and storage.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"conditions": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -47760,9 +47768,9 @@ func schema_k8sio_api_resource_v1beta1_CapacityRequirements(ref common.Reference
 				Description: "CapacityRequirements defines the capacity requirements for a specific device request.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"minimum": {
+					"requests": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Minimum defines the minimum amount of each device capacity required for the request.\n\nIf the capacity has a sharing policy, this value is rounded up to the nearest valid amount according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.\n\nIf the quantity does not have a sharing policy, this value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<minimum quantity>)) >= 0` For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0",
+							Description: "Requests represent individual device resource requests for distinct resources which must all be provided and guaranteed by the device. If empty, nothing needs to be allocated.\n\nIf the capacity has a sharing policy, this value is rounded up to the nearest valid amount according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.\n\nIf the quantity does not have a sharing policy, this value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0` For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -49223,6 +49231,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaimStatus(ref common.ReferenceC
 									"driver",
 									"device",
 									"pool",
+									"shareID",
 								},
 								"x-kubernetes-list-type": "map",
 							},
@@ -49633,6 +49642,14 @@ func schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref common.Referenc
 							Format:      "",
 						},
 					},
+					"shareID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ShareID uniquely identifies an individual allocation share of a device.\n\nHex is chosen for its compact representation, ease of generation from binary, and suitability for identifiers in logs, APIs, and storage.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"conditions": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -49733,9 +49750,9 @@ func schema_k8sio_api_resource_v1beta2_CapacityRequirements(ref common.Reference
 				Description: "CapacityRequirements defines the capacity requirements for a specific device request.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"minimum": {
+					"requests": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Minimum defines the minimum amount of each device capacity required for the request.\n\nIf the capacity has a sharing policy, this value is rounded up to the nearest valid amount according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.\n\nIf the quantity does not have a sharing policy, this value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<minimum quantity>)) >= 0` For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0",
+							Description: "Requests represent individual device resource requests for distinct resources which must all be provided and guaranteed by the device. If empty, nothing needs to be allocated.\n\nIf the capacity has a sharing policy, this value is rounded up to the nearest valid amount according to that policy. The rounded value is used during scheduling to determine how much capacity to consume.\n\nIf the quantity does not have a sharing policy, this value is used as an additional filtering condition against the available capacity on the device. This is semantically equivalent to a CEL selector with `device.capacity[<domain>].<name>.compareTo(quantity(<request quantity>)) >= 0` For example, device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -51307,6 +51324,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaimStatus(ref common.ReferenceC
 									"driver",
 									"device",
 									"pool",
+									"shareID",
 								},
 								"x-kubernetes-list-type": "map",
 							},

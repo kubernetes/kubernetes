@@ -82,8 +82,8 @@
                 }
               ],
               "capacityRequests": {
-                "minimum": {
-                  "minimumKey": "0"
+                "requests": {
+                  "requestsKey": "0"
                 }
               }
             }
@@ -98,8 +98,8 @@
             }
           ],
           "capacityRequests": {
-            "minimum": {
-              "minimumKey": "0"
+            "requests": {
+              "requestsKey": "0"
             }
           }
         }
@@ -220,6 +220,7 @@
         "driver": "driverValue",
         "pool": "poolValue",
         "device": "deviceValue",
+        "shareID": "shareIDValue",
         "conditions": [
           {
             "type": "typeValue",
