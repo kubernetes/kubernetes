@@ -733,15 +733,6 @@ func (d Deltas) Newest() *Delta {
 	return nil
 }
 
-// copyDeltas returns a shallow copy of d; that is, it copies the slice but not
-// the objects in the slice. This allows Get/List to return an object that we
-// know won't be clobbered by a subsequent modifications.
-func copyDeltas(d Deltas) Deltas {
-	d2 := make(Deltas, len(d))
-	copy(d2, d)
-	return d2
-}
-
 // DeletedFinalStateUnknown is placed into a DeltaFIFO in the case where an object
 // was deleted but the watch deletion event was missed while disconnected from
 // apiserver. In this case we don't know the final "resting" state of the object, so
