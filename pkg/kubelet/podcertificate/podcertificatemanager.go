@@ -113,13 +113,14 @@ type projectionRecord struct {
 
 	// The state machine for this projection:
 	//
-	//                            ┌─────────────────┐
-	//                            ▼                 │
-	//  initial ────► wait ────► fresh ──────► waitrefresh
-	//                            │                 │
-	//                            ├───► denied ◄────┤
-	//                            │                 │
-	//                            └───► failed ◄────┘
+	//
+	//                         ┌─────────────────┐
+	//                         ▼                 │
+	// fresh ────► wait ────► fresh ──────► waitrefresh
+	//               │                           │
+	//               ├──────► denied ◄───────────┤
+	//               │                           │
+	//               └──────► failed ◄───────────┘
 	curState credState
 }
 
@@ -617,7 +618,7 @@ func (m *IssuingManager) createPodCertificateRequest(
 	nodeName types.NodeName, nodeUID types.UID,
 	signerName, keyType string, maxExpirationSeconds *int32) ([]byte, *certificatesv1alpha1.PodCertificateRequest, error) {
 
-	privateKey, publicKey, proof, err := m.generateKeyAndProof(keyType, []byte(podUID))
+	privateKey, publicKey, proof, err := generateKeyAndProof(keyType, []byte(podUID))
 	if err != nil {
 		return nil, nil, fmt.Errorf("while generating keypair: %w", err)
 	}
@@ -698,7 +699,7 @@ func hashBytes(in []byte) []byte {
 	return out[:]
 }
 
-func (m *IssuingManager) generateKeyAndProof(keyType string, toBeSigned []byte) (privKey crypto.PrivateKey, pubKey crypto.PublicKey, sig []byte, err error) {
+func generateKeyAndProof(keyType string, toBeSigned []byte) (privKey crypto.PrivateKey, pubKey crypto.PublicKey, sig []byte, err error) {
 	switch keyType {
 	case "RSA2048":
 		key, err := rsa.GenerateKey(rand.Reader, 2048)

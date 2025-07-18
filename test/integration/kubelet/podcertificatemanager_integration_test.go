@@ -134,7 +134,7 @@ func TestPodCertificateManager(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error generating CA hierarchy: %v", err)
 	}
-	pcrSigner := hermeticpodcertificatesigner.New(signerName, caKeys, caCerts, signerClient)
+	pcrSigner := hermeticpodcertificatesigner.New(clock.RealClock{}, signerName, caKeys, caCerts, signerClient)
 	go pcrSigner.Run(ctx)
 
 	//

@@ -2374,6 +2374,266 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 			},
 		},
 		{
+			description: "adding additional unknown condition types is allowed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Unknown",
+							Status:  metav1.ConditionFalse,
+							Reason:  "Foo",
+							Message: "Foo message",
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Unknown",
+							Status:  metav1.ConditionFalse,
+							Reason:  "Foo",
+							Message: "Foo message",
+						},
+						{
+							Type:    "Unknown2",
+							Status:  metav1.ConditionFalse,
+							Reason:  "Foo2",
+							Message: "Foo message2",
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "adding additional unknown condition types to an issued PCR is allowed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Issued",
+							Status:  metav1.ConditionTrue,
+							Reason:  "NoReason",
+							Message: "No",
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Issued",
+							Status:  metav1.ConditionTrue,
+							Reason:  "NoReason",
+							Message: "No",
+						},
+						{
+							Type:    "Unknown2",
+							Status:  metav1.ConditionFalse,
+							Reason:  "Foo2",
+							Message: "Foo message2",
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "adding additional unknown condition types to a failed PCR is allowed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Failed",
+							Status:  metav1.ConditionTrue,
+							Reason:  "NoReason",
+							Message: "No",
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Failed",
+							Status:  metav1.ConditionTrue,
+							Reason:  "NoReason",
+							Message: "No",
+						},
+						{
+							Type:    "Unknown2",
+							Status:  metav1.ConditionFalse,
+							Reason:  "Foo2",
+							Message: "Foo message2",
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "adding additional unknown condition types to a denied PCR is allowed",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Denied",
+							Status:  metav1.ConditionTrue,
+							Reason:  "NoReason",
+							Message: "No",
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Denied",
+							Status:  metav1.ConditionTrue,
+							Reason:  "NoReason",
+							Message: "No",
+						},
+						{
+							Type:    "Unknown2",
+							Status:  metav1.ConditionFalse,
+							Reason:  "Foo2",
+							Message: "Foo message2",
+						},
+					},
+				},
+			},
+		},
+		{
 			description: "Issued must have status True",
 			oldPCR: &capi.PodCertificateRequest{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2579,6 +2839,71 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 			},
 		},
 		{
+			description: "transitioning to Denied status is allowed with pre-existing non-terminal conditions",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Unknown",
+							Status:  metav1.ConditionTrue,
+							Reason:  "WhoKnows",
+							Message: " message",
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Unknown",
+							Status:  metav1.ConditionTrue,
+							Reason:  "WhoKnows",
+							Message: " message",
+						},
+						{
+							Type:    capi.PodCertificateRequestConditionTypeDenied,
+							Status:  metav1.ConditionTrue,
+							Reason:  capi.PodCertificateRequestConditionUnsupportedKeyType,
+							Message: "Foo message",
+						},
+					},
+				},
+			},
+		},
+		{
 			description: "you can't issue a certificate if you set Denied status",
 			oldPCR: &capi.PodCertificateRequest{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2685,6 +3010,71 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 			},
 		},
 		{
+			description: "transitioning to Failed status is allowed with pre-existing non-terminal conditions",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Unknown",
+							Status:  metav1.ConditionTrue,
+							Reason:  "WhoKnows",
+							Message: " message",
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Unknown",
+							Status:  metav1.ConditionTrue,
+							Reason:  "WhoKnows",
+							Message: " message",
+						},
+						{
+							Type:    capi.PodCertificateRequestConditionTypeFailed,
+							Status:  metav1.ConditionTrue,
+							Reason:  "Whatever",
+							Message: "message",
+						},
+					},
+				},
+			},
+		},
+		{
 			description: "you can't issue a certificate if you set Failed status",
 			oldPCR: &capi.PodCertificateRequest{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2780,6 +3170,75 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 				},
 				Status: capi.PodCertificateRequestStatus{
 					Conditions: []metav1.Condition{
+						{
+							Type:    capi.PodCertificateRequestConditionTypeIssued,
+							Status:  metav1.ConditionTrue,
+							Reason:  "Whatever",
+							Message: "Foo message",
+						},
+					},
+					CertificateChain: pod1Cert1,
+					NotBefore:        ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T00:00:00Z"))),
+					BeginRefreshAt:   ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-01T12:00:00Z"))),
+					NotAfter:         ptr.To(metav1.NewTime(mustParseTime(t, "1970-01-02T00:00:00Z"))),
+				},
+			},
+		},
+		{
+			description: "valid issuance with pre-existing non-terminal condition",
+			oldPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Unknown",
+							Status:  metav1.ConditionTrue,
+							Reason:  "WhoKnows",
+							Message: " message",
+						},
+					},
+				},
+			},
+			newPCR: &capi.PodCertificateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+				Spec: capi.PodCertificateRequestSpec{
+					SignerName:           "foo.com/abc",
+					PodName:              "pod-1",
+					PodUID:               types.UID(podUID1),
+					ServiceAccountName:   "sa-1",
+					ServiceAccountUID:    "sa-uid-1",
+					NodeName:             "node-1",
+					NodeUID:              "node-uid-1",
+					MaxExpirationSeconds: ptr.To[int32](86400),
+					PKIXPublicKey:        pubPKIX1,
+					ProofOfPossession:    proof1,
+				},
+				Status: capi.PodCertificateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:    "Unknown",
+							Status:  metav1.ConditionTrue,
+							Reason:  "WhoKnows",
+							Message: " message",
+						},
 						{
 							Type:    capi.PodCertificateRequestConditionTypeIssued,
 							Status:  metav1.ConditionTrue,

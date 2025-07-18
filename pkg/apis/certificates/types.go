@@ -335,10 +335,6 @@ type PodCertificateRequestSpec struct {
 	// If omitted, kube-apiserver will set it to 86400(24 hours). kube-apiserver
 	// will reject values shorter than 3600 (1 hour).
 	//
-	// The PodCertificateMaxExpiration admission plugin, if enabled, will
-	// shorten the value to the maximum expiration configured for the requested
-	// signer.
-	//
 	// The signer implementation is then free to issue a certificate with any
 	// lifetime *shorter* than MaxExpirationSeconds, but no shorter than 3600
 	// seconds (1 hour).  This constraint is enforced by kube-apiserver.

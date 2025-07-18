@@ -32,6 +32,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -587,7 +588,7 @@ func validateTrustBundle(path *field.Path, in string) field.ErrorList {
 func ValidatePodCertificateRequestCreate(req *certificates.PodCertificateRequest) field.ErrorList {
 	var allErrors field.ErrorList
 
-	metaErrors := apivalidation.ValidateObjectMeta(&req.ObjectMeta, true, validatePodCertificateRequestName, field.NewPath("metadata"))
+	metaErrors := apivalidation.ValidateObjectMeta(&req.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	allErrors = append(allErrors, metaErrors...)
 
 	signerNameErrors := apivalidation.ValidateSignerName(field.NewPath("spec", "signerName"), req.Spec.SignerName)
@@ -599,17 +600,26 @@ func ValidatePodCertificateRequestCreate(req *certificates.PodCertificateRequest
 	if len(req.Spec.PodUID) == 0 {
 		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "podUID"), req.Spec.PodUID, "must not be empty"))
 	}
+	if len(req.Spec.PodUID) > 128 {
+		allErrors = append(allErrors, field.TooLong(field.NewPath("spec", "podUID"), req.Spec.PodUID, 128))
+	}
 	for _, msg := range apivalidation.ValidateServiceAccountName(req.Spec.ServiceAccountName, false) {
 		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "serviceAccountName"), req.Spec.ServiceAccountName, msg))
 	}
 	if len(req.Spec.ServiceAccountUID) == 0 {
 		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "serviceAccountUID"), req.Spec.ServiceAccountUID, "must not be empty"))
 	}
+	if len(req.Spec.ServiceAccountUID) > 128 {
+		allErrors = append(allErrors, field.TooLong(field.NewPath("spec", "serviceAccountUID"), req.Spec.ServiceAccountUID, 128))
+	}
 	for _, msg := range apivalidation.ValidateNodeName(string(req.Spec.NodeName), false) {
 		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "nodeName"), req.Spec.NodeName, msg))
 	}
 	if len(req.Spec.NodeUID) == 0 {
 		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "nodeUID"), req.Spec.NodeUID, "must not be empty"))
+	}
+	if len(req.Spec.NodeUID) > 128 {
+		allErrors = append(allErrors, field.TooLong(field.NewPath("spec", "nodeUID"), req.Spec.NodeUID, 128))
 	}
 
 	if req.Spec.MaxExpirationSeconds == nil {
@@ -698,28 +708,35 @@ var (
 // ValidatePodCertificateRequestUpdate runs all update validation checks on a
 // non-status update.
 //
-// All spec fields are immutable after creation, so only metadata updates are
+// All spec fields are immutable after creation, and status updates must go
+// through the dedicated status update verb, so only metadata updates are
 // allowed.
 func ValidatePodCertificateRequestUpdate(newReq, oldReq *certificates.PodCertificateRequest) field.ErrorList {
 	var allErrors field.ErrorList
 	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newReq.ObjectMeta, &oldReq.ObjectMeta, field.NewPath("metadata"))...)
 
-	// All status fields are immutable.
+	// All spec & status fields are immutable.
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec, oldReq.Spec, field.NewPath("spec"))...)
 	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Status, oldReq.Status, field.NewPath("status"))...)
 
 	return allErrors
 }
 
-// We don't care what you call your pod certificate requests.
-func validatePodCertificateRequestName(name string, prefix bool) []string {
-	return nil
-}
-
-// ValidatePodCertificateRequestStatusUpdate validates
+// ValidatePodCertificateRequestStatusUpdate validates a status update for a
+// PodCertificateRequest.
 func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodCertificateRequest, clock clock.PassiveClock) field.ErrorList {
 	var allErrors field.ErrorList
 
-	if len(newReq.Status.Conditions) == 0 {
+	// Metadata is *mostly* immutable... for example, ResourceVersion and
+	// ManagedFields are allowed to change.  We are reliant on the strategy
+	// that's calling us to have patched newReq.ObjectMeta using
+	// metav1.ResetObjectMetaForStatus.
+	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newReq.ObjectMeta, &oldReq.ObjectMeta, field.NewPath("metadata"))...)
+
+	// Spec is immutable during status update.
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec, oldReq.Spec, field.NewPath("spec"))...)
+
+	if len(allErrors) > 0 {
 		return allErrors
 	}
 
@@ -745,10 +762,17 @@ func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodC
 	}
 
 	// Is the original PCR in a terminal condition?  If so, the entire status
-	// field (including conditions) is immutable.  No more changes are
+	// field (including conditions) is immutable (except for arbitrary
+	// conditions that aren't Issued, Failed, or Denied).  No more changes are
 	// permitted.
 	if pcrIsIssued(oldReq) || pcrIsDenied(oldReq) || pcrIsFailed(oldReq) {
-		allErrors = append(allErrors, validateSemanticEquality(newReq.Status, oldReq.Status, field.NewPath("status"), "immutable after PodCertificateRequest is issued, denied, or failed")...)
+		// Compare just the status fields and known conditions
+		newStatusSmudged := newReq.Status.DeepCopy()
+		newStatusSmudged.Conditions = filterUnknownConditions(newReq.Status.Conditions)
+		oldStatusSmudged := oldReq.Status.DeepCopy()
+		oldStatusSmudged.Conditions = filterUnknownConditions(oldReq.Status.Conditions)
+
+		allErrors = append(allErrors, validateSemanticEquality(newStatusSmudged, oldStatusSmudged, field.NewPath("status"), "immutable after PodCertificateRequest is issued, denied, or failed")...)
 		return allErrors
 	}
 
@@ -899,10 +923,27 @@ func pcrIsFailed(pcr *certificates.PodCertificateRequest) bool {
 	return false
 }
 
+func filterUnknownConditions(in []metav1.Condition) []metav1.Condition {
+	ret := []metav1.Condition{}
+	for _, cond := range in {
+		if cond.Type == certificates.PodCertificateRequestConditionTypeIssued {
+			ret = append(ret, cond)
+		}
+		if cond.Type == certificates.PodCertificateRequestConditionTypeFailed {
+			ret = append(ret, cond)
+		}
+		if cond.Type == certificates.PodCertificateRequestConditionTypeFailed {
+			ret = append(ret, cond)
+		}
+	}
+	return ret
+}
+
 func formatIndex(i int) string {
 	return "[" + strconv.Itoa(i) + "]"
 }
 
+// Similar to apivalidation.ValidateImmutableField but we can supply our own detail string.
 func validateSemanticEquality(oldVal, newVal any, fldPath *field.Path, detail string) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !apiequality.Semantic.DeepEqual(oldVal, newVal) {

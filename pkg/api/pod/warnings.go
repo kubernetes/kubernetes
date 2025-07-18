@@ -463,13 +463,13 @@ func warningsForOverlappingVirtualPaths(volumes []api.Volume) []string {
 					sourcePaths = []pathAndSource{{source.ClusterTrustBundle.Path, fmt.Sprintf("ClusterTrustBundle %q", name)}}
 				case source.PodCertificate != nil:
 					sourcePaths = []pathAndSource{}
-					if source.PodCertificate.CertificateChainPath != "" {
+					if len(source.PodCertificate.CertificateChainPath) != 0 {
 						sourcePaths = append(sourcePaths, pathAndSource{source.PodCertificate.CertificateChainPath, "PodCertificate chain"})
 					}
-					if source.PodCertificate.KeyPath != "" {
+					if len(source.PodCertificate.KeyPath) != 0 {
 						sourcePaths = append(sourcePaths, pathAndSource{source.PodCertificate.KeyPath, "PodCertificate key"})
 					}
-					if source.PodCertificate.CredentialBundlePath != "" {
+					if len(source.PodCertificate.CredentialBundlePath) != 0 {
 						sourcePaths = append(sourcePaths, pathAndSource{source.PodCertificate.CredentialBundlePath, "PodCertificate credential bundle"})
 					}
 				}

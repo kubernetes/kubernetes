@@ -40,11 +40,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 )
 
 // Controller is an in-memory signing controller for PodCertificateRequests.
 type Controller struct {
+	clock clock.PassiveClock
+
 	signerName string
 
 	kc          kubernetes.Interface
@@ -56,7 +59,7 @@ type Controller struct {
 }
 
 // New creates a new Controller.
-func New(signerName string, caKeys []crypto.PrivateKey, caCerts [][]byte, kc kubernetes.Interface) *Controller {
+func New(clock clock.PassiveClock, signerName string, caKeys []crypto.PrivateKey, caCerts [][]byte, kc kubernetes.Interface) *Controller {
 	pcrInformer := certinformersv1alpha1.NewFilteredPodCertificateRequestInformer(kc, metav1.NamespaceAll, 24*time.Hour, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(opts *metav1.ListOptions) {
 			opts.FieldSelector = fields.OneTermEqualSelector("spec.signerName", signerName).String()
@@ -64,6 +67,7 @@ func New(signerName string, caKeys []crypto.PrivateKey, caCerts [][]byte, kc kub
 	)
 
 	sc := &Controller{
+		clock:       clock,
 		signerName:  signerName,
 		kc:          kc,
 		pcrInformer: pcrInformer,
