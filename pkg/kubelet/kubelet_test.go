@@ -177,10 +177,10 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/, false /*sourcesReady*/)
 }
 
-func newTestKubeletExcludeAdmitHandlers(t *testing.T, controllerAttachDetachEnabled bool) *TestKubelet {
+func newTestKubeletExcludeAdmitHandlers(t *testing.T, controllerAttachDetachEnabled, sourcesReady bool) *TestKubelet {
 	imageList := []kubecontainer.Image{
 		{
 			ID:       "abc",
@@ -193,7 +193,7 @@ func newTestKubeletExcludeAdmitHandlers(t *testing.T, controllerAttachDetachEnab
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, true /*excludePodAdmitHandlers*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, true /*excludePodAdmitHandlers*/, sourcesReady)
 }
 
 func newTestKubeletWithImageList(
@@ -203,6 +203,7 @@ func newTestKubeletWithImageList(
 	initFakeVolumePlugin bool,
 	localStorageCapacityIsolation bool,
 	excludeAdmitHandlers bool,
+	sourcesReady bool,
 ) *TestKubelet {
 	logger, _ := ktesting.NewTestContext(t)
 
@@ -328,7 +329,7 @@ func newTestKubeletWithImageList(
 		func(pod *v1.Pod) { kubelet.HandlePodSyncs([]*v1.Pod{pod}) },
 		kubelet.GetActivePods,
 		kubelet.podManager.GetPodByUID,
-		config.NewSourcesReady(func(_ sets.Set[string]) bool { return false }),
+		config.NewSourcesReady(func(_ sets.Set[string]) bool { return sourcesReady }),
 	)
 	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)
 	volumeStatsAggPeriod := time.Second * 10
@@ -1073,7 +1074,7 @@ func TestHandleMemExceeded(t *testing.T) {
 // Tests that we handle result of interface UpdatePluginResources correctly
 // by setting corresponding status in status map.
 func TestHandlePluginResources(t *testing.T) {
-	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */, false /*sourcesReady*/)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
