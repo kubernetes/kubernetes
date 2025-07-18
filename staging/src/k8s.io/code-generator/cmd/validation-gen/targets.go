@@ -34,8 +34,8 @@ import (
 
 // These are the comment tags that carry parameters for validation generation.
 const (
-	tagName               = "k8s:validation-gen"
-	inputTagName          = "k8s:validation-gen-input"
+	mainTagName           = "k8s:validation-gen"                 // defines which types to generate validation for
+	inputTagName          = "k8s:validation-gen-input"           // indicates that input types are in a different package
 	schemeRegistryTagName = "k8s:validation-gen-scheme-registry" // defaults to k8s.io/apimachinery/pkg.runtime.Scheme
 	testFixtureTagName    = "k8s:validation-gen-test-fixture"    // if set, generate go test files for test fixtures.  Supported values: "validateFalse".
 
@@ -52,12 +52,12 @@ var (
 	schemeType = types.Name{Package: runtimePkg, Name: "Scheme"}
 )
 
-func extractTag(comments []string) ([]string, bool) {
-	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagName}, comments)
+func extractMainTag(comments []string) ([]string, bool) {
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{mainTagName}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract tags: %v", err)
 	}
-	values, found := tags[tagName]
+	values, found := tags[mainTagName]
 	if !found || len(values) == 0 {
 		return nil, false
 	}
@@ -86,12 +86,13 @@ func extractInputTag(comments []string) []string {
 	return result
 }
 
-func checkTag(comments []string, require ...string) bool {
-	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagName}, comments)
+// TODO: this can just accept a single bool
+func checkMainTag(comments []string, require ...string) bool {
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{mainTagName}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract tags: %v", err)
 	}
-	values, found := tags[tagName]
+	values, found := tags[mainTagName]
 	if !found {
 		return false
 	}
@@ -302,21 +303,21 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 		schemeRegistry := schemeRegistryTag(pkg)
 
-		typesWith, found := extractTag(pkg.Comments)
+		typesWith, found := extractMainTag(pkg.Comments)
 		if !found {
-			klog.V(2).InfoS("  did not find required tag", "tag", tagName)
+			klog.V(2).InfoS("  did not find required tag", "tag", mainTagName)
 			continue
 		}
 		if len(typesWith) == 1 && typesWith[0] == "" {
-			klog.Fatalf("found package tag %q with no value", tagName)
+			klog.Fatalf("found package tag %q with no value", mainTagName)
 		}
 		shouldCreateObjectValidationFn := func(t *types.Type) bool {
 			// opt-out
-			if checkTag(t.SecondClosestCommentLines, "false") {
+			if checkMainTag(t.SecondClosestCommentLines, "false") {
 				return false
 			}
 			// opt-in
-			if checkTag(t.SecondClosestCommentLines, "true") {
+			if checkMainTag(t.SecondClosestCommentLines, "true") {
 				return true
 			}
 			// all types
