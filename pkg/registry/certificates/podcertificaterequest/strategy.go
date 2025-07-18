@@ -134,12 +134,16 @@ func (s *StatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 	metav1.ResetObjectMetaForStatus(&newReq.ObjectMeta, &oldReq.ObjectMeta)
 
-	// Specifically preserve existing Denied/Failed/SuggestedKeyType conditions.
-	preserveConditionInstances(newReq, oldReq, certificates.PodCertificateRequestConditionTypeIssued)
-	preserveConditionInstances(newReq, oldReq, certificates.PodCertificateRequestConditionTypeDenied)
-	preserveConditionInstances(newReq, oldReq, certificates.PodCertificateRequestConditionTypeFailed)
+	// TODO(KEP-4317): Drop the preserveConditionInstances,
+	// populateConditionTimestamps.  Make sure this is covered by validation
+	// unit tests.
 
-	populateConditionTimestamps(newReq, oldReq)
+	// Specifically preserve existing Denied/Failed/SuggestedKeyType conditions.
+	// preserveConditionInstances(newReq, oldReq, certificates.PodCertificateRequestConditionTypeIssued)
+	// preserveConditionInstances(newReq, oldReq, certificates.PodCertificateRequestConditionTypeDenied)
+	// preserveConditionInstances(newReq, oldReq, certificates.PodCertificateRequestConditionTypeFailed)
+
+	// populateConditionTimestamps(newReq, oldReq)
 }
 
 // preserveConditionInstances copies instances of the specified condition type from oldCSR to newCSR.
