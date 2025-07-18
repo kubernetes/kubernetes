@@ -34,7 +34,7 @@ var (
 			Subsystem:      ResourceClaimSubsystem,
 			Name:           "create_attempts_total",
 			Help:           "Number of ResourceClaims creation requests",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		})
 	// ResourceClaimCreateFailures tracks the number of unsuccessful
 	// ResourceClaims().Create calls
@@ -43,7 +43,7 @@ var (
 			Subsystem:      ResourceClaimSubsystem,
 			Name:           "create_failures_total",
 			Help:           "Number of ResourceClaims creation request failures",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		})
 	// NumResourceClaims tracks the current number of ResourceClaims.
 	NumResourceClaims = metrics.NewGauge(
@@ -51,7 +51,7 @@ var (
 			Subsystem:      ResourceClaimSubsystem,
 			Name:           "resource_claims",
 			Help:           "Number of ResourceClaims",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		})
 	// NumAllocatedResourceClaims tracks the current number of allocated ResourceClaims.
 	NumAllocatedResourceClaims = metrics.NewGauge(
@@ -59,7 +59,7 @@ var (
 			Subsystem:      ResourceClaimSubsystem,
 			Name:           "allocated_resource_claims",
 			Help:           "Number of allocated ResourceClaims",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		})
 )
 
