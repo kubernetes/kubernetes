@@ -38,6 +38,7 @@ type v1PodResourcesServer struct {
 	memoryProvider           MemoryProvider
 	dynamicResourcesProvider DynamicResourcesProvider
 	useActivePods            bool
+	podresourcesv1.UnsafePodResourcesListerServer
 }
 
 // NewV1PodResourcesServer returns a PodResourcesListerServer which lists pods provided by the PodsProvider

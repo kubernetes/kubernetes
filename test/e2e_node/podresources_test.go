@@ -283,17 +283,17 @@ func logPodResources(podIdx int, pr *kubeletpodresourcesv1.PodResources) {
 	}
 }
 
-type podResMap map[string]map[string]kubeletpodresourcesv1.ContainerResources
+type podResMap map[string]map[string]*kubeletpodresourcesv1.ContainerResources
 
 func convertToMap(podsResources []*kubeletpodresourcesv1.PodResources) podResMap {
-	res := make(map[string]map[string]kubeletpodresourcesv1.ContainerResources)
+	res := make(map[string]map[string]*kubeletpodresourcesv1.ContainerResources)
 	for idx, podResource := range podsResources {
 		// to make troubleshooting easier
 		logPodResources(idx, podResource)
 
-		cnts := make(map[string]kubeletpodresourcesv1.ContainerResources)
+		cnts := make(map[string]*kubeletpodresourcesv1.ContainerResources)
 		for _, cnt := range podResource.GetContainers() {
-			cnts[cnt.GetName()] = *cnt
+			cnts[cnt.GetName()] = cnt
 		}
 		res[podResource.GetName()] = cnts
 	}

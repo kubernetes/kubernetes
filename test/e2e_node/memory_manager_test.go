@@ -408,7 +408,7 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 						continue
 					}
 
-					gomega.Expect(containerMemory.Size_).To(gomega.BeEquivalentTo(numaStateMemory.Size))
+					gomega.Expect(containerMemory.Size).To(gomega.BeEquivalentTo(numaStateMemory.Size))
 				}
 			}
 
@@ -541,7 +541,7 @@ var _ = SIGDescribe("Memory Manager", "[LinuxOnly]", framework.WithDisruptive(),
 									q := c.Resources.Limits[v1.ResourceName(containerMemory.MemoryType)]
 									value, ok := q.AsInt64()
 									gomega.Expect(ok).To(gomega.BeTrueBecause("cannot convert value to integer"))
-									gomega.Expect(value).To(gomega.BeEquivalentTo(containerMemory.Size_))
+									gomega.Expect(value).To(gomega.BeEquivalentTo(containerMemory.Size))
 								}
 							}
 						}
