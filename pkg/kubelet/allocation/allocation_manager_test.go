@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
@@ -185,7 +186,16 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 	}
 }
 
-func TestIsPodResizeInProgress(t *testing.T) {
+func getEventsFromFakeRecorder(t *testing.T, am Manager) string {
+	select {
+	case e := <-am.(*manager).recorder.(*record.FakeRecorder).Events:
+		return e
+	default:
+		return ""
+	}
+}
+
+func TestCheckPodResizeInProgress(t *testing.T) {
 	type testResources struct {
 		cpuReq, cpuLim, memReq, memLim int64
 	}
@@ -198,9 +208,11 @@ func TestIsPodResizeInProgress(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		containers      []testContainer
-		expectHasResize bool
+		name                            string
+		containers                      []testContainer
+		oldPodResizeInProgressCondition bool
+		expectHasResize                 bool
+		expectPodResizeCompletedMsg     string
 	}{{
 		name: "simple running container",
 		containers: []testContainer{{
@@ -208,14 +220,17 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{100, 100, 100, 100},
 			isRunning: true,
 		}},
-		expectHasResize: false,
+		oldPodResizeInProgressCondition: true,
+		expectHasResize:                 false,
+		expectPodResizeCompletedMsg:     `Normal ResizeCompleted Pod resize completed: {"containers":[{"name":"c0","resources":{"limits":{"cpu":"100m","memory":"100"},"requests":{"cpu":"100m","memory":"100"}}}]}`,
 	}, {
 		name: "simple unstarted container",
 		containers: []testContainer{{
 			allocated: testResources{100, 100, 100, 100},
 			unstarted: true,
 		}},
-		expectHasResize: false,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 false,
 	}, {
 		name: "simple resized container/cpu req",
 		containers: []testContainer{{
@@ -223,7 +238,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{150, 200, 100, 200},
 			isRunning: true,
 		}},
-		expectHasResize: true,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 true,
 	}, {
 		name: "simple resized container/cpu limit",
 		containers: []testContainer{{
@@ -231,7 +247,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{100, 300, 100, 200},
 			isRunning: true,
 		}},
-		expectHasResize: true,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 true,
 	}, {
 		name: "simple resized container/mem req",
 		containers: []testContainer{{
@@ -239,7 +256,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{100, 200, 150, 200},
 			isRunning: true,
 		}},
-		expectHasResize: true,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 true,
 	}, {
 		name: "simple resized container/cpu+mem req",
 		containers: []testContainer{{
@@ -247,7 +265,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{150, 200, 150, 200},
 			isRunning: true,
 		}},
-		expectHasResize: true,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 true,
 	}, {
 		name: "simple resized container/mem limit",
 		containers: []testContainer{{
@@ -255,7 +274,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{100, 200, 100, 300},
 			isRunning: true,
 		}},
-		expectHasResize: true,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 true,
 	}, {
 		name: "terminated resized container",
 		containers: []testContainer{{
@@ -263,7 +283,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{200, 200, 100, 200},
 			isRunning: false,
 		}},
-		expectHasResize: false,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 false,
 	}, {
 		name: "non-sidecar init container",
 		containers: []testContainer{{
@@ -275,7 +296,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{100, 200, 100, 200},
 			isRunning: true,
 		}},
-		expectHasResize: false,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 false,
 	}, {
 		name: "non-resized sidecar",
 		containers: []testContainer{{
@@ -288,7 +310,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{100, 200, 100, 200},
 			isRunning: true,
 		}},
-		expectHasResize: false,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 false,
 	}, {
 		name: "resized sidecar",
 		containers: []testContainer{{
@@ -301,7 +324,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{100, 200, 100, 200},
 			isRunning: true,
 		}},
-		expectHasResize: true,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 true,
 	}, {
 		name: "several containers and a resize",
 		containers: []testContainer{{
@@ -320,7 +344,27 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{200, 200, 100, 200}, // Resized
 			isRunning: true,
 		}},
-		expectHasResize: true,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 true,
+	}, {
+		name: "several containers",
+		containers: []testContainer{{
+			allocated: testResources{cpuReq: 100, cpuLim: 200},
+			actuated:  &testResources{cpuReq: 100, cpuLim: 200},
+			sidecar:   true,
+			isRunning: true,
+		}, {
+			allocated: testResources{memReq: 100, memLim: 200},
+			actuated:  &testResources{memReq: 100, memLim: 200},
+			isRunning: true,
+		}, {
+			allocated: testResources{cpuReq: 200, memReq: 100},
+			actuated:  &testResources{cpuReq: 200, memReq: 100},
+			isRunning: true,
+		}},
+		oldPodResizeInProgressCondition: true,
+		expectHasResize:                 false,
+		expectPodResizeCompletedMsg:     `Normal ResizeCompleted Pod resize completed: {"initContainers":[{"name":"c0","resources":{"limits":{"cpu":"200m"},"requests":{"cpu":"100m"}}}],"containers":[{"name":"c1","resources":{"limits":{"memory":"200"},"requests":{"memory":"100"}}},{"name":"c2","resources":{"requests":{"cpu":"200m","memory":"100"}}}]}`,
 	}, {
 		name: "best-effort pod",
 		containers: []testContainer{{
@@ -328,7 +372,9 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{},
 			isRunning: true,
 		}},
-		expectHasResize: false,
+		oldPodResizeInProgressCondition: true,
+		expectHasResize:                 false,
+		expectPodResizeCompletedMsg:     `Normal ResizeCompleted Pod resize completed: {"containers":[{"name":"c0","resources":{}}]}`,
 	}, {
 		name: "burstable pod/not resizing",
 		containers: []testContainer{{
@@ -336,7 +382,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{cpuReq: 100},
 			isRunning: true,
 		}},
-		expectHasResize: false,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 false,
 	}, {
 		name: "burstable pod/resized",
 		containers: []testContainer{{
@@ -344,7 +391,8 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{cpuReq: 500},
 			isRunning: true,
 		}},
-		expectHasResize: true,
+		oldPodResizeInProgressCondition: false,
+		expectHasResize:                 true,
 	}}
 
 	mkRequirements := func(r testResources) v1.ResourceRequirements {
@@ -431,8 +479,32 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			}
 			require.NoError(t, am.SetAllocatedResources(pod))
 
-			hasResizedResources := am.(*manager).isPodResizeInProgress(pod, podStatus)
-			require.Equal(t, test.expectHasResize, hasResizedResources, "hasResizedResources")
+			am.(*manager).recorder = record.NewFakeRecorder(200)
+
+			// Set old Pod condition as Inprogress, so that ClearPodResizeInProgressCondition is true and emit resize completed event
+			if test.oldPodResizeInProgressCondition {
+				am.(*manager).statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", int64(1))
+			}
+
+			am.CheckPodResizeInProgress(pod, podStatus)
+
+			// Verify pod resize completed event is emitted
+			podResizeCompletionEvent := getEventsFromFakeRecorder(t, am)
+			assert.Equal(t, test.expectPodResizeCompletedMsg, podResizeCompletionEvent)
+
+			if test.expectHasResize {
+				// Verify the status manager has the InProgress condition set on it
+				gotResizeConditions := am.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+				for _, c := range gotResizeConditions {
+					require.Equal(t, v1.PodResizeInProgress, c.Type, "ResizeConditions Type should be PodResizeInProgress")
+					require.Empty(t, c.Reason, "ResizeConditions Error")
+					require.Empty(t, c.Message, "ResizeConditions Message")
+				}
+			} else {
+				// Verify pod resize Inprogress condition is cleared
+				gotResizeConditions := am.(*manager).statusManager.GetPodResizeConditions(pod.UID)
+				require.Empty(t, gotResizeConditions, "ResizeConditions Error")
+			}
 		})
 	}
 }
