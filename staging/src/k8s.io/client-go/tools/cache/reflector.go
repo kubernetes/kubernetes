@@ -770,6 +770,8 @@ func (r *TypedReflector[T]) watchList(ctx context.Context) (watch.Interface, err
 	}
 
 	storeOpts := []TypedStoreOption[T]{}
+	//nolint:staticcheck // staticcheck reports an impossible type assertion, but that's a false positive
+	// (the code is covered by a unit test and the transformer is added correctly)
 	if tr, ok := r.store.(TypedTransformingStore[T]); ok && tr.Transformer() != nil {
 		storeOpts = append(storeOpts, WithTypedTransformer(tr.Transformer()))
 	}
