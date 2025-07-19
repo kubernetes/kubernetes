@@ -378,15 +378,7 @@ func newEndpointsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		endpoints := map[string]string{
-			"healthz":     healthz.DefaultHealthzPath,
-			"livez":       "/livez",
-			"readyz":      "/readyz",
-			"metrics":     "/metrics",
-			"pod metrics": "/metrics/resources",
-			"sli metrics": "/metrics/slis",
-		}
-		statusz.Install(pathRecorderMux, kubeScheduler, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), endpoints))
+		statusz.Install(pathRecorderMux, kubeScheduler, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), pathRecorderMux))
 	}
 
 	return pathRecorderMux

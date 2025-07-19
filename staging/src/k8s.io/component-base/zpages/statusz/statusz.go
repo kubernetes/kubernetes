@@ -44,8 +44,8 @@ type mux interface {
 	Handle(path string, handler http.Handler)
 }
 
-func NewRegistry(effectiveVersion compatibility.EffectiveVersion, endpoints map[string]string) statuszRegistry {
-	return &registry{effectiveVersion: effectiveVersion, endpoints: endpoints}
+func NewRegistry(effectiveVersion compatibility.EffectiveVersion, provider PathsProvider) statuszRegistry {
+	return &registry{effectiveVersion: effectiveVersion, pathsProvider: provider}
 }
 
 func Install(m mux, componentName string, reg statuszRegistry) {
@@ -93,24 +93,19 @@ Binary version%[1]s %[5]s
 %[6]s
 `, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion)
 
-	endpoints := reg.usefulEndpoints()
-	if len(endpoints) > 0 {
+	paths := reg.paths()
+	if len(paths) > 0 {
 		var endpointsText string
 		endpointsText += `
 Useful Endpoints:
 ----------------
 `
-		endpointNames := make([]string, 0, len(endpoints))
-		for key := range endpoints {
-			endpointNames = append(endpointNames, key)
-		}
-
-		sort.Slice(endpointNames, func(i, j int) bool {
-			return endpointNames[i] > endpointNames[j]
+		sort.Slice(paths, func(i, j int) bool {
+			return paths[i] < paths[j]
 		})
 
-		for _, endpointName := range endpointNames {
-			endpointsText += fmt.Sprintf("%s%s %q\n", html.EscapeString(endpointName), delim, html.EscapeString(endpoints[endpointName]))
+		for _, path := range paths {
+			endpointsText += fmt.Sprintf("%q\n", html.EscapeString(path))
 		}
 		status += endpointsText
 	}

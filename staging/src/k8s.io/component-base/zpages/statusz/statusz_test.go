@@ -39,11 +39,11 @@ Emulation version: %v
 
 Useful Endpoints:
 ----------------
-version: "/version"
-readyz: "/readyz"
-metrics: "/metrics"
-livez: "/livez"
-healthz: "/healthz"
+"/healthz"
+"/livez"
+"/metrics"
+"/readyz"
+"/version"
 `
 
 const wantTmplWithoutEmulation = `
@@ -88,12 +88,14 @@ func TestStatusz(t *testing.T) {
 				goVer:        fakeGoVersion,
 				binaryVer:    fakeBinaryVersion,
 				emulationVer: fakeEmulationVersion,
-				endpoints: map[string]string{
-					"healthz": "/healthz",
-					"livez":   "/livez",
-					"readyz":  "/readyz",
-					"version": "/version",
-					"metrics": "/metrics",
+				tracker: fakePathProvider{
+					paths: []string{
+						"/healthz",
+						"/livez",
+						"/readyz",
+						"/version",
+						"/metrics",
+					},
 				},
 			},
 			wantStatusCode: http.StatusOK,
@@ -181,7 +183,7 @@ type fakeRegistry struct {
 	goVer        string
 	binaryVer    *version.Version
 	emulationVer *version.Version
-	endpoints    map[string]string
+	tracker      PathsProvider
 }
 
 func (f fakeRegistry) processStartTime() time.Time {
@@ -200,6 +202,17 @@ func (f fakeRegistry) emulationVersion() *version.Version {
 	return f.emulationVer
 }
 
-func (f fakeRegistry) usefulEndpoints() map[string]string {
-	return f.endpoints
+func (f fakeRegistry) paths() []string {
+	if f.tracker == nil {
+		return nil
+	}
+	return f.tracker.ListedPaths()
+}
+
+type fakePathProvider struct {
+	paths []string
+}
+
+func (f fakePathProvider) ListedPaths() []string {
+	return f.paths
 }

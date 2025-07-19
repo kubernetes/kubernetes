@@ -32,13 +32,17 @@ type statuszRegistry interface {
 	goVersion() string
 	binaryVersion() *version.Version
 	emulationVersion() *version.Version
-	usefulEndpoints() map[string]string
+	paths() []string
+}
+
+type PathsProvider interface {
+	ListedPaths() []string
 }
 
 type registry struct {
 	// componentGlobalsRegistry compatibility.ComponentGlobalsRegistry
 	effectiveVersion compatibility.EffectiveVersion
-	endpoints        map[string]string
+	pathsProvider    PathsProvider
 }
 
 func (*registry) processStartTime() time.Time {
@@ -69,6 +73,9 @@ func (r *registry) emulationVersion() *version.Version {
 	return nil
 }
 
-func (r *registry) usefulEndpoints() map[string]string {
-	return r.endpoints
+func (r *registry) paths() []string {
+	if r.pathsProvider != nil {
+		return r.pathsProvider.ListedPaths()
+	}
+	return nil
 }
