@@ -229,6 +229,7 @@ func TestDRA(t *testing.T) {
 				features.DynamicResourceAllocation: true,
 				// TODO: replace specific list with AllBeta once DRA is not beta.
 				features.DRAResourceClaimDeviceStatus: false,
+				features.DRAPrioritizedList:           false,
 				// featuregate.Feature("AllBeta"):     false,
 			},
 			f: func(tCtx ktesting.TContext) {
@@ -250,7 +251,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
-				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
+				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices)
