@@ -437,6 +437,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		scheduler.WithKubeConfig(cc.KubeConfig),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
+		scheduler.WithMaxNodesToScore(cc.ComponentConfig.MaxNodesToScore),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
 		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
 		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
