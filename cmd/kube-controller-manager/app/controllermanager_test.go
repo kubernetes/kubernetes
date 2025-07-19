@@ -152,8 +152,8 @@ func TestFeatureGatedControllersShouldNotDefineAliases(t *testing.T) {
 			continue
 		}
 
-		// DO NOT ADD any new controllers here. one controller is an exception, because it was added before this test was introduced
-		if name == names.ResourceClaimController {
+		// DO NOT ADD any new controllers here. These are an exception, because they were added before this test was introduced
+		if name == names.ResourceClaimController || name == names.StorageVersionMigratorController {
 			continue
 		}
 

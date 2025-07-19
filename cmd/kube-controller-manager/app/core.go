@@ -938,10 +938,6 @@ func newSELinuxWarningControllerDescriptor() *ControllerDescriptor {
 }
 
 func startSELinuxWarningController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxChangePolicy) {
-		return nil, false, nil
-	}
-
 	logger := klog.FromContext(ctx)
 	csiDriverInformer := controllerContext.InformerFactory.Storage().V1().CSIDrivers()
 	plugins, err := ProbePersistentVolumePlugins(logger, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
