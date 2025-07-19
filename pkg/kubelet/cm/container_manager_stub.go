@@ -125,7 +125,8 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulerframework.NodeIn
 }
 
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager()}
+	// TODO: Replace with real context during container manager migration.
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager(context.TODO())}
 }
 
 func (cm *containerManagerStub) GetPodCgroupRoot() string {
@@ -145,7 +146,8 @@ func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
 }
 
 func (cm *containerManagerStub) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
-	return topologymanager.NewFakeManager()
+	// TODO: Replace with real context during container manager migration.
+	return topologymanager.NewFakeManager(context.TODO())
 }
 
 func (cm *containerManagerStub) UpdateAllocatedDevices() {

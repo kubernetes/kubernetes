@@ -171,7 +171,8 @@ func (cm *FakeContainerManager) InternalContainerLifecycle() InternalContainerLi
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "InternalContainerLifecycle")
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager()}
+	// TODO: Replace with real context during container manager migration.
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager(context.TODO())}
 }
 
 func (cm *FakeContainerManager) GetPodCgroupRoot() string {
@@ -206,7 +207,8 @@ func (cm *FakeContainerManager) GetAllocateResourcesPodAdmitHandler() lifecycle.
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocateResourcesPodAdmitHandler")
-	return topologymanager.NewFakeManager()
+	// TODO: Replace with real context during container manager migration.
+	return topologymanager.NewFakeManager(context.TODO())
 }
 
 func (cm *FakeContainerManager) UpdateAllocatedDevices() {

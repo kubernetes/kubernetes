@@ -16,6 +16,8 @@ limitations under the License.
 
 package topologymanager
 
+import "context"
+
 type restrictedPolicy struct {
 	bestEffortPolicy
 }
@@ -38,8 +40,8 @@ func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) bool {
 	return hint.Preferred
 }
 
-func (p *restrictedPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
-	filteredHints := filterProvidersHints(providersHints)
+func (p *restrictedPolicy) Merge(ctx context.Context, providersHints []map[string][]TopologyHint) (TopologyHint, bool) {
+	filteredHints := filterProvidersHints(ctx, providersHints)
 	merger := NewHintMerger(p.numaInfo, filteredHints, p.Name(), p.opts)
 	bestHint := merger.Merge()
 	admit := p.canAdmitPodResult(&bestHint)
