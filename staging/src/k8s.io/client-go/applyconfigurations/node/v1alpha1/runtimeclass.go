@@ -45,6 +45,27 @@ func RuntimeClass(name string) *RuntimeClassApplyConfiguration {
 	return b
 }
 
+// ExtractRuntimeClassFrom extracts the applied configuration owned by fieldManager from
+// runtimeClass for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// runtimeClass must be a unmodified RuntimeClass API object that was retrieved from the Kubernetes API.
+// ExtractRuntimeClassFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractRuntimeClassFrom(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string, subresource string) (*RuntimeClassApplyConfiguration, error) {
+	b := &RuntimeClassApplyConfiguration{}
+	err := managedfields.ExtractInto(runtimeClass, internal.Parser().Type("io.k8s.api.node.v1alpha1.RuntimeClass"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(runtimeClass.Name)
+
+	b.WithKind("RuntimeClass")
+	b.WithAPIVersion("node.k8s.io/v1alpha1")
+	return b, nil
+}
+
 // ExtractRuntimeClass extracts the applied configuration owned by fieldManager from
 // runtimeClass. If no managedFields are found in runtimeClass for fieldManager, a
 // RuntimeClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
@@ -57,28 +78,9 @@ func RuntimeClass(name string) *RuntimeClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractRuntimeClass(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
-	return extractRuntimeClass(runtimeClass, fieldManager, "")
+	return ExtractRuntimeClassFrom(runtimeClass, fieldManager, "")
 }
 
-// ExtractRuntimeClassStatus is the same as ExtractRuntimeClass except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractRuntimeClassStatus(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
-	return extractRuntimeClass(runtimeClass, fieldManager, "status")
-}
-
-func extractRuntimeClass(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string, subresource string) (*RuntimeClassApplyConfiguration, error) {
-	b := &RuntimeClassApplyConfiguration{}
-	err := managedfields.ExtractInto(runtimeClass, internal.Parser().Type("io.k8s.api.node.v1alpha1.RuntimeClass"), fieldManager, b, subresource)
-	if err != nil {
-		return nil, err
-	}
-	b.WithName(runtimeClass.Name)
-
-	b.WithKind("RuntimeClass")
-	b.WithAPIVersion("node.k8s.io/v1alpha1")
-	return b, nil
-}
 func (b RuntimeClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
