@@ -136,6 +136,8 @@ type containerManagerImpl struct {
 	draManager *dra.Manager
 	// kubeClient is the interface to the Kubernetes API server. May be nil if the kubelet is running in standalone mode.
 	kubeClient clientset.Interface
+	// updates is a channel that provides resource updates.
+	updates chan resourceupdates.Update
 }
 
 type features struct {
@@ -349,6 +351,37 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 	cm.topologyManager.AddHintProvider(cm.memoryManager)
+
+	// Create a single channel for all resource updates. This channel is consumed
+	// by the Kubelet's main sync loop.
+	cm.updates = make(chan resourceupdates.Update, 10)
+
+	// Start goroutines to fan-in updates from the various sub-managers
+	// (e.g., device manager, DRA manager) into the single updates channel.
+	var wg sync.WaitGroup
+	sources := map[string]<-chan resourceupdates.Update{}
+	if cm.deviceManager != nil {
+		sources["deviceManager"] = cm.deviceManager.Updates()
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+		sources["draManager"] = cm.draManager.Updates()
+	}
+
+	for name, ch := range sources {
+		wg.Add(1)
+		go func(name string, c <-chan resourceupdates.Update) {
+			defer wg.Done()
+			for v := range c {
+				klog.V(4).InfoS("Container Manager: forwarding resource update", "source", name, "pods", v.PodUIDs)
+				cm.updates <- v
+			}
+		}(name, ch)
+	}
+
+	go func() {
+		wg.Wait()
+		close(cm.updates)
+	}()
 
 	return cm, nil
 }
@@ -1050,10 +1083,12 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 	// For now we only support Device Plugin
 	cm.deviceManager.UpdateAllocatedResourcesStatus(pod, status)
 
-	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources which is planned for the next iteration of a KEP.
+	// Update DRA resources if the feature is enabled and the manager exists
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+		cm.draManager.UpdateAllocatedResourcesStatus(pod, status)
+	}
 }
 
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
-	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources, for now only use device plugin updates. DRA support is planned for the next iteration of a KEP.
-	return cm.deviceManager.Updates()
+	return cm.updates
 }
