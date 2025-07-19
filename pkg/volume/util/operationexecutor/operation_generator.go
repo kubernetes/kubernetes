@@ -1477,13 +1477,6 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			}
 		}
 
-		// Volume is not attached - check if this is due to resource exhaustion before returning the error
-		if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
-			if attachablePlugin, pluginErr := og.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec); pluginErr == nil && attachablePlugin != nil {
-				attachablePlugin.VerifyExhaustedResource(volumeToMount.VolumeSpec, nodeName)
-			}
-		}
-
 		// Volume not attached, return error. Caller will log and retry.
 		eventErr, detailedErr := volumeToMount.GenerateError("Volume not attached according to node status", nil)
 		return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)

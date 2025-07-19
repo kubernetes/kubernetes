@@ -105,7 +105,9 @@ func (plugin *TestPlugin) NewUnmounter(name string, podUID types.UID) (volume.Un
 	return nil, nil
 }
 
-func (plugin *TestPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {}
+func (plugin *TestPlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return false
+}
 
 func (plugin *TestPlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
 	fakeVolume := &v1.Volume{
