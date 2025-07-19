@@ -7320,6 +7320,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: hostname
       type:
         scalar: string
+    - name: hostnameOverride
+      type:
+        scalar: string
     - name: imagePullSecrets
       type:
         list:
