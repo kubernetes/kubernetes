@@ -56,6 +56,7 @@ const (
 	flagUsername           = "username"
 	flagPassword           = "password"
 	flagTimeout            = "request-timeout"
+	flagProxyURL           = "proxy-url"
 	flagCacheDir           = "cache-dir"
 	flagDisableCompression = "disable-compression"
 )
@@ -100,6 +101,7 @@ type ConfigFlags struct {
 	Username           *string
 	Password           *string
 	Timeout            *string
+	ProxyURL           *string
 	DisableCompression *bool
 	// If non-nil, wrap config function can transform the Config
 	// before it is returned in ToRESTConfig function.
@@ -208,6 +210,9 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	}
 	if f.DisableCompression != nil {
 		overrides.ClusterInfo.DisableCompression = *f.DisableCompression
+	}
+	if f.ProxyURL != nil {
+		overrides.ClusterInfo.ProxyURL = *f.ProxyURL
 	}
 
 	// bind context flags
@@ -407,6 +412,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Timeout != nil {
 		flags.StringVar(f.Timeout, flagTimeout, *f.Timeout, "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.")
 	}
+	if f.ProxyURL != nil {
+		flags.StringVar(f.ProxyURL, flagProxyURL, *f.ProxyURL, "HTTP/HTTPS proxy URL to use for connecting to the API server. Overrides any proxy-url specified in kubeconfig. Supports http://, https://, and socks5:// schemes.")
+	}
 	if f.DisableCompression != nil {
 		flags.BoolVar(f.DisableCompression, flagDisableCompression, *f.DisableCompression, "If true, opt-out of response compression for all requests to the server")
 	}
@@ -452,6 +460,7 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 	return &ConfigFlags{
 		Insecure:   &insecure,
 		Timeout:    ptr.To("0"),
+		ProxyURL:   ptr.To(""),
 		KubeConfig: ptr.To(""),
 
 		CacheDir:           ptr.To(getDefaultCacheDir()),
