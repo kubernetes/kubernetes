@@ -2282,12 +2282,13 @@ func TestDontAllowApplyWithPodGeneratedName(t *testing.T) {
 
 func TestApplySetParentValidation(t *testing.T) {
 	for name, test := range map[string]struct {
-		applysetFlag        string
-		namespaceFlag       string
-		setup               func(*testing.T, *cmdtesting.TestFactory)
-		expectParentKind    string
-		expectBlankParentNs bool
-		expectErr           string
+		applysetFlag          string
+		applysetNamespaceFlag string
+		namespaceFlag         string
+		setup                 func(*testing.T, *cmdtesting.TestFactory)
+		expectParentKind      string
+		expectBlankParentNs   bool
+		expectErr             string
 	}{
 		"parent type must be valid": {
 			applysetFlag: "doesnotexist/thename",
@@ -2307,6 +2308,11 @@ func TestApplySetParentValidation(t *testing.T) {
 			namespaceFlag:    "mynamespace",
 			expectParentKind: "Secret",
 		},
+		"parents in custom namespace are valid": {
+			applysetFlag:          "secret/thename",
+			applysetNamespaceFlag: "thenamespace",
+			expectParentKind:      "Secret",
+		},
 		"plural resource works": {
 			applysetFlag:     "secrets/thename",
 			namespaceFlag:    "mynamespace",
@@ -2315,7 +2321,7 @@ func TestApplySetParentValidation(t *testing.T) {
 		"other namespaced builtin parents types are correctly parsed but invalid": {
 			applysetFlag:     "deployments.apps/thename",
 			expectParentKind: "Deployment",
-			expectErr:        "[namespace is required to use namespace-scoped ApplySet, resource \"apps/v1, Resource=deployments\" is not permitted as an ApplySet parent]",
+			expectErr:        "[namespace is required to use namespace-scoped ApplySet. You can provide it either using --applyset-namespace or --namespace parameter, resource \"apps/v1, Resource=deployments\" is not permitted as an ApplySet parent]",
 		},
 		"namespaced builtin parents with multi-segment groups are correctly parsed but invalid": {
 			applysetFlag:     "priorityclasses.scheduling.k8s.io/thename",
@@ -2346,7 +2352,7 @@ func TestApplySetParentValidation(t *testing.T) {
 			},
 			expectBlankParentNs: true,
 			expectParentKind:    "Secret",
-			expectErr:           "namespace is required to use namespace-scoped ApplySet",
+			expectErr:           "namespace is required to use namespace-scoped ApplySet. You can provide it either using --applyset-namespace or --namespace parameter",
 		},
 		"parent namespace should not use the default namespace from the user's kubeconfig": {
 			applysetFlag: "mysecret",
@@ -2360,7 +2366,7 @@ func TestApplySetParentValidation(t *testing.T) {
 			},
 			expectBlankParentNs: true,
 			expectParentKind:    "Secret",
-			expectErr:           "namespace is required to use namespace-scoped ApplySet",
+			expectErr:           "namespace is required to use namespace-scoped ApplySet. You can provide it either using --applyset-namespace or --namespace parameter",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -2371,6 +2377,9 @@ func TestApplySetParentValidation(t *testing.T) {
 				cmd.Flags().Set("filename", filenameRC)
 				cmd.Flags().Set("applyset", test.applysetFlag)
 				cmd.Flags().Set("prune", "true")
+				if test.applysetNamespaceFlag != "" {
+					cmd.Flags().Set("applyset-namespace", test.applysetNamespaceFlag)
+				}
 				f := cmdtesting.NewTestFactory()
 				defer f.Cleanup()
 				setUpClientsForApplySetWithSSA(t, f)
@@ -2381,6 +2390,9 @@ func TestApplySetParentValidation(t *testing.T) {
 					if !test.expectBlankParentNs {
 						expectedParentNs = test.namespaceFlag
 					}
+				}
+				if test.applysetNamespaceFlag != "" && !test.expectBlankParentNs {
+					expectedParentNs = test.applysetNamespaceFlag
 				}
 
 				if test.setup != nil {
