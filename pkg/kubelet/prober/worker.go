@@ -26,6 +26,7 @@ import (
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
@@ -219,6 +220,8 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		return false
 	}
 
+	// Check if the container is a restartable init container (sidecar).
+	isRestartableInitContainer := false
 	c, ok := podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name)
 	if !ok || len(c.ContainerID) == 0 {
 		c, ok = podutil.GetContainerStatus(status.InitContainerStatuses, w.container.Name)
@@ -228,13 +231,14 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 				"pod", klog.KObj(w.pod), "containerName", w.container.Name)
 			return true // Wait for more information.
 		}
+		isRestartableInitContainer = podutil.IsRestartableInitContainer(&w.container)
 	}
 
 	if w.containerID.String() != c.ContainerID {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
-		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
+		w.containerID = container.ParseContainerID(c.ContainerID)
 		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
 		// We've got a new container; resume probing.
 		w.onHold = false
@@ -251,9 +255,10 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
 		}
-		// Abort if the container will not be restarted.
+		// Abort if the container will not be restarted, unless it's a restartable init container.
 		return c.State.Terminated == nil ||
-			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
+			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever ||
+			isRestartableInitContainer
 	}
 
 	// Graceful shutdown of the pod.
