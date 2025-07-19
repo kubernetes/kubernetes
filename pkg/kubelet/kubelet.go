@@ -287,7 +287,7 @@ type Bootstrap interface {
 	StartGarbageCollection()
 	ListenAndServe(kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions, auth server.AuthInterface, tp trace.TracerProvider)
 	ListenAndServeReadOnly(address net.IP, port uint, tp trace.TracerProvider)
-	ListenAndServePodResources()
+	ListenAndServePodResources(ctx context.Context)
 	Run(<-chan kubetypes.PodUpdate)
 }
 
@@ -2006,7 +2006,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
-	kl.tryReconcileMirrorPods(pod, mirrorPod)
+	kl.tryReconcileMirrorPods(ctx, pod, mirrorPod)
 
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
@@ -2984,7 +2984,7 @@ func (pp *kubeletPodsProvider) GetPodByName(namespace, name string) (*v1.Pod, bo
 }
 
 // ListenAndServePodResources runs the kubelet podresources grpc service
-func (kl *Kubelet) ListenAndServePodResources() {
+func (kl *Kubelet) ListenAndServePodResources(ctx context.Context) {
 	endpoint, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
 	if err != nil {
 		klog.V(2).InfoS("Failed to get local endpoint for PodResources endpoint", "err", err)
@@ -2999,7 +2999,7 @@ func (kl *Kubelet) ListenAndServePodResources() {
 		DynamicResources: kl.containerManager,
 	}
 
-	server.ListenAndServePodResources(endpoint, providers)
+	server.ListenAndServePodResources(ctx, endpoint, providers)
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
@@ -3105,7 +3105,7 @@ func (kl *Kubelet) UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) e
 
 // Ensure Mirror Pod for Static Pod exists and matches the current pod definition.
 // The function logs and ignores any errors.
-func (kl *Kubelet) tryReconcileMirrorPods(staticPod, mirrorPod *v1.Pod) {
+func (kl *Kubelet) tryReconcileMirrorPods(ctx context.Context, staticPod, mirrorPod *v1.Pod) {
 	if !kubetypes.IsStaticPod(staticPod) {
 		return
 	}
@@ -3114,9 +3114,9 @@ func (kl *Kubelet) tryReconcileMirrorPods(staticPod, mirrorPod *v1.Pod) {
 		if mirrorPod.DeletionTimestamp != nil || !kubepod.IsMirrorPodOf(mirrorPod, staticPod) {
 			// The mirror pod is semantically different from the static pod. Remove
 			// it. The mirror pod will get recreated later.
-			klog.InfoS("Trying to delete pod", "pod", klog.KObj(mirrorPod), "podUID", mirrorPod.ObjectMeta.UID)
+			klog.InfoS("Trying to delete pod", "pod", klog.KObj(mirrorPod), "podUID", mirrorPod.UID)
 			podFullName := kubecontainer.GetPodFullName(staticPod)
-			if ok, err := kl.mirrorPodClient.DeleteMirrorPod(podFullName, &mirrorPod.ObjectMeta.UID); err != nil {
+			if ok, err := kl.mirrorPodClient.DeleteMirrorPod(ctx, podFullName, &mirrorPod.UID); err != nil {
 				klog.ErrorS(err, "Failed deleting mirror pod", "pod", klog.KObj(mirrorPod))
 			} else if ok {
 				deleted = ok
@@ -3132,7 +3132,7 @@ func (kl *Kubelet) tryReconcileMirrorPods(staticPod, mirrorPod *v1.Pod) {
 			klog.InfoS("No need to create a mirror pod, since node has been removed from the cluster", "node", klog.KRef("", string(kl.nodeName)))
 		} else {
 			klog.InfoS("Creating a mirror pod for static pod", "pod", klog.KObj(staticPod))
-			if err := kl.mirrorPodClient.CreateMirrorPod(staticPod); err != nil {
+			if err := kl.mirrorPodClient.CreateMirrorPod(ctx, staticPod); err != nil {
 				klog.ErrorS(err, "Failed creating a mirror pod", "pod", klog.KObj(staticPod))
 			}
 		}
@@ -3155,7 +3155,7 @@ func (kl *Kubelet) fastStaticPodsRegistration(ctx context.Context) {
 
 	staticPodToMirrorPodMap := kl.podManager.GetStaticPodToMirrorPodMap()
 	for staticPod, mirrorPod := range staticPodToMirrorPodMap {
-		kl.tryReconcileMirrorPods(staticPod, mirrorPod)
+		kl.tryReconcileMirrorPods(ctx, staticPod, mirrorPod)
 	}
 }
 
