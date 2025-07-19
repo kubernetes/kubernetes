@@ -470,6 +470,7 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 // Test if volumes that were recorded to be read from disk during reconstruction
 // are handled correctly by the ASOW.
 func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name           string
 		opCallback     func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error
@@ -585,7 +586,7 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 			generatedVolumeName1, err := util.GetUniqueVolumeNameFromSpec(
 				plugin, volumeSpec1)
 			require.NoError(t, err)
-			err = asw.AddAttachUncertainReconstructedVolume(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
+			err = asw.AddAttachUncertainReconstructedVolume(logger, generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
 			if err != nil {
 				t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 			}
@@ -1077,7 +1078,7 @@ func TestUncertainVolumeMounts(t *testing.T) {
 		t.Fatalf("expected volume %s to be found in aws.GetPossiblyMountedVolumesForPod", volumeSpec1.Name())
 	}
 
-	volExists, _, _ := asw.PodExistsInVolume(podName1, generatedVolumeName1, resource.Quantity{}, "")
+	volExists, _, _ := asw.PodExistsInVolume(logger, podName1, generatedVolumeName1, resource.Quantity{}, "")
 	if volExists {
 		t.Fatalf("expected volume %s to not exist in asw", generatedVolumeName1)
 	}
@@ -1215,8 +1216,9 @@ func verifyPodExistsInVolumeAswWithSELinux(
 	expectedDevicePath string,
 	expectedSELinuxLabel string,
 	asw ActualStateOfWorld) {
+	logger, _ := ktesting.NewTestContext(t)
 	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(expectedPodName, expectedVolumeName, resource.Quantity{}, expectedSELinuxLabel)
+		asw.PodExistsInVolume(logger, expectedPodName, expectedVolumeName, resource.Quantity{}, expectedSELinuxLabel)
 	if err != nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume failed. Expected: <no error> Actual: <%v>", err)
@@ -1257,8 +1259,9 @@ func verifyPodDoesntExistInVolumeAsw(
 	volumeToCheck v1.UniqueVolumeName,
 	expectVolumeToExist bool,
 	asw ActualStateOfWorld) {
+	logger, _ := ktesting.NewTestContext(t)
 	podExistsInVolume, devicePath, err :=
-		asw.PodExistsInVolume(podToCheck, volumeToCheck, resource.Quantity{}, "")
+		asw.PodExistsInVolume(logger, podToCheck, volumeToCheck, resource.Quantity{}, "")
 	if !expectVolumeToExist && err == nil {
 		t.Fatalf(
 			"ASW PodExistsInVolume did not return error. Expected: <error indicating volume does not exist> Actual: <%v>", err)
@@ -1288,8 +1291,8 @@ func verifyPodExistsInVolumeSELinuxMismatch(
 	volumeToCheck v1.UniqueVolumeName,
 	unexpectedSELinuxLabel string,
 	asw ActualStateOfWorld) {
-
-	podExistsInVolume, _, err := asw.PodExistsInVolume(podToCheck, volumeToCheck, resource.Quantity{}, unexpectedSELinuxLabel)
+	logger, _ := ktesting.NewTestContext(t)
+	podExistsInVolume, _, err := asw.PodExistsInVolume(logger, podToCheck, volumeToCheck, resource.Quantity{}, unexpectedSELinuxLabel)
 	if podExistsInVolume {
 		t.Errorf("expected Pod %s not to exists, but it does", podToCheck)
 	}
