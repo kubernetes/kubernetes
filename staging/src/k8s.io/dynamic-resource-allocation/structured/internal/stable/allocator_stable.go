@@ -871,6 +871,12 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 		return false, nil
 	}
 
+	// The ResourceSlice Mixins feature is not yet available on the stable variant of the
+	// allocator, so we should not consider devices that uses mixins.
+	if isDeviceReferencingMixins(device) {
+		return false, nil
+	}
+
 	deviceID := DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name}
 	matchKey := matchKey{DeviceID: deviceID, requestIndices: r}
 	if matches, ok := alloc.deviceMatchesRequest[matchKey]; ok {
@@ -921,6 +927,20 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	alloc.deviceMatchesRequest[matchKey] = true
 	return true, nil
 
+}
+
+// isDeviceReferencingMixins checks if a device references mixins, either
+// device mixins or counter consumption mixins.
+func isDeviceReferencingMixins(device *draapi.BasicDevice) bool {
+	if len(device.Includes) > 0 {
+		return true
+	}
+	for _, deviceCounterConsumption := range device.ConsumesCounters {
+		if len(deviceCounterConsumption.Includes) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.BasicDevice, deviceID DeviceID, class *resourceapi.DeviceClass, selectors []resourceapi.DeviceSelector) (bool, error) {

@@ -163,13 +163,12 @@ var availableAllocators = []struct {
 		supportedFeatures: experimental.SupportedFeatures,
 		newAllocator: func(ctx context.Context,
 			features Features,
-			claimsToAllocate []*resourceapi.ResourceClaim,
 			allocatedDevices sets.Set[DeviceID],
 			classLister DeviceClassLister,
 			slices []*resourceapi.ResourceSlice,
 			celCache *cel.Cache,
 		) (Allocator, error) {
-			return experimental.NewAllocator(ctx, features, claimsToAllocate, allocatedDevices, classLister, slices, celCache)
+			return experimental.NewAllocator(ctx, features, allocatedDevices, classLister, slices, celCache)
 		},
 	},
 }

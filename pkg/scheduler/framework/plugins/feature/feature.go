@@ -41,6 +41,7 @@ type Features struct {
 	EnablePodLevelResources                      bool
 	EnablePartitionableDevices                   bool
 	EnableStorageCapacityScoring                 bool
+	EnableResourceSliceMixins                    bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
