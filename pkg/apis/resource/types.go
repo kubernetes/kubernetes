@@ -163,6 +163,13 @@ type ResourceSliceSpec struct {
 	// +listType=atomic
 	// +featureGate=DRAPartitionableDevices
 	SharedCounters []CounterSet
+
+	// Mixins provides common definitions that can be
+	// used for devices and counter sets in the ResourceSlice.
+	//
+	// +featureGate=DRAResourceSliceMixins
+	// +optional
+	Mixins *ResourceSliceMixins
 }
 
 // CounterSet defines a named set of counters
@@ -183,7 +190,153 @@ type CounterSet struct {
 	// Counters defines the set of counters for this CounterSet
 	// The name of each counter must be unique in that set and must be a DNS label.
 	//
-	// The maximum number of counters in all sets is 32.
+	// At least one of counters and includes must be specified.
+	//
+	// The maximum number of counters across all counter sets and counter set
+	// mixins in a ResourceSlice is 256.
+	//
+	// +optional
+	Counters map[string]Counter
+
+	// Includes defines a list of references to CounterSetMixin.
+	// The counters listed in the mixins will be added to the counters
+	// available in this CounterSet.
+	//
+	// The counters of each included mixin are applied to this counter set in
+	// order. Conflicting counters from multiple mixins are taken from the
+	// last mixin listed. Counters set on the CounterSet will always override
+	// counters from mixins.
+	//
+	// At least one of counters and includes must be specified.
+	//
+	// The mixins referenced here must be defined in the same
+	// ResourceSlice.
+	//
+	// The maximum number of includes is 8.
+	//
+	// +featureGate=DRAResourceSliceMixins
+	// +listType=atomic
+	// +optional
+	Includes []string
+}
+
+// ResourceSliceMixins provides common definitions for the ResourceSlice.
+//
+// The main purpose is to reduce the memory footprint of devices since
+// they can reference the mixins provided here rather than duplicate them.
+type ResourceSliceMixins struct {
+	// Device represents a list of device mixins, i.e. a collection of
+	// shared attributes and capacities that an actual device can "include"
+	// to extend the set of attributes and capacities it already defines.
+	//
+	// There are no limits on the number of device mixins, but the total
+	// number of attributes and capacities across device mixins and
+	// devices in a single ResourceSlice must not exceed 4096.
+	//
+	// +optional
+	// +listType=atomic
+	Device []DeviceMixin
+
+	// DeviceCounterConsumption represents a list of counter
+	// consumption mixins, each of which contains a set of counters
+	// that a device will consume from a counter set.
+	//
+	// There are no limits on the number of device counter consumption
+	// mixins, but the total number of consumed counters across device
+	// counter consumption mixins and devices in a single
+	// ResourceSlice must not exceed 2048.
+	//
+	// +optional
+	// +listType=atomic
+	DeviceCounterConsumption []DeviceCounterConsumptionMixin
+
+	// CounterSet represents a list of counter set mixins, i.e.
+	// a collection of counters that a CounterSet can "include"
+	// to extend the set of counters it already defines.
+	//
+	// There are no limits on the number of counter set mixins, but
+	// the total number of counters across counter set mixins and
+	// counter sets in a single ResourceSlice must not exceed 256.
+	//
+	// +optional
+	// +listType=atomic
+	CounterSet []CounterSetMixin
+}
+
+// DeviceMixin defines common attributes and capacities that can be
+// referenced from a device.
+type DeviceMixin struct {
+	// Name is a unique identifier among all device mixins in the ResourceSlice.
+	// It must be a DNS label.
+	//
+	// +required
+	Name string
+
+	// Attributes defines the set of attributes for this mixin.
+	// The name of each attribute must be unique in that set.
+	//
+	// To ensure this uniqueness, attributes defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// The maximum number of attributes and capacities across all devices
+	// and device mixins in a ResourceSlice is 4096. When flattened, the
+	// total number of attributes and capacities for each device must not
+	// exceed 32.
+	//
+	// +optional
+	Attributes map[QualifiedName]DeviceAttribute
+
+	// Capacity defines the set of capacities for this mixin.
+	// The name of each capacity must be unique in that set.
+	//
+	// To ensure this uniqueness, capacities defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// The maximum number of attributes and capacities across all devices
+	// and device mixins in a ResourceSlice is 4096. When flattened, the
+	// total number of attributes and capacities for each device must not
+	// exceed 32.
+	//
+	// +optional
+	Capacity map[QualifiedName]DeviceCapacity
+}
+
+// DeviceCounterConsumptionMixin defines common consumed counters that
+// devices can include to extend or override the set of consumed counters
+// for a device.
+type DeviceCounterConsumptionMixin struct {
+	// Name is a unique identifier among all device counter consumption
+	// mixins in the ResourceSlice. It must be a DNS label.
+	//
+	// +required
+	Name string
+
+	// Counters defines a set of counters
+	// that a device will consume from a counter set.
+	//
+	// The maximum number of consumed counters across all device counter
+	// consumptions and device counter consumption mixins in a
+	// ResourceSlice is 2048.
+	//
+	// +required
+	Counters map[string]Counter
+}
+
+// CounterSetMixin defines common counters that a counter set can include.
+type CounterSetMixin struct {
+	// Name is a unique identifier among all counter set mixins in the ResourceSlice.
+	// It must be a DNS label.
+	//
+	// +required
+	Name string
+
+	// Counters defines the set of counters for this mixin.
+	// The name of each counter must be unique in that set and must be a DNS label.
+	//
+	// The maximum number of counters across all counter sets and counter set
+	// mixins in a ResourceSlice is 256.
 	//
 	// +required
 	Counters map[string]Counter
@@ -238,6 +391,13 @@ const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a 
 // in a ResourceSlice. The number is summed up across all sets.
 const ResourceSliceMaxSharedCounters = 32
 
+// Defines the maximum number of include entries allowed.
+const ResourceSliceMaxIncludes = 8
+
+// Defines the maximum number of attributes, capacity, and counters allowed
+// across all mixins in a ResourceSlice.
+const ResourceSliceMaxMixins = 256
+
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type Device struct {
@@ -250,7 +410,10 @@ type Device struct {
 	// Attributes defines the set of attributes for this device.
 	// The name of each attribute must be unique in that set.
 	//
-	// The maximum number of attributes and capacities combined is 32.
+	// The maximum number of attributes and capacities across all devices
+	// and device mixins in a ResourceSlice is 4096. When flattened, the
+	// total number of attributes and capacities for each device must not
+	// exceed 32.
 	//
 	// +optional
 	Attributes map[QualifiedName]DeviceAttribute
@@ -258,7 +421,10 @@ type Device struct {
 	// Capacity defines the set of capacities for this device.
 	// The name of each capacity must be unique in that set.
 	//
-	// The maximum number of attributes and capacities combined is 32.
+	// The maximum number of attributes and capacities across all devices
+	// and device mixins in a ResourceSlice is 4096. When flattened, the
+	// total number of attributes and capacities for each device must not
+	// exceed 32.
 	//
 	// +optional
 	Capacity map[QualifiedName]DeviceCapacity
@@ -269,10 +435,9 @@ type Device struct {
 	//
 	// There can only be a single entry per counterSet.
 	//
-	// The total number of device counter consumption entries
-	// must be <= 32. In addition, the total number in the
-	// entire ResourceSlice must be <= 1024 (for example,
-	// 64 devices with 16 counters each).
+	// The maximum number of consumed counters across all device counter
+	// consumptions and device counter consumption mixins in a
+	// ResourceSlice is 2048.
 	//
 	// +optional
 	// +listType=atomic
@@ -322,6 +487,24 @@ type Device struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Taints []DeviceTaint
+
+	// Includes defines a list of references to device mixins. The attributes
+	// and capacity listed in the mixins will be added to the device.
+	//
+	// The attributes and capacity of each included mixin are applied in
+	// order. Conflicting attributes/capacity from multiple mixins are taken from the
+	// last mixin listed. Attributes and capacity set on the device will
+	// always override those from mixins.
+	//
+	// The mixins referenced here must be defined in the same
+	// ResourceSlice.
+	//
+	// The maximum number of includes is 8.
+	//
+	// +featureGate=DRAResourceSliceMixins
+	// +optional
+	// +listType=atomic
+	Includes []string
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -340,8 +523,31 @@ type DeviceCounterConsumption struct {
 	// in all devices is 1024 (for example, 64 devices with
 	// 16 counters each).
 	//
-	// +required
+	// At least one of counters and includes must be specified.
+	//
+	// +optional
 	Counters map[string]Counter
+
+	// Includes defines a list of references to device counter consumption
+	// mixins. The counters listed in the mixins will be added to the
+	// counters that will be consumed by the device.
+	//
+	// The counters of each included mixin are applied in
+	// order. Conflicting counters from multiple mixins are taken from the
+	// last mixin listed. Counters set on the DeviceCounterConsumption will
+	// always override counters from mixins.
+	//
+	// At least one of counters and includes must be specified.
+	//
+	// The mixins referenced here must be defined in the same
+	// ResourceSlice.
+	//
+	// The maximum number of includes is 8.
+	//
+	// +featureGate=DRAResourceSliceMixins
+	// +optional
+	// +listType=atomic
+	Includes []string
 }
 
 // DeviceCapacity describes a quantity associated with a device.
