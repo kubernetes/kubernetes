@@ -299,6 +299,124 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 			return pod
 		}).Should(gomega.BeNil(), "no pod after deletion after downgrade")
 	})
+
+	ginkgo.It("keeps list/watch alive", func(ctx context.Context) {
+		// TODO: replace with helper code from https://github.com/kubernetes/kubernetes/pull/122481 should that get merged.
+		tCtx := ktesting.Init(GinkgoContextTB())
+		tCtx = ktesting.WithContext(tCtx, ctx)
+
+		envName, dir := currentBinDir()
+		if dir == "" {
+			tCtx.Fatalf("%s must be set to test DRA upgrade/downgrade scenarios.", envName)
+		}
+
+		// Determine what we need to downgrade to.
+		tCtx = ktesting.Begin(tCtx, "get source code version")
+		gitVersion, _, err := sourceVersion(tCtx, repoRoot)
+		tCtx.ExpectNoError(err, "determine source code version for repo root %q", repoRoot)
+		version, err := version.ParseGeneric(gitVersion)
+		tCtx.ExpectNoError(err, "parse version %s of repo root %q", gitVersion, repoRoot)
+		major, previousMinor := version.Major(), version.Minor()-1
+		tCtx = ktesting.End(tCtx)
+
+		// KUBERNETES_SERVER_CACHE_DIR can be set to keep downloaded files across test restarts.
+		binDir, cacheBinaries := os.LookupEnv("KUBERNETES_SERVER_CACHE_DIR")
+		if !cacheBinaries {
+			binDir = tCtx.TempDir()
+		}
+		haveBinaries := false
+
+		// Get the previous release, if necessary.
+		previousURL, previousVersion := serverDownloadURL(tCtx, major, previousMinor)
+		if cacheBinaries {
+			binDir = path.Join(binDir, previousVersion)
+			_, err := os.Stat(path.Join(binDir, string(localupcluster.KubeClusterComponents[0])))
+			if err == nil {
+				haveBinaries = true
+			}
+		}
+		if !haveBinaries {
+			tCtx = ktesting.Begin(tCtx, fmt.Sprintf("download and unpack %s", previousURL))
+			req, err := http.NewRequestWithContext(tCtx, http.MethodGet, previousURL, nil)
+			tCtx.ExpectNoError(err, "construct request")
+			response, err := http.DefaultClient.Do(req)
+			tCtx.ExpectNoError(err, "download")
+			defer func() {
+				_ = response.Body.Close()
+			}()
+			decompress, err := gzip.NewReader(response.Body)
+			tCtx.ExpectNoError(err, "construct gzip reader")
+			unpack := tar.NewReader(decompress)
+			for {
+				header, err := unpack.Next()
+				if err == io.EOF {
+					break
+				}
+				base := path.Base(header.Name)
+				if slices.Contains(localupcluster.KubeClusterComponents, localupcluster.KubeComponentName(base)) {
+					data, err := io.ReadAll(unpack)
+					tCtx.ExpectNoError(err, fmt.Sprintf("read content of %s", header.Name))
+					tCtx.ExpectNoError(os.MkdirAll(binDir, 0755), "create directory for binaries")
+					tCtx.ExpectNoError(os.WriteFile(path.Join(binDir, base), data, 0555), fmt.Sprintf("write content of %s", header.Name))
+				}
+			}
+			tCtx = ktesting.End(tCtx)
+		}
+
+		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("bring up v%d.%d", major, previousMinor))
+		cluster := localupcluster.New(tCtx)
+		localUpClusterEnv := map[string]string{
+			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2",
+			"FEATURE_GATES":  "DynamicResourceAllocation=true",
+			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
+		}
+		cluster.Start(tCtx, binDir, localUpClusterEnv)
+		tCtx = ktesting.End(tCtx)
+
+		restConfig := cluster.LoadConfig(tCtx)
+		restConfig.UserAgent = fmt.Sprintf("%s -- dra", restclient.DefaultKubernetesUserAgent())
+		tCtx = ktesting.WithRESTConfig(tCtx, restConfig)
+		// TODO: rewrite all DRA test code to use ktesting.TContext once https://github.com/kubernetes/kubernetes/pull/122481 is
+		// merged, then we don't need to fake a Framework instance.
+		f := &framework.Framework{
+			BaseName:      "dra",
+			Timeouts:      framework.NewTimeoutContext(),
+			ClientSet:     tCtx.Client(),
+			DynamicClient: tCtx.Dynamic(),
+
+			// The driver containers have to run with sufficient privileges to
+			// modify /var/lib/kubelet/plugins.
+			NamespacePodSecurityLevel: admissionapi.LevelPrivileged,
+		}
+		f.SetClientConfig(restConfig)
+
+		namespace, err := f.CreateNamespace(tCtx, f.BaseName, map[string]string{
+			"e2e-framework": f.BaseName,
+		})
+		tCtx.ExpectNoError(err, "create namespace")
+		f.Namespace = namespace
+		f.UniqueName = namespace.Name
+
+		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("v%d.%d", major, previousMinor))
+
+		tCtx.ExpectNoError(e2enode.WaitForAllNodesSchedulable(tCtx, tCtx.Client(), f.Timeouts.NodeSchedulable), "wait for all nodes to be schedulable")
+		tCtx = ktesting.End(tCtx)
+
+		// This starts watching claims. The driver is not doing anything with slices.
+		nodes := drautils.NewNodesNow(tCtx, f, 1, 1)
+		driver := drautils.NewDriverInstance(f)
+		b := drautils.NewBuilderNow(ctx, f, driver)
+
+		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("update to %s", gitVersion))
+		cluster.Modify(tCtx, localupcluster.ModifyOptions{Upgrade: true, BinDir: dir})
+		tCtx = ktesting.End(tCtx)
+
+		claim := b.ExternalClaim()
+		b.Create(ctx, claim)
+
+		ginkgo.By("waiting for ResourceClaim cache to get updated")
+		gomega.Eventually(ctx, nodes.ListCachedResourceClaims).Should(gomega.HaveLen(1))
+	})
 })
 
 // sourceVersion identifies the Kubernetes git version based on hack/print-workspace-status.sh.
