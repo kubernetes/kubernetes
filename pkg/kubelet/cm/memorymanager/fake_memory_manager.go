@@ -17,6 +17,8 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -31,42 +33,53 @@ type fakeManager struct {
 	state state.State
 }
 
-func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	klog.InfoS("Start()")
+func (m *fakeManager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+	logger := klog.FromContext(ctx)
+	logger.Info("Start()")
 	return nil
 }
 
-func (m *fakeManager) Policy() Policy {
-	klog.InfoS("Policy()")
-	return NewPolicyNone()
+func (m *fakeManager) Policy(ctx context.Context) Policy {
+	logger := klog.FromContext(ctx)
+	logger.Info("Policy()")
+	return NewPolicyNone(ctx)
 }
 
 func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
-	klog.InfoS("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+	logger.Info("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
 }
 
-func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
-	klog.InfoS("Add container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
+func (m *fakeManager) AddContainer(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Add container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
-func (m *fakeManager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Set[int] {
-	klog.InfoS("Get MemoryNUMANodes", "pod", klog.KObj(pod), "containerName", container.Name)
+func (m *fakeManager) GetMemoryNUMANodes(ctx context.Context, pod *v1.Pod, container *v1.Container) sets.Set[int] {
+	logger := klog.FromContext(ctx)
+	logger.Info("Get MemoryNUMANodes", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
 }
 
-func (m *fakeManager) RemoveContainer(containerID string) error {
-	klog.InfoS("RemoveContainer", "containerID", containerID)
+func (m *fakeManager) RemoveContainer(ctx context.Context, containerID string) error {
+	logger := klog.FromContext(ctx)
+	logger.Info("RemoveContainer", "containerID", containerID)
 	return nil
 }
 
 func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	klog.InfoS("Get Topology Hints", "pod", klog.KObj(pod), "containerName", container.Name)
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+	logger.Info("Get Topology Hints", "pod", klog.KObj(pod), "containerName", container.Name)
 	return map[string][]topologymanager.TopologyHint{}
 }
 
 func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	klog.InfoS("Get Pod Topology Hints", "pod", klog.KObj(pod))
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+	logger.Info("Get Pod Topology Hints", "pod", klog.KObj(pod))
 	return map[string][]topologymanager.TopologyHint{}
 }
 
@@ -75,20 +88,24 @@ func (m *fakeManager) State() state.Reader {
 }
 
 // GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
-func (m *fakeManager) GetAllocatableMemory() []state.Block {
-	klog.InfoS("Get Allocatable Memory")
+func (m *fakeManager) GetAllocatableMemory(ctx context.Context) []state.Block {
+	logger := klog.FromContext(ctx)
+	logger.Info("Get Allocatable Memory")
 	return []state.Block{}
 }
 
 // GetMemory returns the memory allocated by a container from NUMA nodes
-func (m *fakeManager) GetMemory(podUID, containerName string) []state.Block {
-	klog.InfoS("Get Memory", "podUID", podUID, "containerName", containerName)
+func (m *fakeManager) GetMemory(ctx context.Context, podUID, containerName string) []state.Block {
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podUID", podUID, "containerName", containerName)
+	logger.Info("Get Memory")
 	return []state.Block{}
 }
 
 // NewFakeManager creates empty/fake memory manager
-func NewFakeManager() Manager {
+func NewFakeManager(ctx context.Context) Manager {
+	logger := klog.LoggerWithName(klog.FromContext(ctx), "memory-mgr.fake")
 	return &fakeManager{
-		state: state.NewMemoryState(),
+		// logger: logger,
+		state: state.NewMemoryState(logger),
 	}
 }
