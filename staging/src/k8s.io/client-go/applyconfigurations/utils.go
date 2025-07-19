@@ -1628,6 +1628,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.AllocationResultApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("BasicDevice"):
 		return &applyconfigurationsresourcev1beta1.BasicDeviceApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CapacityRequirements"):
+		return &applyconfigurationsresourcev1beta1.CapacityRequirementsApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CapacitySharingPolicy"):
+		return &applyconfigurationsresourcev1beta1.CapacitySharingPolicyApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CapacitySharingPolicyRange"):
+		return &applyconfigurationsresourcev1beta1.CapacitySharingPolicyRangeApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("CELDeviceSelector"):
 		return &applyconfigurationsresourcev1beta1.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("Counter"):
@@ -1700,6 +1706,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.AllocatedDeviceStatusApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &applyconfigurationsresourcev1beta2.AllocationResultApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CapacityRequirements"):
+		return &applyconfigurationsresourcev1beta2.CapacityRequirementsApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CapacitySharingPolicy"):
+		return &applyconfigurationsresourcev1beta2.CapacitySharingPolicyApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CapacitySharingPolicyRange"):
+		return &applyconfigurationsresourcev1beta2.CapacitySharingPolicyRangeApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("CELDeviceSelector"):
 		return &applyconfigurationsresourcev1beta2.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("Counter"):

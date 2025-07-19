@@ -171,6 +171,12 @@ const (
 	// is to move it into a separate KEP.
 	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
 
+	// owner: @sunya-ch
+	// kep: https://kep.k8s.io/5075
+	//
+	// DRAConsumableCapacity
+	DRAConsumableCapacity featuregate.Feature = "DRAConsumableCapacity"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/5055
 	//
@@ -1136,6 +1142,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DRAAdminAccess: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	DRAConsumableCapacity: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DRADeviceTaints: {

@@ -75,6 +75,13 @@ func SetObjectDefaults_ResourceClaim(in *resourcev1beta1.ResourceClaim) {
 			}
 		}
 	}
+	for i := range in.Status.Devices {
+		a := &in.Status.Devices[i]
+		if a.ShareID == nil {
+			var ptrVar1 string = ""
+			a.ShareID = &ptrVar1
+		}
+	}
 }
 
 func SetObjectDefaults_ResourceClaimList(in *resourcev1beta1.ResourceClaimList) {
