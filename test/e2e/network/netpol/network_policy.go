@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -980,7 +979,6 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 
 			err := k8s.cleanNetworkPolicies(ctx)
-			time.Sleep(3 * time.Second) // TODO we can remove this eventually, its just a hack to keep CI stable.
 			framework.ExpectNoError(err, "unable to clean network policies")
 
 			// Now the policy is deleted, we expect all connectivity to work again.
