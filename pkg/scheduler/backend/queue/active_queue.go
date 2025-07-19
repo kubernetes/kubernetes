@@ -37,25 +37,53 @@ import (
 // getLock() methods should be used only for unlocked() methods
 // and it is forbidden to call any other activeQueuer's method under this lock.
 type activeQueuer interface {
+	// underLock runs the fn function under the lock.Lock.
+	// fn can run unlockedActiveQueuer methods but should NOT run any other activeQueue method,
+	// as it would end up in deadlock.
 	underLock(func(unlockedActiveQ unlockedActiveQueuer))
+	// underLock runs the fn function under the lock.RLock.
+	// fn can run unlockedActiveQueueReader methods but should NOT run any other activeQueue method,
+	// as it would end up in deadlock.
 	underRLock(func(unlockedActiveQ unlockedActiveQueueReader))
 
+	// update updates the pod in activeQ if oldPodInfo is already in the queue.
+	// It returns new pod info if updated, nil otherwise.
 	update(newPod *v1.Pod, oldPodInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo
+	// delete deletes the pod info from activeQ.
 	delete(pInfo *framework.QueuedPodInfo) error
+	// pop removes the head of the queue and returns it.
+	// It blocks if the queue is empty and waits until a new item is added to the queue.
+	// It increments scheduling cycle when a pod is popped.
 	pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
+	// list returns all pods that are in the queue.
 	list() []*v1.Pod
+	// len returns length of the queue.
 	len() int
+	// has inform if pInfo exists in the queue.
 	has(pInfo *framework.QueuedPodInfo) bool
 
+	// listInFlightEvents returns all inFlightEvents.
 	listInFlightEvents() []interface{}
+	// listInFlightPods returns all inFlightPods.
 	listInFlightPods() []*v1.Pod
+	// clusterEventsForPod gets all cluster events that have happened during pod for pInfo is being scheduled.
 	clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) ([]*clusterEvent, error)
+	// addEventsIfPodInFlight adds clusterEvent to inFlightEvents if the newPod is in inFlightPods.
+	// It returns true if pushed the event to the inFlightEvents.
 	addEventsIfPodInFlight(oldPod, newPod *v1.Pod, events []fwk.ClusterEvent) bool
+	// addEventIfAnyInFlight adds clusterEvent to inFlightEvents if any pod is in inFlightPods.
+	// It returns true if pushed the event to the inFlightEvents.
 	addEventIfAnyInFlight(oldObj, newObj interface{}, event fwk.ClusterEvent) bool
 
+	// schedulingCycle returns the current scheduling cycle number.
+	// This is incremented each time a pod is popped from the queue.
 	schedulingCycle() int64
+	// done must be called for pod returned by Pop. This allows the queue to
+	// keep track of which pods are currently being processed.
 	done(pod types.UID)
+	// close closes the activeQueue.
 	close()
+	// broadcast notifies the pop() operation that new pod(s) was added to the activeQueue.
 	broadcast()
 }
 
@@ -66,7 +94,7 @@ type unlockedActiveQueuer interface {
 	// add adds a new pod to the activeQ.
 	// The event should show which event triggered this addition and is used for the metric recording.
 	// This method should be called in activeQueue.underLock().
-	add(pInfo *framework.QueuedPodInfo, event string)
+	add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string)
 }
 
 // unlockedActiveQueueReader defines activeQ read-only methods that are not protected by the lock itself.
@@ -96,9 +124,10 @@ func newUnlockedActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo]) *unlocke
 // add adds a new pod to the activeQ.
 // The event should show which event triggered this addition and is used for the metric recording.
 // This method should be called in activeQueue.underLock().
-func (uaq *unlockedActiveQueue) add(pInfo *framework.QueuedPodInfo, event string) {
+func (uaq *unlockedActiveQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) {
 	uaq.queue.AddOrUpdate(pInfo)
 	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
+	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
 }
 
 // get returns the pod matching pInfo inside the activeQ.
@@ -421,6 +450,8 @@ func (aq *activeQueue) addEventIfAnyInFlight(oldObj, newObj interface{}, event f
 	return false
 }
 
+// schedulingCycle returns the current scheduling cycle number.
+// This is incremented each time a pod is popped from the queue.
 func (aq *activeQueue) schedulingCycle() int64 {
 	aq.lock.RLock()
 	defer aq.lock.RUnlock()
