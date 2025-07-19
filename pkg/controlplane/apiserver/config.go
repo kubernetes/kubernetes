@@ -281,11 +281,7 @@ func CreateConfig(
 	storageFactory *serverstorage.DefaultStorageFactory,
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	additionalInitializers []admission.PluginInitializer,
-) (
-	*Config,
-	[]admission.PluginInitializer,
-	error,
-) {
+) (*Config, error) {
 	proxyTransport := CreateProxyTransport()
 
 	opts.Metrics.Apply()
@@ -318,7 +314,7 @@ func CreateConfig(
 		var err error
 		config.PeerEndpointLeaseReconciler, err = CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if opts.PeerCAFile != "" {
 			leaseInformer := versionedInformers.Coordination().V1().Leases()
@@ -332,20 +328,20 @@ func CreateConfig(
 				config.Extra.PeerEndpointLeaseReconciler,
 				config.Generic.Serializer)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 		}
 	}
 
 	clientCAProvider, err := opts.Authentication.ClientCert.GetClientCAContentProvider()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	config.ClusterAuthenticationInfo.ClientCA = clientCAProvider
 
 	requestHeaderConfig, err := opts.Authentication.RequestHeader.ToAuthenticationRequestHeaderConfig()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if requestHeaderConfig != nil {
 		config.ClusterAuthenticationInfo.RequestHeaderCA = requestHeaderConfig.CAContentProvider
@@ -363,15 +359,15 @@ func CreateConfig(
 	}
 	genericInitializers, err := genericAdmissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
+		return nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
 	}
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create real client-go external client: %w", err)
+		return nil, fmt.Errorf("failed to create real client-go external client: %w", err)
 	}
 	dynamicExternalClient, err := dynamic.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create real dynamic external client: %w", err)
+		return nil, fmt.Errorf("failed to create real dynamic external client: %w", err)
 	}
 	err = opts.Admission.ApplyTo(
 		genericConfig,
@@ -382,7 +378,7 @@ func CreateConfig(
 		append(genericInitializers, additionalInitializers...)...,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to apply admission: %w", err)
+		return nil, fmt.Errorf("failed to apply admission: %w", err)
 	}
 
 	if len(opts.Authentication.ServiceAccounts.KeyFiles) > 0 {
@@ -391,13 +387,13 @@ func CreateConfig(
 		for _, f := range opts.Authentication.ServiceAccounts.KeyFiles {
 			keys, err := keyutil.PublicKeysFromFile(f)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to parse key file %q: %w", f, err)
+				return nil, fmt.Errorf("failed to parse key file %q: %w", f, err)
 			}
 			pubKeys = append(pubKeys, keys...)
 		}
 		keysGetter, err := serviceaccount.StaticPublicKeysGetter(pubKeys)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to set up public service account keys: %w", err)
+			return nil, fmt.Errorf("failed to set up public service account keys: %w", err)
 		}
 		config.ServiceAccountPublicKeysGetter = keysGetter
 	} else if opts.Authentication.ServiceAccounts.ExternalPublicKeysGetter != nil {
@@ -407,7 +403,7 @@ func CreateConfig(
 	config.ServiceAccountIssuerURL = opts.Authentication.ServiceAccounts.Issuers[0]
 	config.ServiceAccountJWKSURI = opts.Authentication.ServiceAccounts.JWKSURI
 
-	return config, genericInitializers, nil
+	return config, nil
 }
 
 // CreateProxyTransport creates the dialer infrastructure to connect to the nodes.
