@@ -41,6 +41,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2313,6 +2314,123 @@ func TestConflictingData(t *testing.T) {
 				}),
 			},
 		},
+		{
+			// https://github.com/kubernetes/kubernetes/issues/114603
+			name: "resourceVersion conflict between Get/Delete while processing object deletion",
+			steps: []step{
+				// setup, 0,1
+				createObjectInClient("", "v1", "pods", "ns1", makeMetadataObj(pod1ns1)),                        // good parent
+				createObjectInClient("", "v1", "pods", "ns1", withRV(makeMetadataObj(pod2ns1, pod1ns1), "42")), // good child
+				// events, 2,3
+				processEvent(makeAddEvent(pod1ns1)),
+				processEvent(withRV(makeAddEvent(pod2ns1, pod1ns1), "42")),
+				// delete parent, 4,5,6
+				deleteObjectFromClient("", "v1", "pods", "ns1", pod1ns1.Name),
+				processEvent(makeDeleteEvent(pod1ns1)),
+				assertState(state{
+					absentOwnerCache: []objectReference{pod1ns1},
+					graphNodes: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+					pendingAttemptToDelete: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1)),
+					},
+				}),
+
+				// add reactor to enforce RV precondition, 7
+				prependReactor("delete", "pods", (func() func(ctx stepContext) clientgotesting.ReactionFunc {
+					call := 0
+					return func(ctx stepContext) clientgotesting.ReactionFunc {
+						return func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
+							call++
+							deleteAction, ok := action.(clientgotesting.DeleteAction)
+							if !ok {
+								ctx.t.Error("missing DeleteAction")
+								return false, nil, nil
+							}
+
+							preconditionRV := ""
+							if preconditions := deleteAction.GetDeleteOptions().Preconditions; preconditions != nil {
+								if rv := preconditions.ResourceVersion; rv != nil {
+									preconditionRV = *rv
+								}
+							}
+
+							objectRV := ""
+							var metadataObj *metav1.PartialObjectMetadata
+							if obj, err := ctx.metadataClient.Tracker().Get(deleteAction.GetResource(), deleteAction.GetNamespace(), deleteAction.GetName(), metav1.GetOptions{}); err == nil {
+								metadataObj = obj.(*metav1.PartialObjectMetadata)
+								objectRV = metadataObj.ResourceVersion
+							}
+
+							switch call {
+							case 1:
+								if preconditionRV == "42" && objectRV == "42" {
+									// simulate a concurrent change that modifies the owner references
+									ctx.t.Log("changing rv 42 --> 43 concurrently")
+									metadataObj.OwnerReferences = []metav1.OwnerReference{role1v1.OwnerReference}
+									metadataObj.ResourceVersion = "43"
+									if err := ctx.metadataClient.Tracker().Update(deleteAction.GetResource(), metadataObj, deleteAction.GetNamespace()); err != nil {
+										ctx.t.Errorf("unexpected error updating tracker: %v", err)
+									}
+									return true, nil, errors.NewConflict(deleteAction.GetResource().GroupResource(), deleteAction.GetName(), fmt.Errorf("expected 42, got 43"))
+								} else {
+									ctx.t.Errorf("expected delete with rv=42 precondition on call 1, got %q, %q", preconditionRV, objectRV)
+								}
+							case 2:
+								if preconditionRV == "43" && objectRV == "43" {
+									// simulate a concurrent change that *does not* modify the owner references
+									ctx.t.Log("changing rv 43 --> 44 concurrently")
+									metadataObj.ResourceVersion = "44"
+									if err := ctx.metadataClient.Tracker().Update(deleteAction.GetResource(), metadataObj, deleteAction.GetNamespace()); err != nil {
+										ctx.t.Errorf("unexpected error updating tracker: %v", err)
+									}
+									return true, nil, errors.NewConflict(deleteAction.GetResource().GroupResource(), deleteAction.GetName(), fmt.Errorf("expected 43, got 44"))
+								} else {
+									ctx.t.Errorf("expected delete with rv=43 precondition on call 2, got %q, %q", preconditionRV, objectRV)
+								}
+							case 3:
+								if preconditionRV != "" {
+									ctx.t.Errorf("expected delete with no rv precondition on call 3, got %q", preconditionRV)
+								}
+							default:
+								ctx.t.Errorf("expected delete call %d", call)
+							}
+							return false, nil, nil
+						}
+					}
+				})()),
+
+				// 8,9
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname2",    // first get sees rv=42, pod1ns1 owner
+						"delete /v1, Resource=pods ns=ns1 name=podname2", // first delete with rv=42 precondition gets confict, triggers a live get
+						"get /v1, Resource=pods ns=ns1 name=podname2",    // get has new ownerReferences, exits attemptToDelete
+					},
+					absentOwnerCache: []objectReference{pod1ns1},
+					graphNodes: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+					pendingAttemptToDelete: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+				}),
+
+				// reattempt delete, 10,11
+				processAttemptToDelete(1),
+				assertState(state{
+					clientActions: []string{
+						"get /v1, Resource=pods ns=ns1 name=podname2",                        // first get sees rv=43, role1v1 owner
+						"get rbac.authorization.k8s.io/v1, Resource=roles ns=ns1 name=role1", // verify missing owner
+						"delete /v1, Resource=pods ns=ns1 name=podname2",                     // first delete RV precondition triggers a live Get
+						"get /v1, Resource=pods ns=ns1 name=podname2",                        // the object has same ownerReferences, causing unconditional Delete
+						"delete /v1, Resource=pods ns=ns1 name=podname2",                     // unconditional Delete
+					},
+					absentOwnerCache: []objectReference{pod1ns1, role1v1},
+					graphNodes: []*node{
+						makeNode(pod2ns1, withOwners(pod1ns1))},
+				}),
+			},
+		},
 	}
 
 	alwaysStarted := make(chan struct{})
@@ -2369,6 +2487,7 @@ func TestConflictingData(t *testing.T) {
 						uidToNode:     make(map[types.UID]*node),
 					},
 					attemptToDelete:  attemptToDelete,
+					attemptToOrphan:  attemptToOrphan,
 					absentOwnerCache: absentOwnerCache,
 				},
 			}
@@ -2473,6 +2592,16 @@ func makeObj(identity objectReference, owners ...objectReference) *metaonly.Meta
 	return obj
 }
 
+func withRV[T any](obj T, rv string) T {
+	switch t := any(obj).(type) {
+	case *metav1.PartialObjectMetadata:
+		t.ResourceVersion = rv
+	case *event:
+		withRV(t.obj, rv)
+	}
+	return obj
+}
+
 func makeMetadataObj(identity objectReference, owners ...objectReference) *metav1.PartialObjectMetadata {
 	obj := &metav1.PartialObjectMetadata{
 		TypeMeta:   metav1.TypeMeta{APIVersion: identity.APIVersion, Kind: identity.Kind},
@@ -2519,6 +2648,18 @@ func processPendingGraphChanges(count int) step {
 					ctx.gc.dependencyGraphBuilder.processGraphChanges(ctx.logger)
 				}
 			}
+		},
+	}
+}
+
+type reactionFuncFactory func(ctx stepContext) clientgotesting.ReactionFunc
+
+func prependReactor(verb, resource string, reaction reactionFuncFactory) step {
+	return step{
+		name: "prependReactor",
+		check: func(ctx stepContext) {
+			ctx.t.Helper()
+			ctx.metadataClient.PrependReactor(verb, resource, reaction(ctx))
 		},
 	}
 }
