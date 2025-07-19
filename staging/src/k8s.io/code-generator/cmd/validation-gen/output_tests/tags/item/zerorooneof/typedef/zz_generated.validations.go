@@ -57,6 +57,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Tasks
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj TaskList) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_TaskList(ctx, op, fldPath, obj, oldObj)...)
 			return

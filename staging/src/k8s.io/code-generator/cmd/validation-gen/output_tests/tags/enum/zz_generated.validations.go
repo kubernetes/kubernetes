@@ -102,6 +102,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum0Field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum0) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum0(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -110,6 +114,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum0PtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum0) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum0(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -118,6 +126,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum1Field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum1) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum1(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -126,6 +138,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum1PtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum1) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum1(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -134,6 +150,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum2Field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum2) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum2(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -142,6 +162,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Enum2PtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Enum2) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Enum2(ctx, op, fldPath, obj, oldObj)...)
 			return
