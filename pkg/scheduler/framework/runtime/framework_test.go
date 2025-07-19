@@ -23,9 +23,9 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unsafe"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/mock"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2906,75 +2906,15 @@ func TestPermitPlugins(t *testing.T) {
 	}
 }
 
+// withMetricsRecorder set metricsRecorder for the scheduling frameworkImpl.
+func withMetricsRecorder(recorder MetricsRecorder) Option {
+	return func(o *frameworkOptions) {
+		o.metricsRecorder = recorder
+	}
+}
+
 func TestRecordingMetrics(t *testing.T) {
-	// Most tests now use mocks - this is much simpler and faster
-	TestRecordingMetricsWithMocks(t)
-
-	// Keep one simple test with real metrics as requested in the issue
-	TestRecordingMetricsRealMetricsSimple(t)
-}
-
-// TestRecordingMetricsRealMetricsSimple keeps one simple test with real metrics as safety measure
-func TestRecordingMetricsRealMetricsSimple(t *testing.T) {
 	state.SetRecordPluginMetrics(true)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Reset metrics before test
-	metrics.FrameworkExtensionPointDuration.Reset()
-	metrics.PluginExecutionDuration.Reset()
-
-	plugin := &TestPlugin{name: testPlugin, inj: injectedResult{}}
-	r := make(Registry)
-	if err := r.Register(testPlugin,
-		func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return plugin, nil
-		}); err != nil {
-		t.Fatalf("Failed to register plugin %s: %v", testPlugin, err)
-	}
-	pluginSet := config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
-	plugins := &config.Plugins{
-		PreFilter: pluginSet,
-	}
-
-	// Use real metrics recorder for this one test
-	recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
-	profile := config.KubeSchedulerProfile{
-		PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
-		SchedulerName:            testProfileName,
-		Plugins:                  plugins,
-	}
-	f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
-		WithMetricsRecorder(recorder),
-		WithWaitingPods(NewWaitingPodsMap()),
-		WithSnapshotSharedLister(cache.NewEmptySnapshot()),
-	)
-	if err != nil {
-		t.Fatalf("Failed to create framework for testing: %v", err)
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	// Run the operation - simple success case
-	f.RunPreFilterPlugins(ctx, state, pod)
-
-	// Stop recorder and flush metrics
-	cancel()
-	<-recorder.IsStoppedCh
-	recorder.FlushMetrics()
-
-	// Verify using real metrics (original approach) - keep this simple
-	collectAndCompareFrameworkMetrics(t, "PreFilter", fwk.Success)
-	collectAndComparePluginMetrics(t, "PreFilter", testPlugin, fwk.Success)
-}
-
-// TestRecordingMetricsWithMocks demonstrates the refactored approach
-// This verifies framework behavior without relying on global metrics registration
-// Avoid sync.Once issues by not verifying actual metrics
-func TestRecordingMetricsWithMocks(t *testing.T) {
-	state.SetRecordPluginMetrics(true)
-
 	tests := []struct {
 		name               string
 		action             func(ctx context.Context, f framework.Framework)
@@ -2989,11 +2929,35 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 			wantStatus:         fwk.Success,
 		},
 		{
+			name:               "PreScore - Success",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, state, pod, nil) },
+			wantExtensionPoint: "PreScore",
+			wantStatus:         fwk.Success,
+		},
+		{
 			name: "Score - Success",
 			action: func(ctx context.Context, f framework.Framework) {
 				f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
 			},
 			wantExtensionPoint: "Score",
+			wantStatus:         fwk.Success,
+		},
+		{
+			name:               "Reserve - Success",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunReservePluginsReserve(ctx, state, pod, "") },
+			wantExtensionPoint: "Reserve",
+			wantStatus:         fwk.Success,
+		},
+		{
+			name:               "Unreserve - Success",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunReservePluginsUnreserve(ctx, state, pod, "") },
+			wantExtensionPoint: "Unreserve",
+			wantStatus:         fwk.Success,
+		},
+		{
+			name:               "PreBind - Success",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, state, pod, "") },
+			wantExtensionPoint: "PreBind",
 			wantStatus:         fwk.Success,
 		},
 		{
@@ -3003,10 +2967,53 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 			wantStatus:         fwk.Success,
 		},
 		{
+			name:               "PostBind - Success",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPostBindPlugins(ctx, state, pod, "") },
+			wantExtensionPoint: "PostBind",
+			wantStatus:         fwk.Success,
+		},
+		{
+			name:               "Permit - Success",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
+			wantExtensionPoint: "Permit",
+			wantStatus:         fwk.Success,
+		},
+
+		{
 			name:               "PreFilter - Error",
 			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
 			inject:             injectedResult{PreFilterStatus: int(fwk.Error)},
 			wantExtensionPoint: "PreFilter",
+			wantStatus:         fwk.Error,
+		},
+		{
+			name:               "PreScore - Error",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, state, pod, nil) },
+			inject:             injectedResult{PreScoreStatus: int(fwk.Error)},
+			wantExtensionPoint: "PreScore",
+			wantStatus:         fwk.Error,
+		},
+		{
+			name: "Score - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
+			},
+			inject:             injectedResult{ScoreStatus: int(fwk.Error)},
+			wantExtensionPoint: "Score",
+			wantStatus:         fwk.Error,
+		},
+		{
+			name:               "Reserve - Error",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunReservePluginsReserve(ctx, state, pod, "") },
+			inject:             injectedResult{ReserveStatus: int(fwk.Error)},
+			wantExtensionPoint: "Reserve",
+			wantStatus:         fwk.Error,
+		},
+		{
+			name:               "PreBind - Error",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, state, pod, "") },
+			inject:             injectedResult{PreBindStatus: int(fwk.Error)},
+			wantExtensionPoint: "PreBind",
 			wantStatus:         fwk.Error,
 		},
 		{
@@ -3016,16 +3023,28 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 			wantExtensionPoint: "Bind",
 			wantStatus:         fwk.Error,
 		},
+		{
+			name:               "Permit - Error",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
+			inject:             injectedResult{PermitStatus: int(fwk.Error)},
+			wantExtensionPoint: "Permit",
+			wantStatus:         fwk.Error,
+		},
+		{
+			name:               "Permit - Wait",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, state, pod, "") },
+			inject:             injectedResult{PermitStatus: int(fwk.Wait)},
+			wantExtensionPoint: "Permit",
+			wantStatus:         fwk.Wait,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			// Create a fake metrics recorder to verify calls.
-			// This captures calls without actually recording metrics, avoiding sync.Once issues.
-			fakeRecorder := NewFakeMetricAsyncRecorder()
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			metrics.FrameworkExtensionPointDuration.Reset()
+			metrics.PluginExecutionDuration.Reset()
 
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)
@@ -3037,7 +3056,149 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 			plugins := &config.Plugins{
 				Score:     pluginSet,
 				PreFilter: pluginSet,
+				Filter:    pluginSet,
+				PreScore:  pluginSet,
+				Reserve:   pluginSet,
+				Permit:    pluginSet,
+				PreBind:   pluginSet,
 				Bind:      pluginSet,
+				PostBind:  pluginSet,
+			}
+
+			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
+			profile := config.KubeSchedulerProfile{
+				PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
+				SchedulerName:            testProfileName,
+				Plugins:                  plugins,
+			}
+			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+				withMetricsRecorder(recorder),
+				WithWaitingPods(NewWaitingPodsMap()),
+				WithSnapshotSharedLister(cache.NewEmptySnapshot()),
+			)
+			if err != nil {
+				cancel()
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+			defer func() {
+				_ = f.Close()
+			}()
+
+			tt.action(ctx, f)
+
+			// Stop the goroutine which records metrics and ensure it's stopped.
+			cancel()
+			<-recorder.IsStoppedCh
+			// Try to clean up the metrics buffer again in case it's not empty.
+			recorder.FlushMetrics()
+
+			collectAndCompareFrameworkMetrics(t, tt.wantExtensionPoint, tt.wantStatus)
+			collectAndComparePluginMetrics(t, tt.wantExtensionPoint, testPlugin, tt.wantStatus)
+		})
+	}
+}
+
+// TestRecordingMetricsWithMocks is the refactored approach using mocks.
+// This verifies framework behavior without relying on global metrics registration.
+// Avoids sync.Once issues by not verifying actual metrics.
+func TestRecordingMetricsWithMocks(t *testing.T) {
+	state.SetRecordPluginMetrics(true)
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	tests := []struct {
+		name               string
+		action             func(ctx context.Context, f framework.Framework)
+		inject             injectedResult
+		wantExtensionPoint string
+		wantStatus         fwk.Code
+		pluginSet          *config.PluginSet
+	}{
+		{
+			name:               "PreFilter - Success",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
+			wantExtensionPoint: "PreFilter",
+			wantStatus:         fwk.Success,
+			pluginSet:          &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+		},
+		{
+			name: "Score - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
+			},
+			wantExtensionPoint: "Score",
+			wantStatus:         fwk.Success,
+			pluginSet:          &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+		},
+		{
+			name:               "Bind - Success",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, state, pod, "") },
+			wantExtensionPoint: "Bind",
+			wantStatus:         fwk.Success,
+			pluginSet:          &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+		},
+		{
+			name:               "PreFilter - Error",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
+			inject:             injectedResult{PreFilterStatus: int(fwk.Error)},
+			wantExtensionPoint: "PreFilter",
+			wantStatus:         fwk.Error,
+			pluginSet:          &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+		},
+		{
+			name:               "Bind - Error",
+			action:             func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, state, pod, "") },
+			inject:             injectedResult{BindStatus: int(fwk.Error)},
+			wantExtensionPoint: "Bind",
+			wantStatus:         fwk.Error,
+			pluginSet:          &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock metrics recorder to verify calls
+			mockRecorder := NewMockMetricsRecorder()
+
+			// Set specific expectations for the metrics call we expect
+			// Score plugins may call metrics twice (Score + ScoreExtensionNormalize)
+			expectedCalls := 1
+			if tt.wantExtensionPoint == "Score" {
+				expectedCalls = 2 // Score plugin calls metrics for both Score and ScoreExtensionNormalize
+			}
+
+			mockRecorder.On("ObservePluginDurationAsync",
+				mock.MatchedBy(func(extensionPoint string) bool {
+					// For Score, accept both "Score" and "ScoreExtensionNormalize"
+					if tt.wantExtensionPoint == "Score" {
+						return extensionPoint == "Score" || extensionPoint == "ScoreExtensionNormalize"
+					}
+					return extensionPoint == tt.wantExtensionPoint
+				}),
+				testPlugin,
+				tt.wantStatus.String(),
+				mock.AnythingOfType("float64")).Return().Times(expectedCalls)
+
+			// Create registry with test plugin
+			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
+			r := make(Registry)
+			if err := r.Register(testPlugin,
+				func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return plugin, nil
+				}); err != nil {
+				t.Fatalf("Failed to register plugin %s: %v", testPlugin, err)
+			}
+
+			// Build plugins configuration based on the test case
+			plugins := &config.Plugins{}
+			switch tt.wantExtensionPoint {
+			case "PreFilter":
+				plugins.PreFilter = *tt.pluginSet
+			case "Score":
+				plugins.Score = *tt.pluginSet
+			case "Bind":
+				plugins.Bind = *tt.pluginSet
 			}
 
 			profile := config.KubeSchedulerProfile{
@@ -3046,8 +3207,9 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 				Plugins:                  plugins,
 			}
 
-			// Create framework with default metrics recorder first
+			// Create framework with mock recorder
 			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+				withMetricsRecorder(mockRecorder),
 				WithWaitingPods(NewWaitingPodsMap()),
 				WithSnapshotSharedLister(cache.NewEmptySnapshot()),
 			)
@@ -3058,144 +3220,80 @@ func TestRecordingMetricsWithMocks(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			// Replace the metrics recorder with our fake recorder
-			// This allows us to capture and verify calls without sync.Once limitations
-			fwImpl := f.(*frameworkImpl)
-			// Use unsafe pointer casting to replace the metrics recorder
-			// This is necessary because Go's type system doesn't allow direct assignment
-			fwImpl.metricsRecorder = (*metrics.MetricAsyncRecorder)(unsafe.Pointer(fakeRecorder))
-
-			// Execute the scheduler operation - framework will use our recorder
+			// Run the action
 			tt.action(ctx, f)
 
-			// Force flush to ensure all async metrics are processed
-			fakeRecorder.FlushMetrics()
-
-			// Wait for async recording to complete
-			select {
-			case <-fakeRecorder.IsStoppedCh:
-				// Recorder stopped (context cancelled)
-			case <-time.After(10 * time.Millisecond):
-				// Give async recording time to process
-			}
-
-			// Verification:
-			// This approach avoids the sync.Once limitations by not relying on global metrics registration
-			// Instead, we verify that:
-			// 1. The framework was created successfully with our fake recorder
-			// 2. The plugin was properly registered and called
-			// 3. The test completes without errors
-
-			// Basic verification that the framework and plugin are working
-			if f == nil {
-				t.Error("Framework was not created successfully")
-			}
-
-			// Verify the plugin was registered by checking if the framework has the expected plugin
-			frameworkPlugins := f.ListPlugins()
-			foundPlugin := false
-
-			// Check each extension point for our plugin
-			extensionPoints := []config.PluginSet{
-				frameworkPlugins.PreFilter,
-				frameworkPlugins.PreScore,
-				frameworkPlugins.Score,
-				frameworkPlugins.Reserve,
-				frameworkPlugins.PreBind,
-				frameworkPlugins.Bind,
-				frameworkPlugins.PostBind,
-				frameworkPlugins.Permit,
-			}
-
-			for _, pluginSet := range extensionPoints {
-				for _, plugin := range pluginSet.Enabled {
-					if plugin.Name == testPlugin {
-						foundPlugin = true
-						break
-					}
-				}
-				if foundPlugin {
-					break
-				}
-			}
-
-			if !foundPlugin {
-				t.Errorf("Expected plugin %s to be registered in framework, but it was not found", testPlugin)
-			}
+			// Verify the mock was called exactly as expected
+			mockRecorder.AssertExpectations(t)
 
 			// This test successfully demonstrates that:
-			// 1. We can create a framework with a fake metrics recorder
-			// 2. The plugin is properly registered and called
+			// 1. The mock properly records all metric calls
+			// 2. We can verify the calls were made as expected
 			// 3. The test runs without sync.Once issues
-			// 4. The framework correctly integrates with the metrics recorder interface
-			t.Logf("Framework successfully created and executed %s operation with fake metrics recorder", tt.wantExtensionPoint)
-			t.Logf("Plugin %s was registered and called successfully", testPlugin)
-			t.Logf("Test completed without sync.Once limitations")
+			// 4. No real metrics are recorded, avoiding test interference
+			t.Logf("Successfully verified mock pattern for %s operation with status %s",
+				tt.wantExtensionPoint, tt.wantStatus.String())
 		})
 	}
 }
 
-func TestRunBindPlugins(t *testing.T) {
-	// Most tests now use mocks - this is much simpler and faster
-	TestRunBindPluginsWithMocks(t)
-
-	// Keep one simple test with real metrics as requested in the issue
-	TestRunBindPluginsRealMetricsSimple(t)
-}
-
-// TestRunBindPluginsRealMetricsSimple keeps one simple test with real metrics as safety measure
-func TestRunBindPluginsRealMetricsSimple(t *testing.T) {
-	// Reset metrics before test
-	metrics.FrameworkExtensionPointDuration.Reset()
-	metrics.PluginExecutionDuration.Reset()
-
-	pluginSet := config.PluginSet{}
-	r := make(Registry)
-	// Simple success case only
-	name := "bind-0"
-	plugin := &TestPlugin{name: name, inj: injectedResult{BindStatus: int(fwk.Success)}}
-	if err := r.Register(name,
-		func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return plugin, nil
-		}); err != nil {
-		t.Fatalf("Failed to register plugin %s: %v", name, err)
-	}
-	pluginSet.Enabled = append(pluginSet.Enabled, config.Plugin{Name: name})
-
-	plugins := &config.Plugins{Bind: pluginSet}
+// TestRunBindPluginsWithMocks is focused testing of bind plugins using mocks.
+// This shows how to test specific framework behavior without complex setup.
+func TestRunBindPluginsWithMocks(t *testing.T) {
+	state.SetRecordPluginMetrics(true)
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
-	profile := config.KubeSchedulerProfile{
-		SchedulerName:            testProfileName,
-		PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
-		Plugins:                  plugins,
+
+	// Create a mock metrics recorder with specific expectations
+	mockRecorder := NewMockMetricsRecorder()
+	mockRecorder.On("ObservePluginDurationAsync",
+		"Bind",
+		bindPlugin,
+		"Success",
+		mock.AnythingOfType("float64")).Return().Once()
+
+	// Create framework with bind plugin and mock recorder
+	plugin := &TestBindPlugin{}
+	r := make(Registry)
+	if err := r.Register(bindPlugin,
+		func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return plugin, nil
+		}); err != nil {
+		t.Fatalf("Failed to register bind plugin: %v", err)
 	}
-	f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile, WithMetricsRecorder(recorder))
+
+	profile := config.KubeSchedulerProfile{
+		SchedulerName: testProfileName,
+		Plugins: &config.Plugins{
+			Bind: config.PluginSet{
+				Enabled: []config.Plugin{{Name: bindPlugin}},
+			},
+		},
+	}
+
+	f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+		withMetricsRecorder(mockRecorder),
+		WithSnapshotSharedLister(cache.NewEmptySnapshot()),
+	)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to create framework: %v", err)
 	}
 	defer func() {
 		_ = f.Close()
 	}()
 
-	st := f.RunBindPlugins(ctx, state, pod, "")
-	if st.Code() != fwk.Success {
-		t.Errorf("got status code %s, want %s", st.Code(), fwk.Success)
+	// Run bind plugins
+	status := f.RunBindPlugins(ctx, state, pod, "test-node")
+	if !status.IsSuccess() {
+		t.Errorf("Expected bind to succeed, got: %v", status)
 	}
 
-	// Stop the goroutine which records metrics and ensure it's stopped.
-	cancel()
-	<-recorder.IsStoppedCh
-	// Try to clean up the metrics buffer again in case it's not empty.
-	recorder.FlushMetrics()
-	collectAndCompareFrameworkMetrics(t, "Bind", fwk.Success)
+	// Verify the mock was called exactly as expected
+	mockRecorder.AssertExpectations(t)
 }
 
-// TestRunBindPluginsWithMocks demonstrates the refactored approach using mocks
-// This replaces the complex real metrics verification with simple mock verification
-func TestRunBindPluginsWithMocks(t *testing.T) {
+func TestRunBindPlugins(t *testing.T) {
 	tests := []struct {
 		name       string
 		injects    []fwk.Code
@@ -3227,6 +3325,11 @@ func TestRunBindPluginsWithMocks(t *testing.T) {
 			wantStatus: fwk.Success,
 		},
 		{
+			name:       "invalid status",
+			injects:    []fwk.Code{fwk.Unschedulable},
+			wantStatus: fwk.Unschedulable,
+		},
+		{
 			name:       "simple error",
 			injects:    []fwk.Code{fwk.Error},
 			wantStatus: fwk.Error,
@@ -3236,13 +3339,31 @@ func TestRunBindPluginsWithMocks(t *testing.T) {
 			injects:    []fwk.Code{fwk.Skip, fwk.Success},
 			wantStatus: fwk.Success,
 		},
+		{
+			name:       "invalid status, returns error",
+			injects:    []fwk.Code{fwk.Skip, fwk.UnschedulableAndUnresolvable},
+			wantStatus: fwk.UnschedulableAndUnresolvable,
+		},
+		{
+			name:       "error after success status, returns success",
+			injects:    []fwk.Code{fwk.Success, fwk.Error},
+			wantStatus: fwk.Success,
+		},
+		{
+			name:       "success before invalid status, returns success",
+			injects:    []fwk.Code{fwk.Success, fwk.Error},
+			wantStatus: fwk.Success,
+		},
+		{
+			name:       "success after error status, returns error",
+			injects:    []fwk.Code{fwk.Error, fwk.Success},
+			wantStatus: fwk.Error,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a real metrics recorder with test-friendly parameters
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
+			metrics.FrameworkExtensionPointDuration.Reset()
+			metrics.PluginExecutionDuration.Reset()
 
 			pluginSet := config.PluginSet{}
 			r := make(Registry)
@@ -3256,87 +3377,39 @@ func TestRunBindPluginsWithMocks(t *testing.T) {
 				pluginSet.Enabled = append(pluginSet.Enabled, config.Plugin{Name: name})
 			}
 			plugins := &config.Plugins{Bind: pluginSet}
-
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
 			profile := config.KubeSchedulerProfile{
 				SchedulerName:            testProfileName,
 				PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
 				Plugins:                  plugins,
 			}
-
-			// Create framework with the test-friendly metrics recorder
-			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
-				WithMetricsRecorder(recorder))
+			fwk, err := newFrameworkWithQueueSortAndBind(ctx, r, profile, withMetricsRecorder(recorder))
 			if err != nil {
+				cancel()
 				t.Fatal(err)
 			}
 			defer func() {
-				_ = f.Close()
+				_ = fwk.Close()
 			}()
 
-			// Execute the actual framework operation
-			st := f.RunBindPlugins(ctx, state, pod, "")
+			st := fwk.RunBindPlugins(ctx, state, pod, "")
 			if st.Code() != tt.wantStatus {
 				t.Errorf("got status code %s, want %s", st.Code(), tt.wantStatus)
 			}
 
-			// Force flush to ensure all async metrics are processed
+			// Stop the goroutine which records metrics and ensure it's stopped.
+			cancel()
+			<-recorder.IsStoppedCh
+			// Try to clean up the metrics buffer again in case it's not empty.
 			recorder.FlushMetrics()
-
-			// Verify the framework successfully used our recorder during execution
-			// The recorder captured the metrics asynchronously during framework execution
-			t.Logf("Framework bind execution completed successfully for status: %s", tt.wantStatus)
+			collectAndCompareFrameworkMetrics(t, "Bind", tt.wantStatus)
 		})
 	}
 }
 
 func TestPermitWaitDurationMetric(t *testing.T) {
-	// Most tests now use mocks - this is much simpler and faster
-	TestPermitWaitDurationMetricWithMocks(t)
-
-	// Keep one simple test with real metrics as requested in the issue
-	TestPermitWaitDurationMetricRealMetricsSimple(t)
-}
-
-// TestPermitWaitDurationMetricRealMetricsSimple keeps one simple test with real metrics as safety measure
-func TestPermitWaitDurationMetricRealMetricsSimple(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	metrics.PermitWaitDuration.Reset()
-
-	// Simple no-wait case only
-	plugin := &TestPlugin{name: testPlugin, inj: injectedResult{}}
-	r := make(Registry)
-	err := r.Register(testPlugin,
-		func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return plugin, nil
-		})
-	if err != nil {
-		t.Fatal(err)
-	}
-	plugins := &config.Plugins{
-		Permit: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
-	}
-	profile := config.KubeSchedulerProfile{Plugins: plugins}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
-		WithWaitingPods(NewWaitingPodsMap()),
-	)
-	if err != nil {
-		t.Fatalf("Failed to create framework for testing: %v", err)
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	f.RunPermitPlugins(ctx, state, pod, "")
-	f.WaitOnPermit(ctx, pod)
-
-	collectAndComparePermitWaitDuration(t, "")
-}
-
-// TestPermitWaitDurationMetricWithMocks demonstrates the refactored approach using mocks
-// This replaces the complex real metrics verification with simple mock verification
-func TestPermitWaitDurationMetricWithMocks(t *testing.T) {
 	tests := []struct {
 		name    string
 		inject  injectedResult
@@ -3354,10 +3427,8 @@ func TestPermitWaitDurationMetricWithMocks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a real metrics recorder with test-friendly parameters
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
+			_, ctx := ktesting.NewTestContext(t)
+			metrics.PermitWaitDuration.Reset()
 
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)
@@ -3372,10 +3443,9 @@ func TestPermitWaitDurationMetricWithMocks(t *testing.T) {
 				Permit: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
 			}
 			profile := config.KubeSchedulerProfile{Plugins: plugins}
-
-			// Create framework with the test-friendly metrics recorder
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
-				WithMetricsRecorder(recorder),
 				WithWaitingPods(NewWaitingPodsMap()),
 			)
 			if err != nil {
@@ -3385,20 +3455,10 @@ func TestPermitWaitDurationMetricWithMocks(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			// Execute the framework operations
 			f.RunPermitPlugins(ctx, state, pod, "")
 			f.WaitOnPermit(ctx, pod)
 
-			// Force flush to ensure all async metrics are processed
-			recorder.FlushMetrics()
-
-			// Verify the framework successfully used our recorder during execution
-			expectedResult := tt.wantRes
-			if expectedResult == "" {
-				expectedResult = "Success" // No wait means success
-			}
-
-			t.Logf("Framework permit execution completed successfully for PermitWait:%s", expectedResult)
+			collectAndComparePermitWaitDuration(t, tt.wantRes)
 		})
 	}
 }
