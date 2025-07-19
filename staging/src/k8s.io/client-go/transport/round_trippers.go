@@ -319,7 +319,7 @@ func (rt *bearerAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 			token = refreshedToken.AccessToken
 		}
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Authorization", "Bearer "+token)
 	return rt.rt.RoundTrip(req)
 }
 
