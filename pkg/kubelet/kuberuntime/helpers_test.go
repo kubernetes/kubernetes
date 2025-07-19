@@ -30,9 +30,11 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimetesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -180,6 +182,7 @@ func TestGetBackoffKey(t *testing.T) {
 }
 
 func TestToKubeContainer(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	c := &runtimeapi.Container{
 		Id: "test-id",
 		Metadata: &runtimeapi.ContainerMetadata{
@@ -208,14 +211,14 @@ func TestToKubeContainer(t *testing.T) {
 		State:               kubecontainer.ContainerStateRunning,
 	}
 
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
-	got, err := m.toKubeContainer(c)
+	got, err := m.toKubeContainer(tCtx, c)
 	assert.NoError(t, err)
 	assert.Equal(t, expect, got)
 
 	// unable to convert a nil pointer to a runtime container
-	_, err = m.toKubeContainer(nil)
+	_, err = m.toKubeContainer(tCtx, nil)
 	assert.Error(t, err)
 	_, err = m.sandboxToKubeContainer(nil)
 	assert.Error(t, err)
@@ -223,6 +226,7 @@ func TestToKubeContainer(t *testing.T) {
 
 func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
+	tCtx := ktesting.Init(t)
 	c := &runtimeapi.Container{
 		Id: "test-id",
 		Metadata: &runtimeapi.ContainerMetadata{
@@ -251,21 +255,22 @@ func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
 		State:               kubecontainer.ContainerStateRunning,
 	}
 
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
-	got, err := m.toKubeContainer(c)
+	got, err := m.toKubeContainer(tCtx, c)
 	assert.NoError(t, err)
 	assert.Equal(t, expect, got)
 
 	// unable to convert a nil pointer to a runtime container
-	_, err = m.toKubeContainer(nil)
+	_, err = m.toKubeContainer(tCtx, nil)
 	assert.Error(t, err)
 	_, err = m.sandboxToKubeContainer(nil)
 	assert.Error(t, err)
 }
 
 func TestGetImageUser(t *testing.T) {
-	_, i, m, err := createTestRuntimeManager()
+	tCtx := ktesting.Init(t)
+	_, i, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
 
 	type image struct {
@@ -332,11 +337,11 @@ func TestGetImageUser(t *testing.T) {
 
 	i.SetFakeImages([]string{"test-image-ref1", "test-image-ref2", "test-image-ref3"})
 	for j, test := range tests {
-		ctx := context.Background()
+		tCtx := ktesting.Init(t)
 		i.Images[test.originalImage.name].Username = test.originalImage.username
 		i.Images[test.originalImage.name].Uid = test.originalImage.uid
 
-		uid, username, err := m.getImageUser(ctx, test.originalImage.name)
+		uid, username, err := m.getImageUser(tCtx, test.originalImage.name)
 		assert.NoError(t, err, "TestCase[%d]", j)
 
 		if test.expectedImageUserValues.uid == (*int64)(nil) {
@@ -349,6 +354,8 @@ func TestGetImageUser(t *testing.T) {
 }
 
 func TestToRuntimeProtocol(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
 	for _, test := range []struct {
 		name     string
 		protocol string
@@ -376,7 +383,7 @@ func TestToRuntimeProtocol(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if result := toRuntimeProtocol(v1.Protocol(test.protocol)); result != test.expected {
+			if result := toRuntimeProtocol(logger, v1.Protocol(test.protocol)); result != test.expected {
 				t.Errorf("expected %d but got %d", test.expected, result)
 			}
 		})
