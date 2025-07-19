@@ -83,7 +83,7 @@ func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
 
 type QueueSortPlugin struct {
 	// lessFunc is used to compare two queued pod infos.
-	lessFunc func(info1, info2 *framework.QueuedPodInfo) bool
+	lessFunc func(info1, info2 fwk.QueuedPodInfo) bool
 }
 
 type PreEnqueuePlugin struct {
@@ -330,7 +330,7 @@ func (ep *QueueSortPlugin) Name() string {
 	return queuesortPluginName
 }
 
-func (ep *QueueSortPlugin) Less(info1, info2 *framework.QueuedPodInfo) bool {
+func (ep *QueueSortPlugin) Less(info1, info2 fwk.QueuedPodInfo) bool {
 	if ep.lessFunc != nil {
 		return ep.lessFunc(info1, info2)
 	}
@@ -338,7 +338,7 @@ func (ep *QueueSortPlugin) Less(info1, info2 *framework.QueuedPodInfo) bool {
 	return true
 }
 
-func NewQueueSortPlugin(lessFunc func(info1, info2 *framework.QueuedPodInfo) bool) *QueueSortPlugin {
+func NewQueueSortPlugin(lessFunc func(info1, info2 fwk.QueuedPodInfo) bool) *QueueSortPlugin {
 	return &QueueSortPlugin{
 		lessFunc: lessFunc,
 	}
@@ -362,7 +362,7 @@ func (sp *ScorePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (sp *ScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -394,7 +394,7 @@ func (sp *ScoreWithNormalizePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -419,7 +419,7 @@ func (fp *FilterPlugin) Name() string {
 
 // Filter is a test function that returns an error or nil, depending on the
 // value of "failFilter".
-func (fp *FilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (fp *FilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	fp.mutex.Lock()
 	defer fp.mutex.Unlock()
 
@@ -478,7 +478,7 @@ func (*PreScorePlugin) Name() string {
 }
 
 // PreScore is a test function.
-func (pfp *PreScorePlugin) PreScore(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []*framework.NodeInfo) *fwk.Status {
+func (pfp *PreScorePlugin) PreScore(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []fwk.NodeInfo) *fwk.Status {
 	pfp.numPreScoreCalled++
 	if pfp.failPreScore {
 		return fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -581,7 +581,7 @@ func (pp *PreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 // PreFilter is a test function that returns (true, nil) or errors for testing.
-func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	pp.numPreFilterCalled++
 	if pp.failPreFilter {
 		return nil, fwk.NewStatus(fwk.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -778,24 +778,24 @@ func TestQueueSortPlugin(t *testing.T) {
 		name           string
 		podNames       []string
 		expectedOrder  []string
-		customLessFunc func(info1, info2 *framework.QueuedPodInfo) bool
+		customLessFunc func(info1, info2 fwk.QueuedPodInfo) bool
 	}{
 		{
 			name:          "timestamp_sort_order",
 			podNames:      []string{"pod-1", "pod-2", "pod-3"},
 			expectedOrder: []string{"pod-1", "pod-2", "pod-3"},
-			customLessFunc: func(info1, info2 *framework.QueuedPodInfo) bool {
-				return info1.Timestamp.Before(info2.Timestamp)
+			customLessFunc: func(info1, info2 fwk.QueuedPodInfo) bool {
+				return info1.GetTimestamp().Before(info2.GetTimestamp())
 			},
 		},
 		{
 			name:          "priority_sort_order",
 			podNames:      []string{"pod-1", "pod-2", "pod-3"},
 			expectedOrder: []string{"pod-3", "pod-2", "pod-1"}, // depends on pod priority
-			customLessFunc: func(info1, info2 *framework.QueuedPodInfo) bool {
-				p1 := corev1helpers.PodPriority(info1.Pod)
-				p2 := corev1helpers.PodPriority(info2.Pod)
-				return (p1 > p2) || (p1 == p2 && info1.Timestamp.Before(info2.Timestamp))
+			customLessFunc: func(info1, info2 fwk.QueuedPodInfo) bool {
+				p1 := corev1helpers.PodPriority(info1.GetPodInfo().GetPod())
+				p2 := corev1helpers.PodPriority(info2.GetPodInfo().GetPod())
+				return (p1 > p2) || (p1 == p2 && info1.GetTimestamp().Before(info2.GetTimestamp()))
 			},
 		},
 	}
@@ -2631,7 +2631,7 @@ func (j *JobPlugin) Name() string {
 	return jobPluginName
 }
 
-func (j *JobPlugin) PreFilter(_ context.Context, _ fwk.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (j *JobPlugin) PreFilter(_ context.Context, _ fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	labelSelector := labels.SelectorFromSet(labels.Set{"driver": ""})
 	driverPods, err := j.podLister.Pods(p.Namespace).List(labelSelector)
 	if err != nil {

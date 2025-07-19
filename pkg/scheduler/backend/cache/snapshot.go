@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -30,12 +31,12 @@ type Snapshot struct {
 	// nodeInfoMap a map of node name to a snapshot of its NodeInfo.
 	nodeInfoMap map[string]*framework.NodeInfo
 	// nodeInfoList is the list of nodes as ordered in the cache's nodeTree.
-	nodeInfoList []*framework.NodeInfo
+	nodeInfoList []fwk.NodeInfo
 	// havePodsWithAffinityNodeInfoList is the list of nodes with at least one pod declaring affinity terms.
-	havePodsWithAffinityNodeInfoList []*framework.NodeInfo
+	havePodsWithAffinityNodeInfoList []fwk.NodeInfo
 	// havePodsWithRequiredAntiAffinityNodeInfoList is the list of nodes with at least one pod declaring
 	// required anti-affinity terms.
-	havePodsWithRequiredAntiAffinityNodeInfoList []*framework.NodeInfo
+	havePodsWithRequiredAntiAffinityNodeInfoList []fwk.NodeInfo
 	// usedPVCSet contains a set of PVC names that have one or more scheduled pods using them,
 	// keyed in the format "namespace/name".
 	usedPVCSet sets.Set[string]
@@ -55,9 +56,9 @@ func NewEmptySnapshot() *Snapshot {
 // NewSnapshot initializes a Snapshot struct and returns it.
 func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	nodeInfoMap := createNodeInfoMap(pods, nodes)
-	nodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
-	havePodsWithAffinityNodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
-	havePodsWithRequiredAntiAffinityNodeInfoList := make([]*framework.NodeInfo, 0, len(nodeInfoMap))
+	nodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
+	havePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
+	havePodsWithRequiredAntiAffinityNodeInfoList := make([]fwk.NodeInfo, 0, len(nodeInfoMap))
 	for _, v := range nodeInfoMap {
 		nodeInfoList = append(nodeInfoList, v)
 		if len(v.PodsWithAffinity) > 0 {
@@ -123,12 +124,12 @@ func createUsedPVCSet(pods []*v1.Pod) sets.Set[string] {
 }
 
 // getNodeImageStates returns the given node's image states based on the given imageExistence map.
-func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.Set[string]) map[string]*framework.ImageStateSummary {
-	imageStates := make(map[string]*framework.ImageStateSummary)
+func getNodeImageStates(node *v1.Node, imageExistenceMap map[string]sets.Set[string]) map[string]*fwk.ImageStateSummary {
+	imageStates := make(map[string]*fwk.ImageStateSummary)
 
 	for _, image := range node.Status.Images {
 		for _, name := range image.Names {
-			imageStates[name] = &framework.ImageStateSummary{
+			imageStates[name] = &fwk.ImageStateSummary{
 				Size:     image.SizeBytes,
 				NumNodes: imageExistenceMap[name].Len(),
 			}
@@ -170,23 +171,23 @@ func (s *Snapshot) NumNodes() int {
 }
 
 // List returns the list of nodes in the snapshot.
-func (s *Snapshot) List() ([]*framework.NodeInfo, error) {
+func (s *Snapshot) List() ([]fwk.NodeInfo, error) {
 	return s.nodeInfoList, nil
 }
 
 // HavePodsWithAffinityList returns the list of nodes with at least one pod with inter-pod affinity
-func (s *Snapshot) HavePodsWithAffinityList() ([]*framework.NodeInfo, error) {
+func (s *Snapshot) HavePodsWithAffinityList() ([]fwk.NodeInfo, error) {
 	return s.havePodsWithAffinityNodeInfoList, nil
 }
 
 // HavePodsWithRequiredAntiAffinityList returns the list of nodes with at least one pod with
 // required inter-pod anti-affinity
-func (s *Snapshot) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
+func (s *Snapshot) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return s.havePodsWithRequiredAntiAffinityNodeInfoList, nil
 }
 
 // Get returns the NodeInfo of the given node name.
-func (s *Snapshot) Get(nodeName string) (*framework.NodeInfo, error) {
+func (s *Snapshot) Get(nodeName string) (fwk.NodeInfo, error) {
 	if v, ok := s.nodeInfoMap[nodeName]; ok && v.Node() != nil {
 		return v, nil
 	}

@@ -65,7 +65,7 @@ func (pl *NodePorts) Name() string {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	s := util.GetHostPorts(pod)
 	// Skip if a pod has no ports.
 	if len(s) == 0 {
@@ -139,7 +139,7 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	// Construct a fake NodeInfo that only has the deleted Pod.
 	// If we can schedule `pod` to this fake node, it means that `pod` and the deleted pod don't have any common port(s).
 	// So, deleting that pod couldn't make `pod` schedulable.
-	usedPorts := make(framework.HostPortInfo, len(ports))
+	usedPorts := make(fwk.HostPortInfo, len(ports))
 	for _, p := range ports {
 		usedPorts.Add(p.HostIP, string(p.Protocol), p.HostPort)
 	}
@@ -154,7 +154,7 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	wantPorts, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
@@ -169,13 +169,13 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 }
 
 // Fits checks if the pod fits the node.
-func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
+func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
 	return fitsPorts(util.GetHostPorts(pod), nodeInfo)
 }
 
-func fitsPorts(wantPorts []v1.ContainerPort, nodeInfo *framework.NodeInfo) bool {
+func fitsPorts(wantPorts []v1.ContainerPort, nodeInfo fwk.NodeInfo) bool {
 	// try to see whether existingPorts and wantPorts will conflict or not
-	existingPorts := nodeInfo.UsedPorts
+	existingPorts := nodeInfo.GetUsedPorts()
 	for _, cp := range wantPorts {
 		if existingPorts.CheckConflict(cp.HostIP, string(cp.Protocol), cp.HostPort) {
 			return false

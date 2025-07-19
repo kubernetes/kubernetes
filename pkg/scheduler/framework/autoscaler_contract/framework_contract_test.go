@@ -36,7 +36,7 @@ import (
 
 type frameworkContract interface {
 	RunPreFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *fwk.Status, sets.Set[string])
-	RunFilterPlugins(context.Context, fwk.CycleState, *v1.Pod, *framework.NodeInfo) *fwk.Status
+	RunFilterPlugins(context.Context, fwk.CycleState, *v1.Pod, fwk.NodeInfo) *fwk.Status
 	RunReservePluginsReserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
 }
 

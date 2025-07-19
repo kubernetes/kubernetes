@@ -451,7 +451,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
-func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, pod *v1.Pod) ([]*framework.NodeInfo, framework.Diagnosis, error) {
+func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework framework.Framework, state fwk.CycleState, pod *v1.Pod) ([]fwk.NodeInfo, framework.Diagnosis, error) {
 	logger := klog.FromContext(ctx)
 	diagnosis := framework.Diagnosis{
 		NodeToStatus: framework.NewDefaultNodeToStatus(),
@@ -494,7 +494,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 
 	nodes := allNodes
 	if !preRes.AllNodes() {
-		nodes = make([]*framework.NodeInfo, 0, len(preRes.NodeNames))
+		nodes = make([]fwk.NodeInfo, 0, len(preRes.NodeNames))
 		for nodeName := range preRes.NodeNames {
 			// PreRes may return nodeName(s) which do not exist; we verify
 			// node exists in the Snapshot.
@@ -535,14 +535,14 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 	return feasibleNodesAfterExtender, diagnosis, nil
 }
 
-func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, fwk framework.Framework, state fwk.CycleState, diagnosis framework.Diagnosis) ([]*framework.NodeInfo, error) {
+func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, schedFramework framework.Framework, state fwk.CycleState, diagnosis framework.Diagnosis) ([]fwk.NodeInfo, error) {
 	nnn := pod.Status.NominatedNodeName
 	nodeInfo, err := sched.nodeInfoSnapshot.Get(nnn)
 	if err != nil {
 		return nil, err
 	}
-	node := []*framework.NodeInfo{nodeInfo}
-	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, &diagnosis, node)
+	node := []fwk.NodeInfo{nodeInfo}
+	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, schedFramework, state, pod, &diagnosis, node)
 	if err != nil {
 		return nil, err
 	}
@@ -585,7 +585,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 	state fwk.CycleState,
 	pod *v1.Pod,
 	diagnosis *framework.Diagnosis,
-	nodes []*framework.NodeInfo) ([]*framework.NodeInfo, error) {
+	nodes []fwk.NodeInfo) ([]fwk.NodeInfo, error) {
 	numAllNodes := len(nodes)
 	numNodesToFind := sched.numFeasibleNodesToFind(schedFramework.PercentageOfNodesToScore(), int32(numAllNodes))
 	if !sched.hasExtenderFilters() && !sched.hasScoring(schedFramework) {
@@ -594,7 +594,7 @@ func (sched *Scheduler) findNodesThatPassFilters(
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.
-	feasibleNodes := make([]*framework.NodeInfo, numNodesToFind)
+	feasibleNodes := make([]fwk.NodeInfo, numNodesToFind)
 
 	if !schedFramework.HasFilterPlugins() {
 		for i := range feasibleNodes {
@@ -694,7 +694,7 @@ func (sched *Scheduler) numFeasibleNodesToFind(percentageOfNodesToScore *int32, 
 	return numNodes
 }
 
-func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Extender, pod *v1.Pod, feasibleNodes []*framework.NodeInfo, statuses *framework.NodeToStatus) ([]*framework.NodeInfo, error) {
+func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Extender, pod *v1.Pod, feasibleNodes []fwk.NodeInfo, statuses *framework.NodeToStatus) ([]fwk.NodeInfo, error) {
 	logger := klog.FromContext(ctx)
 
 	// Extenders are called sequentially.
@@ -748,15 +748,15 @@ func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Exten
 func prioritizeNodes(
 	ctx context.Context,
 	extenders []framework.Extender,
-	fwk framework.Framework,
+	schedFramework framework.Framework,
 	state fwk.CycleState,
 	pod *v1.Pod,
-	nodes []*framework.NodeInfo,
+	nodes []fwk.NodeInfo,
 ) ([]framework.NodePluginScores, error) {
 	logger := klog.FromContext(ctx)
 	// If no priority configs are provided, then all nodes will have a score of one.
 	// This is required to generate the priority list in the required format
-	if len(extenders) == 0 && !fwk.HasScorePlugins() {
+	if len(extenders) == 0 && !schedFramework.HasScorePlugins() {
 		result := make([]framework.NodePluginScores, 0, len(nodes))
 		for i := range nodes {
 			result = append(result, framework.NodePluginScores{
@@ -768,13 +768,13 @@ func prioritizeNodes(
 	}
 
 	// Run PreScore plugins.
-	preScoreStatus := fwk.RunPreScorePlugins(ctx, state, pod, nodes)
+	preScoreStatus := schedFramework.RunPreScorePlugins(ctx, state, pod, nodes)
 	if !preScoreStatus.IsSuccess() {
 		return nil, preScoreStatus.AsError()
 	}
 
 	// Run the Score plugins.
-	nodesScores, scoreStatus := fwk.RunScorePlugins(ctx, state, pod, nodes)
+	nodesScores, scoreStatus := schedFramework.RunScorePlugins(ctx, state, pod, nodes)
 	if !scoreStatus.IsSuccess() {
 		return nil, scoreStatus.AsError()
 	}

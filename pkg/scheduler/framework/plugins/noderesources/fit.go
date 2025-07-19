@@ -124,7 +124,7 @@ func (s *preScoreState) Clone() fwk.StateData {
 }
 
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
-func (f *Fit) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+func (f *Fit) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	state := &preScoreState{
 		podRequests: f.calculatePodResourceRequestList(pod, f.resources),
 	}
@@ -227,7 +227,7 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	if !f.enableSidecarContainers && hasRestartableInitContainer(pod) {
 		// Scheduler will calculate resources usage for a Pod containing
 		// restartable init containers that will be equal or more than kubelet will
@@ -408,7 +408,7 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 	modifiedNodeInfo := framework.NewNodeInfo()
 	modifiedNodeInfo.SetNode(modifiedNode)
 
-	if modifiedNodeInfo.Allocatable.AllowedPodNumber > originalNodeInfo.Allocatable.AllowedPodNumber {
+	if modifiedNodeInfo.Allocatable.GetAllowedPodNumber() > originalNodeInfo.Allocatable.GetAllowedPodNumber() {
 		return true
 	}
 
@@ -419,9 +419,9 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 		return false
 	}
 
-	if (podRequest.MilliCPU > 0 && modifiedNodeInfo.Allocatable.MilliCPU > originalNodeInfo.Allocatable.MilliCPU) ||
-		(podRequest.Memory > 0 && modifiedNodeInfo.Allocatable.Memory > originalNodeInfo.Allocatable.Memory) ||
-		(podRequest.EphemeralStorage > 0 && modifiedNodeInfo.Allocatable.EphemeralStorage > originalNodeInfo.Allocatable.EphemeralStorage) {
+	if (podRequest.MilliCPU > 0 && modifiedNodeInfo.Allocatable.GetMilliCPU() > originalNodeInfo.Allocatable.GetMilliCPU()) ||
+		(podRequest.Memory > 0 && modifiedNodeInfo.Allocatable.GetMemory() > originalNodeInfo.Allocatable.GetMemory()) ||
+		(podRequest.EphemeralStorage > 0 && modifiedNodeInfo.Allocatable.GetEphemeralStorage() > originalNodeInfo.Allocatable.GetEphemeralStorage()) {
 		return true
 	}
 
@@ -431,7 +431,7 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 			continue
 		}
 
-		if modifiedNodeInfo.Allocatable.ScalarResources[rName] > originalNodeInfo.Allocatable.ScalarResources[rName] {
+		if modifiedNodeInfo.Allocatable.GetScalarResources()[rName] > originalNodeInfo.Allocatable.GetScalarResources()[rName] {
 			return true
 		}
 	}
@@ -452,7 +452,7 @@ func isFit(pod *v1.Pod, node *v1.Node, opts ResourceRequestsOptions) bool {
 // Filter invoked at the filter extension point.
 // Checks if a node has sufficient resources, such as cpu, memory, gpu, opaque int resources etc to run a pod.
 // It returns a list of insufficient resources, if empty, then the node has all the resources requested by the pod.
-func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
@@ -501,20 +501,20 @@ type InsufficientResource struct {
 }
 
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, opts ResourceRequestsOptions) []InsufficientResource {
+func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, opts ResourceRequestsOptions) []InsufficientResource {
 	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string]) []InsufficientResource {
+func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string]) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
-	allowedPodNumber := nodeInfo.Allocatable.AllowedPodNumber
-	if len(nodeInfo.Pods)+1 > allowedPodNumber {
+	allowedPodNumber := nodeInfo.GetAllocatable().GetAllowedPodNumber()
+	if len(nodeInfo.GetPods())+1 > allowedPodNumber {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourcePods,
 			Reason:       "Too many pods",
 			Requested:    1,
-			Used:         int64(len(nodeInfo.Pods)),
+			Used:         int64(len(nodeInfo.GetPods())),
 			Capacity:     int64(allowedPodNumber),
 		})
 	}
@@ -526,35 +526,35 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 		return insufficientResources
 	}
 
-	if podRequest.MilliCPU > 0 && podRequest.MilliCPU > (nodeInfo.Allocatable.MilliCPU-nodeInfo.Requested.MilliCPU) {
+	if podRequest.MilliCPU > 0 && podRequest.MilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-nodeInfo.GetRequested().GetMilliCPU()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceCPU,
 			Reason:       "Insufficient cpu",
 			Requested:    podRequest.MilliCPU,
-			Used:         nodeInfo.Requested.MilliCPU,
-			Capacity:     nodeInfo.Allocatable.MilliCPU,
-			Unresolvable: podRequest.MilliCPU > nodeInfo.Allocatable.MilliCPU,
+			Used:         nodeInfo.GetRequested().GetMilliCPU(),
+			Capacity:     nodeInfo.GetAllocatable().GetMilliCPU(),
+			Unresolvable: podRequest.MilliCPU > nodeInfo.GetAllocatable().GetMilliCPU(),
 		})
 	}
-	if podRequest.Memory > 0 && podRequest.Memory > (nodeInfo.Allocatable.Memory-nodeInfo.Requested.Memory) {
+	if podRequest.Memory > 0 && podRequest.Memory > (nodeInfo.GetAllocatable().GetMemory()-nodeInfo.GetRequested().GetMemory()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceMemory,
 			Reason:       "Insufficient memory",
 			Requested:    podRequest.Memory,
-			Used:         nodeInfo.Requested.Memory,
-			Capacity:     nodeInfo.Allocatable.Memory,
-			Unresolvable: podRequest.Memory > nodeInfo.Allocatable.Memory,
+			Used:         nodeInfo.GetRequested().GetMemory(),
+			Capacity:     nodeInfo.GetAllocatable().GetMemory(),
+			Unresolvable: podRequest.Memory > nodeInfo.GetAllocatable().GetMemory(),
 		})
 	}
 	if podRequest.EphemeralStorage > 0 &&
-		podRequest.EphemeralStorage > (nodeInfo.Allocatable.EphemeralStorage-nodeInfo.Requested.EphemeralStorage) {
+		podRequest.EphemeralStorage > (nodeInfo.GetAllocatable().GetEphemeralStorage()-nodeInfo.GetRequested().GetEphemeralStorage()) {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourceEphemeralStorage,
 			Reason:       "Insufficient ephemeral-storage",
 			Requested:    podRequest.EphemeralStorage,
-			Used:         nodeInfo.Requested.EphemeralStorage,
-			Capacity:     nodeInfo.Allocatable.EphemeralStorage,
-			Unresolvable: podRequest.EphemeralStorage > nodeInfo.Allocatable.EphemeralStorage,
+			Used:         nodeInfo.GetRequested().GetEphemeralStorage(),
+			Capacity:     nodeInfo.GetAllocatable().GetEphemeralStorage(),
+			Unresolvable: podRequest.GetEphemeralStorage() > nodeInfo.GetAllocatable().GetEphemeralStorage(),
 		})
 	}
 
@@ -576,14 +576,14 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 			}
 		}
 
-		if rQuant > (nodeInfo.Allocatable.ScalarResources[rName] - nodeInfo.Requested.ScalarResources[rName]) {
+		if rQuant > (nodeInfo.GetAllocatable().GetScalarResources()[rName] - nodeInfo.GetRequested().GetScalarResources()[rName]) {
 			insufficientResources = append(insufficientResources, InsufficientResource{
 				ResourceName: rName,
 				Reason:       fmt.Sprintf("Insufficient %v", rName),
 				Requested:    podRequest.ScalarResources[rName],
-				Used:         nodeInfo.Requested.ScalarResources[rName],
-				Capacity:     nodeInfo.Allocatable.ScalarResources[rName],
-				Unresolvable: rQuant > nodeInfo.Allocatable.ScalarResources[rName],
+				Used:         nodeInfo.GetRequested().GetScalarResources()[rName],
+				Capacity:     nodeInfo.GetAllocatable().GetScalarResources()[rName],
+				Unresolvable: rQuant > nodeInfo.GetAllocatable().GetScalarResources()[rName],
 			})
 		}
 	}
@@ -592,7 +592,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 }
 
 // Score invoked at the Score extension point.
-func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	s, err := getPreScoreState(state)
 	if err != nil {
 		s = &preScoreState{
