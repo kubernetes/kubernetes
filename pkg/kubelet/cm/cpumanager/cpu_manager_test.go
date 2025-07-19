@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -172,6 +173,22 @@ func makePod(podUID, containerName, cpuRequest, cpuLimit string) *v1.Pod {
 	return pod
 }
 
+func makePodWithPodLevelResources(podUID, podCPURequest, podCPULimit, containerName, cpuRequest, cpuLimit string) *v1.Pod {
+	pod := makePod(podUID, containerName, cpuRequest, cpuLimit)
+	pod.Spec.Resources = &v1.ResourceRequirements{
+		Requests: v1.ResourceList{
+			v1.ResourceName(v1.ResourceCPU):    resource.MustParse(podCPURequest),
+			v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+		},
+		Limits: v1.ResourceList{
+			v1.ResourceName(v1.ResourceCPU):    resource.MustParse(podCPULimit),
+			v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+		},
+	}
+
+	return pod
+}
+
 func makeMultiContainerPod(initCPUs, appCPUs []struct{ request, limit string }) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -287,7 +304,7 @@ func TestCPUManagerAdd(t *testing.T) {
 		0,
 		cpuset.New(),
 		topologymanager.NewFakeManager(),
-		nil)
+		nil, &record.FakeRecorder{})
 	testCases := []struct {
 		description        string
 		updateErr          error
@@ -541,7 +558,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil, &record.FakeRecorder{})
 
 		mockState := &mockState{
 			assignments:   testCase.stAssignments,
@@ -704,7 +721,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			mgr, err := NewManager(testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			mgr, err := NewManager(testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(), &record.FakeRecorder{})
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -794,7 +811,7 @@ func TestReconcileState(t *testing.T) {
 		0,
 		cpuset.New(),
 		topologymanager.NewFakeManager(),
-		nil)
+		nil, &record.FakeRecorder{})
 
 	testCases := []struct {
 		description                  string
@@ -1317,7 +1334,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		1,
 		cpuset.New(0),
 		topologymanager.NewFakeManager(),
-		nil)
+		nil, &record.FakeRecorder{})
 	testCases := []struct {
 		description        string
 		updateErr          error
@@ -1433,7 +1450,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			_, err = NewManager(testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			_, err = NewManager(testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager(), &record.FakeRecorder{})
 			if err == nil {
 				t.Errorf("Expected error, but NewManager succeeded")
 			}
@@ -1466,7 +1483,7 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 		1,
 		cpuset.New(0),
 		topologymanager.NewFakeManager(),
-		nil)
+		nil, &record.FakeRecorder{})
 
 	testCases := []struct {
 		description        string

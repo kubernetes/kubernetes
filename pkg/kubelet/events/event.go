@@ -81,6 +81,10 @@ const (
 	FailedPrepareDynamicResources        = "FailedPrepareDynamicResources"
 	PossibleMemoryBackedVolumesOnDisk    = "PossibleMemoryBackedVolumesOnDisk"
 	CgroupV1                             = "CgroupV1"
+	// CPUManagerPodLevelResourceAllocation is the event reason when CPU alignment is skipped for a pod with pod-level resources
+	CPUManagerPodLevelResourceAllocation = "CPUManagerPodLevelResourceAllocation"
+	// MemoryManagerPodLevelResourceAllocation is the event reason when Memory alignment is skipped for a pod with pod-level resources
+	MemoryManagerPodLevelResourceAllocation = "MemoryManagerPodLevelResourceAllocation"
 )
 
 // Image manager event reason list

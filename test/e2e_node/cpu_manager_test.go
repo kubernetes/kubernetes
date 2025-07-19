@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/types"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -381,6 +382,47 @@ func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64, 
 		},
 	}
 	pod = makeCPUManagerPod("non-gu-pod", ctnAttrs)
+	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+	ginkgo.By("checking if the expected cpuset was assigned")
+	expAllowedCPUs, err := cpuset.Parse(fmt.Sprintf("0-%d", cpuCap-1))
+	framework.ExpectNoError(err)
+	expAllowedCPUs = expAllowedCPUs.Difference(strictReservedCPUs)
+	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", expAllowedCPUs.String())
+	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
+	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+		pod.Spec.Containers[0].Name, pod.Name)
+
+	ginkgo.By("by deleting the pods and waiting for container removal")
+	deletePods(ctx, f, []string{pod.Name})
+	waitForContainerRemoval(ctx, pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
+}
+
+func runPodLevelPodTest(ctx context.Context, f *framework.Framework, cpuCap int64, strictReservedCPUs cpuset.CPUSet) {
+	var ctnAttrs []ctnAttribute
+	var err error
+	var pod *v1.Pod
+	var expAllowedCPUsListRegex string
+
+	ctnAttrs = []ctnAttribute{
+		{
+			ctnName:    "gu-container",
+			cpuRequest: "1",
+			cpuLimit:   "1",
+		},
+	}
+	pod = makeCPUManagerPod("gu-pod-level-resources", ctnAttrs)
+	pod.Spec.Resources = &v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+		Requests: v1.ResourceList{
+			v1.ResourceCPU:    resource.MustParse("1"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+	}
+
 	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
@@ -1298,6 +1340,42 @@ func runCPUManagerTests(f *framework.Framework) {
 	})
 }
 
+func runCPUManagerPodLevelResourcesTests(f *framework.Framework) {
+	var cpuCap int64
+	var oldCfg *kubeletconfig.KubeletConfiguration
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		var err error
+		if oldCfg == nil {
+			oldCfg, err = getCurrentKubeletConfig(ctx)
+			framework.ExpectNoError(err)
+		}
+	})
+
+	ginkgo.It("should not assign any CPUs to pods with pod level resources", func(ctx context.Context) {
+		cpuCap, _, _ = getLocalNodeCPUDetails(ctx, f)
+
+		// Skip CPU Manager tests altogether if the CPU capacity < minCPUCapacity.
+		if cpuCap < minCPUCapacity {
+			e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < %d", minCPUCapacity)
+		}
+
+		// Enable CPU Manager in the kubelet.
+		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			policyName:         string(cpumanager.PolicyStatic),
+			reservedSystemCPUs: cpuset.CPUSet{},
+		})
+		updateKubeletConfig(ctx, f, newCfg, true)
+
+		ginkgo.By("running a guaranteed pod with pod level resources")
+		runPodLevelPodTest(ctx, f, cpuCap, cpuset.New())
+	})
+
+	ginkgo.AfterEach(func(ctx context.Context) {
+		updateKubeletConfig(ctx, f, oldCfg, true)
+	})
+}
+
 func runSMTAlignmentNegativeTests(ctx context.Context, f *framework.Framework) {
 	// negative test: try to run a container whose requests aren't a multiple of SMT level, expect a rejection
 	ctnAttrs := []ctnAttribute{
@@ -1484,5 +1562,14 @@ var _ = SIGDescribe("CPU Manager", framework.WithSerial(), feature.CPUManager, f
 
 	ginkgo.Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {
 		runCPUManagerTests(f)
+	})
+})
+
+var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", framework.WithSerial(), feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
+	f := framework.NewDefaultFramework("cpu-manager-incompatibility-pod-level-resources-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.Context("With kubeconfig updated with static CPU Manager policy and pod level resources enabled run the CPU Manager tests", func() {
+		runCPUManagerPodLevelResourcesTests(f)
 	})
 })
