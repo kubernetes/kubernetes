@@ -38,6 +38,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -202,13 +204,28 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// test the defaults.
 		driver := drautils.NewDriverInstance(f)
 		driver.IsLocal = true
-		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 1))
+		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 2))
 		b := drautils.NewBuilderNow(ctx, f, driver)
 
 		claim := b.ExternalClaim()
-		pod := b.PodExternal()
-		b.Create(ctx, claim, pod)
-		b.TestPod(ctx, f, pod)
+		podExternal := b.PodExternal()
+		podInline, claimTemplate := b.PodInline()
+		b.Create(ctx, claim, podExternal, claimTemplate, podInline)
+		b.TestPod(ctx, f, podExternal)
+		b.TestPod(ctx, f, podInline)
+
+		podInline, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(tCtx, podInline.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "get pod with inline claim")
+		inlineClaimName := ptr.Deref(podInline.Status.ResourceClaimStatuses[0].ResourceClaimName, "")
+
+		claim2 := b.ExternalClaim()
+		podExternal2 := b.PodExternal()
+		podExternal2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+		podInline2, claimTemplate2 := b.PodInline()
+		podInline2.Spec.ResourceClaims[0].ResourceClaimTemplateName = &claimTemplate2.Name
+		b.Create(ctx, claim2, podExternal2, claimTemplate2, podInline2)
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podExternal2.Name, podExternal2.Namespace))
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podInline2.Name, podInline2.Namespace))
 
 		tCtx = ktesting.End(tCtx)
 
@@ -225,17 +242,36 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		gomega.Eventually(ctx, driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
 		tCtx = ktesting.End(tCtx)
 
-		// Remove pod prepared by previous Kubernetes.
+		// Remove pods prepared by previous Kubernetes.
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podExternal.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podExternal.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podInline.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podInline.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		waitForClaimDeallocated(tCtx, f, claim.Name)
+		waitForClaimDeleted(tCtx, f, inlineClaimName)
+
 		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
-		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, namespace.Name, f.Timeouts.PodDelete))
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate.Name, metav1.DeleteOptions{}))
+
+		// The previously unschedulable pods can now be scheduled.
+		b.TestPod(ctx, f, podExternal2)
+		b.TestPod(ctx, f, podInline2)
+
+		podInline2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(tCtx, podInline2.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "get pod with inline claim")
+		inlineClaimName2 := ptr.Deref(podInline2.Status.ResourceClaimStatuses[0].ResourceClaimName, "")
 
 		// Create another claim and pod, this time using the latest Kubernetes.
 		claim = b.ExternalClaim()
-		pod = b.PodExternal()
-		pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
-		b.Create(ctx, claim, pod)
-		b.TestPod(ctx, f, pod)
+		podExternal = b.PodExternal()
+		podExternal.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+		podInline, claimTemplate = b.PodInline()
+		podInline.Spec.ResourceClaims[0].ResourceClaimTemplateName = &claimTemplate.Name
+		b.Create(ctx, claim, podExternal, claimTemplate, podInline)
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podExternal.Name, podExternal.Namespace))
+		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, podInline.Name, podInline.Namespace))
 
 		// Roll back.
 		tCtx = ktesting.Begin(tCtx, "downgrade")
@@ -252,6 +288,23 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		}).Should(gomega.ContainSubstring(`"Caches are synced" controller="resource_claim"`))
 		tCtx = ktesting.End(tCtx)
 
+		// Remove running pods.
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podExternal2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podExternal2.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, podInline2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, podInline2.Name, namespace.Name, f.Timeouts.PodDelete))
+
+		waitForClaimDeallocated(tCtx, f, claim2.Name)
+		waitForClaimDeleted(tCtx, f, inlineClaimName2)
+
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim2.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(ctx, claimTemplate2.Name, metav1.DeleteOptions{}))
+
+		// The previously unschedulable pods can now be scheduled.
+		b.TestPod(ctx, f, podExternal)
+		b.TestPod(ctx, f, podInline)
+
 		// We need to clean up explicitly because the normal
 		// cleanup doesn't work (driver shuts down first).
 		//
@@ -263,16 +316,31 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 			return f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
 		}).Should(gomega.Succeed(), "delete claim after downgrade")
 		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-			return f.ClientSet.CoreV1().Pods(namespace.Name).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
-		}).Should(gomega.Succeed(), "delete pod after downgrade")
+			return f.ClientSet.CoreV1().Pods(namespace.Name).Delete(tCtx, podExternal.Name, metav1.DeleteOptions{})
+		}).Should(gomega.Succeed(), "delete pod with external claim after downgrade")
 		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-			pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Get(tCtx, pod.Name, metav1.GetOptions{})
+			pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Get(tCtx, podExternal.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return nil
 			}
-			tCtx.ExpectNoError(err, "get pod")
+			tCtx.ExpectNoError(err, "get pod with external claim")
 			return pod
-		}).Should(gomega.BeNil(), "no pod after deletion after downgrade")
+		}).Should(gomega.BeNil(), "no pod with external claim after deletion after downgrade")
+
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+			return f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(namespace.Name).Delete(tCtx, claimTemplate.Name, metav1.DeleteOptions{})
+		}).Should(gomega.Succeed(), "delete claim template after downgrade")
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+			return f.ClientSet.CoreV1().Pods(namespace.Name).Delete(tCtx, podInline.Name, metav1.DeleteOptions{})
+		}).Should(gomega.Succeed(), "delete pod with inline claim after downgrade")
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+			pod, err := f.ClientSet.CoreV1().Pods(namespace.Name).Get(tCtx, podInline.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			tCtx.ExpectNoError(err, "get pod with inline claim")
+			return pod
+		}).Should(gomega.BeNil(), "no pod with inline claim after deletion after downgrade")
 	})
 })
 
@@ -366,4 +434,25 @@ func serverDownloadURL(tCtx ktesting.TContext, major, minor uint) (string, strin
 	version, err := io.ReadAll(resp.Body)
 	tCtx.ExpectNoError(err, "read response body for %s", url)
 	return fmt.Sprintf("https://dl.k8s.io/release/%s/kubernetes-server-%s-%s.tar.gz", string(version), runtime.GOOS, runtime.GOARCH), string(version)
+}
+
+func waitForClaimDeallocated(tCtx ktesting.TContext, f *framework.Framework, claimName string) {
+	tCtx.Helper()
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+		claim, err := f.ClientSet.ResourceV1beta2().ResourceClaims(f.Namespace.Name).Get(tCtx, claimName, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get claim")
+		return claim
+	}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", gomega.BeNil()))
+}
+
+func waitForClaimDeleted(tCtx ktesting.TContext, f *framework.Framework, claimName string) {
+	tCtx.Helper()
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+		claim, err := f.ClientSet.ResourceV1beta2().ResourceClaims(f.Namespace.Name).Get(tCtx, claimName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		tCtx.ExpectNoError(err, "get claim")
+		return claim
+	}).Should(gomega.BeNil(), "claim should have been deleted")
 }
