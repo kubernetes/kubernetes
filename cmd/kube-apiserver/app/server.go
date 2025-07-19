@@ -26,6 +26,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -50,6 +51,7 @@ import (
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/component-base/zpages/flagz"
+	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -216,7 +218,10 @@ func CreateKubeAPIServerConfig(
 		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
 	}
 
-	serviceResolver := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+	serviceResolver, err := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error building service resolver: %w", err)
+	}
 	controlplaneConfig, admissionInitializers, err := controlplaneapiserver.CreateConfig(opts.CompletedOptions, genericConfig, versionedInformers, storageFactory, serviceResolver, kubeInitializers)
 	if err != nil {
 		return nil, nil, nil, err
@@ -275,16 +280,21 @@ func SetServiceResolverForTests(resolver webhook.ServiceResolver) func() {
 	}
 }
 
-func buildServiceResolver(enabledAggregatorRouting bool, hostname string, informer clientgoinformers.SharedInformerFactory) webhook.ServiceResolver {
+func buildServiceResolver(enabledAggregatorRouting bool, hostname string, informer clientgoinformers.SharedInformerFactory) (webhook.ServiceResolver, error) {
 	if testServiceResolver != nil {
-		return testServiceResolver
+		return testServiceResolver, nil
+	}
+
+	endpointSliceGetter, err := endpointsliceutil.NewEndpointSliceIndexerGetter(informer.Discovery().V1().EndpointSlices())
+	if err != nil {
+		return nil, err
 	}
 
 	var serviceResolver webhook.ServiceResolver
 	if enabledAggregatorRouting {
 		serviceResolver = aggregatorapiserver.NewEndpointServiceResolver(
 			informer.Core().V1().Services().Lister(),
-			informer.Core().V1().Endpoints().Lister(),
+			endpointSliceGetter,
 		)
 	} else {
 		serviceResolver = aggregatorapiserver.NewClusterIPServiceResolver(
@@ -296,5 +306,5 @@ func buildServiceResolver(enabledAggregatorRouting bool, hostname string, inform
 	if localHost, err := url.Parse(hostname); err == nil {
 		serviceResolver = aggregatorapiserver.NewLoopbackServiceResolver(serviceResolver, localHost)
 	}
-	return serviceResolver
+	return serviceResolver, nil
 }
