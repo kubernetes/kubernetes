@@ -69,7 +69,7 @@ const (
 )
 
 type EvictionTestConfig struct {
-	Signal                  string //eviction signal (e.g., "memory.available")
+	Signal                  string // eviction signal (e.g., "memory.available")
 	PressureTimeout         time.Duration
 	ExpectedNodeCondition   v1.NodeConditionType //  on eviction (e.g., NodeMemoryPressure)
 	ExpectedStarvedResource v1.ResourceName      // (e.g., v1.ResourceMemory)
@@ -83,11 +83,11 @@ type EvictionTestConfig struct {
 	PrepullImages       bool                      // Optional: prepull images before running test
 }
 
-// testRunner sets up and executes a Kubelet eviction test.
+// testRunnerWithConfig sets up and executes a Kubelet eviction test.
 // It dynamically configures the Kubelet's eviction thresholds for a specified
 // resource (hard or soft), then induces resource pressure to verify that
 // pods are evicted as expected based on their priority.
-func testRunner(f *framework.Framework, config EvictionTestConfig, specs []podEvictSpec) {
+func testRunnerWithConfig(f *framework.Framework, config EvictionTestConfig, specs []podEvictSpec) {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context(fmt.Sprintf(testContextFmt, config.ExpectedNodeCondition), func() {
 		if config.PrepullImages {
@@ -115,6 +115,7 @@ func testRunner(f *framework.Framework, config EvictionTestConfig, specs []podEv
 				initialConfig.EvictionHard = map[string]string{config.Signal: thresholdValue}
 			} else {
 				initialConfig.EvictionSoft = map[string]string{config.Signal: thresholdValue}
+				// kubelet level grace period for soft evictions
 				initialConfig.EvictionSoftGracePeriod = map[string]string{config.Signal: config.EvictionGracePeriod}
 				initialConfig.EvictionMaxPodGracePeriod = 30
 			}
@@ -137,7 +138,7 @@ func testRunner(f *framework.Framework, config EvictionTestConfig, specs []podEv
 // InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
 // Node disk pressure is induced by consuming all inodes on the node.
 var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
-	testRunner(
+	testRunnerWithConfig(
 		framework.NewDefaultFramework("inode-eviction-test"),
 		EvictionTestConfig{
 			Signal:                  string(evictionapi.SignalNodeFsInodesFree),
@@ -171,7 +172,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 // Images are pre-pulled before running the test workload to ensure
 // that the image garbage collerctor can remove them to avoid eviction.
 var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
-	testRunner(framework.NewDefaultFramework("image-gc-eviction-test"), EvictionTestConfig{
+	testRunnerWithConfig(framework.NewDefaultFramework("image-gc-eviction-test"), EvictionTestConfig{
 		Signal:                  string(evictionapi.SignalNodeFsInodesFree),
 		PressureTimeout:         10 * time.Minute,
 		ExpectedNodeCondition:   v1.NodeDiskPressure,
@@ -230,7 +231,7 @@ var _ = SIGDescribe("MemoryAllocatableEviction", framework.WithSlow(), framework
 // Disk pressure is induced by running pods which consume disk space.
 var _ = SIGDescribe("LocalStorageEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
 	diskConsumed := resource.MustParse("4Gi")
-	testRunner(framework.NewDefaultFramework("localstorage-eviction-test"), EvictionTestConfig{
+	testRunnerWithConfig(framework.NewDefaultFramework("localstorage-eviction-test"), EvictionTestConfig{
 		Signal:                  string(evictionapi.SignalNodeFsAvailable),
 		PressureTimeout:         15 * time.Minute,
 		ExpectedNodeCondition:   v1.NodeDiskPressure,
@@ -261,7 +262,7 @@ var _ = SIGDescribe("LocalStorageEviction", framework.WithSlow(), framework.With
 // Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
 var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
 	diskConsumed := resource.MustParse("4Gi")
-	testRunner(
+	testRunnerWithConfig(
 		framework.NewDefaultFramework("localstorage-eviction-test"),
 		EvictionTestConfig{
 			Signal:                  string(evictionapi.SignalNodeFsAvailable),
@@ -288,41 +289,31 @@ var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.
 		})
 })
 
+// TODO: add another test with different grace periods for pod and kubelet
+//
+// LocalStorageSoftEvictionNotOverwriteTerminationGracePeriodSeconds verifies that kubelet
+// respects both pod-level and kubelet-level grace periods during soft eviction without overwriting them
 var _ = SIGDescribe("LocalStorageSoftEvictionNotOverwriteTerminationGracePeriodSeconds", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
-	f := framework.NewDefaultFramework("localstorage-eviction-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	pressureTimeout := 10 * time.Minute
-	expectedNodeCondition := v1.NodeDiskPressure
-	expectedStarvedResource := v1.ResourceEphemeralStorage
-
-	evictionMaxPodGracePeriod := 30
-	evictionSoftGracePeriod := 30
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("4Gi")
-			summary := eventuallyGetSummary(ctx)
-			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			if availableBytes <= uint64(diskConsumed.Value()) {
-				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
-			}
-			initialConfig.EvictionSoft = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
-			initialConfig.EvictionSoftGracePeriod = map[string]string{string(evictionapi.SignalNodeFsAvailable): "30s"}
-			// Defer to the pod default grace period
-			initialConfig.EvictionMaxPodGracePeriod = int32(evictionMaxPodGracePeriod)
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-			// Ensure that pods are not evicted because of the eviction-hard threshold
-			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
-		})
-
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
-			{
-				evictionMaxPodGracePeriod: evictionSoftGracePeriod,
-				evictionSoftGracePeriod:   evictionMaxPodGracePeriod,
-				evictionPriority:          1,
-				pod:                       diskConsumingPod("container-disk-hog", lotsOfDisk, nil, v1.ResourceRequirements{}),
-			},
-		})
+	diskConsumed := resource.MustParse("4Gi")
+	testRunnerWithConfig(framework.NewDefaultFramework("localstorage-eviction-test"), EvictionTestConfig{
+		Signal:                  string(evictionapi.SignalNodeFsAvailable),
+		PressureTimeout:         10 * time.Minute,
+		ExpectedNodeCondition:   v1.NodeDiskPressure,
+		ExpectedStarvedResource: v1.ResourceEphemeralStorage,
+		IsHardEviction:          false,
+		ResourceThreshold:       uint64(diskConsumed.Value()),
+		EvictionGracePeriod:     "30s",
+		MetricsLogger:           logDiskMetrics,
+		ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+			return *summary.Node.Fs.AvailableBytes
+		},
+	}, []podEvictSpec{
+		{
+			evictionMaxPodGracePeriod: 30,
+			evictionSoftGracePeriod:   30,
+			evictionPriority:          1,
+			pod:                       diskConsumingPod("container-disk-hog", lotsOfDisk, nil, v1.ResourceRequirements{}),
+		},
 	})
 })
 
@@ -332,8 +323,7 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(
 	useOverLimit := 41  /* Mb */
 	useUnderLimit := 39 /* Mb */
 	containerLimit := v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit}
-
-	testRunner(
+	testRunnerWithConfig(
 		framework.NewDefaultFramework("localstorage-eviction-test"),
 		EvictionTestConfig{
 			Signal:                  string(evictionapi.SignalMemoryAvailable),
