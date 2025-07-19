@@ -776,3 +776,46 @@ func TestGetHostPorts(t *testing.T) {
 		})
 	}
 }
+
+func TestIsScalarResourceName(t *testing.T) {
+	tests := []struct {
+		name         string
+		resourceName v1.ResourceName
+		expected     bool
+	}{
+		{
+			name:         "extended resource",
+			resourceName: "example.com/gpu",
+			expected:     true,
+		},
+		{
+			name:         "hugepages resource",
+			resourceName: "hugepages-2Mi",
+			expected:     true,
+		},
+		{
+			name:         "prefixed native resource",
+			resourceName: "kubernetes.io/cpu",
+			expected:     true,
+		},
+		{
+			name:         "attachable volume resource",
+			resourceName: "attachable-volumes-aws-ebs",
+			expected:     true,
+		},
+		{
+			name:         "invalid resource name",
+			resourceName: "invalid-resource",
+			expected:     false,
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsScalarResourceName(tt.resourceName)
+			if result != tt.expected {
+				t.Errorf("IsScalarResourceName(%q) = %v, expected as %v", tt.resourceName, result, tt.expected)
+			}
+		})
+	}
+}
