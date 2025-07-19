@@ -5905,7 +5905,136 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 				})
 			})
 		})
+
 	})
+
+	ginkgo.When("A restartable init container with startup probe fails initially", func() {
+		ginkgo.It("should continue probing and allow regular container to start after restartable init recovers", func(ctx context.Context) {
+			restartableInit := "buggy-restartable-init"
+			regularContainer := "regular-container"
+
+			podSpec := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "restartable-init-startup-probe-bug-fix",
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever, // Key condition for the bug
+					Volumes: []v1.Volume{
+						{
+							Name: "workdir",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name:          restartableInit,
+							Image:         busyboxImage,
+							RestartPolicy: &containerRestartPolicyAlways,
+							VolumeMounts: []v1.VolumeMount{
+								{Name: "workdir", MountPath: "/work"},
+							},
+							Command: []string{"sh", "-c", `
+								if [ ! -f /work/first_run_done ]; then
+									echo "First run: creating marker and exiting with 1."
+									touch /work/first_run_done
+									exit 1
+								else
+									echo "Second run: marker found. Running as a restartable init."
+									sleep 60
+								fi
+							`},
+							StartupProbe: &v1.Probe{
+								InitialDelaySeconds: 5, // Must be long enough for first container to fail
+								PeriodSeconds:       2,
+								FailureThreshold:    3,
+								ProbeHandler: v1.ProbeHandler{
+									Exec: &v1.ExecAction{
+										Command: []string{"/bin/true"},
+									},
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:  regularContainer,
+							Image: imageutils.GetPauseImageName(),
+							StartupProbe: &v1.Probe{
+								InitialDelaySeconds: 5,
+								PeriodSeconds:       5,
+								ProbeHandler: v1.ProbeHandler{
+									Exec: &v1.ExecAction{
+										Command: []string{"/bin/true"},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			preparePod(podSpec)
+
+			client := e2epod.NewPodClient(f)
+			podSpec = client.Create(ctx, podSpec)
+
+			ginkgo.By("Waiting for restartable init container to fail and restart")
+			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "restartable init restarted", 60*time.Second, func(pod *v1.Pod) (bool, error) {
+				// Look for the restartable init container in init containers
+				for _, status := range pod.Status.InitContainerStatuses {
+					if status.Name == restartableInit {
+						// Check if it has restarted at least once
+						if status.RestartCount > 0 {
+							return true, nil
+						}
+					}
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "restartable init container should have restarted")
+
+			ginkgo.By("Verifying restartable init container is running after restart")
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "restartable init running", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+				for _, status := range pod.Status.InitContainerStatuses {
+					if status.Name == restartableInit && status.State.Running != nil {
+						return true, nil
+					}
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "restartable init container should be running")
+
+			ginkgo.By("Waiting for regular container to start (bug fix verification)")
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, podSpec.Namespace, podSpec.Name, "regular container running", 45*time.Second, func(pod *v1.Pod) (bool, error) {
+				for _, status := range pod.Status.ContainerStatuses {
+					if status.Name == regularContainer && status.State.Running != nil {
+						return true, nil
+					}
+				}
+				return false, nil
+			})
+			framework.ExpectNoError(err, "regular container should eventually start - this verifies the bug fix")
+
+			ginkgo.By("Final verification: pod is not stuck in Initializing state")
+			finalPod, err := client.Get(ctx, podSpec.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			// Verify regular container is actually running
+			var regularContainerStatus *v1.ContainerStatus
+			for i := range finalPod.Status.ContainerStatuses {
+				if finalPod.Status.ContainerStatuses[i].Name == regularContainer {
+					regularContainerStatus = &finalPod.Status.ContainerStatuses[i]
+					break
+				}
+			}
+
+			gomega.Expect(regularContainerStatus).NotTo(gomega.BeNil(), "regular container status should exist")
+			gomega.Expect(regularContainerStatus.State.Running).NotTo(gomega.BeNil(), "regular container should be in running state")
+		})
+	})
+
 })
 
 var _ = SIGDescribe(feature.SidecarContainers, framework.WithSerial(), "Containers Lifecycle", func() {
