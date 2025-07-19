@@ -21,9 +21,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -653,4 +655,121 @@ func (tc *throughputCollector) collect() []DataItem {
 	throughputSummary.Unit = "pods/s"
 
 	return []DataItem{throughputSummary}
+}
+
+// memoryCollector collects memory usage metrics during the test
+type memoryCollector struct {
+	samples      []memorySample
+	resultLabels map[string]string
+	interval     time.Duration
+	mu           sync.RWMutex
+}
+
+type memorySample struct {
+	timestamp   time.Time
+	heapInuseMB float64
+}
+
+func newMemoryCollector(resultLabels map[string]string, interval time.Duration) *memoryCollector {
+	return &memoryCollector{
+		resultLabels: resultLabels,
+		interval:     interval,
+	}
+}
+
+func (mc *memoryCollector) init() error {
+	mc.collectSample()
+	return nil
+}
+
+func (mc *memoryCollector) run(tCtx ktesting.TContext) {
+	ticker := time.NewTicker(mc.interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-tCtx.Done():
+			return
+		case <-ticker.C:
+			mc.collectSample()
+		}
+	}
+}
+
+func (mc *memoryCollector) collectSample() {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	sample := memorySample{
+		timestamp:   time.Now(),
+		heapInuseMB: float64(m.HeapInuse) / 1024 / 1024,
+	}
+
+	mc.mu.Lock()
+	mc.samples = append(mc.samples, sample)
+	mc.mu.Unlock()
+}
+
+func (mc *memoryCollector) createMetricDataItem(values []float64, unit, metricName string) DataItem {
+	sort.Float64s(values)
+
+	sum := 0.0
+	for _, v := range values {
+		sum += v
+	}
+
+	labels := maps.Clone(mc.resultLabels)
+	labels["Metric"] = metricName
+
+	return DataItem{
+		Labels: labels,
+		Data: map[string]float64{
+			"Perc50":  values[int(math.Ceil(float64(len(values)*50)/100))-1],
+			"Perc90":  values[int(math.Ceil(float64(len(values)*90)/100))-1],
+			"Perc95":  values[int(math.Ceil(float64(len(values)*95)/100))-1],
+			"Perc99":  values[int(math.Ceil(float64(len(values)*99)/100))-1],
+			"Average": sum / float64(len(values)),
+			"Max":     values[len(values)-1],
+		},
+		Unit: unit,
+	}
+}
+
+func (mc *memoryCollector) collect() []DataItem {
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
+
+	length := len(mc.samples)
+	if length == 0 {
+		return nil
+	}
+
+	firstSample := mc.samples[0]
+	lastSample := firstSample
+	if length >= 2 {
+		lastSample = mc.samples[length-1]
+	}
+	durationMin := lastSample.timestamp.Sub(firstSample.timestamp).Minutes()
+	growthRateMBPerMin := 0.0
+	if durationMin > 0 {
+		growthRateMBPerMin = (lastSample.heapInuseMB - firstSample.heapInuseMB) / durationMin
+	}
+	growthItem := DataItem{
+		Labels: maps.Clone(mc.resultLabels),
+		Data: map[string]float64{
+			"GrowthRate": growthRateMBPerMin,
+		},
+		Unit: "MB/min",
+	}
+	growthItem.Labels["Metric"] = "memory_growth_rate"
+
+	heapValues := make([]float64, len(mc.samples))
+	for i, s := range mc.samples {
+		heapValues[i] = s.heapInuseMB
+	}
+
+	return []DataItem{
+		mc.createMetricDataItem(heapValues, "MB", "heap_memory_usage"),
+		growthItem,
+	}
 }
