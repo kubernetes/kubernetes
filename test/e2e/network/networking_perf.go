@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -168,14 +169,12 @@ var _ = common.SIGDescribe("Networking IPerf2", feature.NetworkingPerformance, f
 		_, err = iperf2ClientDaemonSet(ctx, f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err, "deploy iperf2 client daemonset")
 
-		// Make sure the server is ready to go
+		// Make sure the server is ready to go. (We use WaitForEndpointSlices
+		// rather than the simpler WaitForEndpointCount because we want to use
+		// largeClusterTimeout.)
 		framework.Logf("waiting for iperf2 server endpoints")
-		err = wait.Poll(2*time.Second, largeClusterTimeout, func() (done bool, err error) {
-			listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serverServiceName)}
-			esList, err := f.ClientSet.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, listOptions)
-			framework.ExpectNoError(err, "Error fetching EndpointSlice for Service %s/%s", f.Namespace.Name, serverServiceName)
-
-			if len(esList.Items) == 0 {
+		err = e2eendpointslice.WaitForEndpointSlices(ctx, f.ClientSet, f.Namespace.Name, serverServiceName, 2*time.Second, largeClusterTimeout, func(ctx context.Context, endpointSlices []discoveryv1.EndpointSlice) (bool, error) {
+			if len(endpointSlices) == 0 {
 				framework.Logf("EndpointSlice for Service %s/%s not found", f.Namespace.Name, serverServiceName)
 				return false, nil
 			}
