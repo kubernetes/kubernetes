@@ -73,6 +73,14 @@ func (t *Time) Before(u *Time) bool {
 	return false
 }
 
+// String returns the time formatted using the format string
+func (t *Time) String() string {
+	if t == nil {
+		return ""
+	}
+	return t.Time.String()
+}
+
 // Equal reports whether the time instant t is equal to u.
 func (t *Time) Equal(u *Time) bool {
 	if t == nil && u == nil {
