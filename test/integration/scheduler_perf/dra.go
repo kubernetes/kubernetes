@@ -138,6 +138,9 @@ type createResourceDriverOp struct {
 	MaxClaimsPerNodeParam string
 	// Nodes matching this glob pattern have resources managed by the driver.
 	Nodes string
+	// UseMixins will create mixins for the attributes and capacity, rather than
+	// defining them directly on the devices.
+	UseMixins bool
 }
 
 var _ realOp = &createResourceDriverOp{}
@@ -192,7 +195,7 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 	}
 
 	for _, nodeName := range driverNodes {
-		slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode)
+		slice := resourceSlice(op.DriverName, nodeName, op.MaxClaimsPerNode, op.UseMixins)
 		_, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
 		tCtx.ExpectNoError(err, "create node resource slice")
 	}
@@ -205,7 +208,7 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 	})
 }
 
-func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.ResourceSlice {
+func resourceSlice(driverName, nodeName string, cap int, useMixins bool) *resourceapi.ResourceSlice {
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
@@ -221,26 +224,50 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 		},
 	}
 
-	for i := 0; i < capacity; i++ {
-		slice.Spec.Devices = append(slice.Spec.Devices,
-			resourceapi.Device{
-				Name: fmt.Sprintf("instance-%d", i),
-				Basic: &resourceapi.BasicDevice{
-					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-						"model":                {StringValue: ptr.To("A100")},
-						"family":               {StringValue: ptr.To("GPU")},
-						"driverVersion":        {VersionValue: ptr.To("1.2.3")},
-						"dra.example.com/numa": {IntValue: ptr.To(int64(i))},
-					},
-					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-						"memory": {Value: resource.MustParse("1Gi")},
-					},
+	deviceMixinsName := "device-mixin"
+	if useMixins {
+		slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+			Device: []resourceapi.DeviceMixin{
+				{
+					Name:       deviceMixinsName,
+					Attributes: attributes(),
+					Capacity:   capacity(),
 				},
 			},
-		)
+		}
+	}
+
+	for i := 0; i < cap; i++ {
+		d := resourceapi.Device{
+			Name:  fmt.Sprintf("instance-%d", i),
+			Basic: &resourceapi.BasicDevice{},
+		}
+		if useMixins {
+			d.Basic.Includes = []string{deviceMixinsName}
+		} else {
+			d.Basic.Attributes = attributes()
+			d.Basic.Capacity = capacity()
+		}
+		slice.Spec.Devices = append(slice.Spec.Devices, d)
 	}
 
 	return slice
+}
+
+func attributes() map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
+	return map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+		"model":                {StringValue: ptr.To("A100")},
+		"family":               {StringValue: ptr.To("GPU")},
+		"driverVersion":        {VersionValue: ptr.To("1.2.3")},
+		"dra.example.com/numa": {IntValue: ptr.To(int64(1))},
+	}
+}
+
+func capacity() map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
+	return map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+		"memory": {Value: resource.MustParse("1Gi")},
+		"cpu":    {Value: resource.MustParse("2")},
+	}
 }
 
 // allocResourceClaimsOp defines an op where resource claims with structured
@@ -343,6 +370,7 @@ claims:
 			AdminAccess:          utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
+			ResourceSliceMixins:  utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceSliceMixins),
 		}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
