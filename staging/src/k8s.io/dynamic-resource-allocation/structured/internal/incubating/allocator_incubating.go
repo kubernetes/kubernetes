@@ -54,6 +54,7 @@ var SupportedFeatures = internal.Features{
 	PrioritizedList:      true,
 	PartitionableDevices: true,
 	DeviceTaints:         true,
+	DeviceBinding:        true,
 }
 
 type Allocator struct {
@@ -293,6 +294,17 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				Device:      internal.id.Device.String(),
 				AdminAccess: internal.adminAccess,
 			}
+
+			// If deviceBindingConditions are enabled, we need to populate the AllocatedDeviceStatus.
+			if a.features.DeviceBinding {
+				for _, device := range internal.slice.Spec.Devices {
+					if device.Name == internal.id.Device && len(device.Basic.BindingConditions) > 0 {
+						allocationResult.Devices.Results[i].BindingConditions = device.Basic.BindingConditions
+						allocationResult.Devices.Results[i].BindingFailureConditions = device.Basic.BindingFailureConditions
+						allocationResult.Devices.Results[i].BindingTimeoutSeconds = device.Basic.BindingTimeoutSeconds
+					}
+				}
+			}
 		}
 
 		// Populate configs.
@@ -356,7 +368,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		}
 
 		// Determine node selector.
-		nodeSelector, err := alloc.createNodeSelector(internalResult.devices)
+		nodeSelector, err := alloc.createNodeSelector(internalResult.devices, node.Name)
 		if err != nil {
 			return nil, fmt.Errorf("create NodeSelector for claim %s: %w", claim.Name, err)
 		}
@@ -1310,7 +1322,7 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
 // otherwise it returns nil.
-func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.NodeSelector, error) {
+func (alloc *allocator) createNodeSelector(result []internalDeviceResult, targetNodeName string) (*v1.NodeSelector, error) {
 	// Selector with one term. That term gets extended with additional
 	// requirements from the different devices.
 	ns := &v1.NodeSelector{
@@ -1342,6 +1354,19 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 					}},
 				}},
 			}, nil
+		}
+		for _, device := range slice.Spec.Devices {
+			if device.Basic.BindsToNode {
+				return &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{targetNodeName},
+						}},
+					}},
+				}, nil
+			}
 		}
 		if nodeSelector != nil {
 			switch len(nodeSelector.NodeSelectorTerms) {

@@ -43,6 +43,12 @@ spec:
           int: 2
           string: stringValue
           version: versionValue
+      bindingConditions:
+      - bindingConditionsValue
+      bindingFailureConditions:
+      - bindingFailureConditionsValue
+      bindingTimeoutSeconds: 11
+      bindsToNode: true
       capacity:
         capacityKey:
           value: "0"
