@@ -19,6 +19,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -319,4 +320,26 @@ func panicSafeValidateFunc(
 
 		return validateUpdateFunc(ctx, scheme, obj, oldObj, o)
 	}
+}
+
+// DeduplicateValidationErrorsAndUpdateMetric removes duplicate validation errors
+// and increment duplicate validation error metric when duplicates are found.
+func DeduplicateValidationErrorsAndUpdateMetric(ctx context.Context, qualifiedKind schema.GroupKind, operation string, errs field.ErrorList) field.ErrorList {
+	logger := klog.FromContext(ctx)
+	uniqueErrs := field.ErrorList{}
+	seenErrs := make([]string, 0, len(errs))
+
+	for _, err := range errs {
+		errStr := fmt.Sprintf("%+v", err)
+
+		if slices.Contains(seenErrs, errStr) {
+			logger.Info("Removed duplicate validation error", "kind", qualifiedKind.String(), "operation", operation, "error", errStr)
+			// Increment the duplicate error metric counter
+			validationmetrics.Metrics.IncDuplicateValidationErrorMetric()
+		} else {
+			uniqueErrs = append(uniqueErrs, err)
+			seenErrs = append(seenErrs, errStr)
+		}
+	}
+	return uniqueErrs
 }

@@ -153,6 +153,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 
 	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
 	if len(errs) > 0 {
+		errs = DeduplicateValidationErrorsAndUpdateMetric(ctx, kind.GroupKind(), "UPDATE", errs)
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
 	}
 
