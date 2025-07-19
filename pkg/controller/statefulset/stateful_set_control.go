@@ -743,14 +743,13 @@ func updateStatefulSetAfterInvariantEstablished(
 		}
 	}
 
-	if unavailablePods >= maxUnavailable {
-		logger.V(2).Info("StatefulSet found unavailablePods, more than or equal to allowed maxUnavailable",
+	if unavailablePods > maxUnavailable {
+		logger.V(4).Info("StatefulSet found unavailablePods, more than the allowed maxUnavailable",
 			"statefulSet", klog.KObj(set),
 			"unavailablePods", unavailablePods,
 			"maxUnavailable", maxUnavailable)
-		if unavailablePods > maxUnavailable {
-			metrics.MaxUnavailableViolations.WithLabelValues(set.Namespace, set.Name).Inc()
-		}
+		
+		metrics.MaxUnavailableViolations.WithLabelValues(set.Namespace, set.Name, string(set.Spec.PodManagementPolicy)).Inc()
 		return &status, nil
 	}
 
