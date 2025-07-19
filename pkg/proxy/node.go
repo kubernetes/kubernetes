@@ -196,16 +196,18 @@ func (n *NodeManager) OnNodeChange(node *v1.Node) {
 	if !reflect.DeepEqual(n.nodeIPs, nodeIPs) {
 		klog.InfoS("NodeIPs changed for the node",
 			"node", klog.KObj(node), "newNodeIPs", nodeIPs, "oldNodeIPs", n.nodeIPs)
-		klog.Flush()
-		n.exitFunc(1)
+		// FIXME: exit
+		// klog.Flush()
+		// n.exitFunc(1)
 	}
 }
 
 // OnNodeDelete is a handler for Node deletes.
 func (n *NodeManager) OnNodeDelete(node *v1.Node) {
 	klog.InfoS("Node is being deleted", "node", klog.KObj(node))
-	klog.Flush()
-	n.exitFunc(1)
+	// FIXME: exit
+	// klog.Flush()
+	// n.exitFunc(1)
 }
 
 // OnNodeSynced is called after the cache is synced and all pre-existing Nodes have been reported
