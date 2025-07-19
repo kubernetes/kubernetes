@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -742,11 +743,13 @@ func updateStatefulSetAfterInvariantEstablished(
 		}
 	}
 
-	if unavailablePods >= maxUnavailable {
-		logger.V(2).Info("StatefulSet found unavailablePods, more than or equal to allowed maxUnavailable",
+	if unavailablePods > maxUnavailable {
+		logger.V(4).Info("StatefulSet found unavailablePods, more than the allowed maxUnavailable",
 			"statefulSet", klog.KObj(set),
 			"unavailablePods", unavailablePods,
 			"maxUnavailable", maxUnavailable)
+		
+		metrics.MaxUnavailableViolations.WithLabelValues(set.Namespace, set.Name, string(set.Spec.PodManagementPolicy)).Inc()
 		return &status, nil
 	}
 
