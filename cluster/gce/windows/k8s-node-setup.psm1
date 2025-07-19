@@ -1487,8 +1487,8 @@ function Install-Pigz {
 
 # Node Problem Detector Resources
 $NPD_SERVICE = "node-problem-detector"
-$DEFAULT_NPD_VERSION = '0.8.10-gke0.1'
-$DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/gke-release/winnode'
+$DEFAULT_NPD_VERSION = '0.8.20'
+$DEFAULT_NPD_RELEASE_PATH = 'https://github.com/kubernetes/node-problem-detector/releases/download'
 $DEFAULT_NPD_HASH = '97ddfe3544da9e02a1cfb55d24f329eb29d606fca7fbbf800415d5de9dbc29a00563f8e0d1919595c8e316fd989d45b09b13c07be528841fc5fd37e21d016a2d'
 
 # Install Node Problem Detector (NPD).
