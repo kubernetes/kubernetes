@@ -17,6 +17,7 @@ limitations under the License.
 package validate
 
 import (
+	"fmt"
 	"context"
 	"sort"
 
@@ -44,7 +45,7 @@ type MatchFunc[T any] func(T, T) bool
 func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []T,
 	match, equiv MatchFunc[T], validator ValidateFunc[*T]) field.ErrorList {
 	var errs field.ErrorList
-	for i, val := range newSlice {
+	for _, val := range newSlice {
 		var old *T
 		if match != nil && len(oldSlice) > 0 {
 			old = lookup(oldSlice, val, match)
@@ -58,7 +59,7 @@ func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *f
 		if op.Type == operation.Update && old != nil && (equiv == nil || equiv(val, *old)) {
 			continue
 		}
-		errs = append(errs, validator(ctx, op, fldPath.Index(i), &val, old)...)
+		errs = append(errs, validator(ctx, op, fldPath.Key(fmt.Sprintf("name=%v", val)), &val, old)...)
 	}
 	return errs
 }
