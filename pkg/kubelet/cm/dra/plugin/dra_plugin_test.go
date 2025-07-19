@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"testing"
@@ -81,6 +82,10 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	go func() {
 		go func() {
 			if err := s.Serve(listener); err != nil {
+				// TODO: remove once the windows error has been sorted out
+				if err := recover(); err != nil {
+					fmt.Printf("Recovered from err: %v\n %s", err, debug.Stack())
+				}
 				panic(err)
 			}
 		}()

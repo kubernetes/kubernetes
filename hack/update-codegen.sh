@@ -1026,14 +1026,14 @@ function codegen::protobindings() {
 
         "staging/src/k8s.io/kubelet/pkg/apis/dra"
 
-        "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"
-        "pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis"
 
     )
     local apis_using_protoc=(
         "staging/src/k8s.io/kubelet/pkg/apis/podresources"
         "staging/src/k8s.io/kms/apis"
         "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
+        "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"
+        "pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis"
         "staging/src/k8s.io/cri-api/pkg/apis/runtime"
         "staging/src/k8s.io/externaljwt/apis"
     )
