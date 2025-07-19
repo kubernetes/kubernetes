@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -207,7 +208,7 @@ func getExpectedCPULimitFromCPUQuota(cpuQuota int64, podOnCgroupV2 bool) string 
 	return expectedCPULimitString
 }
 
-func getExpectedCPUShares(rr *v1.ResourceRequirements, podOnCgroupv2 bool) int64 {
+func getExpectedCPUShares(rr *v1.ResourceRequirements, podOnCgroupv2 bool) []string {
 	cpuRequest := rr.Requests.Cpu()
 	cpuLimit := rr.Limits.Cpu()
 	var shares int64
@@ -217,10 +218,17 @@ func getExpectedCPUShares(rr *v1.ResourceRequirements, podOnCgroupv2 bool) int64
 		shares = int64(kubecm.MilliCPUToShares(cpuRequest.MilliValue()))
 	}
 	if podOnCgroupv2 {
-		// TODO: This fomula should be a shared function.
-		return 1 + ((shares-2)*9999)/262142
+		// Because of https://github.com/kubernetes/kubernetes/issues/131216, the way of conversion has been changed.
+		// runc: https://github.com/opencontainers/runc/pull/4785
+		// crun: https://github.com/containers/crun/issues/1721
+		// This is dependent on the container runtime version. In order not to break the tests when we upgrade the
+		// container runtimes, we check if either the old or the new conversion matches the actual value for now.
+		// TODO: Remove the old conversion once container runtimes are updated.
+		oldConverted := 1 + ((shares-2)*9999)/262142
+		converted := libcontainercgroups.ConvertCPUSharesToCgroupV2Value(uint64(shares))
+		return []string{strconv.FormatInt(oldConverted, 10), strconv.FormatInt(int64(converted), 10)}
 	} else {
-		return shares
+		return []string{strconv.FormatInt(shares, 10)}
 	}
 }
 
@@ -236,7 +244,7 @@ func getExpectedMemLimitString(rr *v1.ResourceRequirements, podOnCgroupv2 bool) 
 func verifyContainerCPUWeight(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	cpuWeightCgPath := getCgroupCPURequestPath(cgroupFsPath, podOnCgroupv2)
 	expectedCPUShares := getExpectedCPUShares(expectedResources, podOnCgroupv2)
-	if err := VerifyCgroupValue(f, pod, containerName, cpuWeightCgPath, strconv.FormatInt(expectedCPUShares, 10)); err != nil {
+	if err := VerifyCgroupValue(f, pod, containerName, cpuWeightCgPath, expectedCPUShares...); err != nil {
 		return fmt.Errorf("failed to verify cpu request cgroup value: %w", err)
 	}
 	return nil
@@ -286,7 +294,7 @@ func verifyPodCPUWeight(f *framework.Framework, pod *v1.Pod, expectedResources *
 		cpuWeightCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupCPUSharesFile)
 	}
 	expectedCPUShares := getExpectedCPUShares(expectedResources, podOnCgroupv2)
-	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuWeightCgPath, strconv.FormatInt(expectedCPUShares, 10)); err != nil {
+	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuWeightCgPath, expectedCPUShares...); err != nil {
 		return fmt.Errorf("pod cgroup cpu weight verification failed: %w", err)
 	}
 	return nil
