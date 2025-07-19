@@ -487,29 +487,38 @@ func defaultPodRequests(obj *v1.Pod) {
 // limits set:
 // The pod-level limit becomes equal to the aggregated hugepages limit of all
 // the containers in the pod.
-func defaultHugePagePodLimits(obj *v1.Pod) {
-	// We only populate defaults when the pod-level resources are partly specified already.
-	if obj.Spec.Resources == nil {
+func defaultHugePagePodLimits(pod *v1.Pod) {
+	// We only populate hugepage limit defaults when the pod-level resources are partly specified.
+	if pod.Spec.Resources == nil {
 		return
 	}
 
-	if len(obj.Spec.Resources.Limits) == 0 && len(obj.Spec.Resources.Requests) == 0 {
+	if len(pod.Spec.Resources.Limits) == 0 && len(pod.Spec.Resources.Requests) == 0 {
 		return
 	}
 
 	var podLims v1.ResourceList
-	podLims = obj.Spec.Resources.Limits
+	podLims = pod.Spec.Resources.Limits
 	if podLims == nil {
 		podLims = make(v1.ResourceList)
 	}
 
-	aggrCtrLims := resourcehelper.AggregateContainerLimits(obj, resourcehelper.PodResourcesOptions{})
+	aggrCtrLims := resourcehelper.AggregateContainerLimits(pod, resourcehelper.PodResourcesOptions{})
 
 	// When containers specify limits for hugepages and pod-level limits are not
 	// set for that resource, the pod-level limit will default to the aggregated
 	// hugepages limit of all the containers.
 	for key, aggrCtrLim := range aggrCtrLims {
-		if _, exists := podLims[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && corev1helper.IsHugePageResourceName(key) {
+		if !resourcehelper.IsSupportedPodLevelResource(key) || !corev1helper.IsHugePageResourceName(key) {
+			continue
+		}
+
+		// We do not default pod-level hugepage limits if there is a hugepage request.
+		if _, exists := pod.Spec.Resources.Requests[key]; exists {
+			continue
+		}
+
+		if _, exists := podLims[key]; !exists {
 			podLims[key] = aggrCtrLim.DeepCopy()
 		}
 	}
@@ -517,6 +526,6 @@ func defaultHugePagePodLimits(obj *v1.Pod) {
 	// Only set pod-level resource limits in the PodSpec if the requirements map
 	// contains entries after collecting container-level limits and pod-level limits for hugepages.
 	if len(podLims) > 0 {
-		obj.Spec.Resources.Limits = podLims
+		pod.Spec.Resources.Limits = podLims
 	}
 }
