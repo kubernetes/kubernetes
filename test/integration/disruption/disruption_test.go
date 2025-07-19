@@ -658,8 +658,9 @@ func TestStalePodDisruption(t *testing.T) {
 			podPhase: v1.PodRunning,
 			wantConditions: []v1.PodCondition{
 				{
-					Type:   v1.DisruptionTarget,
-					Status: v1.ConditionFalse,
+					Type:               v1.DisruptionTarget,
+					Status:             v1.ConditionFalse,
+					ObservedGeneration: 1,
 				},
 			},
 		},
