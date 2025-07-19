@@ -19,14 +19,62 @@ package container
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // TODO(random-liu): We need to better organize runtime errors for introspection.
 
-// ErrCrashLoopBackOff returned when a container Terminated and Kubelet is backing off the restart.
-var ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
+// BackoffError should be used whenever an error needs to specify a particular backoff duration
+// to the Kubelet.
+type BackoffError struct {
+	err         error
+	backoffTime time.Duration
+}
+
+func NewBackoffError(err error, backoffTime time.Duration) *BackoffError {
+	return &BackoffError{
+		err:         err,
+		backoffTime: backoffTime,
+	}
+}
+
+func (e *BackoffError) Error() string {
+	return e.err.Error()
+}
+
+func (e *BackoffError) BackoffTime() time.Duration {
+	return e.backoffTime
+}
+
+// MinBackoff recursively searches through err for BackoffErrors and returns
+// the minimum of all found backoff durations.
+func MinBackoff(err error) (time.Duration, bool) {
+	var ae utilerrors.Aggregate
+	var be *BackoffError
+	switch {
+	case errors.As(err, &be):
+		return be.BackoffTime(), true
+	case errors.As(err, &ae):
+		var min time.Duration
+		found := false
+		for _, e := range ae.Errors() {
+			if backoff, ok := MinBackoff(e); ok {
+				if !found || backoff < min {
+					min = backoff
+					found = true
+				}
+			}
+		}
+		return min, found
+	default:
+		if e := errors.Unwrap(err); e != nil {
+			return MinBackoff(e)
+		}
+		return 0, false
+	}
+}
 
 var (
 	// ErrContainerNotFound returned when a container in the given pod with the
@@ -126,11 +174,11 @@ func (p *PodSyncResult) Fail(err error) {
 func (p *PodSyncResult) Error() error {
 	errlist := []error{}
 	if p.SyncError != nil {
-		errlist = append(errlist, fmt.Errorf("failed to SyncPod: %v", p.SyncError))
+		errlist = append(errlist, fmt.Errorf("failed to SyncPod: %w", p.SyncError))
 	}
 	for _, result := range p.SyncResults {
 		if result.Error != nil {
-			errlist = append(errlist, fmt.Errorf("failed to %q for %q with %v: %q", result.Action, result.Target,
+			errlist = append(errlist, fmt.Errorf("failed to %q for %q with %w: %q", result.Action, result.Target,
 				result.Error, result.Message))
 		}
 	}

@@ -18,11 +18,14 @@ package kubelet
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc/codes"
@@ -878,6 +881,88 @@ func TestUpdatePod(t *testing.T) {
 
 			// TODO: validate processed records for the pod based on the test case, which reduces
 			// the amount of testing we need to do in kubelet_pods_test.go
+		})
+	}
+}
+
+func TestCompleteWorkWithSyncError(t *testing.T) {
+	defaultBackoff := 10 * time.Second
+
+	testCases := []struct {
+		name        string
+		syncErr     error
+		expectedMin time.Duration
+	}{
+		{
+			name:        "generic error uses default backoff",
+			syncErr:     errors.New("generic error"),
+			expectedMin: defaultBackoff,
+		},
+		{
+			name: "BackoffError uses error's backoff",
+			syncErr: kubecontainer.NewBackoffError(
+				errors.New("backoff error"),
+				5*time.Second,
+			),
+			expectedMin: 5 * time.Second,
+		},
+		{
+			name: "Aggregate error with one BackoffError uses its backoff",
+			syncErr: utilerrors.NewAggregate([]error{
+				errors.New("some other error"),
+				kubecontainer.NewBackoffError(
+					errors.New("backoff error in aggregate"),
+					7*time.Second,
+				),
+			}),
+			expectedMin: 7 * time.Second,
+		},
+		{
+			name: "Aggregate error with multiple BackoffErrors uses minimum backoff",
+			syncErr: utilerrors.NewAggregate([]error{
+				kubecontainer.NewBackoffError(
+					errors.New("backoff error 1"),
+					10*time.Second,
+				),
+				kubecontainer.NewBackoffError(
+					errors.New("backoff error 2"),
+					3*time.Second,
+				),
+			}),
+			expectedMin: 3 * time.Second,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			podWorkers, _, _ := createPodWorkers()
+			fakeQueue := podWorkers.workQueue.(*fakeQueue)
+			podUID := types.UID("12345")
+
+			podWorkers.backOffPeriod = defaultBackoff
+
+			podWorkers.podLock.Lock()
+			podWorkers.podSyncStatuses[podUID] = &podSyncStatus{}
+			podWorkers.podLock.Unlock()
+
+			podWorkers.completeWork(podUID, false, tc.syncErr)
+
+			if fakeQueue.Empty() {
+				t.Fatalf("work queue should not be empty")
+			}
+			items := fakeQueue.Items()
+			if len(items) != 1 {
+				t.Fatalf("expected 1 item in queue, got %d", len(items))
+			}
+			item := items[0]
+			if item.UID != podUID {
+				t.Errorf("expected pod UID %q, got %q", podUID, item.UID)
+			}
+
+			expectedMax := tc.expectedMin + time.Duration(float64(tc.expectedMin)*workerBackOffPeriodJitterFactor)
+			if item.Delay < tc.expectedMin || item.Delay >= expectedMax {
+				t.Errorf("expected delay in range [%v, %v), got %v", tc.expectedMin, expectedMax, item.Delay)
+			}
 		})
 	}
 }
