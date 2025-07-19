@@ -14,6 +14,7 @@
 package util
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -109,4 +110,17 @@ func ParseBool(b string) *bool {
 		return nil
 	}
 	return &truth
+}
+
+// ReadHexFromFile reads a file and attempts to parse a uint64 from a hexadecimal format 0xXX.
+func ReadHexFromFile(path string) (uint64, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	hexString := strings.TrimSpace(string(data))
+	if !strings.HasPrefix(hexString, "0x") {
+		return 0, errors.New("invalid format: hex string does not start with '0x'")
+	}
+	return strconv.ParseUint(hexString[2:], 16, 64)
 }

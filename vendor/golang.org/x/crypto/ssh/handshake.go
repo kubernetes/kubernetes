@@ -5,7 +5,6 @@
 package ssh
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -501,7 +500,7 @@ func (t *handshakeTransport) sendKexInit() error {
 		CompressionClientServer: supportedCompressions,
 		CompressionServerClient: supportedCompressions,
 	}
-	io.ReadFull(rand.Reader, msg.Cookie[:])
+	io.ReadFull(t.config.Rand, msg.Cookie[:])
 
 	// We mutate the KexAlgos slice, in order to add the kex-strict extension algorithm,
 	// and possibly to add the ext-info extension algorithm. Since the slice may be the
