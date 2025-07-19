@@ -33,8 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -64,7 +66,7 @@ var _ = SIGDescribe("Security Context", func() {
 		podClient = e2epod.NewPodClient(f)
 	})
 
-	ginkgo.Context("When creating a pod with HostUsers", func() {
+	ginkgo.Context("When creating a pod with HostUsers [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func() {
 		ginkgo.BeforeEach(func() {
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 		})
@@ -89,7 +91,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		}
 
-		f.It("must create the user namespace if set to false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("must create the user namespace if set to false", func(ctx context.Context) {
 			// with hostUsers=false the pod must use a new user namespace
 			podClient := e2epod.PodClientNS(f, f.Namespace.Name)
 
@@ -127,7 +129,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("must create the user namespace in the configured hostUID/hostGID range [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("must create the user namespace in the configured hostUID/hostGID range", func(ctx context.Context) {
 			// We need to check with the binary "getsubuids" the mappings for the kubelet.
 			// If something is not present, we skip the test as the node wasn't configured to run this test.
 			id, length, err := kubeletUsernsMappings(getsubuidsBinary)
@@ -195,7 +197,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("must not create the user namespace if set to true [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("must not create the user namespace if set to true", func(ctx context.Context) {
 			// with hostUsers=true the pod must use the host user namespace
 			pod := makePod(true)
 			// When running in the host's user namespace, the /proc/self/uid_map file content looks like:
@@ -206,7 +208,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		f.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("should mount all volumes with proper permissions with hostUsers=false", func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -328,7 +330,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		f.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+		f.It("should set FSGroup to user inside the container with hostUsers=false", func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -386,6 +388,38 @@ var _ = SIGDescribe("Security Context", func() {
 			e2epodoutput.TestContainerOutput(ctx, f, "check FSGroup is mapped correctly", pod, 0, []string{
 				strings.Repeat(fmt.Sprintf("=%v\n", fsGroup), len(configMap.Data)),
 			})
+		})
+		f.It("metrics should report count of started and failed user namespaced pods", func(ctx context.Context) {
+			targetNode, err := findLinuxNode(ctx, f)
+			framework.ExpectNoError(err, "Error finding Linux node")
+			framework.Logf("Using node: %v", targetNode.Name)
+
+			ginkgo.By("Getting initial kubelet metrics values")
+			beforeMetrics, err := getCurrentUserNamespacedPodsMetrics(ctx, f, targetNode.Name)
+			framework.ExpectNoError(err, "Error getting initial kubelet metrics for node")
+			framework.Logf("Initial UserNamespaced pods metrics -- StartedPods: %v, StartedPodsErrors: %v", beforeMetrics.StartedPods, beforeMetrics.StartedPodsErrors)
+
+			ginkgo.By("Scheduling a pod with a UserNamespace that will fail")
+
+			createdPod := makePod(false)
+			createdPod.Spec.NodeName = targetNode.Name
+			createdPod.Spec.Containers[0].Command = []string{"bogus"}
+
+			createdPod = e2epod.NewPodClient(f).Create(ctx, createdPod)
+			ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, createdPod)
+			framework.ExpectNoError(err)
+			gomega.Expect(ev).NotTo(gomega.BeNil())
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
+
+			ginkgo.By("Getting subsequent kubelet metrics values")
+
+			afterMetrics, err := getCurrentUserNamespacedPodsMetrics(ctx, f, targetNode.Name)
+			framework.ExpectNoError(err, "Error getting subsequent kubelet metrics for node")
+			framework.Logf("Subsequent UserNamespaced pods metrics -- StartedPods: %v, StartedPodsErrors: %v", afterMetrics.StartedPods, afterMetrics.StartedPodsErrors)
+
+			ginkgo.By("Ensuring metrics were updated")
+			gomega.Expect(beforeMetrics.StartedPods).To(gomega.BeNumerically("<", afterMetrics.StartedPods), "Count of started UserNamespaced pods should increase")
+			gomega.Expect(beforeMetrics.StartedPodsErrors).To(gomega.BeNumerically("<", afterMetrics.StartedPodsErrors), "Count of started UserNamespaced pods errors should increase")
 		})
 	})
 
@@ -1064,4 +1098,32 @@ func kubeletUsernsMappings(subuidBinary string) (uint32, uint32, error) {
 	}
 
 	return parseGetSubIdsOutput(string(outUids))
+}
+
+// getCurrentUserNamespacedPodsMetrics returns a UserNamespacedPodsMetrics object. Any metrics that do not have any
+// values reported will be set to 0.
+func getCurrentUserNamespacedPodsMetrics(ctx context.Context, f *framework.Framework, nodeName string) (UserNamespacedPodsMetrics, error) {
+	var result UserNamespacedPodsMetrics
+
+	m, err := e2emetrics.GetKubeletMetrics(ctx, f.ClientSet, nodeName)
+	if err != nil {
+		return result, err
+	}
+
+	samples := m[metrics.StartedUserNamespacedPodsTotalKey]
+	for _, v := range samples {
+		result.StartedPods += int(v.Value)
+	}
+
+	samples = m[metrics.StartedUserNamespacedPodsErrorsTotalKey]
+	for _, v := range samples {
+		result.StartedPodsErrors += int(v.Value)
+	}
+
+	return result, nil
+}
+
+type UserNamespacedPodsMetrics struct {
+	StartedPods       int
+	StartedPodsErrors int
 }
