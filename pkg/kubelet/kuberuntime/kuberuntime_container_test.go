@@ -81,7 +81,6 @@ func TestRemoveContainer(t *testing.T) {
 	podLogsDirectory := "/var/log/pods"
 	expectedContainerLogPath := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log")
 	expectedContainerLogPathRotated := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
-	expectedContainerLogSymlink := legacyLogSymlink(containerID, "foo", "bar", "new")
 
 	fakeOS.Create(expectedContainerLogPath)
 	fakeOS.Create(expectedContainerLogPathRotated)
@@ -92,7 +91,7 @@ func TestRemoveContainer(t *testing.T) {
 	// Verify container log is removed.
 	// We could not predict the order of `fakeOS.Removes`, so we use `assert.ElementsMatch` here.
 	assert.ElementsMatch(t,
-		[]string{expectedContainerLogSymlink, expectedContainerLogPath, expectedContainerLogPathRotated},
+		[]string{expectedContainerLogPath, expectedContainerLogPathRotated},
 		fakeOS.Removes)
 	// Verify container is removed
 	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
