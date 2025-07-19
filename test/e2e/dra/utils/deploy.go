@@ -47,17 +47,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery/cached/memory"
-	resourceapiinformer "k8s.io/client-go/informers/resource/v1beta2"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
+	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
@@ -129,7 +132,40 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 
 	// Watch claims in the namespace. This is useful for monitoring a test
 	// and enables additional sanity checks.
-	claimInformer := resourceapiinformer.NewResourceClaimInformer(f.ClientSet, f.Namespace.Name, 100*time.Hour /* resync */, nil)
+	resourceClaimLogger := klog.LoggerWithName(klog.FromContext(ctx), "ResourceClaimListWatch")
+	var resourceClaimWatchCounter atomic.Int32
+	resourceClient := draclient.New(f.ClientSet)
+	claimInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				slices, err := resourceClient.ResourceClaims("").List(ctx, options)
+				if err == nil {
+					resourceClaimLogger.Info("Listed ResourceClaims", "resourceAPI", resourceClient.CurrentAPI(), "numClaims", len(slices.Items), "listMeta", slices.ListMeta)
+				} else {
+					resourceClaimLogger.Info("Listing ResourceClaims failed", "resourceAPI", resourceClient.CurrentAPI(), "err", err)
+				}
+				return slices, err
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				w, err := resourceClient.ResourceClaims("").Watch(ctx, options)
+				if err == nil {
+					resourceClaimLogger.Info("Started watching ResourceClaims", "resourceAPI", resourceClient.CurrentAPI())
+					wrapper := newWatchWrapper(klog.LoggerWithName(resourceClaimLogger, fmt.Sprintf("%d", resourceClaimWatchCounter.Load())), w)
+					resourceClaimWatchCounter.Add(1)
+					go wrapper.run()
+					w = wrapper
+				} else {
+					resourceClaimLogger.Info("Watching ResourceClaims failed", "resourceAPI", resourceClient.CurrentAPI(), "err", err)
+				}
+				return w, err
+			},
+		},
+		&resourceapi.ResourceClaim{},
+		// No resync because all it would do is periodically trigger syncing pools
+		// again by reporting all slices as updated with the object as old/new.
+		0,
+		nil,
+	)
 	cancelCtx, cancel := context.WithCancelCause(context.Background())
 	var wg sync.WaitGroup
 	ginkgo.DeferCleanup(func() {
@@ -140,20 +176,23 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 		AddFunc: func(obj any) {
 			defer ginkgo.GinkgoRecover()
 			claim := obj.(*resourceapi.ResourceClaim)
-			framework.Logf("New claim:\n%s", format.Object(claim, 1))
+			resourceClaimLogger.Info("New claim", "claim", format.Object(claim, 0))
 			validateClaim(claim)
 		},
 		UpdateFunc: func(oldObj, newObj any) {
 			defer ginkgo.GinkgoRecover()
 			oldClaim := oldObj.(*resourceapi.ResourceClaim)
 			newClaim := newObj.(*resourceapi.ResourceClaim)
-			framework.Logf("Updated claim:\n%s\nDiff:\n%s", format.Object(newClaim, 1), cmp.Diff(oldClaim, newClaim))
+			resourceClaimLogger.Info("Updated claim", "newClaim", format.Object(newClaim, 0), "diff", cmp.Diff(oldClaim, newClaim))
 			validateClaim(newClaim)
 		},
 		DeleteFunc: func(obj any) {
 			defer ginkgo.GinkgoRecover()
+			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+				obj = tombstone.Obj
+			}
 			claim := obj.(*resourceapi.ResourceClaim)
-			framework.Logf("Deleted claim:\n%s", format.Object(claim, 1))
+			resourceClaimLogger.Info("Deleted claim", "claim", format.Object(claim, 0))
 		},
 	})
 	framework.ExpectNoError(err, "AddEventHandler")
@@ -162,6 +201,43 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 		defer wg.Done()
 		claimInformer.Run(cancelCtx.Done())
 	}()
+}
+
+type watchWrapper struct {
+	logger     klog.Logger
+	delegate   watch.Interface
+	resultChan chan watch.Event
+}
+
+func newWatchWrapper(logger klog.Logger, delegate watch.Interface) *watchWrapper {
+	return &watchWrapper{
+		logger:     logger,
+		delegate:   delegate,
+		resultChan: make(chan watch.Event, 100),
+	}
+}
+
+func (w *watchWrapper) run() {
+	defer utilruntime.HandleCrashWithLogger(w.logger)
+	defer close(w.resultChan)
+	inputChan := w.delegate.ResultChan()
+	for {
+		event, ok := <-inputChan
+		if !ok {
+			w.logger.Info("Wrapped result channel was closed, stopping event forwarding")
+			return
+		}
+		w.logger.Info("Received event", "event", event.Type, "content", fmt.Sprintf("%T", event.Object))
+		w.resultChan <- event
+	}
+}
+
+func (w *watchWrapper) Stop() {
+	w.delegate.Stop()
+}
+
+func (w *watchWrapper) ResultChan() <-chan watch.Event {
+	return w.resultChan
 }
 
 func validateClaim(claim *resourceapi.ResourceClaim) {

@@ -45,7 +45,7 @@ func init() {
 //
 // More legacy types will get added when reaching GA.
 
-func newConvertingClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any](c *client, native funcs[N, NL, NAC], v1beta1 funcs[O, OL, OAC]) *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC] {
+func newConvertingClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any](c *Client, native funcs[N, NL, NAC], v1beta1 funcs[O, OL, OAC]) *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC] {
 	return &convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]{
 		c:       c,
 		native:  native,
@@ -54,7 +54,7 @@ func newConvertingClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL
 }
 
 type convertingClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any] struct {
-	c       *client
+	c       *Client
 	native  funcs[N, NL, NAC]
 	v1beta1 funcs[O, OL, OAC]
 }
@@ -198,7 +198,7 @@ func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) ApplyStatus(ctx conte
 	return nil, ErrNotImplemented
 }
 
-func newCall[N any](c *client, call func(currentAPI int32) (N, error)) callSequence[N] {
+func newCall[N any](c *Client, call func(currentAPI int32) (N, error)) callSequence[N] {
 	seq := callSequence[N]{
 		c:    c,
 		call: call,
@@ -207,7 +207,7 @@ func newCall[N any](c *client, call func(currentAPI int32) (N, error)) callSeque
 }
 
 type callSequence[N any] struct {
-	c    *client
+	c    *Client
 	call func(currentAPI int32) (N, error)
 }
 
@@ -303,6 +303,8 @@ func (w *watchSomething[NP, N, OP]) ResultChan() <-chan watch.Event {
 }
 
 func (w *watchSomething[NP, N, OP]) run() {
+	defer utilruntime.HandleCrash()
+	defer close(w.resultChan)
 	resultChan := w.upstream.ResultChan()
 	for {
 		e, ok := <-resultChan
@@ -320,9 +322,6 @@ func (w *watchSomething[NP, N, OP]) run() {
 				Type:   e.Type,
 				Object: NP(out),
 			}
-		} else {
-			//nolint:logcheck // Shouldn't happen.
-			klog.Errorf("unexpected object with type %T received from watch", e.Object)
 		}
 		// This must not get blocked when the consumer stops reading,
 		// hence the stopChan.

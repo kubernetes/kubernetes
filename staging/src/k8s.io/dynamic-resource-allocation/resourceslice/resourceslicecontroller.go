@@ -41,7 +41,6 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	cgocore "k8s.io/client-go/kubernetes/typed/core/v1"
-	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	draclient "k8s.io/dynamic-resource-allocation/client"
@@ -77,7 +76,7 @@ type Controller struct {
 	cancel         func(cause error)
 	driverName     string
 	owner          *Owner
-	resourceClient cgoresource.ResourceV1beta2Interface
+	resourceClient *draclient.Client
 	coreClient     cgocore.CoreV1Interface
 	wg             sync.WaitGroup
 	// The queue is keyed with the pool name that needs work.
@@ -436,11 +435,19 @@ func (c *Controller) initInformer(ctx context.Context) error {
 		&cache.ListWatch{
 			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 				tweakListOptions(&options)
-				return c.resourceClient.ResourceSlices().List(ctx, options)
+				slices, err := c.resourceClient.ResourceSlices().List(ctx, options)
+				if err == nil {
+					logger.V(5).Info("Listed ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "numSlices", len(slices.Items), "listMeta", slices.ListMeta)
+				} else {
+					logger.V(5).Info("Listed ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
+				}
+				return slices, err
 			},
 			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 				tweakListOptions(&options)
-				return c.resourceClient.ResourceSlices().Watch(ctx, options)
+				w, err := c.resourceClient.ResourceSlices().Watch(ctx, options)
+				logger.V(5).Info("Started watching ResourceSlices", "resourceAPI", c.resourceClient.CurrentAPI(), "err", err)
+				return w, err
 			},
 		},
 		&resourceapi.ResourceSlice{},
