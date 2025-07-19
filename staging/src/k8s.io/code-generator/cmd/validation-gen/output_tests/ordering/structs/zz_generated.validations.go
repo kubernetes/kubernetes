@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -118,11 +117,6 @@ func Validate_T00(ctx context.Context, op operation.Operation, fldPath *field.Pa
 // Validate_T01 validates an instance of T01 according
 // to declarative validation rules in the API schema.
 func Validate_T01(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T01) (errs field.ErrorList) {
-	// type T01
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T01, no flags")...)
 
 	// field T01.TypeMeta has no validation
@@ -185,11 +179,6 @@ func Validate_T01(ctx context.Context, op operation.Operation, fldPath *field.Pa
 // Validate_T02 validates an instance of T02 according
 // to declarative validation rules in the API schema.
 func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T02) (errs field.ErrorList) {
-	// type T02
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T02, ShortCircuit"); len(e) != 0 {
 		errs = append(errs, e...)
 		return // do not proceed
@@ -267,11 +256,6 @@ func Validate_T02(ctx context.Context, op operation.Operation, fldPath *field.Pa
 // Validate_T03 validates an instance of T03 according
 // to declarative validation rules in the API schema.
 func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T03) (errs field.ErrorList) {
-	// type T03
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T03, ShortCircuit"); len(e) != 0 {
 		errs = append(errs, e...)
 		return // do not proceed
@@ -354,11 +338,6 @@ func Validate_T03(ctx context.Context, op operation.Operation, fldPath *field.Pa
 // Validate_TMultiple validates an instance of TMultiple according
 // to declarative validation rules in the API schema.
 func Validate_TMultiple(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TMultiple) (errs field.ErrorList) {
-	// type TMultiple
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "TMultiple, ShortCircuit 1"); len(e) != 0 {
 		errs = append(errs, e...)
 		return // do not proceed

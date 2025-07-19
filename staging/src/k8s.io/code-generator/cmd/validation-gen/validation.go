@@ -1006,9 +1006,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 		default:
 			panic(fmt.Sprintf("unexpected type-validations on type %v, kind %s", thisNode.valueType, thisNode.valueType.Kind))
 		}
-		sw.Do("// type $.inType|raw$\n", targs)
 		emitComments(validations.Comments, sw)
-		emitRatchetingCheck(c, thisNode.valueType, sw)
 		emitCallsToValidators(c, validations.Functions, sw)
 		if thisNode.valueType.Kind == types.Alias {
 			underlyingNode := thisNode.underlying.node
@@ -1059,6 +1057,49 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			// Accumulate into a buffer so we don't emit empty functions.
 			buf := bytes.NewBuffer(nil)
 			bufsw := sw.Dup(buf)
+
+			// On ratcheting checks:
+			//
+			// We emit ratcheting checks ONLY for struct fields and ONLY when
+			// that field has some validations to call.
+			//
+			// We DO NOT emit ratchet checks inside type-specific validation
+			// functions, because that leads to repeated ratchet checking which
+			// is almost never useful work (keep reading).
+			//
+			// The consequence of this is that a caller of a type's validation
+			// function is assumed to have already done a ratchet check (which
+			// is true for all generated code (except root types, keep
+			// reading)). For struct types (our most common case), the type's
+			// function will do ratchet checks on each sub-field anyway.
+			//
+			// This leaves one case where validation is executed unilaterally:
+			// non-pre-checked calls of validation functions for types which have
+			// type-attached validations.  This can happen in two cases:
+			//   1. an external caller of a type's validation function
+			//   2. the generated register function for a package which calls a
+			//      root-type's validation function
+			//
+			// TODO: We are leaving this as a problem for the future. If we
+			// find that we have a root type which has type-attached validation
+			// AND that validation is being ratcheted, then we will need to
+			// address this. Some options:
+			//   1. emit a ratchet check in the package's register function
+			//   2. emit a ratchet check in the type's validation function
+			//      (IFF it has type-attached validation, perhaps only for root
+			//      types)
+			//   3. emit both "safe" (ratchet check the whole object) and
+			//      "fast" (assume the object was already ratchet checked)
+			//      forms of each type's validation function, so that the
+			//      generated code can call the "fast" form while external code
+			//      calls the "safe" form.
+			//   4. implement depth-first traversal of validation, where each
+			//      function returns an additional bool indicating "something
+			//      changed", which gets propagated up the caller to decide if
+			//      it needs to do higher-level validations (e.g. if any field
+			//      in a struct changes, the struct's type-attached validations
+			//      need to be executed, but if no fields changed they can be
+			//      skipped).
 
 			validations := fld.fieldValidations
 			fldRatchetingChecked := false

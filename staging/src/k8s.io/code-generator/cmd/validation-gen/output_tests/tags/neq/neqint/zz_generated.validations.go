@@ -107,11 +107,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 // Validate_ValidatedIntType validates an instance of ValidatedIntType according
 // to declarative validation rules in the API schema.
 func Validate_ValidatedIntType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ValidatedIntType) (errs field.ErrorList) {
-	// type ValidatedIntType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, 100)...)
 
 	return errs

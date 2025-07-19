@@ -52,11 +52,6 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_OtherStruct validates an instance of OtherStruct according
 // to declarative validation rules in the API schema.
 func Validate_OtherStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) (errs field.ErrorList) {
-	// type OtherStruct
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type OtherStruct")...)
 
 	return errs
@@ -65,11 +60,6 @@ func Validate_OtherStruct(ctx context.Context, op operation.Operation, fldPath *
 // Validate_OtherTypedefStruct validates an instance of OtherTypedefStruct according
 // to declarative validation rules in the API schema.
 func Validate_OtherTypedefStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherTypedefStruct) (errs field.ErrorList) {
-	// type OtherTypedefStruct
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type OtherTypedefStruct")...)
 
 	return errs
@@ -78,11 +68,6 @@ func Validate_OtherTypedefStruct(ctx context.Context, op operation.Operation, fl
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
-	// type Struct
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type Struct")...)
 
 	// field Struct.TypeMeta has no validation

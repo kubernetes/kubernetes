@@ -52,11 +52,6 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_DualItemList validates an instance of DualItemList according
 // to declarative validation rules in the API schema.
 func Validate_DualItemList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj DualItemList) (errs field.ErrorList) {
-	// type DualItemList
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *DualItem) bool { return item.ID == "typedef-target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DualItem) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item DualItems[id=typedef-target] from typedef")
 	})...)
@@ -67,11 +62,6 @@ func Validate_DualItemList(ctx context.Context, op operation.Operation, fldPath 
 // Validate_ItemList validates an instance of ItemList according
 // to declarative validation rules in the API schema.
 func Validate_ItemList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ItemList) (errs field.ErrorList) {
-	// type ItemList
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "immutable" }, validate.DirectEqual, validate.ImmutableByCompare)...)
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "validated" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item ItemList[key=validated]")
@@ -83,11 +73,6 @@ func Validate_ItemList(ctx context.Context, op operation.Operation, fldPath *fie
 // Validate_ItemListAlias validates an instance of ItemListAlias according
 // to declarative validation rules in the API schema.
 func Validate_ItemListAlias(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ItemListAlias) (errs field.ErrorList) {
-	// type ItemListAlias
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "aliased" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item ItemListAlias[key=aliased]")
 	})...)

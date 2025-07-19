@@ -124,11 +124,6 @@ func Validate_T2(ctx context.Context, op operation.Operation, fldPath *field.Pat
 // Validate_T3 validates an instance of T3 according
 // to declarative validation rules in the API schema.
 func Validate_T3(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T3) (errs field.ErrorList) {
-	// type T3
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T3")...)
 
 	// field T3.T4

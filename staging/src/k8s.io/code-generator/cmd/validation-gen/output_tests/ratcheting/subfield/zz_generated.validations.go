@@ -85,11 +85,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 // Validate_StructWithSubfield validates an instance of StructWithSubfield according
 // to declarative validation rules in the API schema.
 func Validate_StructWithSubfield(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StructWithSubfield) (errs field.ErrorList) {
-	// type StructWithSubfield
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "intField", func(o *StructWithSubfield) *int { return &o.IntField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field IntField")
 	})...)

@@ -157,11 +157,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 // Validate_ValidatedInnerStruct validates an instance of ValidatedInnerStruct according
 // to declarative validation rules in the API schema.
 func Validate_ValidatedInnerStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ValidatedInnerStruct) (errs field.ErrorList) {
-	// type ValidatedInnerStruct
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *ValidatedInnerStruct) *string { return &o.StringField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 		return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-typedef-struct")
 	})...)
@@ -173,11 +168,6 @@ func Validate_ValidatedInnerStruct(ctx context.Context, op operation.Operation, 
 // Validate_ValidatedStringSlice validates an instance of ValidatedStringSlice according
 // to declarative validation rules in the API schema.
 func Validate_ValidatedStringSlice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ValidatedStringSlice) (errs field.ErrorList) {
-	// type ValidatedStringSlice
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 		return validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-typedef")
 	})...)
