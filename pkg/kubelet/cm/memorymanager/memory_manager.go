@@ -140,9 +140,9 @@ func NewManager(policyName string, machineInfo *cadvisorapi.MachineInfo, nodeAll
 	case policyTypeNone:
 		policy = NewPolicyNone()
 
-	case policyTypeStatic:
+	case PolicyTypeStatic:
 		if runtime.GOOS == "windows" {
-			return nil, fmt.Errorf("policy %q is not available on Windows", policyTypeStatic)
+			return nil, fmt.Errorf("policy %q is not available on Windows", PolicyTypeStatic)
 		}
 
 		systemReserved, err := getSystemReservedMemory(machineInfo, nodeAllocatableReservation, reservedMemory)
