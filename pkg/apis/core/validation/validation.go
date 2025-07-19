@@ -2155,11 +2155,6 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume, opts Pe
 		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update is forbidden when the VolumeAttributesClass feature gate is disabled"))
 		}
-		if opts.EnableVolumeAttributesClass {
-			if oldPv.Spec.VolumeAttributesClassName != nil && newPv.Spec.VolumeAttributesClassName == nil {
-				allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update from non-nil value to nil is forbidden"))
-			}
-		}
 	}
 
 	return allErrs
@@ -2431,7 +2426,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 		newPvcClone.Spec.Resources.Requests["storage"] = oldPvc.Spec.Resources.Requests["storage"] // +k8s:verify-mutation:reason=clone
 	}
 	// lets make sure volume attributes class name is same.
-	if newPvc.Status.Phase == core.ClaimBound && newPvcClone.Spec.VolumeAttributesClassName != nil {
+	if newPvc.Status.Phase == core.ClaimBound {
 		newPvcClone.Spec.VolumeAttributesClassName = oldPvcClone.Spec.VolumeAttributesClassName // +k8s:verify-mutation:reason=clone
 	}
 
@@ -2461,15 +2456,6 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *core.PersistentVolumeCl
 	if !apiequality.Semantic.DeepEqual(oldPvc.Spec.VolumeAttributesClassName, newPvc.Spec.VolumeAttributesClassName) {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update is forbidden when the VolumeAttributesClass feature gate is disabled"))
-		}
-		if opts.EnableVolumeAttributesClass {
-			if oldPvc.Spec.VolumeAttributesClassName != nil {
-				if newPvc.Spec.VolumeAttributesClassName == nil {
-					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update from non-nil value to nil is forbidden"))
-				} else if len(*newPvc.Spec.VolumeAttributesClassName) == 0 {
-					allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "volumeAttributesClassName"), "update from non-nil value to an empty string is forbidden"))
-				}
-			}
 		}
 	}
 
