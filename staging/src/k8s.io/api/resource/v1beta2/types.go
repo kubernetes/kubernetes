@@ -386,20 +386,16 @@ type ResourcePool struct {
 	ResourceSliceCount int64 `json:"resourceSliceCount" protobuf:"bytes,3,name=resourceSliceCount"`
 }
 
-const ResourceSliceMaxSharedCapacity = 128
+// Defines the maximum number of devices that can be specified in a single ResourceSlice.
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
 
-// Defines the max number of shared counters that can be specified
-// in a ResourceSlice. The number is summed up across all sets.
-const ResourceSliceMaxSharedCounters = 32
+// Defines the max number of counters that can be defined in a ResourceSlice. This includes
+// both counters defined in counter sets and in counter set mixins.
+const ResourceSliceMaxCountersPerResourceSlice = 256
 
 // Defines the maximum number of include entries allowed.
 const ResourceSliceMaxIncludes = 8
-
-// Defines the maximum number of attributes, capacity, and counters allowed
-// across all mixins in a ResourceSlice.
-const ResourceSliceMaxMixins = 256
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
@@ -572,16 +568,18 @@ type Counter struct {
 	Value resource.Quantity `json:"value" protobuf:"bytes,1,rep,name=value"`
 }
 
-// Limit for the sum of the number of entries in both attributes and capacity.
-const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
+// Limit for the sum of attributes and capacities that can be specified across
+// devices and device mixins in a ResourceSlice.
+const ResourceSliceMaxAttributesAndCapacitiesPerResourceSlice = 4096
 
-// Limit for the total number of counters in each device.
-const ResourceSliceMaxCountersPerDevice = 32
+// Limit for the sum of the number of attributes and capacities that can be
+// set on a device after mixins have been applied.
+const ResourceSliceMaxAttributesAndCapacitiesPerDeviceAfterMixins = 32
 
 // Limit for the total number of counters defined in devices in
-// a ResourceSlice. We want to allow up to 64 devices to specify
-// up to 16 counters, so the limit for the ResourceSlice will be 1024.
-const ResourceSliceMaxDeviceCountersPerSlice = 1024 // 64 * 16
+// a ResourceSlice. With the maximum number of devices in a ResourceSlice
+// (2048) there can be on average 16 counters per device.
+const ResourceSliceMaxConsumedCountersPerResourceSlice = 2048
 
 // QualifiedName is the name of a device attribute or capacity.
 //
