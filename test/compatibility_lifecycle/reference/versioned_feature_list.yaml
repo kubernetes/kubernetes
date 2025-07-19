@@ -246,6 +246,11 @@
   - default: true
     lockToDefault: true
     preRelease: GA
+- name: ConstrainedImpersonation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
     version: "1.34"
 - name: ContainerCheckpoint
   versionedSpecs:
