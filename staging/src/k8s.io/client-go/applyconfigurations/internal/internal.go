@@ -3116,6 +3116,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.autoscaling.v2.CrossVersionObjectReference
       default: {}
+    - name: selectionStrategy
+      type:
+        scalar: string
 - name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerStatus
   map:
     fields:
