@@ -900,6 +900,134 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		gomega.Expect(tokenReview.Status.Authenticated).To(gomega.BeTrueBecause("expect that the TokenReview is authenticated"))
 		gomega.Expect(tokenReview.Status.Error).To(gomega.BeEmpty(), "confirm that there are no TokenReview errors")
 	})
+
+	/*
+	   Release: v1.32
+	   Testname: Service Account Token Rotation in Terminating Pods
+	   Description: A projected service account token MUST be rotated by the Kubelet
+	   for a pod that is in the 'Terminating' state. This test creates a pod with a
+	   short-lived token. It then delete a pod and observe in-cluster logs for token rotation.
+	   At the end of the test there should be at least two tokens in the logs.
+	*/
+	f.It("should rotate a projected service account token for a pod in the Terminating state", f.WithSlow(), func(ctx context.Context) {
+		podName := "pod-terminating-token-test-" + string(uuid.NewUUID())
+		containerName := "main-test-container"
+		gracePeriod := int64(1200) // longer than the test run
+		tenMin := int64(10 * 60)
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: podName},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  containerName,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"inclusterclient"},
+					VolumeMounts: []v1.VolumeMount{{
+						MountPath: serviceaccount.DefaultAPITokenMountPath,
+						Name:      "kube-api-access-e2e",
+						ReadOnly:  true,
+					}},
+					Lifecycle: &v1.Lifecycle{
+						PreStop: &v1.LifecycleHandler{
+							Exec: &v1.ExecAction{
+								Command: []string{"sleep", "1200"},
+							},
+						},
+					},
+				}},
+				RestartPolicy:                 v1.RestartPolicyNever,
+				TerminationGracePeriodSeconds: &gracePeriod,
+				ServiceAccountName:            "default",
+				Volumes: []v1.Volume{{
+					Name: "kube-api-access-e2e",
+					VolumeSource: v1.VolumeSource{
+						Projected: &v1.ProjectedVolumeSource{
+							Sources: []v1.VolumeProjection{
+								{
+									ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+										Path:              "token",
+										ExpirationSeconds: &tenMin,
+									},
+								},
+								{
+									ConfigMap: &v1.ConfigMapProjection{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "kube-root-ca.crt",
+										},
+										Items: []v1.KeyToPath{
+											{
+												Key:  "ca.crt",
+												Path: "ca.crt",
+											},
+										},
+									},
+								},
+								{
+									DownwardAPI: &v1.DownwardAPIProjection{
+										Items: []v1.DownwardAPIVolumeFile{
+											{
+												Path: "namespace",
+												FieldRef: &v1.ObjectFieldSelector{
+													APIVersion: "v1",
+													FieldPath:  "metadata.namespace",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+			},
+		}
+		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		framework.Logf("created pod")
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, time.Minute))
+
+		framework.Logf("pod is ready")
+
+		framework.Logf("deleting pod")
+		framework.Logf("deleting pod to trigger termination")
+		go func() {
+			err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, podName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete pod")
+		}()
+
+		framework.Logf("verifying pod is in Terminating state")
+		err = e2epod.WaitForPodTerminatingInNamespaceTimeout(ctx, f.ClientSet, podName, f.Namespace.Name, time.Minute)
+		framework.ExpectNoError(err, "pod did not enter terminating state")
+
+		var logs string
+		err = wait.PollUntilContextTimeout(ctx, 1*time.Minute, 20*time.Minute, true, func(ctx context.Context) (done bool, err error) {
+			select {
+			case <-ctx.Done():
+				return false, ctx.Err()
+			default:
+				{
+					framework.Logf("polling logs")
+					logs, err = e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, containerName)
+					if err != nil {
+						framework.Logf("Error pulling logs: %v", err)
+						return false, nil
+					}
+					tokenCount, err := ParseInClusterClientLogs(logs)
+					if err != nil {
+						return false, fmt.Errorf("inclusterclient reported an error: %w", err)
+					}
+					if tokenCount < 2 {
+						framework.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)
+						return false, nil
+					}
+					return true, nil
+				}
+			}
+		})
+		if err != nil {
+			framework.Failf("Unexpected error: %v\n%s", err, logs)
+		}
+	})
 })
 
 var reportLogsParser = regexp.MustCompile("([a-zA-Z0-9-_]*)=([a-zA-Z0-9-_]*)$")
