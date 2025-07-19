@@ -1842,6 +1842,54 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 			expCPUAlloc: true,
 			expCSet:     cpuset.New(2, 3, 122, 123), // takeFullCores
 		},
+		{
+			// test feature compatibility with strict-cpu-reservation on split cache architecture
+			description:     "GuPodSingleContainer, SingleSocketSMTSmallUncore, StrictReserveCompatability",
+			topo:            topoSingleSocketSingleNumaPerSocketSMTSmallUncore,
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 64, 65), // note 4 cpus taken from uncore 0
+			cpuPolicyOptions: map[string]string{
+				StrictCPUReservationOption:     "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoSingleSocketSingleNumaPerSocketSMTSmallUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"2000m", "2000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 66), // should avoid reserved cpuset
+		},
+		{
+			// test feature compatibility with strict-cpu-reservation on monolithic uncore architecture
+			description:     "GuPodSingleContainer, DualSocketHTMonoUncore, StrictReserveCompatability",
+			topo:            topoDualSocketSubNumaPerSocketHTMonolithicUncore,
+			numReservedCPUs: 4,
+			reserved:        cpuset.New(0, 1, 120, 121), // first two cpus reserved
+			cpuPolicyOptions: map[string]string{
+				StrictCPUReservationOption:     "true",
+				PreferAlignByUnCoreCacheOption: "true",
+			},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: topoDualSocketSubNumaPerSocketHTMonolithicUncore.CPUDetails.CPUs(),
+			pod: WithPodUID(
+				makeMultiContainerPod(
+					[]struct{ request, limit string }{}, // init container
+					[]struct{ request, limit string }{ // app container
+						{"4000m", "4000m"},
+					},
+				),
+				"with-single-container",
+			),
+			expCPUAlloc: true,
+			expCSet:     cpuset.New(2, 3, 122, 123), // packed assignment avoid reserved cpuset
+		},
 	}
 
 	for _, testCase := range testCases {
