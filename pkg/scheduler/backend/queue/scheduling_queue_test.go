@@ -49,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/schedulinggates"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -1225,7 +1224,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 		},
 		{
 			name:  "when updating a pod which is in unschedulable pods but the plugin returns skip, it will remain in unschedulablePods",
-			wantQ: unschedulablePods,
+			wantQ: unschedulableQ,
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
 				q.unschedulablePods.addOrUpdate(q.newQueuedPodInfo(medPriorityPodInfo.Pod, skipPlugin), framework.EventUnscheduledPodAdd.Label())
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
@@ -1289,7 +1288,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 				})
 
 				if pInfoFromUnsched := q.unschedulablePods.get(newPod); pInfoFromUnsched != nil {
-					if tt.wantQ != unschedulablePods {
+					if tt.wantQ != unschedulableQ {
 						t.Errorf("expected pod %s to not be queued to unschedulablePods, but it was", newPod.Name)
 					}
 					pInfo = pInfoFromUnsched
@@ -1920,7 +1919,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			name:      "Skip queues pod to unschedulablePods",
 			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
 			hint:      queueHintReturnSkip,
-			expectedQ: unschedulablePods,
+			expectedQ: unschedulableQ,
 		},
 		{
 			name:    "QueueHintFunction is not called when Pod is gated by the plugin that isn't interested in the event",
@@ -1931,7 +1930,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			hint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 				return fwk.Queue, fmt.Errorf("QueueingHintFn should not be called as pod is gated")
 			},
-			expectedQ: unschedulablePods,
+			expectedQ: unschedulableQ,
 		},
 		{
 			name:    "QueueHintFunction is called when Pod is gated by the plugin that is interested in the event",
@@ -1987,7 +1986,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 				t.Fatalf("expected pod to be queued to activeQ, but it was not")
 			}
 
-			if q.unschedulablePods.get(test.podInfo.Pod) == nil && test.expectedQ == unschedulablePods {
+			if q.unschedulablePods.get(test.podInfo.Pod) == nil && test.expectedQ == unschedulableQ {
 				t.Fatalf("expected pod to be queued to unschedulablePods, but it was not")
 			}
 		})
@@ -2729,115 +2728,6 @@ func TestPriorityQueue_NewWithOptions(t *testing.T) {
 
 	if q.backoffQ.podMaxBackoffDuration() != 20*time.Second {
 		t.Errorf("Unexpected pod backoff max duration. Expected: %v, got: %v", 2*time.Second, q.backoffQ.podMaxBackoffDuration())
-	}
-}
-
-func TestUnschedulablePodsMap(t *testing.T) {
-	var pods = []*v1.Pod{
-		st.MakePod().Name("p0").Namespace("ns1").Annotation("annot1", "val1").NominatedNodeName("node1").Obj(),
-		st.MakePod().Name("p1").Namespace("ns1").Annotation("annot", "val").Obj(),
-		st.MakePod().Name("p2").Namespace("ns2").Annotation("annot2", "val2").Annotation("annot3", "val3").NominatedNodeName("node3").Obj(),
-		st.MakePod().Name("p3").Namespace("ns4").Annotation("annot2", "val2").Annotation("annot3", "val3").NominatedNodeName("node1").Obj(),
-	}
-	var updatedPods = make([]*v1.Pod, len(pods))
-	updatedPods[0] = pods[0].DeepCopy()
-	updatedPods[1] = pods[1].DeepCopy()
-	updatedPods[3] = pods[3].DeepCopy()
-
-	tests := []struct {
-		name                   string
-		podsToAdd              []*v1.Pod
-		expectedMapAfterAdd    map[string]*framework.QueuedPodInfo
-		podsToUpdate           []*v1.Pod
-		expectedMapAfterUpdate map[string]*framework.QueuedPodInfo
-		podsToDelete           []*v1.Pod
-		expectedMapAfterDelete map[string]*framework.QueuedPodInfo
-	}{
-		{
-			name:      "create, update, delete subset of pods",
-			podsToAdd: []*v1.Pod{pods[0], pods[1], pods[2], pods[3]},
-			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
-			},
-			podsToUpdate: []*v1.Pod{updatedPods[0]},
-			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, updatedPods[0]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
-			},
-			podsToDelete: []*v1.Pod{pods[0], pods[1]},
-			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
-			},
-		},
-		{
-			name:      "create, update, delete all",
-			podsToAdd: []*v1.Pod{pods[0], pods[3]},
-			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, pods[3]), UnschedulablePlugins: sets.New[string]()},
-			},
-			podsToUpdate: []*v1.Pod{updatedPods[3]},
-			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[0]): {PodInfo: mustNewTestPodInfo(t, pods[0]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[3]): {PodInfo: mustNewTestPodInfo(t, updatedPods[3]), UnschedulablePlugins: sets.New[string]()},
-			},
-			podsToDelete:           []*v1.Pod{pods[0], pods[3]},
-			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{},
-		},
-		{
-			name:      "delete non-existing and existing pods",
-			podsToAdd: []*v1.Pod{pods[1], pods[2]},
-			expectedMapAfterAdd: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, pods[1]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
-			},
-			podsToUpdate: []*v1.Pod{updatedPods[1]},
-			expectedMapAfterUpdate: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.New[string]()},
-				util.GetPodFullName(pods[2]): {PodInfo: mustNewTestPodInfo(t, pods[2]), UnschedulablePlugins: sets.New[string]()},
-			},
-			podsToDelete: []*v1.Pod{pods[2], pods[3]},
-			expectedMapAfterDelete: map[string]*framework.QueuedPodInfo{
-				util.GetPodFullName(pods[1]): {PodInfo: mustNewTestPodInfo(t, updatedPods[1]), UnschedulablePlugins: sets.New[string]()},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			upm := newUnschedulablePods(nil, nil)
-			for _, p := range test.podsToAdd {
-				upm.addOrUpdate(newQueuedPodInfoForLookup(p), framework.EventUnscheduledPodAdd.Label())
-			}
-			if diff := cmp.Diff(test.expectedMapAfterAdd, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
-				t.Errorf("Unexpected map after adding pods(-want, +got):\n%s", diff)
-			}
-
-			if len(test.podsToUpdate) > 0 {
-				for _, p := range test.podsToUpdate {
-					upm.addOrUpdate(newQueuedPodInfoForLookup(p), framework.EventUnscheduledPodUpdate.Label())
-				}
-				if diff := cmp.Diff(test.expectedMapAfterUpdate, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
-					t.Errorf("Unexpected map after updating pods (-want, +got):\n%s", diff)
-				}
-			}
-			for _, p := range test.podsToDelete {
-				upm.delete(p, false)
-			}
-			if diff := cmp.Diff(test.expectedMapAfterDelete, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
-				t.Errorf("Unexpected map after deleting pods (-want, +got):\n%s", diff)
-			}
-			upm.clear()
-			if len(upm.podInfoMap) != 0 {
-				t.Errorf("Expected the map to be empty, but has %v elements.", len(upm.podInfoMap))
-			}
-		})
 	}
 }
 

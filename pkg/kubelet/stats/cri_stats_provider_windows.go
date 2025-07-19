@@ -31,6 +31,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/utils/ptr"
 )
 
 // windowsNetworkStatsProvider creates an interface that allows for testing the logic without needing to create a container
@@ -131,8 +132,8 @@ func (p *criStatsProvider) makeWinContainerStats(
 		}
 	} else {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.CPU.UsageCoreNanoSeconds = uint64Ptr(0)
-		result.CPU.UsageNanoCores = uint64Ptr(0)
+		result.CPU.UsageCoreNanoSeconds = ptr.To[uint64](0)
+		result.CPU.UsageNanoCores = ptr.To[uint64](0)
 	}
 	if stats.Memory != nil {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, stats.Memory.Timestamp))
@@ -147,9 +148,9 @@ func (p *criStatsProvider) makeWinContainerStats(
 		}
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
-		result.Memory.WorkingSetBytes = uint64Ptr(0)
-		result.Memory.AvailableBytes = uint64Ptr(0)
-		result.Memory.PageFaults = uint64Ptr(0)
+		result.Memory.WorkingSetBytes = ptr.To[uint64](0)
+		result.Memory.AvailableBytes = ptr.To[uint64](0)
+		result.Memory.PageFaults = ptr.To[uint64](0)
 	}
 	if stats.WritableLayer != nil {
 		result.Rootfs.Time = metav1.NewTime(time.Unix(0, stats.WritableLayer.Timestamp))

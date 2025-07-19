@@ -346,6 +346,14 @@ type FilterPlugin interface {
 	// For example, during preemption, we may pass a copy of the original
 	// nodeInfo object that has some pods removed from it to evaluate the
 	// possibility of preempting them to schedule the target pod.
+	//
+	// Plugins are encouraged to check the context for cancellation.
+	// Once canceled, they should return as soon as possible with
+	// an UnschedulableAndUnresolvable status that includes the
+	// `context.Cause(ctx)` error explanation. For example, the
+	// context gets canceled when a sufficient number of suitable
+	// nodes have been found and searching for more isn't necessary
+	// anymore.
 	Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *fwk.Status
 }
 
@@ -432,6 +440,12 @@ type ReservePlugin interface {
 // These plugins are called before a pod being scheduled.
 type PreBindPlugin interface {
 	Plugin
+	// PreBindPreFlight is called before PreBind, and the plugin is supposed to return Success, Skip, or Error status.
+	// If it returns Success, it means this PreBind plugin will handle this pod.
+	// If it returns Skip, it means this PreBind plugin has nothing to do with the pod, and PreBind will be skipped.
+	// This function should be lightweight, and shouldn't do any actual operation, e.g., creating a volume etc.
+	PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status
+
 	// PreBind is called before binding a pod. All prebind plugins must return
 	// success or the pod will be rejected and won't be sent for binding.
 	PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status

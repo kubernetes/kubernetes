@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/schemaconv"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	smdschema "sigs.k8s.io/structured-merge-diff/v4/schema"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
-	"sigs.k8s.io/structured-merge-diff/v4/value"
+	smdschema "sigs.k8s.io/structured-merge-diff/v6/schema"
+	"sigs.k8s.io/structured-merge-diff/v6/typed"
+	"sigs.k8s.io/structured-merge-diff/v6/value"
 )
 
 // TypeConverter allows you to convert from runtime.Object to

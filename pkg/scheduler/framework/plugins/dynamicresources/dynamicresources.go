@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -41,10 +42,13 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -68,7 +72,8 @@ type stateData struct {
 	claims []*resourceapi.ResourceClaim
 
 	// Allocator handles claims with structured parameters.
-	allocator *structured.Allocator
+	allocator        structured.Allocator
+	claimsToAllocate []*resourceapi.ResourceClaim
 
 	// mutex must be locked while accessing any of the fields below.
 	mutex sync.Mutex
@@ -108,6 +113,8 @@ type DynamicResources struct {
 	enableSchedulingQueueHint  bool
 	enablePartitionableDevices bool
 	enableDeviceTaints         bool
+	enableFilterTimeout        bool
+	filterTimeout              time.Duration
 
 	fh         framework.Handle
 	clientset  kubernetes.Interface
@@ -122,13 +129,23 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		return &DynamicResources{}, nil
 	}
 
+	args, ok := plArgs.(*config.DynamicResourcesArgs)
+	if !ok {
+		return nil, fmt.Errorf("got args of type %T, want *DynamicResourcesArgs", plArgs)
+	}
+	if err := validation.ValidateDynamicResourcesArgs(nil, args, fts); err != nil {
+		return nil, err
+	}
+
 	pl := &DynamicResources{
 		enabled:                    true,
 		enableAdminAccess:          fts.EnableDRAAdminAccess,
 		enableDeviceTaints:         fts.EnableDRADeviceTaints,
 		enablePrioritizedList:      fts.EnableDRAPrioritizedList,
+		enableFilterTimeout:        fts.EnableDRASchedulerFilterTimeout,
 		enableSchedulingQueueHint:  fts.EnableSchedulingQueueHint,
 		enablePartitionableDevices: fts.EnablePartitionableDevices,
+		filterTimeout:              ptr.Deref(args.FilterTimeout, metav1.Duration{}).Duration,
 
 		fh:        fh,
 		clientset: fh.ClientSet(),
@@ -374,7 +391,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 	}
 
 	// All claims which the scheduler needs to allocate itself.
-	allocateClaims := make([]*resourceapi.ResourceClaim, 0, len(claims))
+	claimsToAllocate := make([]*resourceapi.ResourceClaim, 0, len(claims))
 
 	s.informationsForClaim = make([]informationForClaim, len(claims))
 	for index, claim := range claims {
@@ -394,7 +411,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 				s.informationsForClaim[index].availableOnNodes = nodeSelector
 			}
 		} else {
-			allocateClaims = append(allocateClaims, claim)
+			claimsToAllocate = append(claimsToAllocate, claim)
 
 			// Allocation in flight? Better wait for that
 			// to finish, see inFlightAllocations
@@ -433,8 +450,8 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 		}
 	}
 
-	if len(allocateClaims) > 0 {
-		logger.V(5).Info("Preparing allocation with structured parameters", "pod", klog.KObj(pod), "resourceclaims", klog.KObjSlice(allocateClaims))
+	if len(claimsToAllocate) > 0 {
+		logger.V(5).Info("Preparing allocation with structured parameters", "pod", klog.KObj(pod), "resourceclaims", klog.KObjSlice(claimsToAllocate))
 
 		// Doing this over and over again for each pod could be avoided
 		// by setting the allocator up once and then keeping it up-to-date
@@ -462,11 +479,12 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			PartitionableDevices: pl.enablePartitionableDevices,
 			DeviceTaints:         pl.enableDeviceTaints,
 		}
-		allocator, err := structured.NewAllocator(ctx, features, allocateClaims, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
+		allocator, err := structured.NewAllocator(ctx, features, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
 		s.allocator = allocator
+		s.claimsToAllocate = claimsToAllocate
 		s.nodeAllocations = make(map[string][]resourceapi.AllocationResult)
 	}
 
@@ -551,8 +569,20 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "node", klog.KObj(node)))
 		}
 
-		a, err := state.allocator.Allocate(allocCtx, node)
-		if err != nil {
+		// Apply timeout to the operation?
+		if pl.enableFilterTimeout && pl.filterTimeout > 0 {
+			c, cancel := context.WithTimeout(allocCtx, pl.filterTimeout)
+			defer cancel()
+			allocCtx = c
+		}
+
+		a, err := state.allocator.Allocate(allocCtx, node, state.claimsToAllocate)
+		switch {
+		case errors.Is(err, context.DeadlineExceeded):
+			return statusUnschedulable(logger, "timed out trying to allocate devices", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.claimsToAllocate))
+		case ctx.Err() != nil:
+			return statusUnschedulable(logger, fmt.Sprintf("asked by caller to stop allocating devices: %v", context.Cause(ctx)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.claimsToAllocate))
+		case err != nil:
 			// This should only fail if there is something wrong with the claim or class.
 			// Return an error to abort scheduling of it.
 			//
@@ -563,11 +593,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			// But we cannot do both. As this shouldn't occur often, aborting like this is
 			// better than the more complicated alternative (return Unschedulable here, remember
 			// the error, then later raise it again later if needed).
-			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.allocator.ClaimsToAllocate()))
+			return statusError(logger, err, "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.claimsToAllocate))
 		}
 		// Check for exact length just to be sure. In practice this is all-or-nothing.
-		if len(a) != len(state.allocator.ClaimsToAllocate()) {
-			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.allocator.ClaimsToAllocate()))
+		if len(a) != len(state.claimsToAllocate) {
+			return statusUnschedulable(logger, "cannot allocate all claims", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.claimsToAllocate))
 		}
 		// Reserve uses this information.
 		allocations = a
@@ -678,7 +708,7 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs fwk.CycleState, pod 
 	// Prepare allocation of claims handled by the schedulder.
 	if state.allocator != nil {
 		// Entries in these two slices match each other.
-		claimsToAllocate := state.allocator.ClaimsToAllocate()
+		claimsToAllocate := state.claimsToAllocate
 		allocations, ok := state.nodeAllocations[nodeName]
 		if !ok {
 			// We checked before that the node is suitable. This shouldn't have failed,
@@ -794,6 +824,22 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	}
 	// If we get here, we know that reserving the claim for
 	// the pod worked and we can proceed with binding it.
+	return nil
+}
+
+// PreBindPreFlight is called before PreBind, and determines whether PreBind is going to do something for this pod, or not.
+// It just checks state.claims to determine whether there are any claims and hence the plugin has to handle them at PreBind.
+func (pl *DynamicResources) PreBindPreFlight(ctx context.Context, cs fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+	if !pl.enabled {
+		return fwk.NewStatus(fwk.Skip)
+	}
+	state, err := getStateData(cs)
+	if err != nil {
+		return statusError(klog.FromContext(ctx), err)
+	}
+	if len(state.claims) == 0 {
+		return fwk.NewStatus(fwk.Skip)
+	}
 	return nil
 }
 

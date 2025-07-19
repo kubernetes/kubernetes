@@ -160,6 +160,17 @@ const (
 	ImageVolumeRequestedTotalKey      = "image_volume_requested_total"
 	ImageVolumeMountedSucceedTotalKey = "image_volume_mounted_succeed_total"
 	ImageVolumeMountedErrorsTotalKey  = "image_volume_mounted_errors_total"
+
+	// Special label for [DRAResourceClaimsInUseDesc] which counts ResourceClaims regardless of the driver.
+	DRAResourceClaimsInUseAnyDriver = "<any>"
+
+	// Metric keys for in-place pod resize operations.
+	ContainerRequestedResizesKey     = "container_requested_resizes_total"
+	PodResizeDurationMillisecondsKey = "pod_resize_duration_milliseconds"
+	PodPendingResizesKey             = "pod_pending_resizes"
+	PodInfeasibleResizesKey          = "pod_infeasible_resizes_total"
+	PodInProgressResizesKey          = "pod_in_progress_resizes"
+	PodDeferredAcceptedResizesKey    = "pod_deferred_accepted_resizes_total"
 )
 
 type imageSizeBucket struct {
@@ -191,10 +202,13 @@ var (
 	// The buckets max value 40 is based on the 45sec max gRPC timeout value defined
 	// for the DRA gRPC calls in the pkg/kubelet/cm/dra/plugin/registration.go
 	DRADurationBuckets = metrics.ExponentialBucketsRange(.1, 40, 15)
+
+	// podResizeDurationBuckets is the bucket boundaries for pod_resize_duration_milliseconds metrics.
+	podResizeDurationBuckets = []float64{10, 50, 100, 500, 1000, 2000, 5000, 10000, 20000, 30000, 60000, 120000, 300000, 600000}
 )
 
 var (
-	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
+	// NodeName is a Gauge that tracks the node's name. The count is always 1.
 	NodeName = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1028,6 +1042,14 @@ var (
 		[]string{"driver_name", "method_name", "grpc_status_code"},
 	)
 
+	DRAResourceClaimsInUseDesc = metrics.NewDesc(DRASubsystem+"_resource_claims_in_use",
+		"The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.",
+		[]string{"driver_name"},
+		nil,
+		metrics.ALPHA,
+		"",
+	)
+
 	// AdmissionRejectionsTotal tracks the number of failed admission times, currently, just record it for pod additions
 	AdmissionRejectionsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -1067,6 +1089,72 @@ var (
 			Help:           "Number of failed image volume mounts.",
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+
+	// ContainerRequestedResizes tracks the cumulative number of requested resizes at the container level.
+	ContainerRequestedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ContainerRequestedResizesKey,
+			Help:           "Number of requested resizes, counted at the container level. Different resources on the same container are counted separately. The 'requirement' label refers to 'memory' or 'limits'; the 'operation' label can be one of 'add', 'remove', 'increase' or 'decrease'.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource", "requirement", "operation"},
+	)
+
+	// PodResizeDurationMilliseconds tracks the duration (in milliseconds) it takes to resize a pod.
+	PodResizeDurationMilliseconds = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodResizeDurationMillisecondsKey,
+			Help:           "Duration in milliseconds to actuate a pod resize",
+			Buckets:        podResizeDurationBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"success"},
+	)
+
+	// PodPendingResizes tracks the number of pending resizes for pods.
+	PodPendingResizes = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodPendingResizesKey,
+			Help:           "Number of pending resizes for pods.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"reason"},
+	)
+
+	// PodInfeasibleResizes tracks the number of infeasible resizes for pods.
+	PodInfeasibleResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodInfeasibleResizesKey,
+			Help:           "Number of infeasible resizes for pods.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"reason_detail"},
+	)
+
+	// PodInProgressResizes tracks the number of in-progress resizes for pods.
+	PodInProgressResizes = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodInProgressResizesKey,
+			Help:           "Number of in-progress resizes for pods.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// PodDeferredAcceptedResizes tracks the cumulative number of deferred accepted resizes for pods.
+	PodDeferredAcceptedResizes = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodDeferredAcceptedResizesKey,
+			Help:           "Cumulative number of resizes that were accepted after being deferred.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"retry_trigger"},
 	)
 )
 
@@ -1164,8 +1252,10 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(CgroupVersion)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-			legacyregistry.MustRegister(DRAOperationsDuration)
-			legacyregistry.MustRegister(DRAGRPCOperationsDuration)
+			legacyregistry.MustRegister(
+				DRAOperationsDuration,
+				DRAGRPCOperationsDuration,
+			)
 		}
 
 		legacyregistry.MustRegister(AdmissionRejectionsTotal)
@@ -1174,6 +1264,15 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(ImageVolumeRequestedTotal)
 			legacyregistry.MustRegister(ImageVolumeMountedSucceedTotal)
 			legacyregistry.MustRegister(ImageVolumeMountedErrorsTotal)
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			legacyregistry.MustRegister(ContainerRequestedResizes)
+			legacyregistry.MustRegister(PodResizeDurationMilliseconds)
+			legacyregistry.MustRegister(PodPendingResizes)
+			legacyregistry.MustRegister(PodInfeasibleResizes)
+			legacyregistry.MustRegister(PodInProgressResizes)
+			legacyregistry.MustRegister(PodDeferredAcceptedResizes)
 		}
 	})
 }

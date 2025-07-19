@@ -607,6 +607,10 @@ func lastIndexOf(str, substr string) (int64, error) {
 	if substr == "" {
 		return int64(len(runes)), nil
 	}
+
+	if len(str) < len(substr) {
+		return -1, nil
+	}
 	return lastIndexOfOffset(str, substr, int64(len(runes)-1))
 }
 

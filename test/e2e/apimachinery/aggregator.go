@@ -52,7 +52,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -362,7 +362,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 			Service: &apiregistrationv1.ServiceReference{
 				Namespace: n.namespace,
 				Name:      "sample-api",
-				Port:      pointer.Int32(aggregatorServicePort),
+				Port:      ptr.To[int32](aggregatorServicePort),
 			},
 			Group:                apiServiceGroupName,
 			Version:              apiServiceVersion,

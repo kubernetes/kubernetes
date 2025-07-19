@@ -21,6 +21,6 @@ package allocation
 
 import v1 "k8s.io/api/core/v1"
 
-func IsInPlacePodVerticalScalingAllowed(_ *v1.Pod) (allowed bool, msg string) {
-	return false, "In-place pod resize is not supported on Windows"
+func IsInPlacePodVerticalScalingAllowed(_ *v1.Pod) (allowed bool, msg, reason string) {
+	return false, "In-place pod resize is not supported on Windows", "windows"
 }

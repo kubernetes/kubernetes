@@ -2154,7 +2154,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"invaild-apigroup-in-data-source": {
+		"invalid-apigroup-in-data-source": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
@@ -2172,7 +2172,7 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
-		"invaild-apigroup-in-data-source-ref": {
+		"invalid-apigroup-in-data-source-ref": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
@@ -2333,9 +2333,10 @@ func TestAlphaPVVolumeModeUpdate(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	block := core.PersistentVolumeBlock
 	file := core.PersistentVolumeFilesystem
-	invaildAPIGroup := "^invalid"
+	invalidAPIGroup := "^invalid"
 
 	validClaim := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
@@ -2718,7 +2719,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 		DataSource: &core.TypedLocalObjectReference{
-			APIGroup: &invaildAPIGroup,
+			APIGroup: &invalidAPIGroup,
 			Kind:     "Foo",
 			Name:     "foo",
 		},
@@ -2736,7 +2737,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 		DataSourceRef: &core.TypedObjectReference{
-			APIGroup: &invaildAPIGroup,
+			APIGroup: &invalidAPIGroup,
 			Kind:     "Foo",
 			Name:     "foo",
 		},
@@ -3097,7 +3098,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 }
 
 func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
-	invaildAPIGroup := "^invalid"
+	invalidAPIGroup := "^invalid"
 
 	tests := map[string]struct {
 		oldPvc                      *core.PersistentVolumeClaim
@@ -3111,15 +3112,15 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 				EnableVolumeAttributesClass:       false,
 			},
 		},
-		"invaild apiGroup in dataSource allowed because the old pvc is used": {
-			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invaildAPIGroup}),
+		"invalid apiGroup in dataSource allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
-		"invaild apiGroup in dataSourceRef allowed because the old pvc is used": {
-			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invaildAPIGroup}),
+		"invalid apiGroup in dataSourceRef allowed because the old pvc is used": {
+			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
@@ -15474,11 +15475,12 @@ func TestValidateServiceCreate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 
 	testCases := []struct {
-		name           string
-		tweakSvc       func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs        int
-		legacyIPs      bool
-		newTrafficDist bool
+		name                string
+		tweakSvc            func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs             int
+		legacyIPs           bool
+		newTrafficDist      bool
+		relaxedServiceNames bool
 	}{{
 		name:     "default",
 		tweakSvc: func(s *core.Service) {},
@@ -16764,12 +16766,28 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
 			numErrs: 1,
+		}, {
+
+			name:                "valid: service name begins with a digit feature gate enabled",
+			relaxedServiceNames: true,
+			tweakSvc: func(s *core.Service) {
+				s.Name = "1-test-service"
+			},
+			numErrs: 0,
+		}, {
+			name:                "invalid: service name begins with a digit feature gate disabled",
+			relaxedServiceNames: false,
+			tweakSvc: func(s *core.Service) {
+				s.Name = "1-test-service"
+			},
+			numErrs: 1,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, tc.newTrafficDist)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, tc.relaxedServiceNames)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
@@ -18214,9 +18232,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 	singleStack := core.IPFamilyPolicySingleStack
 	testCases := []struct {
-		name     string
-		tweakSvc func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
-		numErrs  int
+		name                string
+		tweakSvc            func(oldSvc, newSvc *core.Service) // given basic valid services, each test case can customize them
+		numErrs             int
+		relaxedServiceNames bool
 	}{{
 		name: "no change",
 		tweakSvc: func(oldSvc, newSvc *core.Service) {
@@ -19477,12 +19496,22 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8, 1.2.3.0/24"
 			},
 			numErrs: 1,
+		}, {
+			name: "can modify a pre-existing relaxed service name without error",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Name = "1-test-service"
+				newSvc.Name = "1-test-service"
+				newSvc.Labels["foo"] = "bar"
+			},
+			relaxedServiceNames: false,
+			numErrs:             0,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, tc.relaxedServiceNames)
 
 			oldSvc := makeValidService()
 			newSvc := makeValidService()
@@ -19578,6 +19607,33 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			},
 		},
 		expectedErrors: []string{"must be greater than or equal to aggregate container requests"},
+	}, {
+		name: "container requests with resources unsupported at pod-level",
+		podResources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:     resource.MustParse("6"),
+						core.ResourceMemory:  resource.MustParse("5Mi"),
+						core.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:     resource.MustParse("4"),
+						core.ResourceMemory:  resource.MustParse("3Mi"),
+						core.ResourceStorage: resource.MustParse("5Gi"),
+					},
+				},
+			},
+		},
 	}, {
 		name: "aggregate container limits less than pod limits",
 		podResources: core.ResourceRequirements{
@@ -20085,6 +20141,7 @@ func TestValidateLimitRange(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	validClaim := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
@@ -22848,10 +22905,6 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 }
 
 func TestValidateWindowsSecurityContextOptions(t *testing.T) {
-	toPtr := func(s string) *string {
-		return &s
-	}
-
 	testCases := []struct {
 		testName string
 
@@ -22865,26 +22918,26 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 	}, {
 		testName: "a valid input",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			GMSACredentialSpecName: toPtr("dummy-gmsa-crep-spec-name"),
-			GMSACredentialSpec:     toPtr("dummy-gmsa-crep-spec-contents"),
+			GMSACredentialSpecName: ptr.To("dummy-gmsa-crep-spec-name"),
+			GMSACredentialSpec:     ptr.To("dummy-gmsa-crep-spec-contents"),
 		},
 	}, {
 		testName: "a GMSA cred spec name that is not a valid resource name",
 		windowsOptions: &core.WindowsSecurityContextOptions{
 			// invalid because of the underscore
-			GMSACredentialSpecName: toPtr("not_a-valid-gmsa-crep-spec-name"),
+			GMSACredentialSpecName: ptr.To("not_a-valid-gmsa-crep-spec-name"),
 		},
 		expectedErrorSubstring: dnsSubdomainLabelErrMsg,
 	}, {
 		testName: "empty GMSA cred spec contents",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			GMSACredentialSpec: toPtr(""),
+			GMSACredentialSpec: ptr.To(""),
 		},
 		expectedErrorSubstring: "gmsaCredentialSpec cannot be an empty string",
 	}, {
 		testName: "GMSA cred spec contents that are too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			GMSACredentialSpec: toPtr(strings.Repeat("a", maxGMSACredentialSpecLength+1)),
+			GMSACredentialSpec: ptr.To(strings.Repeat("a", maxGMSACredentialSpecLength+1)),
 		},
 		expectedErrorSubstring: "gmsaCredentialSpec size must be under",
 	}, {
@@ -22895,105 +22948,105 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 	}, {
 		testName: "a valid RunAsUserName",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container. User"),
+			RunAsUserName: ptr.To("Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with NetBios Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Network Service\\Container. User"),
+			RunAsUserName: ptr.To("Network Service\\Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with DNS Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("fOo", 20) + ".liSH\\Container. User"),
+			RunAsUserName: ptr.To(strings.Repeat("fOo", 20) + ".liSH\\Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with DNS Domain with a single character segment",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("fOo", 20) + ".l\\Container. User"),
+			RunAsUserName: ptr.To(strings.Repeat("fOo", 20) + ".l\\Container. User"),
 		},
 	}, {
 		testName: "a valid RunAsUserName with a long single segment DNS Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("a", 42) + "\\Container. User"),
+			RunAsUserName: ptr.To(strings.Repeat("a", 42) + "\\Container. User"),
 		},
 	}, {
 		testName: "an empty RunAsUserName",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(""),
+			RunAsUserName: ptr.To(""),
 		},
 		expectedErrorSubstring: "runAsUserName cannot be an empty string",
 	}, {
 		testName: "RunAsUserName containing a control character",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container\tUser"),
+			RunAsUserName: ptr.To("Container\tUser"),
 		},
 		expectedErrorSubstring: "runAsUserName cannot contain control characters",
 	}, {
 		testName: "RunAsUserName containing too many backslashes",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container\\Foo\\Lish"),
+			RunAsUserName: ptr.To("Container\\Foo\\Lish"),
 		},
 		expectedErrorSubstring: "runAsUserName cannot contain more than one backslash",
 	}, {
 		testName: "RunAsUserName containing backslash but empty Domain",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("\\User"),
+			RunAsUserName: ptr.To("\\User"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios nor the DNS format",
 	}, {
 		testName: "RunAsUserName containing backslash but empty User",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container\\"),
+			RunAsUserName: ptr.To("Container\\"),
 		},
 		expectedErrorSubstring: "runAsUserName's User cannot be empty",
 	}, {
 		testName: "RunAsUserName's NetBios Domain is too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("NetBios " + strings.Repeat("a", 8) + "\\user"),
+			RunAsUserName: ptr.To("NetBios " + strings.Repeat("a", 8) + "\\user"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios",
 	}, {
 		testName: "RunAsUserName's DNS Domain is too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
 			// even if this tests the max Domain length, the Domain should still be "valid".
-			RunAsUserName: toPtr(strings.Repeat(strings.Repeat("a", 63)+".", 4)[:253] + ".com\\user"),
+			RunAsUserName: ptr.To(strings.Repeat(strings.Repeat("a", 63)+".", 4)[:253] + ".com\\user"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain length must be under",
 	}, {
 		testName: "RunAsUserName's User is too long",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("a", maxRunAsUserNameUserLength+1)),
+			RunAsUserName: ptr.To(strings.Repeat("a", maxRunAsUserNameUserLength+1)),
 		},
 		expectedErrorSubstring: "runAsUserName's User length must not be longer than",
 	}, {
 		testName: "RunAsUserName's User cannot contain only spaces or periods",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("... ..."),
+			RunAsUserName: ptr.To("... ..."),
 		},
 		expectedErrorSubstring: "runAsUserName's User cannot contain only periods or spaces",
 	}, {
 		testName: "RunAsUserName's NetBios Domain cannot start with a dot",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(".FooLish\\User"),
+			RunAsUserName: ptr.To(".FooLish\\User"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios",
 	}, {
 		testName: "RunAsUserName's NetBios Domain cannot contain invalid characters",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Foo? Lish?\\User"),
+			RunAsUserName: ptr.To("Foo? Lish?\\User"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios",
 	}, {
 		testName: "RunAsUserName's DNS Domain cannot contain invalid characters",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr(strings.Repeat("a", 32) + ".com-\\user"),
+			RunAsUserName: ptr.To(strings.Repeat("a", 32) + ".com-\\user"),
 		},
 		expectedErrorSubstring: "runAsUserName's Domain doesn't match the NetBios nor the DNS format",
 	}, {
 		testName: "RunAsUserName's User cannot contain invalid characters",
 		windowsOptions: &core.WindowsSecurityContextOptions{
-			RunAsUserName: toPtr("Container/User"),
+			RunAsUserName: ptr.To("Container/User"),
 		},
 		expectedErrorSubstring: "runAsUserName's User cannot contain the following characters",
 	},
@@ -26829,12 +26882,12 @@ func TestValidatePodResize(t *testing.T) {
 			test: "no restart policy: memory limit decrease",
 			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", "")),
 			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
-			err:  "memory limits cannot be decreased",
+			err:  "",
 		}, {
 			test: "restart NotRequired: memory limit decrease",
 			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", ""), resizePolicy("memory", core.NotRequired)),
 			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", ""), resizePolicy("memory", core.NotRequired)),
-			err:  "memory limits cannot be decreased",
+			err:  "",
 		}, {
 			test: "RestartContainer: memory limit decrease",
 			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", ""), resizePolicy("memory", core.RestartContainer)),
@@ -27053,19 +27106,9 @@ func TestValidatePodResize(t *testing.T) {
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways),
 			err:  "",
 		}, {
-			test: "memory limit decrease for sidecar containers, no resize policy",
+			test: "memory limit decrease for sidecar containers",
 			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways),
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
-			err:  "memory limits cannot be decreased",
-		}, {
-			test: "memory limit decrease for sidecar containers, resize policy NotRequired",
-			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
-			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
-			err:  "memory limits cannot be decreased",
-		}, {
-			test: "memory limit decrease for sidecar containers, resize policy RestartContainer",
-			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
-			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
 			err:  "",
 		}, {
 			test: "storage limit change for sidecar containers",

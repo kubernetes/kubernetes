@@ -27,6 +27,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	summaryprovidertest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestCollectResourceMetrics(t *testing.T) {
@@ -42,6 +43,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 		"container_cpu_usage_seconds_total",
 		"container_memory_working_set_bytes",
 		"container_swap_usage_bytes",
+		"container_swap_limit_bytes",
 		"container_start_time_seconds",
 		"pod_cpu_usage_seconds_total",
 		"pod_memory_working_set_bytes",
@@ -73,15 +75,15 @@ func TestCollectResourceMetrics(t *testing.T) {
 				Node: statsapi.NodeStats{
 					CPU: &statsapi.CPUStats{
 						Time:                 testTime,
-						UsageCoreNanoSeconds: uint64Ptr(10000000000),
+						UsageCoreNanoSeconds: ptr.To[uint64](10000000000),
 					},
 					Memory: &statsapi.MemoryStats{
 						Time:            testTime,
-						WorkingSetBytes: uint64Ptr(1000),
+						WorkingSetBytes: ptr.To[uint64](1000),
 					},
 					Swap: &statsapi.SwapStats{
 						Time:           testTime,
-						SwapUsageBytes: uint64Ptr(500),
+						SwapUsageBytes: ptr.To[uint64](500),
 					},
 				},
 			},
@@ -143,15 +145,16 @@ func TestCollectResourceMetrics(t *testing.T) {
 								StartTime: metav1.NewTime(staticTimestamp.Add(-30 * time.Second)),
 								CPU: &statsapi.CPUStats{
 									Time:                 testTime,
-									UsageCoreNanoSeconds: uint64Ptr(10000000000),
+									UsageCoreNanoSeconds: ptr.To[uint64](10000000000),
 								},
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
-									WorkingSetBytes: uint64Ptr(1000),
+									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 								Swap: &statsapi.SwapStats{
-									Time:           testTime,
-									SwapUsageBytes: uint64Ptr(1000),
+									Time:               testTime,
+									SwapUsageBytes:     ptr.To[uint64](1000),
+									SwapAvailableBytes: ptr.To[uint64](9000),
 								},
 							},
 							{
@@ -159,11 +162,11 @@ func TestCollectResourceMetrics(t *testing.T) {
 								StartTime: metav1.NewTime(staticTimestamp.Add(-2 * time.Minute)),
 								CPU: &statsapi.CPUStats{
 									Time:                 testTime,
-									UsageCoreNanoSeconds: uint64Ptr(10000000000),
+									UsageCoreNanoSeconds: ptr.To[uint64](10000000000),
 								},
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
-									WorkingSetBytes: uint64Ptr(1000),
+									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 							},
 						},
@@ -179,11 +182,11 @@ func TestCollectResourceMetrics(t *testing.T) {
 								StartTime: metav1.NewTime(staticTimestamp.Add(-10 * time.Minute)),
 								CPU: &statsapi.CPUStats{
 									Time:                 testTime,
-									UsageCoreNanoSeconds: uint64Ptr(10000000000),
+									UsageCoreNanoSeconds: ptr.To[uint64](10000000000),
 								},
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
-									WorkingSetBytes: uint64Ptr(1000),
+									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 							},
 						},
@@ -213,6 +216,9 @@ func TestCollectResourceMetrics(t *testing.T) {
 				container_start_time_seconds{container="container_a",namespace="namespace_a",pod="pod_a"} 1.6243962483020916e+09
 				container_start_time_seconds{container="container_a",namespace="namespace_b",pod="pod_b"} 1.6243956783020916e+09
 				container_start_time_seconds{container="container_b",namespace="namespace_a",pod="pod_a"} 1.6243961583020916e+09
+				# HELP container_swap_limit_bytes [ALPHA] Current amount of the container swap limit in bytes. Reported only on non-windows systems
+				# TYPE container_swap_limit_bytes gauge
+				container_swap_limit_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 10000 1624396278302
         		# HELP container_swap_usage_bytes [ALPHA] Current amount of the container swap usage in bytes. Reported only on non-windows systems
         		# TYPE container_swap_usage_bytes gauge
         		container_swap_usage_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 1624396278302
@@ -233,11 +239,11 @@ func TestCollectResourceMetrics(t *testing.T) {
 								StartTime: metav1.NewTime(time.Unix(0, -1624396278302091597)),
 								CPU: &statsapi.CPUStats{
 									Time:                 testTime,
-									UsageCoreNanoSeconds: uint64Ptr(10000000000),
+									UsageCoreNanoSeconds: ptr.To[uint64](10000000000),
 								},
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
-									WorkingSetBytes: uint64Ptr(1000),
+									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 							},
 						},
@@ -295,11 +301,11 @@ func TestCollectResourceMetrics(t *testing.T) {
 								StartTime: metav1.NewTime(staticTimestamp.Add(-10 * time.Minute)),
 								CPU: &statsapi.CPUStats{
 									Time:                 testTime,
-									UsageCoreNanoSeconds: uint64Ptr(10000000000),
+									UsageCoreNanoSeconds: ptr.To[uint64](10000000000),
 								},
 								Memory: &statsapi.MemoryStats{
 									Time:            testTime,
-									WorkingSetBytes: uint64Ptr(1000),
+									WorkingSetBytes: ptr.To[uint64](1000),
 								},
 							},
 						},
@@ -337,15 +343,15 @@ func TestCollectResourceMetrics(t *testing.T) {
 						},
 						CPU: &statsapi.CPUStats{
 							Time:                 testTime,
-							UsageCoreNanoSeconds: uint64Ptr(10000000000),
+							UsageCoreNanoSeconds: ptr.To[uint64](10000000000),
 						},
 						Memory: &statsapi.MemoryStats{
 							Time:            testTime,
-							WorkingSetBytes: uint64Ptr(1000),
+							WorkingSetBytes: ptr.To[uint64](1000),
 						},
 						Swap: &statsapi.SwapStats{
 							Time:           testTime,
-							SwapUsageBytes: uint64Ptr(5000),
+							SwapUsageBytes: ptr.To[uint64](5000),
 						},
 					},
 				},
@@ -414,8 +420,4 @@ func TestCollectResourceMetrics(t *testing.T) {
 			}
 		})
 	}
-}
-
-func uint64Ptr(u uint64) *uint64 {
-	return &u
 }

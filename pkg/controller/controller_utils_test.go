@@ -55,7 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
@@ -83,7 +82,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 			ResourceVersion: "18",
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(int32(replicas)),
+			Replicas: ptr.To[int32](int32(replicas)),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -145,7 +144,7 @@ func newReplicaSet(name string, replicas int, rsUuid types.UID) *apps.ReplicaSet
 			ResourceVersion: "18",
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: pointer.Int32(int32(replicas)),
+			Replicas: ptr.To[int32](int32(replicas)),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

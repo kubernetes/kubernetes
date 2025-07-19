@@ -112,11 +112,18 @@ func (sc *stateCheckpoint) GetContainerResources(podUID types.UID, containerName
 	return sc.cache.GetContainerResources(podUID, containerName)
 }
 
-// GetPodResourceInfoMap returns current pod resource information
+// GetPodResourceInfoMap returns current pod resource information map
 func (sc *stateCheckpoint) GetPodResourceInfoMap() PodResourceInfoMap {
 	sc.mux.RLock()
 	defer sc.mux.RUnlock()
 	return sc.cache.GetPodResourceInfoMap()
+}
+
+// GetPodResourceInfo returns current pod resource information
+func (sc *stateCheckpoint) GetPodResourceInfo(podUID types.UID) (PodResourceInfo, bool) {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+	return sc.cache.GetPodResourceInfo(podUID)
 }
 
 // SetContainerResoruces sets resources information for a pod's container
@@ -170,6 +177,10 @@ func (sc *noopStateCheckpoint) GetContainerResources(_ types.UID, _ string) (v1.
 
 func (sc *noopStateCheckpoint) GetPodResourceInfoMap() PodResourceInfoMap {
 	return nil
+}
+
+func (sc *noopStateCheckpoint) GetPodResourceInfo(_ types.UID) (PodResourceInfo, bool) {
+	return PodResourceInfo{}, false
 }
 
 func (sc *noopStateCheckpoint) SetContainerResources(_ types.UID, _ string, _ v1.ResourceRequirements) error {

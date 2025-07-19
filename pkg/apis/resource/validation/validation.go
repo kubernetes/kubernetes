@@ -1047,7 +1047,7 @@ func validateRawExtension(rawExtension runtime.RawExtension, fldPath *field.Path
 	} else if v == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	} else if _, isObject := v.(map[string]any); !isObject {
-		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", "parameters must be a valid JSON object"))
+		allErrs = append(allErrs, field.Invalid(fldPath, "<value omitted>", "must be a valid JSON object"))
 	}
 	return allErrs
 }

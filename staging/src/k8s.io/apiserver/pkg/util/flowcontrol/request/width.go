@@ -74,9 +74,10 @@ type maxSeatsFunc func(priorityLevelName string) uint64
 // work estimate of 1 seat is allocated to the request.
 func NewWorkEstimator(objectCountFn statsGetterFunc, watchCountFn watchCountGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
 	estimator := &workEstimator{
+		maxSeatsFn:            maxSeatsFn,
 		minimumSeats:          config.MinimumSeats,
-		maximumSeatsLimit:     config.MaximumSeatsLimit,
-		listWorkEstimator:     newListWorkEstimator(objectCountFn, config, maxSeatsFn),
+		maximumSeatsLimit:     max(config.MaximumListSeatsLimit, config.MaximumMutatingSeatsLimit),
+		listWorkEstimator:     newListWorkEstimator(objectCountFn, config, maxSeatsFn).estimate,
 		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn, config, maxSeatsFn),
 	}
 	return estimator.estimate
@@ -92,6 +93,7 @@ func (e WorkEstimatorFunc) EstimateWork(r *http.Request, flowSchemaName, priorit
 }
 
 type workEstimator struct {
+	maxSeatsFn maxSeatsFunc
 	// the minimum number of seats a request must occupy
 	minimumSeats uint64
 	// the default maximum number of seats a request can occupy
@@ -107,7 +109,11 @@ func (e *workEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelN
 	if !ok {
 		klog.ErrorS(fmt.Errorf("no RequestInfo found in context"), "Failed to estimate work for the request", "URI", r.RequestURI)
 		// no RequestInfo should never happen, but to be on the safe side let's return maximumSeats
-		return WorkEstimate{InitialSeats: e.maximumSeatsLimit}
+		maxSeats := e.maxSeatsFn(priorityLevelName)
+		if maxSeats == 0 || maxSeats > e.maximumSeatsLimit {
+			maxSeats = e.maximumSeatsLimit
+		}
+		return WorkEstimate{InitialSeats: maxSeats}
 	}
 
 	switch requestInfo.Verb {

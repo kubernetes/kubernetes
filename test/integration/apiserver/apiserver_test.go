@@ -1597,7 +1597,7 @@ func TestGetSubresourcesAsTables(t *testing.T) {
 						Name: "replicationcontroller-1",
 					},
 					Spec: v1.ReplicationControllerSpec{
-						Replicas: int32Ptr(2),
+						Replicas: ptr.To[int32](2),
 						Selector: map[string]string{
 							"label": "test-label",
 						},
@@ -1632,7 +1632,7 @@ func TestGetSubresourcesAsTables(t *testing.T) {
 						Name: "replicationcontroller-2",
 					},
 					Spec: v1.ReplicationControllerSpec{
-						Replicas: int32Ptr(2),
+						Replicas: ptr.To[int32](2),
 						Selector: map[string]string{
 							"label": "test-label",
 						},
@@ -3676,10 +3676,6 @@ func assertManagedFields(t *testing.T, obj *unstructured.Unstructured) {
 	if len(obj.GetManagedFields()) == 0 {
 		t.Errorf("unexpected empty managed fields in object: %v", obj)
 	}
-}
-
-func int32Ptr(i int32) *int32 {
-	return &i
 }
 
 // TestDefaultStorageEncoding verifies that the storage encoding for all built-in resources is

@@ -18,6 +18,7 @@ package content
 
 import (
 	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/validate/constraints"
 )
@@ -26,4 +27,13 @@ import (
 // validation failure.
 func MinError[T constraints.Integer](min T) string {
 	return fmt.Sprintf("must be greater than or equal to %d", min)
+}
+
+// NEQError returns a string explanation of a "must not be equal to" validation failure.
+func NEQError[T any](disallowed T) string {
+	format := "%v"
+	if reflect.ValueOf(disallowed).Kind() == reflect.String {
+		format = "%q"
+	}
+	return fmt.Sprintf("must not be equal to "+format, disallowed)
 }

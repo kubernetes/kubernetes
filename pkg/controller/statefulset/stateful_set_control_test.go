@@ -31,6 +31,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/utils/ptr"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -53,7 +55,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/ptr"
 )
 
 type invariantFunc func(set *apps.StatefulSet, om *fakeObjectManager) error
@@ -3463,4 +3464,302 @@ func isOrHasInternalError(err error) bool {
 		}
 	}
 	return apierrors.IsInternalError(err)
+}
+
+func TestStatefulSetRollingUpdateRespectsMinReadySeconds(t *testing.T) {
+	// This test validates that the change to pass set.Spec.MinReadySeconds to isUnavailable()
+	// in the rolling update logic actually works
+	set := setMinReadySeconds(newStatefulSet(2), int32(30)) // 30 seconds MinReadySeconds
+	client := fake.NewClientset(set)
+	om, _, ssc := setupController(client)
+
+	// Create running and ready pods manually
+	set, _ = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+
+	// Manually create pods that are running and ready
+	for i := 0; i < 2; i++ {
+		pod := newStatefulSetPod(set, i)
+		pod.Status.Phase = v1.PodRunning
+		pod.Status.Conditions = []v1.PodCondition{
+			{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: time.Now().Add(-10 * time.Second)}},
+		}
+		fakeResourceVersion(pod)
+		if err := om.podsIndexer.Add(pod); err != nil {
+			t.Fatalf("failed to add pod to indexer: %s", err)
+		}
+	}
+
+	// Trigger a rolling update by changing the image
+	set.Spec.Template.Spec.Containers[0].Image = "updated-image"
+
+	// Get pods
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatalf("failed to create selector: %s", err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("failed to list pods: %s", err)
+	}
+
+	// Perform update - should be blocked because pods haven't been ready for 30 seconds
+	status, err := ssc.UpdateStatefulSet(context.TODO(), set, pods)
+	if err != nil {
+		t.Fatalf("failed to update StatefulSet: %s", err)
+	}
+
+	// Verify that MinReadySeconds prevented the rolling update from proceeding
+	if status.AvailableReplicas != 0 {
+		t.Errorf("expected 0 available replicas due to MinReadySeconds (pods ready for <30s), got %d", status.AvailableReplicas)
+	}
+
+	// Now set pods as ready for longer than MinReadySeconds
+	for i := 0; i < 2; i++ {
+		pod := newStatefulSetPod(set, i)
+		pod.Status.Phase = v1.PodRunning
+		pod.Status.Conditions = []v1.PodCondition{
+			{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: time.Now().Add(-60 * time.Second)}}, // 60 seconds > 30
+		}
+		fakeResourceVersion(pod)
+		if err := om.podsIndexer.Update(pod); err != nil {
+			t.Fatalf("failed to update pod to indexer: %s", err)
+		}
+	}
+
+	// Get updated pods
+	pods, err = om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("failed to list pods: %s", err)
+	}
+
+	// Perform update again - now should proceed
+	status, err = ssc.UpdateStatefulSet(context.TODO(), set, pods)
+	if err != nil {
+		t.Fatalf("failed to update StatefulSet: %s", err)
+	}
+
+	// Now pods should be considered available
+	if status.AvailableReplicas != 2 {
+		t.Errorf("expected 2 available replicas when MinReadySeconds is satisfied (pods ready for >30s), got %d", status.AvailableReplicas)
+	}
+}
+
+func TestStatefulSetScaleDownRespectsMinReadySeconds(t *testing.T) {
+	// Test that scale down operations also respect MinReadySeconds
+	set := setMinReadySeconds(newStatefulSet(3), int32(30)) // 30 seconds
+	client := fake.NewClientset(set)
+	om, _, ssc := setupController(client)
+
+	// Scale up to 3 replicas first
+	if err := scaleUpStatefulSetControl(set, ssc, om, assertMonotonicInvariants); err != nil {
+		t.Fatalf("failed to scale up: %s", err)
+	}
+
+	// Create pods that are running and ready but not for long enough
+	for i := 0; i < 3; i++ {
+		pod := newStatefulSetPod(set, i)
+		pod.Status.Phase = v1.PodRunning
+		pod.Status.Conditions = []v1.PodCondition{
+			{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: time.Now().Add(-10 * time.Second)}}, // 10 < 30
+		}
+		fakeResourceVersion(pod)
+		if i == 0 {
+			if err := om.podsIndexer.Add(pod); err != nil {
+				t.Fatalf("failed to add pod to indexer: %s", err)
+			}
+		} else {
+			if err := om.podsIndexer.Update(pod); err != nil {
+				t.Fatalf("failed to update pod to indexer: %s", err)
+			}
+		}
+	}
+
+	// Now scale down to 1 replica
+	set.Spec.Replicas = &[]int32{1}[0]
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatalf("failed to create selector: %s", err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("failed to list pods: %s", err)
+	}
+
+	// Scale down should be blocked because pods haven't been available for 30 seconds
+	status, err := ssc.UpdateStatefulSet(context.TODO(), set, pods)
+	if err != nil {
+		t.Fatalf("failed to update StatefulSet: %s", err)
+	}
+
+	if status.AvailableReplicas != 0 {
+		t.Errorf("expected 0 available replicas due to MinReadySeconds during scale down, got %d", status.AvailableReplicas)
+	}
+
+	// Pods should still be present (scale down blocked)
+	newPods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("failed to list pods: %s", err)
+	}
+	if len(newPods) != 3 {
+		t.Errorf("expected 3 pods to still exist (scale down blocked), got %d", len(newPods))
+	}
+}
+
+func TestStatefulSetOnDeleteStrategyIgnoresMinReadySeconds(t *testing.T) {
+	// Test that OnDelete strategy is not affected by MinReadySeconds
+	set := setMinReadySeconds(newStatefulSet(2), int32(30)) // 30 seconds
+	set.Spec.UpdateStrategy.Type = apps.OnDeleteStatefulSetStrategyType
+	client := fake.NewClientset(set)
+	om, _, ssc := setupController(client)
+
+	// Scale up first
+	if err := scaleUpStatefulSetControl(set, ssc, om, assertMonotonicInvariants); err != nil {
+		t.Fatalf("failed to scale up: %s", err)
+	}
+
+	// Create pods that are ready but not for long enough for MinReadySeconds
+	for i := 0; i < 2; i++ {
+		pod := newStatefulSetPod(set, i)
+		pod.Status.Phase = v1.PodRunning
+		pod.Status.Conditions = []v1.PodCondition{
+			{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: time.Now().Add(-10 * time.Second)}}, // 10 < 30
+		}
+		fakeResourceVersion(pod)
+		if i == 0 {
+			if err := om.podsIndexer.Add(pod); err != nil {
+				t.Fatalf("failed to add pod to indexer: %s", err)
+			}
+		} else {
+			if err := om.podsIndexer.Update(pod); err != nil {
+				t.Fatalf("failed to update pod to indexer: %s", err)
+			}
+		}
+	}
+
+	// Trigger a rolling update by changing image
+	set.Spec.Template.Spec.Containers[0].Image = "updated-image"
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatalf("failed to create selector: %s", err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("failed to list pods: %s", err)
+	}
+
+	// OnDelete strategy should complete regardless of MinReadySeconds
+	status, err := ssc.UpdateStatefulSet(context.TODO(), set, pods)
+	if err != nil {
+		t.Fatalf("failed to update StatefulSet: %s", err)
+	}
+
+	// Status should be computed normally (AvailableReplicas should be 0 due to MinReadySeconds)
+	if status.AvailableReplicas != 0 {
+		t.Errorf("expected 0 available replicas due to MinReadySeconds, got %d", status.AvailableReplicas)
+	}
+
+	// But the update should have completed (OnDelete doesn't wait)
+	if status.UpdateRevision == "" {
+		t.Error("expected UpdateRevision to be set for OnDelete strategy")
+	}
+}
+
+func TestStatefulSetZeroMinReadySeconds(t *testing.T) {
+	// Test that zero MinReadySeconds works like the original behavior
+	set := setMinReadySeconds(newStatefulSet(2), int32(0)) // 0 seconds = immediate availability
+	client := fake.NewClientset(set)
+	om, _, ssc := setupController(client)
+
+	// Create pods that are running and ready (even just now)
+	for i := 0; i < 2; i++ {
+		pod := newStatefulSetPod(set, i)
+		pod.Status.Phase = v1.PodRunning
+		pod.Status.Conditions = []v1.PodCondition{
+			{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: time.Now()}}, // Ready right now
+		}
+		fakeResourceVersion(pod)
+		if err := om.podsIndexer.Add(pod); err != nil {
+			t.Fatalf("failed to add pod to indexer: %s", err)
+		}
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatalf("failed to create selector: %s", err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("failed to list pods: %s", err)
+	}
+
+	// With zero MinReadySeconds, pods should be immediately available
+	status, err := ssc.UpdateStatefulSet(context.TODO(), set, pods)
+	if err != nil {
+		t.Fatalf("failed to update StatefulSet: %s", err)
+	}
+
+	if status.AvailableReplicas != 2 {
+		t.Errorf("expected 2 available replicas with zero MinReadySeconds, got %d", status.AvailableReplicas)
+	}
+}
+
+func TestStatefulSetPartitionRollingUpdateWithMinReadySeconds(t *testing.T) {
+	// Test that partition-based rolling updates respect MinReadySeconds
+	set := setMinReadySeconds(newStatefulSet(4), int32(30)) // 30 seconds
+	set = setupPodManagementPolicy(apps.OrderedReadyPodManagement, set)
+	var partition int32 = 2
+	set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+		Type: apps.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+			Partition: &partition,
+		},
+	}
+	client := fake.NewClientset(set)
+	om, _, ssc := setupController(client)
+
+	// Create pods that are ready but not for long enough
+	for i := 0; i < 4; i++ {
+		pod := newStatefulSetPod(set, i)
+		pod.Status.Phase = v1.PodRunning
+		pod.Status.Conditions = []v1.PodCondition{
+			{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: time.Now().Add(-10 * time.Second)}}, // 10 < 30
+		}
+		fakeResourceVersion(pod)
+		if err := om.podsIndexer.Add(pod); err != nil {
+			t.Fatalf("failed to add pod to indexer: %s", err)
+		}
+	}
+
+	// Trigger rolling update by changing image (should only affect pods >= partition, i.e., pods 2 and 3)
+	set.Spec.Template.Spec.Containers[0].Image = "updated-image"
+
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Fatalf("failed to create selector: %s", err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("failed to list pods: %s", err)
+	}
+
+	// Rolling update should be blocked because pods haven't been available for 30 seconds
+	status, err := ssc.UpdateStatefulSet(context.TODO(), set, pods)
+	if err != nil {
+		t.Fatalf("failed to update StatefulSet: %s", err)
+	}
+
+	if status.AvailableReplicas != 0 {
+		t.Errorf("expected 0 available replicas due to MinReadySeconds in partition update, got %d", status.AvailableReplicas)
+	}
+
+	// All pods should still be present (update blocked)
+	newPods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("failed to list pods: %s", err)
+	}
+	if len(newPods) != 4 {
+		t.Errorf("expected 4 pods to still exist (partition update blocked), got %d", len(newPods))
+	}
 }

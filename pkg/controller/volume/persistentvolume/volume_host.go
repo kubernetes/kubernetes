@@ -18,7 +18,6 @@ package persistentvolume
 
 import (
 	"fmt"
-	"net"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -78,10 +77,6 @@ func (ctrl *PersistentVolumeController) GetMounter() mount.Interface {
 
 func (ctrl *PersistentVolumeController) GetHostName() string {
 	return ""
-}
-
-func (ctrl *PersistentVolumeController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("PersistentVolumeController.GetHostIP() is not implemented")
 }
 
 func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, error) {

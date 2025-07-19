@@ -141,6 +141,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: AuthorizeWithSelectors
   versionedSpecs:
   - default: false
@@ -151,6 +155,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: BtreeWatchCache
   versionedSpecs:
   - default: true
@@ -235,6 +243,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: ContainerCheckpoint
   versionedSpecs:
   - default: false
@@ -389,6 +401,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
+- name: DetectCacheInconsistency
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: DevicePluginCDIDevices
   versionedSpecs:
   - default: false
@@ -471,6 +489,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: DRASchedulerFilterTimeout
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: DynamicResourceAllocation
   versionedSpecs:
   - default: false
@@ -727,6 +751,16 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.27"
+- name: KubeletPodResourcesListUseActivePods
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
+  - default: true
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.34"
 - name: KubeletPSI
   versionedSpecs:
   - default: false
@@ -769,6 +803,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.27"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: LegacySidecarContainers
   versionedSpecs:
   - default: true
@@ -785,6 +823,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: LoadBalancerIPMode
   versionedSpecs:
   - default: false
@@ -921,6 +963,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: NFTablesProxyMode
   versionedSpecs:
   - default: false
@@ -973,6 +1019,16 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
+- name: NominatedNodeNameForExpectation
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: OpenAPIEnums
   versionedSpecs:
   - default: false
@@ -1147,6 +1203,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: RecursiveReadOnlyMounts
   versionedSpecs:
   - default: false
@@ -1194,6 +1254,12 @@
   - default: true
     lockToDefault: true
     preRelease: GA
+    version: "1.34"
+- name: RelaxedServiceNameValidation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
     version: "1.34"
 - name: ReloadKubeletServerCertificateFile
   versionedSpecs:
@@ -1573,6 +1639,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.34"
+- name: StructuredAuthenticationConfigurationEgressSelector
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: StructuredAuthorizationConfiguration
   versionedSpecs:
   - default: false
@@ -1603,6 +1675,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+- name: TokenRequestServiceAccountUIDValidation
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: TopologyAwareHints
   versionedSpecs:
   - default: false

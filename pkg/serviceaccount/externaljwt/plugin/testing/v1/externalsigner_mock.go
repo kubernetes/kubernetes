@@ -35,7 +35,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"k8s.io/externaljwt/apis/v1"
+	v1 "k8s.io/externaljwt/apis/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -57,6 +57,8 @@ type MockSigner struct {
 	FetchError    error
 	MetadataError error
 	errorLock     sync.RWMutex
+
+	v1.UnsafeExternalJWTSignerServer
 }
 
 type KeyT struct {

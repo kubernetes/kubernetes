@@ -121,6 +121,7 @@ func TestSchedulerDefaults(t *testing.T) {
 	unknownPluginConfigs[0].Args = runtime.RawExtension{Object: &runtime.Unknown{}}
 
 	tests := []struct {
+		features map[featuregate.Feature]bool
 		name     string
 		config   *configv1.KubeSchedulerConfiguration
 		expected *configv1.KubeSchedulerConfiguration
@@ -640,10 +641,63 @@ func TestSchedulerDefaults(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:     "default DynamicResources",
+			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
+			config:   &configv1.KubeSchedulerConfiguration{},
+			expected: &configv1.KubeSchedulerConfiguration{
+				Parallelism: ptr.To[int32](16),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
+				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
+					LeaderElect:       ptr.To(true),
+					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+					ResourceLock:      "leases",
+					ResourceNamespace: "kube-system",
+					ResourceName:      "kube-scheduler",
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: ptr.To[int32](config.DefaultPercentageOfNodesToScore),
+				PodInitialBackoffSeconds: ptr.To[int64](1),
+				PodMaxBackoffSeconds:     ptr.To[int64](10),
+				Profiles: []configv1.KubeSchedulerProfile{
+					{
+						Plugins: func() *configv1.Plugins {
+							config := getDefaultPlugins()
+							applyDynamicResources(config)
+							return config
+						}(),
+						// Order must match the one from applyDynamicResources.
+						PluginConfig: append([]configv1.PluginConfig{pluginConfigs[0], {
+							Name: "DynamicResources",
+							Args: runtime.RawExtension{Object: &configv1.DynamicResourcesArgs{
+								TypeMeta: metav1.TypeMeta{
+									Kind:       "DynamicResourcesArgs",
+									APIVersion: "kubescheduler.config.k8s.io/v1",
+								},
+								FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+							}},
+						}}, pluginConfigs[1:]...),
+						SchedulerName: ptr.To("default-scheduler"),
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			for featureName, enabled := range tc.features {
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, featureName, enabled)
+			}
 			SetDefaults_KubeSchedulerConfiguration(tc.config)
 			if diff := cmp.Diff(tc.expected, tc.config); diff != "" {
 				t.Errorf("Got unexpected defaults (-want, +got):\n%s", diff)

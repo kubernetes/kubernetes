@@ -59,7 +59,7 @@ func NewKubernetesRecorder(client kubernetes.Interface) *KubernetesRecorder {
 }
 
 func (r *KubernetesRecorder) List(ctx context.Context, key string, opts kubernetes.ListOptions) (kubernetes.ListResponse, error) {
-	recorderKey, ok := ctx.Value(recorderContextKey).(string)
+	recorderKey, ok := ctx.Value(RecorderContextKey).(string)
 	if ok {
 		r.mux.Lock()
 		r.listsPerKey[recorderKey] = append(r.listsPerKey[recorderKey], RecordedList{Key: key, ListOptions: opts})
@@ -79,6 +79,6 @@ type RecordedList struct {
 	kubernetes.ListOptions
 }
 
-var recorderContextKey recorderKeyType
+var RecorderContextKey recorderKeyType
 
 type recorderKeyType struct{}

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/naming"
@@ -912,6 +913,15 @@ loop:
 					continue
 				}
 			}
+			// For now, let’s block unsupported Table
+			// resources for watchlist only
+			// see #132926 for more info
+			if exitOnWatchListBookmarkReceived {
+				if unsupportedGVK := isUnsupportedTableObject(event.Object); unsupportedGVK {
+					utilruntime.HandleErrorWithContext(ctx, nil, "Unsupported watch event object gvk", "reflector", name, "actualGVK", event.Object.GetObjectKind().GroupVersionKind())
+					continue
+				}
+			}
 			meta, err := meta.Accessor(event.Object)
 			if err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Unable to understand watch event", "reflector", name, "event", event)
@@ -1178,4 +1188,23 @@ type VeryShortWatchError struct {
 func (e *VeryShortWatchError) Error() string {
 	return fmt.Sprintf("very short watch: %s: Unexpected watch close - "+
 		"watch lasted less than a second and no items received", e.Name)
+}
+
+var unsupportedTableGVK = map[schema.GroupVersionKind]bool{
+	metav1beta1.SchemeGroupVersion.WithKind("Table"): true,
+	metav1.SchemeGroupVersion.WithKind("Table"):      true,
+}
+
+// isUnsupportedTableObject checks whether the given runtime.Object
+// is a "Table" object that belongs to a set of well-known unsupported GroupVersionKinds.
+func isUnsupportedTableObject(rawObject runtime.Object) bool {
+	unstructuredObj, ok := rawObject.(*unstructured.Unstructured)
+	if !ok {
+		return false
+	}
+	if unstructuredObj.GetKind() != "Table" {
+		return false
+	}
+
+	return unsupportedTableGVK[rawObject.GetObjectKind().GroupVersionKind()]
 }

@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func setupController(ctx context.Context, clientset kubernetes.Interface) {
@@ -53,7 +53,7 @@ func newKubeApiserverLease(name, holderIdentity string) *coordinationv1.Lease {
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr(holderIdentity),
+			HolderIdentity: ptr.To(holderIdentity),
 		},
 	}
 }
@@ -89,7 +89,7 @@ func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *te
 					DecodableVersions: []string{"v2"},
 				},
 			},
-			CommonEncodingVersion: utilpointer.String("v1"),
+			CommonEncodingVersion: ptr.To("v1"),
 		},
 	}
 
@@ -174,7 +174,7 @@ func Test_StorageVersionUpdatedWithDifferentEncodingVersionsOnLeaseDeletion(t *t
 					DecodableVersions: []string{"v2"},
 				},
 			},
-			CommonEncodingVersion: utilpointer.String("v1"),
+			CommonEncodingVersion: ptr.To("v1"),
 		},
 	}
 
@@ -255,7 +255,7 @@ func Test_StorageVersionContainsInvalidLeaseID(t *testing.T) {
 					DecodableVersions: []string{"v1"},
 				},
 			},
-			CommonEncodingVersion: utilpointer.String("v1"),
+			CommonEncodingVersion: ptr.To("v1"),
 		},
 	}
 

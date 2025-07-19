@@ -20,10 +20,9 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
-
-	"k8s.io/code-generator/cmd/validation-gen/util"
 )
 
 const (
@@ -71,10 +70,11 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 	result := Validations{}
 	subContext := Context{
-		Scope:  ScopeField,
-		Type:   submemb.Type,
-		Parent: t,
-		Path:   context.Path.Child(subname),
+		Scope:      ScopeField,
+		Type:       submemb.Type,
+		ParentPath: context.Path,
+		Member:     submemb,
+		Path:       context.Path.Child(subname),
 	}
 	if validations, err := stv.validator.ExtractValidations(subContext, *tag.ValueTag); err != nil {
 		return Validations{}, err

@@ -240,6 +240,10 @@ func (pl *TestPlugin) PreBind(ctx context.Context, state fwk.CycleState, p *v1.P
 	return fwk.NewStatus(fwk.Code(pl.inj.PreBindStatus), injectReason)
 }
 
+func (pl *TestPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
 func (pl *TestPlugin) PostBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
 }
 

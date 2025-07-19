@@ -26,16 +26,20 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path"
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
@@ -45,6 +49,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -379,17 +384,17 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			}).WithTimeout(retryTestTimeout).Should(gomega.Equal(calls))
 		})
 
-		functionalListenAfterRegistration := func(ctx context.Context, socketPath string) {
+		functionalListenAfterRegistration := func(ctx context.Context, datadir string, opts ...any) {
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, socketPath)
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, opts...)
 
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
 			ginkgo.By("start DRA plugin service")
-			draService := newDRAService(ctx, f.ClientSet, nodeName, driverName, socketPath)
+			draService := newDRAService(ctx, f.ClientSet, nodeName, driverName, datadir, opts...)
 
 			pod := createTestObjects(ctx, f.ClientSet, nodeName, f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
@@ -403,20 +408,25 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		ginkgo.DescribeTable("must be functional when plugin starts to listen on a service socket after registration",
 			functionalListenAfterRegistration,
 			ginkgo.Entry("2 sockets", ""),
-			ginkgo.Entry("1 common socket", path.Join(kubeletplugin.KubeletRegistryDir, driverName+"-common.sock")),
+			ginkgo.Entry(
+				"1 common socket",
+				kubeletplugin.KubeletRegistryDir,
+				kubeletplugin.PluginDataDirectoryPath(kubeletplugin.KubeletRegistryDir),
+				kubeletplugin.PluginSocket(driverName+"-common.sock"),
+			),
 		)
 
-		functionalAfterServiceReconnect := func(ctx context.Context, socketPath string) {
+		functionalAfterServiceReconnect := func(ctx context.Context, datadir string, opts ...any) {
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, socketPath)
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, opts...)
 
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
 			ginkgo.By("start DRA plugin service")
-			draService := newDRAService(ctx, f.ClientSet, nodeName, driverName, socketPath)
+			draService := newDRAService(ctx, f.ClientSet, nodeName, driverName, datadir, opts...)
 
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drasleeppod" /* enables sleeping */, false /* pod is deleted below */, []string{driverName})
 
@@ -434,7 +444,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Eventually(ctx, listResources(f.ClientSet)).Should(gomega.BeEmpty(), "ResourceSlices without plugin")
 
 			ginkgo.By("restarting plugin")
-			draService = newDRAService(ctx, f.ClientSet, nodeName, driverName, socketPath)
+			draService = newDRAService(ctx, f.ClientSet, nodeName, driverName, datadir, opts...)
 
 			ginkgo.By("stopping pod")
 			err = f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
@@ -444,7 +454,59 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		ginkgo.DescribeTable("must be functional after service reconnect",
 			functionalAfterServiceReconnect,
 			ginkgo.Entry("2 sockets", ""),
-			ginkgo.Entry("1 common socket", path.Join(kubeletplugin.KubeletRegistryDir, driverName+"-common.sock")),
+			ginkgo.Entry(
+				"1 common socket",
+				kubeletplugin.KubeletRegistryDir,
+				kubeletplugin.PluginDataDirectoryPath(kubeletplugin.KubeletRegistryDir),
+				kubeletplugin.PluginSocket(driverName+"-common.sock"),
+			),
+		)
+
+		failOnClosedListener := func(
+			ctx context.Context,
+			service func(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, datadir string, opts ...any) *testdriver.ExamplePlugin,
+			listenerOptionFun func(listen func(ctx context.Context, path string) (net.Listener, error)) kubeletplugin.Option,
+		) {
+			ginkgo.By("create a custom listener")
+			var listener net.Listener
+			errorMsg := "simulated listener failure"
+			getListener := func(ctx context.Context, socketPath string) (net.Listener, error) {
+				listener = newErrorOnCloseListener(errors.New(errorMsg))
+				return listener, nil
+			}
+
+			ginkgo.By("create a context with a cancel function")
+			tCtx, cancel := context.WithCancelCause(ctx)
+			defer cancel(nil)
+
+			ginkgo.By("start service")
+			service(
+				ctx,
+				f.ClientSet,
+				getNodeName(ctx, f),
+				driverName,
+				"",
+				listenerOptionFun(getListener),
+				testdriver.CancelMainContext(cancel),
+			)
+
+			ginkgo.By("close listener to make the grpc.Server.Serve() fail")
+			framework.ExpectNoError(listener.Close())
+
+			ginkgo.By("check that the context is canceled with an expected error and cause")
+			gomega.Eventually(tCtx.Err).Should(gomega.MatchError(gomega.ContainSubstring("context canceled")), "Context should be canceled by the error handler")
+			gomega.Expect(context.Cause(tCtx).Error()).To(gomega.ContainSubstring(errorMsg), "Context should be canceled with the expected cause")
+		}
+		// The wrappedNewRegistrar function is used to create a new registrar
+		// with the same signature as the newDRAService function, so that it can be
+		// used in the DescribeTable.
+		wrappedNewRegistrar := func(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, datadir string, opts ...any) *testdriver.ExamplePlugin {
+			return newRegistrar(ctx, clientSet, nodeName, driverName, opts...)
+		}
+		ginkgo.DescribeTable("must report gRPC serving error",
+			failOnClosedListener,
+			ginkgo.Entry("for registrar", wrappedNewRegistrar, kubeletplugin.RegistrarListener),
+			ginkgo.Entry("for DRA service", newDRAService, kubeletplugin.PluginListener),
 		)
 	})
 
@@ -477,6 +539,43 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			ginkgo.By("wait for NodeUnprepareResources calls to succeed")
 			gomega.Eventually(kubeletPlugin1.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesSucceeded)
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodeUnprepareResourcesSucceeded)
+		})
+
+		ginkgo.It("must provide metrics", func(ctx context.Context) {
+			kubeletPlugin1, kubeletPlugin2 := start(ctx)
+
+			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drasleeppod", false, []string{kubeletPlugin1Name, kubeletPlugin2Name})
+
+			ginkgo.By("wait for pod to succeed")
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err)
+			gomega.Expect(kubeletPlugin1.GetGRPCCalls()).Should(testdrivergomega.NodePrepareResourcesSucceeded, "Plugin 1 should have prepared resources.")
+			gomega.Expect(kubeletPlugin2.GetGRPCCalls()).Should(testdrivergomega.NodePrepareResourcesSucceeded, "Plugin 2 should have prepared resources.")
+			driverName := func(element any) string {
+				el := element.(*testutil.Sample)
+				return string(el.Metric[testutil.LabelName("driver_name")])
+			}
+
+			gomega.Expect(getKubeletMetrics(ctx)).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"dra_resource_claims_in_use": gstruct.MatchAllElements(driverName, gstruct.Elements{
+					"<any>":            timelessSample(1),
+					kubeletPlugin1Name: timelessSample(1),
+					kubeletPlugin2Name: timelessSample(1),
+				}),
+			}), "metrics while pod is running")
+
+			ginkgo.By("delete pod")
+			err = f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete)
+			framework.ExpectNoError(err)
+			gomega.Expect(kubeletPlugin1.GetGRPCCalls()).Should(testdrivergomega.NodeUnprepareResourcesSucceeded, "Plugin 2 should have unprepared resources.")
+			gomega.Expect(kubeletPlugin2.GetGRPCCalls()).Should(testdrivergomega.NodeUnprepareResourcesSucceeded, "Plugin 2 should have unprepared resources.")
+			gomega.Expect(getKubeletMetrics(ctx)).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"dra_resource_claims_in_use": gstruct.MatchAllElements(driverName, gstruct.Elements{
+					"<any>": timelessSample(0),
+				}),
+			}), "metrics while pod is running")
 		})
 
 		ginkgo.It("must run pod if NodePrepareResources fails for one plugin and then succeeds", func(ctx context.Context) {
@@ -625,17 +724,17 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Consistently(ctx, listResources(f.ClientSet)).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices with no plugin")
 		})
 
-		removedIfPluginStopsAfterRegistration := func(ctx context.Context, socketPath string) {
+		removedIfPluginStopsAfterRegistration := func(ctx context.Context, datadir string, opts ...any) {
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, socketPath)
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, opts...)
 
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
 			ginkgo.By("start DRA plugin service")
-			kubeletPlugin := newDRAService(ctx, f.ClientSet, nodeName, driverName, socketPath)
+			kubeletPlugin := newDRAService(ctx, f.ClientSet, nodeName, driverName, datadir, opts...)
 
 			ginkgo.By("wait for ResourceSlice to be created by plugin")
 			matchNode := gomega.ConsistOf(matchResourcesByNodeName(nodeName))
@@ -652,14 +751,19 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		ginkgo.DescribeTable("must be removed if plugin stops after registration",
 			removedIfPluginStopsAfterRegistration,
 			ginkgo.Entry("2 sockets", ""),
-			ginkgo.Entry("1 common socket", path.Join(kubeletplugin.KubeletRegistryDir, driverName+"-common.sock")),
+			ginkgo.Entry(
+				"1 common socket",
+				kubeletplugin.KubeletRegistryDir,
+				kubeletplugin.PluginDataDirectoryPath(kubeletplugin.KubeletRegistryDir),
+				kubeletplugin.PluginSocket(driverName+"-common.sock"),
+			),
 		)
 
 		f.It("must be removed if plugin is unresponsive after registration", func(ctx context.Context) {
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, "")
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
@@ -672,17 +776,17 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Consistently(ctx, listResources(f.ClientSet)).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices without plugin")
 		})
 
-		testRemoveIfRestartsQuickly := func(ctx context.Context, socketPath string) {
+		testRemoveIfRestartsQuickly := func(ctx context.Context, datadir string, opts ...any) {
 			nodeName := getNodeName(ctx, f)
 
 			ginkgo.By("start DRA registrar")
-			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, "")
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName, opts...)
 
 			ginkgo.By("wait for registration to complete")
 			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 
 			ginkgo.By("start DRA plugin service")
-			kubeletPlugin := newDRAService(ctx, f.ClientSet, nodeName, driverName, "")
+			kubeletPlugin := newDRAService(ctx, f.ClientSet, nodeName, driverName, datadir, opts...)
 
 			ginkgo.By("wait for ResourceSlice to be created by plugin")
 			matchNode := gomega.ConsistOf(matchResourcesByNodeName(nodeName))
@@ -700,7 +804,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			time.Sleep(5 * time.Second)
 
 			ginkgo.By("restarting plugin")
-			newDRAService(ctx, f.ClientSet, nodeName, driverName, "")
+			newDRAService(ctx, f.ClientSet, nodeName, driverName, datadir, opts...)
 
 			ginkgo.By("ensuring unchanged ResourceSlices")
 			gomega.Consistently(ctx, listResources(f.ClientSet)).WithTimeout(time.Minute).Should(gomega.Equal(slices), "ResourceSlices")
@@ -708,7 +812,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		ginkgo.DescribeTable("must not be removed if plugin restarts quickly enough",
 			testRemoveIfRestartsQuickly,
 			ginkgo.Entry("2 sockets", ""),
-			ginkgo.Entry("1 common socket", path.Join(kubeletplugin.KubeletRegistryDir, driverName+"-common.sock")),
+			ginkgo.Entry(
+				"1 common socket",
+				kubeletplugin.KubeletRegistryDir,
+				kubeletplugin.PluginDataDirectoryPath(kubeletplugin.KubeletRegistryDir),
+				kubeletplugin.PluginSocket(driverName+"-common.sock"),
+			),
 		)
 	})
 })
@@ -765,18 +874,11 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 }
 
 // newRegistrar starts a registrar for the specified DRA driver, without the DRA gRPC service.
-func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, serviceSocketPath string) *testdriver.ExamplePlugin {
+func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string, opts ...any) *testdriver.ExamplePlugin {
 	ginkgo.By("start only Kubelet plugin registrar")
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin registrar "+driverName))
 	ctx = klog.NewContext(ctx, logger)
-	opts := []kubeletplugin.Option{
-		kubeletplugin.DRAService(false),
-	}
-	if serviceSocketPath != "" {
-		dir, file := path.Split(serviceSocketPath)
-		opts = append(opts, kubeletplugin.PluginDataDirectoryPath(dir))
-		opts = append(opts, kubeletplugin.PluginSocket(file))
-	}
+	opts = append(opts, kubeletplugin.DRAService(false))
 	registrar, err := testdriver.StartPlugin(
 		ctx,
 		cdiDir,
@@ -790,31 +892,35 @@ func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName,
 	return registrar
 }
 
-// newDRAService starts the DRA gRPC service for the specified DRA driver, without the registrar.
-func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, socketPath string) *testdriver.ExamplePlugin {
+// newDRAService starts the DRA gRPC service for the specified node and driver.
+// It ensures that necessary directories exist, starts the plugin and registers
+// cleanup functions to remove created resources after the test.
+// Parameters:
+//   - ctx: The context for controlling cancellation and logging.
+//   - clientSet: Kubernetes client interface for interacting with the cluster.
+//   - nodeName: The name of the node where the plugin will run.
+//   - driverName: The name of the DRA driver.
+//   - datadir: The directory for the DRA socket and state files.
+//     Must match what is specified via [kubeletplugin.PluginDataDirectoryPath].
+//     May be empty if that option is not used, then the default path is used.
+//   - opts: Additional options for plugin configuration.
+//
+// Returns:
+//   - A pointer to the started ExamplePlugin instance.
+func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName, datadir string, opts ...any) *testdriver.ExamplePlugin {
 	ginkgo.By("start only Kubelet plugin")
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin "+driverName), "node", nodeName)
 	ctx = klog.NewContext(ctx, logger)
+
+	opts = append(opts, kubeletplugin.RegistrationService(false))
 
 	// Ensure that directories exist, creating them if necessary. We want
 	// to know early if there is a setup problem that would prevent
 	// creating those directories.
 	err := os.MkdirAll(cdiDir, os.FileMode(0750))
 	framework.ExpectNoError(err, "create CDI directory")
-	opts := []kubeletplugin.Option{
-		kubeletplugin.RegistrationService(false),
-	}
-	var datadir string
-	if socketPath == "" {
-		// The default, not set as option.
+	if datadir == "" {
 		datadir = path.Join(kubeletplugin.KubeletPluginsDir, driverName)
-	} else {
-		dir, file := path.Split(socketPath)
-		opts = append(opts,
-			kubeletplugin.PluginDataDirectoryPath(dir),
-			kubeletplugin.PluginSocket(file),
-		)
-		datadir = dir
 	}
 	err = os.MkdirAll(datadir, 0750)
 	framework.ExpectNoError(err, "create DRA socket directory")
@@ -1034,4 +1140,45 @@ func listAndStoreResources(client kubernetes.Interface, lastSlices *[]resourceap
 
 func matchResourcesByNodeName(nodeName string) types.GomegaMatcher {
 	return gomega.HaveField("Spec.NodeName", gomega.Equal(nodeName))
+}
+
+// errorOnCloseListener is a mock net.Listener that blocks on Accept()
+// until Close() is called, at which point Accept() returns a predefined error.
+//
+// This is useful in tests or simulated environments to trigger grpc.Server.Serve()
+// to exit cleanly with a known error, without needing real network activity.
+type errorOnCloseListener struct {
+	ch     chan struct{}
+	closed atomic.Bool
+	err    error
+}
+
+// newErrorOnCloseListener creates a new listener that causes Accept to fail
+// with the given error after Close is called.
+func newErrorOnCloseListener(err error) *errorOnCloseListener {
+	return &errorOnCloseListener{
+		ch:  make(chan struct{}),
+		err: err,
+	}
+}
+
+// Accept blocks until Close is called, then returns the configured error.
+func (l *errorOnCloseListener) Accept() (net.Conn, error) {
+	<-l.ch
+	return nil, l.err
+}
+
+// Close unblocks Accept and causes it to return the configured error.
+// It is safe to call multiple times.
+func (l *errorOnCloseListener) Close() error {
+	if l.closed.Swap(true) {
+		return nil // already closed
+	}
+	close(l.ch)
+	return nil
+}
+
+// Addr returns a dummy Unix address. Required to satisfy net.Listener.
+func (*errorOnCloseListener) Addr() net.Addr {
+	return &net.UnixAddr{Name: "errorOnCloseListener", Net: "unix"}
 }

@@ -50,6 +50,7 @@ kube::test::find_go_packages() {
             -e '^k8s.io/kubernetes/third_party(/.*)?$' \
             -e '^k8s.io/kubernetes/cmd/kubeadm/test(/.*)?$' \
             -e '^k8s.io/kubernetes/test/e2e$' \
+            -e '^k8s.io/kubernetes/test/e2e_dra$' \
             -e '^k8s.io/kubernetes/test/e2e_node(/.*)?$' \
             -e '^k8s.io/kubernetes/test/e2e_kubeadm(/.*)?$' \
             -e '^k8s.io/.*/test/integration(/.*)?$'

@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/utils/ptr"
 )
 
 func TestForProperValidationErrors(t *testing.T) {
@@ -841,7 +842,7 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 				t.Fatalf("unexpected non-error: uniqueItems cannot be set to true")
 			}
 
-			validationSchema.OpenAPIV3Schema.Ref = strPtr("#/definition/zeta")
+			validationSchema.OpenAPIV3Schema.Ref = ptr.To("#/definition/zeta")
 			validationSchema.OpenAPIV3Schema.Properties["zeta"] = apiextensionsv1.JSONSchemaProps{
 				Type:        "array",
 				UniqueItems: false,
@@ -1613,10 +1614,6 @@ func toValidationJSON(yml string) string {
 
 func float64Ptr(f float64) *float64 {
 	return &f
-}
-
-func strPtr(str string) *string {
-	return &str
 }
 
 func TestNonStructuralSchemaConditionForCRDV1(t *testing.T) {

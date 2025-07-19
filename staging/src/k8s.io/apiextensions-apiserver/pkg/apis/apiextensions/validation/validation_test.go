@@ -89,8 +89,6 @@ func (v validationMatch) contains(s string) validationMatch {
 	return v
 }
 
-func strPtr(s string) *string { return &s }
-
 // exampleCert was generated from crypto/tls/generate_cert.go with the following command:
 //
 //	go run generate_cert.go  --rsa-bits 2048 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
@@ -386,7 +384,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 							Service: &apiextensions.ServiceReference{
 								Name:      "n",
 								Namespace: "ns",
@@ -436,7 +434,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr(""),
+							URL: ptr.To(""),
 						},
 					},
 					Validation: &apiextensions.CustomResourceValidation{
@@ -483,7 +481,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("None"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 					},
 					PreserveUnknownFields: ptr.To(false),
@@ -573,7 +571,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"invalid-version"},
 					},
@@ -620,7 +618,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"0v"},
 					},
@@ -668,7 +666,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"invalid-version", "v1beta1"},
 					},
@@ -713,7 +711,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"v1beta1", "v1beta1"},
 					},
@@ -887,7 +885,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"v1beta1"},
 					},
@@ -934,7 +932,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"v1beta1"},
 					},
@@ -979,7 +977,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"v1"},
 					},
@@ -1724,7 +1722,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 								Scale: &apiextensions.CustomResourceSubresourceScale{
 									SpecReplicasPath:   ".spec.replicas",
 									StatusReplicasPath: ".status.replicas",
-									LabelSelectorPath:  strPtr(".status.labelSelector"),
+									LabelSelectorPath:  ptr.To(".status.labelSelector"),
 								},
 							},
 						},
@@ -1737,7 +1735,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 								Scale: &apiextensions.CustomResourceSubresourceScale{
 									SpecReplicasPath:   ".spec.replicas",
 									StatusReplicasPath: ".status.replicas",
-									LabelSelectorPath:  strPtr(".spec.labelSelector"),
+									LabelSelectorPath:  ptr.To(".spec.labelSelector"),
 								},
 							},
 						},
@@ -1750,7 +1748,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 								Scale: &apiextensions.CustomResourceSubresourceScale{
 									SpecReplicasPath:   ".spec.replicas",
 									StatusReplicasPath: ".status.replicas",
-									LabelSelectorPath:  strPtr(".labelSelector"),
+									LabelSelectorPath:  ptr.To(".labelSelector"),
 								},
 							},
 						},
@@ -5200,7 +5198,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {
 								Type:      "array",
-								XListType: strPtr("set"),
+								XListType: ptr.To("set"),
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
 										Type:       "object", // non-atomic
@@ -5233,7 +5231,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"bar": {
 								Type:      "array",
-								XListType: strPtr("set"),
+								XListType: ptr.To("set"),
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
 										Type:       "object", // non-atomic
@@ -5293,7 +5291,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"bar": {
 								Type:      "array",
-								XListType: strPtr("set"),
+								XListType: ptr.To("set"),
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
 										Type:       "object", // non-atomic
@@ -5480,7 +5478,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"invalid-version"},
 					},
@@ -5521,7 +5519,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"invalid-version_0, invalid-version"},
 					},
@@ -5566,7 +5564,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"invalid-version"},
 					},
@@ -5607,7 +5605,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"v1beta1", "invalid-version"},
 					},
@@ -5654,7 +5652,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 						ConversionReviewVersions: []string{"invalid-version"},
 					},
@@ -5695,7 +5693,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("Webhook"),
 						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
+							URL: ptr.To("https://example.com/webhook"),
 						},
 					},
 					Validation: &apiextensions.CustomResourceValidation{
@@ -7022,7 +7020,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7052,7 +7050,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"bar": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7086,7 +7084,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7117,7 +7115,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"bar": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7153,7 +7151,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7185,7 +7183,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"bar": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7221,7 +7219,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7252,7 +7250,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"bar": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7290,7 +7288,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7322,7 +7320,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"bar": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7358,7 +7356,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7389,7 +7387,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"bar": {
 								Type:         "array",
-								XListType:    strPtr("map"),
+								XListType:    ptr.To("map"),
 								XListMapKeys: []string{"key"},
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
@@ -7427,7 +7425,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {
 								Type:      "array",
-								XListType: strPtr("set"),
+								XListType: ptr.To("set"),
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
 										Type:     "string",
@@ -7452,7 +7450,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"bar": {
 								Type:      "array",
-								XListType: strPtr("set"),
+								XListType: ptr.To("set"),
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
 										Type:     "string",
@@ -7481,7 +7479,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {
 								Type:      "array",
-								XListType: strPtr("set"),
+								XListType: ptr.To("set"),
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
 										Type: "string",
@@ -7505,7 +7503,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{"bar": {
 								Type:      "array",
-								XListType: strPtr("set"),
+								XListType: ptr.To("set"),
 								Items: &apiextensions.JSONSchemaPropsOrArray{
 									Schema: &apiextensions.JSONSchemaProps{
 										Type:     "string",
@@ -8158,7 +8156,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "object",
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 				},
 			},
 			expectedErrors: []validationMatch{
@@ -8169,7 +8167,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			name: "unset type with list type extension set",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 				},
 			},
 			expectedErrors: []validationMatch{
@@ -8181,7 +8179,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("invalid"),
+					XListType: ptr.To("invalid"),
 				},
 			},
 			expectedErrors: []validationMatch{
@@ -8193,7 +8191,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("set"),
+					XListType:    ptr.To("set"),
 					XListMapKeys: []string{"key"},
 				},
 			},
@@ -8217,7 +8215,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("map"),
+					XListType: ptr.To("map"),
 				},
 			},
 			expectedErrors: []validationMatch{
@@ -8230,7 +8228,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key"},
 				},
 			},
@@ -8243,7 +8241,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						JSONSchemas: []apiextensions.JSONSchemaProps{
@@ -8266,7 +8264,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8284,7 +8282,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8302,7 +8300,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8325,7 +8323,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key", "key"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8348,7 +8346,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"keyA", "keyB"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8371,7 +8369,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("atomic"),
+					XListType: ptr.To("atomic"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Type: "string",
@@ -8385,7 +8383,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("atomic"),
+					XListType: ptr.To("atomic"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Type:       "object",
@@ -8400,7 +8398,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Type: "string",
@@ -8414,11 +8412,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Type:     "object",
-							XMapType: strPtr("atomic"),
+							XMapType: ptr.To("atomic"),
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"foo": {Type: "string"},
 							},
@@ -8432,11 +8430,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Type:     "object",
-							XMapType: strPtr("granular"),
+							XMapType: ptr.To("granular"),
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"foo": {Type: "string"},
 							},
@@ -8454,7 +8452,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -8475,11 +8473,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Type:      "array",
-							XListType: strPtr("atomic"),
+							XListType: ptr.To("atomic"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type: "string",
@@ -8495,7 +8493,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Type: "array",
@@ -8514,11 +8512,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Type:      "array",
-							XListType: strPtr("set"),
+							XListType: ptr.To("set"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type: "string",
@@ -8538,7 +8536,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:     "array",
-					XMapType: strPtr("granular"),
+					XMapType: ptr.To("granular"),
 				},
 			},
 			expectedErrors: []validationMatch{
@@ -8549,7 +8547,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			name: "unset type with map type extension (granular)",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
-					XMapType: strPtr("granular"),
+					XMapType: ptr.To("granular"),
 				},
 			},
 			expectedErrors: []validationMatch{
@@ -8561,7 +8559,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:     "array",
-					XMapType: strPtr("atomic"),
+					XMapType: ptr.To("atomic"),
 				},
 			},
 			expectedErrors: []validationMatch{
@@ -8572,7 +8570,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			name: "unset type with map type extension (atomic)",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
-					XMapType: strPtr("atomic"),
+					XMapType: ptr.To("atomic"),
 				},
 			},
 			expectedErrors: []validationMatch{
@@ -8584,7 +8582,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:     "object",
-					XMapType: strPtr("badMapType"),
+					XMapType: ptr.To("badMapType"),
 				},
 			},
 			expectedErrors: []validationMatch{
@@ -8596,7 +8594,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:     "object",
-					XMapType: strPtr("granular"),
+					XMapType: ptr.To("granular"),
 				},
 			},
 		},
@@ -8605,7 +8603,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:     "object",
-					XMapType: strPtr("atomic"),
+					XMapType: ptr.To("atomic"),
 				},
 			},
 		},
@@ -8614,7 +8612,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8640,7 +8638,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8664,7 +8662,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8689,7 +8687,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8717,7 +8715,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"key"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8745,7 +8743,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:         "array",
-					XListType:    strPtr("map"),
+					XListType:    ptr.To("map"),
 					XListMapKeys: []string{"a"},
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
@@ -8782,7 +8780,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Nullable: true,
@@ -8802,7 +8800,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
-					XListType: strPtr("set"),
+					XListType: ptr.To("set"),
 					Items: &apiextensions.JSONSchemaPropsOrArray{
 						Schema: &apiextensions.JSONSchemaProps{
 							Nullable: false,
@@ -9640,11 +9638,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "array",
-							XListType: strPtr("atomic"),
+							XListType: ptr.To("atomic"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -9670,7 +9668,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -9693,8 +9691,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "array",
-							MaxItems:  int64ptr(10),
-							XListType: strPtr("atomic"),
+							MaxItems:  ptr.To[int64](10),
+							XListType: ptr.To("atomic"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type: "string",
@@ -9716,11 +9714,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:     "array",
-							MaxItems: int64ptr(10),
+							MaxItems: ptr.To[int64](10),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 								},
 							},
 							XValidations: apiextensions.ValidationRules{
@@ -9740,12 +9738,12 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "array",
-							MaxItems:  int64ptr(10),
-							XListType: strPtr("set"),
+							MaxItems:  ptr.To[int64](10),
+							XListType: ptr.To("set"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -9768,12 +9766,12 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "array",
-							MaxItems:  int64ptr(10),
-							XListType: strPtr("set"),
+							MaxItems:  ptr.To[int64](10),
+							XListType: ptr.To("set"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 								},
 							},
 							XValidations: apiextensions.ValidationRules{
@@ -9793,7 +9791,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:         "array",
-							XListType:    strPtr("map"),
+							XListType:    ptr.To("map"),
 							XListMapKeys: []string{"name"},
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
@@ -9803,7 +9801,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 									},
 									Required: []string{"name"},
 									Properties: map[string]apiextensions.JSONSchemaProps{
-										"name": {Type: "string", MaxLength: int64ptr(5)},
+										"name": {Type: "string", MaxLength: ptr.To[int64](5)},
 									},
 								},
 							},
@@ -9821,15 +9819,15 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:         "array",
-							MaxItems:     int64ptr(10),
-							XListType:    strPtr("map"),
+							MaxItems:     ptr.To[int64](10),
+							XListType:    ptr.To("map"),
 							XListMapKeys: []string{"name"},
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:     "object",
 									Required: []string{"name"},
 									Properties: map[string]apiextensions.JSONSchemaProps{
-										"name": {Type: "string", MaxLength: int64ptr(5)},
+										"name": {Type: "string", MaxLength: ptr.To[int64](5)},
 									},
 								},
 							},
@@ -9850,11 +9848,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:     "object",
-							XMapType: strPtr("granular"),
+							XMapType: ptr.To("granular"),
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"subfield": {
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -9874,11 +9872,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:     "object",
-							XMapType: strPtr("future"),
+							XMapType: ptr.To("future"),
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"subfield": {
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -9905,7 +9903,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"subfield": {
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self == oldSelf"},
 									},
@@ -9925,7 +9923,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:     "object",
-							XMapType: strPtr("granular"),
+							XMapType: ptr.To("granular"),
 							XValidations: apiextensions.ValidationRules{
 								{Rule: "self == oldSelf"},
 							},
@@ -9960,7 +9958,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:     "object",
-							XMapType: strPtr("atomic"),
+							XMapType: ptr.To("atomic"),
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"subfield": {
 									Type: "object",
@@ -9983,7 +9981,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:     "object",
-							XMapType: strPtr("atomic"),
+							XMapType: ptr.To("atomic"),
 							XValidations: apiextensions.ValidationRules{
 								{Rule: "self == oldSelf"},
 							},
@@ -10047,7 +10045,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 											Type:     "object",
 											Required: []string{"key"},
 											Properties: map[string]apiextensions.JSONSchemaProps{
-												"key": {Type: "string", MaxLength: int64ptr(10)},
+												"key": {Type: "string", MaxLength: ptr.To[int64](10)},
 											},
 										},
 									},
@@ -10077,17 +10075,17 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:     "array",
-							MaxItems: int64ptr(10),
+							MaxItems: ptr.To[int64](10),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:          "object",
-									MaxProperties: int64ptr(10),
+									MaxProperties: ptr.To[int64](10),
 									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
 										Schema: &apiextensions.JSONSchemaProps{
 											Type:     "object",
 											Required: []string{"key"},
 											Properties: map[string]apiextensions.JSONSchemaProps{
-												"key": {Type: "string", MaxLength: int64ptr(10)},
+												"key": {Type: "string", MaxLength: ptr.To[int64](10)},
 											},
 										},
 									},
@@ -10111,7 +10109,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:     "array",
-							MaxItems: int64ptr(4),
+							MaxItems: ptr.To[int64](4),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type: "object",
@@ -10162,11 +10160,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"list": {
 							Type:     "array",
-							MaxItems: int64Ptr(100000),
+							MaxItems: ptr.To[int64](100000),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:      "string",
-									MaxLength: int64Ptr(5000),
+									MaxLength: ptr.To[int64](5000),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self.contains('keyword')"},
 									},
@@ -10175,12 +10173,12 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 						},
 						"map": {
 							Type:          "object",
-							MaxProperties: int64Ptr(1000),
+							MaxProperties: ptr.To[int64](1000),
 							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
 								Allows: true,
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:      "string",
-									MaxLength: int64Ptr(5000),
+									MaxLength: ptr.To[int64](5000),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: "self.contains('keyword')"},
 									},
@@ -10802,11 +10800,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "array",
-							XListType: strPtr("atomic"),
+							XListType: ptr.To("atomic"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: `self == oldSelf.orValue("")`, OptionalOldSelf: ptr.To(true)},
 									},
@@ -10832,7 +10830,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: `self == oldSelf.orValue("")`, OptionalOldSelf: ptr.To(true)},
 									},
@@ -10855,12 +10853,12 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "array",
-							MaxItems:  int64ptr(10),
-							XListType: strPtr("set"),
+							MaxItems:  ptr.To[int64](10),
+							XListType: ptr.To("set"),
 							Items: &apiextensions.JSONSchemaPropsOrArray{
 								Schema: &apiextensions.JSONSchemaProps{
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: `self == oldSelf.orValue("")`, OptionalOldSelf: ptr.To(true)},
 									},
@@ -10883,11 +10881,11 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:     "object",
-							XMapType: strPtr("future"),
+							XMapType: ptr.To("future"),
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"subfield": {
 									Type:      "string",
-									MaxLength: int64ptr(10),
+									MaxLength: ptr.To[int64](10),
 									XValidations: apiextensions.ValidationRules{
 										{Rule: `self == oldSelf.orValue("")`, OptionalOldSelf: ptr.To(true)},
 									},
@@ -10911,7 +10909,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "string",
-							MaxLength: int64ptr(10),
+							MaxLength: ptr.To[int64](10),
 							XValidations: apiextensions.ValidationRules{
 								{Rule: `self == "foo"`, OptionalOldSelf: ptr.To(true)},
 							},
@@ -10932,7 +10930,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Properties: map[string]apiextensions.JSONSchemaProps{
 						"value": {
 							Type:      "string",
-							MaxLength: int64ptr(10),
+							MaxLength: ptr.To[int64](10),
 							XValidations: apiextensions.ValidationRules{
 								{Rule: `self == "foo"`, OptionalOldSelf: ptr.To(false)},
 							},
@@ -11142,11 +11140,11 @@ var validValidationSchema = &apiextensions.JSONSchemaProps{
 	ExclusiveMaximum: true,
 	Minimum:          float64Ptr(5),
 	ExclusiveMinimum: true,
-	MaxLength:        int64Ptr(10),
-	MinLength:        int64Ptr(5),
+	MaxLength:        ptr.To[int64](10),
+	MinLength:        ptr.To[int64](5),
 	Pattern:          "^[a-z]$",
-	MaxItems:         int64Ptr(10),
-	MinItems:         int64Ptr(5),
+	MaxItems:         ptr.To[int64](10),
+	MinItems:         ptr.To[int64](5),
 	MultipleOf:       float64Ptr(3),
 	Required:         []string{"spec", "status"},
 	Properties: map[string]apiextensions.JSONSchemaProps{
@@ -11178,11 +11176,11 @@ var validUnstructuralValidationSchema = &apiextensions.JSONSchemaProps{
 	ExclusiveMaximum: true,
 	Minimum:          float64Ptr(5),
 	ExclusiveMinimum: true,
-	MaxLength:        int64Ptr(10),
-	MinLength:        int64Ptr(5),
+	MaxLength:        ptr.To[int64](10),
+	MinLength:        ptr.To[int64](5),
 	Pattern:          "^[a-z]$",
-	MaxItems:         int64Ptr(10),
-	MinItems:         int64Ptr(5),
+	MaxItems:         ptr.To[int64](10),
+	MinItems:         ptr.To[int64](5),
 	MultipleOf:       float64Ptr(3),
 	Required:         []string{"spec", "status"},
 	Items: &apiextensions.JSONSchemaPropsOrArray{
@@ -11201,10 +11199,6 @@ var validUnstructuralValidationSchema = &apiextensions.JSONSchemaProps{
 }
 
 func float64Ptr(f float64) *float64 {
-	return &f
-}
-
-func int64Ptr(f int64) *int64 {
 	return &f
 }
 
@@ -11350,14 +11344,14 @@ func TestCostInfo(t *testing.T) {
 			schema: []*apiextensions.JSONSchemaProps{
 				genObjectSchema(),
 			},
-			expectedMaxCardinality: uint64ptr(1),
+			expectedMaxCardinality: ptr.To[uint64](1),
 		},
 		{
 			name: "array",
 			schema: []*apiextensions.JSONSchemaProps{
-				withMaxItems(genArraySchema(), int64ptr(5)),
+				withMaxItems(genArraySchema(), ptr.To[int64](5)),
 			},
-			expectedMaxCardinality: uint64ptr(5),
+			expectedMaxCardinality: ptr.To[uint64](5),
 		},
 		{
 			name:                   "unbounded array",
@@ -11366,8 +11360,8 @@ func TestCostInfo(t *testing.T) {
 		},
 		{
 			name:                   "map",
-			schema:                 []*apiextensions.JSONSchemaProps{withMaxProperties(genMapSchema(), int64ptr(10))},
-			expectedMaxCardinality: uint64ptr(10),
+			schema:                 []*apiextensions.JSONSchemaProps{withMaxProperties(genMapSchema(), ptr.To[int64](10))},
+			expectedMaxCardinality: ptr.To[uint64](10),
 		},
 		{
 			name: "unbounded map",
@@ -11379,15 +11373,15 @@ func TestCostInfo(t *testing.T) {
 		{
 			name: "array inside map",
 			schema: []*apiextensions.JSONSchemaProps{
-				withMaxProperties(genMapSchema(), int64ptr(5)),
-				withMaxItems(genArraySchema(), int64ptr(5)),
+				withMaxProperties(genMapSchema(), ptr.To[int64](5)),
+				withMaxItems(genArraySchema(), ptr.To[int64](5)),
 			},
-			expectedMaxCardinality: uint64ptr(25),
+			expectedMaxCardinality: ptr.To[uint64](25),
 		},
 		{
 			name: "unbounded array inside bounded map",
 			schema: []*apiextensions.JSONSchemaProps{
-				withMaxProperties(genMapSchema(), int64ptr(5)),
+				withMaxProperties(genMapSchema(), ptr.To[int64](5)),
 				genArraySchema(),
 			},
 			expectedMaxCardinality: nil,
@@ -11395,27 +11389,27 @@ func TestCostInfo(t *testing.T) {
 		{
 			name: "object inside array",
 			schema: []*apiextensions.JSONSchemaProps{
-				withMaxItems(genArraySchema(), int64ptr(3)),
+				withMaxItems(genArraySchema(), ptr.To[int64](3)),
 				genObjectSchema(),
 			},
-			expectedMaxCardinality: uint64ptr(3),
+			expectedMaxCardinality: ptr.To[uint64](3),
 		},
 		{
 			name: "map inside object inside array",
 			schema: []*apiextensions.JSONSchemaProps{
-				withMaxItems(genArraySchema(), int64ptr(2)),
+				withMaxItems(genArraySchema(), ptr.To[int64](2)),
 				genObjectSchema(),
-				withMaxProperties(genMapSchema(), int64ptr(4)),
+				withMaxProperties(genMapSchema(), ptr.To[int64](4)),
 			},
-			expectedMaxCardinality: uint64ptr(8),
+			expectedMaxCardinality: ptr.To[uint64](8),
 		},
 		{
 			name: "integer overflow bounds check",
 			schema: []*apiextensions.JSONSchemaProps{
-				withMaxItems(genArraySchema(), int64ptr(math.MaxInt)),
-				withMaxItems(genArraySchema(), int64ptr(100)),
+				withMaxItems(genArraySchema(), ptr.To[int64](math.MaxInt)),
+				withMaxItems(genArraySchema(), ptr.To[int64](100)),
 			},
-			expectedMaxCardinality: uint64ptr(math.MaxUint),
+			expectedMaxCardinality: ptr.To[uint64](math.MaxUint),
 		},
 	}
 	for _, tt := range tests {
@@ -11573,8 +11567,4 @@ func TestPerCRDEstimatedCost(t *testing.T) {
 			}
 		})
 	}
-}
-
-func int64ptr(i int64) *int64 {
-	return &i
 }

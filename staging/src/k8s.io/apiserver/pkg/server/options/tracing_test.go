@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	tracingapi "k8s.io/component-base/tracing/api/v1"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -31,10 +32,6 @@ var (
 	ipAddress    = "127.0.0.1:4317"
 	samplingRate = int32(12345)
 )
-
-func strptr(s string) *string {
-	return &s
-}
 
 func TestValidateTracingOptions(t *testing.T) {
 	testcases := []struct {
@@ -95,7 +92,7 @@ func TestReadTracingConfiguration(t *testing.T) {
 			createFile:     false,
 			contents:       ``,
 			expectedResult: nil,
-			expectedError:  strptr("unable to read tracing configuration from \"test-tracing-config-absent\": open test-tracing-config-absent: no such file or directory"),
+			expectedError:  ptr.To("unable to read tracing configuration from \"test-tracing-config-absent\": open test-tracing-config-absent: no such file or directory"),
 		},
 		{
 			name:       "duplicate field error; strict validation",
@@ -108,7 +105,7 @@ endpoint: localhost:4318
 samplingRatePerMillion: 12345
 `,
 			expectedResult: nil,
-			expectedError:  strptr("unable to decode tracing configuration data: strict decoding error"),
+			expectedError:  ptr.To("unable to decode tracing configuration data: strict decoding error"),
 		},
 		{
 			name:       "unknown field error; strict validation",
@@ -121,7 +118,7 @@ endpoint: localhost:4318
 samplingRatePerMillion: 12345
 `,
 			expectedResult: nil,
-			expectedError:  strptr("unable to decode tracing configuration data: strict decoding error"),
+			expectedError:  ptr.To("unable to decode tracing configuration data: strict decoding error"),
 		},
 		{
 			name:       "v1alpha1",
@@ -173,7 +170,7 @@ spec:
           name: agent
 `,
 			expectedResult: nil,
-			expectedError:  strptr("unable to decode tracing configuration data: no kind \"DaemonSet\" is registered for version \"apps/v1\" in scheme"),
+			expectedError:  ptr.To("unable to decode tracing configuration data: no kind \"DaemonSet\" is registered for version \"apps/v1\" in scheme"),
 		},
 	}
 

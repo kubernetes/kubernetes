@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodSecurityContextAccessor(t *testing.T) {
@@ -278,8 +278,8 @@ func TestPodSecurityContextMutator(t *testing.T) {
 		{
 			modifiedSC := nonNilSC(tc.newSC())
 			m := NewPodSecurityContextMutator(tc.newSC())
-			modifiedSC.SeccompProfile = &api.SeccompProfile{Type: api.SeccompProfileTypeLocalhost, LocalhostProfile: pointer.String("verylocalhostey")}
-			m.SetSeccompProfile(&api.SeccompProfile{Type: api.SeccompProfileTypeLocalhost, LocalhostProfile: pointer.String("verylocalhostey")})
+			modifiedSC.SeccompProfile = &api.SeccompProfile{Type: api.SeccompProfileTypeLocalhost, LocalhostProfile: ptr.To("verylocalhostey")}
+			m.SetSeccompProfile(&api.SeccompProfile{Type: api.SeccompProfileTypeLocalhost, LocalhostProfile: ptr.To("verylocalhostey")})
 			if !reflect.DeepEqual(m.PodSecurityContext(), modifiedSC) {
 				t.Errorf("%s: unexpected object:\n%s", k, diff.ObjectGoPrintSideBySide(modifiedSC, m.PodSecurityContext()))
 				continue

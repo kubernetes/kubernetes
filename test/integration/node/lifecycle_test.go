@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -318,9 +319,13 @@ func TestTaintBasedEvictions(t *testing.T) {
 
 	// Build admission chain handler.
 	podTolerations := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
+	defaultTolerationSeconds, err := newHandlerForTest()
+	if err != nil {
+		t.Errorf("unexpected error initializing handler: %v", err)
+	}
 	admission := admission.NewChainHandler(
 		podTolerations,
-		defaulttolerationseconds.NewDefaultTolerationSeconds(),
+		defaultTolerationSeconds,
 	)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -457,4 +462,12 @@ func TestTaintBasedEvictions(t *testing.T) {
 			testutils.CleanupNodes(cs, t)
 		})
 	}
+}
+
+// newHandlerForTest returns a handler configured for testing.
+func newHandlerForTest() (*defaulttolerationseconds.Plugin, error) {
+	handler := defaulttolerationseconds.NewDefaultTolerationSeconds()
+	pluginInitializer := initializer.New(nil, nil, nil, nil, nil, nil, nil)
+	pluginInitializer.Initialize(handler)
+	return handler, admission.ValidateInitialization(handler)
 }

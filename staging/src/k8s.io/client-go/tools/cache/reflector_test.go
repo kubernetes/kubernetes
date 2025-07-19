@@ -2361,3 +2361,56 @@ func BenchmarkReflectorList(b *testing.B) {
 		})
 	}
 }
+
+func TestIsUnsupportedTableObject(t *testing.T) {
+	tests := []struct {
+		name     string
+		obj      runtime.Object
+		expected bool
+	}{
+		{
+			name: "Unsupported Table object in meta.k8s.io/v1beta1",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "meta.k8s.io/v1beta1",
+					"kind":       "Table",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Unsupported Table object in meta.k8s.io/v1",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "meta.k8s.io/v1",
+					"kind":       "Table",
+				},
+			},
+			expected: true,
+		},
+		{
+			name:     "Pod obj is not a Table",
+			obj:      &v1.Pod{},
+			expected: false,
+		},
+		{
+			name: "Table object with unrecognised API group",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "custom.group/v1",
+					"kind":       "Table",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isUnsupportedTableObject(tt.obj)
+			if result != tt.expected {
+				t.Errorf("Expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}

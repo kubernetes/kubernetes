@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -36,17 +37,23 @@ type v1PodResourcesServer struct {
 	cpusProvider             CPUsProvider
 	memoryProvider           MemoryProvider
 	dynamicResourcesProvider DynamicResourcesProvider
+	useActivePods            bool
+	podresourcesv1.UnsafePodResourcesListerServer
 }
 
 // NewV1PodResourcesServer returns a PodResourcesListerServer which lists pods provided by the PodsProvider
 // with device information provided by the DevicesProvider
-func NewV1PodResourcesServer(providers PodResourcesProviders) podresourcesv1.PodResourcesListerServer {
+func NewV1PodResourcesServer(ctx context.Context, providers PodResourcesProviders) podresourcesv1.PodResourcesListerServer {
+	logger := klog.FromContext(ctx)
+	useActivePods := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesListUseActivePods)
+	logger.Info("podresources", "method", "list", "useActivePods", useActivePods)
 	return &v1PodResourcesServer{
 		podsProvider:             providers.Pods,
 		devicesProvider:          providers.Devices,
 		cpusProvider:             providers.Cpus,
 		memoryProvider:           providers.Memory,
 		dynamicResourcesProvider: providers.DynamicResources,
+		useActivePods:            useActivePods,
 	}
 }
 
@@ -55,7 +62,13 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsListCount.WithLabelValues("v1").Inc()
 
-	pods := p.podsProvider.GetPods()
+	var pods []*v1.Pod
+	if p.useActivePods {
+		pods = p.podsProvider.GetActivePods()
+	} else {
+		pods = p.podsProvider.GetPods()
+	}
+
 	podResources := make([]*podresourcesv1.PodResources, len(pods))
 	p.devicesProvider.UpdateAllocatedDevices()
 

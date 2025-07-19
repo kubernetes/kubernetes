@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
@@ -51,6 +52,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 var scheme = runtime.NewScheme()
@@ -251,12 +253,19 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, increaseRV(client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+	storagetesting.RunTestList(ctx, t, store, compactStorage(store, client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
 }
 
 func TestConsistentList(t *testing.T) {
 	ctx, store, client := testSetup(t)
 	storagetesting.RunTestConsistentList(ctx, t, store, increaseRV(client.Client), false, true, false)
+}
+
+func TestCompactRevision(t *testing.T) {
+	// Test requires store to observe extenal changes to compaction revision, requiring dedicated watch on compact key which is enabled by ListFromCacheSnapshot.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestCompactRevision(ctx, t, store, increaseRV(client.Client), compactStorage(store, client.Client))
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *storagetesting.KVRecorder) storagetesting.CallsValidation {
@@ -297,6 +306,9 @@ func TestListContinuation(t *testing.T) {
 }
 
 func TestListPaginationRareObject(t *testing.T) {
+	// ListFromCacheSnapshots adds additional Get call to read compact key.
+	// TODO: Rewrite call validation to only count calls to pods.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
 	ctx, store, client := testSetup(t)
 	validation := checkStorageCallsInvariants(
 		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*storagetesting.KVRecorder))
@@ -315,15 +327,34 @@ func TestNamespaceScopedList(t *testing.T) {
 	storagetesting.RunTestNamespaceScopedList(ctx, t, store)
 }
 
-func compactStorage(client *clientv3.Client) storagetesting.Compaction {
+func compactStorage(s *store, client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = client.Compact(ctx, int64(rv)); err != nil {
-			t.Fatalf("Unable to compact, %v", err)
+		var currentVersion int64
+		currentVersion, _, _, err = Compact(ctx, client, currentVersion, int64(rv))
+		if err != nil {
+			_, _, _, err = Compact(ctx, client, currentVersion, int64(rv))
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Wait for compaction to be observed.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+			for {
+				select {
+				case <-ctx.Done():
+					t.Fatal(ctx.Err())
+				case <-time.After(100 * time.Millisecond):
+				}
+				compactedRev := s.CompactRevision()
+				if compactedRev == int64(rv) {
+					break
+				}
+			}
 		}
 	}
 }
@@ -338,7 +369,7 @@ func increaseRV(client *clientv3.Client) storagetesting.IncreaseRVFunc {
 
 func TestListInconsistentContinuation(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestListInconsistentContinuation(ctx, t, store, compactStorage(client.Client))
+	storagetesting.RunTestListInconsistentContinuation(ctx, t, store, compactStorage(store, client.Client))
 }
 
 func TestListResourceVersionMatch(t *testing.T) {
@@ -587,8 +618,11 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 	}
 	client := setupOpts.client(t)
 	versioner := storage.APIObjectVersioner{}
+	compactor := NewCompactor(client.Client, 0, clock.RealClock{}, nil)
+	t.Cleanup(compactor.Stop)
 	store := New(
 		client,
+		compactor,
 		setupOpts.codec,
 		setupOpts.newFunc,
 		setupOpts.newListFunc,

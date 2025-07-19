@@ -2185,12 +2185,16 @@ type PersistentVolumeClaimSpecValidationOptions struct {
 	EnableVolumeAttributesClass bool
 }
 
-func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
-	opts := PersistentVolumeClaimSpecValidationOptions{
+func ValidationOptionsForPersistentVolumeClaimCreate() PersistentVolumeClaimSpecValidationOptions {
+	return PersistentVolumeClaimSpecValidationOptions{
 		EnableRecoverFromExpansionFailure: utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure),
 		AllowInvalidLabelValueInSelector:  false,
 		EnableVolumeAttributesClass:       utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
 	}
+}
+
+func ValidationOptionsForPersistentVolumeClaim(pvc, oldPvc *core.PersistentVolumeClaim) PersistentVolumeClaimSpecValidationOptions {
+	opts := ValidationOptionsForPersistentVolumeClaimCreate()
 	if oldPvc == nil {
 		// If there's no old PVC, use the options based solely on feature enablement
 		return opts
@@ -4399,10 +4403,13 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 
 	// Pod-level requests must be >= aggregate requests of all containers in a pod.
 	for resourceName, ctrReqs := range aggrContainerReqs {
-		key := resourceName.String()
-		podSpecRequests := spec.Resources.Requests[core.ResourceName(key)]
+		// Skip if the pod-level request of the resource is not set.
+		podSpecRequests, exists := spec.Resources.Requests[core.ResourceName(resourceName.String())]
+		if !exists {
+			continue
+		}
 
-		fldPath := reqPath.Key(key)
+		fldPath := reqPath.Key(resourceName.String())
 		if ctrReqs.Cmp(podSpecRequests) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, podSpecRequests.String(), fmt.Sprintf("must be greater than or equal to aggregate container requests of %s", ctrReqs.String())))
 		}
@@ -4411,6 +4418,7 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// Individual Container limits must be <= Pod-level limits.
 	for i, ctr := range spec.Containers {
 		for resourceName, ctrLimit := range ctr.Resources.Limits {
+			// Skip if the pod-level limit of the resource is not set.
 			podSpecLimits, exists := spec.Resources.Limits[core.ResourceName(resourceName.String())]
 			if !exists {
 				continue
@@ -5837,31 +5845,6 @@ func validateContainerResize(newRequirements, oldRequirements *core.ResourceRequ
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("limits"), "resource limits cannot be removed"))
 	}
 
-	// Special case: memory limits may not be decreased if resize policy is NotRequired.
-	var memRestartPolicy core.ResourceResizeRestartPolicy
-	for _, policy := range resizePolicies {
-		if policy.ResourceName == core.ResourceMemory {
-			memRestartPolicy = policy.RestartPolicy
-			break
-		}
-	}
-	if memRestartPolicy == core.NotRequired || memRestartPolicy == "" {
-		newLimit, hasNewLimit := newRequirements.Limits[core.ResourceMemory]
-		oldLimit, hasOldLimit := oldRequirements.Limits[core.ResourceMemory]
-		if hasNewLimit && hasOldLimit {
-			if newLimit.Cmp(oldLimit) < 0 {
-				allErrs = append(allErrs, field.Forbidden(
-					fldPath.Child("limits").Key(core.ResourceMemory.String()),
-					fmt.Sprintf("memory limits cannot be decreased unless resizePolicy is %s", core.RestartContainer)))
-			}
-		} else if hasNewLimit && !hasOldLimit {
-			// Adding a memory limit is implicitly decreasing the memory limit (from 'max')
-			allErrs = append(allErrs, field.Forbidden(
-				fldPath.Child("limits").Key(core.ResourceMemory.String()),
-				fmt.Sprintf("memory limits cannot be added unless resizePolicy is %s", core.RestartContainer)))
-		}
-	}
-
 	// TODO(tallclair): Move resizable resource checks here.
 
 	return allErrs
@@ -5924,9 +5907,12 @@ var supportedServiceIPFamilyPolicy = sets.New(
 	core.IPFamilyPolicyRequireDualStack)
 
 // ValidateService tests if required fields/annotations of a Service are valid.
-func ValidateService(service, oldService *core.Service) field.ErrorList {
+func validateService(service, oldService *core.Service) field.ErrorList {
 	metaPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, metaPath)
+
+	// Don't validate ObjectMeta here - that is handled in the ValidateServiceCreate/ValidateServiceUpdate
+	// functions which call ValidateObjectMeta and ValidateObjectMetaUpdate respectively.
+	var allErrs field.ErrorList
 
 	topologyHintsVal, topologyHintsSet := service.Annotations[core.DeprecatedAnnotationTopologyAwareHints]
 	topologyModeVal, topologyModeSet := service.Annotations[core.AnnotationTopologyMode]
@@ -6276,7 +6262,17 @@ func validateServiceTrafficDistribution(service *core.Service) field.ErrorList {
 
 // ValidateServiceCreate validates Services as they are created.
 func ValidateServiceCreate(service *core.Service) field.ErrorList {
-	return ValidateService(service, nil)
+	metaPath := field.NewPath("metadata")
+
+	// KEP-5311 Relaxed validation for Services names
+	validateServiceNameFunc := ValidateServiceName
+	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedServiceNameValidation) {
+		validateServiceNameFunc = apimachineryvalidation.NameIsDNSLabel
+	}
+
+	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, validateServiceNameFunc, metaPath)
+
+	return append(allErrs, validateService(service, nil)...)
 }
 
 // ValidateServiceUpdate tests if required fields in the service are set during an update
@@ -6299,7 +6295,7 @@ func ValidateServiceUpdate(service, oldService *core.Service) field.ErrorList {
 
 	allErrs = append(allErrs, validateServiceExternalTrafficFieldsUpdate(oldService, service)...)
 
-	return append(allErrs, ValidateService(service, oldService)...)
+	return append(allErrs, validateService(service, oldService)...)
 }
 
 // ValidateServiceStatusUpdate tests if required fields in the Service are set when updating status.

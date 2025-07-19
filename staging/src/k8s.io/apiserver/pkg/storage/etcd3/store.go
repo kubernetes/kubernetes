@@ -91,6 +91,7 @@ type store struct {
 	resourcePrefix string
 	newListFunc    func() runtime.Object
 	stats          *statsCache
+	compactor      Compactor
 }
 
 var _ storage.Interface = (*store)(nil)
@@ -141,7 +142,7 @@ func (a *abortOnFirstError) Aggregate(key string, err error) bool {
 func (a *abortOnFirstError) Err() error { return a.err }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
+func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc, newListFunc func() runtime.Object, prefix, resourcePrefix string, groupResource schema.GroupResource, transformer value.Transformer, leaseManagerConfig LeaseManagerConfig, decoder Decoder, versioner storage.Versioner) *store {
 	// for compatibility with etcd2 impl.
 	// no-op for default prefix of '/registry'.
 	// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
@@ -183,6 +184,7 @@ func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() 
 
 		resourcePrefix: resourcePrefix,
 		newListFunc:    newListFunc,
+		compactor:      compactor,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
 		stats := newStatsCache(pathPrefix, s.getKeys)
@@ -197,6 +199,13 @@ func New(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc func() 
 		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	}
 	return s
+}
+
+func (s *store) CompactRevision() int64 {
+	if s.compactor == nil {
+		return 0
+	}
+	return s.compactor.CompactRevision()
 }
 
 // Versioner implements storage.Interface.Versioner.
@@ -645,6 +654,9 @@ func (s *store) getKeys(ctx context.Context) ([]string, error) {
 	startTime := time.Now()
 	resp, err := s.client.KV.Get(ctx, s.pathPrefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	metrics.RecordEtcdRequest("listOnlyKeys", s.groupResource, err, startTime)
+	if err != nil {
+		return nil, err
+	}
 	keys := make([]string, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
 		keys = append(keys, string(kv.Key))

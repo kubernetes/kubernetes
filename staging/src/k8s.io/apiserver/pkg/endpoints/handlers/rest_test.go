@@ -334,7 +334,7 @@ func (p *testTimeoutPatcher) New() runtime.Object {
 func (p *testTimeoutPatcher) Update(ctx context.Context, _ string, _ rest.UpdatedObjectInfo, _ rest.ValidateObjectFunc, _ rest.ValidateObjectUpdateFunc, _ bool, _ *metav1.UpdateOptions) (runtime.Object, bool, error) {
 	// Block until the context is canceled to simulate a timeout scenario.
 	<-ctx.Done()
-	return nil, false, ctx.Err()
+	return nil, false, apierrors.NewTimeoutError("test reason", 10)
 }
 
 func (p *testTimeoutPatcher) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
@@ -606,6 +606,11 @@ func (tc *patchTestCase) Run(t *testing.T) {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
 				continue
 			}
+		} else if tc.isTimeout {
+			if !apierrors.IsTimeout(err) {
+				t.Errorf("%s: expected timeout error, but got: %v", tc.name, err)
+				continue
+			}
 		} else {
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", tc.name, err)
@@ -711,13 +716,12 @@ func TestPatchResourceNumberConversion(t *testing.T) {
 
 func TestPatchResourceTimeout(t *testing.T) {
 	tc := &patchTestCase{
-		name:          "TestPatchResourceTimeout",
-		startingPod:   &example.Pod{},
-		changedPod:    &example.Pod{},
-		updatePod:     &example.Pod{},
-		expectedPod:   nil,
-		isTimeout:     true,
-		expectedError: "Timeout: request did not complete within requested timeout - context deadline exceeded",
+		name:        "TestPatchResourceTimeout",
+		startingPod: &example.Pod{},
+		changedPod:  &example.Pod{},
+		updatePod:   &example.Pod{},
+		expectedPod: nil,
+		isTimeout:   true,
 	}
 
 	tc.Run(t)

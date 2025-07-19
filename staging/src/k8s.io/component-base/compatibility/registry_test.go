@@ -18,11 +18,11 @@ package compatibility
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/spf13/pflag"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
@@ -475,4 +475,46 @@ func assertVersionEqualTo(t *testing.T, ver *version.Version, expectedVer string
 		return
 	}
 	t.Errorf("expected: %s, got %s", expectedVer, ver.String())
+}
+
+func Test_enabledAlphaFeatures(t *testing.T) {
+	features := map[featuregate.Feature]featuregate.FeatureSpec{
+		"myFeat": {
+			PreRelease: featuregate.Alpha,
+		},
+		"myOtherFeat": {
+			PreRelease: featuregate.Beta,
+		},
+		"otherFeatDisabled": {
+			PreRelease: featuregate.Alpha,
+		},
+	}
+
+	alphaGate := featuregate.NewFeatureGate()
+	if err := alphaGate.Add(features); err != nil {
+		t.Fatalf("Unable to add features, %s", err)
+	}
+
+	err := alphaGate.SetFromMap(
+		map[string]bool{
+			"myFeat":            true,
+			"myOtherFeat":       true,
+			"otherFeatDisabled": false,
+		},
+	)
+	if err != nil {
+		t.Fatalf("Unable to set feature gate, %s", err)
+	}
+
+	globals := &ComponentGlobals{
+		featureGate: alphaGate,
+	}
+
+	want := []string{
+		"myFeat",
+	}
+
+	if got := enabledAlphaFeatures(features, globals); !reflect.DeepEqual(got, want) {
+		t.Errorf("enabledAlphaFeatures() = %v, want %v", got, want)
+	}
 }

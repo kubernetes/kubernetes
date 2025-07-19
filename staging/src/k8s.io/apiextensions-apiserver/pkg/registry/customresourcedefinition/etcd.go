@@ -30,7 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // rest implements a RESTStorage for API services against etcd

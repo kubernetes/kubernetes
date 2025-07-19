@@ -1232,35 +1232,6 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 	return inUse
 }
 
-// appArmorAnnotationsInUse returns true if the pod has apparmor annotations
-func appArmorAnnotationsInUse(podAnnotations map[string]string) bool {
-	for k := range podAnnotations {
-		if strings.HasPrefix(k, api.DeprecatedAppArmorAnnotationKeyPrefix) {
-			return true
-		}
-	}
-	return false
-}
-
-// appArmorFieldsInUse returns true if the pod has apparmor fields set
-func appArmorFieldsInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.SecurityContext != nil && podSpec.SecurityContext.AppArmorProfile != nil {
-		return true
-	}
-	hasAppArmorContainer := false
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
-		if c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != nil {
-			hasAppArmorContainer = true
-			return false
-		}
-		return true
-	})
-	return hasAppArmorContainer
-}
-
 // restartableInitContainersInUse returns true if the pod spec is non-nil and
 // it has any init container with ContainerRestartPolicyAlways.
 func restartableInitContainersInUse(podSpec *api.PodSpec) bool {
@@ -1560,4 +1531,30 @@ func HasAPIObjectReference(pod *api.Pod) (bool, string, error) {
 	}
 
 	return false, "", nil
+}
+
+// ApparmorFieldForAnnotation takes a pod annotation and returns the converted
+// apparmor profile field.
+func ApparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
+	if annotation == api.DeprecatedAppArmorAnnotationValueUnconfined {
+		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined}
+	}
+
+	if annotation == api.DeprecatedAppArmorAnnotationValueRuntimeDefault {
+		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeRuntimeDefault}
+	}
+
+	if strings.HasPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix) {
+		localhostProfile := strings.TrimPrefix(annotation, api.DeprecatedAppArmorAnnotationValueLocalhostPrefix)
+		if localhostProfile != "" {
+			return &api.AppArmorProfile{
+				Type:             api.AppArmorProfileTypeLocalhost,
+				LocalhostProfile: &localhostProfile,
+			}
+		}
+	}
+
+	// we can only reach this code path if the localhostProfile name has a zero
+	// length or if the annotation has an unrecognized value
+	return nil
 }

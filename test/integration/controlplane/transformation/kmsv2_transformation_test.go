@@ -33,10 +33,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/protobuf/proto"
 
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -464,7 +464,7 @@ resources:
 	var firstEncryptedDEKSource []byte
 	var f checkFunc
 	if useSeed {
-		f = func(_ int, _ uint64, etcdKey string, obj kmstypes.EncryptedObject) {
+		f = func(_ int, _ uint64, etcdKey string, obj *kmstypes.EncryptedObject) {
 			firstEncryptedDEKSource = obj.EncryptedDEKSource
 
 			if obj.KeyID != "1" {
@@ -472,7 +472,7 @@ resources:
 			}
 		}
 	} else {
-		f = func(_ int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject) {
+		f = func(_ int, counter uint64, etcdKey string, obj *kmstypes.EncryptedObject) {
 			firstEncryptedDEKSource = obj.EncryptedDEKSource
 
 			if obj.KeyID != "1" {
@@ -532,7 +532,7 @@ resources:
 	// - create
 	var checkDEK checkFunc
 	if useSeed {
-		checkDEK = func(_ int, _ uint64, etcdKey string, obj kmstypes.EncryptedObject) {
+		checkDEK = func(_ int, _ uint64, etcdKey string, obj *kmstypes.EncryptedObject) {
 			if len(obj.EncryptedDEKSource) == 0 {
 				t.Error("unexpected empty DEK source")
 			}
@@ -546,7 +546,7 @@ resources:
 			}
 		}
 	} else {
-		checkDEK = func(_ int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject) {
+		checkDEK = func(_ int, counter uint64, etcdKey string, obj *kmstypes.EncryptedObject) {
 			if len(obj.EncryptedDEKSource) == 0 {
 				t.Error("unexpected empty DEK source")
 			}
@@ -685,7 +685,7 @@ func TestKMSv2ProviderDEKSourceReuse(t *testing.T) {
 		kmsName := "kms-provider-dek-reuse-false"
 		defer encryptionconfig.SetKDFForTests(kmsName, false)()
 		testKMSv2ProviderDEKSourceReuse(t, kmsName,
-			func(i int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject) {
+			func(i int, counter uint64, etcdKey string, obj *kmstypes.EncryptedObject) {
 				if obj.KeyID != "1" {
 					t.Errorf("key %s: want key ID %s, got %s", etcdKey, "1", obj.KeyID)
 				}
@@ -703,7 +703,7 @@ func TestKMSv2ProviderDEKSourceReuse(t *testing.T) {
 		kmsName := "kms-provider-dek-reuse-true"
 		defer encryptionconfig.SetKDFForTests(kmsName, true)()
 		testKMSv2ProviderDEKSourceReuse(t, kmsName,
-			func(_ int, _ uint64, etcdKey string, obj kmstypes.EncryptedObject) {
+			func(_ int, _ uint64, etcdKey string, obj *kmstypes.EncryptedObject) {
 				if obj.KeyID != "1" {
 					t.Errorf("key %s: want key ID %s, got %s", etcdKey, "1", obj.KeyID)
 				}
@@ -764,7 +764,7 @@ resources:
 	)
 }
 
-type checkFunc func(i int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject)
+type checkFunc func(i int, counter uint64, etcdKey string, obj *kmstypes.EncryptedObject)
 
 func assertPodDEKSources(ctx context.Context, t *testing.T, config storagebackend.Config, podCount, dekSourcesCount int, kmsName, kmsPrefix string, f checkFunc) {
 	t.Helper()
@@ -818,12 +818,12 @@ func assertPodDEKSources(ctx context.Context, t *testing.T, config storagebacken
 		}
 
 		counter := binary.LittleEndian.Uint64(count)
-		f(i, counter, string(kv.Key), out[i])
+		f(i, counter, string(kv.Key), &out[i])
 	}
 
 	uniqueDEKSources := sets.NewString()
-	for _, object := range out {
-		object := object
+	for i := range out {
+		object := &out[i]
 		uniqueDEKSources.Insert(string(object.EncryptedDEKSource))
 		if useSeed {
 			if object.EncryptedDEKSourceType != kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED {
@@ -1413,8 +1413,8 @@ resources:
 	if err := kmsv2.ValidateEncryptedObject(legacyDEKSourceAESGCMKeyObject); err != nil {
 		t.Fatal(err)
 	}
-	if diff := cmp.Diff(expectedDEKSourceAESGCMKeyObject, legacyDEKSourceAESGCMKeyObject); len(diff) > 0 {
-		t.Errorf("kms v2 legacy encrypted object diff (-want, +got):\n%s", diff)
+	if !proto.Equal(expectedDEKSourceAESGCMKeyObject, legacyDEKSourceAESGCMKeyObject) {
+		t.Errorf("kms v2 legacy encrypted object diff, want: %+v; got: %+v", expectedDEKSourceAESGCMKeyObject, legacyDEKSourceAESGCMKeyObject)
 	}
 
 	// commit: 855e7c48de7388eb330da0f8d9d2394ee818fb8d
@@ -1440,8 +1440,8 @@ resources:
 	if err := kmsv2.ValidateEncryptedObject(legacyDEKSourceHKDFSHA256XNonceAESGCMSeedObject); err != nil {
 		t.Fatal(err)
 	}
-	if diff := cmp.Diff(expectedDEKSourceHKDFSHA256XNonceAESGCMSeedObject, legacyDEKSourceHKDFSHA256XNonceAESGCMSeedObject); len(diff) > 0 {
-		t.Errorf("kms v2 legacy encrypted object diff (-want, +got):\n%s", diff)
+	if !proto.Equal(expectedDEKSourceHKDFSHA256XNonceAESGCMSeedObject, legacyDEKSourceHKDFSHA256XNonceAESGCMSeedObject) {
+		t.Errorf("kms v2 legacy encrypted object diff, want: %+v; got: %+v", expectedDEKSourceAESGCMKeyObject, legacyDEKSourceAESGCMKeyObject)
 	}
 
 	ctx := testContext(t)

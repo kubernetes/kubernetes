@@ -63,7 +63,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client.Client))
+	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(store, client.Client))
 }
 
 // TestWatchFromNonZero tests that
@@ -106,9 +106,9 @@ func TestWatchInitializationSignal(t *testing.T) {
 func TestProgressNotify(t *testing.T) {
 	clusterConfig := testserver.NewTestConfig(t)
 	clusterConfig.WatchProgressNotifyInterval = time.Second
-	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
+	ctx, store, client := testSetup(t, withClientConfig(clusterConfig))
 
-	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
+	storagetesting.RunOptionalTestProgressNotify(ctx, t, store, increaseRV(client.Client))
 }
 
 func TestWatchWithUnsafeDelete(t *testing.T) {

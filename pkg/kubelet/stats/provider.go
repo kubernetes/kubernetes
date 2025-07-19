@@ -22,11 +22,13 @@ import (
 	"fmt"
 
 	cadvisormemory "github.com/google/cadvisor/cache/memory"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
@@ -47,14 +49,14 @@ func NewCRIStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	podManager PodManager,
-	runtimeCache kubecontainer.RuntimeCache,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	hostStatsProvider HostStatsProvider,
 	podAndContainerStatsFromCRI bool,
+	fallbackStatsProvider containerStatsProvider,
 ) *Provider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
-		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI))
+	return newStatsProvider(cadvisor, podManager, newCRIStatsProvider(cadvisor, resourceAnalyzer,
+		runtimeService, imageService, hostStatsProvider, podAndContainerStatsFromCRI, fallbackStatsProvider))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both
@@ -63,12 +65,12 @@ func NewCadvisorStatsProvider(
 	cadvisor cadvisor.Interface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	podManager PodManager,
-	runtimeCache kubecontainer.RuntimeCache,
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
 	hostStatsProvider HostStatsProvider,
+	containerManager cm.ContainerManager,
 ) *Provider {
-	return newStatsProvider(cadvisor, podManager, runtimeCache, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider, hostStatsProvider))
+	return newStatsProvider(cadvisor, podManager, newCadvisorStatsProvider(cadvisor, resourceAnalyzer, imageService, statusProvider, hostStatsProvider, containerManager))
 }
 
 // newStatsProvider returns a new Provider that provides node stats from
@@ -76,28 +78,27 @@ func NewCadvisorStatsProvider(
 func newStatsProvider(
 	cadvisor cadvisor.Interface,
 	podManager PodManager,
-	runtimeCache kubecontainer.RuntimeCache,
 	containerStatsProvider containerStatsProvider,
 ) *Provider {
 	return &Provider{
 		cadvisor:               cadvisor,
 		podManager:             podManager,
-		runtimeCache:           runtimeCache,
 		containerStatsProvider: containerStatsProvider,
 	}
 }
 
 // Provider provides the stats of the node and the pod-managed containers.
 type Provider struct {
-	cadvisor     cadvisor.Interface
-	podManager   PodManager
-	runtimeCache kubecontainer.RuntimeCache
+	cadvisor   cadvisor.Interface
+	podManager PodManager
 	containerStatsProvider
 }
 
 // containerStatsProvider is an interface that provides the stats of the
 // containers managed by pods.
 type containerStatsProvider interface {
+	// PodCPUAndMemoryStats gets the latest CPU & Memory stats for the pod and all its running containers.
+	PodCPUAndMemoryStats(context.Context, *v1.Pod, *kubecontainer.PodStatus) (*statsapi.PodStats, error)
 	ListPodStats(ctx context.Context) ([]statsapi.PodStats, error)
 	ListPodStatsAndUpdateCPUNanoCoreUsage(ctx context.Context) ([]statsapi.PodStats, error)
 	ListPodCPUAndMemoryStats(ctx context.Context) ([]statsapi.PodStats, error)

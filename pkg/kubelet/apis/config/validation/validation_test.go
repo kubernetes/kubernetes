@@ -382,14 +382,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		},
 		errMsg: "invalid configuration: memorySwap.swapBehavior \"invalid-behavior\" must be one of: \"\", \"LimitedSwap\" or \"NoSwap\"",
 	}, {
-		name: "specify MemorySwap.SwapBehavior without enabling NodeSwap",
-		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-			conf.FeatureGates = map[string]bool{"NodeSwap": false}
-			conf.MemorySwap.SwapBehavior = string(kubetypes.LimitedSwap)
-			return conf
-		},
-		errMsg: "invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled",
-	}, {
 		name: "CrashLoopBackOff.MaxContainerRestartPeriod too low",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true}
@@ -569,19 +561,9 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			},
 			errMsg: "invalid configuration: taint.TimeAdded is not nil",
 		}, {
-			name: "specify tracing with KubeletTracing disabled",
-			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
-				samplingRate := int32(99999)
-				conf.FeatureGates = map[string]bool{"KubeletTracing": false}
-				conf.Tracing = &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
-				return conf
-			},
-			errMsg: "invalid configuration: tracing should not be configured if KubeletTracing feature flag is disabled.",
-		}, {
 			name: "specify tracing invalid sampling rate",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				samplingRate := int32(-1)
-				conf.FeatureGates = map[string]bool{"KubeletTracing": true}
 				conf.Tracing = &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
 				return conf
 			},
@@ -590,7 +572,6 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			name: "specify tracing invalid endpoint",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 				ep := "dn%2s://localhost:4317"
-				conf.FeatureGates = map[string]bool{"KubeletTracing": true}
 				conf.Tracing = &tracingapi.TracingConfiguration{Endpoint: &ep}
 				return conf
 			},

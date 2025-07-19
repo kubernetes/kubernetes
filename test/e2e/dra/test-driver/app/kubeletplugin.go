@@ -70,6 +70,10 @@ type ExamplePlugin struct {
 
 	unprepareResourcesFailure   error
 	failUnprepareResourcesMutex sync.Mutex
+
+	// cancelMainContext is used to cancel an upper-level context.
+	// It's called from HandleError if set.
+	cancelMainContext context.CancelCauseFunc
 }
 
 type GRPCCall struct {
@@ -119,15 +123,16 @@ type FileOperations struct {
 	// file does not exist.
 	Remove func(name string) error
 
-	// ErrorHandler is an optional callback for ResourceSlice publishing problems.
-	ErrorHandler func(ctx context.Context, err error, msg string)
+	// HandleError is an optional callback for ResourceSlice publishing problems.
+	HandleError func(ctx context.Context, err error, msg string)
+
 	// DriverResources provides the information that the driver will use to
 	// construct the ResourceSlices that it will publish.
 	DriverResources *resourceslice.DriverResources
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
-func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...any) (*ExamplePlugin, error) {
 	logger := klog.FromContext(ctx)
 
 	if fileOps.Create == nil {
@@ -143,25 +148,44 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 			return nil
 		}
 	}
-	ex := &ExamplePlugin{
-		stopCh:         ctx.Done(),
-		logger:         logger,
-		resourceClient: draclient.New(kubeClient),
-		fileOps:        fileOps,
-		cdiDir:         cdiDir,
-		driverName:     driverName,
-		nodeName:       nodeName,
-		prepared:       make(map[ClaimID][]kubeletplugin.Device),
-	}
 
-	opts = append(opts,
+	publicOpts := []kubeletplugin.Option{
 		kubeletplugin.DriverName(driverName),
 		kubeletplugin.NodeName(nodeName),
 		kubeletplugin.KubeClient(kubeClient),
+	}
+
+	testOpts := &options{}
+	for _, opt := range opts {
+		switch typedOpt := opt.(type) {
+		case TestOption:
+			if err := typedOpt(testOpts); err != nil {
+				return nil, fmt.Errorf("apply test option: %w", err)
+			}
+		case kubeletplugin.Option:
+			publicOpts = append(publicOpts, typedOpt)
+		default:
+			return nil, fmt.Errorf("unexpected option type %T", opt)
+		}
+	}
+
+	ex := &ExamplePlugin{
+		stopCh:            ctx.Done(),
+		logger:            logger,
+		resourceClient:    draclient.New(kubeClient),
+		fileOps:           fileOps,
+		cdiDir:            cdiDir,
+		driverName:        driverName,
+		nodeName:          nodeName,
+		prepared:          make(map[ClaimID][]kubeletplugin.Device),
+		cancelMainContext: testOpts.cancelMainContext,
+	}
+
+	publicOpts = append(publicOpts,
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
 	)
-	d, err := kubeletplugin.Start(ctx, ex, opts...)
+	d, err := kubeletplugin.Start(ctx, ex, publicOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}
@@ -189,12 +213,15 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 	return status.PluginRegistered
 }
 
-func (ex *ExamplePlugin) ErrorHandler(ctx context.Context, err error, msg string) {
-	if ex.fileOps.ErrorHandler != nil {
-		ex.fileOps.ErrorHandler(ctx, err, msg)
+func (ex *ExamplePlugin) HandleError(ctx context.Context, err error, msg string) {
+	if ex.fileOps.HandleError != nil {
+		ex.fileOps.HandleError(ctx, err, msg)
 		return
 	}
 	utilruntime.HandleErrorWithContext(ctx, err, msg)
+	if ex.cancelMainContext != nil {
+		ex.cancelMainContext(err)
+	}
 }
 
 // BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it

@@ -27,7 +27,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	psaapi "k8s.io/pod-security-admission/api"
 	psapolicy "k8s.io/pod-security-admission/policy"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // This command runs an infinite loop, sleeping for 1 second in each iteration.
@@ -62,6 +62,9 @@ func GetDefaultTestImage() string {
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
 // If the node OS is linux, return busybox image
 func GetDefaultTestImageID() imageutils.ImageID {
+	if framework.NodeOSDistroIs("windows") {
+		return GetTestImageID(imageutils.Agnhost)
+	}
 	return GetTestImageID(imageutils.BusyBox)
 }
 
@@ -92,7 +95,7 @@ func GetDefaultNonRootUser() *int64 {
 	if framework.NodeOSDistroIs("windows") {
 		return nil
 	}
-	return pointer.Int64(DefaultNonRootUser)
+	return ptr.To[int64](DefaultNonRootUser)
 }
 
 // GeneratePodSecurityContext generates the corresponding pod security context with the given inputs
@@ -119,11 +122,11 @@ func GenerateContainerSecurityContext(level psaapi.Level) *v1.SecurityContext {
 	switch level {
 	case psaapi.LevelBaseline:
 		return &v1.SecurityContext{
-			Privileged: pointer.Bool(false),
+			Privileged: ptr.To(false),
 		}
 	case psaapi.LevelPrivileged:
 		return &v1.SecurityContext{
-			Privileged: pointer.Bool(true),
+			Privileged: ptr.To(true),
 		}
 	case psaapi.LevelRestricted:
 		return GetRestrictedContainerSecurityContext()
@@ -154,14 +157,14 @@ const DefaultNonRootUserName = "ContainerUser"
 // Tests that require a specific user ID should override this.
 func GetRestrictedPodSecurityContext() *v1.PodSecurityContext {
 	psc := &v1.PodSecurityContext{
-		RunAsNonRoot:   pointer.Bool(true),
+		RunAsNonRoot:   ptr.To(true),
 		RunAsUser:      GetDefaultNonRootUser(),
 		SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
 	}
 
 	if framework.NodeOSDistroIs("windows") {
 		psc.WindowsOptions = &v1.WindowsSecurityContextOptions{}
-		psc.WindowsOptions.RunAsUserName = pointer.String(DefaultNonRootUserName)
+		psc.WindowsOptions.RunAsUserName = ptr.To(DefaultNonRootUserName)
 	}
 
 	return psc
@@ -170,7 +173,7 @@ func GetRestrictedPodSecurityContext() *v1.PodSecurityContext {
 // GetRestrictedContainerSecurityContext returns a minimal restricted container security context.
 func GetRestrictedContainerSecurityContext() *v1.SecurityContext {
 	return &v1.SecurityContext{
-		AllowPrivilegeEscalation: pointer.Bool(false),
+		AllowPrivilegeEscalation: ptr.To(false),
 		Capabilities:             &v1.Capabilities{Drop: []v1.Capability{"ALL"}},
 	}
 }
@@ -194,7 +197,7 @@ func MixinRestrictedPodSecurity(pod *v1.Pod) error {
 		pod.Spec.SecurityContext = GetRestrictedPodSecurityContext()
 	} else {
 		if pod.Spec.SecurityContext.RunAsNonRoot == nil {
-			pod.Spec.SecurityContext.RunAsNonRoot = pointer.Bool(true)
+			pod.Spec.SecurityContext.RunAsNonRoot = ptr.To(true)
 		}
 		if pod.Spec.SecurityContext.RunAsUser == nil {
 			pod.Spec.SecurityContext.RunAsUser = GetDefaultNonRootUser()
@@ -204,7 +207,7 @@ func MixinRestrictedPodSecurity(pod *v1.Pod) error {
 		}
 		if framework.NodeOSDistroIs("windows") && pod.Spec.SecurityContext.WindowsOptions == nil {
 			pod.Spec.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{}
-			pod.Spec.SecurityContext.WindowsOptions.RunAsUserName = pointer.String(DefaultNonRootUserName)
+			pod.Spec.SecurityContext.WindowsOptions.RunAsUserName = ptr.To(DefaultNonRootUserName)
 		}
 	}
 	for i := range pod.Spec.Containers {
@@ -234,7 +237,7 @@ func mixinRestrictedContainerSecurityContext(container *v1.Container) {
 		container.SecurityContext = GetRestrictedContainerSecurityContext()
 	} else {
 		if container.SecurityContext.AllowPrivilegeEscalation == nil {
-			container.SecurityContext.AllowPrivilegeEscalation = pointer.Bool(false)
+			container.SecurityContext.AllowPrivilegeEscalation = ptr.To(false)
 		}
 		if container.SecurityContext.Capabilities == nil {
 			container.SecurityContext.Capabilities = &v1.Capabilities{}

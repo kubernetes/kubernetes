@@ -119,19 +119,42 @@ type DRAPlugin interface {
 	// must have an entry in the response, even if that entry is nil.
 	UnprepareResourceClaims(ctx context.Context, claims []NamespacedObject) (result map[types.UID]error, err error)
 
-	// ErrorHandler gets called for each error encountered while publishing
-	// ResourceSlices. See [resourceslice.Options.ErrorHandler] for details.
+	// HandleError gets called for errors encountered in the background,
+	// for example while publishing ResourceSlices.
+	// See [resourceslice.Options.ErrorHandler] for details on that.
 	//
-	// A simple implementation is to only log with k8s.io/apimachinery/pkg/util/runtime.HandleErrorWithContext:
-	//    runtime.HandleErrorWithContext(ctx, err, msg)
+	// The recommended implementation is to log with
+	// runtime.HandleErrorWithContext(ctx, err, msg) (from
+	// k8s.io/apimachinery/pkg/util/runtime.HandleErrorWithContext)
+	// and then to exit the process if the error is fatal.
+	// Ideally the process should shut down gracefully, which can be
+	// achieved by canceling the main context of the DRA driver.
+	//
+	// Fatal errors can be distinguished from recoverable errors via
+	//    errors.Is(err, kubeletplugin.ErrRecoverable)
 	//
 	// This is a mandatory method because drivers should check for errors
 	// which won't get resolved by retrying and then fail or change the
 	// slices that they are trying to publish:
 	// - dropped fields (see [resourceslice.DroppedFieldsError])
 	// - validation errors (see [apierrors.IsInvalid])
-	ErrorHandler(ctx context.Context, err error, msg string)
+	HandleError(ctx context.Context, err error, msg string)
 }
+
+// ErrRecoverable distinguishes recoverable errors from those errors which are fatal
+// and should cause the process to exit. Use with:
+//
+//	errors.Is(err, ErrRecoverable)
+var ErrRecoverable = errors.New("recoverable error")
+
+type recoverableError struct {
+	error
+}
+
+var _ error = recoverableError{}
+
+func (err recoverableError) Is(other error) bool { return other == ErrRecoverable }
+func (err recoverableError) Unwrap() error       { return err.error }
 
 // PrepareResult contains the result of preparing one particular ResourceClaim.
 type PrepareResult struct {
@@ -275,7 +298,7 @@ func PluginSocket(name string) Option {
 	}
 }
 
-// PluginListener configures how to create the registrar socket.
+// PluginListener configures how to create the DRA service socket.
 // The default is to remove the file if it exists and to then
 // create a socket.
 //
@@ -589,12 +612,22 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 
 	if o.draService {
 		// Run the node plugin gRPC server first to ensure that it is ready.
-		pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
-			if o.nodeV1beta1 {
-				logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
-				drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
-			}
-		})
+		pluginServer, err := startGRPCServer(
+			klog.LoggerWithName(logger, "dra"),
+			o.grpcVerbosity,
+			o.unaryInterceptors,
+			o.streamInterceptors,
+			draEndpoint,
+			func(ctx context.Context, err error) {
+				plugin.HandleError(ctx, err, "DRA gRPC server failed")
+			},
+			func(grpcServer *grpc.Server) {
+				if o.nodeV1beta1 {
+					logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
+					drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
+				}
+			},
+		)
 		if err != nil {
 			return nil, fmt.Errorf("start DRA service: %w", err)
 		}
@@ -603,7 +636,19 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 
 	if o.registrationService {
 		// Now make it available to kubelet.
-		registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint)
+		registrar, err := startRegistrar(
+			klog.LoggerWithName(logger, "registrar"),
+			o.grpcVerbosity,
+			o.unaryInterceptors,
+			o.streamInterceptors,
+			o.driverName,
+			supportedServices,
+			draEndpoint.path(),
+			o.pluginRegistrationEndpoint,
+			func(ctx context.Context, err error) {
+				plugin.HandleError(ctx, err, "registrar gRPC server failed")
+			},
+		)
 		if err != nil {
 			return nil, fmt.Errorf("start registrar: %w", err)
 		}
@@ -690,11 +735,17 @@ func (d *Helper) PublishResources(_ context.Context, resources resourceslice.Dri
 		var err error
 		if d.resourceSliceController, err = resourceslice.StartController(controllerCtx,
 			resourceslice.Options{
-				DriverName:   d.driverName,
-				KubeClient:   d.kubeClient,
-				Owner:        &owner,
-				Resources:    driverResources,
-				ErrorHandler: d.plugin.ErrorHandler,
+				DriverName: d.driverName,
+				KubeClient: d.kubeClient,
+				Owner:      &owner,
+				Resources:  driverResources,
+				ErrorHandler: func(ctx context.Context, err error, msg string) {
+					// ResourceSlice publishing errors like dropped fields or
+					// invalid spec are not going to get resolved by retrying,
+					// but neither is restarting the process going to help
+					// -> all errors are recoverable.
+					d.plugin.HandleError(ctx, recoverableError{error: err}, msg)
+				},
 			}); err != nil {
 			return fmt.Errorf("start ResourceSlice controller: %w", err)
 		}

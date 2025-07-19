@@ -338,6 +338,7 @@ type Cacher struct {
 	bookmarkWatchers *watcherBookmarkTimeBuckets
 	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
 	expiredBookmarkWatchers []*cacheWatcher
+	compactor               *compactor
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -439,6 +440,11 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+		cacher.compactor = newCompactor(config.Storage, watchCache, config.Clock)
+		go cacher.compactor.Run(stopCh)
+	}
 
 	go cacher.dispatchEvents()
 	go progressRequester.Run(stopCh)
@@ -1123,6 +1129,19 @@ func (c *Cacher) isStopped() bool {
 	c.stopLock.RLock()
 	defer c.stopLock.RUnlock()
 	return c.stopped
+}
+
+func (c *Cacher) Compact(resourceVersion string) error {
+	rv, err := c.versioner.ParseResourceVersion(resourceVersion)
+	if err != nil {
+		return err
+	}
+	c.watchCache.Compact(rv)
+	return nil
+}
+
+func (c *Cacher) MarkConsistent(consistent bool) {
+	c.watchCache.MarkConsistent(consistent)
 }
 
 // Stop implements the graceful termination.

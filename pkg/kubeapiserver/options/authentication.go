@@ -715,6 +715,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 			return err
 		}
 		authenticatorConfig.CustomDial = egressDialer
+		authenticatorConfig.EgressLookup = egressSelector.Lookup
 	}
 
 	// var openAPIV3SecuritySchemes spec3.SecuritySchemes
@@ -726,6 +727,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 
 	if len(o.AuthenticationConfigFile) > 0 {
 		authenticationconfigmetrics.RegisterMetrics()
+		authenticationconfigmetrics.RecordAuthenticationConfigLastConfigInfo(apiServerID, authenticatorConfig.AuthenticationConfigData)
 		trackedAuthenticationConfigData := authenticatorConfig.AuthenticationConfigData
 		var mu sync.Mutex
 
@@ -788,7 +790,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 
 				trackedAuthenticationConfigData = authConfigData
 				klog.InfoS("reloaded authentication config")
-				authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadSuccess(apiServerID)
+				authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadSuccess(apiServerID, authConfigData)
 			},
 			func(err error) { klog.ErrorS(err, "watching authentication config file") },
 		)

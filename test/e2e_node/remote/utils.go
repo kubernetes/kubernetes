@@ -71,6 +71,7 @@ providers:
    defaultCacheDuration: 1m
    tokenAttributes:
      serviceAccountTokenAudience: test-audience
+     cacheType: Token
      requireServiceAccount: true
      requiredServiceAccountAnnotationKeys:
      - "domain.io/identity-id"

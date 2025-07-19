@@ -39,6 +39,10 @@ func (sr StatelessPreBindExample) Name() string {
 	return Name
 }
 
+func (mc StatelessPreBindExample) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
 // PreBind is the functions invoked by the framework at "prebind" extension point.
 func (sr StatelessPreBindExample) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	if pod == nil {

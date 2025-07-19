@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -160,7 +159,7 @@ func TestValidateClaim(t *testing.T) {
 		"deletion-grace-period-seconds": {
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
-				claim.DeletionGracePeriodSeconds = pointer.Int64(10)
+				claim.DeletionGracePeriodSeconds = ptr.To[int64](10)
 				return claim
 			}(),
 		},
@@ -432,7 +431,7 @@ func TestValidateClaim(t *testing.T) {
 			wantFailures: field.ErrorList{
 				field.Required(field.NewPath("spec", "devices", "config").Index(0).Child("opaque", "parameters"), ""),
 				field.Invalid(field.NewPath("spec", "devices", "config").Index(1).Child("opaque", "parameters"), "<value omitted>", "error parsing data as JSON: unexpected end of JSON input"),
-				field.Invalid(field.NewPath("spec", "devices", "config").Index(2).Child("opaque", "parameters"), "<value omitted>", "parameters must be a valid JSON object"),
+				field.Invalid(field.NewPath("spec", "devices", "config").Index(2).Child("opaque", "parameters"), "<value omitted>", "must be a valid JSON object"),
 				field.Required(field.NewPath("spec", "devices", "config").Index(3).Child("opaque", "parameters"), ""),
 				field.TooLong(field.NewPath("spec", "devices", "config").Index(5).Child("opaque", "parameters"), "" /* unused */, resource.OpaqueParametersMaxLength),
 			},

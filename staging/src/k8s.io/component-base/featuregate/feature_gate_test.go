@@ -409,9 +409,9 @@ func TestFeatureGateSetFromMap(t *testing.T) {
 			},
 		},
 		{
-			name: "set TestInvaild true",
+			name: "set TestInvalid true",
 			setmap: map[string]bool{
-				"TestInvaild": true,
+				"TestInvalid": true,
 			},
 			expect: map[Feature]bool{
 				testAlphaGate: false,

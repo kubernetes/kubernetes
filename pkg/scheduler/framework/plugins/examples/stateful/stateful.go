@@ -69,6 +69,10 @@ func (mp *MultipointExample) Unreserve(ctx context.Context, state fwk.CycleState
 	mp.executionPoints = nil
 }
 
+func (mp *MultipointExample) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	return nil
+}
+
 // PreBind is the function invoked by the framework at "prebind" extension
 // point.
 func (mp *MultipointExample) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {

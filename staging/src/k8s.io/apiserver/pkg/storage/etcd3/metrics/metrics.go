@@ -23,6 +23,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
@@ -69,11 +72,28 @@ var (
 	)
 	objectCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_storage_objects",
-			Help:           "Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.",
-			StabilityLevel: compbasemetrics.STABLE,
+			Name:              "apiserver_storage_objects",
+			Help:              "Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.",
+			StabilityLevel:    compbasemetrics.STABLE,
+			DeprecatedVersion: "1.34.0",
 		},
 		[]string{"resource"},
+	)
+	resourceSizeEstimate = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:           "apiserver_resource_size_estimate_bytes",
+			Help:           "Estimated size of stored objects in database. Estimate is based on sum of last observed sizes of serialized objects. In case of a fetching error, the value will be -1.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+	newObjectCounts = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:           "apiserver_resource_objects",
+			Help:           "Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
 	)
 	dbTotalSize = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -166,6 +186,8 @@ func Register() {
 		legacyregistry.MustRegister(etcdRequestCounts)
 		legacyregistry.MustRegister(etcdRequestErrorCounts)
 		legacyregistry.MustRegister(objectCounts)
+		legacyregistry.MustRegister(resourceSizeEstimate)
+		legacyregistry.MustRegister(newObjectCounts)
 		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.CustomMustRegister(storageMonitor)
 		legacyregistry.MustRegister(etcdEventsReceivedCounts)
@@ -179,14 +201,34 @@ func Register() {
 	})
 }
 
-// UpdateObjectCount sets the apiserver_storage_object_counts metric.
-func UpdateObjectCount(groupResource schema.GroupResource, count int64) {
-	objectCounts.WithLabelValues(groupResource.String()).Set(float64(count))
+// UpdateStoreStats sets the stats metrics.
+func UpdateStoreStats(groupResource schema.GroupResource, stats storage.Stats, err error) {
+	if err != nil {
+		objectCounts.WithLabelValues(groupResource.String()).Set(-1)
+		newObjectCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
+		if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
+		}
+		return
+	}
+	objectCounts.WithLabelValues(groupResource.String()).Set(float64(stats.ObjectCount))
+	newObjectCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(stats.ObjectCount))
+	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		if stats.ObjectCount > 0 && stats.EstimatedAverageObjectSizeBytes == 0 {
+			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(-1)
+		} else {
+			resourceSizeEstimate.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(stats.EstimatedAverageObjectSizeBytes * stats.ObjectCount))
+		}
+	}
 }
 
-// DeleteObjectCount delete the apiserver_storage_object_counts metric.
-func DeleteObjectCount(groupResource schema.GroupResource) {
+// DeleteStoreStats delete the stats metrics.
+func DeleteStoreStats(groupResource schema.GroupResource) {
 	objectCounts.DeleteLabelValues(groupResource.String())
+	newObjectCounts.DeleteLabelValues(groupResource.Group, groupResource.Resource)
+	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		resourceSizeEstimate.DeleteLabelValues(groupResource.Group, groupResource.Resource)
+	}
 }
 
 // RecordEtcdRequest updates and sets the etcd_request_duration_seconds,

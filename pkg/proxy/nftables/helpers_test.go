@@ -522,8 +522,8 @@ func tracePacket(t *testing.T, nft *knftables.Fake, sourceIP, protocol, destIP, 
 	var err error
 	tracer := newNFTablesTracer(t, nft, nodeIPs)
 
-	// filter-prerouting goes first, then nat-prerouting if not terminated.
-	if tracer.runChain("filter-prerouting", sourceIP, protocol, destIP, destPort) {
+	// filter-prerouting-pre-dnat goes first, then nat-prerouting if not terminated.
+	if tracer.runChain("filter-prerouting-pre-dnat", sourceIP, protocol, destIP, destPort) {
 		return tracer.matches, strings.Join(tracer.outputs, ", "), tracer.markMasq
 	}
 	tracer.runChain("nat-prerouting", sourceIP, protocol, destIP, destPort)
@@ -544,7 +544,7 @@ func tracePacket(t *testing.T, nft *knftables.Fake, sourceIP, protocol, destIP, 
 	// Run filter-input
 	tracer.runChain("filter-input", sourceIP, protocol, destIP, destPort)
 
-	// Skip filter-output and nat-output as they ought to be fully redundant with the prerouting chains.
+	// Skip filter-output-pre-dnat, filter-output and nat-output as they ought to be fully redundant with the prerouting chains.
 	// Skip nat-postrouting because it only does masquerading and we handle that separately.
 	return tracer.matches, strings.Join(tracer.outputs, ", "), tracer.markMasq
 }
@@ -778,10 +778,11 @@ func TestTracePacketV4(t *testing.T) {
 		add chain ip kube-proxy services
 		add chain ip kube-proxy firewall-check
 		add chain ip kube-proxy endpoints-check
-		add chain ip kube-proxy filter-prerouting { type filter hook prerouting priority -110 ; }
-		add chain ip kube-proxy filter-forward { type filter hook forward priority -110 ; }
-		add chain ip kube-proxy filter-input { type filter hook input priority -110 ; }
-		add chain ip kube-proxy filter-output { type filter hook output priority -110 ; }
+		add chain ip kube-proxy filter-prerouting-pre-dnat { type filter hook prerouting priority -110 ; }
+		add chain ip kube-proxy filter-output-pre-dnat { type filter hook prerouting priority -110 ; }
+		add chain ip kube-proxy filter-forward { type filter hook forward priority 0 ; }
+		add chain ip kube-proxy filter-input { type filter hook input priority 0 ; }
+		add chain ip kube-proxy filter-output { type filter hook output priority 0 ; }
 		add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
 		add chain ip kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
 		add chain ip kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
@@ -807,11 +808,11 @@ func TestTracePacketV4(t *testing.T) {
 		add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
 		add rule ip kube-proxy masquerading mark set mark xor 0x4000
 		add rule ip kube-proxy masquerading masquerade fully-random
-		add rule ip kube-proxy filter-prerouting ct state new jump firewall-check
+		add rule ip kube-proxy filter-prerouting-pre-dnat ct state new jump firewall-check
 		add rule ip kube-proxy filter-forward ct state new jump endpoints-check
 		add rule ip kube-proxy filter-input ct state new jump endpoints-check
 		add rule ip kube-proxy filter-output ct state new jump endpoints-check
-		add rule ip kube-proxy filter-output ct state new jump firewall-check
+		add rule ip kube-proxy filter-output-pre-dnat ct state new jump firewall-check
 		add rule ip kube-proxy nat-output jump services
 		add rule ip kube-proxy nat-postrouting jump masquerading
 		add rule ip kube-proxy nat-prerouting jump services
@@ -985,11 +986,12 @@ func TestTracePacketV6(t *testing.T) {
 		add chain ip6 kube-proxy endpoint-2CRNCTTE-ns1/svc1/tcp/p80__fd00.10.180..2.1/80
 		add chain ip6 kube-proxy endpoint-ZVRFLKHO-ns1/svc1/tcp/p80__fd00.10.180..1/80
 		add chain ip6 kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80
-		add chain ip6 kube-proxy filter-forward { type filter hook forward priority -110 ; }
-		add chain ip6 kube-proxy filter-input { type filter hook input priority -110 ; }
-		add chain ip6 kube-proxy filter-output { type filter hook output priority -110 ; }
+		add chain ip6 kube-proxy filter-prerouting-pre-dnat { type filter hook prerouting priority -110 ; }
+		add chain ip6 kube-proxy filter-output-pre-dnat { type filter hook output priority -110 ; }
+		add chain ip6 kube-proxy filter-forward { type filter hook forward priority 0 ; }
+		add chain ip6 kube-proxy filter-input { type filter hook input priority 0 ; }
+		add chain ip6 kube-proxy filter-output { type filter hook output priority 0 ; }
 		add chain ip6 kube-proxy filter-output-post-dnat { type filter hook output priority -90 ; }
-		add chain ip6 kube-proxy filter-prerouting { type filter hook prerouting priority -110 ; }
 		add chain ip6 kube-proxy firewall-check
 		add chain ip6 kube-proxy mark-for-masquerade
 		add chain ip6 kube-proxy masquerading
@@ -1021,9 +1023,9 @@ func TestTracePacketV6(t *testing.T) {
 		add rule ip6 kube-proxy filter-input ct state new jump nodeport-endpoints-check
 		add rule ip6 kube-proxy filter-input ct state new jump service-endpoints-check
 		add rule ip6 kube-proxy filter-output ct state new jump service-endpoints-check
-		add rule ip6 kube-proxy filter-output ct state new jump firewall-check
+		add rule ip6 kube-proxy filter-output-pre-dnat ct state new jump firewall-check
 		add rule ip6 kube-proxy filter-output-post-dnat ct state new jump cluster-ips-check
-		add rule ip6 kube-proxy filter-prerouting ct state new jump firewall-check
+		add rule ip6 kube-proxy filter-prerouting-pre-dnat ct state new jump firewall-check
 		add rule ip6 kube-proxy firewall-check ip6 daddr . meta l4proto . th dport vmap @firewall-ips
 		add rule ip6 kube-proxy mark-for-masquerade mark set mark or 0x4000
 		add rule ip6 kube-proxy masquerading mark and 0x4000 == 0 return

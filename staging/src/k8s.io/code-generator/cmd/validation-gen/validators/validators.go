@@ -26,7 +26,21 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
-// TagValidator describes a single validation tag and how to use it.
+// TagValidator describes a single validation tag and how to use it. To be
+// findable by validation-gen, a TagValidator must be registered - see
+// RegisterTagValidator.
+//
+// TagValidators are always evaluated before TypeValidators and
+// FieldValidators. In general, TagValidators should not depend on other
+// TagValidators having been run already because users might specify tags in
+// the any order. The one exception to this rule is that some TagValidators may
+// be designated as "late" validators (see LateTagValidator), which means they
+// will be run after all non-late TagValidators.
+//
+// No other guarantees are made about the order of execution of TagValidators
+// or LateTagValidators. Instead of relying on tag ordering, TagValidators can
+// accumulate information internally and use a TypeValidator and/or
+// FieldValidator to finish the work.
 type TagValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)
@@ -53,7 +67,48 @@ type LateTagValidator interface {
 }
 
 // TypeValidator describes a validator which runs on every type definition.
+// To be findable by validation-gen, a TypeValidator must be registered - see
+// RegisterTypeValidator.
+//
+// TypeValidators are always processed after TagValidators, and after the type
+// has been fully processed (including all child fields and their types). This
+// means that they can "finish" work with data that was collected by
+// TagValidators.
+//
+// TypeValidators MUST NOT depend on other TypeValidators having been run
+// already.
 type TypeValidator interface {
+	// Init initializes the implementation.  This will be called exactly once.
+	Init(cfg Config)
+
+	// Name returns a unique name for this validator.  This is used for sorting
+	// and logging.
+	Name() string
+
+	// GetValidations returns any validations imposed by this validator for the
+	// given context.
+	//
+	// The way gengo handles type definitions varies between structs and other
+	// types.  For struct definitions (e.g. `type Foo struct {}`), the realType
+	// is the struct itself (the Kind field will be `types.Struct`) and the
+	// parentType will be nil.  For other types (e.g. `type Bar string`), the
+	// realType will be the underlying type and the parentType will be the
+	// newly defined type (the Kind field will be `types.Alias`).
+	GetValidations(context Context) (Validations, error)
+}
+
+// FieldValidator describes a validator which runs on every field definition.
+// To be findable by validation-gen, a FieldValidator must be registered - see
+// RegisterFieldValidator.
+//
+// FieldValidators are always processed after TagValidators and TypeValidators,
+// and after the field has been fully processed (including all child fields).
+// This means that they can "finish" work with data that was collected by
+// TagValidators.
+//
+// FieldValidators MUST NOT depend on other FieldValidators having been run
+// already.
+type FieldValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)
 
@@ -143,12 +198,10 @@ type Context struct {
 	// both).
 	Type *types.Type
 
-	// Parent provides details about the logical parent type of the object
-	// being validated, when applicable.  When Scope is ScopeField, this is the
-	// containing struct's type.  When Scope indicates a list-value, map-key,
-	// or map-value, this is the type of the whole list or map. When Scope is
-	// ScopeType, this is nil.
-	Parent *types.Type
+	// ParentPath provides the field path to the parent type or field, enabling
+	// unique identification of validation contexts for the same type in
+	// different locations.
+	ParentPath *field.Path
 
 	// Member provides details about a field within a struct when Scope is
 	// ScopeField.  For all other values of Scope, this will be nil.
@@ -182,6 +235,8 @@ type TagDoc struct {
 	PayloadsType codetags.ValueType
 	// PayloadsRequired is true if a payload is required.
 	PayloadsRequired bool
+	// AcceptsUnknownArgs is true if unknown args are accepted
+	AcceptsUnknownArgs bool
 }
 
 func (td TagDoc) Arg(name string) (TagArgDoc, bool) {
@@ -476,14 +531,16 @@ func typeCheck(tag codetags.Tag, doc TagDoc) error {
 
 	for _, tagArg := range tag.Args {
 		if _, ok := doc.Arg(tagArg.Name); !ok {
-			return fmt.Errorf("unrecognized named argument %q", tagArg)
+			if !doc.AcceptsUnknownArgs {
+				return fmt.Errorf("unrecognized named argument %q", tagArg)
+			}
 		}
 	}
 	if tag.ValueType == codetags.ValueTypeNone {
 		if doc.PayloadsRequired {
 			return fmt.Errorf("missing required tag value of type %s", doc.PayloadsType)
 		}
-	} else if tag.ValueType != doc.PayloadsType {
+	} else if doc.PayloadsType != codetags.ValueTypeRaw && tag.ValueType != doc.PayloadsType {
 		return fmt.Errorf("tag value has wrong type: got %s, want %s", tag.ValueType, doc.PayloadsType)
 	}
 	return nil

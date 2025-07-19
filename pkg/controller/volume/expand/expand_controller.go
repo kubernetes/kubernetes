@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -412,10 +411,6 @@ func (expc *expandController) GetMounter() mount.Interface {
 
 func (expc *expandController) GetHostName() string {
 	return ""
-}
-
-func (expc *expandController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP not supported by expand controller's VolumeHost implementation")
 }
 
 func (expc *expandController) GetNodeAllocatable() (v1.ResourceList, error) {

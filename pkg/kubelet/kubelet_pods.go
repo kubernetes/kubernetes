@@ -1245,7 +1245,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	klog.V(3).InfoS("Clean up orphaned mirror pods")
 	for _, podFullname := range orphanedMirrorPodFullnames {
 		if !kl.podWorkers.IsPodForMirrorPodTerminatingByFullName(podFullname) {
-			_, err := kl.mirrorPodClient.DeleteMirrorPod(podFullname, nil)
+			_, err := kl.mirrorPodClient.DeleteMirrorPod(ctx, podFullname, nil)
 			if err != nil {
 				klog.ErrorS(err, "Encountered error when deleting mirror pod", "podName", podFullname)
 			} else {
@@ -1834,7 +1834,13 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		resizeStatus := kl.determinePodResizeStatus(pod, podIsTerminal)
 		for _, c := range resizeStatus {
-			c.ObservedGeneration = podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, c.Type)
+			// Clear the condition's observed generation if BOTH The FG is disabled AND the condition's
+			// observed generation is not already set. We avoid overwriting the condition's observedGeneration
+			// in other cases, because the condition may be reflecting an older podspec.
+			gen := podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, c.Type)
+			if gen == 0 {
+				c.ObservedGeneration = 0
+			}
 			s.Conditions = append(s.Conditions, *c)
 		}
 	}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -103,6 +104,7 @@ func ShouldRetry(err error) (retry bool, retryAfter time.Duration) {
 	if apierrors.IsTimeout(err) ||
 		apierrors.IsTooManyRequests(err) ||
 		apierrors.IsServiceUnavailable(err) ||
+		errors.Is(err, io.EOF) ||
 		errors.As(err, &transientError{}) {
 		return true, 0
 	}

@@ -35,9 +35,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/cacher"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -628,6 +631,7 @@ func sampleExistsInSamples(s *model.Sample, samples model.Samples) bool {
 
 func TestWatchCacheConsistencyCheckMetrics(t *testing.T) {
 	period := time.Second
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DetectCacheInconsistency, true)
 	clean := overrideConsistencyCheckerTimings(period)
 	defer clean()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
@@ -641,8 +645,8 @@ func TestWatchCacheConsistencyCheckMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Do at least 2 scrape cycles to require 2 successes
-	delay := 2 * period
+	// wait 3 periods to for 2 scrape cycles (takes 1-1.5 period) and require 2 successes
+	delay := 3 * period
 	time.Sleep(delay)
 	resp, err := rt.RoundTrip(req)
 	if err != nil {
@@ -680,12 +684,9 @@ func TestWatchCacheConsistencyCheckMetrics(t *testing.T) {
 
 func overrideConsistencyCheckerTimings(period time.Duration) func() {
 	tmpPeriod := cacher.ConsistencyCheckPeriod
-	tmpEnabled := cacher.ConsistencyCheckerEnabled
 	cacher.ConsistencyCheckPeriod = period
-	cacher.ConsistencyCheckerEnabled = true
 	return func() {
 		cacher.ConsistencyCheckPeriod = tmpPeriod
-		cacher.ConsistencyCheckerEnabled = tmpEnabled
 	}
 }
 

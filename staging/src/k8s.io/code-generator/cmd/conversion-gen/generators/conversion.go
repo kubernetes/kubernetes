@@ -388,66 +388,85 @@ func (e equalMemoryTypes) Skip(a, b *types.Type) {
 }
 
 func (e equalMemoryTypes) Equal(a, b *types.Type) bool {
-	// alreadyVisitedTypes holds all the types that have already been checked in the structural type recursion.
-	alreadyVisitedTypes := make(map[*types.Type]bool)
-	return e.cachingEqual(a, b, alreadyVisitedTypes)
+	equal, _ := e.cachingEqual(a, b, nil)
+	return equal
 }
 
-func (e equalMemoryTypes) cachingEqual(a, b *types.Type, alreadyVisitedTypes map[*types.Type]bool) bool {
+// cachingEqual recursively compares a and b for memory equality,
+// using a cache of previously computed results, and caching the result before returning when possible.
+// alreadyVisitedStack is used to check for cycles during recursion.
+// The returned cacheable boolean tells the caller whether the equal result is a definitive answer that can be safely cached,
+// or if it's a temporary assumption made to break a cycle in a recursively defined type.
+func (e equalMemoryTypes) cachingEqual(a, b *types.Type, alreadyVisitedStack []*types.Type) (equal, cacheable bool) {
 	if a == b {
-		return true
+		return true, true
 	}
 	if equal, ok := e[conversionPair{a, b}]; ok {
-		return equal
+		return equal, true
 	}
 	if equal, ok := e[conversionPair{b, a}]; ok {
-		return equal
+		return equal, true
 	}
-	result := e.equal(a, b, alreadyVisitedTypes)
-	e[conversionPair{a, b}] = result
-	e[conversionPair{b, a}] = result
-	return result
+	result, cacheable := e.equal(a, b, alreadyVisitedStack)
+	if cacheable {
+		e[conversionPair{a, b}] = result
+		e[conversionPair{b, a}] = result
+	}
+	return result, cacheable
 }
 
-func (e equalMemoryTypes) equal(a, b *types.Type, alreadyVisitedTypes map[*types.Type]bool) bool {
+// equal recursively compares a and b for memory equality.
+// alreadyVisitedStack is used to check for cycles during recursion.
+// The returned cacheable boolean tells the caller whether the equal result is a definitive answer that can be safely cached,
+// or if it's a temporary assumption made to break a cycle in a recursively defined type.
+func (e equalMemoryTypes) equal(a, b *types.Type, alreadyVisitedStack []*types.Type) (equal, cacheable bool) {
 	in, out := unwrapAlias(a), unwrapAlias(b)
 	switch {
 	case in == out:
-		return true
+		return true, true
 	case in.Kind == out.Kind:
-		// if the type exists already, return early to avoid recursion
-		if alreadyVisitedTypes[in] {
-			return true
+		for _, v := range alreadyVisitedStack {
+			if v == in {
+				// if the type was visited in this stack already, return early to avoid infinite recursion, but do not cache the results
+				return true, false
+			}
 		}
-		alreadyVisitedTypes[in] = true
+		alreadyVisitedStack = append(alreadyVisitedStack, in)
 
 		switch in.Kind {
 		case types.Struct:
 			if len(in.Members) != len(out.Members) {
-				return false
+				return false, true
 			}
+			cacheable = true
 			for i, inMember := range in.Members {
 				outMember := out.Members[i]
-				if !e.cachingEqual(inMember.Type, outMember.Type, alreadyVisitedTypes) {
-					return false
+				memberEqual, memberCacheable := e.cachingEqual(inMember.Type, outMember.Type, alreadyVisitedStack)
+				if !memberEqual {
+					return false, true
+				}
+				if !memberCacheable {
+					cacheable = false
 				}
 			}
-			return true
+			return true, cacheable
 		case types.Pointer:
-			return e.cachingEqual(in.Elem, out.Elem, alreadyVisitedTypes)
+			return e.cachingEqual(in.Elem, out.Elem, alreadyVisitedStack)
 		case types.Map:
-			return e.cachingEqual(in.Key, out.Key, alreadyVisitedTypes) && e.cachingEqual(in.Elem, out.Elem, alreadyVisitedTypes)
+			keyEqual, keyCacheable := e.cachingEqual(in.Key, out.Key, alreadyVisitedStack)
+			valueEqual, valueCacheable := e.cachingEqual(in.Elem, out.Elem, alreadyVisitedStack)
+			return keyEqual && valueEqual, keyCacheable && valueCacheable
 		case types.Slice:
-			return e.cachingEqual(in.Elem, out.Elem, alreadyVisitedTypes)
+			return e.cachingEqual(in.Elem, out.Elem, alreadyVisitedStack)
 		case types.Interface:
 			// TODO: determine whether the interfaces are actually equivalent - for now, they must have the
 			// same type.
-			return false
+			return false, true
 		case types.Builtin:
-			return in.Name.Name == out.Name.Name
+			return in.Name.Name == out.Name.Name, true
 		}
 	}
-	return false
+	return false, true
 }
 
 func findMember(t *types.Type, name string) (types.Member, bool) {

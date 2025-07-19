@@ -87,13 +87,22 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/admissionregistration/v1alpha1.ValidatingAdmissionPolicyStatus":                             schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyStatus(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.Validation":                                                  schema_k8sio_api_admissionregistration_v1alpha1_Validation(ref),
 		"k8s.io/api/admissionregistration/v1alpha1.Variable":                                                    schema_k8sio_api_admissionregistration_v1alpha1_Variable(ref),
+		"k8s.io/api/admissionregistration/v1beta1.ApplyConfiguration":                                           schema_k8sio_api_admissionregistration_v1beta1_ApplyConfiguration(ref),
 		"k8s.io/api/admissionregistration/v1beta1.AuditAnnotation":                                              schema_k8sio_api_admissionregistration_v1beta1_AuditAnnotation(ref),
 		"k8s.io/api/admissionregistration/v1beta1.ExpressionWarning":                                            schema_k8sio_api_admissionregistration_v1beta1_ExpressionWarning(ref),
+		"k8s.io/api/admissionregistration/v1beta1.JSONPatch":                                                    schema_k8sio_api_admissionregistration_v1beta1_JSONPatch(ref),
 		"k8s.io/api/admissionregistration/v1beta1.MatchCondition":                                               schema_k8sio_api_admissionregistration_v1beta1_MatchCondition(ref),
 		"k8s.io/api/admissionregistration/v1beta1.MatchResources":                                               schema_k8sio_api_admissionregistration_v1beta1_MatchResources(ref),
+		"k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicy":                                      schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicy(ref),
+		"k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicyBinding":                               schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyBinding(ref),
+		"k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicyBindingList":                           schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyBindingList(ref),
+		"k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicyBindingSpec":                           schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyBindingSpec(ref),
+		"k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicyList":                                  schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyList(ref),
+		"k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicySpec":                                  schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicySpec(ref),
 		"k8s.io/api/admissionregistration/v1beta1.MutatingWebhook":                                              schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhook(ref),
 		"k8s.io/api/admissionregistration/v1beta1.MutatingWebhookConfiguration":                                 schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration(ref),
 		"k8s.io/api/admissionregistration/v1beta1.MutatingWebhookConfigurationList":                             schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfigurationList(ref),
+		"k8s.io/api/admissionregistration/v1beta1.Mutation":                                                     schema_k8sio_api_admissionregistration_v1beta1_Mutation(ref),
 		"k8s.io/api/admissionregistration/v1beta1.NamedRuleWithOperations":                                      schema_k8sio_api_admissionregistration_v1beta1_NamedRuleWithOperations(ref),
 		"k8s.io/api/admissionregistration/v1beta1.ParamKind":                                                    schema_k8sio_api_admissionregistration_v1beta1_ParamKind(ref),
 		"k8s.io/api/admissionregistration/v1beta1.ParamRef":                                                     schema_k8sio_api_admissionregistration_v1beta1_ParamRef(ref),
@@ -1163,6 +1172,12 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apimachinery/pkg/apis/meta/v1.UpdateOptions":                                                    schema_pkg_apis_meta_v1_UpdateOptions(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.WatchEvent":                                                       schema_pkg_apis_meta_v1_WatchEvent(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.PartialObjectMetadataList":                                   schema_pkg_apis_meta_v1beta1_PartialObjectMetadataList(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.Carp":                                                     schema_pkg_apis_testapigroup_v1_Carp(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpCondition":                                            schema_pkg_apis_testapigroup_v1_CarpCondition(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpInfo":                                                 schema_pkg_apis_testapigroup_v1_CarpInfo(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpList":                                                 schema_pkg_apis_testapigroup_v1_CarpList(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpSpec":                                                 schema_pkg_apis_testapigroup_v1_CarpSpec(ref),
+		"k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpStatus":                                               schema_pkg_apis_testapigroup_v1_CarpStatus(ref),
 		"k8s.io/apimachinery/pkg/runtime.RawExtension":                                                          schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref),
 		"k8s.io/apimachinery/pkg/runtime.TypeMeta":                                                              schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
 		"k8s.io/apimachinery/pkg/runtime.Unknown":                                                               schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
@@ -1243,6 +1258,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyNFTablesConfiguration":                                      schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyNFTablesConfiguration(ref),
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyWinkernelConfiguration":                                     schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyWinkernelConfiguration(ref),
 		"k8s.io/kube-scheduler/config/v1.DefaultPreemptionArgs":                                                 schema_k8sio_kube_scheduler_config_v1_DefaultPreemptionArgs(ref),
+		"k8s.io/kube-scheduler/config/v1.DynamicResourcesArgs":                                                  schema_k8sio_kube_scheduler_config_v1_DynamicResourcesArgs(ref),
 		"k8s.io/kube-scheduler/config/v1.Extender":                                                              schema_k8sio_kube_scheduler_config_v1_Extender(ref),
 		"k8s.io/kube-scheduler/config/v1.ExtenderManagedResource":                                               schema_k8sio_kube_scheduler_config_v1_ExtenderManagedResource(ref),
 		"k8s.io/kube-scheduler/config/v1.ExtenderTLSConfig":                                                     schema_k8sio_kube_scheduler_config_v1_ExtenderTLSConfig(ref),
@@ -1595,10 +1611,9 @@ func schema_k8sio_api_admissionregistration_v1_MutatingWebhook(ref common.Refere
 					},
 					"reinvocationPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reinvocationPolicy indicates whether this webhook should be called multiple times as part of a single admission evaluation. Allowed values are \"Never\" and \"IfNeeded\".\n\nNever: the webhook will not be called more than once in a single admission evaluation.\n\nIfNeeded: the webhook will be called at least one additional time as part of the admission evaluation if the object being admitted is modified by other admission plugins after the initial webhook call. Webhooks that specify this option *must* be idempotent, able to process objects they previously admitted. Note: * the number of additional invocations is not guaranteed to be exactly one. * if additional invocations result in further modifications to the object, webhooks are not guaranteed to be invoked again. * webhooks that use this option may be reordered to minimize the number of additional invocations. * to validate an object after all mutations are guaranteed complete, use a validating admission webhook instead.\n\nDefaults to \"Never\".\n\nPossible enum values:\n - `\"IfNeeded\"` indicates that the mutation may be called at least one additional time as part of the admission evaluation if the object being admitted is modified by other admission plugins after the initial mutation call.\n - `\"Never\"` indicates that the mutation must not be called more than once in a single admission evaluation.",
+							Description: "reinvocationPolicy indicates whether this webhook should be called multiple times as part of a single admission evaluation. Allowed values are \"Never\" and \"IfNeeded\".\n\nNever: the webhook will not be called more than once in a single admission evaluation.\n\nIfNeeded: the webhook will be called at least one additional time as part of the admission evaluation if the object being admitted is modified by other admission plugins after the initial webhook call. Webhooks that specify this option *must* be idempotent, able to process objects they previously admitted. Note: * the number of additional invocations is not guaranteed to be exactly one. * if additional invocations result in further modifications to the object, webhooks are not guaranteed to be invoked again. * webhooks that use this option may be reordered to minimize the number of additional invocations. * to validate an object after all mutations are guaranteed complete, use a validating admission webhook instead.\n\nDefaults to \"Never\".",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"IfNeeded", "Never"},
 						},
 					},
 					"matchConditions": {
@@ -3511,10 +3526,9 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicySpec
 					},
 					"reinvocationPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reinvocationPolicy indicates whether mutations may be called multiple times per MutatingAdmissionPolicyBinding as part of a single admission evaluation. Allowed values are \"Never\" and \"IfNeeded\".\n\nNever: These mutations will not be called more than once per binding in a single admission evaluation.\n\nIfNeeded: These mutations may be invoked more than once per binding for a single admission request and there is no guarantee of order with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only reinvoked when mutations change the object after this mutation is invoked. Required.\n\nPossible enum values:\n - `\"IfNeeded\"` indicates that the mutation may be called at least one additional time as part of the admission evaluation if the object being admitted is modified by other admission plugins after the initial mutation call.\n - `\"Never\"` indicates that the mutation must not be called more than once in a single admission evaluation.",
+							Description: "reinvocationPolicy indicates whether mutations may be called multiple times per MutatingAdmissionPolicyBinding as part of a single admission evaluation. Allowed values are \"Never\" and \"IfNeeded\".\n\nNever: These mutations will not be called more than once per binding in a single admission evaluation.\n\nIfNeeded: These mutations may be invoked more than once per binding for a single admission request and there is no guarantee of order with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only reinvoked when mutations change the object after this mutation is invoked. Required.",
 							Type:        []string{"string"},
 							Format:      "",
-							Enum:        []interface{}{"IfNeeded", "Never"},
 						},
 					},
 				},
@@ -4296,6 +4310,26 @@ func schema_k8sio_api_admissionregistration_v1alpha1_Variable(ref common.Referen
 	}
 }
 
+func schema_k8sio_api_admissionregistration_v1beta1_ApplyConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ApplyConfiguration defines the desired configuration values of an object.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"expression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "expression will be evaluated by CEL to create an apply configuration. ref: https://github.com/google/cel-spec\n\nApply configurations are declared in CEL using object initialization. For example, this CEL expression returns an apply configuration to set a single field:\n\n\tObject{\n\t  spec: Object.spec{\n\t    serviceAccountName: \"example\"\n\t  }\n\t}\n\nApply configurations may not modify atomic structs, maps or arrays due to the risk of accidental deletion of values not included in the apply configuration.\n\nCEL expressions have access to the object types needed to create apply configurations:\n\n- 'Object' - CEL type of the resource object. - 'Object.<fieldName>' - CEL type of object field (such as 'Object.spec') - 'Object.<fieldName1>.<fieldName2>...<fieldNameN>` - CEL type of nested field (such as 'Object.spec.containers')\n\nCEL expressions have access to the contents of the API request, organized into CEL variables as well as some other useful variables:\n\n- 'object' - The object from the incoming request. The value is null for DELETE requests. - 'oldObject' - The existing object. The value is null for CREATE requests. - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)). - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind. - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources. - 'variables' - Map of composited variables, from its name to its lazily evaluated value.\n  For example, a variable named 'foo' can be accessed as 'variables.foo'.\n- 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.\n  See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz\n- 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the\n  request resource.\n\nThe `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the object. No other metadata properties are accessible.\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Required.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_admissionregistration_v1beta1_AuditAnnotation(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -4351,6 +4385,26 @@ func schema_k8sio_api_admissionregistration_v1beta1_ExpressionWarning(ref common
 					},
 				},
 				Required: []string{"fieldRef", "warning"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_admissionregistration_v1beta1_JSONPatch(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JSONPatch defines a JSON Patch.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"expression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "expression will be evaluated by CEL to create a [JSON patch](https://jsonpatch.com/). ref: https://github.com/google/cel-spec\n\nexpression must return an array of JSONPatch values.\n\nFor example, this CEL expression returns a JSON patch to conditionally modify a value:\n\n\t  [\n\t    JSONPatch{op: \"test\", path: \"/spec/example\", value: \"Red\"},\n\t    JSONPatch{op: \"replace\", path: \"/spec/example\", value: \"Green\"}\n\t  ]\n\nTo define an object for the patch value, use Object types. For example:\n\n\t  [\n\t    JSONPatch{\n\t      op: \"add\",\n\t      path: \"/spec/selector\",\n\t      value: Object.spec.selector{matchLabels: {\"environment\": \"test\"}}\n\t    }\n\t  ]\n\nTo use strings containing '/' and '~' as JSONPatch path keys, use \"jsonpatch.escapeKey\". For example:\n\n\t  [\n\t    JSONPatch{\n\t      op: \"add\",\n\t      path: \"/metadata/labels/\" + jsonpatch.escapeKey(\"example.com/environment\"),\n\t      value: \"test\"\n\t    },\n\t  ]\n\nCEL expressions have access to the types needed to create JSON patches and objects:\n\n- 'JSONPatch' - CEL type of JSON Patch operations. JSONPatch has the fields 'op', 'from', 'path' and 'value'.\n  See [JSON patch](https://jsonpatch.com/) for more details. The 'value' field may be set to any of: string,\n  integer, array, map or object.  If set, the 'path' and 'from' fields must be set to a\n  [JSON pointer](https://datatracker.ietf.org/doc/html/rfc6901/) string, where the 'jsonpatch.escapeKey()' CEL\n  function may be used to escape path keys containing '/' and '~'.\n- 'Object' - CEL type of the resource object. - 'Object.<fieldName>' - CEL type of object field (such as 'Object.spec') - 'Object.<fieldName1>.<fieldName2>...<fieldNameN>` - CEL type of nested field (such as 'Object.spec.containers')\n\nCEL expressions have access to the contents of the API request, organized into CEL variables as well as some other useful variables:\n\n- 'object' - The object from the incoming request. The value is null for DELETE requests. - 'oldObject' - The existing object. The value is null for CREATE requests. - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)). - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind. - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources. - 'variables' - Map of composited variables, from its name to its lazily evaluated value.\n  For example, a variable named 'foo' can be accessed as 'variables.foo'.\n- 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.\n  See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz\n- 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the\n  request resource.\n\nCEL expressions have access to [Kubernetes CEL function libraries](https://kubernetes.io/docs/reference/using-api/cel/#cel-options-language-features-and-libraries) as well as:\n\n- 'jsonpatch.escapeKey' - Performs JSONPatch key escaping. '~' and  '/' are escaped as '~0' and `~1' respectively).\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Required.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -4460,6 +4514,331 @@ func schema_k8sio_api_admissionregistration_v1beta1_MatchResources(ref common.Re
 		},
 		Dependencies: []string{
 			"k8s.io/api/admissionregistration/v1beta1.NamedRuleWithOperations", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+	}
+}
+
+func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specification of the desired behavior of the MutatingAdmissionPolicy.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicySpec"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicySpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyBinding(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MutatingAdmissionPolicyBinding binds the MutatingAdmissionPolicy with parametrized resources. MutatingAdmissionPolicyBinding and the optional parameter resource together define how cluster administrators configure policies for clusters.\n\nFor a given admission request, each binding will cause its policy to be evaluated N times, where N is 1 for policies/bindings that don't use params, otherwise N is the number of parameters selected by the binding. Each evaluation is constrained by a [runtime cost budget](https://kubernetes.io/docs/reference/using-api/cel/#runtime-cost-budget).\n\nAdding/removing policies, bindings, or params can not affect whether a given (policy, binding, param) combination is within its own CEL budget.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specification of the desired behavior of the MutatingAdmissionPolicyBinding.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicyBindingSpec"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicyBindingSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyBindingList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of PolicyBinding.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicyBinding"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicyBinding", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyBindingSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MutatingAdmissionPolicyBindingSpec is the specification of the MutatingAdmissionPolicyBinding.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"policyName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "policyName references a MutatingAdmissionPolicy name which the MutatingAdmissionPolicyBinding binds to. If the referenced resource does not exist, this binding is considered invalid and will be ignored Required.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"paramRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "paramRef specifies the parameter resource used to configure the admission control policy. It should point to a resource of the type specified in spec.ParamKind of the bound MutatingAdmissionPolicy. If the policy specifies a ParamKind and the resource referred to by ParamRef does not exist, this binding is considered mis-configured and the FailurePolicy of the MutatingAdmissionPolicy applied. If the policy does not specify a ParamKind then this field is ignored, and the rules are evaluated without a param.",
+							Ref:         ref("k8s.io/api/admissionregistration/v1beta1.ParamRef"),
+						},
+					},
+					"matchResources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "matchResources limits what resources match this binding and may be mutated by it. Note that if matchResources matches a resource, the resource must also match a policy's matchConstraints and matchConditions before the resource may be mutated. When matchResources is unset, it does not constrain resource matching, and only the policy's matchConstraints and matchConditions must match for the resource to be mutated. Additionally, matchResources.resourceRules are optional and do not constraint matching when unset. Note that this is differs from MutatingAdmissionPolicy matchConstraints, where resourceRules are required. The CREATE, UPDATE and CONNECT operations are allowed.  The DELETE operation may not be matched. '*' matches CREATE, UPDATE and CONNECT.",
+							Ref:         ref("k8s.io/api/admissionregistration/v1beta1.MatchResources"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/admissionregistration/v1beta1.MatchResources", "k8s.io/api/admissionregistration/v1beta1.ParamRef"},
+	}
+}
+
+func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of ValidatingAdmissionPolicy.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicy"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/admissionregistration/v1beta1.MutatingAdmissionPolicy", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicySpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "MutatingAdmissionPolicySpec is the specification of the desired behavior of the admission policy.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"paramKind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "paramKind specifies the kind of resources used to parameterize this policy. If absent, there are no parameters for this policy and the param CEL variable will not be provided to validation expressions. If paramKind refers to a non-existent kind, this policy definition is mis-configured and the FailurePolicy is applied. If paramKind is specified but paramRef is unset in MutatingAdmissionPolicyBinding, the params variable will be null.",
+							Ref:         ref("k8s.io/api/admissionregistration/v1beta1.ParamKind"),
+						},
+					},
+					"matchConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "matchConstraints specifies what resources this policy is designed to validate. The MutatingAdmissionPolicy cares about a request if it matches _all_ Constraints. However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API MutatingAdmissionPolicy cannot match MutatingAdmissionPolicy and MutatingAdmissionPolicyBinding. The CREATE, UPDATE and CONNECT operations are allowed.  The DELETE operation may not be matched. '*' matches CREATE, UPDATE and CONNECT. Required.",
+							Ref:         ref("k8s.io/api/admissionregistration/v1beta1.MatchResources"),
+						},
+					},
+					"variables": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "variables contain definitions of variables that can be used in composition of other expressions. Each variable is defined as a named CEL expression. The variables defined here will be available under `variables` in other expressions of the policy except matchConditions because matchConditions are evaluated before the rest of the policy.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after. Thus, variables must be sorted by the order of first appearance and acyclic.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/admissionregistration/v1beta1.Variable"),
+									},
+								},
+							},
+						},
+					},
+					"mutations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "mutations contain operations to perform on matching objects. mutations may not be empty; a minimum of one mutation is required. mutations are evaluated in order, and are reinvoked according to the reinvocationPolicy. The mutations of a policy are invoked for each binding of this policy and reinvocation of mutations occurs on a per binding basis.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/admissionregistration/v1beta1.Mutation"),
+									},
+								},
+							},
+						},
+					},
+					"failurePolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "failurePolicy defines how to handle failures for the admission policy. Failures can occur from CEL expression parse errors, type check errors, runtime errors and invalid or mis-configured policy definitions or bindings.\n\nA policy is invalid if paramKind refers to a non-existent Kind. A binding is invalid if paramRef.name refers to a non-existent resource.\n\nfailurePolicy does not define how validations that evaluate to false are handled.\n\nAllowed values are Ignore or Fail. Defaults to Fail.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"matchConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "matchConditions is a list of conditions that must be met for a request to be validated. Match conditions filter requests that have already been matched by the matchConstraints. An empty list of matchConditions matches all requests. There are a maximum of 64 match conditions allowed.\n\nIf a parameter object is provided, it can be accessed via the `params` handle in the same manner as validation expressions.\n\nThe exact matching logic is (in order):\n  1. If ANY matchCondition evaluates to FALSE, the policy is skipped.\n  2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.\n  3. If any matchCondition evaluates to an error (but none are FALSE):\n     - If failurePolicy=Fail, reject the request\n     - If failurePolicy=Ignore, the policy is skipped",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/admissionregistration/v1beta1.MatchCondition"),
+									},
+								},
+							},
+						},
+					},
+					"reinvocationPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "reinvocationPolicy indicates whether mutations may be called multiple times per MutatingAdmissionPolicyBinding as part of a single admission evaluation. Allowed values are \"Never\" and \"IfNeeded\".\n\nNever: These mutations will not be called more than once per binding in a single admission evaluation.\n\nIfNeeded: These mutations may be invoked more than once per binding for a single admission request and there is no guarantee of order with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only reinvoked when mutations change the object after this mutation is invoked. Required.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/admissionregistration/v1beta1.MatchCondition", "k8s.io/api/admissionregistration/v1beta1.MatchResources", "k8s.io/api/admissionregistration/v1beta1.Mutation", "k8s.io/api/admissionregistration/v1beta1.ParamKind", "k8s.io/api/admissionregistration/v1beta1.Variable"},
 	}
 }
 
@@ -4712,6 +5091,43 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration
 		},
 		Dependencies: []string{
 			"k8s.io/api/admissionregistration/v1beta1.MutatingWebhookConfiguration", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_admissionregistration_v1beta1_Mutation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Mutation specifies the CEL expression which is used to apply the Mutation.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"patchType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "patchType indicates the patch strategy used. Allowed values are \"ApplyConfiguration\" and \"JSONPatch\". Required.\n\n\nPossible enum values:\n - `\"ApplyConfiguration\"` ApplyConfiguration indicates that the mutation is using apply configuration to mutate the object.\n - `\"JSONPatch\"` JSONPatch indicates that the object is mutated through JSON Patch.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"ApplyConfiguration", "JSONPatch"},
+						},
+					},
+					"applyConfiguration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "applyConfiguration defines the desired configuration values of an object. The configuration is applied to the admission object using [structured merge diff](https://github.com/kubernetes-sigs/structured-merge-diff). A CEL expression is used to create apply configuration.",
+							Ref:         ref("k8s.io/api/admissionregistration/v1beta1.ApplyConfiguration"),
+						},
+					},
+					"jsonPatch": {
+						SchemaProps: spec.SchemaProps{
+							Description: "jsonPatch defines a [JSON patch](https://jsonpatch.com/) operation to perform a mutation to the object. A CEL expression is used to create the JSON patch.",
+							Ref:         ref("k8s.io/api/admissionregistration/v1beta1.JSONPatch"),
+						},
+					},
+				},
+				Required: []string{"patchType"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/admissionregistration/v1beta1.ApplyConfiguration", "k8s.io/api/admissionregistration/v1beta1.JSONPatch"},
 	}
 }
 
@@ -12353,13 +12769,13 @@ func schema_k8sio_api_authorization_v1_ResourceAttributes(ref common.ReferenceCa
 					},
 					"fieldSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.\n\nThis field  is alpha-level. To use this field, you must enable the `AuthorizeWithSelectors` feature gate (disabled by default).",
+							Description: "fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.",
 							Ref:         ref("k8s.io/api/authorization/v1.FieldSelectorAttributes"),
 						},
 					},
 					"labelSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.\n\nThis field  is alpha-level. To use this field, you must enable the `AuthorizeWithSelectors` feature gate (disabled by default).",
+							Description: "labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.",
 							Ref:         ref("k8s.io/api/authorization/v1.LabelSelectorAttributes"),
 						},
 					},
@@ -26702,7 +27118,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCall
 					},
 					"volumeAttributesClassName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim. If specified, the CSI driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName, it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass will be applied to the claim but it's not allowed to reset this field to empty string once it is set. If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass will be set by the persistentvolume controller if it exists. If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource exists. More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/ (Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
+							Description: "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim. If specified, the CSI driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName, it can be changed after the claim is created. An empty string or nil value indicates that no VolumeAttributesClass will be applied to the claim. This field can be reset to an empty string or nil to perform a rollback if the claim enters an Infeasible error state. If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource exists. More info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/ (Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28704,7 +29120,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"hostNetwork": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Host networking requested for this pod. Use the host's network namespace. Default to false.",
+							Description: "Host networking requested for this pod. Use the host's network namespace. When using HostNetwork you should specify ports so the scheduler is aware. When `hostNetwork` is true, specified `hostPort` fields in port definitions must match `containerPort`, and unspecified `hostPort` fields in port definitions are defaulted to match `containerPort`. Default to false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -59659,6 +60075,425 @@ func schema_pkg_apis_meta_v1beta1_PartialObjectMetadataList(ref common.Reference
 	}
 }
 
+func schema_pkg_apis_testapigroup_v1_Carp(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Carp is a collection of containers, used as either input (create, update) or as output (list, get).",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specification of the desired behavior of the carp. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Most recently observed status of the carp. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpStatus"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpSpec", "k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpStatus"},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_CarpCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type is the type of the condition. Currently only Ready. More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is the status of the condition. Can be True, False, Unknown. More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastProbeTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time we probed the condition.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"lastTransitionTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Last time the condition transitioned from one status to another.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Unique, one-word, CamelCase reason for the condition's last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Human-readable message indicating details about last transition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"type", "status"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_CarpInfo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"a": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A is the first map key.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"b": {
+						SchemaProps: spec.SchemaProps{
+							Description: "B is the second map key.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"c": {
+						SchemaProps: spec.SchemaProps{
+							Description: "C is the third, optional map key",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Some data for each pair of A and B.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"a", "b", "data"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_CarpList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CarpList is a list of Carps.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "List of carps. More info: http://kubernetes.io/docs/user-guide/carps",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/testapigroup/v1.Carp"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/testapigroup/v1.Carp"},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_CarpSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CarpSpec is a description of a carp",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"restartPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Restart policy for all containers within the carp. One of Always, OnFailure, Never. Default to Always. More info: http://kubernetes.io/docs/user-guide/carp-states#restartpolicy",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"terminationGracePeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional duration in seconds the carp needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the carp are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"activeDeadlineSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional duration in seconds the carp may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers. Value must be a positive integer.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeSelector is a selector which must be true for the carp to fit on a node. Selector which must match a node's labels for the carp to be scheduled on that node. More info: http://kubernetes.io/docs/user-guide/node-selection/README",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"serviceAccountName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ServiceAccountName is the name of the ServiceAccount to use to run this carp. More info: https://kubernetes.io/docs/concepts/security/service-accounts/",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"deprecatedServiceAccount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DeprecatedServiceAccount is a deprecated alias for ServiceAccountName. Deprecated: Use serviceAccountName instead.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeName is a request to schedule this carp onto a specific node. If it is non-empty, the scheduler simply schedules this carp onto that node, assuming that it fits resource requirements.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"hostNetwork": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Host networking requested for this carp. Use the host's network namespace. Default to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"hostPID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Use the host's pid namespace. Optional: Default to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"hostIPC": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Use the host's ipc namespace. Optional: Default to false.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"hostname": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the hostname of the Carp If not specified, the carp's hostname will be set to a system-defined value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"subdomain": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the fully qualified Carp hostname will be \"<hostname>.<subdomain>.<carp namespace>.svc.<cluster domain>\". If not specified, the carp will not have a domainname at all.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"schedulerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the carp will be dispatched by specified scheduler. If not specified, the carp will be dispatched by default scheduler.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_testapigroup_v1_CarpStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CarpStatus represents information about the status of a carp. Status may trail the actual state of a system.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"phase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Current condition of the carp. More info: http://kubernetes.io/docs/user-guide/carp-states#carp-phase",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Current service state of carp. More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpCondition"),
+									},
+								},
+							},
+						},
+					},
+					"message": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A human readable message indicating details about why the carp is in this condition.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"reason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A brief CamelCase message indicating details about why the carp is in this state. e.g. 'DiskPressure'",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"hostIP": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IP address of the host to which the carp is assigned. Empty if not yet scheduled.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"carpIP": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IP address allocated to the carp. Routable at least within the cluster. Empty if not yet allocated.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"startTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the carp.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+					"infos": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"a",
+									"b",
+									"c",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Carp infos are provided by different clients, hence the map type.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpInfo"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time", "k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpCondition", "k8s.io/apimachinery/pkg/apis/testapigroup/v1.CarpInfo"},
+	}
+}
+
 func schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -63799,6 +64634,42 @@ func schema_k8sio_kube_scheduler_config_v1_DefaultPreemptionArgs(ref common.Refe
 	}
 }
 
+func schema_k8sio_kube_scheduler_config_v1_DynamicResourcesArgs(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DynamicResourcesArgs holds arguments used to configure the DynamicResources plugin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"filterTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FilterTimeout limits the amount of time that the filter operation may take per node to search for devices that can be allocated to scheduler a pod to that node.\n\nIn typical scenarios, this operation should complete in 10 to 200 milliseconds, but could also be longer depending on the number of requests per ResourceClaim, number of ResourceClaims, number of published devices in ResourceSlices, and the complexity of the requests. Other checks besides CEL evaluation also take time (usage checks, match attributes, etc.).\n\nTherefore the scheduler plugin applies this timeout. If the timeout is reached, the Pod is considered unschedulable for the node. If filtering succeeds for some other node(s), those are picked instead. If filtering fails for all of them, the Pod is placed in the unschedulable queue. It will get checked again if changes in e.g. ResourceSlices or ResourceClaims indicate that another scheduling attempt might succeed. If this fails repeatedly, exponential backoff slows down future attempts.\n\nThe default is 10 seconds. This is sufficient to prevent worst-case scenarios while not impacting normal usage of DRA. However, slow filtering can slow down Pod scheduling also for Pods not using DRA. Administators can reduce the timeout after checking the `scheduler_framework_extension_point_duration_seconds` metrics.\n\nSetting it to zero completely disables the timeout.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+				},
+				Required: []string{"filterTimeout"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
+	}
+}
+
 func schema_k8sio_kube_scheduler_config_v1_Extender(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -65531,6 +66402,14 @@ func schema_k8sio_kubelet_config_v1_ServiceAccountTokenAttributes(ref common.Ref
 							Format:      "",
 						},
 					},
+					"cacheType": {
+						SchemaProps: spec.SchemaProps{
+							Description: "cacheType indicates the type of cache key use for caching the credentials returned by the plugin when the service account token is used. The most conservative option is to set this to \"Token\", which means the kubelet will cache returned credentials on a per-token basis. This should be set if the returned credential's lifetime is limited to the service account token's lifetime. If the plugin's credential retrieval logic depends only on the service account and not on pod-specific claims, then the plugin can set this to \"ServiceAccount\". In this case, the kubelet will cache returned credentials on a per-serviceaccount basis. Use this when the returned credential is valid for all pods using the same service account.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"requireServiceAccount": {
 						SchemaProps: spec.SchemaProps{
 							Description: "requireServiceAccount indicates whether the plugin requires the pod to have a service account. If set to true, kubelet will only invoke the plugin if the pod has a service account. If set to false, kubelet will invoke the plugin even if the pod does not have a service account and will not include a token in the CredentialProviderRequest in that scenario. This is useful for plugins that are used to pull images for pods without service accounts (e.g., static pods).",
@@ -65579,7 +66458,7 @@ func schema_k8sio_kubelet_config_v1_ServiceAccountTokenAttributes(ref common.Ref
 						},
 					},
 				},
-				Required: []string{"serviceAccountTokenAudience", "requireServiceAccount"},
+				Required: []string{"serviceAccountTokenAudience", "cacheType", "requireServiceAccount"},
 			},
 		},
 	}

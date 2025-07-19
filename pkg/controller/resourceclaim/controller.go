@@ -28,6 +28,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -42,10 +43,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/utils/ptr"
 )
 
@@ -150,7 +152,7 @@ func NewController(
 		deletedObjects: newUIDCache(maxUIDCacheEntries),
 	}
 
-	metrics.RegisterMetrics()
+	resourceclaimmetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
 
 	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -351,28 +353,9 @@ func (ec *Controller) enqueueResourceClaim(logger klog.Logger, oldObj, newObj in
 		return
 	}
 
-	// Maintain metrics based on what was observed.
-	switch {
-	case oldClaim == nil:
-		// Added.
-		metrics.NumResourceClaims.Inc()
-		if newClaim.Status.Allocation != nil {
-			metrics.NumAllocatedResourceClaims.Inc()
-		}
-	case newClaim == nil:
-		// Deleted.
-		metrics.NumResourceClaims.Dec()
-		if oldClaim.Status.Allocation != nil {
-			metrics.NumAllocatedResourceClaims.Dec()
-		}
-	default:
-		// Updated.
-		switch {
-		case oldClaim.Status.Allocation == nil && newClaim.Status.Allocation != nil:
-			metrics.NumAllocatedResourceClaims.Inc()
-		case oldClaim.Status.Allocation != nil && newClaim.Status.Allocation == nil:
-			metrics.NumAllocatedResourceClaims.Dec()
-		}
+	// Check if both the old and new claim are nil in case DeletedFinalStateUnknown.Obj can be nil.
+	if oldClaim == nil && newClaim == nil {
+		return
 	}
 
 	claim := newClaim
@@ -669,13 +652,14 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 			},
 			Spec: template.Spec.Spec,
 		}
-		metrics.ResourceClaimCreateAttempts.Inc()
+		metricLabel := getAdminAccessMetricLabel(claim)
 		claimName := claim.Name
 		claim, err = ec.kubeClient.ResourceV1beta1().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 		if err != nil {
-			metrics.ResourceClaimCreateFailures.Inc()
+			resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("failure", metricLabel).Inc()
 			return fmt.Errorf("create ResourceClaim %s: %v", claimName, err)
 		}
+		resourceclaimmetrics.ResourceClaimCreate.WithLabelValues("success", metricLabel).Inc()
 		logger.V(4).Info("Created ResourceClaim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
 		ec.claimCache.Mutation(claim)
 	}
@@ -990,4 +974,62 @@ func claimPodOwnerIndexFunc(obj interface{}) ([]string, error) {
 		}
 	}
 	return keys, nil
+}
+func getAdminAccessMetricLabel(claim *resourceapi.ResourceClaim) string {
+	if claim == nil {
+		return "false"
+	}
+	for _, request := range claim.Spec.Devices.Requests {
+		if ptr.Deref(request.AdminAccess, false) {
+			return "true"
+		}
+	}
+	return "false"
+}
+
+func newCustomCollector(rcLister resourcelisters.ResourceClaimLister, adminAccessFunc func(*resourceapi.ResourceClaim) string, logger klog.Logger) metrics.StableCollector {
+	return &customCollector{
+		rcLister:        rcLister,
+		adminAccessFunc: adminAccessFunc,
+		logger:          logger,
+	}
+}
+
+type customCollector struct {
+	metrics.BaseStableCollector
+	rcLister        resourcelisters.ResourceClaimLister
+	adminAccessFunc func(*resourceapi.ResourceClaim) string
+	logger          klog.Logger
+}
+
+var _ metrics.StableCollector = &customCollector{}
+
+func (collector *customCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- resourceclaimmetrics.NumResourceClaimsDesc
+}
+
+func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	allocateMetrics := make(map[string]map[string]int)
+	rcList, err := collector.rcLister.List(labels.Everything())
+	if err != nil {
+		collector.logger.Error(err, "failed to list resource claims for metrics collection")
+		return
+	}
+	for _, rc := range rcList {
+		// Determine if the ResourceClaim is allocated
+		allocated := "false"
+		if rc.Status.Allocation != nil {
+			allocated = "true"
+		}
+		adminAccess := collector.adminAccessFunc(rc)
+		if allocateMetrics[allocated] == nil {
+			allocateMetrics[allocated] = make(map[string]int)
+		}
+		allocateMetrics[allocated][adminAccess]++
+	}
+	for allocated, adminAccessMap := range allocateMetrics {
+		for adminAccess, count := range adminAccessMap {
+			ch <- metrics.NewLazyConstMetric(resourceclaimmetrics.NumResourceClaimsDesc, metrics.GaugeValue, float64(count), allocated, adminAccess)
+		}
+	}
 }

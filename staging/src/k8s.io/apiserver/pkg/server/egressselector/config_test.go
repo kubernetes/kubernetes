@@ -27,11 +27,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/apiserver"
+	"k8s.io/utils/ptr"
 )
-
-func strptr(s string) *string {
-	return &s
-}
 
 func TestReadEgressSelectorConfiguration(t *testing.T) {
 	testcases := []struct {
@@ -46,14 +43,14 @@ func TestReadEgressSelectorConfiguration(t *testing.T) {
 			createFile:     true,
 			contents:       ``,
 			expectedResult: nil,
-			expectedError:  strptr("invalid service configuration object \"\""),
+			expectedError:  ptr.To("invalid service configuration object \"\""),
 		},
 		{
 			name:           "absent",
 			createFile:     false,
 			contents:       ``,
 			expectedResult: nil,
-			expectedError:  strptr("errors.errorString{s:\"unable to read egress selector configuration"),
+			expectedError:  ptr.To("errors.errorString{s:\"unable to read egress selector configuration"),
 		},
 		{
 			name:       "unknown field causes error",
@@ -69,7 +66,7 @@ egressSelections:
     bar: "baz"
 `,
 			expectedResult: nil,
-			expectedError:  strptr("runtime.strictDecodingError"),
+			expectedError:  ptr.To("runtime.strictDecodingError"),
 		},
 		{
 			name:       "duplicate field causes error",
@@ -85,7 +82,7 @@ egressSelections:
     proxyProtocol: "Indirect"
 `,
 			expectedResult: nil,
-			expectedError:  strptr("runtime.strictDecodingError"),
+			expectedError:  ptr.To("runtime.strictDecodingError"),
 		},
 		{
 			name:       "v1beta1",
@@ -303,7 +300,7 @@ spec:
               mountPath: /etc/srv/kubernetes/pki/konnectivity-agent
 `,
 			expectedResult: nil,
-			expectedError:  strptr("invalid service configuration object \"DaemonSet\""),
+			expectedError:  ptr.To("invalid service configuration object \"DaemonSet\""),
 		},
 	}
 
