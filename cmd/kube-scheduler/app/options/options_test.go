@@ -631,6 +631,12 @@ profiles:
 								},
 							},
 							{
+								Name: "DynamicResources",
+								Args: &kubeschedulerconfig.DynamicResourcesArgs{
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+								},
+							},
+							{
 								Name: "NodeAffinity",
 								Args: &kubeschedulerconfig.NodeAffinityArgs{},
 							},
@@ -738,6 +744,12 @@ profiles:
 								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
 									MinCandidateNodesPercentage: 10,
 									MinCandidateNodesAbsolute:   100,
+								},
+							},
+							{
+								Name: "DynamicResources",
+								Args: &kubeschedulerconfig.DynamicResourcesArgs{
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
 								},
 							},
 							{
@@ -878,6 +890,12 @@ profiles:
 								Args: &kubeschedulerconfig.DefaultPreemptionArgs{
 									MinCandidateNodesPercentage: 10,
 									MinCandidateNodesAbsolute:   100,
+								},
+							},
+							{
+								Name: "DynamicResources",
+								Args: &kubeschedulerconfig.DynamicResourcesArgs{
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
 								},
 							},
 							{

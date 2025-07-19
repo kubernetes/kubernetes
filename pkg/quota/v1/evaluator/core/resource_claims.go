@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -29,7 +29,7 @@ import (
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
-	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1beta1"
+	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1"
 )
 
 // The name used for object count quota. This evaluator takes over counting
@@ -114,7 +114,8 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 	// charge for claim
 	result[ClaimObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
 	for _, request := range claim.Spec.Devices.Requests {
-		if len(request.FirstAvailable) > 0 {
+		switch {
+		case len(request.FirstAvailable) > 0:
 			// If there are subrequests, we want to use the worst case per device class
 			// to quota. So for each device class, we need to find the max number of
 			// devices that might be allocated.
@@ -145,23 +146,26 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 				result[deviceClassClaim] = quantity
 			}
 			continue
-		}
-		deviceClassClaim := V1ResourceByDeviceClass(request.DeviceClassName)
-		var numDevices int64
-		switch request.AllocationMode {
-		case resourceapi.DeviceAllocationModeExactCount:
-			numDevices = request.Count
-		case resourceapi.DeviceAllocationModeAll:
-			// Worst case...
-			numDevices = resourceapi.AllocationResultsMaxSize
+		case request.Exactly != nil:
+			deviceClassClaim := V1ResourceByDeviceClass(request.Exactly.DeviceClassName)
+			var numDevices int64
+			switch request.Exactly.AllocationMode {
+			case resourceapi.DeviceAllocationModeExactCount:
+				numDevices = request.Exactly.Count
+			case resourceapi.DeviceAllocationModeAll:
+				// Worst case...
+				numDevices = resourceapi.AllocationResultsMaxSize
+			default:
+				// Could happen after a downgrade. Unknown modes
+				// don't count towards the quota and users shouldn't
+				// expect that when downgrading.
+			}
+			quantity := result[deviceClassClaim]
+			quantity.Add(*(resource.NewQuantity(numDevices, resource.DecimalSI)))
+			result[deviceClassClaim] = quantity
 		default:
-			// Could happen after a downgrade. Unknown modes
-			// don't count towards the quota and users shouldn't
-			// expect that when downgrading.
+			// Some unknown, future request type. Cannot do quota for it.
 		}
-		quantity := result[deviceClassClaim]
-		quantity.Add(*(resource.NewQuantity(numDevices, resource.DecimalSI)))
-		result[deviceClassClaim] = quantity
 	}
 
 	return result, nil
@@ -181,7 +185,7 @@ func toExternalResourceClaimOrError(obj runtime.Object) (*resourceapi.ResourceCl
 	case *resourceapi.ResourceClaim:
 		claim = t
 	case *resourceinternal.ResourceClaim:
-		if err := resourceversioned.Convert_resource_ResourceClaim_To_v1beta1_ResourceClaim(t, claim, nil); err != nil {
+		if err := resourceversioned.Convert_resource_ResourceClaim_To_v1_ResourceClaim(t, claim, nil); err != nil {
 			return nil, err
 		}
 	default:

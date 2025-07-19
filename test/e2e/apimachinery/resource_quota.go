@@ -25,7 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -525,7 +525,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		ginkgo.By("Creating a ResourceClaim")
 		claim := newTestResourceClaimForQuota("test-claim")
-		claim, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+		claim, err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status captures resource claim creation")
@@ -536,7 +536,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Deleting a ResourceClaim")
-		err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+		err = f.ClientSet.ResourceV1().ResourceClaims(f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released usage")
@@ -2344,8 +2344,10 @@ func newTestResourceClaimForQuota(name string) *resourceapi.ResourceClaim {
 		Spec: resourceapi.ResourceClaimSpec{
 			Devices: resourceapi.DeviceClaim{
 				Requests: []resourceapi.DeviceRequest{{
-					Name:            "req-0",
-					DeviceClassName: classGold,
+					Name: "req-0",
+					Exactly: &resourceapi.ExactDeviceRequest{
+						DeviceClassName: classGold,
+					},
 				}},
 			},
 		},

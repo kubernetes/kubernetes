@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,10 +64,10 @@ func setup(tb testing.TB) *testContext {
 	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
 	controller := New(fakeClientset,
 		informerFactory.Core().V1().Pods(),
-		informerFactory.Resource().V1beta1().ResourceClaims(),
-		informerFactory.Resource().V1beta1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-		informerFactory.Resource().V1beta1().DeviceClasses(),
+		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
 	)
 	tContext := &testContext{
@@ -225,16 +225,16 @@ var (
 		slice.Spec.Pool.Generation++
 		return slice
 	}()
-	sliceUnknownDevices = func() *resourceapi.ResourceSlice {
+	sliceOtherDevices = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
 		for i := range slice.Spec.Devices {
-			slice.Spec.Devices[i].Basic = nil
+			slice.Spec.Devices[i].Name += "-other"
 		}
 		return slice
 	}()
 	sliceTainted = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
-		slice.Spec.Devices[0].Basic.Taints = []resourceapi.DeviceTaint{{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, Value: taintValue, TimeAdded: &taintTime}}
+		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, Value: taintValue, TimeAdded: &taintTime}}
 		return slice
 	}()
 	sliceTaintedExtended = func() *resourceapi.ResourceSlice {
@@ -246,8 +246,8 @@ var (
 	sliceTaintedNoSchedule = func() *resourceapi.ResourceSlice {
 		slice := sliceTainted.DeepCopy()
 		for i := range slice.Spec.Devices {
-			for j := range slice.Spec.Devices[i].Basic.Taints {
-				slice.Spec.Devices[i].Basic.Taints[j].Effect = resourceapi.DeviceTaintEffectNoSchedule
+			for j := range slice.Spec.Devices[i].Taints {
+				slice.Spec.Devices[i].Taints[j].Effect = resourceapi.DeviceTaintEffectNoSchedule
 			}
 		}
 		return slice
@@ -255,15 +255,15 @@ var (
 	sliceTaintedValueOther = func() *resourceapi.ResourceSlice {
 		slice := sliceTainted.DeepCopy()
 		for i := range slice.Spec.Devices {
-			for j := range slice.Spec.Devices[i].Basic.Taints {
-				slice.Spec.Devices[i].Basic.Taints[j].Value += "-other"
+			for j := range slice.Spec.Devices[i].Taints {
+				slice.Spec.Devices[i].Taints[j].Value += "-other"
 			}
 		}
 		return slice
 	}()
 	sliceTaintedTwice = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
-		slice.Spec.Devices[0].Basic.Taints = []resourceapi.DeviceTaint{
+		slice.Spec.Devices[0].Taints = []resourceapi.DeviceTaint{
 			{Key: taintKey, Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime},
 			{Key: taintKey + "-other", Effect: resourceapi.DeviceTaintEffectNoExecute, TimeAdded: &taintTime},
 		}
@@ -271,14 +271,14 @@ var (
 	}()
 	sliceUntainted = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
-		slice.Spec.Devices[1].Basic.Taints = nil
-		slice.Spec.Devices[2].Basic.Taints = nil
+		slice.Spec.Devices[1].Taints = nil
+		slice.Spec.Devices[2].Taints = nil
 		return slice
 	}()
 	slice2 = func() *resourceapi.ResourceSlice {
 		slice := slice.DeepCopy()
 		slice.Name += "-2"
-		slice.Spec.NodeName = nodeName2
+		slice.Spec.NodeName = &nodeName2
 		slice.Spec.Pool.Name = nodeName2
 		slice.Spec.Pool.Generation++
 		return slice
@@ -860,15 +860,15 @@ func TestHandlers(t *testing.T) {
 				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
 			},
 		},
-		"no-evict-unknown-device": {
+		"no-evict-other-device": {
 			events: []any{
-				add(sliceUnknownDevices),
+				add(sliceOtherDevices),
 				add(slice2),
 				add(inUseClaim),
 				add(podWithClaimTemplateInStatus),
 			},
 			finalState: state{
-				slices:          []*resourceapi.ResourceSlice{sliceUnknownDevices, slice2},
+				slices:          []*resourceapi.ResourceSlice{sliceOtherDevices, slice2},
 				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim}},
 			},
 		},
@@ -1226,10 +1226,10 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 
 	controller := New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
-		informerFactory.Resource().V1beta1().ResourceClaims(),
-		informerFactory.Resource().V1beta1().ResourceSlices(),
+		informerFactory.Resource().V1().ResourceClaims(),
+		informerFactory.Resource().V1().ResourceSlices(),
 		informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-		informerFactory.Resource().V1beta1().DeviceClasses(),
+		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
 	)
 	controller.metrics = metrics.New(300 /* one large initial bucket for testing */)
@@ -1313,11 +1313,11 @@ func TestEviction(t *testing.T) {
 					return err
 				})
 				do(tCtx, "create slice", func(tCtx ktesting.TContext) error {
-					_, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, sliceTainted, metav1.CreateOptions{})
+					_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, sliceTainted, metav1.CreateOptions{})
 					return err
 				})
 				do(tCtx, "create claim", func(tCtx ktesting.TContext) error {
-					_, err := tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
+					_, err := tCtx.Client().ResourceV1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
 					return err
 				})
 			},
@@ -1338,11 +1338,11 @@ func TestEviction(t *testing.T) {
 					return err
 				})
 				do(tCtx, "update slice", func(tCtx ktesting.TContext) error {
-					_, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Update(tCtx, sliceTainted, metav1.UpdateOptions{})
+					_, err := tCtx.Client().ResourceV1().ResourceSlices().Update(tCtx, sliceTainted, metav1.UpdateOptions{})
 					return err
 				})
 				do(tCtx, "update claim", func(tCtx ktesting.TContext) error {
-					_, err := tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).UpdateStatus(tCtx, inUseClaim, metav1.UpdateOptions{})
+					_, err := tCtx.Client().ResourceV1().ResourceClaims(inUseClaim.Namespace).UpdateStatus(tCtx, inUseClaim, metav1.UpdateOptions{})
 					return err
 				})
 			},
@@ -1362,15 +1362,15 @@ func TestEviction(t *testing.T) {
 			},
 			afterSync: func(tCtx ktesting.TContext) {
 				do(tCtx, "delete slice", func(tCtx ktesting.TContext) error {
-					return tCtx.Client().ResourceV1beta1().ResourceSlices().Delete(tCtx, slice.Name+"-other", metav1.DeleteOptions{})
+					return tCtx.Client().ResourceV1().ResourceSlices().Delete(tCtx, slice.Name+"-other", metav1.DeleteOptions{})
 				})
 				do(tCtx, "delete claim", func(tCtx ktesting.TContext) error {
-					return tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Delete(tCtx, inUseClaim.Name, metav1.DeleteOptions{})
+					return tCtx.Client().ResourceV1().ResourceClaims(inUseClaim.Namespace).Delete(tCtx, inUseClaim.Name, metav1.DeleteOptions{})
 				})
 
 				// Re-create after deletion to enabled the normal flow.
 				do(tCtx, "create claim", func(tCtx ktesting.TContext) error {
-					_, err := tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
+					_, err := tCtx.Client().ResourceV1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
 					return err
 				})
 			},
@@ -1483,7 +1483,7 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	// do something which cancels eviction.
 	pod := podWithClaimName.DeepCopy()
 	slice := sliceTainted.DeepCopy()
-	slice.Spec.Devices[0].Basic.Taints[0].TimeAdded = &metav1.Time{Time: time.Now()}
+	slice.Spec.Devices[0].Taints[0].TimeAdded = &metav1.Time{Time: time.Now()}
 	claim := inUseClaim.DeepCopy()
 	claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 		Operator:          resourceapi.DeviceTolerationOpExists,
@@ -1542,7 +1542,7 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	if deletePod {
 		tCtx.ExpectNoError(fakeClientset.CoreV1().Pods(pod.Namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{}))
 	} else {
-		tCtx.ExpectNoError(fakeClientset.ResourceV1beta1().ResourceSlices().Delete(tCtx, slice.Name, metav1.DeleteOptions{}))
+		tCtx.ExpectNoError(fakeClientset.ResourceV1().ResourceSlices().Delete(tCtx, slice.Name, metav1.DeleteOptions{}))
 	}
 
 	// Shortly after deletion we should also see the cancellation.

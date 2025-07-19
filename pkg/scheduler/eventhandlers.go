@@ -569,7 +569,7 @@ func addAllEventHandlers(
 			}
 		case fwk.DeviceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1beta1().DeviceClasses().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1().DeviceClasses().Informer().AddEventHandler(
 					buildEvtResHandler(at, fwk.DeviceClass),
 				); err != nil {
 					return err
