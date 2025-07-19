@@ -48,6 +48,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
+	resourceevaluator "k8s.io/kubernetes/pkg/quota/v1/evaluator/resource"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -518,8 +519,8 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Ensuring resource quota status is calculated")
 		usedResources := v1.ResourceList{}
 		usedResources[v1.ResourceQuotas] = resource.MustParse(strconv.Itoa(c + 1))
-		usedResources[core.ClaimObjectCountName] = resource.MustParse("0")
-		usedResources[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("0")
+		usedResources[resourceevaluator.ClaimObjectCountName] = resource.MustParse("0")
+		usedResources[resourceevaluator.V1ResourceByDeviceClass(classGold)] = resource.MustParse("0")
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		framework.ExpectNoError(err)
 
@@ -530,8 +531,8 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		ginkgo.By("Ensuring resource quota status captures resource claim creation")
 		usedResources = v1.ResourceList{}
-		usedResources[core.ClaimObjectCountName] = resource.MustParse("1")
-		usedResources[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("1")
+		usedResources[resourceevaluator.ClaimObjectCountName] = resource.MustParse("1")
+		usedResources[resourceevaluator.V1ResourceByDeviceClass(classGold)] = resource.MustParse("1")
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		framework.ExpectNoError(err)
 
@@ -540,8 +541,8 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Ensuring resource quota status released usage")
-		usedResources[core.ClaimObjectCountName] = resource.MustParse("0")
-		usedResources[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("0")
+		usedResources[resourceevaluator.ClaimObjectCountName] = resource.MustParse("0")
+		usedResources[resourceevaluator.V1ResourceByDeviceClass(classGold)] = resource.MustParse("0")
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		framework.ExpectNoError(err)
 	})
@@ -2175,8 +2176,8 @@ func newTestResourceQuota(name string) *v1.ResourceQuota {
 // newTestResourceQuotaDRA returns a quota that includes hard limits for ResourceClaim objects.
 func newTestResourceQuotaDRA(name string) *v1.ResourceQuota {
 	quota := newTestResourceQuota(name)
-	quota.Spec.Hard[core.ClaimObjectCountName] = resource.MustParse("1")
-	quota.Spec.Hard[core.V1ResourceByDeviceClass(classGold)] = resource.MustParse("1")
+	quota.Spec.Hard[resourceevaluator.ClaimObjectCountName] = resource.MustParse("1")
+	quota.Spec.Hard[resourceevaluator.V1ResourceByDeviceClass(classGold)] = resource.MustParse("1")
 	return quota
 }
 
