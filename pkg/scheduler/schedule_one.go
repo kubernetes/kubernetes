@@ -31,12 +31,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -278,6 +280,23 @@ func (sched *Scheduler) bindingCycle(
 	logger := klog.FromContext(ctx)
 
 	assumedPod := assumedPodInfo.Pod
+
+	if feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
+		preFlightStatus := schedFramework.RunPreBindPreFlightPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
+		if preFlightStatus.Code() == fwk.Error || preFlightStatus.IsRejected() {
+			return preFlightStatus
+		}
+		if preFlightStatus.IsSuccess() || schedFramework.WillWaitOnPermit(ctx, assumedPod) {
+			// Add NominatedNodeName to tell the external components (e.g., the cluster autoscaler) that the pod is about to be bound to the node.
+			// We only do this when any of WaitOnPermit or PreBind will work because otherwise the pod will be soon bound anyway.
+			if err := updatePod(ctx, sched.client, assumedPod, nil, &framework.NominatingInfo{
+				NominatedNodeName: scheduleResult.SuggestedHost,
+				NominatingMode:    framework.ModeOverride,
+			}); err != nil {
+				return fwk.AsStatus(fmt.Errorf("failed to update the nominated node name in the binding cycle: %w", err))
+			}
+		}
+	}
 
 	// Run "permit" plugins.
 	if status := schedFramework.WaitOnPermit(ctx, assumedPod); !status.IsSuccess() {
@@ -1111,14 +1130,23 @@ func truncateMessage(message string) string {
 	return message[:max-len(suffix)] + suffix
 }
 
+// updatePod updates the condition and nominated node name.
 func updatePod(ctx context.Context, client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) error {
 	logger := klog.FromContext(ctx)
-	logger.V(3).Info("Updating pod condition", "pod", klog.KObj(pod), "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
+	logValues := []any{"pod", klog.KObj(pod)}
+	if condition != nil {
+		logValues = append(logValues, "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
+	}
+	if nominatingInfo != nil {
+		logValues = append(logValues, "nominatedNodeName", nominatingInfo.NominatedNodeName, "nominatingMode", nominatingInfo.Mode())
+	}
+	logger.V(3).Info("Updating pod condition and nominated node name", logValues...)
+
 	podStatusCopy := pod.Status.DeepCopy()
 	// NominatedNodeName is updated only if we are trying to set it, and the value is
 	// different from the existing one.
 	nnnNeedsUpdate := nominatingInfo.Mode() == framework.ModeOverride && pod.Status.NominatedNodeName != nominatingInfo.NominatedNodeName
-	if !podutil.UpdatePodCondition(podStatusCopy, condition) && !nnnNeedsUpdate {
+	if (condition == nil || !podutil.UpdatePodCondition(podStatusCopy, condition)) && !nnnNeedsUpdate {
 		return nil
 	}
 	if nnnNeedsUpdate {
