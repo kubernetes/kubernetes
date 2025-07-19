@@ -34,7 +34,7 @@ var (
 			Name:           "statefulset_unavailability_violation",
 			Help:           "Number of times maxunavailable has been violated",
 			StabilityLevel: metrics.BETA,
-		}, []string{"statefulset_namespace", "statefulset_name"},
+		}, []string{"statefulset_namespace", "statefulset_name", "pod_management_policy"},
 	)
 )
 
