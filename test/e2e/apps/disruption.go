@@ -470,8 +470,9 @@ var _ = SIGDescribe("DisruptionController", func() {
 			ginkgo.By("Creating a replica set")
 			rsName := "test-rs-with-delayed-ready"
 			replicas := int32(3)
-			rs := newRS(rsName, replicas, defaultLabels, WebserverImageName, WebserverImage, nil)
+			rs := newRS(rsName, replicas, defaultLabels, AgnhostImageName, AgnhostImage, nil)
 			rs.Labels["name"] = rsName
+			rs.Spec.Template.Spec.Containers[0].Args = []string{"netexec", "--http-port=80"}
 			initialDelaySeconds := framework.PodStartTimeout.Seconds() + 30
 			if tc.podsShouldBecomeReadyFirst {
 				initialDelaySeconds = 20
@@ -479,7 +480,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			rs.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
 				ProbeHandler: v1.ProbeHandler{
 					HTTPGet: &v1.HTTPGetAction{
-						Path: "/index.html",
+						Path: "/",
 						Port: intstr.IntOrString{IntVal: 80},
 					},
 				},
