@@ -82,6 +82,9 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 
 // TransportConfig converts a client config to an appropriate transport config.
 func (c *Config) TransportConfig() (*transport.Config, error) {
+	if c == nil {
+		return nil, errors.New("config cannot be nil")
+	}
 	conf := &transport.Config{
 		UserAgent:          c.UserAgent,
 		Transport:          c.Transport,
