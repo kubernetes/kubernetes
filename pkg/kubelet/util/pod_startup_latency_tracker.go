@@ -33,6 +33,8 @@ type PodStartupLatencyTracker interface {
 	ObservedPodOnWatch(pod *v1.Pod, when time.Time)
 	RecordImageStartedPulling(podUID types.UID)
 	RecordImageFinishedPulling(podUID types.UID)
+	RecordInitContainerStarted(podUID types.UID, startedAt time.Time)
+	RecordInitContainerFinished(podUID types.UID, finishedAt time.Time)
 	RecordStatusUpdated(pod *v1.Pod)
 	DeletePodStartupState(podUID types.UID)
 }
@@ -48,8 +50,10 @@ type basicPodStartupLatencyTracker struct {
 }
 
 type perPodState struct {
-	firstStartedPulling time.Time
-	lastFinishedPulling time.Time
+	firstStartedPulling     time.Time
+	lastFinishedPulling     time.Time
+	firstInitContainerStart time.Time
+	lastInitContainerFinish time.Time
 	// first time, when pod status changed into Running
 	observedRunningTime time.Time
 	// log, if pod latency was already Observed
@@ -99,7 +103,8 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 	if hasPodStartedSLO(pod) {
 		podStartingDuration := when.Sub(pod.CreationTimestamp.Time)
 		imagePullingDuration := state.lastFinishedPulling.Sub(state.firstStartedPulling)
-		podStartSLOduration := (podStartingDuration - imagePullingDuration).Seconds()
+		initContainerDuration := state.lastInitContainerFinish.Sub(state.firstInitContainerStart)
+		podStartSLOduration := (podStartingDuration - imagePullingDuration - initContainerDuration).Seconds()
 
 		klog.InfoS("Observed pod startup duration",
 			"pod", klog.KObj(pod),
@@ -108,6 +113,8 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 			"podCreationTimestamp", pod.CreationTimestamp.Time,
 			"firstStartedPulling", state.firstStartedPulling,
 			"lastFinishedPulling", state.lastFinishedPulling,
+			"firstInitContainerStart", state.firstInitContainerStart,
+			"lastInitContainerFinish", state.lastInitContainerFinish,
 			"observedRunningTime", state.observedRunningTime,
 			"watchObservedRunningTime", when)
 
@@ -147,6 +154,34 @@ func (p *basicPodStartupLatencyTracker) RecordImageFinishedPulling(podUID types.
 	}
 
 	state.lastFinishedPulling = p.clock.Now() // Now is always grater than values from the past.
+}
+
+func (p *basicPodStartupLatencyTracker) RecordInitContainerStarted(podUID types.UID, startedAt time.Time) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	state := p.pods[podUID]
+	if state == nil {
+		return
+	}
+
+	if state.firstInitContainerStart.IsZero() || startedAt.Before(state.firstInitContainerStart) {
+		state.firstInitContainerStart = startedAt
+	}
+}
+
+func (p *basicPodStartupLatencyTracker) RecordInitContainerFinished(podUID types.UID, finishedAt time.Time) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	state := p.pods[podUID]
+	if state == nil {
+		return
+	}
+
+	if finishedAt.After(state.lastInitContainerFinish) {
+		state.lastInitContainerFinish = finishedAt
+	}
 }
 
 func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
