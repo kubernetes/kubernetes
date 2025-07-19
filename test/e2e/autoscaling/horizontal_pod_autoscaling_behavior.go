@@ -69,7 +69,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-			)
+				nil)
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
@@ -110,7 +110,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-			)
+				nil)
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
@@ -149,7 +149,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-			)
+				nil)
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
@@ -185,7 +185,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-			)
+				nil)
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
@@ -227,7 +227,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-			)
+				nil)
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
@@ -269,7 +269,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-			)
+				nil)
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
@@ -313,7 +313,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-			)
+				nil)
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
@@ -356,7 +356,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-			)
+				nil)
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
@@ -403,7 +403,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-			)
+				nil)
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			hpa := e2eautoscaling.CreateCPUHorizontalPodAutoscalerWithBehavior(ctx,
@@ -455,7 +455,7 @@ var _ = SIGDescribe(feature.HPA, "Horizontal pod autoscaling (non-default behavi
 				hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 				initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 				f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-			)
+				nil)
 			ginkgo.DeferCleanup(rc.CleanUp)
 
 			scaleUpRule := e2eautoscaling.HPAScalingRuleWithScalingPolicy(autoscalingv2.PodsScalingPolicy, int32(podsLimitPerMinute), int32(limitWindowLength.Seconds()))
@@ -516,7 +516,7 @@ var _ = SIGDescribe(feature.HPAConfigurableTolerance, framework.WithFeatureGate(
 					hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 					initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
 					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
-				)
+					nil)
 				ginkgo.DeferCleanup(rc.CleanUp)
 
 				scaleRule := e2eautoscaling.HPAScalingRuleWithToleranceMilli(10000)
