@@ -76,3 +76,86 @@ func TestPodStatusEqual(t *testing.T) {
 
 	}
 }
+
+func TestPodExtendedStatusEqual(t *testing.T) {
+	ra := corev1.ContainerExtendedResourceRequest{
+		ContainerName:        "a",
+		ExtendedResourceName: "example.com/a",
+		RequestName:          "ra",
+	}
+	rb := corev1.ContainerExtendedResourceRequest{
+		ContainerName:        "b",
+		ExtendedResourceName: "example.com/b",
+		RequestName:          "rb",
+	}
+
+	testcases := map[string]struct {
+		statusA, statusB corev1.PodExtendedResourceClaimStatus
+		expectEqual      bool
+	}{
+		"identical": {
+			statusA: corev1.PodExtendedResourceClaimStatus{
+				RequestMappings:   []corev1.ContainerExtendedResourceRequest{ra, rb},
+				ResourceClaimName: "x",
+			},
+			statusB: corev1.PodExtendedResourceClaimStatus{
+				RequestMappings:   []corev1.ContainerExtendedResourceRequest{ra, rb},
+				ResourceClaimName: "x",
+			},
+			expectEqual: true,
+		},
+		"different-order": {
+			statusA: corev1.PodExtendedResourceClaimStatus{
+				RequestMappings:   []corev1.ContainerExtendedResourceRequest{ra, rb},
+				ResourceClaimName: "x",
+			},
+			statusB: corev1.PodExtendedResourceClaimStatus{
+				RequestMappings:   []corev1.ContainerExtendedResourceRequest{rb, ra},
+				ResourceClaimName: "x",
+			},
+			expectEqual: false,
+		},
+		"different-length": {
+			statusA: corev1.PodExtendedResourceClaimStatus{
+				RequestMappings:   []corev1.ContainerExtendedResourceRequest{ra, rb},
+				ResourceClaimName: "x",
+			},
+			statusB: corev1.PodExtendedResourceClaimStatus{
+				RequestMappings:   []corev1.ContainerExtendedResourceRequest{ra},
+				ResourceClaimName: "x",
+			},
+			expectEqual: false,
+		},
+
+		"semantically-equal-empty": {
+			statusA: corev1.PodExtendedResourceClaimStatus{
+				RequestMappings:   []corev1.ContainerExtendedResourceRequest{},
+				ResourceClaimName: "x",
+			},
+			statusB: corev1.PodExtendedResourceClaimStatus{
+				RequestMappings:   nil,
+				ResourceClaimName: "x",
+			},
+			expectEqual: true,
+		},
+		"different-claim-name": {
+			statusA: corev1.PodExtendedResourceClaimStatus{
+				RequestMappings:   []corev1.ContainerExtendedResourceRequest{ra, rb},
+				ResourceClaimName: "x",
+			},
+			statusB: corev1.PodExtendedResourceClaimStatus{
+				RequestMappings:   []corev1.ContainerExtendedResourceRequest{ra, rb},
+				ResourceClaimName: "y",
+			},
+			expectEqual: false,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			assert.True(t, PodExtendedStatusEqual(&tc.statusA, &tc.statusA), "status", tc.statusA)
+			assert.True(t, PodExtendedStatusEqual(&tc.statusB, &tc.statusB), "status", tc.statusB)
+			assert.Equal(t, tc.expectEqual, PodExtendedStatusEqual(&tc.statusA, &tc.statusB), "status", tc.statusA, tc.statusB)
+		})
+	}
+}

@@ -950,6 +950,13 @@ items:
   - apiGroups:
     - resource.k8s.io
     resources:
+    - resourceclaims
+    verbs:
+    - create
+    - delete
+  - apiGroups:
+    - resource.k8s.io
+    resources:
     - devicetaintrules
     verbs:
     - get

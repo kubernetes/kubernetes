@@ -59,6 +59,7 @@ type Features struct {
 
 	AdminAccess          bool
 	DeviceTaints         bool
+	ExtendedResource     bool
 	PartitionableDevices bool
 	PrioritizedList      bool
 }
@@ -77,6 +78,9 @@ func (f Features) Set() sets.Set[string] {
 	if f.DeviceTaints {
 		enabled.Insert("DRADeviceTaints")
 	}
+	if f.ExtendedResource {
+		enabled.Insert("DRAExtendedResource")
+	}
 	if f.PartitionableDevices {
 		enabled.Insert("DRAPartitionableDevices")
 	}
@@ -89,6 +93,7 @@ func (f Features) Set() sets.Set[string] {
 var FeaturesAll = Features{
 	AdminAccess:          true,
 	DeviceTaints:         true,
+	ExtendedResource:     true,
 	PartitionableDevices: true,
 	PrioritizedList:      true,
 }

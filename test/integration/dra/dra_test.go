@@ -70,18 +70,33 @@ import (
 var (
 	// For more test data see pkg/scheduler/framework/plugin/dynamicresources/dynamicresources_test.go.
 
-	podName          = "my-pod"
-	namespace        = "default"
-	resourceName     = "my-resource"
-	className        = "my-resource-class"
-	claimName        = podName + "-" + resourceName
-	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
+	podName                     = "my-pod"
+	podWithExtendedResourceName = "my-pod-with-extended-resource"
+	namespace                   = "default"
+	resourceName                = "my-resource"
+	extendedResourceName        = "my-example.com/my-extended-resource"
+	claimName                   = podName + "-" + resourceName
+	className                   = "my-resource-class"
+	extendedClassName           = "my-extended-resource-class"
+	podWithClaimName            = st.MakePod().Name(podName).Namespace(namespace).
+					Container("my-container").
+					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+					Obj()
+	podWithExtendedResource = st.MakePod().Name(podWithExtendedResourceName).Namespace(namespace).
 				Container("my-container").
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+				Res(map[v1.ResourceName]string{v1.ResourceName(extendedResourceName): "1"}).
 				Obj()
 	class = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: className,
+		},
+	}
+	classWithExtendedResource = &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: extendedClassName,
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &extendedResourceName,
 		},
 	}
 	claim = st.MakeResourceClaim().
@@ -255,6 +270,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices)
 				})
+				tCtx.Run("ExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, false) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 			},
 		},
@@ -295,12 +311,15 @@ func TestDRA(t *testing.T) {
 				features.DRADeviceTaints:         true,
 				features.DRAPartitionableDevices: true,
 				features.DRAPrioritizedList:      true,
+				features.DRAExtendedResource:     true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				tCtx.Run("Convert", testConvert)
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
+				// note testExtendedResource depends on testPublishResourceSlices to provide the devices
+				tCtx.Run("ExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
 			},
@@ -679,6 +698,46 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 		tCtx.ExpectNoError(err, "get pod")
 		return pod
 	}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
+}
+
+func testExtendedResource(tCtx ktesting.TContext, enabled bool) {
+	tCtx.Parallel()
+	c, err := tCtx.Client().ResourceV1beta1().DeviceClasses().Create(tCtx, classWithExtendedResource, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create class")
+	if enabled {
+		require.NotEmpty(tCtx, c.Spec.ExtendedResourceName, "should store ExtendedResourceName")
+	}
+	namespace := createTestNamespace(tCtx, nil)
+	tCtx.Run("scheduler", func(tCtx ktesting.TContext) {
+		startScheduler(tCtx)
+
+		pod := podWithExtendedResource.DeepCopy()
+		pod.Namespace = namespace
+		_, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create pod")
+		schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
+			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Type":    gomega.Equal(v1.PodScheduled),
+				"Status":  gomega.Equal(v1.ConditionFalse),
+				"Reason":  gomega.Equal("Unschedulable"),
+				"Message": gomega.Equal("0/2 nodes are available: 2 Insufficient my-example.com/my-extended-resource. no new claims to deallocate, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling."),
+			}),
+		))
+		if enabled {
+			// pod can be scheduled as the drivers in testPublishResourceSlices provide the devices.
+			schedulingAttempted = gomega.HaveField("Status.Conditions", gomega.ContainElement(
+				gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Type":   gomega.Equal(v1.PodScheduled),
+					"Status": gomega.Equal(v1.ConditionTrue),
+				}),
+			))
+		}
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+			pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+			tCtx.ExpectNoError(err, "get pod")
+			return pod
+		}).WithTimeout(time.Minute).WithPolling(time.Second).Should(schedulingAttempted)
+	})
 }
 
 func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disabledFeatures ...featuregate.Feature) {

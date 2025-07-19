@@ -1092,6 +1092,18 @@ func (wrapper *ResourceClaimWrapper) Name(s string) *ResourceClaimWrapper {
 	return wrapper
 }
 
+// GenerateName sets `s` as the GenerateName of the inner object.
+func (wrapper *ResourceClaimWrapper) GenerateName(s string) *ResourceClaimWrapper {
+	wrapper.SetGenerateName(s)
+	return wrapper
+}
+
+// Annotations sets `s` as the annotations of the inner object.
+func (wrapper *ResourceClaimWrapper) Annotations(s map[string]string) *ResourceClaimWrapper {
+	wrapper.SetAnnotations(s)
+	return wrapper
+}
+
 // UID sets `s` as the UID of the inner object.
 func (wrapper *ResourceClaimWrapper) UID(s string) *ResourceClaimWrapper {
 	wrapper.SetUID(types.UID(s))
@@ -1118,11 +1130,31 @@ func (wrapper *ResourceClaimWrapper) OwnerReference(name, uid string, gvk schema
 	return wrapper
 }
 
+// OwnerReference updates the owning controller of the object.
+func (wrapper *ResourceClaimWrapper) OwnerRef(ref metav1.OwnerReference) *ResourceClaimWrapper {
+	wrapper.OwnerReferences = []metav1.OwnerReference{ref}
+	return wrapper
+}
+
 // Request adds one device request for the given device class.
 func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceClaimWrapper {
 	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
 		resourceapi.DeviceRequest{
 			Name: fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1),
+			// Cannot rely on defaulting here, this is used in unit tests.
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+			DeviceClassName: deviceClassName,
+		},
+	)
+	return wrapper
+}
+
+// Request adds one device request for the given device class.
+func (wrapper *ResourceClaimWrapper) Req(name, deviceClassName string) *ResourceClaimWrapper {
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name: name,
 			// Cannot rely on defaulting here, this is used in unit tests.
 			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
 			Count:           1,

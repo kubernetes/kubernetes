@@ -21,7 +21,9 @@ import (
 	_ "embed"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,8 +36,10 @@ import (
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourceapi "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -44,11 +48,17 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+var (
+	ExtendedResourceName = func(i int) string { return "example.com/gpu" + strconv.Itoa(i) }
+)
+
 // Builder contains a running counter to make objects unique within thir
 // namespace.
 type Builder struct {
-	f      *framework.Framework
-	driver *Driver
+	f                  *framework.Framework
+	driver             *Driver
+	extended           bool
+	extendedMultiNodes bool
 
 	podCounter      int
 	claimCounter    int
@@ -62,11 +72,21 @@ func (b *Builder) ClassName() string {
 
 // Class returns the device Class that the builder's other objects
 // reference.
-func (b *Builder) Class() *resourceapi.DeviceClass {
+func (b *Builder) Class(i int) *resourceapi.DeviceClass {
+	ern := ExtendedResourceName(i)
+	name := b.ClassName()
+	if i > 0 {
+		name = b.ClassName() + strconv.Itoa(i)
+	}
 	class := &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: b.ClassName(),
+			Name: name,
 		},
+	}
+	if b.extended {
+		class.Spec = resourceapi.DeviceClassSpec{
+			ExtendedResourceName: &ern,
+		}
 	}
 	class.Spec.Selectors = []resourceapi.DeviceSelector{{
 		CEL: &resourceapi.CELDeviceSelector{
@@ -367,7 +387,7 @@ func TestContainerEnv(ctx context.Context, f *framework.Framework, pod *v1.Pod, 
 		gomega.Expect(actualEnv).To(gomega.Equal(expectEnv), fmt.Sprintf("container %s env output:\n%s", containerName, stdout))
 	} else {
 		for i := 0; i < len(env); i += 2 {
-			envStr := fmt.Sprintf("\n%s=%s\n", env[i], env[i+1])
+			envStr := fmt.Sprintf("%s=%s\n", env[i], env[i+1])
 			gomega.Expect(stdout).To(gomega.ContainSubstring(envStr), fmt.Sprintf("container %s env variables", containerName))
 		}
 	}
@@ -385,10 +405,41 @@ func NewBuilderNow(ctx context.Context, f *framework.Framework, driver *Driver) 
 	return b
 }
 
+func NewBuilderExtended(f *framework.Framework, driver *Driver) *Builder {
+	b := &Builder{f: f, driver: driver, extended: true}
+	ginkgo.BeforeEach(b.setUp)
+	return b
+}
+
+func NewBuilderExtendedMultiNodes(f *framework.Framework, driver *Driver) *Builder {
+	b := &Builder{f: f, driver: driver, extended: true, extendedMultiNodes: true}
+	ginkgo.BeforeEach(b.setUp)
+	return b
+}
+
 func (b *Builder) setUp(ctx context.Context) {
 	b.podCounter = 0
 	b.claimCounter = 0
-	b.Create(ctx, b.Class())
+	for i := range 6 {
+		b.Create(ctx, b.Class(i))
+	}
+	if b.extendedMultiNodes {
+		cns, err := b.f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err, "getting cluster nodes")
+		for _, cn := range cns.Items {
+			if _, ok := b.driver.Nodes[cn.Name]; ok {
+				continue
+			}
+			cn.Status.Capacity[v1.ResourceName(ExtendedResourceName(0))] = resource.MustParse("1")
+			retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				if _, err := b.f.ClientSet.CoreV1().Nodes().UpdateStatus(ctx, &cn, metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("update node %s status capacity for extended resource %s: %w", cn.Name, ExtendedResourceName(0), err)
+				}
+				return nil
+			})
+			framework.ExpectNoError(retryErr, "update node status capacity for extended resource")
+		}
+	}
 	ginkgo.DeferCleanup(b.tearDown)
 }
 
@@ -421,6 +472,17 @@ func (b *Builder) tearDown(ctx context.Context) {
 			continue
 		}
 		ginkgo.By(fmt.Sprintf("deleting %T %s", &claim, klog.KObj(&claim)))
+		builtinControllerFinalizer := slices.Index(claim.Finalizers, resourceapi.Finalizer)
+		if builtinControllerFinalizer >= 0 {
+			claim.Finalizers = slices.Delete(claim.Finalizers, builtinControllerFinalizer, builtinControllerFinalizer+1)
+			retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				if _, err := b.f.ClientSet.ResourceV1beta2().ResourceClaims(claim.Namespace).Update(ctx, &claim, metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("update claim %s/%s:  %w", claim.Namespace, claim.Name, err)
+				}
+				return nil
+			})
+			framework.ExpectNoError(retryErr, "remove claim finalizer")
+		}
 		err := b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.ExpectNoError(err, "delete claim")
@@ -440,6 +502,25 @@ func (b *Builder) tearDown(ctx context.Context) {
 		}
 		return claims.Items, nil
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "claims in the namespaces")
+
+	if b.extendedMultiNodes {
+		cns, err := b.f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err, "getting cluster nodes")
+		for _, cn := range cns.Items {
+			if _, ok := b.driver.Nodes[cn.Name]; ok {
+				continue
+			}
+			delete(cn.Status.Capacity, v1.ResourceName(ExtendedResourceName(0)))
+			retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				if _, err := b.f.ClientSet.CoreV1().Nodes().UpdateStatus(ctx, &cn, metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("update node %s status capacity:  %w", cn.Name, err)
+				}
+				return nil
+			})
+
+			framework.ExpectNoError(retryErr, "update node status capacity")
+		}
+	}
 }
 
 func (b *Builder) listTestPods(ctx context.Context) ([]v1.Pod, error) {

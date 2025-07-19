@@ -51,6 +51,7 @@ func MakeDeviceID(driver, pool, device string) DeviceID {
 // are enabled.
 var SupportedFeatures = internal.Features{
 	AdminAccess:          true,
+	ExtendedResource:     true,
 	PrioritizedList:      true,
 	PartitionableDevices: true,
 	DeviceTaints:         true,
