@@ -4166,6 +4166,7 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 			t.Cleanup(func() { testKubelet.Cleanup() })
 			kubelet := testKubelet.kubelet
 
+			kubelet.podManager.AddPod(initialPod)
 			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(initialPod))
 			kubelet.HandlePodUpdates([]*v1.Pod{updatedPod})
 

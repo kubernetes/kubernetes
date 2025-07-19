@@ -2665,6 +2665,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
+		oldPod, _ := kl.podManager.GetPodByUID(pod.UID)
 		kl.podManager.UpdatePod(pod)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
@@ -2676,26 +2677,18 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			allocatedPod, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
-			if updatedFromAllocation {
-				if kl.allocationManager.PushPendingResize(pod.UID) {
-					// We only record the metric if the resize is not already in the pending queue.
-					// This will cause us to miss incrementing the counter when a previously
-					// pending resize is overwritten with a new resize, but will prevent us from
-					// erroneously incrementing the counter when there is a non-resize related update
-					// of a pod that currently has a pending resize.
-					// TODO (natasha41575): See if there is an easy way to detect when a pending resize is
-					// being overwritten with a new one.
-					recordContainerResizeOperations(allocatedPod, pod)
+			if recordContainerResizeOperations(oldPod, pod) {
+				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+				if updatedFromAllocation {
+					kl.allocationManager.PushPendingResize(pod.UID)
+					// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
+					// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
+					kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonPodUpdated)
+				} else {
+					// We can hit this case if a pending resize has been reverted,
+					// so we need to clear the pending resize condition.
+					kl.statusManager.ClearPodResizePendingCondition(pod.UID)
 				}
-
-				// TODO (natasha41575): If the resize is immediately actuated, it will trigger a pod sync
-				// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
-				kl.allocationManager.RetryPendingResizes(allocation.TriggerReasonPodUpdated)
-			} else {
-				// We can hit this case if a pending resize has been reverted,
-				// so we need to clear the pending resize condition.
-				kl.statusManager.ClearPodResizePendingCondition(pod.UID)
 			}
 		}
 
@@ -2708,8 +2701,14 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	}
 }
 
-// recordContainerResizeOperations records if any of the pod's containers needs to be resized.
-func recordContainerResizeOperations(oldPod, newPod *v1.Pod) {
+// recordContainerResizeOperations records if any of the pod's containers needs to be resized, and returns
+// true if so
+func recordContainerResizeOperations(oldPod, newPod *v1.Pod) bool {
+	hasResize := false
+	if oldPod == nil {
+		// This should never happen.
+		return true
+	}
 	for oldContainer, containerType := range podutil.ContainerIter(&oldPod.Spec, podutil.InitContainers|podutil.Containers) {
 		if !allocation.IsResizableContainer(oldContainer, containerType) {
 			continue
@@ -2729,18 +2728,24 @@ func recordContainerResizeOperations(oldPod, newPod *v1.Pod) {
 		oldResources := oldContainer.Resources
 
 		if op := resizeOperationForResources(newResources.Requests.Memory(), oldResources.Requests.Memory()); op != "" {
+			hasResize = true
 			metrics.ContainerRequestedResizes.WithLabelValues("memory", "requests", op).Inc()
 		}
 		if op := resizeOperationForResources(newResources.Limits.Memory(), oldResources.Limits.Memory()); op != "" {
+			hasResize = true
 			metrics.ContainerRequestedResizes.WithLabelValues("memory", "limits", op).Inc()
 		}
 		if op := resizeOperationForResources(newResources.Requests.Cpu(), oldResources.Requests.Cpu()); op != "" {
+			hasResize = true
 			metrics.ContainerRequestedResizes.WithLabelValues("cpu", "requests", op).Inc()
 		}
 		if op := resizeOperationForResources(newResources.Limits.Cpu(), oldResources.Limits.Cpu()); op != "" {
+			hasResize = true
 			metrics.ContainerRequestedResizes.WithLabelValues("cpu", "limits", op).Inc()
 		}
 	}
+
+	return hasResize
 }
 
 func resizeOperationForResources(new, old *resource.Quantity) string {

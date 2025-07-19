@@ -114,8 +114,7 @@ type Manager interface {
 	Run(ctx context.Context)
 
 	// PushPendingResize queues a pod with a pending resize request for later reevaluation.
-	// Returns true if the pending resize was added to the queue, false if it was already present.
-	PushPendingResize(uid types.UID) bool
+	PushPendingResize(uid types.UID)
 
 	// RetryPendingResizes retries all pending resizes.
 	RetryPendingResizes(trigger string)
@@ -328,21 +327,20 @@ func (m *manager) retryPendingResizes(trigger string) []*v1.Pod {
 	return successfulResizes
 }
 
-func (m *manager) PushPendingResize(uid types.UID) bool {
+func (m *manager) PushPendingResize(uid types.UID) {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
 	for _, p := range m.podsWithPendingResizes {
 		if p == uid {
 			// Pod is already in the pending resizes queue.
-			return false
+			return
 		}
 	}
 
 	// Add the pod to the pending resizes list and sort by priority.
 	m.podsWithPendingResizes = append(m.podsWithPendingResizes, uid)
 	m.sortPendingResizes()
-	return true
 }
 
 // sortPendingResizes sorts the list of pending resizes:
