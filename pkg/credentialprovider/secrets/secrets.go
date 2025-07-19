@@ -49,7 +49,7 @@ func secretsToTrackedDockerConfigs(secrets []v1.Secret) (credentialprovider.Dock
 				return nil, err
 			}
 
-			coords := credentialprovider.SecretCoordinates{
+			coords := &credentialprovider.SecretCoordinates{
 				UID:       string(passedSecret.UID),
 				Namespace: passedSecret.Namespace,
 				Name:      passedSecret.Name}
@@ -62,7 +62,7 @@ func secretsToTrackedDockerConfigs(secrets []v1.Secret) (credentialprovider.Dock
 				return nil, err
 			}
 
-			coords := credentialprovider.SecretCoordinates{
+			coords := &credentialprovider.SecretCoordinates{
 				UID:       string(passedSecret.UID),
 				Namespace: passedSecret.Namespace,
 				Name:      passedSecret.Name}

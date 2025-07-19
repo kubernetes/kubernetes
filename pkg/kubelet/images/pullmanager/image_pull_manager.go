@@ -179,7 +179,7 @@ func (f *PullManager) decrementImagePullIntent(image string) {
 	f.decrementIntentCounterForImage(image)
 }
 
-func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret) bool {
+func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
 	if len(imageRef) == 0 {
 		return true
 	}
@@ -253,7 +253,7 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 		return false
 	}
 
-	if len(cachedCreds.KubernetesSecrets) == 0 {
+	if len(cachedCreds.KubernetesSecrets) == 0 && len(cachedCreds.KubernetesServiceAccounts) == 0 {
 		return true
 	}
 
@@ -290,6 +290,11 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 				}
 			}
 		}
+	}
+
+	if podServiceAccount != nil && slices.Contains(cachedCreds.KubernetesServiceAccounts, *podServiceAccount) {
+		// we found a matching service account, no need to pull the image
+		return false
 	}
 
 	return true
@@ -421,7 +426,7 @@ type kubeSecretCoordinates struct {
 // after any tag or digest were removed from it.
 //
 // NOTE: pulledRecordMergeNewCreds() may be often called in the read path of
-// PullManager.MustAttemptImagePul() and so it's desirable to limit allocations
+// PullManager.MustAttemptImagePull() and so it's desirable to limit allocations
 // (e.g. DeepCopy()) until it is necessary.
 func pulledRecordMergeNewCreds(orig *kubeletconfiginternal.ImagePulledRecord, imageNoTagDigest string, newCreds *kubeletconfiginternal.ImagePullCredentials) (*kubeletconfiginternal.ImagePulledRecord, bool) {
 	if newCreds == nil {
@@ -429,9 +434,8 @@ func pulledRecordMergeNewCreds(orig *kubeletconfiginternal.ImagePulledRecord, im
 		return orig, false
 	}
 
-	if !newCreds.NodePodsAccessible && len(newCreds.KubernetesSecrets) == 0 {
-		// we don't have any secret credentials or node-wide access to record
-		// TODO(stlaz,aramase): add in a serviceaccount dimension check
+	if !newCreds.NodePodsAccessible && len(newCreds.KubernetesSecrets) == 0 && len(newCreds.KubernetesServiceAccounts) == 0 {
+		// we don't have any secret, service account credentials or node-wide access to record
 		return orig, false
 	}
 	selectedCreds, found := orig.CredentialMapping[imageNoTagDigest]
@@ -449,20 +453,30 @@ func pulledRecordMergeNewCreds(orig *kubeletconfiginternal.ImagePulledRecord, im
 		return orig, false
 	}
 
-	if newCreds.NodePodsAccessible {
+	switch {
+	case newCreds.NodePodsAccessible:
 		selectedCreds.NodePodsAccessible = true
 		selectedCreds.KubernetesSecrets = nil
+		selectedCreds.KubernetesServiceAccounts = nil
 
 		ret := orig.DeepCopy()
 		ret.CredentialMapping[imageNoTagDigest] = selectedCreds
 		ret.LastUpdatedTime = metav1.Time{Time: time.Now()}
 		return ret, true
-	}
 
-	var secretsChanged bool
-	selectedCreds.KubernetesSecrets, secretsChanged = mergePullSecrets(selectedCreds.KubernetesSecrets, newCreds.KubernetesSecrets)
-	if !secretsChanged {
-		return orig, false
+	case len(newCreds.KubernetesSecrets) > 0:
+		var secretsChanged bool
+		selectedCreds.KubernetesSecrets, secretsChanged = mergePullSecrets(selectedCreds.KubernetesSecrets, newCreds.KubernetesSecrets)
+		if !secretsChanged {
+			return orig, false
+		}
+
+	case len(newCreds.KubernetesServiceAccounts) > 0:
+		var serviceAccountsChanged bool
+		selectedCreds.KubernetesServiceAccounts, serviceAccountsChanged = mergePullServiceAccounts(selectedCreds.KubernetesServiceAccounts, newCreds.KubernetesServiceAccounts)
+		if !serviceAccountsChanged {
+			return orig, false
+		}
 	}
 
 	ret := orig.DeepCopy()
@@ -535,4 +549,49 @@ func imagePullSecretLess(a, b kubeletconfiginternal.ImagePullSecret) int {
 func trimImageTagDigest(containerImage string) (string, error) {
 	imageName, _, _, err := parsers.ParseImageName(containerImage)
 	return imageName, err
+}
+
+// mergePullServiceAccounts merges two slices of ImagePullServiceAccount object into one while
+// keeping the objects unique per `Namespace, Name, UID` key.
+// The returned slice is sorted by Namespace, Name and UID (in this order).
+// Also returns an indicator whether the set of input service accounts changed.
+func mergePullServiceAccounts(orig, new []kubeletconfiginternal.ImagePullServiceAccount) ([]kubeletconfiginternal.ImagePullServiceAccount, bool) {
+	credSet := sets.New[kubeletconfiginternal.ImagePullServiceAccount]()
+	for _, serviceAccount := range orig {
+		credSet.Insert(serviceAccount)
+	}
+
+	changed := false
+	for _, s := range new {
+		if !credSet.Has(s) {
+			changed = true
+			credSet.Insert(s)
+		}
+	}
+	if !changed {
+		return orig, false
+	}
+
+	ret := credSet.UnsortedList()
+	slices.SortFunc(ret, imagePullServiceAccountLess)
+
+	return ret, true
+}
+
+// imagePullServiceAccountLess is a helper function to define ordering in a slice of
+// ImagePullServiceAccount objects.
+func imagePullServiceAccountLess(a, b kubeletconfiginternal.ImagePullServiceAccount) int {
+	if cmp := strings.Compare(a.Namespace, b.Namespace); cmp != 0 {
+		return cmp
+	}
+
+	if cmp := strings.Compare(a.Name, b.Name); cmp != 0 {
+		return cmp
+	}
+
+	if cmp := strings.Compare(a.UID, b.UID); cmp != 0 {
+		return cmp
+	}
+
+	return 0
 }

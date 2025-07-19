@@ -87,10 +87,17 @@ func NewTrackedAuthConfig(c *AuthConfig, src *CredentialSource) *TrackedAuthConf
 }
 
 type CredentialSource struct {
-	Secret SecretCoordinates
+	Secret         *SecretCoordinates
+	ServiceAccount *ServiceAccountCoordinates
 }
 
 type SecretCoordinates struct {
+	UID       string
+	Namespace string
+	Name      string
+}
+
+type ServiceAccountCoordinates struct {
 	UID       string
 	Namespace string
 	Name      string
@@ -316,8 +323,6 @@ func (dk *providersDockerKeyring) Lookup(image string) ([]TrackedAuthConfig, boo
 	keyring := &BasicDockerKeyring{}
 
 	for _, p := range dk.Providers {
-		// TODO: the source should probably change once we depend on service accounts (KEP-4412).
-		//       Perhaps `Provide()` should return the source modified to accommodate this?
 		keyring.Add(nil, p.Provide(image))
 	}
 

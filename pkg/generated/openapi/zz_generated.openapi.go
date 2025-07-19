@@ -1296,6 +1296,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kubelet/config/v1alpha1.ImagePullCredentials":                                                   schema_k8sio_kubelet_config_v1alpha1_ImagePullCredentials(ref),
 		"k8s.io/kubelet/config/v1alpha1.ImagePullIntent":                                                        schema_k8sio_kubelet_config_v1alpha1_ImagePullIntent(ref),
 		"k8s.io/kubelet/config/v1alpha1.ImagePullSecret":                                                        schema_k8sio_kubelet_config_v1alpha1_ImagePullSecret(ref),
+		"k8s.io/kubelet/config/v1alpha1.ImagePullServiceAccount":                                                schema_k8sio_kubelet_config_v1alpha1_ImagePullServiceAccount(ref),
 		"k8s.io/kubelet/config/v1alpha1.ImagePulledRecord":                                                      schema_k8sio_kubelet_config_v1alpha1_ImagePulledRecord(ref),
 		"k8s.io/kubelet/config/v1beta1.CrashLoopBackOffConfig":                                                  schema_k8sio_kubelet_config_v1beta1_CrashLoopBackOffConfig(ref),
 		"k8s.io/kubelet/config/v1beta1.CredentialProvider":                                                      schema_k8sio_kubelet_config_v1beta1_CredentialProvider(ref),
@@ -66644,6 +66645,25 @@ func schema_k8sio_kubelet_config_v1alpha1_ImagePullCredentials(ref common.Refere
 							},
 						},
 					},
+					"kubernetesServiceAccounts": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "KubernetesServiceAccounts is an index of coordinates of all the kubernetes service accounts that were used to pull the image.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/kubelet/config/v1alpha1.ImagePullServiceAccount"),
+									},
+								},
+							},
+						},
+					},
 					"nodePodsAccessible": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NodePodsAccessible is a flag denoting the pull credentials are accessible by all the pods on the node, or that no credentials are needed for the pull.\n\nIf true, it is mutually exclusive with the `kubernetesSecrets` field.",
@@ -66655,7 +66675,7 @@ func schema_k8sio_kubelet_config_v1alpha1_ImagePullCredentials(ref common.Refere
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/kubelet/config/v1alpha1.ImagePullSecret"},
+			"k8s.io/kubelet/config/v1alpha1.ImagePullSecret", "k8s.io/kubelet/config/v1alpha1.ImagePullServiceAccount"},
 	}
 }
 
@@ -66733,6 +66753,41 @@ func schema_k8sio_kubelet_config_v1alpha1_ImagePullSecret(ref common.ReferenceCa
 					},
 				},
 				Required: []string{"uid", "namespace", "name", "credentialHash"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1alpha1_ImagePullServiceAccount(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ImagePullServiceAccount is a representation of a Kubernetes service account object coordinates for which the kubelet sent service account token to the credential provider plugin for image pull credentials.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"uid": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
+						},
+					},
+				},
+				Required: []string{"uid", "namespace", "name"},
 			},
 		},
 	}
