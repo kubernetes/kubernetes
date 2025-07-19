@@ -58,6 +58,12 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 			continue
 		}
 
+		// The ResourceSlice Mixins feature is not yet available on the incubating variant of the
+		// allocator, so we should not consider slices that has counter sets that uses mixins.
+		if sliceUsesCounterSetMixins(slice) {
+			continue
+		}
+
 		switch {
 		case slice.Spec.NodeName != "" || slice.Spec.AllNodes || slice.Spec.NodeSelector != nil:
 			match, err := nodeMatches(node, slice.Spec.NodeName, slice.Spec.AllNodes, slice.Spec.NodeSelector)
@@ -116,6 +122,15 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	}
 
 	return result, nil
+}
+
+func sliceUsesCounterSetMixins(slice *resourceapi.ResourceSlice) bool {
+	for _, counterSet := range slice.Spec.SharedCounters {
+		if len(counterSet.Includes) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) error {

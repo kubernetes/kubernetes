@@ -170,6 +170,7 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
+	dropDisabledDRAResourceSliceMixinsFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -226,6 +227,52 @@ func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
 		}
 		if device.NodeName != nil || device.NodeSelector != nil || device.AllNodes != nil {
 			return true
+		}
+	}
+	return false
+}
+
+func dropDisabledDRAResourceSliceMixinsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceSliceMixins) || draResourceSliceMixinsFeatureInUse(oldSlice) {
+		return
+	}
+
+	newSlice.Spec.Mixins = nil
+	for i := range newSlice.Spec.SharedCounters {
+		newSlice.Spec.SharedCounters[i].Includes = nil
+	}
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].Includes = nil
+		for j := range newSlice.Spec.Devices[i].ConsumesCounters {
+			newSlice.Spec.Devices[i].ConsumesCounters[j].Includes = nil
+		}
+	}
+}
+
+func draResourceSliceMixinsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	spec := slice.Spec
+	if spec.Mixins != nil {
+		return true
+	}
+
+	for _, counterSet := range spec.SharedCounters {
+		if len(counterSet.Includes) > 0 {
+			return true
+		}
+	}
+
+	for _, device := range spec.Devices {
+		if len(device.Includes) > 0 {
+			return true
+		}
+		for _, deviceCounterConsumption := range device.ConsumesCounters {
+			if len(deviceCounterConsumption.Includes) > 0 {
+				return true
+			}
 		}
 	}
 	return false

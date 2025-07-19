@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package stable
+package experimental
 
 import (
 	"context"
@@ -58,9 +58,9 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 			continue
 		}
 
-		// The ResourceSlice Mixins feature is not yet available on the stable variant of the
-		// allocator, so we should not consider slices that has counter sets that uses mixins.
-		if sliceUsesCounterSetMixins(slice) {
+		// Don't include the slice if it has shared counters that uses mixins. This might unnecessarily
+		// exclude devices that don't reference counter sets that use mixins.
+		if !features.ResourceSliceMixins && sliceUsesCounterSetMixins(slice) {
 			continue
 		}
 
