@@ -74,11 +74,6 @@ var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tes
 // Validate_TaskList validates an instance of TaskList according
 // to declarative validation rules in the API schema.
 func Validate_TaskList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj TaskList) (errs field.ErrorList) {
-	// type TaskList
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_zerorooneof_typedef_TaskList_, func(list TaskList) bool {
 		for i := range list {
 			if list[i].Name == "failed" {

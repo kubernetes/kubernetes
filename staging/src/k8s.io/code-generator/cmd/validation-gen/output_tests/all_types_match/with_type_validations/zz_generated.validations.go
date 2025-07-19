@@ -59,11 +59,6 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_E1 validates an instance of E1 according
 // to declarative validation rules in the API schema.
 func Validate_E1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *E1) (errs field.ErrorList) {
-	// type E1
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type E1")...)
 
 	return errs
@@ -72,11 +67,6 @@ func Validate_E1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 // Validate_T1 validates an instance of T1 according
 // to declarative validation rules in the API schema.
 func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
-	// type T1
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T1")...)
 
 	// field T1.S

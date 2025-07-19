@@ -131,11 +131,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 // Validate_ValidatedStringType validates an instance of ValidatedStringType according
 // to declarative validation rules in the API schema.
 func Validate_ValidatedStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ValidatedStringType) (errs field.ErrorList) {
-	// type ValidatedStringType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, "disallowed-on-type")...)
 
 	return errs

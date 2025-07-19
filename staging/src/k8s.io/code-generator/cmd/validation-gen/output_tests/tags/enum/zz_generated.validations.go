@@ -54,11 +54,6 @@ var symbolsForEnum0 = sets.New[Enum0]()
 // Validate_Enum0 validates an instance of Enum0 according
 // to declarative validation rules in the API schema.
 func Validate_Enum0(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Enum0) (errs field.ErrorList) {
-	// type Enum0
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum0, nil)...)
 
 	return errs
@@ -69,11 +64,6 @@ var symbolsForEnum1 = sets.New(E1V1)
 // Validate_Enum1 validates an instance of Enum1 according
 // to declarative validation rules in the API schema.
 func Validate_Enum1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Enum1) (errs field.ErrorList) {
-	// type Enum1
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum1, nil)...)
 
 	return errs
@@ -84,11 +74,6 @@ var symbolsForEnum2 = sets.New(E2V1, E2V2)
 // Validate_Enum2 validates an instance of Enum2 according
 // to declarative validation rules in the API schema.
 func Validate_Enum2(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Enum2) (errs field.ErrorList) {
-	// type Enum2
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEnum2, nil)...)
 
 	return errs

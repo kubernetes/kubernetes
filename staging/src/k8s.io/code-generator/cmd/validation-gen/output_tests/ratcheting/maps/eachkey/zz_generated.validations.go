@@ -120,11 +120,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 // Validate_ValidatedMapType validates an instance of ValidatedMapType according
 // to declarative validation rules in the API schema.
 func Validate_ValidatedMapType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ValidatedMapType) (errs field.ErrorList) {
-	// type ValidatedMapType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-		return nil
-	}
 	errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type ValidatedMapType(keys)")
 	})...)
@@ -135,11 +130,6 @@ func Validate_ValidatedMapType(ctx context.Context, op operation.Operation, fldP
 // Validate_ValidatedStringType validates an instance of ValidatedStringType according
 // to declarative validation rules in the API schema.
 func Validate_ValidatedStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ValidatedStringType) (errs field.ErrorList) {
-	// type ValidatedStringType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "ValidatedStringType")...)
 
 	return errs

@@ -52,11 +52,6 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 // Validate_ImmutableType validates an instance of ImmutableType according
 // to declarative validation rules in the API schema.
 func Validate_ImmutableType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ImmutableType) (errs field.ErrorList) {
-	// type ImmutableType
-	// don't revalidate unchanged data
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil
-	}
 	errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj)...)
 
 	return errs
