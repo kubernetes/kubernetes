@@ -116,6 +116,9 @@ type Manager interface {
 	// PushPendingResize queues a pod with a pending resize request for later reevaluation.
 	PushPendingResize(uid types.UID)
 
+	// HasPendingResizes returns whether there are currently any pending resizes.
+	HasPendingResizes() bool
+
 	// RetryPendingResizes retries all pending resizes.
 	RetryPendingResizes(trigger string)
 
@@ -449,6 +452,13 @@ func (m *manager) isResizeIncreasingRequests(pod *v1.Pod) bool {
 		newRequest.Cpu().Cmp(*oldRequest.Cpu()) > 0
 }
 
+func (m *manager) HasPendingResizes() bool {
+	m.allocationMutex.Lock()
+	defer m.allocationMutex.Unlock()
+
+	return len(m.podsWithPendingResizes) > 0
+}
+
 // GetContainerResourceAllocation returns the last checkpointed AllocatedResources values
 // If checkpoint manager has not been initialized, it returns nil, false
 func (m *manager) GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
@@ -737,18 +747,6 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 		return false, v1.PodReasonInfeasible, msg
 	}
 
-	for i := range allocatedPods {
-		for j, c := range allocatedPods[i].Status.ContainerStatuses {
-			actuatedResources, exists := m.GetActuatedResources(allocatedPods[i].UID, c.Name)
-			if exists {
-				// Overwrite the actual resources in the status with the actuated resources.
-				// This lets us reuse the existing scheduler libraries without having to wait
-				// for the actual resources in the status to be updated.
-				allocatedPods[i].Status.ContainerStatuses[j].Resources = &actuatedResources
-			}
-		}
-	}
-
 	if ok, failReason, failMessage := m.canAdmitPod(allocatedPods, pod); !ok {
 		// Log reason and return.
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
@@ -770,8 +768,6 @@ func (m *manager) CheckPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kube
 		if m.recorder != nil {
 			m.recorder.Eventf(allocatedPod, v1.EventTypeNormal, events.ResizeCompleted, podResizeCompletedEventMsg)
 		}
-		// TODO(natasha41575): We only need to make this call if any of the resources were decreased.
-		m.RetryPendingResizes(TriggerReasonPodResized)
 	}
 }
 
