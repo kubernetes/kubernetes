@@ -8715,6 +8715,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.VolumeMountStatus
   map:
     fields:
+    - name: imageRef
+      type:
+        scalar: string
     - name: mountPath
       type:
         scalar: string

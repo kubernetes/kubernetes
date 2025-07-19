@@ -32,7 +32,7 @@ import (
 // secrets if necessary.
 func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecontainer.ImageSpec, credentials []crededentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *crededentialprovider.TrackedAuthConfig, error) {
 	img := image.Image
-	imgSpec := toRuntimeAPIImageSpec(image)
+	imgSpec := ToRuntimeAPIImageSpec(image)
 
 	if len(credentials) == 0 {
 		klog.V(3).InfoS("Pulling image without credentials", "image", img)
@@ -72,7 +72,7 @@ func (m *kubeGenericRuntimeManager) PullImage(ctx context.Context, image kubecon
 // GetImageRef gets the ID of the image which has already been in
 // the local storage. It returns ("", nil) if the image isn't in the local storage.
 func (m *kubeGenericRuntimeManager) GetImageRef(ctx context.Context, image kubecontainer.ImageSpec) (string, error) {
-	resp, err := m.imageService.ImageStatus(ctx, toRuntimeAPIImageSpec(image), false)
+	resp, err := m.imageService.ImageStatus(ctx, ToRuntimeAPIImageSpec(image), false)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get image status", "image", image.Image)
 		return "", err
@@ -84,7 +84,7 @@ func (m *kubeGenericRuntimeManager) GetImageRef(ctx context.Context, image kubec
 }
 
 func (m *kubeGenericRuntimeManager) GetImageSize(ctx context.Context, image kubecontainer.ImageSpec) (uint64, error) {
-	resp, err := m.imageService.ImageStatus(ctx, toRuntimeAPIImageSpec(image), false)
+	resp, err := m.imageService.ImageStatus(ctx, ToRuntimeAPIImageSpec(image), false)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get image status", "image", image.Image)
 		return 0, err
@@ -122,7 +122,7 @@ func (m *kubeGenericRuntimeManager) ListImages(ctx context.Context) ([]kubeconta
 			Size:        int64(img.Size),
 			RepoTags:    img.RepoTags,
 			RepoDigests: img.RepoDigests,
-			Spec:        toKubeContainerImageSpec(img),
+			Spec:        ToKubeContainerImageSpec(img),
 			Pinned:      img.Pinned,
 		})
 	}
