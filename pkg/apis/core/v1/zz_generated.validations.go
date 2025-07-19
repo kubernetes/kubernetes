@@ -67,6 +67,10 @@ func Validate_ReplicationController(ctx context.Context, op operation.Operation,
 	// field corev1.ReplicationController.Spec
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *corev1.ReplicationControllerSpec) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ReplicationControllerSpec(ctx, op, fldPath, obj, oldObj)...)
 			return

@@ -91,6 +91,10 @@ func Validate_T00(ctx context.Context, op operation.Operation, fldPath *field.Pa
 	// field T00.T
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -99,6 +103,10 @@ func Validate_T00(ctx context.Context, op operation.Operation, fldPath *field.Pa
 	// field T00.PT
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *Tother) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Tother(ctx, op, fldPath, obj, oldObj)...)
 			return

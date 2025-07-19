@@ -130,6 +130,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.ValidatedSliceField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj ValidatedStringSlice) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ValidatedStringSlice(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -138,6 +142,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.ValidatedStructField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *ValidatedInnerStruct) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ValidatedInnerStruct(ctx, op, fldPath, obj, oldObj)...)
 			return

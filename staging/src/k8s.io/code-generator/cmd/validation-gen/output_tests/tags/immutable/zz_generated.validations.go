@@ -166,6 +166,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.ImmutableField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *ImmutableType) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ImmutableType(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -174,6 +178,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.ImmutablePtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *ImmutableType) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ImmutableType(ctx, op, fldPath, obj, oldObj)...)
 			return

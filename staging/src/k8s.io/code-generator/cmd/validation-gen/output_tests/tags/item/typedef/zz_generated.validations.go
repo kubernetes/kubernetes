@@ -103,6 +103,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.TypedefItems
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj ItemList) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ItemList(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -111,6 +115,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.NestedTypedefItems
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj ItemListAlias) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_ItemListAlias(ctx, op, fldPath, obj, oldObj)...)
 			return

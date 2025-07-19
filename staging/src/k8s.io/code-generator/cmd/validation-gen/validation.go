@@ -1065,9 +1065,9 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			if !validations.Empty() {
 				emitComments(validations.Comments, bufsw)
 				emitRatchetingCheck(c, fld.childType, bufsw)
+				fldRatchetingChecked = true
 				bufsw.Do("// call field-attached validations\n", nil)
 				emitCallsToValidators(c, validations.Functions, bufsw)
-				fldRatchetingChecked = true
 			}
 
 			// If the node is nil, this must be a type in a package we are not
@@ -1076,8 +1076,16 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				// Get to the real type.
 				switch fld.node.valueType.Kind {
 				case types.Alias, types.Struct:
-					// If this field is another type, call its validation function.
-					g.emitCallToOtherTypeFunc(c, fld.node, bufsw)
+					// If this field is another type, we may need to call its
+					// validation function. If it has no validations
+					// (transitively) then we don't need to do anything.
+					if g.hasValidations(fld.node) {
+						if !fldRatchetingChecked {
+							emitRatchetingCheck(c, fld.childType, bufsw)
+							fldRatchetingChecked = true
+						}
+						g.emitCallToOtherTypeFunc(c, fld.node, bufsw)
+					}
 				case types.Slice:
 					// If this field is a list and the value-type has
 					// validations, call its validation function.
@@ -1175,12 +1183,6 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 // variables named "obj" and "oldObj", and the field path to this value is
 // named "fldPath".
 func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typeNode, sw *generator.SnippetWriter) {
-	// If this type has no validations (transitively) then we don't need to do
-	// anything.
-	if !g.hasValidations(node) {
-		return
-	}
-
 	targs := generator.Args{
 		"funcName": c.Universe.Type(node.funcName),
 	}
