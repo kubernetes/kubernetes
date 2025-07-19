@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"k8s.io/klog/v2"
+	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -41,6 +42,7 @@ const defaultClientCallTimeout = 45 * time.Second
 // All API versions supported by this wrapper.
 // Sorted by most recent first, oldest last.
 var servicesSupportedByKubelet = []string{
+	drapbv1.DRAPluginService,
 	drapbv1beta1.DRAPluginService,
 }
 
@@ -51,7 +53,7 @@ type DRAPlugin struct {
 	driverName        string
 	conn              *grpc.ClientConn
 	endpoint          string
-	chosenService     string // e.g. drapbv1beta1.DRAPluginService
+	chosenService     string // e.g. drapbv1.DRAPluginService
 	clientCallTimeout time.Duration
 }
 
@@ -61,9 +63,9 @@ func (p *DRAPlugin) DriverName() string {
 
 func (p *DRAPlugin) NodePrepareResources(
 	ctx context.Context,
-	req *drapbv1beta1.NodePrepareResourcesRequest,
+	req *drapbv1.NodePrepareResourcesRequest,
 	opts ...grpc.CallOption,
-) (*drapbv1beta1.NodePrepareResourcesResponse, error) {
+) (*drapbv1.NodePrepareResourcesResponse, error) {
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
 	ctx = klog.NewContext(ctx, logger)
@@ -73,11 +75,14 @@ func (p *DRAPlugin) NodePrepareResources(
 	defer cancel()
 
 	var err error
-	var response *drapbv1beta1.NodePrepareResourcesResponse
+	var response *drapbv1.NodePrepareResourcesResponse
 	switch p.chosenService {
 	case drapbv1beta1.DRAPluginService:
-		nodeClient := drapbv1beta1.NewDRAPluginClient(p.conn)
-		response, err = nodeClient.NodePrepareResources(ctx, req)
+		client := drapbv1beta1.NewDRAPluginClient(p.conn)
+		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodePrepareResources(ctx, req)
+	case drapbv1.DRAPluginService:
+		client := drapbv1.NewDRAPluginClient(p.conn)
+		response, err = client.NodePrepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
@@ -89,9 +94,9 @@ func (p *DRAPlugin) NodePrepareResources(
 
 func (p *DRAPlugin) NodeUnprepareResources(
 	ctx context.Context,
-	req *drapbv1beta1.NodeUnprepareResourcesRequest,
+	req *drapbv1.NodeUnprepareResourcesRequest,
 	opts ...grpc.CallOption,
-) (*drapbv1beta1.NodeUnprepareResourcesResponse, error) {
+) (*drapbv1.NodeUnprepareResourcesResponse, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Calling NodeUnprepareResource rpc", "request", req)
 	logger = klog.LoggerWithValues(logger, "driverName", p.driverName, "endpoint", p.endpoint)
@@ -101,11 +106,14 @@ func (p *DRAPlugin) NodeUnprepareResources(
 	defer cancel()
 
 	var err error
-	var response *drapbv1beta1.NodeUnprepareResourcesResponse
+	var response *drapbv1.NodeUnprepareResourcesResponse
 	switch p.chosenService {
 	case drapbv1beta1.DRAPluginService:
-		nodeClient := drapbv1beta1.NewDRAPluginClient(p.conn)
-		response, err = nodeClient.NodeUnprepareResources(ctx, req)
+		client := drapbv1beta1.NewDRAPluginClient(p.conn)
+		response, err = drapbv1beta1.V1Beta1ClientWrapper{DRAPluginClient: client}.NodeUnprepareResources(ctx, req)
+	case drapbv1.DRAPluginService:
+		client := drapbv1.NewDRAPluginClient(p.conn)
+		response, err = client.NodeUnprepareResources(ctx, req)
 	default:
 		// Shouldn't happen, validateSupportedServices should only
 		// return services we support here.
