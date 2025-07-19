@@ -321,6 +321,15 @@ type ValidationRule struct {
 	// +featureGate=CRDValidationRatcheting
 	// +optional
 	OptionalOldSelf *bool `json:"optionalOldSelf,omitempty" protobuf:"bytes,6,opt,name=optionalOldSelf"`
+
+	// optionalSelf is used to opt  a transition rule into evaluation even when the object is unset from set.
+	//
+	// You may check for presence of self using `self.hasValue()` and
+	// unwrap it after checking using `self.value()`. Check the CEL
+	// documentation for Optional types for more information:
+	// https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes
+	// +optional
+	OptionalSelf *bool `json:"optionalSelf,omitempty" protobuf:"bytes,7,opt,name=optionalSelf"`
 }
 
 // JSON represents any valid JSON value.
