@@ -81,6 +81,9 @@ type EvictionTestConfig struct {
 	EvictionGracePeriod string                    // for soft evictions
 	MetricsLogger       func(ctx context.Context) // Optional: logs metrics during test
 	PrepullImages       bool                      // Optional: prepull images before running test
+
+	// Optional: custom kubelet configuration function for special cases
+	CustomKubeletConfig func(ctx context.Context, f *framework.Framework, initialConfig *kubeletconfig.KubeletConfiguration, summary *kubeletstatsv1alpha1.Summary)
 }
 
 // testRunnerWithConfig sets up and executes a Kubelet eviction test.
@@ -100,7 +103,6 @@ func testRunnerWithConfig(f *framework.Framework, config EvictionTestConfig, spe
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			summary := eventuallyGetSummary(ctx)
 			available := config.ResourceGetter(summary)
-
 			if config.ThresholdPercentage == "" && available <= config.ResourceThreshold {
 				e2eskipper.Skipf("Too few resources free on the host for the eviction test to run")
 			}
@@ -111,22 +113,25 @@ func testRunnerWithConfig(f *framework.Framework, config EvictionTestConfig, spe
 			} else {
 				thresholdValue = fmt.Sprintf("%d", available-config.ResourceThreshold)
 			}
+
 			if config.IsHardEviction {
 				initialConfig.EvictionHard = map[string]string{config.Signal: thresholdValue}
 			} else {
 				initialConfig.EvictionSoft = map[string]string{config.Signal: thresholdValue}
-				// kubelet level grace period for soft evictions
+				// kubelet level grace period before evictions. i.e. allow system to reclaim resources naturally
 				initialConfig.EvictionSoftGracePeriod = map[string]string{config.Signal: config.EvictionGracePeriod}
+				// wait for the pod to terminate gracefully before force killing
 				initialConfig.EvictionMaxPodGracePeriod = 30
+				// Ensure that pods are not evicted because of the eviction-hard threshold
+				initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
 			}
 
-			// Add any special overrides for specific tests
+			// Standard config
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 
-			// Ensure that pods are not evicted because of the eviction-hard threshold
-			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
-			if !config.IsHardEviction {
-				initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
+			// Apply custom configuration if provided
+			if config.CustomKubeletConfig != nil {
+				config.CustomKubeletConfig(ctx, f, initialConfig, summary)
 			}
 		})
 
@@ -196,13 +201,17 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 // MemoryAllocatableEviction tests that the node responds to node memory pressure by evicting only responsible pods.
 // Node memory pressure is only encountered because we reserve the majority of the node's capacity via kube-reserved.
 var _ = SIGDescribe("MemoryAllocatableEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
-	f := framework.NewDefaultFramework("memory-allocatable-eviction-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	expectedNodeCondition := v1.NodeMemoryPressure
-	expectedStarvedResource := v1.ResourceMemory
-	pressureTimeout := 10 * time.Minute
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+	testRunnerWithConfig(framework.NewDefaultFramework("memory-allocatable-eviction-test"), EvictionTestConfig{
+		Signal:                  string(evictionapi.SignalMemoryAvailable),
+		PressureTimeout:         10 * time.Minute,
+		ExpectedNodeCondition:   v1.NodeMemoryPressure,
+		ExpectedStarvedResource: v1.ResourceMemory,
+		IsHardEviction:          true, // TODO: need to review this
+		MetricsLogger:           logMemoryMetrics,
+		ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+			return *summary.Node.Memory.AvailableBytes
+		},
+		CustomKubeletConfig: func(ctx context.Context, f *framework.Framework, initialConfig *kubeletconfig.KubeletConfiguration, summary *kubeletstatsv1alpha1.Summary) {
 			// Set large system and kube reserved values to trigger allocatable thresholds far before hard eviction thresholds.
 			kubeReserved := getNodeCPUAndMemoryCapacity(ctx, f)[v1.ResourceMemory]
 			// The default hard eviction threshold is 250Mb, so Allocatable = Capacity - Reserved - 250Mb
@@ -213,17 +222,16 @@ var _ = SIGDescribe("MemoryAllocatableEviction", framework.WithSlow(), framework
 			}
 			initialConfig.EnforceNodeAllocatable = []string{kubetypes.NodeAllocatableEnforcementKey}
 			initialConfig.CgroupsPerQOS = true
-		})
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logMemoryMetrics, []podEvictSpec{
-			{
-				evictionPriority: 1,
-				pod:              getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
-			},
-			{
-				evictionPriority: 0,
-				pod:              innocentPod(),
-			},
-		})
+		},
+	}, []podEvictSpec{
+		{
+			evictionPriority: 1,
+			pod:              getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
+		},
+		{
+			evictionPriority: 0,
+			pod:              innocentPod(),
+		},
 	})
 })
 
