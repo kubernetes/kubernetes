@@ -386,77 +386,70 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(
 // This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
 // the higher priority pod.
 var _ = SIGDescribe("PriorityMemoryEvictionOrdering", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
+	memoryConsumed := resource.MustParse("600Mi")
 	f := framework.NewDefaultFramework("priority-memory-eviction-ordering-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	expectedNodeCondition := v1.NodeMemoryPressure
-	expectedStarvedResource := v1.ResourceMemory
-	pressureTimeout := 10 * time.Minute
-
 	highPriorityClassName := f.BaseName + "-high-priority"
 	highPriority := int32(999999999)
-
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			memoryConsumed := resource.MustParse("600Mi")
-			summary := eventuallyGetSummary(ctx)
-			availableBytes := *(summary.Node.Memory.AvailableBytes)
-			if availableBytes <= uint64(memoryConsumed.Value()) {
-				e2eskipper.Skipf("Too little memory free on the host for the PriorityMemoryEvictionOrdering test to run")
-			}
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): fmt.Sprintf("%d", availableBytes-uint64(memoryConsumed.Value()))}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-		})
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				framework.ExpectNoError(err, "failed to create priority class")
-			}
-		})
-		ginkgo.AfterEach(func(ctx context.Context) {
-			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
-		})
-		specs := []podEvictSpec{
-			{
-				evictionPriority: 2,
-				pod:              getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
-			},
-			{
-				evictionPriority: 1,
-				pod:              getMemhogPod("high-priority-memory-hog-pod", "high-priority-memory-hog", v1.ResourceRequirements{}),
-				prePodCreationModificationFunc: func(ctx context.Context, pod *v1.Pod) {
-					node := getLocalNode(ctx, f)
-
-					nodeSwapInfo := node.Status.NodeInfo.Swap
-					if nodeSwapInfo == nil || nodeSwapInfo.Capacity == nil || *nodeSwapInfo.Capacity <= 0 {
-						return
-					}
-
-					// Whenever swap is provisioned on the node, the kernel might be able to reclaim much more memory,
-					// hence it is harder to get the node to be memory pressured. This will add another container that allocates
-					// the same amount as the swap capacity to help bring the node to memory pressure.
-					pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
-						Name:            pod.Spec.Containers[0].Name + "-static-allocator",
-						Image:           imageutils.GetE2EImage(imageutils.Agnhost),
-						ImagePullPolicy: "Always",
-						Args:            []string{"stress", "--mem-alloc-size", "2Mi", "--mem-alloc-sleep", "1s", "--mem-total", fmt.Sprintf("%d", *nodeSwapInfo.Capacity)},
-					})
-				},
-			},
-			{
-				evictionPriority: 0,
-				pod: getMemhogPod("guaranteed-pod", "guaranteed-pod", v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceMemory: resource.MustParse("300Mi"),
-					},
-					Limits: v1.ResourceList{
-						v1.ResourceMemory: resource.MustParse("300Mi"),
-					},
-				}),
-			},
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{
+			ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName},
+			Value:      highPriority,
+		}, metav1.CreateOptions{})
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.ExpectNoError(err, "failed to create priority class")
 		}
-		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logMemoryMetrics, specs)
+	})
+	ginkgo.AfterEach(func(ctx context.Context) {
+		err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+	})
+
+	testRunnerWithConfig(f, EvictionTestConfig{
+		Signal:                  string(evictionapi.SignalMemoryAvailable),
+		PressureTimeout:         10 * time.Minute,
+		ExpectedNodeCondition:   v1.NodeMemoryPressure,
+		ExpectedStarvedResource: v1.ResourceMemory,
+		IsHardEviction:          true,
+		ResourceThreshold:       uint64(memoryConsumed.Value()),
+		MetricsLogger:           logMemoryMetrics,
+		ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+			return *summary.Node.Memory.AvailableBytes
+		},
+	}, []podEvictSpec{
+		{
+			evictionPriority: 2,
+			pod:              getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
+		},
+		{
+			evictionPriority: 1,
+			pod:              getMemhogPod("high-priority-memory-hog-pod", "high-priority-memory-hog", v1.ResourceRequirements{}),
+			prePodCreationModificationFunc: func(ctx context.Context, pod *v1.Pod) {
+				// Set high priority class
+				pod.Spec.PriorityClassName = highPriorityClassName
+				// Handle swap scenario: if node has swap, add extra container to ensure memory pressure
+				node := getLocalNode(ctx, f)
+				nodeSwapInfo := node.Status.NodeInfo.Swap
+				if nodeSwapInfo == nil || nodeSwapInfo.Capacity == nil || *nodeSwapInfo.Capacity <= 0 {
+					return
+				}
+				// Whenever swap is provisioned on the node, the kernel might be able to reclaim much more memory,
+				// hence it is harder to get the node to be memory pressured. This will add another container that allocates
+				// the same amount as the swap capacity to help bring the node to memory pressure.
+				pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+					Name:            pod.Spec.Containers[0].Name + "-static-allocator",
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
+					ImagePullPolicy: "Always",
+					Args:            []string{"stress", "--mem-alloc-size", "2Mi", "--mem-alloc-sleep", "1s", "--mem-total", fmt.Sprintf("%d", *nodeSwapInfo.Capacity)},
+				})
+			},
+		},
+		{
+			evictionPriority: 0,
+			pod: getMemhogPod("guaranteed-pod", "guaranteed-pod", v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
+				Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("300Mi")},
+			}),
+		},
 	})
 })
 
@@ -464,64 +457,60 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering", framework.WithSlow(), fram
 // This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
 // the higher priority pod.
 var _ = SIGDescribe("PriorityLocalStorageEvictionOrdering", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
+	diskConsumed := resource.MustParse("4Gi")
 	f := framework.NewDefaultFramework("priority-disk-eviction-ordering-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	expectedNodeCondition := v1.NodeDiskPressure
-	expectedStarvedResource := v1.ResourceEphemeralStorage
-	pressureTimeout := 15 * time.Minute
-
 	highPriorityClassName := f.BaseName + "-high-priority"
 	highPriority := int32(999999999)
 
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("4Gi")
-			summary := eventuallyGetSummary(ctx)
-			availableBytes := *(summary.Node.Fs.AvailableBytes)
-			if availableBytes <= uint64(diskConsumed.Value()) {
-				e2eskipper.Skipf("Too little disk free on the host for the PriorityLocalStorageEvictionOrdering test to run")
-			}
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-		})
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
-			if err != nil && !apierrors.IsAlreadyExists(err) {
-				framework.ExpectNoError(err, "failed to create priority class")
-			}
-		})
-		ginkgo.AfterEach(func(ctx context.Context) {
-			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
-		})
-		specs := []podEvictSpec{
-			{
-				evictionPriority: 2,
-				// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
-				// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
-				pod: diskConsumingPod("best-effort-disk", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
-			},
-			{
-				evictionPriority: 1,
-				// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
-				// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
-				pod: diskConsumingPod("high-priority-disk", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
-			},
-			{
-				evictionPriority: 0,
-				// Only require 99% accuracy (297/300 Mb) because on some OS distributions, the file itself (excluding contents), consumes disk space.
-				pod: diskConsumingPod("guaranteed-disk", 297 /* Mb */, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceEphemeralStorage: resource.MustParse("300Mi"),
-					},
-					Limits: v1.ResourceList{
-						v1.ResourceEphemeralStorage: resource.MustParse("300Mi"),
-					},
-				}),
-			},
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{
+			ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName},
+			Value:      highPriority,
+		}, metav1.CreateOptions{})
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.ExpectNoError(err, "failed to create priority class")
 		}
-		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, specs)
+	})
+	ginkgo.AfterEach(func(ctx context.Context) {
+		err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+	})
+
+	testRunnerWithConfig(f, EvictionTestConfig{
+		Signal:                  string(evictionapi.SignalNodeFsAvailable),
+		PressureTimeout:         15 * time.Minute,
+		ExpectedNodeCondition:   v1.NodeDiskPressure,
+		ExpectedStarvedResource: v1.ResourceEphemeralStorage,
+		IsHardEviction:          true,
+		ResourceThreshold:       uint64(diskConsumed.Value()),
+		MetricsLogger:           logDiskMetrics,
+		ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+			return *summary.Node.Fs.AvailableBytes
+		},
+	}, []podEvictSpec{
+		{
+			evictionPriority: 2,
+			// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
+			// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
+			pod: diskConsumingPod("best-effort-disk", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
+		},
+		{
+			evictionPriority: 1,
+			// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
+			// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
+			pod: diskConsumingPod("high-priority-disk", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
+			prePodCreationModificationFunc: func(ctx context.Context, pod *v1.Pod) {
+				pod.Spec.PriorityClassName = highPriorityClassName
+			},
+		},
+		{
+			evictionPriority: 0,
+			// Only require 99% accuracy (297/300 Mb) because on some OS distributions, the file itself (excluding contents), consumes disk space.
+			pod: diskConsumingPod("guaranteed-disk", 297 /* Mb */, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("300Mi")},
+				Limits:   v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("300Mi")},
+			}),
+		},
 	})
 })
 
