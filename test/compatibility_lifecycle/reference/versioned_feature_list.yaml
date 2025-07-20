@@ -173,6 +173,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: CancelPullImage
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: CBORServingAndStorage
   versionedSpecs:
   - default: false
