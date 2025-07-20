@@ -916,8 +916,31 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			mockScheduleResult: emptyScheduleResult,
 			eventReason:        "FailedScheduling",
 		},
+		{
+			name: "pod with existing nominated node name on scheduling error",
+			sendPod: func() *v1.Pod {
+				p := podWithID("foo", "")
+				p.Status.NominatedNodeName = "existing-node"
+				return p
+			}(),
+			injectSchedulingError: schedulingErr,
+			mockScheduleResult:    scheduleResultOk,
+			expectError:           schedulingErr,
+			expectErrorPod: func() *v1.Pod {
+				p := podWithID("foo", "")
+				p.Status.NominatedNodeName = "existing-node"
+				return p
+			}(),
+			expectPodInBackoffQ: func() *v1.Pod {
+				p := podWithID("foo", "")
+				p.Status.NominatedNodeName = "existing-node"
+				return p
+			}(),
+			eventReason: "FailedScheduling",
+		},
 	}
 
+	// Test with QueueingHints and NominatedNodeNameForExpectation feature gates
 	for _, qHintEnabled := range []bool{true, false} {
 		for _, item := range table {
 			asyncAPICallsEnabled := []bool{true, false}
@@ -930,8 +953,8 @@ func TestSchedulerScheduleOne(t *testing.T) {
 					nominatedNodeNameForExpectationEnabled = []bool{*item.nominatedNodeNameForExpectationEnabled}
 				}
 				for _, nominatedNodeNameForExpectationEnabled := range nominatedNodeNameForExpectationEnabled {
-					if nominatedNodeNameForExpectationEnabled && !qHintEnabled {
-						// If the QHint feature gate is disabled, NominatedNodeNameForExpectation cannot be enabled
+					if (asyncAPICallsEnabled || nominatedNodeNameForExpectationEnabled) && !qHintEnabled {
+						// If the QHint feature gate is disabled, NominatedNodeNameForExpectation and SchedulerAsyncAPICalls cannot be enabled
 						// because that means users set the emilation version to 1.33 or later.
 						continue
 					}
@@ -946,6 +969,8 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						var gotForgetPod *v1.Pod
 						var gotAssumedPod *v1.Pod
 						var gotBinding *v1.Binding
+						var gotNominatingInfo *framework.NominatingInfo
+
 						client := clientsetfake.NewClientset(item.sendPod)
 						informerFactory := informers.NewSharedInformerFactory(client, 0)
 						client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -1050,6 +1075,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *framework.NominatingInfo, start time.Time) {
 							gotPod = p.Pod
 							gotError = status.AsError()
+							gotNominatingInfo = ni
 
 							sched.handleSchedulingFailure(ctx, fwk, p, status, ni, start)
 						}
@@ -1129,6 +1155,16 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						} else {
 							if len(unschedulablePods) > 0 {
 								t.Errorf("Expected unschedulable pods to be empty, but it's not.\nGot: %v", unschedulablePods)
+							}
+						}
+						if item.expectError != nil {
+							var expectedNominatingInfo *framework.NominatingInfo
+							// Check nominatingInfo expectation based on feature gate
+							if !nominatedNodeNameForExpectationEnabled {
+								expectedNominatingInfo = &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: ""}
+							}
+							if diff := cmp.Diff(expectedNominatingInfo, gotNominatingInfo); diff != "" {
+								t.Errorf("Unexpected nominatingInfo diff (-want +got):\n%s", diff)
 							}
 						}
 						stopFunc()
@@ -2171,6 +2207,55 @@ func TestUpdatePod(t *testing.T) {
 			newNominatingInfo:        &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"},
 			expectPatchRequest:       true,
 			expectedPatchDataPattern: `{"status":{"nominatedNodeName":"node1"}}`,
+		},
+		{
+			name: "Should not update nominated node name when nominatingInfo is nil",
+			currentPodConditions: []v1.PodCondition{
+				{
+					Type:               "currentType",
+					Status:             "currentStatus",
+					LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+					LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+					Reason:             "currentReason",
+					Message:            "currentMessage",
+				},
+			},
+			newPodCondition: &v1.PodCondition{
+				Type:               "currentType",
+				Status:             "newStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 1, 1, 1, 1, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 1, 1, 1, 1, time.UTC)),
+				Reason:             "newReason",
+				Message:            "newMessage",
+			},
+			currentNominatedNodeName: "existing-node",
+			newNominatingInfo:        nil,
+			expectPatchRequest:       true,
+			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
+		},
+		{
+			name: "Should not make patch request when nominatingInfo is nil and pod condition is unchanged",
+			currentPodConditions: []v1.PodCondition{
+				{
+					Type:               "currentType",
+					Status:             "currentStatus",
+					LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+					LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+					Reason:             "currentReason",
+					Message:            "currentMessage",
+				},
+			},
+			newPodCondition: &v1.PodCondition{
+				Type:               "currentType",
+				Status:             "currentStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+				Reason:             "currentReason",
+				Message:            "currentMessage",
+			},
+			currentNominatedNodeName: "existing-node",
+			newNominatingInfo:        nil,
+			expectPatchRequest:       false,
 		},
 	}
 	for _, asyncAPICallsEnabled := range []bool{true, false} {
