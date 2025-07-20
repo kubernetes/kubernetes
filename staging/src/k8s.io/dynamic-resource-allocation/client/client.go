@@ -31,49 +31,64 @@ const (
 	numAPIs
 )
 
+func apiName(apiNumber int32) string {
+	switch apiNumber {
+	case useLatestAPI:
+		return "V1beta2"
+	case useV1beta1API:
+		return "V1beta1"
+	default:
+		return "???"
+	}
+}
+
 var (
 	ErrNotImplemented = errors.New("not implemented in k8s.io/dynamic-resource-allocation/client")
 )
 
-func New(clientSet kubernetes.Interface) cgoresource.ResourceV1beta2Interface {
-	return &client{
+func New(clientSet kubernetes.Interface) *Client {
+	return &Client{
 		clientSet: clientSet,
 	}
 }
 
-type client struct {
+type Client struct {
 	clientSet kubernetes.Interface
 	useAPI    atomic.Int32
 }
 
-var _ cgoresource.ResourceV1beta2Interface = &client{}
+var _ cgoresource.ResourceV1beta2Interface = &Client{}
 
-func (c *client) RESTClient() rest.Interface {
+func (c *Client) CurrentAPI() string {
+	return apiName(c.useAPI.Load())
+}
+
+func (c *Client) RESTClient() rest.Interface {
 	return c.clientSet.ResourceV1beta2().RESTClient()
 }
 
-func (c *client) DeviceClasses() cgoresource.DeviceClassInterface {
+func (c *Client) DeviceClasses() cgoresource.DeviceClassInterface {
 	return newConvertingClient(c,
 		c.clientSet.ResourceV1beta2().DeviceClasses(),
 		c.clientSet.ResourceV1beta1().DeviceClasses(),
 	)
 }
 
-func (c *client) ResourceClaims(namespace string) cgoresource.ResourceClaimInterface {
+func (c *Client) ResourceClaims(namespace string) cgoresource.ResourceClaimInterface {
 	return newConvertingClient(c,
 		c.clientSet.ResourceV1beta2().ResourceClaims(namespace),
 		c.clientSet.ResourceV1beta1().ResourceClaims(namespace),
 	)
 }
 
-func (c *client) ResourceClaimTemplates(namespace string) cgoresource.ResourceClaimTemplateInterface {
+func (c *Client) ResourceClaimTemplates(namespace string) cgoresource.ResourceClaimTemplateInterface {
 	return newConvertingClient(c,
 		c.clientSet.ResourceV1beta2().ResourceClaimTemplates(namespace),
 		c.clientSet.ResourceV1beta1().ResourceClaimTemplates(namespace),
 	)
 }
 
-func (c *client) ResourceSlices() cgoresource.ResourceSliceInterface {
+func (c *Client) ResourceSlices() cgoresource.ResourceSliceInterface {
 	return newConvertingClient(c,
 		c.clientSet.ResourceV1beta2().ResourceSlices(),
 		c.clientSet.ResourceV1beta1().ResourceSlices(),
