@@ -31,12 +31,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -156,12 +158,18 @@ func (sched *Scheduler) schedulingCycle(
 		}()
 		if err == ErrNoNodesAvailable {
 			status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
+			if utilfeature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
+				return ScheduleResult{}, podInfo, status
+			}
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, status
 		}
 
 		fitError, ok := err.(*framework.FitError)
 		if !ok {
 			logger.Error(err, "Error selecting node for pod", "pod", klog.KObj(pod))
+			if utilfeature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
+				return ScheduleResult{}, podInfo, fwk.AsStatus(err)
+			}
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, fwk.AsStatus(err)
 		}
 
@@ -205,6 +213,9 @@ func (sched *Scheduler) schedulingCycle(
 		// This relies on the fact that Error will check if the pod has been bound
 		// to a node and if so will not add it back to the unscheduled pods queue
 		// (otherwise this would cause an infinite loop).
+		if utilfeature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
+			return ScheduleResult{}, assumedPodInfo, fwk.AsStatus(err)
+		}
 		return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, fwk.AsStatus(err)
 	}
 
@@ -226,7 +237,13 @@ func (sched *Scheduler) schedulingCycle(
 			}
 			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, sts)
 			fitErr.Diagnosis.AddPluginStatus(sts)
+			if utilfeature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
+				return ScheduleResult{}, assumedPodInfo, fwk.NewStatus(sts.Code()).WithError(fitErr)
+			}
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, fwk.NewStatus(sts.Code()).WithError(fitErr)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
+			return ScheduleResult{}, assumedPodInfo, sts
 		}
 		return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, sts
 	}
@@ -250,9 +267,15 @@ func (sched *Scheduler) schedulingCycle(
 			}
 			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, runPermitStatus)
 			fitErr.Diagnosis.AddPluginStatus(runPermitStatus)
+			if utilfeature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
+				return ScheduleResult{}, assumedPodInfo, fwk.NewStatus(runPermitStatus.Code()).WithError(fitErr)
+			}
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, fwk.NewStatus(runPermitStatus.Code()).WithError(fitErr)
 		}
 
+		if utilfeature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
+			return ScheduleResult{}, assumedPodInfo, runPermitStatus
+		}
 		return ScheduleResult{nominatingInfo: clearNominatedNode}, assumedPodInfo, runPermitStatus
 	}
 
@@ -365,7 +388,11 @@ func (sched *Scheduler) handleBindingCycleError(
 		}
 	}
 
-	sched.FailureHandler(ctx, fwk, podInfo, status, clearNominatedNode, start)
+	if utilfeature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
+		sched.FailureHandler(ctx, fwk, podInfo, status, nil, start)
+	} else {
+		sched.FailureHandler(ctx, fwk, podInfo, status, clearNominatedNode, start)
+	}
 }
 
 func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error) {

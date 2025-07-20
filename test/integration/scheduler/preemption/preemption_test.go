@@ -1537,9 +1537,9 @@ func newAlwaysFail(_ context.Context, _ runtime.Object, _ framework.Handle) (fra
 	return &alwaysFail{}, nil
 }
 
-// TestNominatedNodeCleanUp verifies if a pod's nominatedNodeName is set and unset
+// TestNominatedNode verifies if a pod's nominatedNodeName is set and unset
 // properly in different scenarios.
-func TestNominatedNodeCleanUp(t *testing.T) {
+func TestNominatedNode(t *testing.T) {
 	tests := []struct {
 		name string
 		// Initial nodes to simulate special conditions.
@@ -1557,6 +1557,9 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		// Register dummy plugin to simulate particular scheduling failures. Optional.
 		customPlugins     *configv1.Plugins
 		outOfTreeRegistry frameworkruntime.Registry
+
+		// Enable NominatedNodeNameForExpectation feature gate
+		enableNominatedNodeNameForExpectation bool
 	}{
 		{
 			name:         "mid-priority pod preempts low-priority pod, followed by a high-priority pod with another preemption",
@@ -1622,6 +1625,26 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 			podNamesToDelete: []string{"low"},
 		},
 		{
+			name:         "node removal causes unschedulable pods to be re-enqueued with feature gate enabled",
+			nodeCapacity: map[v1.ResourceName]string{v1.ResourceCPU: "2"},
+			podsToCreate: [][]*v1.Pod{
+				{
+					st.MakePod().Name("low").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+				{
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+				},
+			},
+			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
+				testutils.WaitForPodToSchedule,
+				testutils.WaitForNominatedNodeName,
+			},
+			// Delete the fake node to simulate an ErrNoNodesAvailable error.
+			deleteFakeNode:                        true,
+			podNamesToDelete:                      []string{"low"},
+			enableNominatedNodeNameForExpectation: true,
+		},
+		{
 			name: "mid-priority pod preempts low-priority pod at the beginning, but could not find candidates after the nominated node is deleted",
 			// Create a taint node to simulate the `UnschedulableAndUnresolvable` condition in `findCandidates` during preemption.
 			initNodes: []*v1.Node{
@@ -1681,8 +1704,9 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, tt := range tests {
-			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", tt.name, asyncPreemptionEnabled), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s (Async preemption: %v, NominatedNodeNameForExpectation: %v)", tt.name, asyncPreemptionEnabled, tt.enableNominatedNodeNameForExpectation), func(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, tt.enableNominatedNodeNameForExpectation)
 
 				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 					Profiles: []configv1.KubeSchedulerProfile{{
@@ -1710,6 +1734,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					t.Fatalf("Error creating node %v: %v", nodeName, err)
 				}
 
+				// Track pods that were once nominated
+				podsOnceNominated := []string{}
 				// Create pods and run post check if necessary.
 				for i, pods := range tt.podsToCreate {
 					for _, p := range pods {
@@ -1726,6 +1752,12 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 							}
 						}
 					}
+
+					for _, p := range pods {
+						if p.Status.NominatedNodeName != "" {
+							podsOnceNominated = append(podsOnceNominated, p.Name)
+						}
+					}
 				}
 
 				// Delete the fake node if necessary.
@@ -1735,26 +1767,31 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					}
 				}
 
+				// Verify nominated node behavior based on feature gate
+				for _, podName := range podsOnceNominated {
+					pod, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, podName, metav1.GetOptions{})
+					if err != nil {
+						t.Errorf("Error getting the pod %v: %v", podName, err)
+					}
+
+					if tt.enableNominatedNodeNameForExpectation {
+						// Per KEP-5278, when feature gate is enabled, scheduler no longer clears NNN
+						if len(pod.Status.NominatedNodeName) == 0 {
+							t.Fatalf("Pod %v/%v was once nominated but lost its nominatedNodeName after node deletion (NominatedNodeNameForExpectation feature gate enabled)", pod.Namespace, pod.Name)
+						}
+					} else {
+						if len(pod.Status.NominatedNodeName) != 0 {
+							t.Fatalf("Pod %v/%v still has nominatedNodeName after node deletion, expected to be cleared (NominatedNodeNameForExpectation feature gate disabled)", pod.Namespace, pod.Name)
+						}
+					}
+				}
+
 				// Force deleting the terminating pods if necessary.
 				// This is required if we demand to delete terminating Pods physically.
 				for _, podName := range tt.podNamesToDelete {
 					if err := deletePod(cs, podName, ns); err != nil {
 						t.Fatalf("Pod %v cannot be deleted: %v", podName, err)
 					}
-				}
-
-				// Verify if .status.nominatedNodeName is cleared.
-				if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-					pod, err := cs.CoreV1().Pods(ns).Get(ctx, "medium", metav1.GetOptions{})
-					if err != nil {
-						t.Errorf("Error getting the medium pod: %v", err)
-					}
-					if len(pod.Status.NominatedNodeName) == 0 {
-						return true, nil
-					}
-					return false, err
-				}); err != nil {
-					t.Errorf(".status.nominatedNodeName of the medium pod was not cleared: %v", err)
 				}
 			})
 		}

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"reflect"
 	"regexp"
 	goruntime "runtime"
 	"sort"
@@ -682,20 +683,22 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	assignedTestPod := podWithID("foo", testNode.Name)
 
 	table := []struct {
-		name                     string
-		sendPod                  *v1.Pod
-		registerPluginFuncs      []tf.RegisterPluginFunc
-		injectBindError          error
-		injectSchedulingError    error
-		mockScheduleResult       ScheduleResult
-		expectErrorPod           *v1.Pod
-		expectForgetPod          *v1.Pod
-		expectAssumedPod         *v1.Pod
-		expectPodInBackoffQ      *v1.Pod
-		expectPodInUnschedulable *v1.Pod
-		expectError              error
-		expectBind               *v1.Binding
-		eventReason              string
+		name                                   string
+		sendPod                                *v1.Pod
+		registerPluginFuncs                    []tf.RegisterPluginFunc
+		injectBindError                        error
+		injectSchedulingError                  error
+		mockScheduleResult                     ScheduleResult
+		expectErrorPod                         *v1.Pod
+		expectForgetPod                        *v1.Pod
+		expectAssumedPod                       *v1.Pod
+		expectPodInBackoffQ                    *v1.Pod
+		expectPodInUnschedulable               *v1.Pod
+		expectError                            error
+		expectBind                             *v1.Binding
+		eventReason                            string
+		expectNominatingInfo                   *framework.NominatingInfo
+		disableNominatedNodeNameForExpectation bool
 	}{
 		{
 			name:                  "schedule pod failed",
@@ -818,21 +821,51 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			mockScheduleResult: emptyScheduleResult,
 			eventReason:        "FailedScheduling",
 		},
+		{
+			name: "pod with existing nominated node name clears NNN when feature gate is disabled",
+			sendPod: func() *v1.Pod {
+				p := podWithID("foo", "")
+				p.Status.NominatedNodeName = "existing-node"
+				return p
+			}(),
+			injectSchedulingError: schedulingErr,
+			mockScheduleResult:    scheduleResultOk,
+			expectError:           schedulingErr,
+			expectErrorPod: func() *v1.Pod {
+				p := podWithID("foo", "")
+				p.Status.NominatedNodeName = "existing-node"
+				return p
+			}(),
+			expectPodInBackoffQ: func() *v1.Pod {
+				p := podWithID("foo", "")
+				p.Status.NominatedNodeName = "existing-node"
+				return p
+			}(),
+			eventReason:                            "FailedScheduling",
+			expectNominatingInfo:                   nil,
+			disableNominatedNodeNameForExpectation: true,
+		},
 	}
 
 	for _, qHintEnabled := range []bool{true, false} {
 		for _, item := range table {
-			t.Run(fmt.Sprintf("[QueueingHint: %v] %s", qHintEnabled, item.name), func(t *testing.T) {
+			// Since disabling QHint requires emulating specific version, we cannot enable NominatedNodeNameForExpectation feature.
+			nominatedNodeNameFeatureEnabled := qHintEnabled && !item.disableNominatedNodeNameForExpectation
+			t.Run(fmt.Sprintf("[QueueingHint: %v, NominatedNodeNameForExpectation: %v] %s", qHintEnabled, nominatedNodeNameFeatureEnabled, item.name), func(t *testing.T) {
 				if !qHintEnabled {
 					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+				} else {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, nominatedNodeNameFeatureEnabled)
 				}
+
 				logger, ctx := ktesting.NewTestContext(t)
 				var gotError error
 				var gotPod *v1.Pod
 				var gotForgetPod *v1.Pod
 				var gotAssumedPod *v1.Pod
 				var gotBinding *v1.Binding
+				var gotNominatingInfo *framework.NominatingInfo
 				cache := &fakecache.Cache{
 					ForgetFunc: func(pod *v1.Pod) {
 						gotForgetPod = pod
@@ -889,6 +922,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *framework.NominatingInfo, start time.Time) {
 					gotPod = p.Pod
 					gotError = status.AsError()
+					gotNominatingInfo = ni
 
 					sched.handleSchedulingFailure(ctx, fwk, p, status, ni, start)
 				}
@@ -951,6 +985,17 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				} else {
 					if len(unschedulablePods) > 0 {
 						t.Errorf("Expected unschedulable pods to be empty, but it's not.\nGot: %v", unschedulablePods)
+					}
+				}
+				if item.expectError != nil {
+					expectedNominatingInfo := item.expectNominatingInfo
+					// Check nominatingInfo expectation based on feature gate
+					if !nominatedNodeNameFeatureEnabled && expectedNominatingInfo == nil {
+						expectedNominatingInfo = clearNominatedNode
+					}
+					if !reflect.DeepEqual(expectedNominatingInfo, gotNominatingInfo) {
+						t.Errorf("Expected nominatingInfo to be %v, but got %v (NominatedNodeNameForExpectation enabled: %v)",
+							expectedNominatingInfo, gotNominatingInfo, nominatedNodeNameFeatureEnabled)
 					}
 				}
 				stopFunc()
@@ -1905,6 +1950,55 @@ func TestUpdatePod(t *testing.T) {
 			newNominatingInfo:        &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"},
 			expectedPatchRequests:    1,
 			expectedPatchDataPattern: `{"status":{"nominatedNodeName":"node1"}}`,
+		},
+		{
+			name: "Should not update nominated node name when nominatingInfo is nil",
+			currentPodConditions: []v1.PodCondition{
+				{
+					Type:               "currentType",
+					Status:             "currentStatus",
+					LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+					LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+					Reason:             "currentReason",
+					Message:            "currentMessage",
+				},
+			},
+			newPodCondition: &v1.PodCondition{
+				Type:               "currentType",
+				Status:             "newStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 1, 1, 1, 1, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 1, 1, 1, 1, time.UTC)),
+				Reason:             "newReason",
+				Message:            "newMessage",
+			},
+			currentNominatedNodeName: "existing-node",
+			newNominatingInfo:        nil,
+			expectedPatchRequests:    1,
+			expectedPatchDataPattern: `{"status":{"\$setElementOrder/conditions":\[{"type":"currentType"}],"conditions":\[{"lastProbeTime":"2020-05-13T01:01:01Z","lastTransitionTime":".*","message":"newMessage","reason":"newReason","status":"newStatus","type":"currentType"}]}}`,
+		},
+		{
+			name: "Should not make patch request when nominatingInfo is nil and pod condition is unchanged",
+			currentPodConditions: []v1.PodCondition{
+				{
+					Type:               "currentType",
+					Status:             "currentStatus",
+					LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+					LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+					Reason:             "currentReason",
+					Message:            "currentMessage",
+				},
+			},
+			newPodCondition: &v1.PodCondition{
+				Type:               "currentType",
+				Status:             "currentStatus",
+				LastProbeTime:      metav1.NewTime(time.Date(2020, 5, 13, 0, 0, 0, 0, time.UTC)),
+				LastTransitionTime: metav1.NewTime(time.Date(2020, 5, 12, 0, 0, 0, 0, time.UTC)),
+				Reason:             "currentReason",
+				Message:            "currentMessage",
+			},
+			currentNominatedNodeName: "existing-node",
+			newNominatingInfo:        nil,
+			expectedPatchRequests:    0,
 		},
 	}
 	for _, test := range tests {
