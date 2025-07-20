@@ -111,6 +111,9 @@ type Scheduler struct {
 
 	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
 	registeredHandlers []cache.ResourceEventHandlerRegistration
+
+	// nominatedNodeNameForExpectationEnabled stores whether the NominatedNodeNameForExpectation feature gate is enabled.
+	nominatedNodeNameForExpectationEnabled bool
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
@@ -399,15 +402,16 @@ func New(ctx context.Context,
 	debugger.ListenForSignal(ctx)
 
 	sched := &Scheduler{
-		Cache:                    schedulerCache,
-		client:                   client,
-		nodeInfoSnapshot:         snapshot,
-		percentageOfNodesToScore: options.percentageOfNodesToScore,
-		Extenders:                extenders,
-		StopEverything:           stopEverything,
-		SchedulingQueue:          podQueue,
-		Profiles:                 profiles,
-		logger:                   logger,
+		Cache:                                  schedulerCache,
+		client:                                 client,
+		nodeInfoSnapshot:                       snapshot,
+		percentageOfNodesToScore:               options.percentageOfNodesToScore,
+		Extenders:                              extenders,
+		StopEverything:                         stopEverything,
+		SchedulingQueue:                        podQueue,
+		Profiles:                               profiles,
+		logger:                                 logger,
+		nominatedNodeNameForExpectationEnabled: utilfeature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
 	}
 	sched.NextPod = podQueue.Pop
 	sched.applyDefaultHandlers()
