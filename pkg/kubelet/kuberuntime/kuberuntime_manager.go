@@ -1393,8 +1393,22 @@ func (m *kubeGenericRuntimeManager) computePodLevelResourcesResizeAction(ctx con
 //  8. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, restartAllContainers bool) (result kubecontainer.PodSyncResult) {
 	logger := klog.FromContext(ctx)
+
+	// podCtx is used for operations related to the pod where cancellation is not desired,
+	// especially for long-running processes that shouldn't be interrupted by context cancellation.
+	podCtx := context.WithoutCancel(ctx)
+
+	// imagePullCtx is specifically for image pulling operations.
+	// Its cancellability depends on the CancelPullImage feature gate.
+	imagePullCtx := ctx
+
+	// If the CancelPullImage feature is not enabled, image pulls should not be cancelled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CancelPullImage) {
+		imagePullCtx = context.WithoutCancel(ctx)
+	}
+
 	// Step 1: Compute sandbox and container changes.
-	podContainerChanges := m.computePodActions(ctx, pod, podStatus, restartAllContainers)
+	podContainerChanges := m.computePodActions(podCtx, pod, podStatus, restartAllContainers)
 	logger.V(3).Info("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)
@@ -1416,7 +1430,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			logger.V(4).Info("Stopping PodSandbox for pod, because all other containers are dead", "pod", klog.KObj(pod))
 		}
 
-		killResult := m.killPodWithSyncResult(ctx, pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
+		killResult := m.killPodWithSyncResult(podCtx, pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
 			logger.Error(killResult.Error(), "killPodWithSyncResult failed")
@@ -1424,7 +1438,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 
 		if podContainerChanges.CreateSandbox {
-			m.purgeInitContainers(ctx, pod, podStatus)
+			m.purgeInitContainers(podCtx, pod, podStatus)
 		}
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
@@ -1432,7 +1446,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			logger.V(3).Info("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
 			result.AddSyncResult(killContainerResult)
-			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
+			if err := m.killContainer(podCtx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 				logger.Error(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
 				return
@@ -1469,7 +1483,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// Keep terminated init containers fairly aggressively controlled
 	// This is an optimization because container removals are typically handled
 	// by container garbage collector.
-	m.pruneInitContainersBeforeStart(ctx, pod, podStatus)
+	m.pruneInitContainersBeforeStart(podCtx, pod, podStatus)
 
 	// We pass the value of the PRIMARY podIP and list of podIPs down to
 	// generatePodSandboxConfig and generateContainerConfig, which in turn
@@ -1528,7 +1542,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 		// Prepare resources allocated by the Dynammic Resource Allocation feature for the pod
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-			if err := m.runtimeHelper.PrepareDynamicResources(ctx, pod); err != nil {
+			if err := m.runtimeHelper.PrepareDynamicResources(podCtx, pod); err != nil {
 				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 				if referr != nil {
 					logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
@@ -1540,7 +1554,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			}
 		}
 
-		podSandboxID, msg, err = m.createPodSandbox(ctx, pod, podContainerChanges.Attempt)
+		podSandboxID, msg, err = m.createPodSandbox(podCtx, pod, podContainerChanges.Attempt)
 		if err != nil {
 			// createPodSandbox can return an error from CNI, CSI,
 			// or CRI if the Pod has been deleted while the POD is
@@ -1565,7 +1579,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 		logger.V(4).Info("Created PodSandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
 
-		resp, err := m.runtimeService.PodSandboxStatus(ctx, podSandboxID, false)
+		resp, err := m.runtimeService.PodSandboxStatus(podCtx, podSandboxID, false)
 		if err != nil {
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 			if referr != nil {
@@ -1609,7 +1623,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		return
 	}
 
-	imageVolumePullResults, err := m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
+	imageVolumePullResults, err := m.getImageVolumes(imagePullCtx, pod, podSandboxConfig, pullSecrets)
 	if err != nil {
 		logger.Error(err, "Get image volumes for pod failed", "pod", klog.KObj(pod))
 		configPodSandboxResult.Fail(kubecontainer.ErrConfigPodSandbox, err.Error())

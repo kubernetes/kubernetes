@@ -359,6 +359,9 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
 		m.logIt(objRef, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", image, imagePullResult.err), klog.Warning)
+		if ctx.Err() != nil {
+			return "", "", imagePullResult.err
+		}
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
 		msg, err := evalCRIPullErr(image, imagePullResult.err)
 
