@@ -165,7 +165,7 @@ type ThresholdNotifier interface {
 	// UpdateThreshold updates the memory cgroup threshold based on the metrics provided.
 	// Calling UpdateThreshold with recent metrics allows the ThresholdNotifier to trigger at the
 	// eviction threshold more accurately
-	UpdateThreshold(logger klog.Logger, summary *statsapi.Summary) error
+	UpdateThreshold(ctx context.Context, summary *statsapi.Summary) error
 	// Description produces a relevant string describing the Memory Threshold Notifier
 	Description() string
 }

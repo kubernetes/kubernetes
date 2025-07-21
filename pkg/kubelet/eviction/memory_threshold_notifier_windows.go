@@ -20,6 +20,7 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -81,7 +82,7 @@ func (m *windowsMemoryThresholdNotifier) checkMemoryUsage(logger klog.Logger) {
 	}
 }
 
-func (m *windowsMemoryThresholdNotifier) UpdateThreshold(logger klog.Logger, summary *statsapi.Summary) error {
+func (m *windowsMemoryThresholdNotifier) UpdateThreshold(ctx context.Context, summary *statsapi.Summary) error {
 	// Windows doesn't use cgroup notifiers to trigger eviction, so this function is a no-op.
 	// Instead the go-routine set up in Start() will poll the system for memory usage and
 	// trigger eviction when the threshold is crossed.

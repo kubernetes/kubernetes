@@ -69,7 +69,8 @@ func NewMemoryThresholdNotifier(logger klog.Logger, threshold evictionapi.Thresh
 	}, nil
 }
 
-func (m *linuxMemoryThresholdNotifier) UpdateThreshold(logger klog.Logger, summary *statsapi.Summary) error {
+func (m *linuxMemoryThresholdNotifier) UpdateThreshold(ctx context.Context, summary *statsapi.Summary) error {
+	logger := klog.FromContext(ctx)
 	memoryStats := summary.Node.Memory
 	if isAllocatableEvictionThreshold(m.threshold) {
 		allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods)
@@ -103,7 +104,8 @@ func (m *linuxMemoryThresholdNotifier) UpdateThreshold(logger klog.Logger, summa
 }
 
 func (m *linuxMemoryThresholdNotifier) Start(ctx context.Context) {
-	klog.FromContext(ctx).Info("Eviction manager: created memoryThresholdNotifier", "notifier", m.Description())
+	logger := klog.FromContext(ctx)
+	logger.Info("Eviction manager: created memoryThresholdNotifier", "notifier", m.Description())
 	for range m.events {
 		m.handler(fmt.Sprintf("eviction manager: %s crossed", m.Description()))
 	}

@@ -137,7 +137,7 @@ func TestUpdateThreshold(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, tCtx := ktesting.NewTestContext(t)
 			notifierFactory := NewMockNotifierFactory(t)
 			notifier := NewMockCgroupNotifier(t)
 
@@ -145,7 +145,7 @@ func TestUpdateThreshold(t *testing.T) {
 			notifierFactory.EXPECT().NewCgroupNotifier(logger, testCgroupPath, memoryUsageAttribute, tc.expectedThreshold.Value()).Return(notifier, tc.updateThresholdErr).Times(1)
 			var events chan<- struct{} = m.events
 			notifier.EXPECT().Start(logger, events).Return().Maybe()
-			err := m.UpdateThreshold(logger, nodeSummary(tc.available, tc.workingSet, tc.usage, isAllocatableEvictionThreshold(tc.evictionThreshold)))
+			err := m.UpdateThreshold(tCtx, nodeSummary(tc.available, tc.workingSet, tc.usage, isAllocatableEvictionThreshold(tc.evictionThreshold)))
 			if err != nil && !tc.expectErr {
 				t.Errorf("Unexpected error updating threshold: %v", err)
 			} else if err == nil && tc.expectErr {
@@ -186,18 +186,18 @@ func TestUpdateThresholdWithInvalidSummary(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			m := newTestMemoryThresholdNotifier(evictionapi.Threshold{}, nil, nil)
 			if tc.allocatableEvictionThreshold {
 				m.threshold.Signal = evictionapi.SignalAllocatableMemoryAvailable
 			}
-			assert.Error(t, m.UpdateThreshold(logger, tc.summary))
+			assert.Error(t, m.UpdateThreshold(tCtx, tc.summary))
 		})
 	}
 }
 
 func TestStart(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	noResources := resource.MustParse("0")
 	threshold := evictionapi.Threshold{
 		Signal:   evictionapi.SignalMemoryAvailable,
@@ -223,12 +223,12 @@ func TestStart(t *testing.T) {
 		}
 	})
 
-	err := m.UpdateThreshold(logger, nodeSummary(noResources, noResources, noResources, isAllocatableEvictionThreshold(threshold)))
+	err := m.UpdateThreshold(tCtx, nodeSummary(noResources, noResources, noResources, isAllocatableEvictionThreshold(threshold)))
 	if err != nil {
 		t.Errorf("Unexpected error updating threshold: %v", err)
 	}
 
-	go m.Start(logger)
+	go m.Start(tCtx)
 
 	wg.Wait()
 }

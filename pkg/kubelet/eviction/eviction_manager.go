@@ -297,7 +297,7 @@ func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfo
 	if m.clock.Since(m.thresholdsLastUpdated) > notifierRefreshInterval {
 		m.thresholdsLastUpdated = m.clock.Now()
 		for _, notifier := range m.thresholdNotifiers {
-			if err := notifier.UpdateThreshold(logger, summary); err != nil {
+			if err := notifier.UpdateThreshold(ctx, summary); err != nil {
 				logger.Info("Eviction manager: failed to update notifier", "notifier", notifier.Description(), "err", err)
 			}
 		}
