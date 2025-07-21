@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,14 +34,14 @@ import (
 // monitorCallback is the function called when a device's health state changes,
 // or new devices are reported, or old devices are deleted.
 // Updated contains the most recent state of the Device.
-type monitorCallback func(resourceName string, devices []pluginapi.Device)
+type monitorCallback func(ctx context.Context, resourceName string, devices []pluginapi.Device)
 
 func newMockPluginManager() *mockPluginManager {
 	return &mockPluginManager{
 		func(string) error { return nil },
 		func(string, plugin.DevicePlugin) error { return nil },
 		func(string) {},
-		func(string, *pluginapi.ListAndWatchResponse) {},
+		func(context.Context, string, *pluginapi.ListAndWatchResponse) {},
 	}
 }
 
@@ -48,7 +49,7 @@ type mockPluginManager struct {
 	cleanupPluginDirectory     func(string) error
 	pluginConnected            func(string, plugin.DevicePlugin) error
 	pluginDisconnected         func(string)
-	pluginListAndWatchReceiver func(string, *pluginapi.ListAndWatchResponse)
+	pluginListAndWatchReceiver func(context.Context, string, *pluginapi.ListAndWatchResponse)
 }
 
 func (m *mockPluginManager) CleanupPluginDirectory(r string) error {
@@ -63,8 +64,8 @@ func (m *mockPluginManager) PluginDisconnected(r string) {
 	m.pluginDisconnected(r)
 }
 
-func (m *mockPluginManager) PluginListAndWatchReceiver(r string, lr *pluginapi.ListAndWatchResponse) {
-	m.pluginListAndWatchReceiver(r, lr)
+func (m *mockPluginManager) PluginListAndWatchReceiver(ctx context.Context, r string, lr *pluginapi.ListAndWatchResponse) {
+	m.pluginListAndWatchReceiver(ctx, r, lr)
 }
 
 func esocketName() string {
@@ -78,7 +79,7 @@ func TestNewEndpoint(t *testing.T) {
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 	}
 
-	p, e := esetup(t, devs, socket, "mock", func(n string, d []pluginapi.Device) {})
+	p, e := esetup(t, devs, socket, "mock", func(ctx context.Context, n string, d []pluginapi.Device) {})
 	defer ecleanup(t, p, e)
 }
 
@@ -99,7 +100,7 @@ func TestRun(t *testing.T) {
 
 	callbackCount := 0
 	callbackChan := make(chan int)
-	callback := func(n string, devices []pluginapi.Device) {
+	callback := func(ctx context.Context, resourceName string, devices []pluginapi.Device) {
 		// Should be called twice:
 		// one for plugin registration, one for plugin update.
 		if callbackCount > 2 {
@@ -154,7 +155,7 @@ func TestAllocate(t *testing.T) {
 	}
 	callbackCount := 0
 	callbackChan := make(chan int)
-	p, e := esetup(t, devs, socket, "mock", func(n string, d []pluginapi.Device) {
+	p, e := esetup(t, devs, socket, "mock", func(ctx context.Context, n string, d []pluginapi.Device) {
 		callbackCount++
 		callbackChan <- callbackCount
 	})
@@ -204,7 +205,7 @@ func TestGetPreferredAllocation(t *testing.T) {
 	socket := filepath.Join(os.TempDir(), esocketName())
 	callbackCount := 0
 	callbackChan := make(chan int)
-	p, e := esetup(t, []*pluginapi.Device{}, socket, "mock", func(n string, d []pluginapi.Device) {
+	p, e := esetup(t, []*pluginapi.Device{}, socket, "mock", func(ctx context.Context, n string, d []pluginapi.Device) {
 		callbackCount++
 		callbackChan <- callbackCount
 	})
@@ -237,12 +238,12 @@ func TestGetPreferredAllocation(t *testing.T) {
 func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback monitorCallback) (*plugin.Stub, *endpointImpl) {
 	m := newMockPluginManager()
 
-	m.pluginListAndWatchReceiver = func(r string, resp *pluginapi.ListAndWatchResponse) {
+	m.pluginListAndWatchReceiver = func(ctx context.Context, r string, resp *pluginapi.ListAndWatchResponse) {
 		var newDevs []pluginapi.Device
 		for _, d := range resp.Devices {
 			newDevs = append(newDevs, *d)
 		}
-		callback(resourceName, newDevs)
+		callback(ctx, resourceName, newDevs)
 	}
 
 	var dp plugin.DevicePlugin

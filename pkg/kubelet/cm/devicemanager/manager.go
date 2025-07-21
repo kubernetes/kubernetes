@@ -256,15 +256,15 @@ func (m *ManagerImpl) PluginDisconnected(resourceName string) {
 // and ensures that an upto date state (e.g. number of devices and device health)
 // is captured. Also, registered device and device to container allocation
 // information is checkpointed to the disk.
-func (m *ManagerImpl) PluginListAndWatchReceiver(resourceName string, resp *pluginapi.ListAndWatchResponse) {
+func (m *ManagerImpl) PluginListAndWatchReceiver(ctx context.Context, resourceName string, resp *pluginapi.ListAndWatchResponse) {
 	var devices []pluginapi.Device
 	for _, d := range resp.Devices {
 		devices = append(devices, *d)
 	}
-	m.genericDeviceUpdateCallback(resourceName, devices)
+	m.genericDeviceUpdateCallback(ctx, resourceName, devices)
 }
 
-func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices []pluginapi.Device) {
+func (m *ManagerImpl) genericDeviceUpdateCallback(ctx context.Context, resourceName string, devices []pluginapi.Device) {
 	healthyCount := 0
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.New[string]()
@@ -313,7 +313,7 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 		}
 	}
 
-	if err := m.writeCheckpoint(); err != nil {
+	if err := m.writeCheckpoint(ctx); err != nil {
 		klog.ErrorS(err, "Writing checkpoint encountered")
 	}
 	klog.V(2).InfoS("Processed device updates for resource", "resourceName", resourceName, "totalCount", len(devices), "healthyCount", healthyCount)
@@ -346,7 +346,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	m.containerRunningSet = initialContainerRunningSet
 
 	// Loads in allocatedDevices information from disk.
-	err := m.readCheckpoint()
+	err := m.readCheckpoint(context.TODO())
 	if err != nil {
 		klog.ErrorS(err, "Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date")
 	}
@@ -378,7 +378,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// ever change those semantics, this logic will need to be amended.
 	for _, initContainer := range pod.Spec.InitContainers {
 		if container.Name == initContainer.Name {
-			if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+			if err := m.allocateContainerResources(context.TODO(), pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
 				return err
 			}
 			if !podutil.IsRestartableInitContainer(&initContainer) {
@@ -392,7 +392,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 			return nil
 		}
 	}
-	if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+	if err := m.allocateContainerResources(context.TODO(), pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
 		return err
 	}
 	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
@@ -438,6 +438,8 @@ func (m *ManagerImpl) markResourceUnhealthy(resourceName string) {
 // capacity for already allocated pods so that they can continue to run. However, new pods
 // requiring device plugin resources will not be scheduled till device plugin re-registers.
 func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string) {
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	needsUpdateCheckpoint := false
 	var capacity = v1.ResourceList{}
 	var allocatable = v1.ResourceList{}
@@ -450,7 +452,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 			// should always be consistent. Otherwise, we run with the risk
 			// of failing to garbage collect non-existing resources or devices.
 			if !ok {
-				klog.InfoS("Unexpected: healthyDevices and endpoints are out of sync")
+				logger.Info("Unexpected: healthyDevices and endpoints are out of sync")
 			}
 			delete(m.endpoints, resourceName)
 			delete(m.healthyDevices, resourceName)
@@ -465,7 +467,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 		eI, ok := m.endpoints[resourceName]
 		if (ok && eI.e.stopGracePeriodExpired()) || !ok {
 			if !ok {
-				klog.InfoS("Unexpected: unhealthyDevices and endpoints became out of sync")
+				logger.Info("Unexpected: unhealthyDevices and endpoints became out of sync")
 			}
 			delete(m.endpoints, resourceName)
 			delete(m.unhealthyDevices, resourceName)
@@ -480,41 +482,43 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	}
 	m.mutex.Unlock()
 	if needsUpdateCheckpoint {
-		if err := m.writeCheckpoint(); err != nil {
-			klog.ErrorS(err, "Failed to write checkpoint file")
+		if err := m.writeCheckpoint(ctx); err != nil {
+			logger.Error(err, "Failed to write checkpoint file")
 		}
 	}
 	return capacity, allocatable, deletedResources.UnsortedList()
 }
 
 // Checkpoints device to container allocation information to disk.
-func (m *ManagerImpl) writeCheckpoint() error {
+func (m *ManagerImpl) writeCheckpoint(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
 	m.mutex.Lock()
 	registeredDevs := make(map[string][]string)
 	for resource, devices := range m.healthyDevices {
 		registeredDevs[resource] = devices.UnsortedList()
 	}
-	data := checkpoint.New(m.podDevices.toCheckpointData(),
+	data := checkpoint.New(m.podDevices.toCheckpointData(ctx),
 		registeredDevs)
 	m.mutex.Unlock()
 	err := m.checkpointManager.CreateCheckpoint(kubeletDeviceManagerCheckpoint, data)
 	if err != nil {
 		err2 := fmt.Errorf("failed to write checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
-		klog.ErrorS(err, "Failed to write checkpoint file")
+		logger.Error(err, "Failed to write checkpoint file")
 		return err2
 	}
-	klog.V(4).InfoS("Checkpoint file written", "checkpoint", kubeletDeviceManagerCheckpoint)
+	logger.V(4).Info("Checkpoint file written", "checkpoint", kubeletDeviceManagerCheckpoint)
 	return nil
 }
 
 // Reads device to container allocation information from disk, and populates
 // m.allocatedDevices accordingly.
-func (m *ManagerImpl) readCheckpoint() error {
+func (m *ManagerImpl) readCheckpoint(ctx context.Context) error {
+	logger := klog.FromContext(ctx)
 	cp, err := m.getCheckpoint()
 	if err != nil {
 		if err == errors.ErrCheckpointNotFound {
 			// no point in trying anything else
-			klog.ErrorS(err, "Failed to read data from checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint)
+			logger.Error(err, "Failed to read data from checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint)
 			return nil
 		}
 		return err
@@ -523,7 +527,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	podDevices, registeredDevs := cp.GetData()
-	m.podDevices.fromCheckpointData(podDevices)
+	m.podDevices.fromCheckpointData(ctx, podDevices)
 	m.allocatedDevices = m.podDevices.devices()
 	for resource := range registeredDevs {
 		// During start up, creates empty healthyDevices list so that the resource capacity
@@ -533,7 +537,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 		m.endpoints[resource] = endpointInfo{e: newStoppedEndpointImpl(resource), opts: nil}
 	}
 
-	klog.V(4).InfoS("Read data from checkpoint file", "checkpoint", kubeletDeviceManagerCheckpoint)
+	logger.V(4).Info("Read data from checkpoint file", "checkpoint", kubeletDeviceManagerCheckpoint)
 	return nil
 }
 
@@ -824,7 +828,7 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 // plugin resources for the input container, issues an Allocate rpc request
 // for each new device resource requirement, processes their AllocateResponses,
 // and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.Set[string]) error {
+func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.Set[string]) error {
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
@@ -916,7 +920,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 	}
 
 	if needsUpdateCheckpoint {
-		return m.writeCheckpoint()
+		return m.writeCheckpoint(ctx)
 	}
 
 	return nil
@@ -937,7 +941,7 @@ func (m *ManagerImpl) checkPodActive(pod *v1.Pod) bool {
 // GetDeviceRunContainerOptions checks whether we have cached containerDevices
 // for the passed-in <pod, container> and returns its DeviceRunContainerOptions
 // for the found one. An empty struct is returned in case no cached state is found.
-func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error) {
+func (m *ManagerImpl) GetDeviceRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error) {
 	podUID := string(pod.UID)
 	contName := container.Name
 	needsReAllocate := false
@@ -969,7 +973,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 			return nil, err
 		}
 	}
-	return m.podDevices.deviceRunContainerOptions(string(pod.UID), container.Name), nil
+	return m.podDevices.deviceRunContainerOptions(ctx, string(pod.UID), container.Name), nil
 }
 
 // callPreStartContainerIfNeeded issues PreStartContainer grpc call for device plugin resource
