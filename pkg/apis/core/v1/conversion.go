@@ -566,3 +566,13 @@ func Convert_Slice_string_To_Pointer_string(in *[]string, out **string, s conver
 	*out = &temp
 	return nil
 }
+
+func Convert_v1_VolumeMountStatus_To_core_VolumeMountStatus(in *v1.VolumeMountStatus, out *core.VolumeMountStatus, s conversion.Scope) error {
+	var imageRef *string
+	if in.ImageRef != nil {
+		imageRef = ptr.To(*in.ImageRef)
+	}
+
+	out.ImageRef = imageRef
+	return nil
+}

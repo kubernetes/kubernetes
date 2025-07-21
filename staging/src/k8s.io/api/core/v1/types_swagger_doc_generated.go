@@ -2705,6 +2705,7 @@ var map_VolumeMountStatus = map[string]string{
 	"mountPath":         "MountPath corresponds to the original VolumeMount.",
 	"readOnly":          "ReadOnly corresponds to the original VolumeMount.",
 	"recursiveReadOnly": "RecursiveReadOnly must be set to Disabled, Enabled, or unspecified (for non-readonly mounts). An IfPossible value in the original VolumeMount must be translated to Disabled or Enabled, depending on the mount result.",
+	"imageRef":          "ImageRef is the digest of the image used for this volume. It should have a value that's similar to the pod's status.containerStatuses[i].imageID. If the volume source is not an ImageVolume, this field will be empty.",
 }
 
 func (VolumeMountStatus) SwaggerDoc() map[string]string {

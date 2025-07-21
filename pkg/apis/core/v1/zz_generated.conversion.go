@@ -2197,11 +2197,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*corev1.VolumeMountStatus)(nil), (*core.VolumeMountStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_VolumeMountStatus_To_core_VolumeMountStatus(a.(*corev1.VolumeMountStatus), b.(*core.VolumeMountStatus), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*core.VolumeMountStatus)(nil), (*corev1.VolumeMountStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_VolumeMountStatus_To_v1_VolumeMountStatus(a.(*core.VolumeMountStatus), b.(*corev1.VolumeMountStatus), scope)
 	}); err != nil {
@@ -2424,6 +2419,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*corev1.Secret)(nil), (*core.Secret)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_Secret_To_core_Secret(a.(*corev1.Secret), b.(*core.Secret), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*corev1.VolumeMountStatus)(nil), (*core.VolumeMountStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_VolumeMountStatus_To_core_VolumeMountStatus(a.(*corev1.VolumeMountStatus), b.(*core.VolumeMountStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -3412,7 +3412,17 @@ func autoConvert_v1_ContainerStatus_To_core_ContainerStatus(in *corev1.Container
 	out.Started = (*bool)(unsafe.Pointer(in.Started))
 	out.AllocatedResources = *(*core.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
 	out.Resources = (*core.ResourceRequirements)(unsafe.Pointer(in.Resources))
-	out.VolumeMounts = *(*[]core.VolumeMountStatus)(unsafe.Pointer(&in.VolumeMounts))
+	if in.VolumeMounts != nil {
+		in, out := &in.VolumeMounts, &out.VolumeMounts
+		*out = make([]core.VolumeMountStatus, len(*in))
+		for i := range *in {
+			if err := Convert_v1_VolumeMountStatus_To_core_VolumeMountStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumeMounts = nil
+	}
 	out.User = (*core.ContainerUser)(unsafe.Pointer(in.User))
 	out.AllocatedResourcesStatus = *(*[]core.ResourceStatus)(unsafe.Pointer(&in.AllocatedResourcesStatus))
 	out.StopSignal = (*core.Signal)(unsafe.Pointer(in.StopSignal))
@@ -3440,7 +3450,17 @@ func autoConvert_core_ContainerStatus_To_v1_ContainerStatus(in *core.ContainerSt
 	out.Started = (*bool)(unsafe.Pointer(in.Started))
 	out.AllocatedResources = *(*corev1.ResourceList)(unsafe.Pointer(&in.AllocatedResources))
 	out.Resources = (*corev1.ResourceRequirements)(unsafe.Pointer(in.Resources))
-	out.VolumeMounts = *(*[]corev1.VolumeMountStatus)(unsafe.Pointer(&in.VolumeMounts))
+	if in.VolumeMounts != nil {
+		in, out := &in.VolumeMounts, &out.VolumeMounts
+		*out = make([]corev1.VolumeMountStatus, len(*in))
+		for i := range *in {
+			if err := Convert_core_VolumeMountStatus_To_v1_VolumeMountStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumeMounts = nil
+	}
 	out.User = (*corev1.ContainerUser)(unsafe.Pointer(in.User))
 	out.AllocatedResourcesStatus = *(*[]corev1.ResourceStatus)(unsafe.Pointer(&in.AllocatedResourcesStatus))
 	out.StopSignal = (*corev1.Signal)(unsafe.Pointer(in.StopSignal))
@@ -6860,10 +6880,40 @@ func autoConvert_v1_PodStatus_To_core_PodStatus(in *corev1.PodStatus, out *core.
 	// WARNING: in.PodIP requires manual conversion: does not exist in peer-type
 	out.PodIPs = *(*[]core.PodIP)(unsafe.Pointer(&in.PodIPs))
 	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
-	out.InitContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
-	out.ContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
+	if in.InitContainerStatuses != nil {
+		in, out := &in.InitContainerStatuses, &out.InitContainerStatuses
+		*out = make([]core.ContainerStatus, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ContainerStatus_To_core_ContainerStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.InitContainerStatuses = nil
+	}
+	if in.ContainerStatuses != nil {
+		in, out := &in.ContainerStatuses, &out.ContainerStatuses
+		*out = make([]core.ContainerStatus, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ContainerStatus_To_core_ContainerStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ContainerStatuses = nil
+	}
 	out.QOSClass = core.PodQOSClass(in.QOSClass)
-	out.EphemeralContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.EphemeralContainerStatuses))
+	if in.EphemeralContainerStatuses != nil {
+		in, out := &in.EphemeralContainerStatuses, &out.EphemeralContainerStatuses
+		*out = make([]core.ContainerStatus, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ContainerStatus_To_core_ContainerStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.EphemeralContainerStatuses = nil
+	}
 	out.Resize = core.PodResizeStatus(in.Resize)
 	out.ResourceClaimStatuses = *(*[]core.PodResourceClaimStatus)(unsafe.Pointer(&in.ResourceClaimStatuses))
 	return nil
@@ -6881,9 +6931,39 @@ func autoConvert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *corev1.
 	out.PodIPs = *(*[]corev1.PodIP)(unsafe.Pointer(&in.PodIPs))
 	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	out.QOSClass = corev1.PodQOSClass(in.QOSClass)
-	out.InitContainerStatuses = *(*[]corev1.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
-	out.ContainerStatuses = *(*[]corev1.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
-	out.EphemeralContainerStatuses = *(*[]corev1.ContainerStatus)(unsafe.Pointer(&in.EphemeralContainerStatuses))
+	if in.InitContainerStatuses != nil {
+		in, out := &in.InitContainerStatuses, &out.InitContainerStatuses
+		*out = make([]corev1.ContainerStatus, len(*in))
+		for i := range *in {
+			if err := Convert_core_ContainerStatus_To_v1_ContainerStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.InitContainerStatuses = nil
+	}
+	if in.ContainerStatuses != nil {
+		in, out := &in.ContainerStatuses, &out.ContainerStatuses
+		*out = make([]corev1.ContainerStatus, len(*in))
+		for i := range *in {
+			if err := Convert_core_ContainerStatus_To_v1_ContainerStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.ContainerStatuses = nil
+	}
+	if in.EphemeralContainerStatuses != nil {
+		in, out := &in.EphemeralContainerStatuses, &out.EphemeralContainerStatuses
+		*out = make([]corev1.ContainerStatus, len(*in))
+		for i := range *in {
+			if err := Convert_core_ContainerStatus_To_v1_ContainerStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.EphemeralContainerStatuses = nil
+	}
 	out.Resize = corev1.PodResizeStatus(in.Resize)
 	out.ResourceClaimStatuses = *(*[]corev1.PodResourceClaimStatus)(unsafe.Pointer(&in.ResourceClaimStatuses))
 	return nil
@@ -8862,12 +8942,8 @@ func autoConvert_v1_VolumeMountStatus_To_core_VolumeMountStatus(in *corev1.Volum
 	out.MountPath = in.MountPath
 	out.ReadOnly = in.ReadOnly
 	out.RecursiveReadOnly = (*core.RecursiveReadOnlyMode)(unsafe.Pointer(in.RecursiveReadOnly))
+	out.ImageRef = (*string)(unsafe.Pointer(in.ImageRef))
 	return nil
-}
-
-// Convert_v1_VolumeMountStatus_To_core_VolumeMountStatus is an autogenerated conversion function.
-func Convert_v1_VolumeMountStatus_To_core_VolumeMountStatus(in *corev1.VolumeMountStatus, out *core.VolumeMountStatus, s conversion.Scope) error {
-	return autoConvert_v1_VolumeMountStatus_To_core_VolumeMountStatus(in, out, s)
 }
 
 func autoConvert_core_VolumeMountStatus_To_v1_VolumeMountStatus(in *core.VolumeMountStatus, out *corev1.VolumeMountStatus, s conversion.Scope) error {
@@ -8875,6 +8951,7 @@ func autoConvert_core_VolumeMountStatus_To_v1_VolumeMountStatus(in *core.VolumeM
 	out.MountPath = in.MountPath
 	out.ReadOnly = in.ReadOnly
 	out.RecursiveReadOnly = (*corev1.RecursiveReadOnlyMode)(unsafe.Pointer(in.RecursiveReadOnly))
+	out.ImageRef = (*string)(unsafe.Pointer(in.ImageRef))
 	return nil
 }
 

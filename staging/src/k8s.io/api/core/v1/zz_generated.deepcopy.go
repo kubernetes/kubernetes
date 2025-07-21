@@ -6350,6 +6350,11 @@ func (in *VolumeMountStatus) DeepCopyInto(out *VolumeMountStatus) {
 		*out = new(RecursiveReadOnlyMode)
 		**out = **in
 	}
+	if in.ImageRef != nil {
+		in, out := &in.ImageRef, &out.ImageRef
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
