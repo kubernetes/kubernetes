@@ -164,7 +164,7 @@ func (v *VersionFile) Write(vp *EtcdVersionPair) error {
 	// We do write only if file content differs from given EtcdVersionPair.
 	isUpToDate, err := v.equals(vp)
 	if err != nil {
-		return fmt.Errorf("failed to check if version file %s should be changed: %v", v.path, err)
+		return fmt.Errorf("failed to check if version file %s should be changed: %w", v.path, err)
 	}
 	if isUpToDate {
 		return nil
