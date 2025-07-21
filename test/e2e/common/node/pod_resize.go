@@ -1043,9 +1043,6 @@ func doPodResizeTests(f *framework.Framework) {
 					MemPolicy: &noRestart,
 				},
 			},
-			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c2", "resources":{"requests":{"memory":"%s"}}}
-					]}}`, increasedMem),
 			expected: []podresize.ResizableContainerInfo{
 				{
 					Name: "c1",
@@ -1318,7 +1315,7 @@ func doPodResizeMemoryLimitDecreaseTest(f *framework.Framework) {
 
 		tStamp := strconv.Itoa(time.Now().Nanosecond())
 		testPod = podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, original)
-		testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+		cgroups.ConfigureHostPathForPodCgroup(testPod)
 
 		ginkgo.By("creating pod")
 		testPod = podClient.CreateSync(ctx, testPod)
