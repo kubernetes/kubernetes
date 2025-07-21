@@ -297,10 +297,10 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			ginkgo.By("wait for the mirror pod to be running")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				return checkMirrorPodRunning(ctx, f.ClientSet, mirrorPodName, ns)
-			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
 		})
 
-		f.It("mirror pod: update activeDeadlineSeconds", func(ctx context.Context) {
+		f.It("mirror pod: update activeDeadlineSeconds", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -312,7 +312,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				return checkMirrorPodRecreated(ctx, f.ClientSet, mirrorPodName, ns, uid)
-			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
 
 			ginkgo.By("check mirror pod generation remains at 1")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
@@ -323,19 +323,19 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
 		})
 
-		f.It("mirror pod: update container image", func(ctx context.Context) {
+		f.It("mirror pod: update container image", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			uid := pod.UID
 
 			ginkgo.By("updating container image")
-			createStaticPod(podPath, staticPodName, ns, imageutils.GetPauseImageName(), v1.RestartPolicyAlways)
+			framework.ExpectNoError(createStaticPod(podPath, staticPodName, ns, imageutils.GetPauseImageName(), v1.RestartPolicyAlways))
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				return checkMirrorPodRecreated(ctx, f.ClientSet, mirrorPodName, ns, uid)
-			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
 
 			ginkgo.By("check mirror pod generation remains at 1")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
@@ -346,19 +346,19 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			gomega.Expect(pod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(int64(0)))
 		})
 
-		f.It("mirror pod: update initContainer image", func(ctx context.Context) {
+		f.It("mirror pod: update initContainer image", f.WithNodeConformance(), func(ctx context.Context) {
 			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			uid := pod.UID
 
 			ginkgo.By("updating initContainer image")
-			createStaticPodWithInitContainer(podPath, staticPodName, ns, imageutils.GetPauseImageName(), imageutils.GetPauseImageName(), v1.RestartPolicyAlways)
+			framework.ExpectNoError(createStaticPodWithInitContainer(podPath, staticPodName, ns, imageutils.GetPauseImageName(), imageutils.GetPauseImageName(), v1.RestartPolicyAlways))
 
 			ginkgo.By("wait for the mirror pod to be updated")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				return checkMirrorPodRecreated(ctx, f.ClientSet, mirrorPodName, ns, uid)
-			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
 
 			ginkgo.By("check mirror pod generation remains at 1")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
@@ -377,7 +377,7 @@ var _ = SIGDescribe("MirrorPod (Pod Generation)", func() {
 			ginkgo.By("wait for the mirror pod to disappear")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				return checkMirrorPodDisappear(ctx, f.ClientSet, mirrorPodName, ns)
-			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+			}, 2*time.Minute, time.Second*4).Should(gomega.Succeed())
 		})
 	})
 })
