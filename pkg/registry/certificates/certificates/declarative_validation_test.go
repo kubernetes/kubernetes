@@ -18,8 +18,14 @@ package certificates
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -27,10 +33,12 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
-var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
+var apiVersions = []string{"v1", "v1beta1"}
 
 type validationStrategy interface {
 	Validate(ctx context.Context, obj runtime.Object) field.ErrorList
@@ -52,7 +60,36 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 		input        api.CertificateSigningRequest
 		expectedErrs field.ErrorList
 	}{
-		// TODO: Add test cases
+		"no conditions - valid": {
+			input: makeValidCSR(),
+		},
+		"approved condition - valid": {
+			input: makeValidCSR(withApprovedCondition()),
+		},
+		"denied condition - valid": {
+			input: makeValidCSR(withDeniedCondition()),
+		},
+		"failed condition - valid": {
+			input: makeValidCSR(withFailedCondition()),
+		},
+		"approved+failed conditions - valid": {
+			input: makeValidCSR(withApprovedCondition(), withFailedCondition()),
+		},
+		"denied+failed conditions - valid": {
+			input: makeValidCSR(withDeniedCondition(), withFailedCondition()),
+		},
+		"approved+denied conditions - invalid": {
+			input: makeValidCSR(withApprovedCondition(), withDeniedCondition()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf"),
+			},
+		},
+		"denied+approved conditions - invalid": {
+			input: makeValidCSR(withDeniedCondition(), withApprovedCondition()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -102,8 +139,77 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 		expectedErrs field.ErrorList
 		subresources []string
 	}{
-		// TODO: Add test cases
+		"no change in conditions - valid": {
+			old:          makeValidCSR(withApprovedCondition()),
+			update:       makeValidCSR(withApprovedCondition()),
+			subresources: []string{"/", "/approval", "/status"},
+		},
+		"ratcheting: approved+denied conditions unchanged - valid": {
+			old:          makeValidCSR(withApprovedCondition(), withDeniedCondition()),
+			update:       makeValidCSR(withApprovedCondition(), withDeniedCondition()),
+			subresources: []string{"/", "/approval", "/status"},
+		},
+		"ratcheting: approved+denied conditions, change spec - valid": {
+			old: makeValidCSR(
+				withApprovedCondition(),
+				withDeniedCondition(),
+				func(csr *api.CertificateSigningRequest) {
+					csr.Spec.ExpirationSeconds = ptr.To(int32(3600))
+				},
+			),
+			update: makeValidCSR(
+				withApprovedCondition(),
+				withDeniedCondition(),
+				func(csr *api.CertificateSigningRequest) {
+					csr.Spec.ExpirationSeconds = ptr.To(int32(7200))
+				},
+			),
+			subresources: []string{"/", "/approval", "/status"},
+		},
+		"ratcheting: approved+denied conditions, add failed condition - valid": {
+			old:          makeValidCSR(withApprovedCondition(), withDeniedCondition()),
+			update:       makeValidCSR(withApprovedCondition(), withDeniedCondition(), withFailedCondition()),
+			subresources: []string{"/", "/approval", "/status"},
+		},
+		"ratcheting: approved+denied conditions, swapped order - valid": {
+			old:          makeValidCSR(withApprovedCondition(), withDeniedCondition()),
+			update:       makeValidCSR(withDeniedCondition(), withApprovedCondition()),
+			subresources: []string{"/", "/approval", "/status"},
+		},
+		"add approved condition - valid": {
+			old:          makeValidCSR(),
+			update:       makeValidCSR(withApprovedCondition()),
+			subresources: []string{"/approval"}, // Can only add Approved and Denied conditions on /approval subresource
+		},
+		"add approved+denied conditions - invalid": {
+			old:    makeValidCSR(),
+			update: makeValidCSR(withApprovedCondition(), withDeniedCondition()),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("status", "conditions"), nil, "").WithOrigin("zeroOrOneOf"),
+			},
+			subresources: []string{"/approval"}, // Can only add Approved and Denied conditions on /approval subresource
+		},
+		"ratcheting: approved+denied conditions, modify condition reason - valid": {
+			old: makeValidCSR(
+				func(csr *api.CertificateSigningRequest) {
+					csr.Status.Conditions = []api.CertificateSigningRequestCondition{
+						{Type: api.CertificateApproved, Status: core.ConditionTrue, Reason: "OldReason"},
+						{Type: api.CertificateDenied, Status: core.ConditionTrue, Reason: "OldReason"},
+					}
+				},
+			),
+			update: makeValidCSR(
+				func(csr *api.CertificateSigningRequest) {
+					csr.Status.Conditions = []api.CertificateSigningRequestCondition{
+						{Type: api.CertificateApproved, Status: core.ConditionTrue, Reason: "NewReason"},
+						{Type: api.CertificateDenied, Status: core.ConditionTrue, Reason: "NewReason"},
+					}
+				},
+			),
+			subresources: []string{"/approval"}, // Can only modify Approved and Denied conditions on /approval subresource
+		},
 	}
+
 	for k, tc := range testCases {
 		for _, subresource := range tc.subresources {
 			t.Run(k+" subresource="+subresource, func(t *testing.T) {
@@ -179,4 +285,78 @@ func createContextForSubresource(apiVersion, subresource string) context.Context
 	}
 
 	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), requestInfo)
+}
+
+func makeValidCSR(mutators ...func(*api.CertificateSigningRequest)) api.CertificateSigningRequest {
+	csr := api.CertificateSigningRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-csr",
+		},
+		Spec: api.CertificateSigningRequestSpec{
+			Request:    newCSRPEM(&testing.T{}),
+			SignerName: "example.com/signer",
+			Usages:     []api.KeyUsage{api.UsageDigitalSignature, api.UsageKeyEncipherment},
+		},
+	}
+	for _, mutate := range mutators {
+		mutate(&csr)
+	}
+	return csr
+}
+
+func newCSRPEM(t *testing.T) []byte {
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			Organization: []string{"testing-org"},
+		},
+	}
+
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	csrPemBlock := &pem.Block{
+		Type:  "CERTIFICATE REQUEST",
+		Bytes: csrDER,
+	}
+
+	p := pem.EncodeToMemory(csrPemBlock)
+	if p == nil {
+		t.Fatal("invalid pem block")
+	}
+
+	return p
+}
+
+func withApprovedCondition() func(*api.CertificateSigningRequest) {
+	return func(csr *api.CertificateSigningRequest) {
+		csr.Status.Conditions = append(csr.Status.Conditions, api.CertificateSigningRequestCondition{
+			Type:   api.CertificateApproved,
+			Status: core.ConditionTrue,
+		})
+	}
+}
+
+func withDeniedCondition() func(*api.CertificateSigningRequest) {
+	return func(csr *api.CertificateSigningRequest) {
+		csr.Status.Conditions = append(csr.Status.Conditions, api.CertificateSigningRequestCondition{
+			Type:   api.CertificateDenied,
+			Status: core.ConditionTrue,
+		})
+	}
+}
+
+func withFailedCondition() func(*api.CertificateSigningRequest) {
+	return func(csr *api.CertificateSigningRequest) {
+		csr.Status.Conditions = append(csr.Status.Conditions, api.CertificateSigningRequestCondition{
+			Type:   api.CertificateFailed,
+			Status: core.ConditionTrue,
+		})
+	}
 }

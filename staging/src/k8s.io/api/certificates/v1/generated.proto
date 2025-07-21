@@ -39,6 +39,8 @@ option go_package = "k8s.io/api/certificates/v1";
 // This API can be used to request client certificates to authenticate to kube-apiserver
 // (with the "kubernetes.io/kube-apiserver-client" signerName),
 // or to obtain certificates from custom non-Kubernetes signers.
+// +k8s:supportsSubresource=/status
+// +k8s:supportsSubresource=/approval
 message CertificateSigningRequest {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
@@ -203,6 +205,11 @@ message CertificateSigningRequestStatus {
   // +listType=map
   // +listMapKey=type
   // +optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=type
+  // +k8s:optional
+  // +k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
+  // +k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
   repeated CertificateSigningRequestCondition conditions = 1;
 
   // certificate is populated with an issued certificate by the signer after an Approved condition is present.
