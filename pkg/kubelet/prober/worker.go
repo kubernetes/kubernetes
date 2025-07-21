@@ -19,6 +19,7 @@ package prober
 import (
 	"context"
 	"math/rand"
+	"net/http"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +31,32 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 )
+
+// httpProbeRequestHolder maintains and reuses the HTTP request object for probes
+type httpProbeRequestHolder struct {
+	request *http.Request
+	httpGet *v1.HTTPGetAction
+	podIP   string
+}
+
+// getRequest returns the cached HTTP request or creates a new one if needed
+func (h *httpProbeRequestHolder) getRequest(container *v1.Container) (*http.Request, error) {
+	if h.request == nil {
+		req, err := httpprobe.NewRequestForHTTPGetAction(h.httpGet, container, h.podIP, "probe")
+		if err != nil {
+			return nil, err
+		}
+		h.request = req
+	}
+	return h.request, nil
+}
+
+// reset clears the cached HTTP request
+func (h *httpProbeRequestHolder) reset() {
+	h.request = nil
+}
 
 // worker handles the periodic probing of its assigned container. Each worker has a go-routine
 // associated with it which runs the probe loop until the container permanently terminates, or the
