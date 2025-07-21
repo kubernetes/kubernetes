@@ -117,7 +117,7 @@ dependencies:
   # Golang
   # TODO: this should really be eliminated and controlled by .go-version
   - name: "golang: upstream version"
-    version: 1.25rc1
+    version: 1.25rc2
     refPaths:
     - path: .go-version
     - path: build/build-image/cross/VERSION
@@ -132,7 +132,7 @@ dependencies:
   # pass when building Kubernetes using a pre-release of Golang.
 
   - name: "golang: 1.<major>"
-    version: 1.25rc1
+    version: 1.25rc2
     refPaths:
     - path: build/build-image/cross/VERSION
     # TODO: (cpanato) uncomment when we upgrade to go1.25.0 final release not candidates
@@ -140,7 +140,7 @@ dependencies:
     #   match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.34.0-go1.25rc1-bullseye.0
+    version: v1.34.0-go1.25rc2-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -178,7 +178,7 @@ dependencies:
       match: registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "registry.k8s.io/distroless-iptables: dependents"
-    version: v0.8.0
+    version: v0.8.1
     refPaths:
     - path: build/common.sh
       match: __default_distroless_iptables_version=
@@ -186,7 +186,7 @@ dependencies:
       match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.4.0-go1.25rc1-bookworm.0
+    version: v2.4.0-go1.25rc2-bookworm.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
