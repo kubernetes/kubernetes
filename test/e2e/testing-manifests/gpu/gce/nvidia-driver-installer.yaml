@@ -142,6 +142,6 @@ spec:
         - name: nvidia-config
           mountPath: /etc/nvidia
       containers:
-      - image: "registry.k8s.io/pause:3.10"
+      - image: "registry.k8s.io/pause:3.10.1"
         name: pause
 
