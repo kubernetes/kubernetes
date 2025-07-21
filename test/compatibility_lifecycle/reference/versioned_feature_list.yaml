@@ -125,6 +125,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.27"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: APIServingWithRoutine
   versionedSpecs:
   - default: false
