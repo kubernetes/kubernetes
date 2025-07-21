@@ -69,7 +69,7 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 	var result Validations
 
 	if enum, ok := etv.enumContext.EnumType(context.Type); ok {
-		// TODO: Avoid the "local" here. This was added to to avoid errors caused when the package is an empty string.
+		// TODO: Avoid the "local" here. This was added to avoid errors caused when the package is an empty string.
 		//       The correct package would be the output package but is not known here. This does not show up in generated code.
 		// TODO: Append a consistent hash suffix to avoid generated name conflicts?
 		supportVarName := PrivateVar{Name: "SymbolsFor" + context.Type.Name.Name, Package: "local"}

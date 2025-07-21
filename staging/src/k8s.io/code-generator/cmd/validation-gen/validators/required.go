@@ -32,7 +32,7 @@ const (
 	requiredTagName  = "k8s:required"
 	optionalTagName  = "k8s:optional"
 	forbiddenTagName = "k8s:forbidden"
-	defaultTagName   = "default" // TODO: this should evenually be +k8s:default
+	defaultTagName   = "default" // TODO: this should eventually be +k8s:default
 )
 
 func init() {

@@ -77,8 +77,8 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 //
 // For example:
 //
-//	var UnionMembershipForABC := validate.NewDiscriminatedUnionMembership("type", [2]string{"a", "A"}, [2]string{"b" "B"}, [2]string{"c", "C"})
-//	func ValidateABC(ctx context.Context, op operation.Operation, fldPath, *field.Path, in *ABC) (errs fields.ErrorList) {
+//	var UnionMembershipForABC = validate.NewDiscriminatedUnionMembership("type", [2]string{"a", "A"}, [2]string{"b", "B"}, [2]string{"c", "C"})
+//	func ValidateABC(ctx context.Context, op operation.Operation, fldPath *field.Path, in *ABC) (errs field.ErrorList) {
 //		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, oldIn, UnionMembershipForABC,
 //			func(in *ABC) string { return string(in.Type) },
 //			func(in *ABC) bool { return in.A != nil },
