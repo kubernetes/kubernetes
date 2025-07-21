@@ -2843,6 +2843,16 @@
     lifecycle of a container.
   release: v1.19
   file: test/e2e/common/node/expansion.go
+- testname: 'Dynamic Resource Allocation: supports claim and class parameters'
+  codename: '[sig-node] [DRA] control plane supports claim and class parameters [Conformance]'
+  description: The Kubernetes API must support specifying parameters in a ResourceClaimTemplate
+    and DeviceClass. kube-controller-manager must create the ResourceClaim for a Pod
+    referencing the ResourceClaimTemplate. kube-scheduler must allocate a suitable
+    device from a ResourceSlice and copy the parameters into the allocation result.
+    kubelet must invoke a DRA driver such these parameters are active for the Pod
+    (not part of conformance).
+  release: v1.34
+  file: test/e2e/dra/dra.go
 - testname: LimitRange, resources
   codename: '[sig-scheduling] LimitRange should create a LimitRange with defaults
     and ensure pod has those defaults applied. [Conformance]'
