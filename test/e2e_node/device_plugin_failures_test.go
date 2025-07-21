@@ -112,7 +112,7 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 			return nil
 		})
 
-		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}})
+		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}})
 		defer plugin.Stop() // should stop even if registration failed
 		gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("failed to get device plugin options")))
 		gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring(expectedErr.Error())))
@@ -128,7 +128,7 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 	ginkgo.It("will set allocatable to zero when a single device became unhealthy and then back to 1 if it got healthy again", func(ctx context.Context) {
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
-		devices := []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
+		devices := []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
 		plugin := testdeviceplugin.NewDevicePlugin(nil)
 
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
@@ -154,7 +154,7 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 	ginkgo.It("will set allocatable to zero when a single device became unhealthy, but capacity will stay at 1", func(ctx context.Context) {
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
-		devices := []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
+		devices := []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
 		plugin := testdeviceplugin.NewDevicePlugin(nil)
 
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
@@ -207,7 +207,7 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
 
-		devices := []kubeletdevicepluginv1beta1.Device{
+		devices := []*kubeletdevicepluginv1beta1.Device{
 			{ID: "0", Health: kubeletdevicepluginv1beta1.Healthy},
 			{ID: "1", Health: kubeletdevicepluginv1beta1.Healthy},
 			{ID: "2", Health: kubeletdevicepluginv1beta1.Healthy},
@@ -257,7 +257,7 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 	ginkgo.It("when ListAndWatch fails immediately, node allocatable will be set to zero and kubelet will not retry to list resources", func(ctx context.Context) {
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
-		devices := []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
+		devices := []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
 
 		// Initially, there are no allocatable of this resource
 		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: -1, Capacity: -1}))
@@ -286,7 +286,7 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 	ginkgo.It("when ListAndWatch fails after provisioning devices, node allocatable will be set to zero and kubelet will not retry to list resources", func(ctx context.Context) {
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
-		devices := []kubeletdevicepluginv1beta1.Device{
+		devices := []*kubeletdevicepluginv1beta1.Device{
 			{ID: "0", Health: kubeletdevicepluginv1beta1.Healthy},
 			{ID: "1", Health: kubeletdevicepluginv1beta1.Healthy},
 		}
@@ -327,7 +327,7 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 	ginkgo.It("when device plugin is stopped after provisioning devices, node allocatable will be set to zero", func(ctx context.Context) {
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
-		devices := []kubeletdevicepluginv1beta1.Device{
+		devices := []*kubeletdevicepluginv1beta1.Device{
 			{ID: "0", Health: kubeletdevicepluginv1beta1.Healthy},
 			{ID: "1", Health: kubeletdevicepluginv1beta1.Healthy},
 		}
