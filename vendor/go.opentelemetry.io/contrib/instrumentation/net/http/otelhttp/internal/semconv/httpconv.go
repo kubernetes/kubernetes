@@ -1,3 +1,6 @@
+// Code created by gotmpl. DO NOT MODIFY.
+// source: internal/shared/semconv/httpconv.go.tmpl
+
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
@@ -7,10 +10,13 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 	semconvNew "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
@@ -135,6 +141,19 @@ func (n CurrentHTTPServer) RequestTraceAttrs(server string, req *http.Request) [
 	return attrs
 }
 
+func (o CurrentHTTPServer) NetworkTransportAttr(network string) attribute.KeyValue {
+	switch network {
+	case "tcp", "tcp4", "tcp6":
+		return semconvNew.NetworkTransportTCP
+	case "udp", "udp4", "udp6":
+		return semconvNew.NetworkTransportUDP
+	case "unix", "unixgram", "unixpacket":
+		return semconvNew.NetworkTransportUnix
+	default:
+		return semconvNew.NetworkTransportPipe
+	}
+}
+
 func (n CurrentHTTPServer) method(method string) (attribute.KeyValue, attribute.KeyValue) {
 	if method == "" {
 		return semconvNew.HTTPRequestMethodGet, attribute.KeyValue{}
@@ -197,6 +216,86 @@ func (n CurrentHTTPServer) ResponseTraceAttrs(resp ResponseTelemetry) []attribut
 // Route returns the attribute for the route.
 func (n CurrentHTTPServer) Route(route string) attribute.KeyValue {
 	return semconvNew.HTTPRoute(route)
+}
+
+func (n CurrentHTTPServer) createMeasures(meter metric.Meter) (metric.Int64Histogram, metric.Int64Histogram, metric.Float64Histogram) {
+	if meter == nil {
+		return noop.Int64Histogram{}, noop.Int64Histogram{}, noop.Float64Histogram{}
+	}
+
+	var err error
+	requestBodySizeHistogram, err := meter.Int64Histogram(
+		semconvNew.HTTPServerRequestBodySizeName,
+		metric.WithUnit(semconvNew.HTTPServerRequestBodySizeUnit),
+		metric.WithDescription(semconvNew.HTTPServerRequestBodySizeDescription),
+	)
+	handleErr(err)
+
+	responseBodySizeHistogram, err := meter.Int64Histogram(
+		semconvNew.HTTPServerResponseBodySizeName,
+		metric.WithUnit(semconvNew.HTTPServerResponseBodySizeUnit),
+		metric.WithDescription(semconvNew.HTTPServerResponseBodySizeDescription),
+	)
+	handleErr(err)
+	requestDurationHistogram, err := meter.Float64Histogram(
+		semconvNew.HTTPServerRequestDurationName,
+		metric.WithUnit(semconvNew.HTTPServerRequestDurationUnit),
+		metric.WithDescription(semconvNew.HTTPServerRequestDurationDescription),
+	)
+	handleErr(err)
+
+	return requestBodySizeHistogram, responseBodySizeHistogram, requestDurationHistogram
+}
+
+func (n CurrentHTTPServer) MetricAttributes(server string, req *http.Request, statusCode int, additionalAttributes []attribute.KeyValue) []attribute.KeyValue {
+	num := len(additionalAttributes) + 3
+	var host string
+	var p int
+	if server == "" {
+		host, p = SplitHostPort(req.Host)
+	} else {
+		// Prioritize the primary server name.
+		host, p = SplitHostPort(server)
+		if p < 0 {
+			_, p = SplitHostPort(req.Host)
+		}
+	}
+	hostPort := requiredHTTPPort(req.TLS != nil, p)
+	if hostPort > 0 {
+		num++
+	}
+	protoName, protoVersion := netProtocol(req.Proto)
+	if protoName != "" {
+		num++
+	}
+	if protoVersion != "" {
+		num++
+	}
+
+	if statusCode > 0 {
+		num++
+	}
+
+	attributes := slices.Grow(additionalAttributes, num)
+	attributes = append(attributes,
+		semconvNew.HTTPRequestMethodKey.String(standardizeHTTPMethod(req.Method)),
+		n.scheme(req.TLS != nil),
+		semconvNew.ServerAddress(host))
+
+	if hostPort > 0 {
+		attributes = append(attributes, semconvNew.ServerPort(hostPort))
+	}
+	if protoName != "" {
+		attributes = append(attributes, semconvNew.NetworkProtocolName(protoName))
+	}
+	if protoVersion != "" {
+		attributes = append(attributes, semconvNew.NetworkProtocolVersion(protoVersion))
+	}
+
+	if statusCode > 0 {
+		attributes = append(attributes, semconvNew.HTTPResponseStatusCode(statusCode))
+	}
+	return attributes
 }
 
 type CurrentHTTPClient struct{}
@@ -341,6 +440,98 @@ func (n CurrentHTTPClient) method(method string) (attribute.KeyValue, attribute.
 		return attr, orig
 	}
 	return semconvNew.HTTPRequestMethodGet, orig
+}
+
+func (n CurrentHTTPClient) createMeasures(meter metric.Meter) (metric.Int64Histogram, metric.Float64Histogram) {
+	if meter == nil {
+		return noop.Int64Histogram{}, noop.Float64Histogram{}
+	}
+
+	var err error
+	requestBodySize, err := meter.Int64Histogram(
+		semconvNew.HTTPClientRequestBodySizeName,
+		metric.WithUnit(semconvNew.HTTPClientRequestBodySizeUnit),
+		metric.WithDescription(semconvNew.HTTPClientRequestBodySizeDescription),
+	)
+	handleErr(err)
+
+	requestDuration, err := meter.Float64Histogram(
+		semconvNew.HTTPClientRequestDurationName,
+		metric.WithUnit(semconvNew.HTTPClientRequestDurationUnit),
+		metric.WithDescription(semconvNew.HTTPClientRequestDurationDescription),
+	)
+	handleErr(err)
+
+	return requestBodySize, requestDuration
+}
+
+func (n CurrentHTTPClient) MetricAttributes(req *http.Request, statusCode int, additionalAttributes []attribute.KeyValue) []attribute.KeyValue {
+	num := len(additionalAttributes) + 2
+	var h string
+	if req.URL != nil {
+		h = req.URL.Host
+	}
+	var requestHost string
+	var requestPort int
+	for _, hostport := range []string{h, req.Header.Get("Host")} {
+		requestHost, requestPort = SplitHostPort(hostport)
+		if requestHost != "" || requestPort > 0 {
+			break
+		}
+	}
+
+	port := requiredHTTPPort(req.URL != nil && req.URL.Scheme == "https", requestPort)
+	if port > 0 {
+		num++
+	}
+
+	protoName, protoVersion := netProtocol(req.Proto)
+	if protoName != "" {
+		num++
+	}
+	if protoVersion != "" {
+		num++
+	}
+
+	if statusCode > 0 {
+		num++
+	}
+
+	attributes := slices.Grow(additionalAttributes, num)
+	attributes = append(attributes,
+		semconvNew.HTTPRequestMethodKey.String(standardizeHTTPMethod(req.Method)),
+		semconvNew.ServerAddress(requestHost),
+		n.scheme(req.TLS != nil),
+	)
+
+	if port > 0 {
+		attributes = append(attributes, semconvNew.ServerPort(port))
+	}
+	if protoName != "" {
+		attributes = append(attributes, semconvNew.NetworkProtocolName(protoName))
+	}
+	if protoVersion != "" {
+		attributes = append(attributes, semconvNew.NetworkProtocolVersion(protoVersion))
+	}
+
+	if statusCode > 0 {
+		attributes = append(attributes, semconvNew.HTTPResponseStatusCode(statusCode))
+	}
+	return attributes
+}
+
+// Attributes for httptrace.
+func (n CurrentHTTPClient) TraceAttributes(host string) []attribute.KeyValue {
+	return []attribute.KeyValue{
+		semconvNew.ServerAddress(host),
+	}
+}
+
+func (n CurrentHTTPClient) scheme(https bool) attribute.KeyValue { // nolint:revive
+	if https {
+		return semconvNew.URLScheme("https")
+	}
+	return semconvNew.URLScheme("http")
 }
 
 func isErrorStatusCode(code int) bool {
