@@ -268,6 +268,10 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
 		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		// We've got a new container so we will reset the HTTP probe request
+		if w.httpProbeRequest != nil {
+			w.httpProbeRequest.reset()
+		}
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
@@ -323,8 +327,22 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 	}
 
-	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	var result results.Result
+	var err error
+	// Use cached HTTP request if available
+	if w.httpProbeRequest != nil {
+		req, reqErr := w.httpProbeRequest.getRequest(&w.container) // either returns cached request or creates a new one
+		if reqErr != nil {
+			klog.V(4).InfoS("HTTP-Probe failed to create request", "error", reqErr)
+			return true
+		}
+		// Note, exec probe does NOT have access to pod environment variables or downward API
+		result, err = w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID, req)
+	} else {
+		// Note, exec probe does NOT have access to pod environment variables or downward API
+		result, err = w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID, nil)
+	}
+
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
