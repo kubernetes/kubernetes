@@ -3059,6 +3059,10 @@ func createAndWaitReadyNamespacedWithWarnHandler(t *testing.T, client clientset.
 		testMarkerName = testMarkerNameAnnotation
 	}
 
+<<<<<<< HEAD
+=======
+	//nolint:staticcheck // SA1019 skip linter to allow cherrypick.
+>>>>>>> v1.33.3
 	marker := &v1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: testMarkerName, Namespace: ns, Labels: matchLabels}}
 	defer func() {
 		err := client.CoreV1().Endpoints(ns).Delete(context.TODO(), marker.Name, metav1.DeleteOptions{})
