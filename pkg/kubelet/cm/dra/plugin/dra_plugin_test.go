@@ -57,10 +57,13 @@ func (f *fakeGRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1
 // tearDown is an idempotent cleanup function.
 type tearDown func()
 
-func setupFakeGRPCServer(service, addr string) (tearDown, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+func setupFakeGRPCServer(tCtx ktesting.TContext, service, addr string) (tearDown, error) {
+	stopCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(tCtx)
 	teardown := func() {
+		tCtx.Logf("Tearing down fake gRPC server at %s", addr)
 		cancel()
+		<-stopCh // wait for the serving goroutine to finish
 	}
 
 	listener, err := net.Listen("unix", addr)
@@ -75,6 +78,7 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 	case drapbv1beta1.DRAPluginService:
 		drapbv1beta1.RegisterDRAPluginServer(s, fakeGRPCServer)
 	default:
+		teardown()
 		return nil, fmt.Errorf("unsupported gRPC service: %s", service)
 	}
 
@@ -85,7 +89,10 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 			}
 		}()
 		<-ctx.Done()
+		tCtx.Logf("Stopping fake gRPC server at %s", addr)
 		s.GracefulStop()
+		tCtx.Logf("gRPC server gracefully stopped at %s", addr)
+		close(stopCh) // signal that the serving goroutine has finished
 	}()
 
 	return teardown, nil
@@ -95,7 +102,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	service := drapbv1beta1.DRAPluginService
 	addr := path.Join(t.TempDir(), "dra.sock")
-	teardown, err := setupFakeGRPCServer(service, addr)
+	teardown, err := setupFakeGRPCServer(tCtx, service, addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +228,7 @@ func TestGRPCMethods(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			addr := path.Join(t.TempDir(), "dra.sock")
-			teardown, err := setupFakeGRPCServer(test.service, addr)
+			teardown, err := setupFakeGRPCServer(tCtx, test.service, addr)
 			if err != nil {
 				t.Fatal(err)
 			}
