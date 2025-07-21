@@ -2847,6 +2847,14 @@ func TestGetImageVolumes(t *testing.T) {
 	imageSpec1 := runtimeapi.ImageSpec{Image: image1, UserSpecifiedImage: image1}
 	imageSpec2 := runtimeapi.ImageSpec{Image: image2, UserSpecifiedImage: image2}
 
+	podSandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      "test-pod",
+			Namespace: "test-namespace",
+			Uid:       "test-uid",
+		},
+	}
+
 	for desc, tc := range map[string]struct {
 		pod                      *v1.Pod
 		expectedImageVolumePulls imageVolumePulls
@@ -2883,7 +2891,8 @@ func TestGetImageVolumes(t *testing.T) {
 			},
 		},
 	} {
-		imageVolumePulls, err := manager.getImageVolumes(tCtx, tc.pod, nil, nil)
+
+		imageVolumePulls, err := manager.getImageVolumes(tCtx, tc.pod, podSandboxConfig, nil)
 		if tc.expectedError != nil {
 			require.EqualError(t, err, tc.expectedError.Error())
 		} else {
