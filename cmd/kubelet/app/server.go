@@ -1239,7 +1239,8 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
 
-	k, err := createAndInitKubelet(kubeServer,
+	k, err := createAndInitKubelet(ctx,
+		kubeServer,
 		kubeDeps,
 		hostname,
 		nodeName,
@@ -1279,7 +1280,9 @@ func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodCo
 	go k.ListenAndServePodResources(ctx)
 }
 
-func createAndInitKubelet(kubeServer *options.KubeletServer,
+func createAndInitKubelet(
+	ctx context.Context,
+	kubeServer *options.KubeletServer,
 	kubeDeps *kubelet.Dependencies,
 	hostname string,
 	nodeName types.NodeName,
@@ -1287,7 +1290,9 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
-	k, err = kubelet.NewMainKubelet(&kubeServer.KubeletConfiguration,
+	k, err = kubelet.NewMainKubelet(
+		ctx,
+		&kubeServer.KubeletConfiguration,
 		kubeDeps,
 		&kubeServer.ContainerRuntimeOptions,
 		hostname,

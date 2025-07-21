@@ -27,9 +27,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestVerifyRunAsNonRoot(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID:       "12345678",
@@ -168,7 +170,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		},
 	} {
 		pod.Spec.Containers[0].SecurityContext = test.sc
-		err := verifyRunAsNonRoot(pod, &pod.Spec.Containers[0], test.uid, test.username)
+		err := verifyRunAsNonRoot(tCtx, pod, &pod.Spec.Containers[0], test.uid, test.username)
 		if test.fail {
 			assert.Error(t, err, test.desc)
 		} else {

@@ -182,6 +182,10 @@ type kubeGenericRuntimeManager struct {
 
 	// Root directory used to store pod logs
 	podLogsDirectory string
+
+	// Swap controller availability check function (Linux only)
+	// Uses sync.OnceValue for lazy initialization
+	getSwapControllerAvailable func() bool
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -193,6 +197,7 @@ type KubeGenericRuntime interface {
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
 func NewKubeGenericRuntimeManager(
+	ctx context.Context,
 	recorder record.EventRecorder,
 	livenessManager proberesults.Manager,
 	readinessManager proberesults.Manager,
@@ -231,7 +236,8 @@ func NewKubeGenericRuntimeManager(
 	tokenManager *token.Manager,
 	getServiceAccount plugin.GetServiceAccountFunc,
 ) (KubeGenericRuntime, []images.PostImageGCHook, error) {
-	ctx := context.Background()
+	logger := klog.FromContext(ctx)
+
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
 	imageService = newInstrumentedImageManagerService(imageService)
 	tracer := tracerProvider.Tracer(instrumentationScope)
@@ -262,30 +268,33 @@ func NewKubeGenericRuntimeManager(
 		podLogsDirectory:       podLogsDirectory,
 	}
 
+	// Initialize swap controller availability check with lazy evaluation
+	kubeRuntimeManager.getSwapControllerAvailable = initSwapControllerAvailabilityCheck(ctx)
+
 	typedVersion, err := kubeRuntimeManager.getTypedVersion(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Get runtime version failed")
+		logger.Error(err, "Get runtime version failed")
 		return nil, nil, err
 	}
 
 	// Only matching kubeRuntimeAPIVersion is supported now
 	// TODO: Runtime API machinery is under discussion at https://github.com/kubernetes/kubernetes/issues/28642
 	if typedVersion.Version != kubeRuntimeAPIVersion {
-		klog.ErrorS(err, "This runtime api version is not supported",
+		logger.Error(err, "This runtime api version is not supported",
 			"apiVersion", typedVersion.Version,
 			"supportedAPIVersion", kubeRuntimeAPIVersion)
 		return nil, nil, ErrVersionNotSupported
 	}
 
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
-	klog.InfoS("Container runtime initialized",
+	logger.Info("Container runtime initialized",
 		"containerRuntime", typedVersion.RuntimeName,
 		"version", typedVersion.RuntimeVersion,
 		"apiVersion", typedVersion.RuntimeApiVersion)
 
 	if imageCredentialProviderConfigPath != "" || imageCredentialProviderBinDir != "" {
 		if err := plugin.RegisterCredentialProviderPlugins(imageCredentialProviderConfigPath, imageCredentialProviderBinDir, tokenManager.GetServiceAccountToken, getServiceAccount); err != nil {
-			klog.ErrorS(err, "Failed to register CRI auth plugins")
+			logger.Error(err, "Failed to register CRI auth plugins")
 			os.Exit(1)
 		}
 	}
@@ -400,6 +409,7 @@ func (m *kubeGenericRuntimeManager) Status(ctx context.Context) (*kubecontainer.
 // specifies whether the runtime returns all containers including those already
 // exited and dead containers (used for garbage collection).
 func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*kubecontainer.Pod, error) {
+	logger := klog.FromContext(ctx)
 	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
 	sandboxes, err := m.getKubeletSandboxes(ctx, all)
 	if err != nil {
@@ -408,7 +418,7 @@ func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*k
 	for i := range sandboxes {
 		s := sandboxes[i]
 		if s.Metadata == nil {
-			klog.V(4).InfoS("Sandbox does not have metadata", "sandbox", s)
+			logger.V(4).Info("Sandbox does not have metadata", "sandbox", s)
 			continue
 		}
 		podUID := kubetypes.UID(s.Metadata.Uid)
@@ -422,7 +432,7 @@ func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*k
 		p := pods[podUID]
 		converted, err := m.sandboxToKubeContainer(s)
 		if err != nil {
-			klog.V(4).InfoS("Convert sandbox of pod failed", "runtimeName", m.runtimeName, "sandbox", s, "podUID", podUID, "err", err)
+			logger.V(4).Info("Convert sandbox of pod failed", "runtimeName", m.runtimeName, "sandbox", s, "podUID", podUID, "err", err)
 			continue
 		}
 		p.Sandboxes = append(p.Sandboxes, converted)
@@ -436,11 +446,11 @@ func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*k
 	for i := range containers {
 		c := containers[i]
 		if c.Metadata == nil {
-			klog.V(4).InfoS("Container does not have metadata", "container", c)
+			logger.V(4).Info("Container does not have metadata", "container", c)
 			continue
 		}
 
-		labelledInfo := getContainerInfoFromLabels(c.Labels)
+		labelledInfo := getContainerInfoFromLabels(ctx, c.Labels)
 		pod, found := pods[labelledInfo.PodUID]
 		if !found {
 			pod = &kubecontainer.Pod{
@@ -451,9 +461,9 @@ func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*k
 			pods[labelledInfo.PodUID] = pod
 		}
 
-		converted, err := m.toKubeContainer(c)
+		converted, err := m.toKubeContainer(ctx, c)
 		if err != nil {
-			klog.V(4).InfoS("Convert container of pod failed", "runtimeName", m.runtimeName, "container", c, "podUID", labelledInfo.PodUID, "err", err)
+			logger.V(4).Info("Convert container of pod failed", "runtimeName", m.runtimeName, "container", c, "podUID", labelledInfo.PodUID, "err", err)
 			continue
 		}
 
@@ -474,7 +484,7 @@ func (m *kubeGenericRuntimeManager) GetPods(ctx context.Context, all bool) ([]*k
 	sort.SliceStable(result, func(i, j int) bool {
 		return result[i].CreatedAt > result[j].CreatedAt
 	})
-	klog.V(4).InfoS("Retrieved pods from runtime", "all", all)
+	logger.V(4).Info("Retrieved pods from runtime", "all", all)
 	return result, nil
 }
 
@@ -594,7 +604,8 @@ func containerResourcesFromRequirements(requirements *v1.ResourceRequirements) c
 // computePodResizeAction determines the actions required (if any) to resize the given container.
 // Returns whether to keep (true) or restart (false) the container.
 // TODO(vibansal): Make this function to be agnostic to whether it is dealing with a restartable init container or not (i.e. remove the argument `isRestartableInitContainer`).
-func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containerIdx int, isRestartableInitContainer bool, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepContainer bool) {
+func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, pod *v1.Pod, containerIdx int, isRestartableInitContainer bool, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepContainer bool) {
+	logger := klog.FromContext(ctx)
 	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		return true
 	}
@@ -616,7 +627,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 
 	actuatedResources, found := m.allocationManager.GetActuatedResources(pod.UID, container.Name)
 	if !found {
-		klog.ErrorS(nil, "Missing actuated resource record", "pod", klog.KObj(pod), "container", container.Name)
+		logger.Error(nil, "Missing actuated resource record", "pod", klog.KObj(pod), "container", container.Name)
 		// Proceed with the zero-value actuated resources. For restart NotRequired, this may
 		// result in an extra call to UpdateContainerResources, but that call should be idempotent.
 		// For RestartContainer, this may trigger a container restart.
@@ -693,6 +704,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 }
 
 func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podContainerChanges podActions) *kubecontainer.SyncResult {
+	logger := klog.FromContext(ctx)
 	start := time.Now()
 	success := false
 	defer func() {
@@ -705,23 +717,23 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	enforceCPULimits := m.cpuCFSQuota
 	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.PodHasExclusiveCPUs(pod) {
 		enforceCPULimits = false
-		klog.V(2).InfoS("Disabled CFS quota", "pod", klog.KObj(pod))
+		logger.V(2).Info("Disabled CFS quota", "pod", klog.KObj(pod))
 	}
 	podResources := cm.ResourceConfigForPod(pod, enforceCPULimits, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false)
 	if podResources == nil {
-		klog.ErrorS(nil, "Unable to get resource configuration", "pod", klog.KObj(pod))
+		logger.Error(nil, "Unable to get resource configuration", "pod", klog.KObj(pod))
 		resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get resource configuration processing resize for pod %q", format.Pod(pod)))
 		return resizeResult
 	}
 	currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
 	if err != nil {
-		klog.ErrorS(nil, "Unable to get pod cgroup memory config", "pod", klog.KObj(pod))
+		logger.Error(err, "Unable to get pod cgroup memory config", "pod", klog.KObj(pod))
 		resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get pod cgroup memory config for pod %q", format.Pod(pod)))
 		return resizeResult
 	}
 	currentPodCPUConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceCPU)
 	if err != nil {
-		klog.ErrorS(nil, "Unable to get pod cgroup cpu config", "pod", klog.KObj(pod))
+		logger.Error(err, "Unable to get pod cgroup cpu config", "pod", klog.KObj(pod))
 		resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("unable to get pod cgroup cpu config for pod %q", format.Pod(pod)))
 		return resizeResult
 	}
@@ -733,7 +745,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	// Before proceeding with the resize, perform a best-effort check to catch potential resize
 	// errors in order to avoid a partial-resize state.
 	if err := m.validatePodResizeAction(ctx, pod, podStatus, currentPodResources, podResources, podContainerChanges); err != nil {
-		klog.ErrorS(err, "Allocated pod resize is not currently feasible", "pod", klog.KObj(pod))
+		logger.Error(err, "Allocated pod resize is not currently feasible", "pod", klog.KObj(pod))
 		resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
 		return resizeResult
 	}
@@ -758,12 +770,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		}
 		err = pcm.SetPodCgroupConfig(pod, resizedResources)
 		if err != nil {
-			klog.ErrorS(err, "Failed to set cgroup config", "resource", rName, "pod", klog.KObj(pod))
+			logger.Error(err, "Failed to set cgroup config", "resource", rName, "pod", klog.KObj(pod))
 			return err
 		}
 		currentPodResources = mergeResourceConfig(currentPodResources, resizedResources)
-		if err = m.updatePodSandboxResources(podContainerChanges.SandboxID, pod, currentPodResources); err != nil {
-			klog.ErrorS(err, "Failed to notify runtime for UpdatePodSandboxResources", "resource", rName, "pod", klog.KObj(pod))
+		if err = m.updatePodSandboxResources(ctx, podContainerChanges.SandboxID, pod, currentPodResources); err != nil {
+			logger.Error(err, "Failed to notify runtime for UpdatePodSandboxResources", "resource", rName, "pod", klog.KObj(pod))
 			// Don't propagate the error since the updatePodSandboxResources call is best-effort.
 		}
 		return nil
@@ -786,8 +798,8 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 			}
 		}
 		if len(podContainerChanges.ContainersToUpdate[rName]) > 0 {
-			if err = m.updatePodContainerResources(pod, rName, podContainerChanges.ContainersToUpdate[rName]); err != nil {
-				klog.ErrorS(err, "updatePodContainerResources failed", "pod", format.Pod(pod), "resource", rName)
+			if err = m.updatePodContainerResources(ctx, pod, rName, podContainerChanges.ContainersToUpdate[rName]); err != nil {
+				logger.Error(err, "updatePodContainerResources failed", "pod", format.Pod(pod), "resource", rName)
 				return err
 			}
 		}
@@ -823,7 +835,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources {
 		if podResources.CPUShares == nil {
 			// This shouldn't happen: ResourceConfigForPod always returns a non-nil value for CPUShares.
-			klog.ErrorS(nil, "podResources.CPUShares is nil", "pod", pod.Name)
+			logger.Error(nil, "podResources.CPUShares is nil", "pod", pod.Name)
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, fmt.Sprintf("podResources.CPUShares is nil for pod %s", pod.Name))
 			return resizeResult
 		}
@@ -921,8 +933,9 @@ func (m *kubeGenericRuntimeManager) validateMemoryResizeAction(
 	return nil
 }
 
-func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {
-	klog.V(5).InfoS("Updating container resources", "pod", klog.KObj(pod))
+func (m *kubeGenericRuntimeManager) updatePodContainerResources(ctx context.Context, pod *v1.Pod, resourceName v1.ResourceName, containersToUpdate []containerToUpdateInfo) error {
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Updating container resources", "pod", klog.KObj(pod))
 
 	for _, cInfo := range containersToUpdate {
 		container := cInfo.container.DeepCopy()
@@ -948,10 +961,10 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 				v1.ResourceMemory: *resource.NewQuantity(cInfo.currentContainerResources.memoryRequest, resource.BinarySI),
 			}
 		}
-		if err := m.updateContainerResources(pod, container, cInfo.kubeContainerID); err != nil {
+		if err := m.updateContainerResources(ctx, pod, container, cInfo.kubeContainerID); err != nil {
 			// Log error and abort as container updates need to succeed in the order determined by computePodResizeAction.
 			// The recovery path is for SyncPod to keep retrying at later times until it succeeds.
-			klog.ErrorS(err, "updateContainerResources failed", "container", container.Name, "cID", cInfo.kubeContainerID,
+			logger.Error(err, "updateContainerResources failed", "container", container.Name, "cID", cInfo.kubeContainerID,
 				"pod", format.Pod(pod), "resourceName", resourceName)
 			return err
 		}
@@ -973,7 +986,8 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
-	klog.V(5).InfoS("Syncing Pod", "pod", klog.KObj(pod))
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Syncing Pod", "pod", klog.KObj(pod))
 
 	createPodSandbox, attempt, sandboxID := runtimeutil.PodSandboxChanged(pod, podStatus)
 	changes := podActions{
@@ -1052,7 +1066,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	}
 
 	// Check initialization progress.
-	hasInitialized := m.computeInitContainerActions(pod, podStatus, &changes)
+	hasInitialized := m.computeInitContainerActions(ctx, pod, podStatus, &changes)
 	if changes.KillPod || !hasInitialized {
 		// Initialization failed or still in progress. Skip inspecting non-init
 		// containers.
@@ -1070,7 +1084,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// to it.
 		if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateRunning {
 			if err := m.internalLifecycle.PostStopContainer(containerStatus.ID.ID); err != nil {
-				klog.ErrorS(err, "Internal container post-stop lifecycle hook failed for container in pod with error",
+				logger.Error(err, "Internal container post-stop lifecycle hook failed for container in pod with error",
 					"containerName", container.Name, "pod", klog.KObj(pod))
 			}
 		}
@@ -1079,7 +1093,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
-				klog.V(3).InfoS("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
+				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
 					// If container is in unknown state, we don't know whether it
@@ -1113,7 +1127,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// If the container failed the startup probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
 			reason = reasonStartupProbe
-		} else if !m.computePodResizeAction(pod, idx, false, containerStatus, &changes) {
+		} else if !m.computePodResizeAction(ctx, pod, idx, false, containerStatus, &changes) {
 			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
 			continue
 		} else {
@@ -1136,7 +1150,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			message:   message,
 			reason:    reason,
 		}
-		klog.V(2).InfoS("Message for Container of pod", "containerName", container.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
+		logger.V(2).Info("Message for Container of pod", "containerName", container.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
 	}
 
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
@@ -1160,33 +1174,34 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 //  7. Resize running containers (if InPlacePodVerticalScaling==true)
 //  8. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+	logger := klog.FromContext(ctx)
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(ctx, pod, podStatus)
-	klog.V(3).InfoS("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
+	logger.V(3).Info("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)
 		if err != nil {
-			klog.ErrorS(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+			logger.Error(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 		}
 		if podContainerChanges.SandboxID != "" {
 			m.recorder.Eventf(ref, v1.EventTypeNormal, events.SandboxChanged, "Pod sandbox changed, it will be killed and re-created.")
 		} else {
-			klog.V(4).InfoS("SyncPod received new pod, will create a sandbox for it", "pod", klog.KObj(pod))
+			logger.V(4).Info("SyncPod received new pod, will create a sandbox for it", "pod", klog.KObj(pod))
 		}
 	}
 
 	// Step 2: Kill the pod if the sandbox has changed.
 	if podContainerChanges.KillPod {
 		if podContainerChanges.CreateSandbox {
-			klog.V(4).InfoS("Stopping PodSandbox for pod, will start new one", "pod", klog.KObj(pod))
+			logger.V(4).Info("Stopping PodSandbox for pod, will start new one", "pod", klog.KObj(pod))
 		} else {
-			klog.V(4).InfoS("Stopping PodSandbox for pod, because all other containers are dead", "pod", klog.KObj(pod))
+			logger.V(4).Info("Stopping PodSandbox for pod, because all other containers are dead", "pod", klog.KObj(pod))
 		}
 
 		killResult := m.killPodWithSyncResult(ctx, pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
 		result.AddPodSyncResult(killResult)
 		if killResult.Error() != nil {
-			klog.ErrorS(killResult.Error(), "killPodWithSyncResult failed")
+			logger.Error(killResult.Error(), "killPodWithSyncResult failed")
 			return
 		}
 
@@ -1196,12 +1211,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
 		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
-			klog.V(3).InfoS("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+			logger.V(3).Info("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
 			result.AddSyncResult(killContainerResult)
 			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil, nil); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				klog.ErrorS(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
+				logger.Error(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
 				return
 			}
 		}
@@ -1233,7 +1248,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		var msg string
 		var err error
 
-		klog.V(4).InfoS("Creating PodSandbox for pod", "pod", klog.KObj(pod))
+		logger.V(4).Info("Creating PodSandbox for pod", "pod", klog.KObj(pod))
 		metrics.StartedPodsTotal.Inc()
 		createSandboxResult := kubecontainer.NewSyncResult(kubecontainer.CreatePodSandbox, format.Pod(pod))
 		result.AddSyncResult(createSandboxResult)
@@ -1253,11 +1268,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			if err := m.runtimeHelper.PrepareDynamicResources(ctx, pod); err != nil {
 				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 				if referr != nil {
-					klog.ErrorS(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+					logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 					return
 				}
 				m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedPrepareDynamicResources, "Failed to prepare dynamic resources: %v", err)
-				klog.ErrorS(err, "Failed to prepare dynamic resources", "pod", klog.KObj(pod))
+				logger.Error(err, "Failed to prepare dynamic resources", "pod", klog.KObj(pod))
 				return
 			}
 		}
@@ -1272,29 +1287,29 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			// SyncPod can still be running when we get here, which
 			// means the PodWorker has not acked the deletion.
 			if m.podStateProvider.IsPodTerminationRequested(pod.UID) {
-				klog.V(4).InfoS("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
+				logger.V(4).Info("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
 				return
 			}
 			metrics.StartedPodsErrorsTotal.Inc()
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
-			klog.ErrorS(err, "CreatePodSandbox for pod failed", "pod", klog.KObj(pod))
+			logger.Error(err, "CreatePodSandbox for pod failed", "pod", klog.KObj(pod))
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 			if referr != nil {
-				klog.ErrorS(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 			}
 			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed to create pod sandbox: %v", err)
 			return
 		}
-		klog.V(4).InfoS("Created PodSandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
+		logger.V(4).Info("Created PodSandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
 
 		resp, err := m.runtimeService.PodSandboxStatus(ctx, podSandboxID, false)
 		if err != nil {
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 			if referr != nil {
-				klog.ErrorS(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+				logger.Error(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
 			}
 			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedStatusPodSandBox, "Unable to get pod sandbox status: %v", err)
-			klog.ErrorS(err, "Failed to get pod sandbox status; Skipping pod", "pod", klog.KObj(pod))
+			logger.Error(err, "Failed to get pod sandbox status; Skipping pod", "pod", klog.KObj(pod))
 			result.Fail(err)
 			return
 		}
@@ -1307,8 +1322,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		// host-network, we may use a stale IP.
 		if !kubecontainer.IsHostNetworkPod(pod) {
 			// Overwrite the podIPs passed in the pod status, since we just started the pod sandbox.
-			podIPs = m.determinePodSandboxIPs(pod.Namespace, pod.Name, resp.GetStatus())
-			klog.V(4).InfoS("Determined the ip for pod after sandbox changed", "IPs", podIPs, "pod", klog.KObj(pod))
+			podIPs = m.determinePodSandboxIPs(ctx, pod.Namespace, pod.Name, resp.GetStatus())
+			logger.V(4).Info("Determined the ip for pod after sandbox changed", "IPs", podIPs, "pod", klog.KObj(pod))
 		}
 	}
 
@@ -1323,17 +1338,17 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// Get podSandboxConfig for containers to start.
 	configPodSandboxResult := kubecontainer.NewSyncResult(kubecontainer.ConfigPodSandbox, podSandboxID)
 	result.AddSyncResult(configPodSandboxResult)
-	podSandboxConfig, err := m.generatePodSandboxConfig(pod, podContainerChanges.Attempt)
+	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, podContainerChanges.Attempt)
 	if err != nil {
 		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
-		klog.ErrorS(err, "GeneratePodSandboxConfig for pod failed", "pod", klog.KObj(pod))
+		logger.Error(err, "GeneratePodSandboxConfig for pod failed", "pod", klog.KObj(pod))
 		configPodSandboxResult.Fail(kubecontainer.ErrConfigPodSandbox, message)
 		return
 	}
 
 	imageVolumePullResults, err := m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
 	if err != nil {
-		klog.ErrorS(err, "Get image volumes for pod failed", "pod", klog.KObj(pod))
+		logger.Error(err, "Get image volumes for pod failed", "pod", klog.KObj(pod))
 		configPodSandboxResult.Fail(kubecontainer.ErrConfigPodSandbox, err.Error())
 		return
 	}
@@ -1347,10 +1362,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, spec.container.Name)
 		result.AddSyncResult(startContainerResult)
 
-		isInBackOff, msg, err := m.doBackOff(pod, spec.container, podStatus, backOff)
+		isInBackOff, msg, err := m.doBackOff(ctx, pod, spec.container, podStatus, backOff)
 		if isInBackOff {
 			startContainerResult.Fail(err, msg)
-			klog.V(4).InfoS("Backing Off restarting container in pod", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod))
+			logger.V(4).Info("Backing Off restarting container in pod", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod))
 			return err
 		}
 
@@ -1358,10 +1373,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		if sc.HasWindowsHostProcessRequest(pod, spec.container) {
 			metrics.StartedHostProcessContainersTotal.WithLabelValues(metricLabel).Inc()
 		}
-		klog.V(4).InfoS("Creating container in pod", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod))
+		logger.V(4).Info("Creating container in pod", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod))
 
 		// We fail late here to populate the "ErrImagePull" and "ImagePullBackOff" correctly to the end user.
-		imageVolumes, err := m.toKubeContainerImageVolumes(imageVolumePullResults, spec.container, pod, startContainerResult)
+		imageVolumes, err := m.toKubeContainerImageVolumes(ctx, imageVolumePullResults, spec.container, pod, startContainerResult)
 		if err != nil {
 			return err
 		}
@@ -1381,7 +1396,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			// repetitive log spam
 			switch {
 			case err == images.ErrImagePullBackOff:
-				klog.V(3).InfoS("Container start failed in pod", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod), "containerMessage", msg, "err", err)
+				logger.V(3).Info("Container start failed in pod", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod), "containerMessage", msg, "err", err)
 			default:
 				utilruntime.HandleError(fmt.Errorf("%v %v start failed in pod %v: %w: %s", typeName, spec.container.Name, format.Pod(pod), err, msg))
 			}
@@ -1405,15 +1420,15 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		// Start the next init container.
 		if err := start(ctx, "init container", metrics.InitContainer, containerStartSpec(container)); err != nil {
 			if podutil.IsRestartableInitContainer(container) {
-				klog.V(4).InfoS("Failed to start the restartable init container for the pod, skipping", "initContainerName", container.Name, "pod", klog.KObj(pod))
+				logger.V(4).Info("Failed to start the restartable init container for the pod, skipping", "initContainerName", container.Name, "pod", klog.KObj(pod))
 				continue
 			}
-			klog.V(4).InfoS("Failed to initialize the pod, as the init container failed to start, aborting", "initContainerName", container.Name, "pod", klog.KObj(pod))
+			logger.V(4).Info("Failed to initialize the pod, as the init container failed to start, aborting", "initContainerName", container.Name, "pod", klog.KObj(pod))
 			return
 		}
 
 		// Successfully started the container; clear the entry in the failure
-		klog.V(4).InfoS("Completed init container for pod", "containerName", container.Name, "pod", klog.KObj(pod))
+		logger.V(4).Info("Completed init container for pod", "containerName", container.Name, "pod", klog.KObj(pod))
 	}
 
 	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
@@ -1464,7 +1479,7 @@ type imageVolumePullResult struct {
 	msg  string
 }
 
-func (m *kubeGenericRuntimeManager) toKubeContainerImageVolumes(imageVolumePullResults imageVolumePulls, container *v1.Container, pod *v1.Pod, syncResult *kubecontainer.SyncResult) (kubecontainer.ImageVolumes, error) {
+func (m *kubeGenericRuntimeManager) toKubeContainerImageVolumes(ctx context.Context, imageVolumePullResults imageVolumePulls, container *v1.Container, pod *v1.Pod, syncResult *kubecontainer.SyncResult) (kubecontainer.ImageVolumes, error) {
 	if len(imageVolumePullResults) == 0 {
 		return nil, nil
 	}
@@ -1482,7 +1497,7 @@ func (m *kubeGenericRuntimeManager) toKubeContainerImageVolumes(imageVolumePullR
 
 		if res.err != nil {
 			s, _ := grpcstatus.FromError(res.err)
-			m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
+			m.recordContainerEvent(ctx, pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
 			lastErr = res.err
 			lastMsg = res.msg
 			continue
@@ -1500,13 +1515,14 @@ func (m *kubeGenericRuntimeManager) toKubeContainerImageVolumes(imageVolumePullR
 }
 
 func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, pullSecrets []v1.Secret) (imageVolumePulls, error) {
+	logger := klog.FromContext(ctx)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 		return nil, nil
 	}
 
 	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
 	if err != nil {
-		klog.ErrorS(err, "Failed to get pod runtime handler", "pod", klog.KObj(pod))
+		logger.Error(err, "Failed to get pod runtime handler", "pod", klog.KObj(pod))
 		return nil, err
 	}
 
@@ -1521,12 +1537,12 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 			ctx, objectRef, pod, volume.Image.Reference, pullSecrets, podSandboxConfig, podRuntimeHandler, volume.Image.PullPolicy,
 		)
 		if err != nil {
-			klog.ErrorS(err, "Failed to ensure image", "pod", klog.KObj(pod))
+			logger.Error(err, "Failed to ensure image", "pod", klog.KObj(pod))
 			res[volume.Name] = imageVolumePullResult{err: err, msg: msg}
 			continue
 		}
 
-		klog.V(4).InfoS("Pulled image", "ref", ref, "pod", klog.KObj(pod))
+		logger.V(4).Info("Pulled image", "ref", ref, "pod", klog.KObj(pod))
 		res[volume.Name] = imageVolumePullResult{spec: &runtimeapi.ImageSpec{
 			Image:              ref,
 			UserSpecifiedImage: volume.Image.Reference,
@@ -1540,7 +1556,8 @@ func (m *kubeGenericRuntimeManager) getImageVolumes(ctx context.Context, pod *v1
 
 // If a container is still in backoff, the function will return a brief backoff error and
 // a detailed error message.
-func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Container, podStatus *kubecontainer.PodStatus, backOff *flowcontrol.Backoff) (bool, string, error) {
+func (m *kubeGenericRuntimeManager) doBackOff(ctx context.Context, pod *v1.Pod, container *v1.Container, podStatus *kubecontainer.PodStatus, backOff *flowcontrol.Backoff) (bool, string, error) {
+	logger := klog.FromContext(ctx)
 	var cStatus *kubecontainer.Status
 	for _, c := range podStatus.ContainerStatuses {
 		if c.Name == container.Name && c.State == kubecontainer.ContainerStateExited {
@@ -1553,7 +1570,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 		return false, "", nil
 	}
 
-	klog.V(3).InfoS("Checking backoff for container in pod", "containerName", container.Name, "pod", klog.KObj(pod))
+	logger.V(3).Info("Checking backoff for container in pod", "containerName", container.Name, "pod", klog.KObj(pod))
 	// Use the finished time of the latest exited container as the start point to calculate whether to do back-off.
 	ts := cStatus.FinishedAt
 	// backOff requires a unique key to identify the container.
@@ -1564,7 +1581,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 				fmt.Sprintf("Back-off restarting failed container %s in pod %s", container.Name, format.Pod(pod)))
 		}
 		err := fmt.Errorf("back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
-		klog.V(3).InfoS("Back-off restarting failed container", "err", err.Error())
+		logger.V(3).Info("Back-off restarting failed container", "err", err.Error())
 		return true, err.Error(), kubecontainer.ErrCrashLoopBackOff
 	}
 
@@ -1584,6 +1601,7 @@ func (m *kubeGenericRuntimeManager) KillPod(ctx context.Context, pod *v1.Pod, ru
 // killPodWithSyncResult kills a runningPod and returns SyncResult.
 // Note: The pod passed in could be *nil* when kubelet restarted.
 func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
+	logger := klog.FromContext(ctx)
 	killContainerResults := m.killContainersWithSyncResult(ctx, pod, runningPod, gracePeriodOverride)
 	for _, containerResult := range killContainerResults {
 		result.AddSyncResult(containerResult)
@@ -1596,7 +1614,7 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, p
 	for _, podSandbox := range runningPod.Sandboxes {
 		if err := m.runtimeService.StopPodSandbox(ctx, podSandbox.ID.ID); err != nil && !crierror.IsNotFound(err) {
 			killSandboxResult.Fail(kubecontainer.ErrKillPodSandbox, err.Error())
-			klog.ErrorS(nil, "Failed to stop sandbox", "podSandboxID", podSandbox.ID)
+			logger.Error(nil, "Failed to stop sandbox", "podSandboxID", podSandbox.ID)
 		}
 	}
 
@@ -1604,11 +1622,12 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, p
 }
 
 func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *kubecontainer.PodStatus {
-	podIPs := m.determinePodSandboxIPs(event.PodSandboxStatus.Metadata.Namespace, event.PodSandboxStatus.Metadata.Name, event.PodSandboxStatus)
+	ctx := context.TODO() // This context will be passed as parameter in the future
+	podIPs := m.determinePodSandboxIPs(ctx, event.PodSandboxStatus.Metadata.Namespace, event.PodSandboxStatus.Metadata.Name, event.PodSandboxStatus)
 
 	kubeContainerStatuses := []*kubecontainer.Status{}
 	for _, status := range event.ContainersStatuses {
-		kubeContainerStatuses = append(kubeContainerStatuses, m.convertToKubeContainerStatus(status))
+		kubeContainerStatuses = append(kubeContainerStatuses, m.convertToKubeContainerStatus(ctx, status))
 	}
 
 	sort.Sort(containerStatusByCreated(kubeContainerStatuses))
@@ -1626,6 +1645,7 @@ func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.Containe
 // GetPodStatus retrieves the status of the pod, including the
 // information of all containers in the pod that are visible in Runtime.
 func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+	logger := klog.FromContext(ctx)
 	// Now we retain restart count of container as a container label. Each time a container
 	// restarts, pod will read the restart count from the registered dead container, increment
 	// it to get the new restart count, and then add a label with the new restart count on
@@ -1654,7 +1674,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 
 	podFullName := format.Pod(pod)
 
-	klog.V(4).InfoS("getSandboxIDByPodUID got sandbox IDs for pod", "podSandboxID", podSandboxIDs, "pod", klog.KObj(pod))
+	logger.V(4).Info("getSandboxIDByPodUID got sandbox IDs for pod", "podSandboxID", podSandboxIDs, "pod", klog.KObj(pod))
 
 	sandboxStatuses := []*runtimeapi.PodSandboxStatus{}
 	containerStatuses := []*kubecontainer.Status{}
@@ -1673,7 +1693,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 			continue
 		}
 		if err != nil {
-			klog.ErrorS(err, "PodSandboxStatus of sandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
+			logger.Error(err, "PodSandboxStatus of sandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
 			return nil, err
 		}
 		if resp.GetStatus() == nil {
@@ -1683,7 +1703,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		sandboxStatuses = append(sandboxStatuses, resp.Status)
 		// Only get pod IP from latest sandbox
 		if idx == 0 && resp.Status.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			podIPs = m.determinePodSandboxIPs(namespace, name, resp.Status)
+			podIPs = m.determinePodSandboxIPs(ctx, namespace, name, resp.Status)
 			activePodSandboxID = podSandboxID
 		}
 
@@ -1694,11 +1714,11 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 				// e.g. CI job 'pull-kubernetes-e2e-gce-alpha-features' will runs with
 				// features gate enabled, which includes Evented PLEG, but uses the
 				// runtime without Evented PLEG support.
-				klog.V(4).InfoS("Runtime does not set pod status timestamp", "pod", klog.KObj(pod))
+				logger.V(4).Info("Runtime does not set pod status timestamp", "pod", klog.KObj(pod))
 				containerStatuses, activeContainerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace, activePodSandboxID)
 				if err != nil {
 					if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
-						klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
+						logger.Error(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
 					}
 					return nil, err
 				}
@@ -1707,7 +1727,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 				// timestamp from sandboxStatus.
 				timestamp = time.Unix(0, resp.Timestamp)
 				for _, cs := range resp.ContainersStatuses {
-					cStatus := m.convertToKubeContainerStatus(cs)
+					cStatus := m.convertToKubeContainerStatus(ctx, cs)
 					containerStatuses = append(containerStatuses, cStatus)
 				}
 			}
@@ -1719,7 +1739,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		containerStatuses, activeContainerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace, activePodSandboxID)
 		if err != nil {
 			if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
-				klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
+				logger.Error(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
 			}
 			return nil, err
 		}
@@ -1743,7 +1763,7 @@ func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, id k
 	if err != nil {
 		return nil, fmt.Errorf("runtime container status: %w", err)
 	}
-	return m.convertToKubeContainerStatus(resp.GetStatus()), nil
+	return m.convertToKubeContainerStatus(ctx, resp.GetStatus()), nil
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy.
@@ -1754,9 +1774,10 @@ func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy
 // UpdatePodCIDR is just a passthrough method to update the runtimeConfig of the shim
 // with the podCIDR supplied by the kubelet.
 func (m *kubeGenericRuntimeManager) UpdatePodCIDR(ctx context.Context, podCIDR string) error {
+	logger := klog.FromContext(ctx)
 	// TODO(#35531): do we really want to write a method on this manager for each
 	// field of the config?
-	klog.InfoS("Updating runtime config through cri with podcidr", "CIDR", podCIDR)
+	logger.Info("Updating runtime config through cri with podcidr", "CIDR", podCIDR)
 	return m.runtimeService.UpdateRuntimeConfig(ctx,
 		&runtimeapi.RuntimeConfig{
 			NetworkConfig: &runtimeapi.NetworkConfig{
