@@ -59,19 +59,20 @@ type pullerExpects struct {
 }
 
 type pullerTestCase struct {
-	testName            string
-	containerImage      string
-	policy              v1.PullPolicy
-	pullSecrets         []v1.Secret
-	allowedCredentials  *mockImagePullManagerConfig                       // controls what the image pull manager considers "allowed"
-	serviceAccountName  string                                            // for testing service account coordinates
-	registryCredentials map[string][]credentialprovider.TrackedAuthConfig // image -> registry credentials (obtained from credential providers using SA tokens)
-	inspectErr          error
-	pullerErr           error
-	qps                 float32
-	burst               int
-	expected            []pullerExpects
-	enableFeatures      []featuregate.Feature
+	testName                   string
+	containerImage             string
+	policy                     v1.PullPolicy
+	pullSecrets                []v1.Secret
+	allowedCredentials         *mockImagePullManagerConfig                       // controls what the image pull manager considers "allowed"
+	serviceAccountName         string                                            // for testing service account coordinates
+	registryCredentials        map[string][]credentialprovider.TrackedAuthConfig // image -> registry credentials (obtained from credential providers using SA tokens)
+	inspectErr                 error
+	pullerErr                  error
+	qps                        float32
+	burst                      int
+	expected                   []pullerExpects
+	expectedEnsureImageMetrics string
+	enableFeatures             []featuregate.Feature
 }
 
 // mockImagePullManagerConfig configures what credentials the mock pull manager considers "allowed"
@@ -106,7 +107,9 @@ func noFGPullerTestCases() []pullerTestCase {
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "false", "true"),
+		},
 
 		{ // image present, don't pull
 			testName:       "image present, allow all, don't pull ",
@@ -129,10 +132,12 @@ func noFGPullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "Pulled"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "true", "false"),
+		},
 		// image present, pull it
 		{containerImage: "present_image",
-			testName:   "image present, pull ",
+			testName:   "image present, pull",
 			policy:     v1.PullAlways,
 			inspectErr: nil,
 			pullerErr:  nil,
@@ -154,7 +159,9 @@ func noFGPullerTestCases() []pullerTestCase {
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("always", "unknown", "true"),
+		},
 		// missing image, error PullNever
 		{containerImage: "missing_image",
 			testName:   "image missing, never pull",
@@ -176,10 +183,12 @@ func noFGPullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "ErrImageNeverPull"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("never", "false", "unknown"),
+		},
 		// missing image, unable to inspect
 		{containerImage: "missing_image",
-			testName:   "image missing, pull if not present",
+			testName:   "image missing, pull if not present, fail on image inspect",
 			policy:     v1.PullIfNotPresent,
 			inspectErr: errors.New("unknown inspectError"),
 			pullerErr:  nil,
@@ -198,7 +207,9 @@ func noFGPullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "InspectFailed"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "unknown", "unknown"),
+		},
 		// missing image, unable to fetch
 		{containerImage: "typo_image",
 			testName:   "image missing, unable to fetch",
@@ -235,7 +246,9 @@ func noFGPullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "BackOff"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "false", "true"),
+		},
 		// image present, non-zero qps, try to pull
 		{containerImage: "present_image",
 			testName:   "image present and qps>0, pull",
@@ -260,7 +273,9 @@ func noFGPullerTestCases() []pullerTestCase {
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("always", "unknown", "true"),
+		},
 		// image present, non-zero qps, try to pull when qps exceeded
 		{containerImage: "present_image",
 			testName:   "image present and excessive qps rate, pull",
@@ -284,7 +299,9 @@ func noFGPullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "BackOff"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("always", "unknown", "true"),
+		},
 		// error case if image name fails validation due to invalid reference format
 		{containerImage: "FAILED_IMAGE",
 			testName:   "invalid image name, no pull",
@@ -298,7 +315,9 @@ func noFGPullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "InspectFailed"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("always", "unknown", "unknown"),
+		},
 		// error case if image name contains http
 		{containerImage: "http://url",
 			testName:   "invalid image name with http, no pull",
@@ -312,7 +331,9 @@ func noFGPullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "InspectFailed"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("always", "unknown", "unknown"),
+		},
 		// error case if image name contains sha256
 		{containerImage: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
 			testName:   "invalid image name with sha256, no pull",
@@ -326,7 +347,9 @@ func noFGPullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "InspectFailed"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("always", "unknown", "unknown"),
+		},
 		{containerImage: "typo_image",
 			testName:   "image missing, SignatureValidationFailed",
 			policy:     v1.PullIfNotPresent,
@@ -358,7 +381,9 @@ func noFGPullerTestCases() []pullerTestCase {
 					[]v1.Event{
 						{Reason: "BackOff"},
 					}, "Back-off pulling image \"typo_image\": SignatureValidationFailed: image pull failed for typo_image because the signature validation failed"},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "false", "true"),
+		},
 	}
 }
 
@@ -399,7 +424,9 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 						{Reason: "Pulling"},
 						{Reason: "Pulled"},
 					}, ""},
-			}},
+			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "true", "true"),
+		},
 		{
 			testName:       "[KubeletEnsureSecretPulledImages] image present, unknown secret to image pull manager, pull",
 			containerImage: "present_image",
@@ -433,6 +460,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 						{Reason: "Pulled"},
 					}, ""},
 			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "true", "true"),
 		},
 		{
 			testName:       "[KubeletEnsureSecretPulledImages] image present, unknown secret to image pull manager, never pull policy -> fail",
@@ -464,6 +492,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 						{Reason: "ErrImageNeverPull"},
 					}, ""},
 			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("never", "true", "true"),
 		},
 		{
 			testName:       "[KubeletEnsureSecretPulledImages] image present, a secret matches one of known to the image pull manager, don't pull",
@@ -498,6 +527,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 						{Reason: "Pulled"},
 					}, ""},
 			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "true", "false"),
 		},
 		{
 			testName:           "[KubeletEnsureSecretPulledImages] image present, service account credentials available, don't pull",
@@ -533,6 +563,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 						{Reason: "Pulled"},
 					}, ""},
 			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "true", "false"),
 		},
 		{
 			testName:           "[KubeletEnsureSecretPulledImages] image present, service account allowed by pull manager, don't pull",
@@ -578,6 +609,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 						{Reason: "Pulled"},
 					}, ""},
 			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "true", "false"),
 		},
 		{
 			testName:           "[KubeletEnsureSecretPulledImages] image present, mixed credentials (secrets + service accounts), pull required",
@@ -621,6 +653,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 						{Reason: "Pulled"},
 					}, ""},
 			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "true", "true"),
 		},
 		{
 			testName:       "[KubeletEnsureSecretPulledImages] image present, only node credentials (no source), proceed without tracking",
@@ -649,6 +682,7 @@ func ensureSecretImagesTestCases() []pullerTestCase {
 						{Reason: "Pulled"},
 					}, ""},
 			},
+			expectedEnsureImageMetrics: ensureExistsMetricForLabels("ifnotpresent", "true", "false"),
 		},
 	}
 
@@ -1412,4 +1446,17 @@ func TestEnsureImageExistsWithNodeCredentialsOnly(t *testing.T) {
 
 	// Image should not be pulled since it's present and accessible
 	fakeRuntime.AssertCalls([]string{"GetImageRef"})
+}
+
+func ensureExistsMetricForLabels(pullPolicy, imagePresentLocally, pullRequired string) string {
+	const desc = `
+# HELP kubelet_image_manager_ensure_image_requests_total [ALPHA] Number of ensure-image requests processed by the kubelet.
+# TYPE kubelet_image_manager_ensure_image_requests_total counter
+`
+	return desc + fmt.Sprintf(
+		"kubelet_image_manager_ensure_image_requests_total{present_locally=\"%s\", pull_policy=\"%s\", pull_required=\"%s\"} 1\n",
+		imagePresentLocally,
+		pullPolicy,
+		pullRequired,
+	)
 }
