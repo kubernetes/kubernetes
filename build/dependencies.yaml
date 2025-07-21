@@ -206,8 +206,6 @@ dependencies:
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=
-    - path: cmd/kubelet/app/options/container_runtime.go
-      match: defaultPodSandboxImageVersion\s+=
     - path: hack/testdata/pod-with-precision.json
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: staging/src/k8s.io/kubectl/testdata/set/multi-resource-yaml.yaml

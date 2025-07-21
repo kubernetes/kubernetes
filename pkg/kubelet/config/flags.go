@@ -17,8 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
-
 	"github.com/spf13/pflag"
 )
 
@@ -28,9 +26,6 @@ type ContainerRuntimeOptions struct {
 
 	// RuntimeCgroups that container runtime is expected to be isolated in.
 	RuntimeCgroups string
-	// PodSandboxImage is the image whose network/ipc namespaces
-	// containers in each pod will use.
-	PodSandboxImage string
 	// Image credential provider plugin options
 
 	// ImageCredentialProviderConfigPath is the path to the credential provider plugin config file or directory.
@@ -49,9 +44,10 @@ type ContainerRuntimeOptions struct {
 
 // AddFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
 func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
+	var tmp string
 	// General settings.
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
-	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, fmt.Sprintf("Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image."))
+	fs.StringVar(&tmp, "pod-infra-container-image", "", "Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image.")
 	_ = fs.MarkDeprecated("pod-infra-container-image", "will be removed in 1.35. Image garbage collector will get sandbox image information from CRI.")
 
 	// Image credential provider settings.
