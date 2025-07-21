@@ -98,6 +98,9 @@ type worker struct {
 	// If set, skip probing.
 	onHold bool
 
+	// Holder for HTTP probe request object
+	httpProbeRequest *httpProbeRequestHolder
+
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
 	proberResultsSuccessfulMetricLabels metrics.Labels
