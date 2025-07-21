@@ -1129,8 +1129,6 @@ func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typ
 // emitRachetingCheck emits a equivalence check for default ratcheting.
 func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.SnippetWriter) {
 	// Emit equivalence check for default ratcheting.
-	// TODO: Need to have a follow-up PR to handle the default behavior
-	// for slices and maps.
 	targs := generator.Args{
 		"operation": mkSymbolArgs(c, operationPkgSymbols),
 	}
