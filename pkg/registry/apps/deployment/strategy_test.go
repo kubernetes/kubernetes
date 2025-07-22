@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -40,6 +41,213 @@ const (
 	deploymentName = "test-deployment"
 	namespace      = "test-namespace"
 )
+
+func TestDeploymentStrategy(t *testing.T) {
+	tests := []struct {
+		name                                                        string
+		enableDeploymentPodReplacementPolicy                        bool
+		disableDeploymentReplicaSetTerminatingReplicasFGAfterCreate bool
+		disableDeploymentPodReplacementPolicyFGAfterCreate          bool
+		podReplacementPolicy                                        *apps.DeploymentPodReplacementPolicy
+		expectedPodReplacementPolicy                                *apps.DeploymentPodReplacementPolicy
+		expectedValidationErr                                       bool
+		updatePodReplacementPolicy                                  *apps.DeploymentPodReplacementPolicy
+		expectedUpdatePodReplacementPolicy                          *apps.DeploymentPodReplacementPolicy
+		expectedValidationUpdateErr                                 bool
+	}{
+		{
+			name:                                 "Deployment strategy with both feature gates disabled",
+			enableDeploymentPodReplacementPolicy: false,
+		},
+		{
+			name:                                 "Deployment strategy with feature gate enabled",
+			enableDeploymentPodReplacementPolicy: true,
+		},
+		{
+			name:                                 "Deployment strategy with FeatureGate disabled should remove podReplacementPolicy",
+			enableDeploymentPodReplacementPolicy: false,
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+			updatePodReplacementPolicy:           ptr.To(apps.TerminationComplete),
+		},
+		{
+			name:                                 "Deployment strategy with FeatureGate disabled should remove invalid podReplacementPolicy",
+			enableDeploymentPodReplacementPolicy: false,
+			podReplacementPolicy:                 ptr.To(apps.DeploymentPodReplacementPolicy("Invalid")),
+			updatePodReplacementPolicy:           ptr.To(apps.DeploymentPodReplacementPolicy("Invalid")),
+		},
+		{
+			name:                                 "Deployment strategy with FeatureGate enabled should respect podReplacementPolicy",
+			enableDeploymentPodReplacementPolicy: true,
+			podReplacementPolicy:                 ptr.To(apps.TerminationComplete),
+			expectedPodReplacementPolicy:         ptr.To(apps.TerminationComplete),
+			updatePodReplacementPolicy:           ptr.To(apps.TerminationStarted),
+			expectedUpdatePodReplacementPolicy:   ptr.To(apps.TerminationStarted),
+		},
+		{
+			name:                                 "Deployment strategy with FeatureGate enabled should fail invalid podReplacementPolicy",
+			enableDeploymentPodReplacementPolicy: true,
+			podReplacementPolicy:                 ptr.To(apps.DeploymentPodReplacementPolicy("Invalid")),
+			expectedValidationErr:                true,
+		},
+		{
+			name:                                 "Deployment strategy with FeatureGate enabled should fail invalid podReplacementPolicy when updated",
+			enableDeploymentPodReplacementPolicy: true,
+			updatePodReplacementPolicy:           ptr.To(apps.DeploymentPodReplacementPolicy("Invalid")),
+			expectedValidationUpdateErr:          true,
+		},
+		{
+			name:                                 "Deployment strategy with podReplacementPolicy should be updated when DeploymentReplicaSetTerminatingReplicas feature gate is disabled",
+			enableDeploymentPodReplacementPolicy: true,
+			disableDeploymentReplicaSetTerminatingReplicasFGAfterCreate: true,
+			podReplacementPolicy:               ptr.To(apps.TerminationComplete),
+			expectedPodReplacementPolicy:       ptr.To(apps.TerminationComplete),
+			updatePodReplacementPolicy:         ptr.To(apps.TerminationStarted),
+			expectedUpdatePodReplacementPolicy: ptr.To(apps.TerminationStarted),
+		},
+		{
+			name:                                 "Deployment strategy with podReplacementPolicy should not be updated to invalid when DeploymentReplicaSetTerminatingReplicas feature gate is disabled",
+			enableDeploymentPodReplacementPolicy: true,
+			disableDeploymentReplicaSetTerminatingReplicasFGAfterCreate: true,
+			podReplacementPolicy:               ptr.To(apps.TerminationComplete),
+			expectedPodReplacementPolicy:       ptr.To(apps.TerminationComplete),
+			updatePodReplacementPolicy:         ptr.To(apps.DeploymentPodReplacementPolicy("Invalid")),
+			expectedValidationUpdateErr:        true,
+			expectedUpdatePodReplacementPolicy: ptr.To(apps.TerminationComplete),
+		},
+		{
+			name:                                 "Deployment strategy with podReplacementPolicy should be updated when DeploymentPodReplacementPolicy feature gate is disabled",
+			enableDeploymentPodReplacementPolicy: true,
+			disableDeploymentPodReplacementPolicyFGAfterCreate: true,
+			podReplacementPolicy:               ptr.To(apps.TerminationComplete),
+			expectedPodReplacementPolicy:       ptr.To(apps.TerminationComplete),
+			updatePodReplacementPolicy:         ptr.To(apps.TerminationStarted),
+			expectedUpdatePodReplacementPolicy: ptr.To(apps.TerminationStarted),
+		},
+		{
+			name:                                 "Deployment strategy with podReplacementPolicy should not be updated to invalid when DeploymentPodReplacementPolicy feature gate is disabled",
+			enableDeploymentPodReplacementPolicy: true,
+			disableDeploymentPodReplacementPolicyFGAfterCreate: true,
+			podReplacementPolicy:               ptr.To(apps.TerminationComplete),
+			expectedPodReplacementPolicy:       ptr.To(apps.TerminationComplete),
+			updatePodReplacementPolicy:         ptr.To(apps.DeploymentPodReplacementPolicy("Invalid")),
+			expectedValidationUpdateErr:        true,
+			expectedUpdatePodReplacementPolicy: ptr.To(apps.TerminationComplete),
+		},
+		{
+			name:                                 "Deployment strategy with podReplacementPolicy should be updated when both feature gates are disabled",
+			enableDeploymentPodReplacementPolicy: true,
+			disableDeploymentPodReplacementPolicyFGAfterCreate:          true,
+			disableDeploymentReplicaSetTerminatingReplicasFGAfterCreate: true,
+			podReplacementPolicy:               ptr.To(apps.TerminationComplete),
+			expectedPodReplacementPolicy:       ptr.To(apps.TerminationComplete),
+			updatePodReplacementPolicy:         ptr.To(apps.TerminationStarted),
+			expectedUpdatePodReplacementPolicy: ptr.To(apps.TerminationStarted),
+		},
+		{
+			name:                                 "Deployment strategy with podReplacementPolicy should not be updated to invalid when both feature gates are disabled",
+			enableDeploymentPodReplacementPolicy: true,
+			disableDeploymentPodReplacementPolicyFGAfterCreate:          true,
+			disableDeploymentReplicaSetTerminatingReplicasFGAfterCreate: true,
+			podReplacementPolicy:               ptr.To(apps.TerminationComplete),
+			expectedPodReplacementPolicy:       ptr.To(apps.TerminationComplete),
+			updatePodReplacementPolicy:         ptr.To(apps.DeploymentPodReplacementPolicy("Invalid")),
+			expectedValidationUpdateErr:        true,
+			expectedUpdatePodReplacementPolicy: ptr.To(apps.TerminationComplete),
+		},
+	}
+
+	withTwoFeatureGates := func(testName string, enableDeploymentPodReplacementPolicy bool, test func(testName string, deploymentReplicaSetTerminatingReplicasEnabled, deploymentPodReplacementPolicyEnabled bool)) {
+		for _, deploymentReplicaSetTerminatingReplicasEnabled := range []bool{true, false} {
+			for _, deploymentPodReplacementPolicyEnabled := range []bool{true, false} {
+				if enableDeploymentPodReplacementPolicy && (!deploymentReplicaSetTerminatingReplicasEnabled || !deploymentPodReplacementPolicyEnabled) {
+					// both feature gates have to be enabled for the DeploymentPodReplacementPolicy feature to work
+					continue
+				}
+				if !enableDeploymentPodReplacementPolicy && deploymentReplicaSetTerminatingReplicasEnabled && deploymentPodReplacementPolicyEnabled {
+					// at least one of the features have to be disabled for the DeploymentPodReplacementPolicy feature to not work
+					continue
+				}
+				testName := fmt.Sprintf("%v and with deploymentReplicaSetTerminatingReplicasEnabled=%v deploymentPodReplacementPolicyEnabled=%v", testName, deploymentReplicaSetTerminatingReplicasEnabled, deploymentPodReplacementPolicyEnabled)
+				test(testName, deploymentReplicaSetTerminatingReplicasEnabled, deploymentPodReplacementPolicyEnabled)
+			}
+		}
+	}
+
+	for _, tc := range tests {
+		withTwoFeatureGates(tc.name, tc.enableDeploymentPodReplacementPolicy, func(testName string, deploymentReplicaSetTerminatingReplicasEnabled, deploymentPodReplacementPolicyEnabled bool) {
+			t.Run(testName, func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, deploymentReplicaSetTerminatingReplicasEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, deploymentPodReplacementPolicyEnabled)
+
+				ctx := genericapirequest.NewDefaultContext()
+				if !Strategy.NamespaceScoped() {
+					t.Errorf("Deployment must be namespace scoped")
+				}
+				if Strategy.AllowCreateOnUpdate() {
+					t.Errorf("Deployment should not allow create on update")
+				}
+
+				validSelector := map[string]string{"a": "b"}
+				deploy := newDeploymentWithSelectorLabels(validSelector)
+				deploy.Spec.Replicas = 3
+				deploy.Spec.PodReplacementPolicy = tc.podReplacementPolicy
+				deploy.Status.Replicas = 3
+				deploy.Status.ObservedGeneration = 2
+
+				StatusStrategy.PrepareForCreate(ctx, deploy)
+				if deploy.Status.Replicas != 0 {
+					t.Error("Deployment should not allow setting status.replicas on create")
+				}
+				if deploy.Status.ObservedGeneration != int64(0) {
+					t.Error("Deployment should not allow setting status.observedGeneration on create")
+				}
+
+				errs := Strategy.Validate(ctx, deploy)
+				if len(errs) != 0 {
+					if !tc.expectedValidationErr {
+						t.Errorf("Unexpected error validating Deployment %v", errs)
+					}
+					return // no point going further when we have invalid Deployment
+				}
+				if len(errs) == 0 && tc.expectedValidationErr {
+					t.Errorf("Expected error validating Deployment")
+				}
+				if !reflect.DeepEqual(deploy.Spec.PodReplacementPolicy, tc.expectedPodReplacementPolicy) {
+					t.Errorf("Unexpected PodReplacementPolicy set: expected %v, got %v", tc.expectedPodReplacementPolicy, deploy.Spec.PodReplacementPolicy)
+				}
+				if tc.disableDeploymentReplicaSetTerminatingReplicasFGAfterCreate {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, false)
+				}
+				if tc.disableDeploymentPodReplacementPolicyFGAfterCreate {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, false)
+				}
+
+				newDeploy := newDeploymentWithSelectorLabels(validSelector)
+				newDeploy.Generation = deploy.Generation
+				newDeploy.Spec.Replicas = 3
+				newDeploy.Spec.PodReplacementPolicy = tc.updatePodReplacementPolicy
+				newDeploy.Status.Replicas = 3
+				newDeploy.Status.ObservedGeneration = deploy.Generation
+
+				Strategy.PrepareForUpdate(ctx, newDeploy, deploy)
+				errs = Strategy.ValidateUpdate(ctx, newDeploy, deploy)
+
+				if len(errs) != 0 {
+					if !tc.expectedValidationUpdateErr {
+						t.Errorf("Unexpected error updating Deployment %v", errs)
+					}
+					return // no point going further when we have invalid Deployment
+				}
+				if len(errs) == 0 && tc.expectedValidationUpdateErr {
+					t.Errorf("Expected error updating Deployment")
+				}
+				if !reflect.DeepEqual(newDeploy.Spec.PodReplacementPolicy, tc.expectedUpdatePodReplacementPolicy) {
+					t.Errorf("Unexpected PodReplacementPolicy set: expected %v, got %v", tc.expectedUpdatePodReplacementPolicy, newDeploy.Spec.PodReplacementPolicy)
+				}
+			})
+		})
+	}
+}
 
 func TestStatusUpdates(t *testing.T) {
 	tests := []struct {
