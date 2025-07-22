@@ -20,15 +20,22 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -470,3 +477,50 @@ func (r *mockResource) DeepCopyObject() runtime.Object {
 
 var _ runtime.Object = (*mockResource)(nil)
 var _ runtime.Object = (*mockResourceList)(nil)
+
+func TestInformerSyncWithFakeClient(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+
+	makeSecret := func(name string) *v1.Secret {
+		return &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   name,
+				Labels: map[string]string{"watchlist": "true"},
+			},
+		}
+	}
+
+	scheme := runtime.NewScheme()
+	var localSchemeBuilder = runtime.SchemeBuilder{
+		v1.AddToScheme,
+	}
+	localSchemeBuilder.AddToScheme(scheme)
+
+	testGVR := v1.SchemeGroupVersion.WithResource("secrets")
+	fakeClient := NewSimpleDynamicClient(scheme, makeSecret("secret-1"))
+
+	targetInformer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return nil, fmt.Errorf("unexpected list call")
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return fakeClient.Resource(testGVR).Namespace("ns-foo").Watch(context.TODO(), options)
+			},
+		},
+		&unstructured.Unstructured{},
+		time.Duration(0),
+		nil,
+	)
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go targetInformer.Run(stopCh)
+
+	ctx := context.TODO()
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (done bool, err error) {
+		return targetInformer.HasSynced(), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
