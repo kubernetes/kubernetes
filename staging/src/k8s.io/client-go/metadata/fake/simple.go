@@ -70,7 +70,13 @@ func NewSimpleMetadataClient(scheme *runtime.Scheme, objects ...runtime.Object) 
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := o.Watch(gvr, ns)
+		var gvk schema.GroupVersionKind
+		var opts metav1.ListOptions
+		if watchAction, ok := action.(testing.WatchActionImpl); ok {
+			gvk = watchAction.Kind
+			opts = watchAction.ListOptions
+		}
+		watch, err := o.Watch(gvr, gvk, ns, opts)
 		if err != nil {
 			return false, nil, err
 		}
