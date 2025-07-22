@@ -62,8 +62,8 @@ func GetPCIeRootAttributeByPCIBusID(pciBusID string) (DeviceAttribute, error) {
 //
 // ref: https://wiki.xenproject.org/wiki/Bus:Device.Function_(BDF)_Notation
 //
-// /sys/devices has directory structure which reflects the hardware hierarchy in the system.
-// Therefore, the device path may contains intermediate directories(devices).
+// /sys/devices has a directory structure which reflects the hardware hierarchy in the system.
+// Therefore, the device path may contain intermediate directories (devices).
 // Thus, we can not simply find the device path from the PCIAddress.
 // Fortunately, /sys/bus/pci/devices/<address> is a symlink to the actual device path in /sys/devices.
 // So we can resolve the actual device path by reading the symlink at /sys/bus/pci/devices/<address>.
