@@ -249,7 +249,12 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Errorf("Failed to remove temporary directory %s: %v", tmpDir, err)
+		}
+	})
 
 	podManager := kubepod.NewBasicPodManager()
 
@@ -294,7 +299,9 @@ func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
 
 	plugMgr := &volume.VolumePluginMgr{}
 	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, kubeClient, nil)
-	plugMgr.InitPlugins([]volume.VolumePlugin{attachablePlug}, nil, fakeVolumeHost)
+	if err := plugMgr.InitPlugins([]volume.VolumePlugin{attachablePlug}, nil, fakeVolumeHost); err != nil {
+		t.Fatalf("Failed to initialize volume plugins: %v", err)
+	}
 
 	manager := NewVolumeManager(
 		true,
