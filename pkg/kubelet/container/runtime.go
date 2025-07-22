@@ -235,7 +235,10 @@ func BuildContainerID(typ, ID string) ContainerID {
 func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		klog.ErrorS(err, "Parsing containerID failed")
+		// Use klog.TODO() because we currently do not have a proper logger to pass in.
+		// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
+		logger := klog.TODO()
+		logger.Error(err, "Parsing containerID failed")
 	}
 	return id
 }
