@@ -51,10 +51,12 @@ func GetPCIeRootAttributeByPCIBusID(pciBusID string) (DeviceAttribute, error) {
 
 	pciRootPart := strings.Split(strings.TrimPrefix(sysDevicesPath, sysfs.devices("")+"/"), "/")[0]
 
-	return DeviceAttribute{
+	attr := DeviceAttribute{
 		Name:  StandardDeviceAttributePCIeRoot,
 		Value: resourceapi.DeviceAttribute{StringValue: &pciRootPart},
-	}, nil
+	}
+
+	return attr, nil
 }
 
 // resolveSysDevicesPath resolves the /sys/devices path from the PCI Bus ID
