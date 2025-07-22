@@ -19,11 +19,16 @@ package kubernetes_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -89,5 +94,32 @@ func TestListDecoding(t *testing.T) {
 
 	if obj.GetObjectKind().GroupVersionKind() != (schema.GroupVersionKind{}) {
 		t.Fatal(obj.GetObjectKind().GroupVersionKind())
+	}
+}
+
+func TestInformerSyncWatchList(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+
+	makePod := func(name string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: "ns",
+			},
+		}
+	}
+	pod1 := makePod("pod-1")
+	fakeClient := fake.NewClientset(pod1)
+
+	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+	podInformer := informerFactory.Core().V1().Pods().Informer()
+
+	ctx := context.TODO()
+	informerFactory.Start(ctx.Done())
+
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(context.Context) (done bool, err error) {
+		return podInformer.HasSynced(), nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }
