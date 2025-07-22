@@ -878,6 +878,37 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
 
 	tpd := newTestPodData()
+	ginkgo.By("checking the output when we try to get an inexistent pod")
+	expected = []podDesc{}
+	descs := []podDesc{
+		{
+			podName: "pod-00",
+			cntName: "cnt-00",
+		},
+		{
+			podName: "pod-01",
+			cntName: "cnt-01",
+		},
+		{
+			podName:    "pod-02",
+			cntName:    "cnt-02",
+			cpuRequest: 1000,
+		},
+		{
+			podName: "pod-03",
+			cntName: "cnt-03",
+		},
+	}
+	tpd.createPodsForTest(ctx, f, descs)
+	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-AA", PodNamespace: f.Namespace.Name})
+	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
+	gomega.Expect(err).To(gomega.HaveOccurred(), "pod not found")
+	res = convertToMap(podResourceList)
+	err = matchPodDescWithResources(expected, res)
+	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
+	tpd.deletePodsForTest(ctx, f)
+
+	tpd = newTestPodData()
 	ginkgo.By("checking the output when only pods which don't require resources are present")
 	expected = []podDesc{
 		{
@@ -907,6 +938,27 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
 	framework.ExpectNoError(err, "Get() call failed for pod %s/%s", f.Namespace.Name, "pod-01")
 	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
+	res = convertToMap(podResourceList)
+	err = matchPodDescWithResources(expected, res)
+	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
+	tpd.deletePodsForTest(ctx, f)
+
+	restartNever := v1.RestartPolicyNever
+	tpd = newTestPodData()
+	ginkgo.By("checking the output when only pod require CPU is terminated")
+	expected = []podDesc{
+		{
+			podName:        "pod-01",
+			cntName:        "cnt-00",
+			cpuRequest:     1000,
+			restartPolicy:  &restartNever,
+			mainCntCommand: []string{"sh", "-c", "/bin/true"},
+		},
+	}
+	tpd.createPodsForTest(ctx, f, expected)
+	resp, err = cli.Get(ctx, &kubeletpodresourcesv1.GetPodResourcesRequest{PodName: "pod-01", PodNamespace: f.Namespace.Name})
+	podResourceList = []*kubeletpodresourcesv1.PodResources{resp.GetPodResources()}
+	gomega.Expect(err).To(gomega.HaveOccurred(), "pod not found")
 	res = convertToMap(podResourceList)
 	err = matchPodDescWithResources(expected, res)
 	framework.ExpectNoError(err, "matchPodDescWithResources() failed err %v", err)
