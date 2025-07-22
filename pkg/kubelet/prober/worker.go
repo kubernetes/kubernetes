@@ -327,21 +327,18 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 	}
 
-	var result results.Result
+	var req *http.Request
 	var err error
 	// Use cached HTTP request if available
 	if w.httpProbeRequest != nil {
-		req, reqErr := w.httpProbeRequest.getRequest(&w.container) // either returns cached request or creates a new one
-		if reqErr != nil {
-			klog.V(4).InfoS("HTTP-Probe failed to create request", "error", reqErr)
+		req, err = w.httpProbeRequest.getRequest(&w.container) // either returns cached request or creates a new one
+		if err != nil {
+			klog.V(4).InfoS("HTTP-Probe failed to create request", "error", err)
 			return true
 		}
-		// Note, exec probe does NOT have access to pod environment variables or downward API
-		result, err = w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID, req)
-	} else {
-		// Note, exec probe does NOT have access to pod environment variables or downward API
-		result, err = w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID, nil)
 	}
+	// Note, exec probe does NOT have access to pod environment variables or downward API
+	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID, req)
 
 	if err != nil {
 		// Prober error, throw away the result.
