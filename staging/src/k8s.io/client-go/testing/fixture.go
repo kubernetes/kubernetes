@@ -30,6 +30,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metainternalversionvalidation "k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,10 +39,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/managedfields"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 )
+
+var scheme = runtime.NewScheme()
+
+func init() {
+	utilruntime.Must(metainternalversion.AddToScheme(scheme))
+}
 
 // ObjectTracker keeps track of objects. It is intended to be used to
 // fake calls to a server by returning objects based on their kind,
@@ -354,7 +363,11 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 }
 
 func (t *tracker) Watch(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string, opts ...metav1.ListOptions) (watch.Interface, error) {
-	_, err := assertOptionalSingleArgument(opts)
+	listOpts, err := assertOptionalSingleArgument(opts)
+	if err != nil {
+		return nil, err
+	}
+	watchListRequest, err := isWatchListRequest(listOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -363,6 +376,32 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, gvk schema.GroupVersion
 	defer t.lock.Unlock()
 
 	fakewatcher := watch.NewRaceFreeFake()
+	if watchListRequest {
+		objs, err := filterByNamespace(t.objects[gvr], ns)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range objs {
+			fakewatcher.Add(obj)
+		}
+
+		newObj, err := t.scheme.New(gvk)
+		if err != nil {
+			return nil, err
+		}
+		objMeta, err := meta.Accessor(newObj)
+		if err != nil {
+			return nil, err
+		}
+		objAnnotations := objMeta.GetAnnotations()
+		if objAnnotations == nil {
+			objAnnotations = map[string]string{}
+		}
+		objAnnotations[metav1.InitialEventsAnnotationKey] = "true"
+		objMeta.SetAnnotations(objAnnotations)
+
+		fakewatcher.Action(watch.Bookmark, newObj)
+	}
 
 	if _, exists := t.watchers[gvr]; !exists {
 		t.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)
@@ -946,4 +985,18 @@ func assertOptionalSingleArgument[T any](arguments []T) (T, error) {
 	default:
 		return a, fmt.Errorf("expected only one option argument but got %d", len(arguments))
 	}
+}
+
+func isWatchListRequest(opts metav1.ListOptions) (bool, error) {
+	if opts.Watch == true && opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+		internalListOptions := &metainternalversion.ListOptions{}
+		if err := scheme.Convert(&opts, internalListOptions, nil); err != nil {
+			return false, err
+		}
+		if errs := metainternalversionvalidation.ValidateListOptions(internalListOptions, true); len(errs) > 0 {
+			return false, errs.ToAggregate()
+		}
+		return true, nil
+	}
+	return false, nil
 }
