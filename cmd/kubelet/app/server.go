@@ -273,10 +273,8 @@ is checked every 20 seconds (also configurable with a flag).`,
 			}
 
 			if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-				if cleanFlagSet != nil {
-					namedFlagSet := map[string]*pflag.FlagSet{server.ComponentKubelet: cleanFlagSet}
-					kubeletDeps.Flagz = flagz.NamedFlagSetsReader{FlagSets: cliflag.NamedFlagSets{FlagSets: namedFlagSet}}
-				}
+				namedFlagSet := map[string]*pflag.FlagSet{server.ComponentKubelet: cleanFlagSet}
+				kubeletDeps.Flagz = flagz.NamedFlagSetsReader{FlagSets: cliflag.NamedFlagSets{FlagSets: namedFlagSet}}
 			}
 
 			if err := checkPermissions(ctx); err != nil {
