@@ -75,16 +75,14 @@ func resolveSysDevicesPath(pciBusID string) (string, error) {
 	// e.g. /sys/bus/pci/devices/0000:00:1f.0
 	sysBusPath := sysfs.bus(filepath.Join("pci", "devices", pciBusID))
 
-	targetRelative, err := os.Readlink(sysBusPath)
+	target, err := os.Readlink(sysBusPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read symlink for PCI Bus ID %s: %w", sysBusPath, err)
 	}
-	var targetAbs string
-	if filepath.IsAbs(targetRelative) {
-		targetAbs = targetRelative
-	} else {
-		// If the target is a relative path, we need to resolve it relative to the symlink's directory.
-		targetAbs = filepath.Join(filepath.Dir(sysBusPath), targetRelative)
+
+	// If the target is a relative path, we need to resolve it relative to the symlink's directory.
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(sysBusPath), target)
 	}
 
 	// targetAbs must be /sys/devices/pci0000:01/...<intermediate PCI devices>.../0000:00:1f.0
