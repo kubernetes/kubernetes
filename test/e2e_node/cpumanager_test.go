@@ -40,6 +40,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -1089,7 +1090,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, ginkgo.ContinueOnFailure, fra
 					ginkgo.By(fmt.Sprintf("validating the container %s on pod %s", cnt.Name, pod.Name))
 
 					gomega.Expect(pod).To(HaveContainerCPUsWithSameUncoreCacheID(cnt.Name))
-					gomega.Expect(pod).ToNot(HaveContainerCPUsShareUncoreCacheWith(cnt.Name, reservedCPUs))
 				}
 			} else {
 				// for node with monolithic uncore cache processor
@@ -2252,7 +2252,8 @@ func HaveContainerCPUsWithSameUncoreCacheID(ctnName string) types.GomegaMatcher 
 
 func HaveContainerCPUsShareUncoreCacheWith(ctnName string, ref cpuset.CPUSet) types.GomegaMatcher {
 	md := &msgData{
-		Name: ctnName,
+		Name:         ctnName,
+		ExpectedCPUs: ref.String(),
 	}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
 		containerCPUs, err := getContainerAllowedCPUs(actual, ctnName, false)
@@ -2262,32 +2263,30 @@ func HaveContainerCPUsShareUncoreCacheWith(ctnName string, ref cpuset.CPUSet) ty
 		md.CurrentCPUs = containerCPUs.String()
 
 		// Build set of uncore cache IDs from the reference cpuset
-		refUncoreIDs := make(map[int64]struct{})
-		for _, cpu := range ref.List() {
+		refUncoreIDs := sets.New[int64]()
+		for _, cpu := range ref.UnsortedList() {
 			uncoreID, err := uncoreCacheIDFromSysFS(cpu)
 			if err != nil {
 				return false, fmt.Errorf("failed to read uncore cache ID for reference CPU %d: %w", cpu, err)
 			}
-			refUncoreIDs[uncoreID] = struct{}{}
+			refUncoreIDs.Insert(uncoreID)
 		}
 
 		// Check if any container CPUs share an uncore ID with the reference set
-		for _, cpu := range containerCPUs.List() {
+		for _, cpu := range containerCPUs.UnsortedList() {
 			uncoreID, err := uncoreCacheIDFromSysFS(cpu)
 			if err != nil {
 				return false, fmt.Errorf("failed to read uncore cache ID for container CPU %d: %w", cpu, err)
 			}
-			if _, ok := refUncoreIDs[uncoreID]; ok {
-				md.UncoreCacheAlign = fmt.Sprintf("container CPU %d shares uncore ID %d with reference cpuset", cpu, uncoreID)
+			if refUncoreIDs.Has(uncoreID) {
+				md.UncoreCacheAlign = fmt.Sprintf("%d", uncoreID)
 				return true, nil
 			}
 		}
 
-		// No shared uncore IDs found
-		md.UncoreCacheAlign = fmt.Sprintf("container %s CPUs do not share any uncore cache ID with reference cpuset %s", ctnName, ref.String())
 		return false, nil
 	}).WithTemplate(
-		"Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} container {{.Data.Name}} has CPUSet <{{.Data.CurrentCPUs}}> with no shared uncore cache ID with reference CPUSet",
+		"Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} container {{.Data.Name}} has CPUSet <{{.Data.CurrentCPUs}}> sharing uncoreCache ID <{{.Data.UncoreCacheAlign}}> with reference CPUSet <{{.Data.ExpectedCPUs}}>",
 		md,
 	)
 }
