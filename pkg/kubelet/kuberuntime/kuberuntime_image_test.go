@@ -325,7 +325,15 @@ func TestPullWithSecrets(t *testing.T) {
 			t.Fatal("failed to setup an file pull records accessor")
 		}
 
-		imagePullManager, err := imagepullmanager.NewImagePullManager(tCtx, fsRecordAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
+		const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
+		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
+			fsRecordAccessor,
+			intentsRecordsCacheSize,
+			pulledRecordsCacheSize,
+			stripedLocksSetSize,
+		)
+
+		imagePullManager, err := imagepullmanager.NewImagePullManager(tCtx, memCacheRecordsAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
 		if err != nil {
 			t.Fatal("failed to setup an image pull manager")
 		}
@@ -407,7 +415,15 @@ func TestPullWithSecretsWithError(t *testing.T) {
 				t.Fatal("failed to setup an file pull records accessor")
 			}
 
-			imagePullManager, err := imagepullmanager.NewImagePullManager(tCtx, fsRecordAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
+			const intentsRecordsCacheSize, pulledRecordsCacheSize, stripedLocksSetSize = 50, 100, 10
+			memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(
+				fsRecordAccessor,
+				intentsRecordsCacheSize,
+				pulledRecordsCacheSize,
+				stripedLocksSetSize,
+			)
+
+			imagePullManager, err := imagepullmanager.NewImagePullManager(tCtx, memCacheRecordsAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
 			if err != nil {
 				t.Fatal("failed to setup an image pull manager")
 			}
