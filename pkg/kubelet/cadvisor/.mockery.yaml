@@ -1,0 +1,10 @@
+---
+dir: testing
+filename: cadvisor_mock.go
+boilerplate-file: ../../../hack/boilerplate/boilerplate.generatego.txt
+outpkg: testing
+with-expecter: true
+packages:
+  k8s.io/kubernetes/pkg/kubelet/cadvisor:
+    interfaces:
+      Interface:

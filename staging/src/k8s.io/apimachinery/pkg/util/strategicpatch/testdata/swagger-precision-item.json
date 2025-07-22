@@ -1,0 +1,47 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "StrategicMergePatchTestingPrecisionItem",
+    "version": "v1.9.0"
+  },
+  "paths": {},
+  "definitions": {
+    "precisionItem": {
+      "description": "PrecisionItem is type definition for testing strategic merge.",
+      "required": [],
+      "properties": {
+        "name": {
+          "description": "Name field.",
+          "type": "string"
+        },
+        "int32": {
+          "description": "Int32 field.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "int64": {
+          "description": "Int64 field.",
+          "type": "integer",
+          "format": "int64"
+        },
+        "float32": {
+          "description": "Float32 field.",
+          "type": "number",
+          "format": "float32"
+        },
+        "float64": {
+          "description": "Float64 field.",
+          "type": "number",
+          "format": "float64"
+        }
+      },
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "fake-group",
+          "kind": "precisionItem",
+          "version": "some-version"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,164 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    annotationsKey: annotationsValue
+  creationTimestamp: "2008-01-01T01:01:01Z"
+  deletionGracePeriodSeconds: 10
+  deletionTimestamp: "2009-01-01T01:01:01Z"
+  finalizers:
+  - finalizersValue
+  generateName: generateNameValue
+  generation: 7
+  labels:
+    labelsKey: labelsValue
+  managedFields:
+  - apiVersion: apiVersionValue
+    fieldsType: fieldsTypeValue
+    fieldsV1: {}
+    manager: managerValue
+    operation: operationValue
+    subresource: subresourceValue
+    time: "2004-01-01T01:01:01Z"
+  name: nameValue
+  namespace: namespaceValue
+  ownerReferences:
+  - apiVersion: apiVersionValue
+    blockOwnerDeletion: true
+    controller: true
+    kind: kindValue
+    name: nameValue
+    uid: uidValue
+  resourceVersion: resourceVersionValue
+  selfLink: selfLinkValue
+  uid: uidValue
+spec:
+  conversion:
+    strategy: strategyValue
+    webhook:
+      clientConfig:
+        caBundle: Ag==
+        service:
+          name: nameValue
+          namespace: namespaceValue
+          path: pathValue
+          port: 4
+        url: urlValue
+      conversionReviewVersions:
+      - conversionReviewVersionsValue
+  group: groupValue
+  names:
+    categories:
+    - categoriesValue
+    kind: kindValue
+    listKind: listKindValue
+    plural: pluralValue
+    shortNames:
+    - shortNamesValue
+    singular: singularValue
+  preserveUnknownFields: true
+  scope: scopeValue
+  versions:
+  - additionalPrinterColumns:
+    - description: descriptionValue
+      format: formatValue
+      jsonPath: jsonPathValue
+      name: nameValue
+      priority: 5
+      type: typeValue
+    deprecated: true
+    deprecationWarning: deprecationWarningValue
+    name: nameValue
+    schema:
+      openAPIV3Schema:
+        $ref: $refValue
+        $schema: $schemaValue
+        additionalItems: true
+        additionalProperties: true
+        allOf:
+        - {}
+        anyOf:
+        - {}
+        default: defaultValue
+        definitions:
+          definitionsKey: {}
+        dependencies:
+          dependenciesKey:
+          - <no json tag> PropertyValue
+        description: descriptionValue
+        enum:
+        - enumValue
+        example: exampleValue
+        exclusiveMaximum: true
+        exclusiveMinimum: true
+        externalDocs:
+          description: descriptionValue
+          url: urlValue
+        format: formatValue
+        id: idValue
+        items:
+        - {}
+        maxItems: 16
+        maxLength: 13
+        maxProperties: 21
+        maximum: 9.5
+        minItems: 17
+        minLength: 14
+        minProperties: 22
+        minimum: 11.5
+        multipleOf: 19.5
+        nullable: true
+        oneOf:
+        - {}
+        pattern: patternValue
+        patternProperties:
+          patternPropertiesKey: {}
+        properties:
+          propertiesKey: {}
+        required:
+        - requiredValue
+        title: titleValue
+        type: typeValue
+        uniqueItems: true
+        x-kubernetes-embedded-resource: true
+        x-kubernetes-int-or-string: true
+        x-kubernetes-list-map-keys:
+        - x-kubernetes-list-map-keysValue
+        x-kubernetes-list-type: x-kubernetes-list-typeValue
+        x-kubernetes-map-type: x-kubernetes-map-typeValue
+        x-kubernetes-preserve-unknown-fields: true
+        x-kubernetes-validations:
+        - fieldPath: fieldPathValue
+          message: messageValue
+          messageExpression: messageExpressionValue
+          optionalOldSelf: true
+          reason: reasonValue
+          rule: ruleValue
+    selectableFields:
+    - jsonPath: jsonPathValue
+    served: true
+    storage: true
+    subresources:
+      scale:
+        labelSelectorPath: labelSelectorPathValue
+        specReplicasPath: specReplicasPathValue
+        statusReplicasPath: statusReplicasPathValue
+      status: {}
+status:
+  acceptedNames:
+    categories:
+    - categoriesValue
+    kind: kindValue
+    listKind: listKindValue
+    plural: pluralValue
+    shortNames:
+    - shortNamesValue
+    singular: singularValue
+  conditions:
+  - lastTransitionTime: "2003-01-01T01:01:01Z"
+    message: messageValue
+    reason: reasonValue
+    status: statusValue
+    type: typeValue
+  storedVersions:
+  - storedVersionsValue

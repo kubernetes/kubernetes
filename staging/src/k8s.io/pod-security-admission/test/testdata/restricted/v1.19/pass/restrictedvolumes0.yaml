@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restrictedvolumes0
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  volumes:
+  - name: volume0
+  - emptyDir: {}
+    name: volume1
+  - name: volume2
+    secret:
+      secretName: test
+  - name: volume3
+    persistentVolumeClaim:
+      claimName: test
+  - downwardAPI:
+      items:
+      - fieldRef:
+          fieldPath: metadata.labels
+        path: labels
+    name: volume4
+  - configMap:
+      name: test
+    name: volume5
+  - name: volume6
+    projected:
+      sources: []

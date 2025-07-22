@@ -1,0 +1,330 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
+# It basically covers all test cases but with their smallest workload. 
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
+- name: SchedulingSecrets
+  defaultPodTemplatePath: ../templates/pod-with-secret-volume.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+  - name: 5000Nodes_10000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 260
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 10000
+  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 260
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 10000
+
+- name: SchedulingInTreePVs
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    persistentVolumeTemplatePath: ../templates/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    persistentVolumeTemplatePath: ../templates/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+  - name: 5000Nodes_2000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 90
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 2000
+  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 90
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 2000
+
+- name: SchedulingMigratedInTreePVs
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    nodeAllocatableStrategy:
+      nodeAllocatable:
+        attachable-volumes-csi-ebs.csi.aws.com: "39"
+      csiNodeAllocatable:
+        ebs.csi.aws.com:
+          count: 39
+      migratedPlugins:
+      - "kubernetes.io/aws-ebs"
+  - opcode: createPods
+    countParam: $initPods
+    persistentVolumeTemplatePath: ../templates/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    persistentVolumeTemplatePath: ../templates/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+  - name: 5000Nodes_5000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 35
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 35
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 5000
+
+- name: SchedulingCSIPVs
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    nodeAllocatableStrategy:
+      nodeAllocatable:
+        attachable-volumes-csi-ebs.csi.aws.com: "39"
+      csiNodeAllocatable:
+        ebs.csi.aws.com:
+          count: 39
+  - opcode: createPods
+    countParam: $initPods
+    persistentVolumeTemplatePath: ../templates/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    persistentVolumeTemplatePath: ../templates/pv-csi.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 1000
+  - name: 5000Nodes_5000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 48
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 48
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 5000
+
+- name: PreemptionPVs
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-low-priority.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-high-priority.yaml
+    persistentVolumeTemplatePath: ../templates/pv-aws.yaml
+    persistentVolumeClaimTemplatePath: ../templates/pvc.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 1000Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance, short]
+    params:
+      initNodes: 1000
+      initPods: 4000
+      measurePods: 1000
+  - name: 1000Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance, short]
+    params:
+      initNodes: 1000
+      initPods: 4000
+      measurePods: 1000
+# This test case always seems to fail.
+# https://github.com/kubernetes/kubernetes/issues/108308
+#
+#  - name: 5000Nodes
+#    params:
+#      initNodes: 5000
+#      initPods: 20000
+#      measurePods: 5000

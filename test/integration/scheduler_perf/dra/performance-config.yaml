@@ -1,0 +1,635 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
+# It basically covers all test cases but with their smallest workload. 
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
+# SchedulingWithResourceClaimTemplate uses a ResourceClaimTemplate
+# and dynamically creates ResourceClaim instances for each pod. Node, pod and
+# device counts are chosen so that the cluster gets filled up completely.
+- name: SchedulingWithResourceClaimTemplate
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: templates/pod-with-claim-template.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+  - name: 2000pods_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 20
+  - name: 2000pods_200nodes
+    params:
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 10
+  - name: 5000pods_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 40 # typically above 51
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2500
+      measurePods: 2500
+      maxClaimsPerNode: 10
+  - name: 5000pods_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSchedulingWithResourceClaimTemplate%2F5000pods_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 56 # typically above 70
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2500
+      measurePods: 2500
+      maxClaimsPerNode: 10
+
+# SteadyStateResourceClaimTemplate uses a ResourceClaimTemplate and
+# dynamically creates ResourceClaim instances for each pod. It creates ten
+# pods, waits for them to be scheduled, deletes them, and starts again,
+# so the cluster remains at the same level of utilization.
+#
+# The number of already allocated claims can be varied, thus simulating
+# various degrees of pre-existing resource utilization.
+- name: SteadyStateClusterResourceClaimTemplate
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaim.yaml
+    countParam: $initClaims
+    namespace: init
+  - opcode: allocResourceClaims
+    namespace: init
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    count: 10
+    steadyState: true
+    durationParam: $duration
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 2s
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 2s
+  - name: empty_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: empty_200nodes
+    params:
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: empty_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fempty_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 64 # typically above 81
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: empty_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fempty_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 64 # typically above 81
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 10s
+  # In the "half" scenarios, half of the devices are in use.
+  - name: half_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initClaims: 500
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: half_200nodes
+    params:
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initClaims: 1000
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: half_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fhalf_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 70 # typically over 78
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 2500
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: half_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Fhalf_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 60 # typically over 75
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 2500
+      maxClaimsPerNode: 10
+      duration: 10s
+  # In the "full" scenarios, the cluster can accommodate exactly 10 additional pods.
+  - name: full_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initClaims: 990
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: full_200nodes
+    params:
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initClaims: 1990
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: full_500nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Ffull_500nodes%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 60 # typically over 75
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 4990
+      maxClaimsPerNode: 10
+      duration: 10s
+  - name: full_500nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=SchedulingThroughput&Name=BenchmarkPerfScheduling%2FSteadyStateClusterResourceClaimTemplate%2Ffull_500nodes_QueueingHintsEnabled%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    threshold: 60 # typically over 75
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initClaims: 4990
+      maxClaimsPerNode: 10
+      duration: 10s
+
+# SteadyStateResourceClaimTemplateFirstAvailable is a variant of SteadyStateResourceClaimTemplate
+# with a claim template that uses the "firstAvailable" subrequests, aka DRAPrioritizedList.
+- name: SteadyStateClusterResourceClaimTemplateFirstAvailable
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAPrioritizedList: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaim.yaml
+    countParam: $initClaims
+    namespace: init
+  - opcode: allocResourceClaims
+    namespace: init
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-first-available.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    count: 10
+    steadyState: true
+    durationParam: $duration
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 2s
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initClaims: 0
+      maxClaimsPerNode: 10
+      duration: 2s
+
+# SchedulingWithResourceClaimTemplateToleration is a variant of SchedulingWithResourceClaimTemplate
+# with a claim template that tolerates the taint defined in a DeviceTaintRule.
+- name: SchedulingWithResourceClaimTemplateToleration
+  featureGates:
+    DynamicResourceAllocation: true
+    DRADeviceTaints: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createAny
+    templatePath: templates/devicetaintrule.yaml
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-toleration.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: templates/pod-with-claim-template.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-toleration.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+
+# SchedulingWithResourceClaimTemplatePartitionable is a variant of SchedulingWithResourceClaimTemplate.
+# It creates ResourceSlices with partitionable devices and uses a claim template referenced
+# by the test pods. It includes allocated claims that consumes counters and it sets up the devices
+# such that the allocator will have to backtrack once in order to find a working solution.
+- name: SteadyStateClusterResourceClaimTemplatePartitionable
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAPartitionableDevices: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: templates/resourceslice-partitionable.yaml
+    countParam: $resourceSlices
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaim-with-selector.yaml
+    namespace: init
+    countParam: $initClaims
+  - opcode: allocResourceClaims
+    namespace: init
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-for-two-devices.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyState: true
+    durationParam: $duration
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 10
+      initClaims: 10
+      measurePods: 10
+      duration: 2s
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 10
+      initClaims: 10
+      measurePods: 10
+      duration: 2s
+  - name: 2000pods_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      resourceSlices: 2000
+      initClaims: 2000
+      measurePods: 2000
+      duration: 10s
+
+# SchedulingWithResourceClaimTemplatePartitionableBacktracking is a variant of
+# SchedulingWithResourceClaimTemplate. It creates a single ResourceSlice and a
+# ResourceClaim that forces the allocator to backtrack multiple times in order
+# to find a solution.
+- name: SteadyStateClusterResourceClaimTemplatePartitionableBacktracking
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAPartitionableDevices: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: templates/resourceslice-partitionable-backtracking.yaml
+    countParam: $resourceSlices
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-backtracking.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyState: true
+    durationParam: $duration
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 1
+      measurePods: 1
+      duration: 2s
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 1
+      measurePods: 1
+      duration: 2s
+
+# SchedulingWithResourceClaimTemplate uses ResourceClaims
+# with deterministic names that are shared between pods.
+# There is a fixed ratio of 1:5 between claims and pods.
+- name: SchedulingWithResourceClaim
+  featureGates:
+    DynamicResourceAllocation: true
+    # SchedulerQueueingHints: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaim.yaml
+    namespace: init
+    countParam: $initClaims
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: templates/pod-with-claim-ref.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaim.yaml
+    namespace: test
+    countParam: $measureClaims
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-with-claim-ref.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      initClaims: 0
+      measurePods: 10
+      measureClaims: 2 # must be measurePods / 5
+      maxClaimsPerNode: 2
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      initClaims: 0
+      measurePods: 10
+      measureClaims: 2 # must be measurePods / 5
+      maxClaimsPerNode: 2
+  - name: 2000pods_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 1000
+      initClaims: 200 # must be initPods / 5
+      measurePods: 1000
+      measureClaims: 200 # must be initPods / 5
+      maxClaimsPerNode: 4
+  - name: 2000pods_200nodes
+    params:
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      initClaims: 200 # must be initPods / 5
+      measurePods: 1000
+      measureClaims: 200 # must be measurePods / 5
+      maxClaimsPerNode: 2
+  - name: 5000pods_500nodes
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2500
+      initClaims: 500 # must be initPods / 5
+      measurePods: 2500
+      measureClaims: 500 # must be measurePods / 5
+      maxClaimsPerNode: 2

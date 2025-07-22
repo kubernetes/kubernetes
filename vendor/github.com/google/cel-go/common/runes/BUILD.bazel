@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "buffer.go",
+    ],
+    importpath = "github.com/google/cel-go/common/runes",
+)
+
+go_test(
+    name = "go_default_test",
+    size = "small",
+    srcs = [
+        "buffer_test.go",
+    ],
+    embed = [
+        ":go_default_library",
+    ],
+)

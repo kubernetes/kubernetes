@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-addon-manager
+  namespace: kube-system
+  labels:
+    component: kube-addon-manager
+spec:
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+    runAsUser: {{runAsUser}}
+    runAsGroup: {{runAsGroup}}
+  priorityClassName: system-node-critical
+  priority: 2000001000
+  hostNetwork: true
+  containers:
+  - name: kube-addon-manager
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - all
+    # When updating version also bump it in:
+    # - test/kubemark/resources/manifests/kube-addon-manager.yaml
+    image: registry.k8s.io/addon-manager/kube-addon-manager:v9.1.7
+    command:
+    - /bin/bash
+    - -c
+    - exec /opt/kube-addons-main.sh 1>>/var/log/kube-addon-manager.log 2>&1
+    resources:
+      requests:
+        cpu: 5m
+        memory: 50Mi
+    volumeMounts:
+    - mountPath: /etc/kubernetes/
+      name: addons
+      readOnly: true
+    - mountPath: /var/log
+      name: varlog
+      readOnly: false
+    - mountPath: /etc/srv/kubernetes/addon-manager/
+      name: srvkube
+      readOnly: true
+    env:
+    - name: KUBECTL_PRUNE_WHITELIST_OVERRIDE
+      value: {{kubectl_prune_whitelist_override}}
+    - name: KUBECTL_EXTRA_PRUNE_WHITELIST
+      value: {{kubectl_extra_prune_whitelist}}
+    - name: KUBECTL_OPTS
+      value: '--kubeconfig=/etc/srv/kubernetes/addon-manager/kubeconfig'
+  volumes:
+  - hostPath:
+      path: /etc/kubernetes/
+    name: addons
+  - hostPath:
+      path: /var/log
+    name: varlog
+  - hostPath:
+      path: /etc/srv/kubernetes/addon-manager/
+    name: srvkube

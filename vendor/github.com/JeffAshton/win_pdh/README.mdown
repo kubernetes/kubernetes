@@ -1,0 +1,15 @@
+About win_pdh
+=============
+
+win_pdh is a Windows Performance Data Helper wrapper package for Go.
+
+Originally part of [walk](https://github.com/lxn/walk) and [win](https://github.com/lxn/win), it is now a separate
+project.
+
+Setup
+=====
+
+Make sure you have a working Go installation.
+See [Getting Started](http://golang.org/doc/install.html)
+
+Now run `go get github.com/JeffAshton/win_pdh`

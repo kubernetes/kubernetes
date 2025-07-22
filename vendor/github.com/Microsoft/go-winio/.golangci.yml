@@ -1,0 +1,147 @@
+linters:
+  enable:
+    # style
+    - containedctx # struct contains a context
+    - dupl # duplicate code
+    - errname # erorrs are named correctly
+    - nolintlint # "//nolint" directives are properly explained
+    - revive # golint replacement
+    - unconvert # unnecessary conversions
+    - wastedassign
+
+    # bugs, performance, unused, etc ...
+    - contextcheck # function uses a non-inherited context
+    - errorlint # errors not wrapped for 1.13
+    - exhaustive # check exhaustiveness of enum switch statements
+    - gofmt # files are gofmt'ed
+    - gosec # security
+    - nilerr # returns nil even with non-nil error
+    - thelper #  test helpers without t.Helper()
+    - unparam # unused function params
+
+issues:
+  exclude-dirs:
+    - pkg/etw/sample
+
+  exclude-rules:
+    # err is very often shadowed in nested scopes
+    - linters:
+        - govet
+      text: '^shadow: declaration of "err" shadows declaration'
+
+    # ignore long lines for skip autogen directives
+    - linters:
+        - revive
+      text: "^line-length-limit: "
+      source: "^//(go:generate|sys) "
+
+    #TODO: remove after upgrading to go1.18
+    # ignore comment spacing for nolint and sys directives
+    - linters:
+        - revive
+      text: "^comment-spacings: no space between comment delimiter and comment text"
+      source: "//(cspell:|nolint:|sys |todo)"
+
+    # not on go 1.18 yet, so no any
+    - linters:
+        - revive
+      text: "^use-any: since GO 1.18 'interface{}' can be replaced by 'any'"
+
+    # allow unjustified ignores of error checks in defer statements
+    - linters:
+        - nolintlint
+      text: "^directive `//nolint:errcheck` should provide explanation"
+      source: '^\s*defer '
+
+    # allow unjustified ignores of error lints for io.EOF
+    - linters:
+        - nolintlint
+      text: "^directive `//nolint:errorlint` should provide explanation"
+      source: '[=|!]= io.EOF'
+
+
+linters-settings:
+  exhaustive:
+    default-signifies-exhaustive: true
+  govet:
+    enable-all: true
+    disable:
+      # struct order is often for Win32 compat
+      # also, ignore pointer bytes/GC issues for now until performance becomes an issue
+      - fieldalignment
+  nolintlint:
+    require-explanation: true
+    require-specific: true
+  revive:
+    # revive is more configurable than static check, so likely the preferred alternative to static-check
+    # (once the perf issue is solved: https://github.com/golangci/golangci-lint/issues/2997)
+    enable-all-rules:
+      true
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md
+    rules:
+      # rules with required arguments
+      - name: argument-limit
+        disabled: true
+      - name: banned-characters
+        disabled: true
+      - name: cognitive-complexity
+        disabled: true
+      - name: cyclomatic
+        disabled: true
+      - name: file-header
+        disabled: true
+      - name: function-length
+        disabled: true
+      - name: function-result-limit
+        disabled: true
+      - name: max-public-structs
+        disabled: true
+      # geneally annoying rules
+      - name: add-constant # complains about any and all strings and integers
+        disabled: true
+      - name: confusing-naming # we frequently use "Foo()" and "foo()" together
+        disabled: true
+      - name: flag-parameter # excessive, and a common idiom we use
+        disabled: true
+      - name: unhandled-error # warns over common fmt.Print* and io.Close; rely on errcheck instead
+        disabled: true
+      # general config
+      - name: line-length-limit
+        arguments:
+          - 140
+      - name: var-naming
+        arguments:
+          - []
+          - - CID
+            - CRI
+            - CTRD
+            - DACL
+            - DLL
+            - DOS
+            - ETW
+            - FSCTL
+            - GCS
+            - GMSA
+            - HCS
+            - HV
+            - IO
+            - LCOW
+            - LDAP
+            - LPAC
+            - LTSC
+            - MMIO
+            - NT
+            - OCI
+            - PMEM
+            - PWSH
+            - RX
+            - SACl
+            - SID
+            - SMB
+            - TX
+            - VHD
+            - VHDX
+            - VMID
+            - VPCI
+            - WCOW
+            - WIM

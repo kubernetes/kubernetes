@@ -1,0 +1,94 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/1150"
+    controller-gen.kubebuilder.io/version: v0.15.0
+  name: volumegroupsnapshotclasses.groupsnapshot.storage.k8s.io
+spec:
+  group: groupsnapshot.storage.k8s.io
+  names:
+    kind: VolumeGroupSnapshotClass
+    listKind: VolumeGroupSnapshotClassList
+    plural: volumegroupsnapshotclasses
+    shortNames:
+    - vgsclass
+    - vgsclasses
+    singular: volumegroupsnapshotclass
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .driver
+      name: Driver
+      type: string
+    - description: Determines whether a VolumeGroupSnapshotContent created through
+        the VolumeGroupSnapshotClass should be deleted when its bound VolumeGroupSnapshot
+        is deleted.
+      jsonPath: .deletionPolicy
+      name: DeletionPolicy
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          VolumeGroupSnapshotClass specifies parameters that a underlying storage system
+          uses when creating a volume group snapshot. A specific VolumeGroupSnapshotClass
+          is used by specifying its name in a VolumeGroupSnapshot object.
+          VolumeGroupSnapshotClasses are non-namespaced.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          deletionPolicy:
+            description: |-
+              DeletionPolicy determines whether a VolumeGroupSnapshotContent created
+              through the VolumeGroupSnapshotClass should be deleted when its bound
+              VolumeGroupSnapshot is deleted.
+              Supported values are "Retain" and "Delete".
+              "Retain" means that the VolumeGroupSnapshotContent and its physical group
+              snapshot on underlying storage system are kept.
+              "Delete" means that the VolumeGroupSnapshotContent and its physical group
+              snapshot on underlying storage system are deleted.
+              Required.
+            enum:
+            - Delete
+            - Retain
+            type: string
+          driver:
+            description: |-
+              Driver is the name of the storage driver expected to handle this VolumeGroupSnapshotClass.
+              Required.
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          parameters:
+            additionalProperties:
+              type: string
+            description: |-
+              Parameters is a key-value map with storage driver specific parameters for
+              creating group snapshots.
+              These values are opaque to Kubernetes and are passed directly to the driver.
+            type: object
+        required:
+        - deletionPolicy
+        - driver
+        type: object
+    served: true
+    storage: true
+    subresources: {}

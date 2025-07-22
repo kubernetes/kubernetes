@@ -1,0 +1,26 @@
+run:
+  timeout: 1m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - errcheck
+    - forcetypeassert
+    - gocritic
+    - gofmt
+    - goimports
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - typecheck
+    - unused
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 10

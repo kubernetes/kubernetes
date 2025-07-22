@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(default_visibility = ["//visibility:public"])
+
+go_library(
+    name = "utilities",
+    srcs = [
+        "doc.go",
+        "pattern.go",
+        "readerfactory.go",
+        "string_array_flag.go",
+        "trie.go",
+    ],
+    importpath = "github.com/grpc-ecosystem/grpc-gateway/v2/utilities",
+)
+
+go_test(
+    name = "utilities_test",
+    size = "small",
+    srcs = [
+        "string_array_flag_test.go",
+        "trie_test.go",
+    ],
+    deps = [":utilities"],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":utilities",
+    visibility = ["//visibility:public"],
+)

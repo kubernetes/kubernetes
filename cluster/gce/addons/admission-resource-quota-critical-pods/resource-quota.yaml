@@ -1,0 +1,18 @@
+# critical pods are configured as a limited resource by admission_controller_config.yaml,
+# which means they are disallowed unless explicitly allowed by a namespaced quota object.
+# This quota effectively removes the restriction on the number of critical pods allowed in the kube-system namespace.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gcp-critical-pods
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  hard:
+    pods: "1000000000"
+  scopeSelector:
+    matchExpressions:
+    - operator : In
+      scopeName: PriorityClass
+      values: ["system-node-critical", "system-cluster-critical"]

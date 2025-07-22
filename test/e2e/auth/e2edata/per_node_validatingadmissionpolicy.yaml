@@ -1,0 +1,32 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: "only-allow-name-matching-node-configmaps"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups:   [""]
+        apiVersions: ["v1"]
+        operations:  ["CREATE", "UPDATE", "DELETE"]
+        resources:   ["configmaps"]
+  matchConditions:
+  - name: isRestrictedUser
+    # e2e-ns gets replaced with the tests's namespace when running the E2E test.
+    expression: >-
+      request.userInfo.username == "system:serviceaccount:e2e-ns:default"
+  variables:
+  - name: userNodeName
+    expression: >-
+      request.userInfo.extra[?'authentication.kubernetes.io/node-name'][0].orValue('')
+  - name: objectNodeName
+    expression: >-
+      (request.operation == 'DELETE' ? oldObject : object).?metadata.name.orValue('')
+  validations:
+  - expression: variables.userNodeName != ""
+    message: >-
+      no node association found for user, this user must run in a pod on a node and ServiceAccountTokenPodNodeInfo must be enabled
+  - expression: variables.userNodeName == variables.objectNodeName
+    messageExpression: >-
+      "this user running on node '"+variables.userNodeName+"' may not modify ConfigMap '" + variables.objectNodeName +
+      "' because the name does not match the node name"

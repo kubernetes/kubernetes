@@ -1,0 +1,98 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(
+    licenses = ["notice"],  # Apache 2.0
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "cel.go",
+        "decls.go",
+        "env.go",
+        "folding.go",
+        "inlining.go",
+        "io.go",
+        "library.go",
+        "macro.go",
+        "optimizer.go",
+        "options.go",
+        "program.go",
+        "prompt.go",
+        "validator.go",
+    ],
+    embedsrcs = ["//cel/templates"],
+    importpath = "github.com/google/cel-go/cel",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//checker:go_default_library",
+        "//checker/decls:go_default_library",
+        "//common:go_default_library",
+        "//common/ast:go_default_library",
+        "//common/containers:go_default_library",
+        "//common/decls:go_default_library",
+        "//common/env:go_default_library",
+        "//common/functions:go_default_library",
+        "//common/operators:go_default_library",
+        "//common/overloads:go_default_library",
+        "//common/stdlib:go_default_library",
+        "//common/types:go_default_library",
+        "//common/types/pb:go_default_library",
+        "//common/types/ref:go_default_library",
+        "//common/types/traits:go_default_library",
+        "//interpreter:go_default_library",
+        "//parser:go_default_library",
+        "@dev_cel_expr//:expr",
+        "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
+        "@org_golang_google_protobuf//proto:go_default_library",
+        "@org_golang_google_protobuf//reflect/protodesc:go_default_library",
+        "@org_golang_google_protobuf//reflect/protoreflect:go_default_library",
+        "@org_golang_google_protobuf//reflect/protoregistry:go_default_library",
+        "@org_golang_google_protobuf//types/descriptorpb:go_default_library",
+        "@org_golang_google_protobuf//types/dynamicpb:go_default_library",
+        "@org_golang_google_protobuf//types/known/anypb:go_default_library",
+        "@org_golang_google_protobuf//types/known/durationpb:go_default_library",
+        "@org_golang_google_protobuf//types/known/timestamppb:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "cel_example_test.go",
+        "cel_test.go",
+        "decls_test.go",
+        "env_test.go",
+        "folding_test.go",
+        "inlining_test.go",
+        "io_test.go",
+        "optimizer_test.go",
+        "prompt_test.go",
+        "validator_test.go",
+    ],
+    data = [
+        "//cel/testdata:gen_test_fds",
+    ],
+    embed = [
+        ":go_default_library",
+    ],
+    embedsrcs = [
+        "//cel/testdata:prompts",
+    ],
+    deps = [
+        "//common/operators:go_default_library",
+        "//common/overloads:go_default_library",
+        "//common/types:go_default_library",
+        "//common/types/ref:go_default_library",
+        "//common/types/traits:go_default_library",
+        "//ext:go_default_library",
+        "//test:go_default_library",
+        "//test/proto2pb:go_default_library",
+        "//test/proto3pb:go_default_library",
+        "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
+        "@org_golang_google_protobuf//encoding/prototext:go_default_library",
+        "@org_golang_google_protobuf//proto:go_default_library",
+        "@org_golang_google_protobuf//types/known/structpb:go_default_library",
+        "@org_golang_google_protobuf//types/known/wrapperspb:go_default_library",
+    ],
+)

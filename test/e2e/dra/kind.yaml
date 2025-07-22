@@ -1,0 +1,56 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+# Enable CDI as described in
+# https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
+- |-
+  [plugins."io.containerd.grpc.v1.cri"]
+    enable_cdi = true
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    scheduler:
+        extraArgs:
+          v: "5"
+          vmodule: "allocator=6,dynamicresources=6" # structured/allocator.go, DRA scheduler plugin
+    controllerManager:
+        extraArgs:
+          v: "5"
+          vmodule: "controller=6" # resourceclaim/controller.go - should have renamed it when copying the controller it was based on!
+    apiServer:
+        extraArgs:
+          runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true"
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
+# Feature gates must be the last entry in this YAML.
+# Some Prow jobs add more feature gates with
+#
+#    --config <(cat test/e2e/dra/kind.yaml; echo "  <some feature>: true")
+featureGates:
+  DynamicResourceAllocation: true

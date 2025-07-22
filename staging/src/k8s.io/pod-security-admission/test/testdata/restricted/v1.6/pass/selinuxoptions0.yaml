@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: selinuxoptions0
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    securityContext: {}
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+    securityContext:
+      seLinuxOptions: {}
+  securityContext:
+    runAsNonRoot: true

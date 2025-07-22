@@ -1,0 +1,526 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
+# It basically covers all test cases but with their smallest workload. 
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
+- name: SchedulingBasic
+  defaultPodTemplatePath: ../templates/pod-default.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 500
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 1000
+  - name: 5000Nodes_10000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 270
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 10000
+  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 270
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 10000
+  - name: 5000Nodes_50000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 50000
+
+# This test case simulates the scheduling of daemonset.
+# https://github.com/kubernetes/kubernetes/issues/124709
+- name: SchedulingDaemonset
+  defaultPodTemplatePath: ../templates/daemonset-pod.yaml
+  workloadTemplate:
+    # Create one node with a specific name (scheduler-perf-node),
+    # which is supposed to get all Pods created in this test case.
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: ../templates/node-with-name.yaml
+    # Create other nodes that the scheduler has to filter out with PreFilterResult from NodeAffinity plugin.
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    # Create pods with nodeAffinity (metadata.name=scheduler-perf-node).
+    # This scenario doesn't schedule each Pod to each Node though, 
+    # they go through completely the same scheduling process as daemonset pods does.
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      measurePods: 10
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      measurePods: 10
+  - name: 15000Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 390
+    params:
+      initNodes: 15000
+      measurePods: 30000
+  - name: 15000Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 390
+    params:
+      initNodes: 15000
+      measurePods: 30000
+
+- name: PreemptionBasic
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-low-priority.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-high-priority.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 1000Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance, short]
+    params:
+      initNodes: 1000
+      initPods: 4000
+      measurePods: 1000
+  - name: 1000Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance, short]
+    params:
+      initNodes: 1000
+      initPods: 4000
+      measurePods: 1000
+# This test case always seems to fail.
+# https://github.com/kubernetes/kubernetes/issues/108308
+#
+#  - name: 5000Nodes
+#    params:
+#      initNodes: 5000
+#      initPods: 20000
+#      measurePods: 5000
+
+# Measure throughput of regular schedulable pods that are interleaved by high priority preemption pods scheduled at 5/s rate.
+# Implementation of asynchronous preemption feature https://github.com/kubernetes/kubernetes/issues/126858 is supposed to increase the throughput of the measured pods as all heavy operations (apiserver communication) will be performed asynchronously, without blocking the scheduler loop.
+# How is it achieved:
+# 1. There are X initial nodes with 4 low priority pods each, consuming 3.6 CPU out of the total 4 available.
+# 2. High priority preemption which need to preempt 3 of 4 low priority pods to fit (require 3 CPU).
+# 3. Measured pods are always schedulable, as they require 0.1 CPU only.
+- name: PreemptionAsync
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-low-priority.yaml
+  - opcode: churn
+    mode: create
+    templatePaths:
+    - ../templates/pod-high-priority.yaml
+    intervalMilliseconds: 200
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-default.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 2000
+      measurePods: 500
+  - name: 5000Nodes
+    labels: [performance]
+    threshold: 160
+    featureGates:
+      SchedulerQueueingHints: false
+      SchedulerAsyncPreemption: false
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 5000
+  - name: 5000Nodes_AsyncPreemptionEnabled
+    threshold: 160
+    labels: [performance]
+    featureGates:
+      SchedulerAsyncPreemption: true
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 5000
+  - name: 5000Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 160
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 5000
+
+# Measure throughput of regular schedulable pods that are interleaved by unschedulable pods injected at 5/s rate.
+# Note that the scheduling performance depends on the number of Pods, as preemption plugin needs to loop over all Pods in attempt to preempt them.
+- name: Unschedulable
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
+  - opcode: churn
+    mode: create
+    templatePaths:
+    - ../templates/pod-high-priority-large-cpu.yaml
+    intervalMilliseconds: 200
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-default.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes/1Init/10Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 1
+      measurePods: 10
+  - name: 5Nodes/1Init/10Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 1
+      measurePods: 10
+  - name: 500Nodes/10Init/1kPods
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 10
+      measurePods: 1000
+  - name: 5kNodes/100Init/1kPods
+    labels: [performance, short]
+    params:
+      initNodes: 5000
+      initPods: 100
+      measurePods: 1000
+  - name: 5kNodes/100Init/10kPods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 140
+    params:
+      initNodes: 5000
+      initPods: 100
+      measurePods: 10000
+  - name: 5kNodes/100Init/10kPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 170
+    params:
+      initNodes: 5000
+      initPods: 100
+      measurePods: 10000
+  - name: 5kNodes/20kInit/10kPods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 10000
+  - name: 5kNodes/20kInit/10kPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 10000
+
+- name: SchedulingWithMixedChurn
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: churn
+    mode: recreate
+    number: 1
+    templatePaths:
+    - ../templates/churn/node-default.yaml
+    - ../templates/pod-high-priority-large-cpu.yaml
+    - ../templates/churn/service-default.yaml
+    intervalMilliseconds: 1000
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-default.yaml
+    collectMetrics: true
+  workloads:
+  - name: 10Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      measurePods: 100
+  - name: 10Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      measurePods: 100
+  - name: 1000Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 1000
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 5000
+      measurePods: 2000
+  - name: 5000Nodes_10000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 265
+    params:
+      initNodes: 5000
+      measurePods: 10000
+  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 265
+    params:
+      initNodes: 5000
+      measurePods: 10000
+
+# This test case simulates the scheduling when many pods are gated and others are gradually deleted.
+# https://github.com/kubernetes/kubernetes/issues/124384
+- name: SchedulingWhileGated
+  defaultPodTemplatePath: ../templates/light-pod.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: ../templates/node-with-name.yaml
+    # Create pods that will stay gated to the end of the test.
+  - opcode: createPods
+    countParam: $gatedPods
+    podTemplatePath: ../templates/gated-pod.yaml
+    skipWaitToCompletion: true
+    # Wait to make sure gated pods are enqueued in scheduler.
+  - opcode: barrier
+    stageRequirement: Attempted
+    # Create pods that will be gradually deleted after being scheduled.
+  - opcode: createPods
+    countParam: $deletingPods
+    # Delete scheduled pods, which will generate many AssignedPodDelete events.
+    # Each of them will be processed by the scheduling queue.
+    # But, the scheduling throughput should only be minimally impacted by the number of gated Pods.
+  - opcode: deletePods
+    namespace: namespace-3
+    deletePodsPerSecond: 50
+    skipWaitToCompletion: true
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 1Node_10GatedPods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      gatedPods: 10
+      deletingPods: 10
+      measurePods: 10
+  - name: 1Node_10GatedPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      gatedPods: 10
+      deletingPods: 10
+      measurePods: 10
+  - name: 1Node_10000GatedPods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 130
+    params:
+      gatedPods: 10000
+      deletingPods: 20000
+      measurePods: 20000
+  - name: 1Node_10000GatedPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 130
+    params:
+      gatedPods: 10000
+      deletingPods: 20000
+      measurePods: 20000
+
+# This test case simulates the scheduling when pods selected to schedule have deletionTimestamp set.
+# There was a memory leak related to this path of code fixed in:
+# https://github.com/kubernetes/kubernetes/pull/126962
+# Main goal of this test case is to verify if InFlightEvents is empty after the test.
+- name: SchedulingDeletedPodsWithFinalizers
+  featureGates:
+    SchedulerQueueingHints: true
+  defaultPodTemplatePath: ../templates/light-pod.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createPods
+    # Create pods with finalizers and delete them before they are scheduled.
+    # DeletionTimestamp field should be populated then, 
+    # but a few pods should still be chosen into the scheduling.
+    countParam: $deletingPods
+    podTemplatePath: ../templates/pod-with-finalizer.yaml
+    skipWaitToCompletion: true
+  - opcode: deletePods
+    namespace: namespace-1
+    deletePodsPerSecond: 100
+    skipWaitToCompletion: true
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 10Node_100DeletingPods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      deletingPods: 10
+      measurePods: 10
+  - name: 10Node_100DeletingPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      deletingPods: 10
+      measurePods: 10
+  - name: 1000Node_1000DeletingPods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance, short]
+    params:
+      initNodes: 1000
+      deletingPods: 1000
+      measurePods: 1000
+  - name: 1000Node_1000DeletingPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance, short]
+    params:
+      initNodes: 1000
+      deletingPods: 1000
+      measurePods: 1000

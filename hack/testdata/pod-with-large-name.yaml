@@ -1,0 +1,12 @@
+# Used for testing name truncation in kubectl expose
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kubernetes-serve-hostname-testing-sixty-three-characters-in-length
+  labels:
+    name: kubernetes-serve-hostname
+spec:
+  containers:
+  - name: kubernetes-serve-hostname
+    image: registry.k8s.io/e2e-test-images/agnhost:2.32
+    command: ["/agnhost", "serve-hostname"]

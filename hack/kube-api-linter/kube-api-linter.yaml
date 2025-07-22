@@ -1,0 +1,30 @@
+
+linters:
+  disable:
+    - '*'
+  enable:
+    # - "commentstart" # Ensure comments start with the serialized version of the field name.
+    # - "conditions" # Ensure conditions have the correct json tags and markers.
+    # - "integers" # Ensure only int32 and int64 are used for integers.
+    # - "jsontags" # Ensure every field has a json tag.
+    # - "maxlength" # Ensure all strings and arrays have maximum lengths/maximum items. ONLY for CRDs until declarative markers exist in core types.
+    # - "nobools" # Bools do not evolve over time, should use enums instead.
+    # - "nofloats" # Ensure floats are not used.
+    # - "nomaps" # Ensure maps are not used, unless they are `map[string]string` (for labels/annotations/etc).
+    # - "nophase" # Ensure field names do not have the word "phase" in them.
+    # - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
+    # - "requiredfields" # Required fields should not be pointers, and should not have `omitempty`.
+lintersConfig:
+  # conditions:
+  #   isFirstField: Warn # Require conditions to be the first field in the status struct.
+  #   usePatchStrategy: SuggestFix # Conditions should not use the patch strategy on CRDs.
+  #   useProtobuf: SuggestFix # We don't use protobuf, so protobuf tags are not required.
+  # jsonTags:
+  #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
+  # nomaps:
+  #   policy: AllowStringToStringMaps # Determines how the linter should handle maps of basic types. Maps of objects are always disallowed.
+  # optionalOrRequired:
+  #   preferredOptionalMarker: optional # The preferred optional marker to use, fixes will suggest to use this marker. Defaults to `optional`.
+  #   preferredRequiredMarker: required # The preferred required marker to use, fixes will suggest to use this marker. Defaults to `required`.
+  # requiredFields:
+  #   pointerPolicy: SuggestFix # Defaults to `SuggestFix`. We want our required fields to not be pointers.

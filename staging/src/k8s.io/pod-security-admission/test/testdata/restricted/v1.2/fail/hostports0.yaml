@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostports0
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    ports:
+    - containerPort: 12345
+      hostPort: 12345
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+  securityContext:
+    runAsNonRoot: true

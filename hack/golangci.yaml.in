@@ -1,0 +1,325 @@
+# golangci-lint is used in Kubernetes with different configurations that
+# enable an increasing amount of checks:
+# - golangci.yaml is the most permissive configuration. All existing code
+#   passed.
+# - golangci-hints.yaml adds checks for code patterns where developer
+#   and reviewer may decide whether findings should get addressed before
+#   merging. Beware that the golangci-lint output includes also the
+#   issues that must be fixed and doesn't indicate how severe each issue
+#   is (https://gophers.slack.com/archives/CS0TBRKPC/p1685721815275349).
+#
+# All three flavors are generated from golangci.yaml.in with
+# hack/update-golangci-lint-config.sh.
+
+run:
+  timeout: 30m
+
+  # The default is relative to the configuration, which is confusing because
+  # then all paths start with ../ to move out of the "hack" directory.
+  # `gomod` mirrors the current behavior of `golangci-lint.sh` changing into
+  # the root of the repository. Because we are operating in a workspace,
+  # the module picked by `gomod` is the main one
+  relative-path-mode: gomod
+
+version: "2"
+
+formatters:
+  exclusions:
+    paths:
+      - third_party
+
+output:
+  formats:
+    text:
+      path: stderr
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  exclusions:
+    paths:
+      - third_party
+
+    # Log a warning if an exclusion rule is unused.
+    #
+    # Uncomment when investigating whether the configuration can be simplified,
+    # but beware that golangci-lint then needs to be invoked for the entire
+    # repository. Invoking it for individual packages may trigger these warning
+    # when the rules are only needed elsewhere.
+    #
+    # warn-unused: true
+
+    # Excluding configuration per-path, per-linter, per-text and per-source.
+    rules:
+
+      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
+      - linters:
+          - gocritic
+        text: "ifElseChain: rewrite if-else to switch statement"
+
+      # Only packages listed here opt into the strict "exported symbols must be documented".
+      #
+      # Exclude texts from https://github.com/golangci/golangci-lint/blob/ab3c3cd69e602ff53bb4c3e2c188f0caeb80305d/pkg/config/issues.go#L11-L103
+      - linters:
+          - revive
+          - staticcheck
+        text: comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|exported (.+) should have comment( \(or a comment on this block\))? or be unexported|package comment should be of the form "(.+)...|comment on exported (.+) should be of the form "(.+)...|should have a package comment
+        path-except: cmd/kubeadm
+
+      # The unused linter that comes from staticcheck currently does not handle types which implement
+      # a generic interface. The linter incorrectly reports the implementations of unexported
+      # interface methods as unused. See https://github.com/dominikh/go-tools/issues/1294.
+      # Rather than exporting the interface methods, which makes the error go away but changes the
+      # semantics of the code, we ignore this error for affected files.
+      # This can be removed when the staticcheck implementation of this rule is fixed, which may
+      # depend on https://github.com/golang/go/issues/63982.
+      - linters:
+          - unused
+        path: staging/src/k8s.io/client-go/util/workqueue/metrics.go
+
+      # SSA Extract calls are allowed in tests.
+      - linters:
+          - forbidigo
+        text: should not be used because managedFields was removed
+        path: _test.go$
+
+      # Adding unversioned feature gates is allowed in tests
+      - linters:
+          - forbidigo
+        text: should not use Add, use AddVersioned instead
+        path: _test.go$
+
+      # The Kubernetes naming convention for conversion functions uses underscores
+      # and intentionally deviates from normal Go conventions to make those function
+      # names more readable. Same for SetDefaults_*.
+      #
+      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
+      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
+      - linters:
+          - staticcheck
+          - revive
+        text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
+
+      # The generated swagger docs also don't follow the naming convention.
+      - linters:
+          - staticcheck
+        text: "ST1003: should not use underscores in Go names"
+        path: types_swagger_doc_generated.go$
+
+      {{- if .Hints}}
+
+      - path: (.+)\.go$
+        # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
+        text: ineffective break statement. Did you mean to break out of the outer loop
+
+      # exclude ineffassign linter for generated files for conversion
+      - path: conversion\.go
+        linters:
+          - ineffassign
+
+      {{- end}}
+
+      {{- if .Base}}
+
+      # TODO(https://github.com/kubernetes/kubernetes/issues/131475): Remove these excluded directories and fix findings. Due to large amount of findings in different components
+      # with different owners it's hard to fix everything in a single pr. This will therefore be done in multiple prs.
+      - path: (pkg/volume/*|test/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*)
+        linters:
+          - gocritic
+
+      # Some of these seem legitimate, maybe better fix code (https://github.com/kubernetes/kubernetes/issues/130449).
+
+      - linters:
+          - govet
+        text: "lostcancel|printf"
+
+      - linters:
+          - ginkgolinter
+        text: "wrong error assertion. Consider using `gomega.(Eventually|Consistently)|wrong comparison assertion|wrong length assertion"
+
+      - linters:
+          - gocritic
+        text: "append result not assigned to the same slice|put a space between `//` and comment text|sloppyLen|elseif|should rewrite switch statement to if statement|regexpMust|wrapperFunc: use strings.ReplaceAll|singleCaseSwitch|deprecatedComment|exitAfterDefer|captLocal|unlambda|underef|unslice|valSwap|typeSwitchVar"
+
+      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
+      - linters:
+          - gocritic
+        text: "assignOp:"
+
+    {{- end}}
+
+      # Kube-API-Linter should only be run on the API definitions
+      - linters:
+        - kubeapilinter
+        path-except: staging/src/k8s.io/api/.*
+        
+      {{include "hack/kube-api-linter/exceptions.yaml" | indent 6 | trim}}
+
+  default: {{if .Base -}} none {{- else -}} standard {{- end}}
+  enable: # please keep this alphabetized
+    - depguard
+    - forbidigo
+    - ginkgolinter
+    - gocritic
+    - govet
+    {{- if .Hints}}
+    - errorlint
+    {{- end}}
+    - ineffassign
+    - kubeapilinter
+    - logcheck
+    - revive
+    - sorted
+    - staticcheck
+    - testifylint
+    - unused
+  {{- if not .Base }}
+    - usestdlibvars
+  {{- end }}
+
+  settings: # please keep this alphabetized
+    custom:
+      logcheck:
+        # Installed there by hack/verify-golangci-lint.sh.
+        path: _output/local/bin/logcheck.so
+        description: structured logging checker
+        original-url: k8s.io/logtools/logcheck
+        settings:
+          config: |
+            {{include "hack/logcheck.conf" | indent 12 | trim}}
+      sorted:
+        # Installed there by hack/verify-golangci-lint.sh.
+        path: _output/local/bin/sorted.so
+        description: check if feature gates are sorted
+        original-url: k8s.io/kubernetes/hack/tools/golangci-lint/sorted
+        settings:
+          {{include "hack/tools/golangci-lint/sorted/config.yaml" | indent 10 | trim}}
+      kubeapilinter:
+        path: _output/local/bin/kube-api-linter.so
+        description: kube-api-linter and lints Kube like APIs based on API conventions and best practices.
+        original-url: sigs.k8s.io/kube-api-linter
+        settings:
+          {{include "hack/kube-api-linter/kube-api-linter.yaml" | indent 10 | trim}}
+    depguard:
+      rules:
+        go-cmp:
+          files:
+            - $all
+            - "!$test"
+            - "!**/test/**"
+            - "!**/testing/**"
+            - "!**/apitesting/**"
+          deny:
+            - pkg: "github.com/google/go-cmp/cmp"
+              desc: "cmp is allowed only in test files"
+            - pkg: "html/template"
+              desc: "template is allowed only in test files as it disables dead code elimination"
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^managedfields\.ExtractInto$
+          pkg: ^k8s\.io/apimachinery/pkg/util/managedfields$
+          msg: should not be used because managedFields was removed
+        - pattern: \.Extract
+          pkg: ^k8s\.io/client-go/applyconfigurations/
+          msg: should not be used because managedFields was removed
+        - pattern: \.Add$
+          pkg: ^k8s\.io/component-base/featuregate$         
+          msg: should not use Add, use AddVersioned instead 
+      {{- if .Hints}}
+        - pattern: ^gomega\.BeTrue$
+          pkg: ^github.com/onsi/gomega$
+          msg: "it does not produce a good failure message - use BeTrueBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
+        - pattern: ^gomega\.BeFalse$
+          pkg: ^github.com/onsi/gomega$
+          msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"        
+      {{- end}}
+      {{- if .Base }}
+    gocritic:	
+      enabled-checks:	
+        - equalFold	
+        - boolExprSimplify	
+    {{- end}}
+    revive:
+      # Only these rules are enabled.
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+    staticcheck:
+      checks:
+        - "all"
+        {{- if .Base }}
+        - "-QF1001"  # Apply De Morgan’s law
+        - "-QF1002"  # Convert untagged switch to tagged switch
+        - "-QF1003"  # Convert if/else-if chain to tagged switch
+        - "-QF1004"  # Use strings.ReplaceAll instead of strings.Replace with n == -1
+        - "-QF1006"  # Lift if+break into loop condition
+        - "-QF1007"  # Merge conditional assignment into variable declaration
+        - "-QF1008"  # Omit embedded fields from selector expression
+        - "-QF1009"  # Use time.Time.Equal instead of == operator
+        - "-QF1011"  # Omit redundant type from variable declaration
+        - "-QF1012"  # Use fmt.Fprintf(x, ...) instead of x.Write(fmt.Sprintf(...))
+        - "-S1000"   # Use plain channel send or receive instead of single-case select
+        - "-S1002"   # Omit comparison with boolean constant
+        - "-S1003"   # Replace call to strings.Index with strings.Contains
+        - "-S1004"   # Replace call to bytes.Compare with bytes.Equal
+        - "-S1005"   # Drop unnecessary use of the blank identifier
+        - "-S1006"   # Use for { ... } for infinite loops
+        - "-S1007"   # Simplify regular expression by using raw string literal
+        - "-S1008"   # Simplify returning boolean expression
+        - "-S1009"   # Omit redundant nil check on slices, maps, and channels
+        - "-S1011"   # Use a single append to concatenate two slices
+        - "-S1012"   # Replace time.Now().Sub(x) with time.Since(x)
+        - "-S1016"   # Use a type conversion instead of manually copying struct fields
+        - "-S1017"   # Replace manual trimming with strings.TrimPrefix
+        - "-S1019"   # Simplify make call by omitting redundant arguments
+        - "-S1021"   # Merge variable declaration and assignment
+        - "-S1023"   # Omit redundant control flow
+        - "-S1024"   # Replace x.Sub(time.Now()) with time.Until(x)
+        - "-S1025"   # Don’t use fmt.Sprintf("%s", x) unnecessarily
+        - "-S1028"   # Simplify error construction with fmt.Errorf
+        - "-S1030"   # Use bytes.Buffer.String or bytes.Buffer.Bytes
+        - "-S1034"   # Use result of type assertion to simplify cases
+        - "-S1036"   # Unnecessary guard around map access
+        - "-S1038"   # Unnecessarily complex way of printing formatted string
+        - "-S1039"   # Unnecessary use of fmt.Sprint
+        - "-S1040"   # Type assertion to current type
+        - "-SA1006"  # Printf with dynamic first argument and no further arguments
+        - "-SA1019"  # Using a deprecated function, variable, constant or field
+        - "-SA2002"  # Called testing.T.FailNow or SkipNow in a goroutine, which isn’t allowed
+        - "-SA4006"  # A value assigned to a variable is never read before being overwritten. Forgotten error check or dead code?
+        - "-SA4011"  # ineffective break statement. Did you mean to break out of the outer loop?
+        - "-ST1000"  # Incorrect or missing package comment
+        - "-ST1001"  # Dot imports are discouraged
+        - "-ST1003"  # Poorly chosen identifier
+        - "-ST1005"  # Incorrectly formatted error string
+        - "-ST1006"  # Poorly chosen receiver name
+        - "-ST1008"  # A function’s error value should be its last return value
+        - "-ST1011"  # Poorly chosen name for variable of type time.Duration
+        - "-ST1012"  # Poorly chosen name for error variable
+        - "-ST1013"  # Should use constants for HTTP error codes, not magic numbers
+        - "-ST1016"  # Use consistent method receiver names
+        - "-ST1017"  # Don’t use Yoda conditions
+        - "-ST1020"  # The documentation of an exported function should start with the function’s name
+        - "-ST1023"  # Redundant type in variable declaration
+        {{- end}}
+    testifylint:
+      enable-all: true
+      {{- if not .Hints }}
+      disable:
+        {{- if .Base }}
+        - empty
+        - encoded-compare
+        - equal-values
+        - error-nil
+        - expected-actual
+        - float-compare
+        - formatter
+        - len
+        - useless-assert
+        {{- end}}
+        - require-error
+      {{- end}}

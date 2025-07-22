@@ -1,0 +1,24 @@
+# OSX leaves these everywhere on SMB shares
+._*
+
+# Eclipse files
+.classpath
+.project
+.settings/**
+
+# Idea files
+.idea/**
+.idea/
+
+# Emacs save files
+*~
+
+# Vim-related files
+[._]*.s[a-w][a-z]
+[._]s[a-w][a-z]
+*.un~
+Session.vim
+.netrwhist
+
+# Go test binaries
+*.test

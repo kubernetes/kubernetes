@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluentd-gcp-scaler
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: system:fluentd-gcp-scaler
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups:
+  - "apps"
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - patch
+- apiGroups:
+  - "scalingpolicy.kope.io"
+  resources:
+  - scalingpolicies
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: fluentd-gcp-scaler-binding
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: system:fluentd-gcp-scaler
+subjects:
+- kind: ServiceAccount
+  name: fluentd-gcp-scaler
+  namespace: kube-system

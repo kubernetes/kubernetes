@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - johnSchnake
+  - BenTheElder
+approvers:
+  - dims
+  - cblecker
+emeritus_aprovers:
+  - spiffxp

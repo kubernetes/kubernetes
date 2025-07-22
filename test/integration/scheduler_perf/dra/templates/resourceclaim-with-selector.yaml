@@ -1,0 +1,15 @@
+apiVersion: resource.k8s.io/v1beta2
+kind: ResourceClaim
+metadata:
+  name: test-claim-with-selector-{{.Index}}
+spec:
+  devices:
+    requests:
+    - name: req-0
+      exactly:
+        deviceClassName: test-class
+        selectors:
+        - cel:
+            expression: |-
+              device.capacity['test-driver.cdi.k8s.io'].counters.compareTo(quantity('2')) >= 0 &&
+              device.attributes['test-driver.cdi.k8s.io'].preallocate
