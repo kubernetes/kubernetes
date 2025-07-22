@@ -405,6 +405,7 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 }
 
 func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
 	switch {
 	case len(c.namespace) == 0:
 		return c.client.Fake.
@@ -413,7 +414,6 @@ func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptio
 	case len(c.namespace) > 0:
 		return c.client.Fake.
 			InvokesWatch(testing.NewWatchAction(c.resource, c.namespace, opts))
-
 	}
 
 	panic("math broke")
