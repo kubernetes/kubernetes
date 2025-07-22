@@ -118,9 +118,9 @@ func NewSimpleDynamicClientWithCustomListKinds(scheme *runtime.Scheme, gvrToList
 		ns := action.GetNamespace()
 		var gvk schema.GroupVersionKind
 		var opts metav1.ListOptions
-		if watchActcion, ok := action.(testing.WatchActionImpl); ok {
-			gvk = watchActcion.Kind
-			opts = watchActcion.ListOptions
+		if watchAction, ok := action.(testing.WatchActionImpl); ok {
+			gvk = watchAction.Kind
+			opts = watchAction.ListOptions
 		}
 		watch, err := o.Watch(gvr, gvk, ns, opts)
 		if err != nil {
@@ -415,7 +415,7 @@ func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptio
 	switch {
 	case len(c.namespace) == 0:
 		return c.client.Fake.
-			InvokesWatch(testing.NewRootWatchActionWithOptions(c.resource, opts))
+			InvokesWatch(testing.NewRootWatchActionWithOptions(c.resource, c.resource.GroupVersion().WithKind(c.listKind), opts))
 
 	case len(c.namespace) > 0:
 		return c.client.Fake.
