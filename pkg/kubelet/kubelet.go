@@ -60,6 +60,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	coreinformersv1 "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -106,6 +107,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	plugincache "k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	"k8s.io/kubernetes/pkg/kubelet/preemption"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -453,6 +455,7 @@ func NewMainKubelet(ctx context.Context,
 	}
 
 	var nodeHasSynced cache.InformerSynced
+	var nodeInformer coreinformersv1.NodeInformer
 	var nodeLister corelisters.NodeLister
 
 	// If kubeClient == nil, we are running in standalone mode (i.e. no API servers)
@@ -461,7 +464,8 @@ func NewMainKubelet(ctx context.Context,
 		kubeInformers := informers.NewSharedInformerFactoryWithOptions(kubeDeps.KubeClient, 0, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.FieldSelector = fields.Set{metav1.ObjectNameField: string(nodeName)}.String()
 		}))
-		nodeLister = kubeInformers.Core().V1().Nodes().Lister()
+		nodeInformer = kubeInformers.Core().V1().Nodes()
+		nodeLister = nodeInformer.Lister()
 		nodeHasSynced = func() bool {
 			return kubeInformers.Core().V1().Nodes().Informer().HasSynced()
 		}
@@ -933,11 +937,34 @@ func NewMainKubelet(ctx context.Context,
 		klog.InfoS("Not starting ClusterTrustBundle informer because we are in static kubelet mode or the ClusterTrustBundleProjection featuregate is disabled")
 	}
 
+	if kubeDeps.KubeClient != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+		kubeInformers := informers.NewSharedInformerFactoryWithOptions(
+			kubeDeps.KubeClient,
+			0,
+			informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+				options.FieldSelector = fields.OneTermEqualSelector("spec.nodeName", string(nodeName)).String()
+			}),
+		)
+		podCertificateManager := podcertificate.NewIssuingManager(
+			kubeDeps.KubeClient,
+			klet.podManager,
+			kubeInformers.Certificates().V1alpha1().PodCertificateRequests(),
+			nodeInformer,
+			nodeName,
+			clock.RealClock{},
+		)
+		klet.podCertificateManager = podCertificateManager
+		kubeInformers.Start(ctx.Done())
+		go podCertificateManager.Run(ctx)
+	} else {
+		klet.podCertificateManager = &podcertificate.NoOpManager{}
+		klog.InfoS("Not starting PodCertificateRequest manager because we are in static kubelet mode or the PodCertificateProjection feature gate is disabled")
+	}
+
 	// NewInitializedVolumePluginMgr initializes some storageErrors on the Kubelet runtimeState (in csi_plugin.go init)
 	// which affects node ready status. This function must be called before Kubelet is initialized so that the Node
 	// ReadyState is accurate with the storage state.
-	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, clusterTrustBundleManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
+	klet.volumePluginMgr, err = NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, clusterTrustBundleManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
 	if err != nil {
 		return nil, err
 	}
@@ -1172,6 +1199,11 @@ type Kubelet struct {
 
 	// allocationManager manages allocated resources for pods.
 	allocationManager allocation.Manager
+
+	// podCertificateManager is fed updates as pods are added and removed from
+	// the node, and requests certificates for them based on their configured
+	// pod certificate volumes.
+	podCertificateManager podcertificate.Manager
 
 	// resyncInterval is the interval between periodic full reconciliations of
 	// pods on this node.
@@ -2597,6 +2629,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// the apiserver and no action (other than cleanup) is required.
 		kl.podManager.AddPod(pod)
 
+		kl.podCertificateManager.TrackPod(context.TODO(), pod)
+
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
 			if pod == nil {
@@ -2770,6 +2804,7 @@ func resizeOperationForResources(new, old *resource.Quantity) string {
 func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
+		kl.podCertificateManager.ForgetPod(context.TODO(), pod)
 		kl.podManager.RemovePod(pod)
 		kl.allocationManager.RemovePod(pod.UID)
 

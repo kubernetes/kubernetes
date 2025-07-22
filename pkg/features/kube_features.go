@@ -611,6 +611,12 @@ const (
 	// Requires the CRI implementation supports supplying the required stats.
 	PodAndContainerStatsFromCRI featuregate.Feature = "PodAndContainerStatsFromCRI"
 
+	// owner: @ahmedtd
+	// kep: https://kep.k8s.io/4317
+	//
+	// Enable PodCertificateRequest objects and podCertificate projected volume sources.
+	PodCertificateRequest featuregate.Feature = "PodCertificateRequest"
+
 	// owner: @ahg-g
 	//
 	// Enables controlling pod ranking on replicaset scale-down.
@@ -1434,6 +1440,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	PodAndContainerStatsFromCRI: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	PodCertificateRequest: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	PodDeletionCost: {

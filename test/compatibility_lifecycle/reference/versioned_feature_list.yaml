@@ -1049,6 +1049,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.23"
+- name: PodCertificateRequest
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.34"
 - name: PodDeletionCost
   versionedSpecs:
   - default: false

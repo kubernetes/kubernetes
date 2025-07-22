@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 
@@ -35,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	"k8s.io/kubernetes/pkg/volume"
@@ -81,6 +83,7 @@ func NewInitializedVolumePluginMgr(
 		configMapManager:          configMapManager,
 		tokenManager:              tokenManager,
 		clusterTrustBundleManager: clusterTrustBundleManager,
+		podCertificateManager:     kubelet.podCertificateManager,
 		informerFactory:           informerFactory,
 		csiDriverLister:           csiDriverLister,
 		csiDriversSynced:          csiDriversSynced,
@@ -110,6 +113,7 @@ type kubeletVolumeHost struct {
 	tokenManager              *token.Manager
 	configMapManager          configmap.Manager
 	clusterTrustBundleManager clustertrustbundle.Manager
+	podCertificateManager     podcertificate.Manager
 	informerFactory           informers.SharedInformerFactory
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriversSynced          cache.InformerSynced
@@ -259,6 +263,10 @@ func (kvh *kubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing bo
 
 func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
 	return kvh.clusterTrustBundleManager.GetTrustAnchorsBySigner(signerName, labelSelector, allowMissing)
+}
+
+func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {
+	return kvh.podCertificateManager.GetPodCertificateCredentialBundle(ctx, namespace, podName, volumeName, podUID, sourceIndex)
 }
 
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {

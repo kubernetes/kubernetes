@@ -414,7 +414,7 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		authorizationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, RuleResolver: c.ControlPlane.Generic.RuleResolver},
 		autoscalingrest.RESTStorageProvider{},
 		batchrest.RESTStorageProvider{},
-		certificatesrest.RESTStorageProvider{},
+		certificatesrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer},
 		coordinationrest.RESTStorageProvider{},
 		discoveryrest.StorageProvider{},
 		networkingrest.RESTStorageProvider{},

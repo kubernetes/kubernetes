@@ -76,20 +76,23 @@ func NewPlugin(nodeIdentifier nodeidentifier.NodeIdentifier) *Plugin {
 // Plugin holds state for and implements the admission plugin.
 type Plugin struct {
 	*admission.Handler
-	nodeIdentifier  nodeidentifier.NodeIdentifier
-	podsGetter      corev1lister.PodLister
-	nodesGetter     corev1lister.NodeLister
-	csiDriverGetter storagelisters.CSIDriverLister
-	pvcGetter       corev1lister.PersistentVolumeClaimLister
-	pvGetter        corev1lister.PersistentVolumeLister
-	csiTranslator   csitrans.CSITranslator
+	nodeIdentifier       nodeidentifier.NodeIdentifier
+	podsGetter           corev1lister.PodLister
+	nodesGetter          corev1lister.NodeLister
+	serviceAccountGetter corev1lister.ServiceAccountLister
+	csiDriverGetter      storagelisters.CSIDriverLister
+	pvcGetter            corev1lister.PersistentVolumeClaimLister
+	pvGetter             corev1lister.PersistentVolumeLister
+	csiTranslator        csitrans.CSITranslator
 
 	authz authorizer.Authorizer
 
+	inspectedFeatureGates                          bool
 	expansionRecoveryEnabled                       bool
 	dynamicResourceAllocationEnabled               bool
 	allowInsecureKubeletCertificateSigningRequests bool
 	serviceAccountNodeAudienceRestriction          bool
+	podCertificateRequestsEnabled                  bool
 }
 
 var (
@@ -105,6 +108,8 @@ func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.dynamicResourceAllocationEnabled = featureGates.Enabled(features.DynamicResourceAllocation)
 	p.allowInsecureKubeletCertificateSigningRequests = featureGates.Enabled(features.AllowInsecureKubeletCertificateSigningRequests)
 	p.serviceAccountNodeAudienceRestriction = featureGates.Enabled(features.ServiceAccountNodeAudienceRestriction)
+	p.podCertificateRequestsEnabled = featureGates.Enabled(features.PodCertificateRequest)
+	p.inspectedFeatureGates = true
 }
 
 // SetExternalKubeInformerFactory registers an informer factory into Plugin
@@ -117,6 +122,7 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 		p.pvGetter = f.Core().V1().PersistentVolumes().Lister()
 		p.csiTranslator = csitrans.New()
 	}
+	p.serviceAccountGetter = f.Core().V1().ServiceAccounts().Lister()
 }
 
 // ValidateInitialization validates the Plugin was initialized properly
@@ -144,6 +150,12 @@ func (p *Plugin) ValidateInitialization() error {
 			return fmt.Errorf("%s requires an authorizer", PluginName)
 		}
 	}
+	if p.serviceAccountGetter == nil {
+		return fmt.Errorf("%s requires a service account getter", PluginName)
+	}
+	if !p.inspectedFeatureGates {
+		return fmt.Errorf("%s has not inspected feature gates", PluginName)
+	}
 	return nil
 }
 
@@ -155,22 +167,23 @@ func (p *Plugin) SetAuthorizer(authz authorizer.Authorizer) {
 }
 
 var (
-	podResource           = api.Resource("pods")
-	nodeResource          = api.Resource("nodes")
-	pvcResource           = api.Resource("persistentvolumeclaims")
-	svcacctResource       = api.Resource("serviceaccounts")
-	leaseResource         = coordapi.Resource("leases")
-	csiNodeResource       = storage.Resource("csinodes")
-	resourceSliceResource = resource.Resource("resourceslices")
-	csrResource           = certapi.Resource("certificatesigningrequests")
+	podResource                   = api.Resource("pods")
+	nodeResource                  = api.Resource("nodes")
+	pvcResource                   = api.Resource("persistentvolumeclaims")
+	svcacctResource               = api.Resource("serviceaccounts")
+	leaseResource                 = coordapi.Resource("leases")
+	csiNodeResource               = storage.Resource("csinodes")
+	resourceSliceResource         = resource.Resource("resourceslices")
+	csrResource                   = certapi.Resource("certificatesigningrequests")
+	podCertificateRequestResource = certapi.Resource("podcertificaterequests")
 )
 
 // Admit checks the admission policy and triggers corresponding actions
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	nodeName, isNode := p.nodeIdentifier.NodeIdentity(a.GetUserInfo())
 
-	// Our job is just to restrict nodes
 	if !isNode {
+		// The calling user is not a node, so they should not be node-restricted.
 		return nil
 	}
 
@@ -178,6 +191,9 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		// disallow requests we cannot match to a particular node
 		return admission.NewForbidden(a, fmt.Errorf("could not determine node from user %q", a.GetUserInfo().GetName()))
 	}
+
+	// At this point, the caller has been affirmitively matched up to a node
+	// name.
 
 	// TODO: if node doesn't exist and this isn't a create node request, then reject.
 
@@ -207,6 +223,9 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 
 	case svcacctResource:
 		return p.admitServiceAccount(ctx, nodeName, a)
+
+	case podCertificateRequestResource:
+		return p.admitPodCertificateRequest(nodeName, a)
 
 	case leaseResource:
 		return p.admitLease(nodeName, a)
@@ -771,6 +790,83 @@ func (p *Plugin) csiDriverHasAudience(driverName, audience string) (bool, error)
 		}
 	}
 	return false, nil
+}
+
+func (p *Plugin) admitPodCertificateRequest(nodeName string, a admission.Attributes) error {
+	if !p.podCertificateRequestsEnabled {
+		return admission.NewForbidden(a, fmt.Errorf("PodCertificateRequest feature gate is disabled"))
+	}
+
+	if a.GetOperation() != admission.Create {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected operation %v", a.GetOperation()))
+	}
+
+	if len(a.GetSubresource()) != 0 {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected subresource %v", a.GetSubresource()))
+	}
+
+	namespace := a.GetNamespace()
+
+	req, ok := a.GetObject().(*certapi.PodCertificateRequest)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+	}
+
+	// Cross check the node name and node UID with the node that made the request.
+	if string(req.Spec.NodeName) != nodeName {
+		return admission.NewForbidden(a, fmt.Errorf("PodCertificateRequest.Spec.NodeName=%q, which is not the requesting node %q", req.Spec.NodeName, nodeName))
+	}
+	node, err := p.nodesGetter.Get(string(req.Spec.NodeName))
+	if apierrors.IsNotFound(err) {
+		return fmt.Errorf("while retrieving node %q named in the PodCertificateRequest: %w", req.Spec.NodeName, err)
+	}
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("while retrieving node %q named in the PodCertificateRequest: %w", req.Spec.NodeName, err))
+	}
+	if node.ObjectMeta.UID != req.Spec.NodeUID {
+		// Could be caused by informer lag.  Don't return Forbidden to indicate that retries may succeed.
+		return fmt.Errorf("PodCertificateRequest for pod %q names node UID %q, inconsistent with the running node (%q)", namespace+"/"+req.Spec.PodName, req.Spec.NodeUID, node.ObjectMeta.UID)
+	}
+
+	// Cross-check that the pod is a real pod, running on the node.
+	pod, err := p.podsGetter.Pods(namespace).Get(req.Spec.PodName)
+	if apierrors.IsNotFound(err) {
+		return fmt.Errorf("while retrieving pod %q named in the PodCertificateRequest: %w", namespace+"/"+req.Spec.PodName, err)
+	}
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("while retrieving pod %q named in the PodCertificateRequest: %w", namespace+"/"+req.Spec.PodName, err))
+	}
+	if req.Spec.PodUID != pod.ObjectMeta.UID {
+		// Could be caused by informer lag.  Don't return Forbidden to indicate that retries may succeed.
+		return fmt.Errorf("PodCertificateRequest for pod %q contains pod UID (%q) which differs from running pod %q", namespace+"/"+req.Spec.PodName, req.Spec.PodUID, string(pod.ObjectMeta.UID))
+	}
+	if pod.Spec.NodeName != string(req.Spec.NodeName) {
+		return admission.NewForbidden(a, fmt.Errorf("pod %q is not running on node %q named in the PodCertificateRequest", namespace+"/"+req.Spec.PodName, req.Spec.NodeName))
+	}
+
+	// Mirror pods don't get pod certificates.
+	if _, isMirror := pod.Annotations[api.MirrorPodAnnotationKey]; isMirror {
+		return admission.NewForbidden(a, fmt.Errorf("pod %q is a mirror pod", namespace+"/"+req.Spec.PodName))
+	}
+
+	if req.Spec.ServiceAccountName != pod.Spec.ServiceAccountName {
+		// We can outright forbid because this cannot be caused by informer lag (the UIDs match)
+		return admission.NewForbidden(a, fmt.Errorf("PodCertificateRequest for pod %q contains serviceAccountName (%q) that differs from running pod (%q)", namespace+"/"+req.Spec.PodName, req.Spec.ServiceAccountName, pod.Spec.ServiceAccountName))
+	}
+	sa, err := p.serviceAccountGetter.ServiceAccounts(namespace).Get(req.Spec.ServiceAccountName)
+	if apierrors.IsNotFound(err) {
+		// Could be caused by informer lag.  Don't return Forbidden to indicate that retries may succeed.
+		return fmt.Errorf("while retrieving service account %q named in the PodCertificateRequest: %w", namespace+"/"+req.Spec.ServiceAccountName, err)
+	}
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("while retrieving service account %q named in the PodCertificateRequest: %w", namespace+"/"+req.Spec.ServiceAccountName, err))
+	}
+	if req.Spec.ServiceAccountUID != sa.ObjectMeta.UID {
+		// Could be caused by informer lag.  Don't return Forbidden to indicate that retries may succeed.
+		return fmt.Errorf("PodCertificateRequest for pod %q names service account UID %q, which differs from the running service account (%q)", namespace+"/"+req.Spec.PodName, req.Spec.ServiceAccountUID, sa.ObjectMeta.UID)
+	}
+
+	return nil
 }
 
 func (p *Plugin) admitLease(nodeName string, a admission.Attributes) error {

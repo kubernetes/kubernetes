@@ -683,6 +683,7 @@ func dropDisabledFields(
 	dropDisabledMatchLabelKeysFieldInPodAffinity(podSpec, oldPodSpec)
 	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
+	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
 		// Drop ResizePolicy fields. Don't drop updates to Resources field as template.spec.resources
@@ -1309,6 +1310,49 @@ func dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec *api.PodSpec) 
 	}
 }
 
+func podCertificateProjectionInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, v := range podSpec.Volumes {
+		if v.Projected == nil {
+			continue
+		}
+
+		for _, s := range v.Projected.Sources {
+			if s.PodCertificate != nil {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func dropDisabledPodCertificateProjection(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+		return
+	}
+	if podSpec == nil {
+		return
+	}
+
+	// If the pod was already using it, it can keep using it.
+	if podCertificateProjectionInUse(oldPodSpec) {
+		return
+	}
+
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Projected == nil {
+			continue
+		}
+
+		for j := range podSpec.Volumes[i].Projected.Sources {
+			podSpec.Volumes[i].Projected.Sources[j].PodCertificate = nil
+		}
+	}
+}
+
 func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
 	if spec.Affinity != nil {
 		if spec.Affinity.PodAffinity != nil {
@@ -1517,6 +1561,8 @@ func HasAPIObjectReference(pod *api.Pod) (bool, string, error) {
 					return true, "serviceaccounts (via projected volumes)", nil
 				case s.ClusterTrustBundle != nil:
 					return true, "clustertrustbundles", nil
+				case s.PodCertificate != nil:
+					return true, "podcertificates", nil
 				case s.DownwardAPI != nil:
 					// Allow projected volume sources that don't require the Kubernetes API
 					continue

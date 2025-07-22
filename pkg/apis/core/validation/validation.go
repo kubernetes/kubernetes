@@ -51,6 +51,7 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -1246,6 +1247,69 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				allPaths.Insert(curPath)
 			} else {
 				allErrs = append(allErrs, field.Invalid(fldPath, curPath, "conflicting duplicate paths"))
+			}
+		}
+		if projPath := srcPath.Child("podCertificate"); source.PodCertificate != nil {
+			numSources++
+
+			allErrs = append(allErrs, ValidateSignerName(projPath.Child("signerName"), source.PodCertificate.SignerName)...)
+
+			switch source.PodCertificate.KeyType {
+			case "RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519":
+				// ok
+			default:
+				allErrs = append(allErrs, field.NotSupported(projPath.Child("keyType"), source.PodCertificate.KeyType, []string{"RSA3072", "RSA4096", "ECDSAP256", "ECDSAP384", "ECDSAP521", "ED25519"}))
+			}
+
+			if source.PodCertificate.MaxExpirationSeconds != nil {
+				if *source.PodCertificate.MaxExpirationSeconds < 3600 {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("maxExpirationSeconds"), *source.PodCertificate.MaxExpirationSeconds, "if provided, maxExpirationSeconds must be >= 3600"))
+				}
+				maxMaxExpirationSeconds := certificates.MaxMaxExpirationSeconds
+				if IsKubernetesSignerName(source.PodCertificate.SignerName) {
+					maxMaxExpirationSeconds = certificates.KubernetesMaxMaxExpirationSeconds
+				}
+				if *source.PodCertificate.MaxExpirationSeconds > int32(maxMaxExpirationSeconds) {
+					allErrs = append(allErrs, field.Invalid(projPath.Child("maxExpirationSeconds"), *source.PodCertificate.MaxExpirationSeconds, fmt.Sprintf("if provided, maxExpirationSeconds must be <= %d", maxMaxExpirationSeconds)))
+				}
+			}
+
+			numPaths := 0
+			if len(source.PodCertificate.CredentialBundlePath) != 0 {
+				numPaths++
+				// Credential bundle path must not be weird.
+				allErrs = append(allErrs, ValidateLocalNonReservedPath(source.PodCertificate.CredentialBundlePath, projPath.Child("credentialBundlePath"))...)
+				// Credential bundle path must not collide with a path from another source.
+				if !allPaths.Has(source.PodCertificate.CredentialBundlePath) {
+					allPaths.Insert(source.PodCertificate.CredentialBundlePath)
+				} else {
+					allErrs = append(allErrs, field.Invalid(fldPath, source.PodCertificate.CredentialBundlePath, "conflicting duplicate paths"))
+				}
+			}
+
+			if len(source.PodCertificate.KeyPath) != 0 {
+				numPaths++
+				allErrs = append(allErrs, ValidateLocalNonReservedPath(source.PodCertificate.KeyPath, projPath.Child("keyPath"))...)
+				if !allPaths.Has(source.PodCertificate.KeyPath) {
+					allPaths.Insert(source.PodCertificate.KeyPath)
+				} else {
+					allErrs = append(allErrs, field.Invalid(fldPath, source.PodCertificate.KeyPath, "conflicting duplicate paths"))
+				}
+
+			}
+
+			if len(source.PodCertificate.CertificateChainPath) != 0 {
+				numPaths++
+				allErrs = append(allErrs, ValidateLocalNonReservedPath(source.PodCertificate.CertificateChainPath, projPath.Child("certificateChainPath"))...)
+				if !allPaths.Has(source.PodCertificate.CertificateChainPath) {
+					allPaths.Insert(source.PodCertificate.CertificateChainPath)
+				} else {
+					allErrs = append(allErrs, field.Invalid(fldPath, source.PodCertificate.CertificateChainPath, "conflicting duplicate paths"))
+				}
+			}
+
+			if numPaths == 0 {
+				allErrs = append(allErrs, field.Required(projPath, "specify at least one of credentialBundlePath, keyPath, and certificateChainPath"))
 			}
 		}
 		if numSources > 1 {
