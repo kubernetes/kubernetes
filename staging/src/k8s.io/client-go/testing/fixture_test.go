@@ -61,6 +61,7 @@ func getArbitraryResource(s schema.GroupVersionResource, name, namespace string)
 
 func TestWatchCallNonNamespace(t *testing.T) {
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
+	testKind := testResource.GroupVersion().WithKind("test_kind")
 	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
 	accessor, err := meta.Accessor(testObj)
 	if err != nil {
@@ -70,7 +71,7 @@ func TestWatchCallNonNamespace(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
-	watch, err := o.Watch(testResource, ns)
+	watch, err := o.Watch(testResource, testKind, ns)
 	if err != nil {
 		t.Fatalf("test resource watch failed in %s: %v ", ns, err)
 	}
@@ -86,6 +87,7 @@ func TestWatchCallNonNamespace(t *testing.T) {
 
 func TestWatchCallAllNamespace(t *testing.T) {
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
+	testKind := testResource.GroupVersion().WithKind("test_kind")
 	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
 	accessor, err := meta.Accessor(testObj)
 	if err != nil {
@@ -95,11 +97,11 @@ func TestWatchCallAllNamespace(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
-	w, err := o.Watch(testResource, "test_namespace")
+	w, err := o.Watch(testResource, testKind, "test_namespace")
 	if err != nil {
 		t.Fatalf("test resource watch failed in test_namespace: %v", err)
 	}
-	wAll, err := o.Watch(testResource, "")
+	wAll, err := o.Watch(testResource, testKind, "")
 	if err != nil {
 		t.Fatalf("test resource watch failed in all namespaces: %v", err)
 	}
@@ -186,6 +188,7 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
+	testKind := testResource.GroupVersion().WithKind("test_kind")
 
 	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
 	watchNamespaces := []string{
@@ -199,7 +202,7 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 	for idx, watchNamespace := range watchNamespaces {
 		i := idx
 		watchNamespace := watchNamespace
-		w, err := o.Watch(testResource, watchNamespace)
+		w, err := o.Watch(testResource, testKind, watchNamespace)
 		if err != nil {
 			t.Fatalf("test resource watch failed in %s: %v", watchNamespace, err)
 		}
@@ -239,6 +242,7 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 
 func TestWatchAddAfterStop(t *testing.T) {
 	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
+	testKind := testResource.GroupVersion().WithKind("test_kind")
 	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
 	accessor, err := meta.Accessor(testObj)
 	if err != nil {
@@ -249,7 +253,7 @@ func TestWatchAddAfterStop(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
-	watch, err := o.Watch(testResource, ns)
+	watch, err := o.Watch(testResource, testKind, ns)
 	if err != nil {
 		t.Errorf("watch creation failed: %v", err)
 	}
