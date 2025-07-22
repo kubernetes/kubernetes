@@ -121,7 +121,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	logger := klog.FromContext(ctx)
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
-		klog.ErrorS(err, "Cannot get Node info")
+		logger.Error(err, "Cannot get Node info")
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  InvalidNodeInfo,
@@ -148,7 +148,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 
 	if rejectPodAdmissionBasedOnSupplementalGroupsPolicy(admitPod, node) {
 		message := fmt.Sprintf("SupplementalGroupsPolicy=%s is not supported in this node", v1.SupplementalGroupsPolicyStrict)
-		klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
+		logger.Info("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  SupplementalGroupsPolicyNotSupported,
