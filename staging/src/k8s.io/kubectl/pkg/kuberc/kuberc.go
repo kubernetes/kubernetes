@@ -452,7 +452,7 @@ func validate(plugin *config.Preference) error {
 // loadAliasesForHelpDisplay loads all aliases from the kuberc file and registers them
 // in the command hierarchy for help display. This is called when kubectl is run without arguments.
 func (p *Preferences) loadAliasesForHelpDisplay(rootCmd *cobra.Command, errOut io.Writer) {
-	kuberc, err := DefaultGetPreferences("", errOut)
+	kuberc, err := p.getPreferencesFunc("", errOut)
 	if err != nil || kuberc == nil {
 		return
 	}
@@ -460,21 +460,39 @@ func (p *Preferences) loadAliasesForHelpDisplay(rootCmd *cobra.Command, errOut i
 	// Register aliases in the command
 	for _, alias := range kuberc.Aliases {
 		commands := strings.Fields(alias.Command)
-		existingCmd, _, err := rootCmd.Find(commands)
+		_, _, err := rootCmd.Find(commands)
 		if err != nil {
 			continue
 		}
 
+		// Build the full expanded command for display
+		fullCommand := []string{alias.Command}
+		if len(alias.PrependArgs) > 0 {
+			fullCommand = append(fullCommand, alias.PrependArgs...)
+		}
+
+		// Add flags/options to display
+		var flagParts []string
+		for _, option := range alias.Options {
+			flagParts = append(flagParts, fmt.Sprintf("--%s=%s", option.Name, option.Default))
+		}
+		if len(flagParts) > 0 {
+			fullCommand = append(fullCommand, flagParts...)
+		}
+
+		if len(alias.AppendArgs) > 0 {
+			fullCommand = append(fullCommand, alias.AppendArgs...)
+		}
+		fullCommandStr := strings.Join(fullCommand, " ")
+
 		// Create a copy of the existing command with the alias name
 		aliasCmd := &cobra.Command{
 			Use:   alias.Name,
-			Short: fmt.Sprintf(i18n.T("Alias for: %s"), alias.Command),
-			Long:  existingCmd.Long,
+			Short: fmt.Sprintf(i18n.T("Alias for: %s"), fullCommandStr),
 			// Add a Run function to make it a valid command
 			Run: func(cmd *cobra.Command, args []string) {},
 		}
 
 		rootCmd.AddCommand(aliasCmd)
-		p.aliases[alias.Name] = struct{}{}
 	}
 }
