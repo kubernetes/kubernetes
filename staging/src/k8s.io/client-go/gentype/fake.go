@@ -185,7 +185,7 @@ func (l *alsoFakeLister[T, L]) List(ctx context.Context, opts metav1.ListOptions
 func (c *FakeClient[T]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(c.resource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(c.resource, c.kind, c.ns, opts))
 }
 
 // Create takes the representation of a resource and creates it.  Returns the server's representation of the resource, and an error, if there is any.
