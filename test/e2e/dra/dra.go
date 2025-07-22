@@ -632,6 +632,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 		})
 
+		// Seamless upgrade support was added in Kubernetes 1.33.
 		f.It("sequential update with pods replacing each other", f.WithLabel("KubeletMinVersion:1.33"), framework.WithSlow(), func(ctx context.Context) {
 			nodes := drautils.NewNodesNow(ctx, f, 1, 1)
 
@@ -1817,18 +1818,10 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		})
 	}
 
-	// Deleting a pending pod that cannot start because there is no driver was fixed in
-	// in https://github.com/kubernetes/kubernetes/pull/131968 for 1.34. Older kubelets
-	// cause tests to get stuck because the pod cannot be deleted.
-	//
-	// Besides, tests covering only the control plane are not useful in a
-	// job which is meant to cover kubelet version skew. We might want to
-	// filter them out differently at some point.
-
-	framework.Context("control plane with single node", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, f.WithLabel("KubeletMinVersion:1.34"), func() { singleNodeTests(false) })
+	framework.Context("control plane with single node", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func() { singleNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on single node", func() { singleNodeTests(true) })
 
-	framework.Context("control plane with multiple nodes", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, f.WithLabel("KubeletMinVersion:1.34"), func() { multiNodeTests(false) })
+	framework.Context("control plane with multiple nodes", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func() { multiNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on multiple nodes", func() { multiNodeTests(true) })
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPrioritizedList), prioritizedListTests)
@@ -1932,7 +1925,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		//
 		// Could become a conformance test because it only depends
 		// on the apiserver.
-		f.It("creates slices", func(ctx context.Context) {
+		f.It("creates slices", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
 			// Define desired resource slices.
 			driverName := f.Namespace.Name
 			numSlices := 100
@@ -2022,7 +2015,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		})
 	})
 
-	framework.Context("control plane", feature.DynamicResourceAllocation, func() {
+	framework.Context("control plane", func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false))
 		driver.WithKubelet = false
@@ -2068,7 +2061,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			}).Should(gomega.Succeed())
 		})
 
-		f.It("truncates the name of a generated resource claim", f.WithLabel("KubeletMinVersion:1.34"), func(ctx context.Context) {
+		f.It("truncates the name of a generated resource claim", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
 			pod, template := b.PodInline()
 			pod.Name = strings.Repeat("p", 63)
 			pod.Spec.ResourceClaims[0].Name = strings.Repeat("c", 63)
@@ -2078,7 +2071,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			b.TestPod(ctx, f, pod)
 		})
 
-		ginkgo.It("supports count/resourceclaims.resource.k8s.io ResourceQuota", func(ctx context.Context) {
+		f.It("supports count/resourceclaims.resource.k8s.io ResourceQuota", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
 			claim := &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "claim-0",
@@ -2133,12 +2126,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		})
 	})
 
-	framework.Context("control plane", feature.DynamicResourceAllocation, func() {
+	framework.Context("control plane", func() {
 		nodes := drautils.NewNodes(f, 1, 4)
 		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
 		driver.WithKubelet = false
 
-		f.It("must apply per-node permission checks", func(ctx context.Context) {
+		f.It("must apply per-node permission checks", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
 			// All of the operations use the client set of a kubelet plugin for
 			// a fictional node which both don't exist, so nothing interferes
 			// when we actually manage to create a slice.
