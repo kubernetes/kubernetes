@@ -17,13 +17,16 @@ limitations under the License.
 package apiresources
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/spf13/cobra"
-
+	"github.com/stretchr/testify/assert"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"sigs.k8s.io/yaml"
 )
 
 func TestAPIResourcesComplete(t *testing.T) {
@@ -300,121 +303,6 @@ bazzes   b            somegroup/v1   true         Baz
 `,
 			expectedInvalidations: 0,
 		},
-		{
-			name: "json",
-			commandSetupFn: func(cmd *cobra.Command) {
-				cmd.Flags().Set("output", "json")
-			},
-			expectedOutput: `{
-    "kind": "APIResourceList",
-    "apiVersion": "v1",
-    "groupVersion": "",
-    "resources": [
-        {
-            "name": "foos",
-            "singularName": "",
-            "namespaced": false,
-            "version": "v1",
-            "kind": "Foo",
-            "verbs": [
-                "get",
-                "list"
-            ],
-            "shortNames": [
-                "f",
-                "fo"
-            ],
-            "categories": [
-                "some-category"
-            ]
-        },
-        {
-            "name": "bars",
-            "singularName": "",
-            "namespaced": true,
-            "version": "v1",
-            "kind": "Bar",
-            "verbs": [
-                "get",
-                "list",
-                "create"
-            ]
-        },
-        {
-            "name": "bazzes",
-            "singularName": "",
-            "namespaced": true,
-            "group": "somegroup",
-            "version": "v1",
-            "kind": "Baz",
-            "verbs": [
-                "get",
-                "list",
-                "create",
-                "delete"
-            ],
-            "shortNames": [
-                "b"
-            ],
-            "categories": [
-                "some-category",
-                "another-category"
-            ]
-        }
-    ]
-}
-`,
-			expectedInvalidations: 1,
-		},
-		{
-			name: "yaml",
-			commandSetupFn: func(cmd *cobra.Command) {
-				cmd.Flags().Set("output", "yaml")
-			},
-			expectedOutput: `apiVersion: v1
-groupVersion: ""
-kind: APIResourceList
-resources:
-- categories:
-  - some-category
-  kind: Foo
-  name: foos
-  namespaced: false
-  shortNames:
-  - f
-  - fo
-  singularName: ""
-  verbs:
-  - get
-  - list
-  version: v1
-- kind: Bar
-  name: bars
-  namespaced: true
-  singularName: ""
-  verbs:
-  - get
-  - list
-  - create
-  version: v1
-- categories:
-  - some-category
-  - another-category
-  kind: Baz
-  name: bazzes
-  namespaced: true
-  shortNames:
-  - b
-  singularName: ""
-  verbs:
-  - get
-  - list
-  - create
-  - delete
-  version: v1
-`,
-			expectedInvalidations: 1,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -430,6 +318,194 @@ resources:
 			}
 			if out.String() != tc.expectedOutput {
 				tt.Fatalf("unexpected output: %s\nexpected: %s", out.String(), tc.expectedOutput)
+			}
+			if dc.Invalidations != tc.expectedInvalidations {
+				tt.Fatalf("unexpected invalidations: %d, expected: %d", dc.Invalidations, tc.expectedInvalidations)
+			}
+		})
+	}
+}
+
+// TestAPIResourcesRunJson is doing same thing as TestAPIResourcesRun but for JSON outputs
+// A separate test function is created because we are using apieqaulity.Semantic.DeepEqual
+// to check equality between input and output
+func TestAPIResourcesRunJson(t *testing.T) {
+	dc := cmdtesting.NewFakeCachedDiscoveryClient()
+	tf := cmdtesting.NewTestFactory().WithDiscoveryClient(dc)
+	defer tf.Cleanup()
+
+	testCases := []struct {
+		name                  string
+		commandSetupFn        func(cmd *cobra.Command)
+		expectedInvalidations int
+		preferredResources    []*v1.APIResourceList
+	}{
+		{
+			name: "one",
+			commandSetupFn: func(cmd *cobra.Command) {
+				cmd.Flags().Set("output", "json")
+			},
+			preferredResources: []*v1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []v1.APIResource{
+						{
+							Name:       "foos",
+							Namespaced: false,
+							Kind:       "Foo",
+							Verbs:      []string{"get", "list"},
+							ShortNames: []string{"f", "fo"},
+							Categories: []string{"some-category"},
+						},
+					},
+				},
+			},
+			expectedInvalidations: 1,
+		},
+		{
+			name: "two",
+			commandSetupFn: func(cmd *cobra.Command) {
+				cmd.Flags().Set("output", "json")
+			},
+			preferredResources: []*v1.APIResourceList{
+				{
+					GroupVersion: "somegroup/v1",
+					APIResources: []v1.APIResource{
+						{
+							Name:       "bazzes",
+							Namespaced: true,
+							Kind:       "Baz",
+							Verbs:      []string{"get", "list", "create", "delete"},
+							ShortNames: []string{"b"},
+							Categories: []string{"some-category", "another-category"},
+						},
+					},
+				},
+			},
+			expectedInvalidations: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(tt *testing.T) {
+			dc.Invalidations = 0
+			dc.PreferredResources = tc.preferredResources
+			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
+			cmd := NewCmdAPIResources(tf, ioStreams)
+			tc.commandSetupFn(cmd)
+			cmd.Run(cmd, []string{})
+
+			if errOut.Len() > 0 {
+				t.Fatalf("unexpected error output: %s", errOut.String())
+			}
+			var apiResourceList v1.APIResourceList
+			err := json.Unmarshal(out.Bytes(), &apiResourceList)
+			assert.Nil(tt, err)
+
+			// this will undo custom value we add in RunAPIResources in the lines:
+			// resource.Group = gv.Group
+			// resource.Version = gv.Version
+			{
+				apiResourceList.GroupVersion = apiResourceList.APIResources[0].Group + "/" + apiResourceList.APIResources[0].Version
+				apiResourceList.APIResources[0].Version = ""
+				apiResourceList.APIResources[0].Group = ""
+			}
+
+			if !apiequality.Semantic.DeepEqual(tc.preferredResources[0].APIResources[0], apiResourceList.APIResources[0]) {
+				tt.Fatalf("expected output: [%v]\n, but got [%v]", tc.preferredResources, apiResourceList)
+			}
+			if dc.Invalidations != tc.expectedInvalidations {
+				tt.Fatalf("unexpected invalidations: %d, expected: %d", dc.Invalidations, tc.expectedInvalidations)
+			}
+		})
+	}
+}
+
+// TestAPIResourcesRunYAML is same as TestAPIResourcesJSON, but for YAML outputs
+func TestAPIResourcesRunYAML(t *testing.T) {
+	dc := cmdtesting.NewFakeCachedDiscoveryClient()
+	tf := cmdtesting.NewTestFactory().WithDiscoveryClient(dc)
+	defer tf.Cleanup()
+
+	testCases := []struct {
+		name                  string
+		commandSetupFn        func(cmd *cobra.Command)
+		expectedInvalidations int
+		preferredResources    []*v1.APIResourceList
+	}{
+		{
+			name: "one",
+			commandSetupFn: func(cmd *cobra.Command) {
+				cmd.Flags().Set("output", "json")
+			},
+			preferredResources: []*v1.APIResourceList{
+				{
+					GroupVersion: "v1",
+					APIResources: []v1.APIResource{
+						{
+							Name:       "foos",
+							Namespaced: false,
+							Kind:       "Foo",
+							Verbs:      []string{"get", "list"},
+							ShortNames: []string{"f", "fo"},
+							Categories: []string{"some-category"},
+						},
+					},
+				},
+			},
+			expectedInvalidations: 1,
+		},
+		{
+			name: "two",
+			commandSetupFn: func(cmd *cobra.Command) {
+				cmd.Flags().Set("output", "json")
+			},
+			preferredResources: []*v1.APIResourceList{
+				{
+					GroupVersion: "somegroup/v1",
+					APIResources: []v1.APIResource{
+						{
+							Name:       "bazzes",
+							Namespaced: true,
+							Kind:       "Baz",
+							Verbs:      []string{"get", "list", "create", "delete"},
+							ShortNames: []string{"b"},
+							Categories: []string{"some-category", "another-category"},
+						},
+					},
+				},
+			},
+			expectedInvalidations: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(tt *testing.T) {
+			dc.Invalidations = 0
+			dc.PreferredResources = tc.preferredResources
+			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
+			cmd := NewCmdAPIResources(tf, ioStreams)
+			tc.commandSetupFn(cmd)
+			cmd.Run(cmd, []string{})
+
+			if errOut.Len() > 0 {
+				t.Fatalf("unexpected error output: %s", errOut.String())
+			}
+			var apiResourceList v1.APIResourceList
+			err := yaml.Unmarshal(out.Bytes(), &apiResourceList)
+			assert.Nil(tt, err)
+
+			// this will undo custom value we add in RunAPIResources in the lines:
+			// resource.Group = gv.Group
+			// resource.Version = gv.Version
+			{
+				apiResourceList.GroupVersion = apiResourceList.APIResources[0].Group + "/" + apiResourceList.APIResources[0].Version
+				apiResourceList.APIResources[0].Version = ""
+				apiResourceList.APIResources[0].Group = ""
+			}
+
+			if !apiequality.Semantic.DeepEqual(tc.preferredResources[0].APIResources[0], apiResourceList.APIResources[0]) {
+				tt.Fatalf("expected output: [%v]\n, but got [%v]", tc.preferredResources, apiResourceList)
 			}
 			if dc.Invalidations != tc.expectedInvalidations {
 				tt.Fatalf("unexpected invalidations: %d, expected: %d", dc.Invalidations, tc.expectedInvalidations)
