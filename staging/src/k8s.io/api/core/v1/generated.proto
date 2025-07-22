@@ -1400,6 +1400,13 @@ message EnvVarSource {
   // Selects a key of a secret in the pod's namespace
   // +optional
   optional SecretKeySelector secretKeyRef = 4;
+
+  // FileKeyRef selects a key of the env file.
+  // Requires the EnvFiles feature gate to be enabled.
+  //
+  // +featureGate=EnvFiles
+  // +optional
+  optional FileKeySelector fileKeyRef = 5;
 }
 
 // An EphemeralContainer is a temporary container that you may add to an existing Pod for
@@ -1776,6 +1783,36 @@ message FCVolumeSource {
   // +optional
   // +listType=atomic
   repeated string wwids = 5;
+}
+
+// FileKeySelector selects a key of the env file.
+// +structType=atomic
+message FileKeySelector {
+  // The name of the volume mount containing the env file.
+  // +required
+  optional string volumeName = 1;
+
+  // The path within the volume from which to select the file.
+  // Must be relative and may not contain the '..' path or start with '..'.
+  // +required
+  optional string path = 2;
+
+  // The key within the env file. An invalid key will prevent the pod from starting.
+  // The keys defined within a source may consist of any printable ASCII characters except '='.
+  // During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+  // +required
+  optional string key = 3;
+
+  // Specify whether the file or its key must be defined. If the file or key
+  // does not exist, then the env var is not published.
+  // If optional is set to true and the specified key does not exist,
+  // the environment variable will not be set in the Pod's containers.
+  //
+  // If optional is set to false and the specified key does not exist,
+  // an error will be returned during Pod creation.
+  // +optional
+  // +default=false
+  optional bool optional = 4;
 }
 
 // FlexPersistentVolumeSource represents a generic persistent volume resource that is

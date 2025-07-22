@@ -6138,7 +6138,7 @@ func TestRelaxedValidateEnv(t *testing.T) {
 			Name:      "abc",
 			ValueFrom: &core.EnvVarSource{},
 		}},
-		expectedError: "[0].valueFrom: Invalid value: \"\": must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`",
+		expectedError: "field[0].valueFrom: Invalid value: \"\": must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef",
 	}, {
 		name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
 		envs: []core.EnvVar{{
@@ -6548,7 +6548,7 @@ func TestValidateEnv(t *testing.T) {
 			Name:      "abc",
 			ValueFrom: &core.EnvVarSource{},
 		}},
-		expectedError: "[0].valueFrom: Invalid value: \"\": must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`",
+		expectedError: "[0].valueFrom: Invalid value: \"\": must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef",
 	}, {
 		name: "valueFrom.fieldRef and valueFrom.secretKeyRef specified",
 		envs: []core.EnvVar{{
@@ -6968,6 +6968,208 @@ func TestValidateEnvFrom(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestValidateEnvVarValueFromFileKeyRef(t *testing.T) {
+	testCases := []struct {
+		name         string
+		envVar       core.EnvVar
+		opts         PodValidationOptions
+		expectedErrs field.ErrorList
+	}{
+		{
+			name: "accept valid file key reference with all required fields",
+			envVar: core.EnvVar{
+				Name: "foo",
+				ValueFrom: &core.EnvVarSource{
+					FileKeyRef: &core.FileKeySelector{
+						VolumeName: "volume-name",
+						Path:       "path/to/file.env",
+						Key:        "MY_VAR",
+					},
+				},
+			},
+			opts:         PodValidationOptions{},
+			expectedErrs: field.ErrorList{},
+		},
+		{
+			name: "reject file key reference when key field is empty",
+			envVar: core.EnvVar{
+				Name: "foo",
+				ValueFrom: &core.EnvVarSource{
+					FileKeyRef: &core.FileKeySelector{
+						VolumeName: "volume-name",
+						Path:       "path/to/file.env",
+						Key:        "",
+					},
+				},
+			},
+			opts: PodValidationOptions{},
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("valueFrom.fileKeyRef.key"), ""),
+			},
+		},
+		{
+			name: "reject file key reference when key contains invalid characters",
+			envVar: core.EnvVar{
+				Name: "foo",
+				ValueFrom: &core.EnvVarSource{
+					FileKeyRef: &core.FileKeySelector{
+						VolumeName: "volume-name",
+						Path:       "path/to/file.env",
+						Key:        "bad=key",
+					},
+				},
+			},
+			opts: PodValidationOptions{},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("valueFrom.fileKeyRef.key"), "", "valid environment"),
+			},
+		},
+		{
+			name: "reject when both value and valueFrom.fileKeyRef are specified",
+			envVar: core.EnvVar{
+				Name:  "foo",
+				Value: "some-value",
+				ValueFrom: &core.EnvVarSource{
+					FileKeyRef: &core.FileKeySelector{
+						VolumeName: "volume-name",
+						Path:       "path/to/file.env",
+						Key:        "MY_VAR",
+					},
+				},
+			},
+			opts: PodValidationOptions{},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("valueFrom"), "", "not empty"),
+			},
+		},
+		{
+			name: "reject file key reference when volumeName is empty",
+			envVar: core.EnvVar{
+				Name: "foo",
+				ValueFrom: &core.EnvVarSource{
+					FileKeyRef: &core.FileKeySelector{
+						VolumeName: "",
+						Path:       "path/to/file.env",
+						Key:        "MY_VAR",
+					},
+				},
+			},
+			opts: PodValidationOptions{},
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("valueFrom.fileKeyRef.volumeName"), ""),
+			},
+		},
+		{
+			name: "reject file key reference when volumeName is invalid",
+			envVar: core.EnvVar{
+				Name: "foo",
+				ValueFrom: &core.EnvVarSource{
+					FileKeyRef: &core.FileKeySelector{
+						VolumeName: "INVALID_NAME!",
+						Path:       "path/to/file.env",
+						Key:        "MY_VAR",
+					},
+				},
+			},
+			opts: PodValidationOptions{},
+			expectedErrs: field.ErrorList{
+				{
+					Type:     field.ErrorTypeInvalid,
+					Field:    field.NewPath("valueFrom.fileKeyRef.volumeName").String(),
+					BadValue: "INVALID_NAME!",
+					Detail:   "a lowercase RFC 1123 label must consist of",
+					Origin:   "format=dns-label",
+				},
+			},
+		},
+		{
+			name: "reject file key reference when path is empty",
+			envVar: core.EnvVar{
+				Name: "foo",
+				ValueFrom: &core.EnvVarSource{
+					FileKeyRef: &core.FileKeySelector{
+						VolumeName: "volume-name",
+						Path:       "",
+						Key:        "MY_VAR",
+					},
+				},
+			},
+			opts: PodValidationOptions{},
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("valueFrom.fileKeyRef.path"), ""),
+			},
+		},
+		{
+			name: "reject file key reference when path contains backsteps",
+			envVar: core.EnvVar{
+				Name: "foo",
+				ValueFrom: &core.EnvVarSource{
+					FileKeyRef: &core.FileKeySelector{
+						VolumeName: "volume-name",
+						Path:       "../etc/passwd",
+						Key:        "MY_VAR",
+					},
+				},
+			},
+			opts: PodValidationOptions{},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("valueFrom.fileKeyRef.path"), "../etc/passwd", "must not contain '..'"),
+			},
+		},
+		{
+			name: "reject file key reference when multiple fields are invalid",
+			envVar: core.EnvVar{
+				Name: "foo",
+				ValueFrom: &core.EnvVarSource{
+					FileKeyRef: &core.FileKeySelector{
+						VolumeName: "!badname",
+						Path:       "../badpath",
+						Key:        "bad=key",
+					},
+				},
+			},
+			opts: PodValidationOptions{},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("valueFrom.fileKeyRef.key"), "bad=key", "environment variable"),
+				{
+					Type:     field.ErrorTypeInvalid,
+					Field:    field.NewPath("valueFrom.fileKeyRef.volumeName").String(),
+					BadValue: "!badname",
+					Detail:   "a lowercase RFC 1123 label must consist of",
+					Origin:   "format=dns-label",
+				},
+				field.Invalid(field.NewPath("valueFrom.fileKeyRef.path"), "../badpath", "must not contain '..'"),
+			},
+		},
+		{
+			name: "accept file key reference with optional true and missing key",
+			envVar: core.EnvVar{
+				Name: "foo",
+				ValueFrom: &core.EnvVarSource{
+					FileKeyRef: &core.FileKeySelector{
+						VolumeName: "volume-name",
+						Path:       "path/to/file.env",
+						Key:        "",
+						Optional:   ptr.To(true),
+					},
+				},
+			},
+			opts: PodValidationOptions{},
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("valueFrom.fileKeyRef.key"), ""),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateEnvVarValueFrom(tc.envVar, field.NewPath("valueFrom"), tc.opts)
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
 	}
 }
 
@@ -27598,6 +27800,559 @@ func TestValidateStopSignal(t *testing.T) {
 					t.Errorf("Unexpected error(s): %v", errs)
 				}
 			}
+		})
+	}
+}
+
+func TestValidateFileKeyRefVolume(t *testing.T) {
+	testCases := []struct {
+		name         string
+		podSpec      *core.PodSpec
+		expectedErrs field.ErrorList
+	}{
+		{
+			name: "should pass when no FileKeyRef environment variables are used",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name:  "STATIC_VAR",
+								Value: "static_value",
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "some-volume",
+						VolumeSource: core.VolumeSource{
+							HostPath: &core.HostPathVolumeSource{
+								Path: "/tmp/data",
+								Type: newHostPathType(string(core.HostPathDirectory)),
+							},
+						},
+					},
+				},
+			},
+			expectedErrs: nil,
+		},
+		{
+			name: "should pass when FileKeyRef references a valid emptyDir volume",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "DATABASE_URL",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "config-volume",
+										Path:       "database.env",
+										Key:        "DATABASE_URL",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "config-volume",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+			expectedErrs: nil,
+		},
+		{
+			name: "should pass when FileKeyRef references emptyDir volume with memory medium",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "CACHE_CONFIG",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "cache-volume",
+										Path:       "cache.env",
+										Key:        "CACHE_CONFIG",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "cache-volume",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{
+								Medium: core.StorageMediumMemory,
+							},
+						},
+					},
+				},
+			},
+			expectedErrs: nil,
+		},
+		{
+			name: "should pass when FileKeyRef references emptyDir volume and other volume types exist",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "DATABASE_URL",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "config-volume",
+										Path:       "database.env",
+										Key:        "DATABASE_URL",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "config-volume",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{},
+						},
+					},
+					{
+						Name: "other-volume",
+						VolumeSource: core.VolumeSource{
+							HostPath: &core.HostPathVolumeSource{
+								Path: "/tmp/data",
+								Type: newHostPathType(string(core.HostPathDirectory)),
+							},
+						},
+					},
+				},
+			},
+			expectedErrs: nil,
+		},
+		{
+			name: "should fail when FileKeyRef references a non-existent volume",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "DATABASE_URL",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "non-existent-volume",
+										Path:       "database.env",
+										Key:        "DATABASE_URL",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "config-volume",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.NotFound(field.NewPath("spec.containers[0].env[0].valueFrom.fileKeyRef.volumeName"), "volume \"non-existent-volume\" referenced by FileKeyRef does not exist"),
+			},
+		},
+		{
+			name: "should fail when FileKeyRef references a hostPath volume",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "DATABASE_URL",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "config-volume",
+										Path:       "database.env",
+										Key:        "DATABASE_URL",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "config-volume",
+						VolumeSource: core.VolumeSource{
+							HostPath: &core.HostPathVolumeSource{
+								Path: "/tmp/config",
+								Type: newHostPathType(string(core.HostPathDirectory)),
+							},
+						},
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.containers[0].env[0].valueFrom.fileKeyRef.volumeName"), "config-volume", "referenced volume must be of type emptyDir"),
+			},
+		},
+		{
+			name: "should fail when FileKeyRef references a secret volume",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "API_KEY",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "secret-volume",
+										Path:       "api.env",
+										Key:        "API_KEY",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "secret-volume",
+						VolumeSource: core.VolumeSource{
+							Secret: &core.SecretVolumeSource{
+								SecretName: "my-secret",
+							},
+						},
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.containers[0].env[0].valueFrom.fileKeyRef.volumeName"), "secret-volume", "referenced volume must be of type emptyDir"),
+			},
+		},
+		{
+			name: "should fail when FileKeyRef references a configMap volume",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "CONFIG_VALUE",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "configmap-volume",
+										Path:       "config.env",
+										Key:        "CONFIG_VALUE",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "configmap-volume",
+						VolumeSource: core.VolumeSource{
+							ConfigMap: &core.ConfigMapVolumeSource{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: "my-config",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.containers[0].env[0].valueFrom.fileKeyRef.volumeName"), "configmap-volume", "referenced volume must be of type emptyDir"),
+			},
+		},
+		{
+			name: "should fail when FileKeyRef references a persistentVolumeClaim volume",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "DATA_PATH",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "pvc-volume",
+										Path:       "data.env",
+										Key:        "DATA_PATH",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "pvc-volume",
+						VolumeSource: core.VolumeSource{
+							PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+								ClaimName: "my-pvc",
+							},
+						},
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.containers[0].env[0].valueFrom.fileKeyRef.volumeName"), "pvc-volume", "referenced volume must be of type emptyDir"),
+			},
+		},
+		{
+			name: "should fail when FileKeyRef references multiple non-emptyDir volumes",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "DATABASE_URL",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "host-volume",
+										Path:       "database.env",
+										Key:        "DATABASE_URL",
+									},
+								},
+							},
+							{
+								Name: "API_KEY",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "configmap-volume",
+										Path:       "api.env",
+										Key:        "API_KEY",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "host-volume",
+						VolumeSource: core.VolumeSource{
+							HostPath: &core.HostPathVolumeSource{
+								Path: "/tmp/config",
+								Type: newHostPathType(string(core.HostPathDirectory)),
+							},
+						},
+					},
+					{
+						Name: "configmap-volume",
+						VolumeSource: core.VolumeSource{
+							ConfigMap: &core.ConfigMapVolumeSource{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: "my-config",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.containers[0].env[0].valueFrom.fileKeyRef.volumeName"), "", "referenced volume must be of type emptyDir"),
+				field.Invalid(field.NewPath("spec.containers[0].env[1].valueFrom.fileKeyRef.volumeName"), "", "referenced volume must be of type emptyDir"),
+			},
+		},
+		{
+			name: "should fail when FileKeyRef references non-existent volume in multiple containers",
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "DATABASE_URL",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "non-existent-volume",
+										Path:       "database.env",
+										Key:        "DATABASE_URL",
+									},
+								},
+							},
+						},
+					},
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "API_KEY",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "another-missing-volume",
+										Path:       "api.env",
+										Key:        "API_KEY",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "config-volume",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.NotFound(field.NewPath("spec.containers[0].env[0].valueFrom.fileKeyRef.volumeName"), "volume \"non-existent-volume\" referenced by FileKeyRef does not exist"),
+				field.NotFound(field.NewPath("spec.containers[1].env[0].valueFrom.fileKeyRef.volumeName"), "volume \"another-missing-volume\" referenced by FileKeyRef does not exist"),
+			},
+		},
+		{
+			name: "should pass when FileKeyRef in initContainers references a valid emptyDir volume",
+			podSpec: &core.PodSpec{
+				InitContainers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "INIT_DATABASE_URL",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "init-config-volume",
+										Path:       "init-database.env",
+										Key:        "DATABASE_URL",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "init-config-volume",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+			expectedErrs: nil,
+		},
+		{
+			name: "should fail when FileKeyRef in initContainers references a hostPath volume",
+			podSpec: &core.PodSpec{
+				InitContainers: []core.Container{
+					{
+						Env: []core.EnvVar{
+							{
+								Name: "INIT_DATABASE_URL",
+								ValueFrom: &core.EnvVarSource{
+									FileKeyRef: &core.FileKeySelector{
+										VolumeName: "init-config-volume",
+										Path:       "init-database.env",
+										Key:        "DATABASE_URL",
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "init-config-volume",
+						VolumeSource: core.VolumeSource{
+							HostPath: &core.HostPathVolumeSource{
+								Path: "/tmp/init",
+								Type: newHostPathType(string(core.HostPathDirectory)),
+							},
+						},
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.initContainers[0].env[0].valueFrom.fileKeyRef.volumeName"), "init-config-volume", "referenced volume must be of type emptyDir"),
+			},
+		},
+		{
+			name: "should pass when FileKeyRef in ephemeralContainers references a valid emptyDir volume",
+			podSpec: &core.PodSpec{
+				EphemeralContainers: []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Env: []core.EnvVar{
+								{
+									Name: "EPHEMERAL_DATABASE_URL",
+									ValueFrom: &core.EnvVarSource{
+										FileKeyRef: &core.FileKeySelector{
+											VolumeName: "ephemeral-config-volume",
+											Path:       "ephemeral-database.env",
+											Key:        "DATABASE_URL",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "ephemeral-config-volume",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+			expectedErrs: nil,
+		},
+		{
+			name: "should fail when FileKeyRef in ephemeralContainers references a hostPath volume",
+			podSpec: &core.PodSpec{
+				EphemeralContainers: []core.EphemeralContainer{
+					{
+						EphemeralContainerCommon: core.EphemeralContainerCommon{
+							Env: []core.EnvVar{
+								{
+									Name: "EPHEMERAL_API_KEY",
+									ValueFrom: &core.EnvVarSource{
+										FileKeyRef: &core.FileKeySelector{
+											VolumeName: "init-config-volume",
+											Path:       "init-database.env",
+											Key:        "DATABASE_URL",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "init-config-volume",
+						VolumeSource: core.VolumeSource{
+							HostPath: &core.HostPathVolumeSource{
+								Path: "/tmp/init",
+								Type: newHostPathType(string(core.HostPathDirectory)),
+							},
+						},
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.ephemeralContainers[0].env[0].valueFrom.fileKeyRef.volumeName"), "init-config-volume", "referenced volume must be of type emptyDir"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateFileKeyRefVolumes(tc.podSpec, field.NewPath("spec"))
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+			matcher.Test(t, tc.expectedErrs, errs)
 		})
 	}
 }

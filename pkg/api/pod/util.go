@@ -432,6 +432,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	// we must allow it
 	opts.AllowRelaxedEnvironmentVariableValidation = useRelaxedEnvironmentVariableValidation(podSpec, oldPodSpec)
 	opts.AllowRelaxedDNSSearchValidation = useRelaxedDNSSearchValidation(oldPodSpec)
+	opts.AllowEnvFilesValidation = useAllowEnvFilesValidation(oldPodSpec)
 
 	opts.AllowOnlyRecursiveSELinuxChangePolicy = useOnlyRecursiveSELinuxChangePolicy(oldPodSpec)
 
@@ -520,6 +521,44 @@ func useRelaxedDNSSearchValidation(oldPodSpec *api.PodSpec) bool {
 func hasDotOrUnderscore(searches []string) bool {
 	for _, domain := range searches {
 		if domain == "." || strings.Contains(domain, "_") {
+			return true
+		}
+	}
+	return false
+}
+
+func useAllowEnvFilesValidation(oldPodSpec *api.PodSpec) bool {
+	// Return true early if feature gate is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles) {
+		return true
+	}
+
+	if oldPodSpec == nil {
+		return false
+	}
+
+	for _, container := range oldPodSpec.Containers {
+		if hasEnvFileKeyRef(container.Env) {
+			return true
+		}
+	}
+	for _, container := range oldPodSpec.InitContainers {
+		if hasEnvFileKeyRef(container.Env) {
+			return true
+		}
+	}
+	for _, container := range oldPodSpec.EphemeralContainers {
+		if hasEnvFileKeyRef(container.Env) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasEnvFileKeyRef(envs []api.EnvVar) bool {
+	for _, env := range envs {
+		if env.ValueFrom != nil && env.ValueFrom.FileKeyRef != nil {
 			return true
 		}
 	}
@@ -725,10 +764,44 @@ func dropDisabledFields(
 		}
 	}
 
+	dropFileKeyRefInUse(podSpec, oldPodSpec)
 	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
 	dropContainerStopSignals(podSpec, oldPodSpec)
+}
+
+func dropFileKeyRefInUse(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles) || podFileKeyRefInUse(oldPodSpec) {
+		return
+	}
+
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		for i := range c.Env {
+			if c.Env[i].ValueFrom != nil && c.Env[i].ValueFrom.FileKeyRef != nil {
+				c.Env[i].ValueFrom.FileKeyRef = nil
+			}
+		}
+		return true
+	})
+}
+
+func podFileKeyRefInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
+		for _, env := range c.Env {
+			if env.ValueFrom != nil && env.ValueFrom.FileKeyRef != nil {
+				inUse = true
+				return false
+			}
+		}
+		return true
+	})
+	return inUse
 }
 
 func dropContainerStopSignals(podSpec, oldPodSpec *api.PodSpec) {

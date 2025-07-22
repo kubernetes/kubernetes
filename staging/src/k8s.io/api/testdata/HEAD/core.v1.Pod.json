@@ -504,6 +504,12 @@
                 "name": "nameValue",
                 "key": "keyValue",
                 "optional": true
+              },
+              "fileKeyRef": {
+                "volumeName": "volumeNameValue",
+                "path": "pathValue",
+                "key": "keyValue",
+                "optional": true
               }
             }
           }
@@ -801,6 +807,12 @@
                 "name": "nameValue",
                 "key": "keyValue",
                 "optional": true
+              },
+              "fileKeyRef": {
+                "volumeName": "volumeNameValue",
+                "path": "pathValue",
+                "key": "keyValue",
+                "optional": true
               }
             }
           }
@@ -1096,6 +1108,12 @@
               },
               "secretKeyRef": {
                 "name": "nameValue",
+                "key": "keyValue",
+                "optional": true
+              },
+              "fileKeyRef": {
+                "volumeName": "volumeNameValue",
+                "path": "pathValue",
                 "key": "keyValue",
                 "optional": true
               }

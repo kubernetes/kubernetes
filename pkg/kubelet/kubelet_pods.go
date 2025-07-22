@@ -34,6 +34,8 @@ import (
 	"strconv"
 	"strings"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	envutil "k8s.io/kubernetes/pkg/kubelet/util/env"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -626,7 +629,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 	}
 	opts.Devices = append(opts.Devices, blkVolumes...)
 
-	envs, err := kl.makeEnvironmentVariables(pod, container, podIP, podIPs)
+	envs, err := kl.makeEnvironmentVariables(pod, container, podIP, podIPs, volumes)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -708,7 +711,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 }
 
 // Make the environment variables for a pod in the given namespace.
-func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) ([]kubecontainer.EnvVar, error) {
+func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.EnvVar, error) {
 	if pod.Spec.EnableServiceLinks == nil {
 		return nil, fmt.Errorf("nil pod.spec.enableServiceLinks encountered, cannot construct envvars")
 	}
@@ -896,6 +899,54 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					return result, fmt.Errorf("couldn't find key %v in Secret %v/%v", key, pod.Namespace, name)
 				}
 				runtimeVal = string(runtimeValBytes)
+			case utilfeature.DefaultFeatureGate.Enabled(features.EnvFiles) && envVar.ValueFrom.FileKeyRef != nil:
+				f := envVar.ValueFrom.FileKeyRef
+				key := f.Key
+				volume := f.VolumeName
+				optional := f.Optional != nil && *f.Optional
+				vol, ok := podVolumes[volume]
+				if !ok || vol.Mounter == nil {
+					return result, fmt.Errorf("cannot find the volume %q referenced by FileKeyRef", volume)
+				}
+
+				hostPath, err := volumeutil.GetPath(vol.Mounter)
+				if err != nil {
+					return result, fmt.Errorf("failed to get host path for volume %q: %w", volume, err)
+				}
+
+				// Validate key length, must not exceed 128 characters.
+				// TODO: @HirazawaUi This limit will be relaxed after the EnvFiles feature gate beta stage.
+				if len(key) > 128 {
+					return result, fmt.Errorf("environment variable key %q exceeds maximum length of 128 characters", key)
+				}
+
+				// Construct the full path to the environment variable file
+				// by combining hostPath with the specified path in FileKeyRef
+				envFilePath, err := securejoin.SecureJoin(hostPath, f.Path)
+				if err != nil {
+					return result, err
+				}
+
+				runtimeVal, err = envutil.ParseEnv(envFilePath, key)
+				if err != nil {
+					klog.ErrorS(err, "Failed to parse env file", "pod", klog.KObj(pod))
+					return result, fmt.Errorf("couldn't parse env file")
+				}
+
+				// Validate value size, must not exceed 32KB.
+				// TODO: @HirazawaUi This limit will be relaxed after the EnvFiles feature gate beta stage.
+				if len(runtimeVal) > 32*1024 {
+					return result, fmt.Errorf("environment variable value for key %q exceeds maximum size of 32KB", key)
+				}
+
+				// If the key was not found, and it's not optional, return an error
+				if runtimeVal == "" {
+					if optional {
+						// If the key doesn't exist, and it's optional, skip this environment variable
+						continue
+					}
+					return result, fmt.Errorf("environment variable key %q not found in file %q", key, envFilePath)
+				}
 			}
 		}
 
