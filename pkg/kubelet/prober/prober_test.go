@@ -18,7 +18,6 @@ package prober
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -138,7 +137,7 @@ func TestGetTCPAddrParts(t *testing.T) {
 }
 
 func TestProbe(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
 
 	execProbe := &v1.Probe{
@@ -423,6 +422,7 @@ func TestRecordContainerEventUnknownStatus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			bufferSize := len(tc.expected) + 1
 			fakeRecorder := record.NewFakeRecorder(bufferSize)
 
@@ -430,8 +430,8 @@ func TestRecordContainerEventUnknownStatus(t *testing.T) {
 				recorder: fakeRecorder,
 			}
 
-			pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, "ContainerProbeWarning", "%s probe warning: %s", tc.probeType, output)
-			pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, "ContainerProbeWarning", "Unknown %s probe status: %s", tc.probeType, tc.result)
+			pb.recordContainerEvent(logger, pod, &container, v1.EventTypeWarning, "ContainerProbeWarning", "%s probe warning: %s", tc.probeType, output)
+			pb.recordContainerEvent(logger, pod, &container, v1.EventTypeWarning, "ContainerProbeWarning", "Unknown %s probe status: %s", tc.probeType, tc.result)
 
 			assert.Equal(t, len(tc.expected), len(fakeRecorder.Events), "unexpected number of events")
 			for _, expected := range tc.expected {
