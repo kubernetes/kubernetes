@@ -17,6 +17,7 @@ limitations under the License.
 package pullmanager
 
 import (
+	"context"
 	"time"
 
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -26,11 +27,11 @@ var _ ImagePullManager = &NoopImagePullManager{}
 
 type NoopImagePullManager struct{}
 
-func (m *NoopImagePullManager) RecordPullIntent(_ string) error { return nil }
-func (m *NoopImagePullManager) RecordImagePulled(_, _ string, _ *kubeletconfiginternal.ImagePullCredentials) {
+func (m *NoopImagePullManager) RecordPullIntent(string) error { return nil }
+func (m *NoopImagePullManager) RecordImagePulled(context.Context, string, string, *kubeletconfiginternal.ImagePullCredentials) {
 }
-func (m *NoopImagePullManager) RecordImagePullFailed(image string) {}
-func (m *NoopImagePullManager) MustAttemptImagePull(_, _ string, _ []kubeletconfiginternal.ImagePullSecret, _ *kubeletconfiginternal.ImagePullServiceAccount) bool {
+func (m *NoopImagePullManager) RecordImagePullFailed(context.Context, string) {}
+func (m *NoopImagePullManager) MustAttemptImagePull(context.Context, string, string, []kubeletconfiginternal.ImagePullSecret, *kubeletconfiginternal.ImagePullServiceAccount) bool {
 	return false
 }
-func (m *NoopImagePullManager) PruneUnknownRecords(_ []string, _ time.Time) {}
+func (m *NoopImagePullManager) PruneUnknownRecords(context.Context, []string, time.Time) {}

@@ -239,7 +239,7 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 			}
 		}
 
-		pullRequired := m.imagePullManager.MustAttemptImagePull(requestedImage, imageRef, imagePullSecrets, imagePullServiceAccount)
+		pullRequired := m.imagePullManager.MustAttemptImagePull(ctx, requestedImage, imageRef, imagePullSecrets, imagePullServiceAccount)
 		if !pullRequired {
 			msg := fmt.Sprintf("Container image %q already present on machine and can be accessed by the pod", requestedImage)
 			m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
@@ -268,9 +268,9 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 
 		defer func() {
 			if pullSucceeded {
-				m.imagePullManager.RecordImagePulled(image, imageRef, trackedToImagePullCreds(finalPullCredentials))
+				m.imagePullManager.RecordImagePulled(ctx, image, imageRef, trackedToImagePullCreds(finalPullCredentials))
 			} else {
-				m.imagePullManager.RecordImagePullFailed(image)
+				m.imagePullManager.RecordImagePullFailed(ctx, image)
 			}
 		}()
 	}
