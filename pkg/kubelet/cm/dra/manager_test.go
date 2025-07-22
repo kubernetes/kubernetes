@@ -1170,7 +1170,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 
 		// Check cache state
 		cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName)
-		assert.Equal(t, state.DeviceHealthString("Unhealthy"), cachedHealth, "Cache update check failed")
+		assert.Equal(t, state.DeviceHealthStatus("Unhealthy"), cachedHealth, "Cache update check failed")
 
 		t.Log("HealthChangeForAllocatedDevice: Closing responses channel to signal EOF")
 		close(responses)
@@ -1221,7 +1221,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 
 		// Check health cache for the "other-device"
 		cachedHealthOther := manager.healthInfoCache.getHealthInfo(driverName, poolName, "other-device")
-		assert.Equal(t, state.DeviceHealthString("Unhealthy"), cachedHealthOther, "Cache update for other-device failed")
+		assert.Equal(t, state.DeviceHealthStatus("Unhealthy"), cachedHealthOther, "Cache update for other-device failed")
 
 		close(responses)
 		var finalErr error
@@ -1246,7 +1246,7 @@ func TestHandleWatchResourcesStream(t *testing.T) {
 
 		// Pre-populate health cache
 		initialHealth := state.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy", LastUpdated: time.Now().Add(-5 * time.Millisecond)} // Ensure LastUpdated is slightly in past
-		_, _, err := manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{initialHealth})
+		_, err := manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{initialHealth})
 		require.NoError(t, err, "Failed to pre-populate health cache")
 
 		t.Log("NoActualStateChange: Test Case Started")
@@ -1368,7 +1368,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 
 	// Populate healthInfoCache
 	healthyDevice := state.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Healthy", LastUpdated: time.Now()}
-	_, _, err = manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{healthyDevice})
+	_, err = manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{healthyDevice})
 	require.NoError(t, err)
 
 	// Create Pod and Status objects

@@ -18,7 +18,9 @@ package dra
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -44,7 +46,7 @@ func newHealthInfoCache(stateFile string) (*healthInfoCache, error) {
 		stateFile:  stateFile,
 	}
 	if err := cache.loadFromCheckpoint(); err != nil {
-		klog.Background().V(3).Info("Failed to load health checkpoint, proceeding with empty cache", "err", err)
+		klog.InfoS("Failed to load health checkpoint, proceeding with empty cache", "err", err)
 	}
 	return cache, nil
 }
@@ -65,14 +67,14 @@ func (cache *healthInfoCache) loadFromCheckpoint() error {
 	return json.Unmarshal(data, cache.HealthInfo)
 }
 
-// withLock runs a function while holding the claimInfoCache lock.
+// withLock runs a function while holding the healthInfoCache lock.
 func (cache *healthInfoCache) withLock(f func() error) error {
 	cache.Lock()
 	defer cache.Unlock()
 	return f()
 }
 
-// withRLock runs a function while holding the claimInfoCache rlock.
+// withRLock runs a function while holding the healthInfoCache rlock.
 func (cache *healthInfoCache) withRLock(f func() error) error {
 	cache.RLock()
 	defer cache.RUnlock()
@@ -87,14 +89,35 @@ func (cache *healthInfoCache) saveToCheckpointInternal() error {
 	}
 	data, err := json.Marshal(cache.HealthInfo)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal health info: %w", err)
 	}
-	return os.WriteFile(cache.stateFile, data, 0644)
+
+	tempFile, err := os.CreateTemp(filepath.Dir(cache.stateFile), filepath.Base(cache.stateFile)+".tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp checkpoint file: %w", err)
+	}
+
+	defer os.Remove(tempFile.Name())
+
+	if _, err := tempFile.Write(data); err != nil {
+		tempFile.Close()
+		return fmt.Errorf("failed to write to temporary file: %w", err)
+	}
+
+	if err := tempFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temporary file: %w", err)
+	}
+
+	if err := os.Rename(tempFile.Name(), cache.stateFile); err != nil {
+		return fmt.Errorf("failed to rename temporary file to state file: %w", err)
+	}
+
+	return nil
 }
 
 // getHealthInfo returns the current health info, adjusting for timeouts.
-func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName string) state.DeviceHealthString {
-	res := state.DeviceHealthStringUnknown
+func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName string) state.DeviceHealthStatus {
+	res := state.DeviceHealthStatusUnknown
 	now := time.Now()
 
 	_ = cache.withRLock(func() error {
@@ -102,7 +125,7 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 			for _, device := range driver.Devices {
 				if device.PoolName == poolName && device.DeviceName == deviceName {
 					if now.Sub(device.LastUpdated) > healthTimeout {
-						res = state.DeviceHealthStringUnknown
+						res = state.DeviceHealthStatusUnknown
 					} else {
 						res = device.Health
 					}
@@ -116,8 +139,7 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 }
 
 // updateHealthInfo updates the cache with a list of devices for driver, reconciling the full state.
-func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []state.DeviceHealth) ([]state.DeviceHealth, bool, error) {
-	var changed bool
+func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []state.DeviceHealth) ([]state.DeviceHealth, error) {
 	changedDevices := []state.DeviceHealth{}
 	err := cache.withLock(func() error {
 		now := time.Now()
@@ -142,7 +164,6 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 			key := existing.PoolName + "/" + existing.DeviceName
 			if updated, ok := reported[key]; ok {
 				if existing.Health != updated.Health {
-					changed = true
 					changedDevices = append(changedDevices, updated)
 				}
 				// Add  device to new device health status list
@@ -150,10 +171,9 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 				// Remove from reported device list
 				delete(reported, key)
 				// If device surpasses health timeout set to unknown
-			} else if existing.Health != state.DeviceHealthStringUnknown && now.Sub(existing.LastUpdated) > healthTimeout {
-				existing.Health = state.DeviceHealthStringUnknown
+			} else if existing.Health != state.DeviceHealthStatusUnknown && now.Sub(existing.LastUpdated) > healthTimeout {
+				existing.Health = state.DeviceHealthStatusUnknown
 				existing.LastUpdated = now
-				changed = true
 				changedDevices = append(changedDevices, existing)
 				newDevices = append(newDevices, existing)
 				// Within the health timeout consider healthy and add as new device
@@ -167,13 +187,12 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 			dev.LastUpdated = now
 			newDevices = append(newDevices, dev)
 			changedDevices = append(changedDevices, dev)
-			changed = true
 		}
 
 		currentDriver.Devices = newDevices
 		(*cache.HealthInfo)[driverName] = currentDriver
 
-		if changed {
+		if len(changedDevices) > 0 {
 			if err := cache.saveToCheckpointInternal(); err != nil {
 				klog.Background().Error(err, "Failed to save health checkpoint after update")
 			}
@@ -181,9 +200,9 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 		return nil
 	})
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	return changedDevices, changed, nil
+	return changedDevices, nil
 }
 
 // clearDriver clears all health data for a specific driver.

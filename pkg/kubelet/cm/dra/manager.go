@@ -846,16 +846,16 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 			devices[i] = state.DeviceHealth{
 				PoolName:    d.PoolName,
 				DeviceName:  d.DeviceName,
-				Health:      state.DeviceHealthString(d.Health),
+				Health:      state.DeviceHealthStatus(d.Health),
 				LastUpdated: time.Unix(d.LastUpdated, 0),
 			}
 		}
 
-		changedDevices, changed, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
+		changedDevices, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
 		if updateErr != nil {
 			logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
 		}
-		if changed && len(changedDevices) > 0 {
+		if len(changedDevices) > 0 {
 			logger.V(4).Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
 
 			podsToUpdate := sets.New[string]()
@@ -886,8 +886,6 @@ func (m *Manager) HandleWatchResourcesStream(ctx context.Context, stream draheal
 			} else {
 				logger.V(4).Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
 			}
-		} else if changed {
-			logger.V(4).Info("Health info updated, but no specific device changes detected", "pluginName", pluginName)
 		}
 
 	}

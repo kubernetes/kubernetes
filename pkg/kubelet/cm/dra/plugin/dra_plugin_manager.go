@@ -376,7 +376,6 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 		pm.wg.Add(1)
 		go func() {
 			defer pm.wg.Done()
-
 			streamCtx, streamCancel := context.WithCancel(p.backgroundCtx)
 			p.SetHealthStream(streamCtx, streamCancel)
 

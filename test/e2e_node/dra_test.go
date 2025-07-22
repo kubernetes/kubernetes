@@ -821,7 +821,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		)
 	})
 
-	f.Context("Resource Health", f.WithSerial(), func() {
+	f.Context("Resource Health", framework.WithFeatureGate(features.ResourceHealthStatus), f.WithSerial(), func() {
 
 		// Verifies that device health transitions (Healthy -> Unhealthy -> Healthy)
 		// reported by a DRA plugin are correctly reflected in the Pod's status.

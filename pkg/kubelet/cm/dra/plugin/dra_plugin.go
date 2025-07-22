@@ -211,14 +211,14 @@ func (p *DRAPlugin) HealthStreamCancel() context.CancelFunc {
 
 // WatchResources establishes a stream to receive health updates from the DRA plugin.
 func (p *DRAPlugin) WatchResources(ctx context.Context) (drahealthv1alpha1.NodeHealth_WatchResourcesClient, error) {
-	if p.healthClient == nil {
-		// May need to call getOrCreateGRPCConn here to ensure the client is initialized
-		_, err := p.getOrCreateGRPCConn()
-		if err != nil {
-			klog.FromContext(p.backgroundCtx).Error(err, "Failed to get gRPC connection for health client")
-			return nil, err
-		}
+	// Ensure a connection and the health client exist before proceeding.
+	// This call is idempotent and will create them if they don't exist.
+	_, err := p.getOrCreateGRPCConn()
+	if err != nil {
+		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get gRPC connection for health client")
+		return nil, err
 	}
+
 	logger := klog.FromContext(ctx).WithValues("pluginName", p.driverName)
 	logger.V(4).Info("Starting WatchResources stream")
 	stream, err := p.healthClient.WatchResources(ctx, &drahealthv1alpha1.WatchResourcesRequest{})

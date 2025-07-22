@@ -68,15 +68,15 @@ type DriverHealthState struct {
 	Devices []DeviceHealth
 }
 
-type DeviceHealthString string
+type DeviceHealthStatus string
 
 const (
-	// DeviceHealthStringHealthy represents a healthy device.
-	DeviceHealthStringHealthy DeviceHealthString = "Healthy"
-	// DeviceHealthStringUnhealthy represents an unhealthy device.
-	DeviceHealthStringUnhealthy DeviceHealthString = "Unhealthy"
-	// DeviceHealthStringUnknown represents a device with unknown health status.
-	DeviceHealthStringUnknown DeviceHealthString = "Unknown"
+	// DeviceHealthStatusHealthy represents a healthy device.
+	DeviceHealthStatusHealthy DeviceHealthStatus = "Healthy"
+	// DeviceHealthStatusUnhealthy represents an unhealthy device.
+	DeviceHealthStatusUnhealthy DeviceHealthStatus = "Unhealthy"
+	// DeviceHealthStatusUnknown represents a device with unknown health status.
+	DeviceHealthStatusUnknown DeviceHealthStatus = "Unknown"
 )
 
 // DeviceHealth is used to store health information of a device.
@@ -90,7 +90,7 @@ type DeviceHealth struct {
 
 	// Health is the health status of the device.
 	// Statuses: "Healthy", "Unhealthy", "Unknown".
-	Health DeviceHealthString
+	Health DeviceHealthStatus
 
 	// LastUpdated keeps track of the last health status update of this device.
 	LastUpdated time.Time
