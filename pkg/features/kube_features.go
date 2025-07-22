@@ -234,6 +234,13 @@ const (
 	// owner: @atiratree
 	// kep: http://kep.k8s.io/3973
 	//
+	// A new deployment field, .spec.podReplacementPolicy, can be used to determine whether to replace
+	// terminating or terminated pods in deployments with new pods.
+	DeploymentPodReplacementPolicy featuregate.Feature = "DeploymentPodReplacementPolicy"
+
+	// owner: @atiratree
+	// kep: http://kep.k8s.io/3973
+	//
 	// Deployments and replica sets can now also track terminating pods via .status.terminatingReplicas.
 	DeploymentReplicaSetTerminatingReplicas featuregate.Feature = "DeploymentReplicaSetTerminatingReplicas"
 
@@ -1157,6 +1164,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DeclarativeValidationTakeover: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	DeploymentPodReplacementPolicy: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DeploymentReplicaSetTerminatingReplicas: {
