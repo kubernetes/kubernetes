@@ -433,16 +433,17 @@ func NewDeleteCollectionActionWithOptions(resource schema.GroupVersionResource, 
 	return action
 }
 
-func NewRootWatchAction(resource schema.GroupVersionResource, opts interface{}) WatchActionImpl {
+func NewRootWatchAction(resource schema.GroupVersionResource, kind schema.GroupVersionKind, opts interface{}) WatchActionImpl {
 	listOpts, _ := opts.(metav1.ListOptions)
-	return NewRootWatchActionWithOptions(resource, listOpts)
+	return NewRootWatchActionWithOptions(resource, kind, listOpts)
 }
 
-func NewRootWatchActionWithOptions(resource schema.GroupVersionResource, opts metav1.ListOptions) WatchActionImpl {
+func NewRootWatchActionWithOptions(resource schema.GroupVersionResource, kind schema.GroupVersionKind, opts metav1.ListOptions) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
 	action.Resource = resource
 	action.ListOptions = opts
+	action.Kind = kind
 
 	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
 	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion}
