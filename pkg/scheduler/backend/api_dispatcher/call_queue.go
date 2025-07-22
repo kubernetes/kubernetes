@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/utils/buffer"
 )
 
@@ -122,6 +123,11 @@ func (cq *callQueue) merge(oldAPICall, apiCall *queuedAPICall) error {
 	}
 	if oldAPICall.CallType() != apiCall.CallType() {
 		// API call types don't match, so we overwrite the old one.
+		// Update the pending calls metric if the old call is not in-flight.
+		if !cq.inFlightEntities.Has(oldAPICall.UID()) {
+			metrics.AsyncAPIPendingCalls.WithLabelValues(string(oldAPICall.CallType())).Dec()
+			metrics.AsyncAPIPendingCalls.WithLabelValues(string(apiCall.CallType())).Inc()
+		}
 		oldAPICall.sendOnFinish(fmt.Errorf("a more relevant call was enqueued for this object: %w", fwk.ErrCallOverwritten))
 		return nil
 	}
@@ -170,6 +176,7 @@ func (cq *callQueue) enqueue(apiCall *queuedAPICall, oldCallPresent bool) error 
 		return nil
 	}
 	cq.callsQueue.WriteOne(objectUID)
+	metrics.AsyncAPIPendingCalls.WithLabelValues(string(apiCall.CallType())).Inc()
 	cq.cond.Broadcast()
 	return nil
 }
@@ -197,9 +204,15 @@ func removeFromQueue(queue *buffer.Ring[types.UID], objectUID types.UID) *buffer
 // (i.e., are not in-flight).
 // Must be called under cq.lock.
 func (cq *callQueue) removePending(objectUID types.UID) {
+	apiCall, ok := cq.apiCalls[objectUID]
+	if !ok {
+		return
+	}
 	delete(cq.apiCalls, objectUID)
 	if !cq.inFlightEntities.Has(objectUID) {
 		cq.callsQueue = *removeFromQueue(&cq.callsQueue, objectUID)
+		callType := string(apiCall.CallType())
+		metrics.AsyncAPIPendingCalls.WithLabelValues(callType).Dec()
 	}
 }
 
@@ -246,6 +259,8 @@ func (cq *callQueue) pop() (*queuedAPICall, error) {
 		return nil, fmt.Errorf("object %s is not present in a map with API calls details", objectUID)
 	}
 	cq.inFlightEntities.Insert(objectUID)
+	callType := string(apiCall.CallType())
+	metrics.AsyncAPIPendingCalls.WithLabelValues(callType).Dec()
 
 	return apiCall, nil
 }
@@ -266,6 +281,8 @@ func (cq *callQueue) finalize(apiCall *queuedAPICall) {
 	} else {
 		// The API call in the map has changed, so re-queue the object for the new call to be processed.
 		cq.callsQueue.WriteOne(objectUID)
+		callType := string(newAPICall.CallType())
+		metrics.AsyncAPIPendingCalls.WithLabelValues(callType).Inc()
 		cq.cond.Broadcast()
 	}
 	cq.inFlightEntities.Delete(objectUID)

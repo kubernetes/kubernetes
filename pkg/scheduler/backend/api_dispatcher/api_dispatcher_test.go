@@ -24,9 +24,21 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
+
+func init() {
+	metrics.Register()
+}
+
+func resetMetrics() {
+	metrics.AsyncAPICallsTotal.Reset()
+	metrics.AsyncAPICallDuration.Reset()
+	metrics.AsyncAPIPendingCalls.Reset()
+}
 
 const (
 	mockCallTypeLow  fwk.APICallType = "low"
@@ -87,6 +99,9 @@ func (mac *mockAPICall) IsNoOp() bool {
 }
 
 func TestAPIDispatcherLifecycle(t *testing.T) {
+	// Reset all async API metrics
+	resetMetrics()
+
 	logger, _ := ktesting.NewTestContext(t)
 
 	uid := types.UID("uid")
@@ -129,7 +144,6 @@ func TestAPIDispatcherLifecycle(t *testing.T) {
 	if err := dispatcher.Add(call1, opts1); err != nil {
 		t.Fatalf("Unexpected error while adding a call1: %v", err)
 	}
-
 	if err := dispatcher.Add(call2, opts2); err != nil {
 		t.Fatalf("Unexpected error while adding a call2: %v", err)
 	}
@@ -160,4 +174,8 @@ func TestAPIDispatcherLifecycle(t *testing.T) {
 	if isNoOpCalls != 2 {
 		t.Errorf("Expected call2's IsNoOp() to be called two times, but was %v times", executeCalls)
 	}
+
+	// Verify execution metrics
+	testutil.AssertVectorCount(t, "scheduler_async_api_call_execution_total", map[string]string{"call_type": "low", "result": "success"}, 1)
+	testutil.AssertHistogramTotalCount(t, "scheduler_async_api_call_execution_duration_seconds", map[string]string{"call_type": "low", "result": "success"}, 1)
 }
