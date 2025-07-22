@@ -18,6 +18,7 @@ package customresourcedefinition
 
 import (
 	"context"
+	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -33,6 +34,22 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
 )
+
+// mkCRD helps construct CustomResourceDefinition objects for testing more
+// legibly and tersely than a Go struct definition.
+func mkCRD(tweaks ...func(*apiextensions.CustomResourceDefinitionSpec)) *apiextensions.CustomResourceDefinition {
+	crd := &apiextensions.CustomResourceDefinition{
+		Spec: apiextensions.CustomResourceDefinitionSpec{
+			Versions: []apiextensions.CustomResourceDefinitionVersion{},
+		},
+	}
+
+	for _, tweak := range tweaks {
+		tweak(&crd.Spec)
+	}
+
+	return crd
+}
 
 func TestValidateAPIApproval(t *testing.T) {
 	okFn := func(t *testing.T, errors field.ErrorList) {
@@ -1309,6 +1326,360 @@ func TestDropDisabledFields(t *testing.T) {
 
 			if diff := cmp.Diff(tc.expectedCRD, tc.crd); diff != "" {
 				t.Fatalf("unexpected crd: %v\n%v", tc.crd, diff)
+			}
+		})
+	}
+}
+
+func TestWarningsOnCreate(t *testing.T) {
+	ctx := context.Background()
+	strategy := NewStrategy(nil)
+
+	testcases := map[string]struct {
+		crd                 *apiextensions.CustomResourceDefinition
+		wantWarningMessages []string
+	}{
+		"no unrecognized formats": {
+			wantWarningMessages: []string{},
+			crd: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "date-time",
+								},
+							},
+						},
+					},
+				})
+			}),
+		},
+		"unrecognized format in version schema": {
+			wantWarningMessages: []string{
+				`unrecognized format "invalidformat"`,
+			},
+			crd: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "invalidformat",
+								},
+							},
+						},
+					},
+				})
+			}),
+		},
+		"unrecognized format in embedded schema": {
+			wantWarningMessages: []string{
+				`unrecognized format "invalidformat"`,
+			},
+			crd: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"nested": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embeddedField": {
+											Type:   "string",
+											Format: "invalidformat",
+										},
+									},
+								},
+							},
+						},
+					},
+				})
+			}),
+		},
+		"unrecognized format in top-level validation schema": {
+			wantWarningMessages: []string{
+				`unrecognized format "invalidformat"`,
+			},
+			crd: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Validation = &apiextensions.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensions.JSONSchemaProps{
+							"field1": {
+								Type:   "string",
+								Format: "invalidformat",
+							},
+						},
+					},
+				}
+			}),
+		},
+		"multiple unrecognized formats": {
+			wantWarningMessages: []string{
+				`unrecognized format "unknownformat1"`,
+				`unrecognized format "unknownformat2"`,
+				`unrecognized format "unknownformat3"`,
+			},
+			crd: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "unknownformat1",
+								},
+								"field2": {
+									Type:   "string",
+									Format: "unknownformat2",
+								},
+								"nested": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"field3": {
+											Type:   "string",
+											Format: "unknownformat3",
+										},
+									},
+								},
+							},
+						},
+					},
+				})
+			}),
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			gotWarnings := strategy.WarningsOnCreate(ctx, tc.crd)
+			if len(gotWarnings) != len(tc.wantWarningMessages) {
+				t.Errorf("got %d warnings but expected %d", len(gotWarnings), len(tc.wantWarningMessages))
+				return
+			}
+
+			// Sort gotWarnings to match expected order
+			sort.Strings(gotWarnings)
+
+			for i, expectedMessage := range tc.wantWarningMessages {
+				if gotWarnings[i] != expectedMessage {
+					t.Errorf("warning %d: got %s, expected %s", i, gotWarnings[i], expectedMessage)
+				}
+			}
+		})
+	}
+}
+
+func TestWarningsOnUpdate(t *testing.T) {
+	ctx := context.Background()
+	strategy := NewStrategy(nil)
+
+	testcases := map[string]struct {
+		oldCRD              *apiextensions.CustomResourceDefinition
+		newCRD              *apiextensions.CustomResourceDefinition
+		wantWarningMessages []string
+	}{
+		"no unrecognized formats": {
+			wantWarningMessages: []string{},
+			oldCRD: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "date-time",
+								},
+							},
+						},
+					},
+				})
+			}),
+			newCRD: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "date-time",
+								},
+							},
+						},
+					},
+				})
+			}),
+		},
+		"newly introduced unrecognized format": {
+			wantWarningMessages: []string{
+				`unrecognized format "invalidformat"`,
+			},
+			oldCRD: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "date-time",
+								},
+							},
+						},
+					},
+				})
+			}),
+			newCRD: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "invalidformat",
+								},
+							},
+						},
+					},
+				})
+			}),
+		},
+		"existing unrecognized format - no warning (ratcheting)": {
+			wantWarningMessages: []string{},
+			oldCRD: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "invalidformat",
+								},
+							},
+						},
+					},
+				})
+			}),
+			newCRD: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "invalidformat",
+								},
+							},
+						},
+					},
+				})
+			}),
+		},
+		"multiple newly introduced unrecognized formats": {
+			wantWarningMessages: []string{
+				`unrecognized format "unknownformat1"`,
+				`unrecognized format "unknownformat2"`,
+			},
+			oldCRD: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "date-time",
+								},
+							},
+						},
+					},
+				})
+			}),
+			newCRD: mkCRD(func(spec *apiextensions.CustomResourceDefinitionSpec) {
+				spec.Versions = append(spec.Versions, apiextensions.CustomResourceDefinitionVersion{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field1": {
+									Type:   "string",
+									Format: "unknownformat1",
+								},
+								"field2": {
+									Type:   "string",
+									Format: "unknownformat2",
+								},
+							},
+						},
+					},
+				})
+			}),
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			gotWarnings := strategy.WarningsOnUpdate(ctx, tc.newCRD, tc.oldCRD)
+			if len(gotWarnings) != len(tc.wantWarningMessages) {
+				t.Errorf("got %d warnings but expected %d", len(gotWarnings), len(tc.wantWarningMessages))
+				return
+			}
+
+			// Sort gotWarnings to match expected order
+			sort.Strings(gotWarnings)
+
+			for i, expectedMessage := range tc.wantWarningMessages {
+				if gotWarnings[i] != expectedMessage {
+					t.Errorf("warning %d: got %s, expected %s", i, gotWarnings[i], expectedMessage)
+				}
 			}
 		})
 	}
