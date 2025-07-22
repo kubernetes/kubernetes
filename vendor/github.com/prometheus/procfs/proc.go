@@ -37,9 +37,9 @@ type Proc struct {
 type Procs []Proc
 
 var (
-	ErrFileParse  = errors.New("Error Parsing File")
-	ErrFileRead   = errors.New("Error Reading File")
-	ErrMountPoint = errors.New("Error Accessing Mount point")
+	ErrFileParse  = errors.New("error parsing file")
+	ErrFileRead   = errors.New("error reading file")
+	ErrMountPoint = errors.New("error accessing mount point")
 )
 
 func (p Procs) Len() int           { return len(p) }
@@ -79,7 +79,7 @@ func (fs FS) Self() (Proc, error) {
 	if err != nil {
 		return Proc{}, err
 	}
-	pid, err := strconv.Atoi(strings.Replace(p, string(fs.proc), "", -1))
+	pid, err := strconv.Atoi(strings.ReplaceAll(p, string(fs.proc), ""))
 	if err != nil {
 		return Proc{}, err
 	}
