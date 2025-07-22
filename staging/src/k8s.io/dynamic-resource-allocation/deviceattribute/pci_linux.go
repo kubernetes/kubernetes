@@ -88,8 +88,11 @@ func resolvePCIeRoot(pciBusID string) (string, error) {
 
 	// targetAbs must be /sys/devices/pci0000:01/...<intermediate PCI devices>.../0000:00:1f.0
 	devicePathPrefix := sysfs.devices("pci")
-	if !strings.HasPrefix(target, devicePathPrefix) || filepath.Base(target) != pciBusID {
-		return "", fmt.Errorf("invalid symlink target for PCI Bus ID %s: %s", sysBusPath, target)
+	if !strings.HasPrefix(target, devicePathPrefix) {
+		return "", fmt.Errorf("symlink target for PCI Bus ID %s is invalid: it must start with %s: %s", pciBusID, devicePathPrefix, target)
+	}
+	if filepath.Base(target) != pciBusID {
+		return "", fmt.Errorf("symlink target for PCI Bus ID %s is invalid: it must end with %s: %s", pciBusID, pciBusID, target)
 	}
 
 	// We need to extract the PCIe Root part, which is the first part of the path after /sys/devices/.

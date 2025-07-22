@@ -17,6 +17,7 @@ limitations under the License.
 package deviceattribute
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -72,7 +73,7 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 			expectsError:      true,
 			expectedErrMsg:    "no such file or directory",
 		},
-		"invalid symlink": {
+		"invalid symlink (invalid prefix)": {
 			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
 				devicePath := mockSysfs.devices(filepath.Join("invalid-pci-root", "0000:00:13.1", pciBusID))
 				touchFile(t, devicePath)
@@ -82,7 +83,19 @@ func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
 			address:           pciBusID,
 			expectedAttribute: nil,
 			expectsError:      true,
-			expectedErrMsg:    "invalid symlink target for PCI Bus ID",
+			expectedErrMsg:    fmt.Sprintf("symlink target for PCI Bus ID %s is invalid: it must start with", pciBusID),
+		},
+		"invalid symlink (invalid suffix)": {
+			mockSysfsSetup: func(t *testing.T, mockSysfs sysfsPath) {
+				devicePath := mockSysfs.devices(filepath.Join(pcieRoot, "0000:00:13.1", "0000:01:02.4")) // different PCI Bus ID
+				touchFile(t, devicePath)
+				busPath := mockSysfs.bus(filepath.Join("pci", "devices", pciBusID))
+				createSymlink(t, devicePath, busPath)
+			},
+			address:           pciBusID,
+			expectedAttribute: nil,
+			expectsError:      true,
+			expectedErrMsg:    fmt.Sprintf("symlink target for PCI Bus ID %s is invalid: it must end with", pciBusID),
 		},
 	}
 	for name, test := range tests {
