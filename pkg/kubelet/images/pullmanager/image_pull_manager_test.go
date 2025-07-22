@@ -726,6 +726,7 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			encoder, decoder, err := createKubeletConfigSchemeEncoderDecoder()
 			require.NoError(t, err)
+			_, tCtx := ktesting.NewTestContext(t)
 
 			testDir := t.TempDir()
 			pullingDir := filepath.Join(testDir, "pulling")
@@ -750,7 +751,8 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 				intentCounters:      &sync.Map{},
 				pulledAccessors:     NewStripedLockSet(10),
 			}
-			if got := f.MustAttemptImagePull(tt.image, tt.imageRef, tt.podSecrets, tt.podServiceAccount); got != tt.want {
+
+			if got := f.MustAttemptImagePull(tCtx, tt.image, tt.imageRef, tt.podSecrets, tt.podServiceAccount); got != tt.want {
 				t.Errorf("FileBasedImagePullManager.MustAttemptImagePull() = %v, want %v", got, tt.want)
 			}
 
@@ -1110,6 +1112,7 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_, tCtx := ktesting.NewTestContext(t)
 			encoder, decoder, err := createKubeletConfigSchemeEncoderDecoder()
 			require.NoError(t, err)
 
@@ -1135,7 +1138,7 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 			}
 			f.intentCounters.Store(tt.image, tt.pullsInFlight)
 			origIntentCounter := f.getIntentCounterForImage(tt.image)
-			f.RecordImagePulled(tt.image, tt.imageRef, tt.creds)
+			f.RecordImagePulled(tCtx, tt.image, tt.imageRef, tt.creds)
 			require.Equal(t, f.getIntentCounterForImage(tt.image), origIntentCounter-1, "intent counter for %s was not decremented", tt.image)
 
 			for _, fname := range tt.expectPulled {
@@ -1399,6 +1402,7 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_, tCtx := ktesting.NewTestContext(t)
 			encoder, decoder, err := createKubeletConfigSchemeEncoderDecoder()
 			require.NoError(t, err)
 
@@ -1420,7 +1424,7 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 				recordsAccessor: fsRecordAccessor,
 				pulledAccessors: NewStripedLockSet(10),
 			}
-			f.PruneUnknownRecords(tt.imageList, tt.gcStartTime)
+			f.PruneUnknownRecords(tCtx, tt.imageList, tt.gcStartTime)
 
 			filesLeft := sets.New[string]()
 			err = filepath.Walk(pulledDir, func(path string, info fs.FileInfo, err error) error {
