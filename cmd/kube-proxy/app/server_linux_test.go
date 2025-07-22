@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -36,14 +35,9 @@ import (
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	clientgotesting "k8s.io/client-go/testing"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
 
@@ -445,18 +439,6 @@ func Test_getLocalDetectors(t *testing.T) {
 	}
 }
 
-func makeNodeWithPodCIDRs(cidrs ...string) *v1.Node {
-	if len(cidrs) == 0 {
-		return &v1.Node{}
-	}
-	return &v1.Node{
-		Spec: v1.NodeSpec{
-			PodCIDR:  cidrs[0],
-			PodCIDRs: cidrs,
-		},
-	}
-}
-
 func TestConfigChange(t *testing.T) {
 	setUp := func() (*os.File, string, error) {
 		tempDir, err := os.MkdirTemp("", "kubeproxy-config-change")
@@ -574,56 +556,6 @@ detectLocalMode: "BridgeInterface"`)
 	}
 }
 
-func Test_waitForPodCIDR(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	expected := []string{"192.168.0.0/24", "fd00:1:2::/64"}
-	nodeName := "test-node"
-	oldNode := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            nodeName,
-			ResourceVersion: "1000",
-		},
-		Spec: v1.NodeSpec{
-			PodCIDR:  "10.0.0.0/24",
-			PodCIDRs: []string{"10.0.0.0/24", "2001:db2:1/64"},
-		},
-	}
-	node := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            nodeName,
-			ResourceVersion: "1",
-		},
-	}
-	updatedNode := node.DeepCopy()
-	updatedNode.Spec.PodCIDRs = expected
-	updatedNode.Spec.PodCIDR = expected[0]
-
-	// start with the new node
-	client := clientsetfake.NewSimpleClientset()
-	client.AddReactor("list", "nodes", func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
-		obj := &v1.NodeList{}
-		return true, obj, nil
-	})
-	fakeWatch := watch.NewFake()
-	client.PrependWatchReactor("nodes", clientgotesting.DefaultWatchReactor(fakeWatch, nil))
-
-	go func() {
-		fakeWatch.Add(node)
-		// receive a delete event for the old node
-		fakeWatch.Delete(oldNode)
-		// set the PodCIDRs on the new node
-		fakeWatch.Modify(updatedNode)
-	}()
-	got, err := waitForPodCIDR(ctx, client, node.Name)
-	if err != nil {
-		t.Errorf("waitForPodCIDR() unexpected error %v", err)
-		return
-	}
-	if !reflect.DeepEqual(got.Spec.PodCIDRs, expected) {
-		t.Errorf("waitForPodCIDR() got %v expected to be %v ", got.Spec.PodCIDRs, expected)
-	}
-}
-
 func TestGetConntrackMax(t *testing.T) {
 	ncores := goruntime.NumCPU()
 	testCases := []struct {
@@ -668,57 +600,6 @@ func TestGetConntrackMax(t *testing.T) {
 		} else if x != tc.expected {
 			t.Errorf("[%d] expected %d, got %d", i, tc.expected, x)
 		}
-	}
-}
-
-func TestProxyServer_platformSetup(t *testing.T) {
-	tests := []struct {
-		name         string
-		node         *v1.Node
-		config       *proxyconfigapi.KubeProxyConfiguration
-		wantPodCIDRs []string
-	}{
-		{
-			name:         "LocalModeNodeCIDR store the node PodCIDRs obtained",
-			node:         makeNodeWithPodCIDRs("10.0.0.0/24"),
-			config:       &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR},
-			wantPodCIDRs: []string{"10.0.0.0/24"},
-		},
-		{
-			name:         "LocalModeNodeCIDR store the node PodCIDRs obtained dual stack",
-			node:         makeNodeWithPodCIDRs("10.0.0.0/24", "2001:db2:1/64"),
-			config:       &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalModeNodeCIDR},
-			wantPodCIDRs: []string{"10.0.0.0/24", "2001:db2:1/64"},
-		},
-		{
-			name:   "LocalModeClusterCIDR does not get the node PodCIDRs",
-			node:   makeNodeWithPodCIDRs("10.0.0.0/24", "2001:db2:1/64"),
-			config: &proxyconfigapi.KubeProxyConfiguration{DetectLocalMode: proxyconfigapi.LocalModeClusterCIDR},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			client := clientsetfake.NewSimpleClientset(tt.node)
-			s := &ProxyServer{
-				Config:   tt.config,
-				Client:   client,
-				NodeName: "nodename",
-				NodeIPs: map[v1.IPFamily]net.IP{
-					v1.IPv4Protocol: netutils.ParseIPSloppy("127.0.0.1"),
-					v1.IPv6Protocol: net.IPv6zero,
-				},
-			}
-			err := s.platformSetup(ctx)
-			if err != nil {
-				t.Errorf("ProxyServer.createProxier() error = %v", err)
-				return
-			}
-			if !reflect.DeepEqual(s.podCIDRs, tt.wantPodCIDRs) {
-				t.Errorf("Expected PodCIDRs %v got %v", tt.wantPodCIDRs, s.podCIDRs)
-			}
-
-		})
 	}
 }
 
