@@ -37,6 +37,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	"k8s.io/utils/ptr"
 )
 
 var labelSelectorPath = ".status.labelSelector"
@@ -527,7 +528,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					"num": {
 						Type:    "integer",
-						Maximum: float64Ptr(10),
+						Maximum: ptr.To[float64](10),
 					},
 				},
 			},
@@ -536,7 +537,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					"num": {
 						Type:    "integer",
-						Maximum: float64Ptr(10),
+						Maximum: ptr.To[float64](10),
 					},
 				},
 			},
