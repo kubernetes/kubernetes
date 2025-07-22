@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
@@ -43,7 +44,13 @@ func TestFakeClient(t *testing.T) {
 	client.PrependWatchReactor("*", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := client.Tracker().Watch(gvr, ns)
+		var gvk schema.GroupVersionKind
+		var opts metav1.ListOptions
+		if watchAction, ok := action.(clienttesting.WatchActionImpl); ok {
+			gvk = watchAction.Kind
+			opts = watchAction.ListOptions
+		}
+		watch, err := client.Tracker().Watch(gvr, gvk, ns, opts)
 		if err != nil {
 			return false, nil, err
 		}
