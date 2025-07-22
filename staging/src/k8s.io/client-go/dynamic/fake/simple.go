@@ -411,15 +411,16 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 }
 
 func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	objectGVKForFakeClient := c.resource.GroupVersion().WithKind(c.listKind[:len(c.listKind)-4]) /*base library appends List*/
 	opts.Watch = true
 	switch {
 	case len(c.namespace) == 0:
 		return c.client.Fake.
-			InvokesWatch(testing.NewRootWatchActionWithOptions(c.resource, c.resource.GroupVersion().WithKind(c.listKind), opts))
+			InvokesWatch(testing.NewRootWatchActionWithOptions(c.resource, objectGVKForFakeClient, opts))
 
 	case len(c.namespace) > 0:
 		return c.client.Fake.
-			InvokesWatch(testing.NewWatchActionWithOptions(c.resource, c.resource.GroupVersion().WithKind(c.listKind), c.namespace, opts))
+			InvokesWatch(testing.NewWatchActionWithOptions(c.resource, objectGVKForFakeClient, c.namespace, opts))
 	}
 
 	panic("math broke")
