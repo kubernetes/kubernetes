@@ -2787,7 +2787,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingWebhookConfiguration(re
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.",
+				Description: "ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects an object without changing it.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
