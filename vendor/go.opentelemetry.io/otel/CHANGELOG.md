@@ -8,6 +8,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+<!-- Released section -->
+<!-- Don't change this section unless doing release -->
+
+## [1.34.0/0.56.0/0.10.0] 2025-01-17
+
+### Changed
+
+- Remove the notices from `Logger` to make the whole Logs API user-facing in `go.opentelemetry.io/otel/log`. (#6167)
+
+### Fixed
+
+- Relax minimum Go version to 1.22.0 in various modules. (#6073)
+- The `Type` name logged for the `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc` client is corrected from `otlphttpgrpc` to `otlptracegrpc`. (#6143)
+- The `Type` name logged for the `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlphttpgrpc` client is corrected from `otlphttphttp` to `otlptracehttp`. (#6143)
+
 ## [1.33.0/0.55.0/0.9.0/0.0.12] 2024-12-12
 
 ### Added
@@ -36,9 +51,6 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Fix invalid exemplar keys in `go.opentelemetry.io/otel/exporters/prometheus`. (#5995)
 - Fix attribute value truncation in `go.opentelemetry.io/otel/sdk/trace`. (#5997)
 - Fix attribute value truncation in `go.opentelemetry.io/otel/sdk/log`. (#6032)
-
-<!-- Released section -->
-<!-- Don't change this section unless doing release -->
 
 ## [1.32.0/0.54.0/0.8.0/0.0.11] 2024-11-08
 
@@ -3185,7 +3197,8 @@ It contains api and sdk for trace and meter.
 - CircleCI build CI manifest files.
 - CODEOWNERS file to track owners of this project.
 
-[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.33.0...HEAD
+[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.34.0...HEAD
+[1.34.0/0.56.0/0.10.0]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.34.0
 [1.33.0/0.55.0/0.9.0/0.0.12]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.33.0
 [1.32.0/0.54.0/0.8.0/0.0.11]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.32.0
 [1.31.0/0.53.0/0.7.0/0.0.10]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.31.0

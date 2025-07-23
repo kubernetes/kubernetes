@@ -5,5 +5,5 @@ package otel // import "go.opentelemetry.io/otel"
 
 // Version is the current release version of OpenTelemetry in use.
 func Version() string {
-	return "1.33.0"
+	return "1.34.0"
 }

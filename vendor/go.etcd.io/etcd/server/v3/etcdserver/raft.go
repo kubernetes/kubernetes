@@ -33,6 +33,7 @@ import (
 	"go.etcd.io/etcd/server/v3/config"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/rafthttp"
+	"go.etcd.io/etcd/server/v3/etcdserver/cindex"
 	"go.etcd.io/etcd/server/v3/wal"
 	"go.etcd.io/etcd/server/v3/wal/walpb"
 	"go.uber.org/zap"
@@ -571,12 +572,25 @@ func restartNode(cfg config.ServerConfig, snapshot *raftpb.Snapshot) (types.ID, 
 	return id, cl, n, s, w
 }
 
-func restartAsStandaloneNode(cfg config.ServerConfig, snapshot *raftpb.Snapshot) (types.ID, *membership.RaftCluster, raft.Node, *raft.MemoryStorage, *wal.WAL) {
+func restartAsStandaloneNode(cfg config.ServerConfig, snapshot *raftpb.Snapshot, ci cindex.ConsistentIndexer) (types.ID, *membership.RaftCluster, raft.Node, *raft.MemoryStorage, *wal.WAL) {
 	var walsnap walpb.Snapshot
 	if snapshot != nil {
 		walsnap.Index, walsnap.Term = snapshot.Metadata.Index, snapshot.Metadata.Term
 	}
 	w, id, cid, st, ents := readWAL(cfg.Logger, cfg.WALDir(), walsnap, cfg.UnsafeNoFsync)
+
+	consistentIndex := ci.ConsistentIndex()
+	oldCommitIndex := st.Commit
+	// If only `HardState.Commit` increases, HardState won't be persisted
+	// to disk, even though the committed entries might have already been
+	// applied. This can result in consistent_index > CommitIndex.
+	//
+	// When restarting etcd with `--force-new-cluster`, all uncommitted
+	// entries are dropped. To avoid losing entries that were actually
+	// committed, we reset Commit to max(HardState.Commit, consistent_index).
+	//
+	// See: https://github.com/etcd-io/raft/pull/300 for more details.
+	st.Commit = max(oldCommitIndex, consistentIndex)
 
 	// discard the previously uncommitted entries
 	for i, ent := range ents {
@@ -615,6 +629,7 @@ func restartAsStandaloneNode(cfg config.ServerConfig, snapshot *raftpb.Snapshot)
 		"forcing restart member",
 		zap.String("cluster-id", cid.String()),
 		zap.String("local-member-id", id.String()),
+		zap.Uint64("wal-commit-index", oldCommitIndex),
 		zap.Uint64("commit-index", st.Commit),
 	)
 
