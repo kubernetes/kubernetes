@@ -247,9 +247,9 @@
   type: Counter
   stabilityLevel: BETA
   labels:
+  - pod_management_policy
   - statefulset_name
   - statefulset_namespace
-  - pod_management_policy
 - name: controller_admission_duration_seconds
   subsystem: admission
   namespace: apiserver
