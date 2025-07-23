@@ -4107,7 +4107,7 @@ func TestPrintControllerRevision(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							Controller: boolP(true),
+							Controller: ptr.To(true),
 							APIVersion: "apps/v1",
 							Kind:       "DaemonSet",
 							Name:       "foo",
@@ -4125,7 +4125,7 @@ func TestPrintControllerRevision(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							Controller: boolP(false),
+							Controller: ptr.To(false),
 							Kind:       "ABC",
 							Name:       "foo",
 						},
@@ -4171,10 +4171,6 @@ func TestPrintControllerRevision(t *testing.T) {
 			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
-}
-
-func boolP(b bool) *bool {
-	return &b
 }
 
 func TestPrintConfigMap(t *testing.T) {
@@ -5675,7 +5671,7 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner:          "kubernetes.io/nfs",
 				ReclaimPolicy:        &policyRetain,
-				AllowVolumeExpansion: boolP(true),
+				AllowVolumeExpansion: ptr.To(true),
 				VolumeBindingMode:    &bindModeWait,
 			},
 			expected: []metav1.TableRow{{Cells: []interface{}{"sc6", "kubernetes.io/nfs", "Retain",
