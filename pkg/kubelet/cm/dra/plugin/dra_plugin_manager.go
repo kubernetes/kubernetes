@@ -387,6 +387,20 @@ func (pm *DRAPluginManager) DeRegisterPlugin(driverName, endpoint string) {
 }
 
 func (pm *DRAPluginManager) remove(driverName, endpoint string) {
+	logger := klog.FromContext(pm.backgroundCtx)
+	var p *monitoredPlugin
+	defer func() {
+		// Defer is used to avoid holding the mutex while closing the connection.
+		// This is necessary because closing the connection may cause deadlock
+		// with DRAPlugin.HandleConn, which can be called while holding the mutex.
+		if p != nil && p.conn != nil {
+			// Close the gRPC connection, so that it doesn't leak and
+			// doesn't try to reconnect to an unregistered plugin.
+			if err := p.conn.Close(); err != nil {
+				logger.Error(err, "Closing gRPC connection", "driverName", driverName, "endpoint", endpoint)
+			}
+		}
+	}()
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
@@ -395,14 +409,15 @@ func (pm *DRAPluginManager) remove(driverName, endpoint string) {
 	if i == -1 {
 		return
 	}
-	p := plugins[i]
+	p = plugins[i]
+
 	last := len(plugins) == 1
 	if last {
 		delete(pm.store, driverName)
 	} else {
 		pm.store[driverName] = slices.Delete(plugins, i, i+1)
 	}
-	logger := klog.FromContext(pm.backgroundCtx)
+
 	logger.V(3).Info("Unregistered DRA plugin", "driverName", p.driverName, "endpoint", p.endpoint, "numPlugins", len(pm.store[driverName]))
 	pm.sync(driverName)
 }
