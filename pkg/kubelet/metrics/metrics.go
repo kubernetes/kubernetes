@@ -74,6 +74,7 @@ const (
 	RestartedPodTotalKey               = "restarted_pods_total"
 	ImagePullDurationKey               = "image_pull_duration_seconds"
 	CgroupVersionKey                   = "cgroup_version"
+	CRILosingSupportKey                = "cri_losing_support"
 
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
@@ -1016,6 +1017,16 @@ var (
 			Help:           "cgroup version on the hosts.",
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+
+	CRILosingSupport = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CRILosingSupportKey,
+			Help:           "the Kubernetes version that the currently running CRI implementation will lose support on if not upgraded.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"version"},
 	)
 
 	// DRAOperationsDuration tracks the duration of the DRA PrepareResources and UnprepareResources requests.

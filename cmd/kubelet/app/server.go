@@ -1397,6 +1397,8 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 				continue
 			}
 			// CRI implementation doesn't support RuntimeConfig, fallback
+			legacyregistry.MustRegister(kubeletmetrics.CRILosingSupport)
+			kubeletmetrics.CRILosingSupport.WithLabelValues("1.36.0").Inc()
 			logger.Info("CRI implementation should be updated to support RuntimeConfig when KubeletCgroupDriverFromCRI feature gate has been enabled. Falling back to using cgroupDriver from kubelet config.")
 			return nil
 		}
