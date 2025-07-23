@@ -3032,21 +3032,45 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			enableVolumeAttributesClass: true,
 			isExpectedFailure:           false,
 		},
-		"invalid-update-volume-attributes-class": {
+		"valid-update-volume-attributes-class-to-nil": {
 			oldClaim:                    validClaimVolumeAttributesClass1,
 			newClaim:                    validClaimNilVolumeAttributesClass,
 			enableVolumeAttributesClass: true,
-			isExpectedFailure:           true,
+			isExpectedFailure:           false,
 		},
-		"invalid-update-volume-attributes-class-to-nil": {
-			oldClaim:                    validClaimVolumeAttributesClass1,
-			newClaim:                    validClaimNilVolumeAttributesClass,
-			enableVolumeAttributesClass: true,
-			isExpectedFailure:           true,
-		},
-		"invalid-update-volume-attributes-class-to-empty": {
+		"valid-update-volume-attributes-class-to-empty": {
 			oldClaim:                    validClaimVolumeAttributesClass1,
 			newClaim:                    validClaimEmptyVolumeAttributesClass,
+			enableVolumeAttributesClass: true,
+			isExpectedFailure:           false,
+		},
+		"invalid-update-volume-attributes-class-to-nil-when-current-vac-set": {
+			oldClaim: func() *core.PersistentVolumeClaim {
+				clone := validClaimVolumeAttributesClass1.DeepCopy()
+				clone.Status.CurrentVolumeAttributesClassName = ptr.To("vac1")
+				return clone
+			}(),
+			newClaim: func() *core.PersistentVolumeClaim {
+				clone := validClaimNilVolumeAttributesClass.DeepCopy()
+				clone.Status.CurrentVolumeAttributesClassName = ptr.To("vac1")
+				clone.Spec.VolumeAttributesClassName = nil
+				return clone
+			}(),
+			enableVolumeAttributesClass: true,
+			isExpectedFailure:           true,
+		},
+		"invalid-update-volume-attributes-class-to-empty-when-current-vac-set": {
+			oldClaim: func() *core.PersistentVolumeClaim {
+				clone := validClaimVolumeAttributesClass1.DeepCopy()
+				clone.Status.CurrentVolumeAttributesClassName = ptr.To("vac1")
+				return clone
+			}(),
+			newClaim: func() *core.PersistentVolumeClaim {
+				clone := validClaimNilVolumeAttributesClass.DeepCopy()
+				clone.Status.CurrentVolumeAttributesClassName = ptr.To("vac1")
+				clone.Spec.VolumeAttributesClassName = ptr.To("")
+				return clone
+			}(),
 			enableVolumeAttributesClass: true,
 			isExpectedFailure:           true,
 		},
