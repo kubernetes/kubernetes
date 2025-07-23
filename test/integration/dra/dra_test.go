@@ -589,8 +589,9 @@ func testFilterTimeout(tCtx ktesting.TContext) {
 	createSlice(tCtx, slice.Obj())
 	otherSlice := st.MakeResourceSlice("worker-1", driverName).Devices(deviceNames...)
 	createdOtherSlice := createSlice(tCtx, otherSlice.Obj())
+	claim := claim.DeepCopy()
 	claim.Spec.Devices.Requests[0].Count = int64(devicesPerSlice + 1) // Impossible to allocate.
-	claim := createClaim(tCtx, namespace, "", class, claim)
+	claim = createClaim(tCtx, namespace, "", class, claim)
 
 	tCtx.Run("disabled", func(tCtx ktesting.TContext) {
 		pod := createPod(tCtx, namespace, "", claim, podWithClaimName)
