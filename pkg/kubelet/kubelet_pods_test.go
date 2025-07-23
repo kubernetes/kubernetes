@@ -55,6 +55,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -7194,3 +7195,155 @@ type Envs []kubecontainer.EnvVar
 func (e Envs) Len() int           { return len(e) }
 func (e Envs) Swap(i, j int)      { e[i], e[j] = e[j], e[i] }
 func (e Envs) Less(i, j int) bool { return e[i].Name < e[j].Name }
+
+func TestGeneratePodHostNameAndDomain(t *testing.T) {
+	kubelet := &Kubelet{}
+	kubelet.dnsConfigurer = &dns.Configurer{
+		ClusterDomain: "cluster.local",
+	}
+
+	testCases := []struct {
+		name                string
+		podName             string
+		podHostname         string
+		podSubdomain        string
+		podHostnameOverride *string
+		featureGateEnabled  bool
+		expectedHostname    string
+		expectedDomain      string
+		expectError         bool
+		errorContains       string
+	}{
+		{
+			name:             "Default behavior - pod name as hostname",
+			podName:          "test-pod",
+			podHostname:      "",
+			podSubdomain:     "",
+			expectedHostname: "test-pod",
+			expectedDomain:   "",
+		},
+		{
+			name:             "Custom Hostname - uses pod.Spec.Hostname",
+			podName:          "test-pod",
+			podHostname:      "custom-hostname",
+			podSubdomain:     "",
+			expectedHostname: "custom-hostname",
+			expectedDomain:   "",
+		},
+		{
+			name:             "Custom Subdomain - constructs FQDN",
+			podName:          "test-pod",
+			podHostname:      "",
+			podSubdomain:     "my-subdomain",
+			expectedHostname: "test-pod",
+			expectedDomain:   "my-subdomain.default.svc.cluster.local",
+		},
+		{
+			name:             "Custom Hostname and Subdomain - uses both",
+			podName:          "test-pod",
+			podHostname:      "custom-hostname",
+			podSubdomain:     "my-subdomain",
+			expectedHostname: "custom-hostname",
+			expectedDomain:   "my-subdomain.default.svc.cluster.local",
+		},
+		{
+			name:                "HostnameOverride - enabled - overrides all",
+			podName:             "test-pod",
+			podHostname:         "custom-hostname",
+			podSubdomain:        "my-subdomain",
+			podHostnameOverride: ptr.To("override-hostname"),
+			featureGateEnabled:  true,
+			expectedHostname:    "override-hostname",
+			expectedDomain:      "",
+		},
+		{
+			name:                "HostnameOverride - enabled - overrides all - invalid hostname",
+			podName:             "test-pod",
+			podHostname:         "custom-hostname",
+			podSubdomain:        "my-subdomain",
+			podHostnameOverride: ptr.To("Invalid-Hostname-!"),
+			featureGateEnabled:  true,
+			expectError:         true,
+			errorContains:       "pod HostnameOverride \"Invalid-Hostname-!\" is not a valid DNS label",
+		},
+		{
+			name:                "HostnameOverride - disabled - is ignored",
+			podName:             "test-pod",
+			podHostname:         "custom-hostname",
+			podSubdomain:        "my-subdomain",
+			podHostnameOverride: ptr.To("override-hostname"),
+			featureGateEnabled:  false,
+			expectedHostname:    "custom-hostname",
+			expectedDomain:      "my-subdomain.default.svc.cluster.local",
+		},
+		{
+			name:             "Hostname Truncation - pod name is too long",
+			podName:          strings.Repeat("a", 65),
+			podHostname:      "",
+			podSubdomain:     "",
+			expectedHostname: strings.Repeat("a", 63),
+			expectedDomain:   "",
+		},
+		{
+			name:          "Validation - invalid hostname",
+			podName:       "test-pod",
+			podHostname:   "Invalid-Hostname-!",
+			expectError:   true,
+			errorContains: "pod Hostname \"Invalid-Hostname-!\" is not a valid DNS label",
+		},
+		{
+			name:          "Validation - invalid subdomain",
+			podName:       "test-pod",
+			podSubdomain:  "invalid_subdomain",
+			expectError:   true,
+			errorContains: "pod Subdomain \"invalid_subdomain\" is not a valid DNS label",
+		},
+		{
+			name:          "Validation - too long hostname",
+			podName:       "test-pod",
+			podHostname:   strings.Repeat("a", 64),
+			expectError:   true,
+			errorContains: "must be no more than 63 characters",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HostnameOverride, tc.featureGateEnabled)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tc.podName,
+					Namespace: "default",
+				},
+				Spec: v1.PodSpec{
+					Hostname:         tc.podHostname,
+					Subdomain:        tc.podSubdomain,
+					HostnameOverride: tc.podHostnameOverride,
+				},
+			}
+
+			hostname, domain, err := kubelet.GeneratePodHostNameAndDomain(pod)
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("expected an error but got none")
+					return
+				}
+				if tc.errorContains != "" && !strings.Contains(err.Error(), tc.errorContains) {
+					t.Errorf("expected error to contain %q, but got %q", tc.errorContains, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if hostname != tc.expectedHostname {
+				t.Errorf("expected hostname %q, but got %q", tc.expectedHostname, hostname)
+			}
+			if domain != tc.expectedDomain {
+				t.Errorf("expected domain %q, but got %q", tc.expectedDomain, domain)
+			}
+		})
+	}
+}

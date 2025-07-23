@@ -4459,6 +4459,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(ResourceRequirements)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.HostnameOverride != nil {
+		in, out := &in.HostnameOverride, &out.HostnameOverride
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

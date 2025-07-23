@@ -567,6 +567,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: HostnameOverride
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.34"
 - name: HPAConfigurableTolerance
   versionedSpecs:
   - default: false
