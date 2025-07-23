@@ -50,13 +50,16 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourceapiac "k8s.io/client-go/applyconfigurations/resource/v1"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -288,6 +291,7 @@ func TestDRA(t *testing.T) {
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				tCtx.Run("Convert", testConvert)
+				tCtx.Run("ControllerManagerMetrics", testControllerManagerMetrics)
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
@@ -1167,6 +1171,227 @@ func testMaxResourceSlice(tCtx ktesting.TContext) {
 	if diff := cmp.Diff(slice.Spec, createdSlice.Spec); diff != "" {
 		tCtx.Errorf("ResourceSliceSpec got modified during Create (- want, + got):\n%s", diff)
 	}
+}
+
+// testControllerManagerMetrics tests ResourceClaim metrics
+func testControllerManagerMetrics(tCtx ktesting.TContext) {
+	namespace := createTestNamespace(tCtx, nil)
+	class, _ := createTestClass(tCtx, namespace)
+
+	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
+	runResourceClaimController := util.CreateResourceClaimController(tCtx, tCtx, tCtx.Client(), informerFactory)
+	informerFactory.Start(tCtx.Done())
+	cache.WaitForCacheSync(tCtx.Done(),
+		informerFactory.Core().V1().Pods().Informer().HasSynced,
+		informerFactory.Resource().V1().ResourceClaims().Informer().HasSynced,
+		informerFactory.Resource().V1().ResourceClaimTemplates().Informer().HasSynced,
+	)
+
+	// Start the controller (this will run in background and stop when tCtx is cancelled)
+	runResourceClaimController()
+
+	tCtx.Log("ResourceClaim controller started successfully")
+	tCtx.Log("Testing ResourceClaim controller success metrics with admin access labels")
+
+	// Helper function to get metrics from the metric counter directly
+	getMetricValue := func(status, adminAccess string) float64 {
+		value, err := testutil.GetCounterMetricValue(resourceclaimmetrics.ResourceClaimCreate.WithLabelValues(status, adminAccess))
+		if err != nil {
+			// If the metric doesn't exist yet, default to 0
+			return 0
+		}
+		return value
+	}
+
+	// Get initial success metrics (only testing success cases since failure cases are not easily testable)
+	initialSuccessNoAdmin := getMetricValue("success", "false")
+	initialSuccessWithAdmin := getMetricValue("success", "true")
+
+	// Test 1: Create Pod with ResourceClaimTemplate without admin access (should succeed and trigger controller)
+	template1 := &resourceapi.ResourceClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-template-no-admin",
+			Namespace: namespace,
+		},
+		Spec: resourceapi.ResourceClaimTemplateSpec{
+			Spec: resourceapi.ResourceClaimSpec{
+				Devices: resourceapi.DeviceClaim{
+					Requests: []resourceapi.DeviceRequest{
+						{
+							Name: "req-0",
+							Exactly: &resourceapi.ExactDeviceRequest{
+								DeviceClassName: class.Name,
+								// AdminAccess defaults to false/nil
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := tCtx.Client().ResourceV1().ResourceClaimTemplates(namespace).Create(tCtx, template1, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create ResourceClaimTemplate without admin access")
+
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod-no-admin",
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			ResourceClaims: []v1.PodResourceClaim{{
+				Name:                      "my-claim",
+				ResourceClaimTemplateName: &template1.Name,
+			}},
+		},
+	}
+
+	_, err = tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod1, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create Pod with ResourceClaimTemplate without admin access")
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify metrics: success counter with admin_access=false should increment
+	successNoAdmin := getMetricValue("success", "false")
+	require.InDelta(tCtx, initialSuccessNoAdmin+1, successNoAdmin, 0.1, "success metric with admin_access=false should increment")
+
+	// Test 2: Create admin namespace and Pod with ResourceClaimTemplate with admin access (should succeed)
+	adminNS := createTestNamespace(tCtx, map[string]string{"resource.kubernetes.io/admin-access": "true"})
+	adminClass, _ := createTestClass(tCtx, adminNS)
+
+	template2 := &resourceapi.ResourceClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-template-admin",
+			Namespace: adminNS,
+		},
+		Spec: resourceapi.ResourceClaimTemplateSpec{
+			Spec: resourceapi.ResourceClaimSpec{
+				Devices: resourceapi.DeviceClaim{
+					Requests: []resourceapi.DeviceRequest{{
+						Name: "req-0",
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: adminClass.Name,
+							AdminAccess:     ptr.To(true),
+						},
+					},
+					},
+				},
+			},
+		},
+	}
+
+	_, err = tCtx.Client().ResourceV1().ResourceClaimTemplates(adminNS).Create(tCtx, template2, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create ResourceClaimTemplate with admin access")
+
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod-admin",
+			Namespace: adminNS,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			ResourceClaims: []v1.PodResourceClaim{{
+				Name:                      "my-claim",
+				ResourceClaimTemplateName: &template2.Name,
+			}},
+		},
+	}
+
+	_, err = tCtx.Client().CoreV1().Pods(adminNS).Create(tCtx, pod2, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create Pod with ResourceClaimTemplate with admin access in admin namespace")
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify metrics: success counter with admin_access=true should increment
+	successWithAdmin := getMetricValue("success", "true")
+	require.InDelta(tCtx, initialSuccessWithAdmin+1, successWithAdmin, 0.1, "success metric with admin_access=true should increment")
+
+	// Test 3: Try to create ResourceClaimTemplate with admin access in non-admin namespace
+	// should fail at API level, controller not triggered, no metrics change expected
+	invalidTemplate := &resourceapi.ResourceClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-template-invalid-admin",
+			Namespace: namespace, // regular namespace without admin label
+		},
+		Spec: resourceapi.ResourceClaimTemplateSpec{
+			Spec: resourceapi.ResourceClaimSpec{
+				Devices: resourceapi.DeviceClaim{
+					Requests: []resourceapi.DeviceRequest{{
+						Name: "req-0",
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: class.Name,
+							AdminAccess:     ptr.To(true),
+						},
+					}},
+				},
+			},
+		},
+	}
+
+	_, err = tCtx.Client().ResourceV1().ResourceClaimTemplates(namespace).Create(tCtx, invalidTemplate, metav1.CreateOptions{})
+	require.Error(tCtx, err, "should fail to create ResourceClaimTemplate with AdminAccess in non-admin namespace")
+	require.ErrorContains(tCtx, err, "admin access to devices requires the `resource.kubernetes.io/admin-access: true` label on the containing namespace")
+
+	// Test 4: Create another Pod with ResourceClaimTemplate without admin access to further verify metrics
+	template4 := &resourceapi.ResourceClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-template-no-admin-2",
+			Namespace: namespace,
+		},
+		Spec: resourceapi.ResourceClaimTemplateSpec{
+			Spec: resourceapi.ResourceClaimSpec{
+				Devices: resourceapi.DeviceClaim{
+					Requests: []resourceapi.DeviceRequest{{
+						Name: "req-0",
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: class.Name,
+						},
+					}},
+				},
+			},
+		},
+	}
+
+	_, err = tCtx.Client().ResourceV1().ResourceClaimTemplates(namespace).Create(tCtx, template4, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create second ResourceClaimTemplate without admin access")
+
+	pod4 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod-no-admin-2",
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "test-container",
+				Image: "busybox",
+			}},
+			ResourceClaims: []v1.PodResourceClaim{{
+				Name:                      "my-claim",
+				ResourceClaimTemplateName: &template4.Name,
+			}},
+		},
+	}
+
+	_, err = tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod4, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create second Pod with ResourceClaimTemplate without admin access")
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify final metrics
+	finalSuccessNoAdmin := getMetricValue("success", "false")
+	finalSuccessWithAdmin := getMetricValue("success", "true")
+
+	require.InDelta(tCtx, initialSuccessNoAdmin+2, finalSuccessNoAdmin, 0.1, "should have 2 more success metrics with admin_access=false")
+	require.InDelta(tCtx, initialSuccessWithAdmin+1, finalSuccessWithAdmin, 0.1, "should have 1 more success metric with admin_access=true")
+
+	tCtx.Log("ResourceClaim controller success metrics correctly track operations with admin_access labels")
 }
 
 func matchPointer[T any](p *T) gtypes.GomegaMatcher {
