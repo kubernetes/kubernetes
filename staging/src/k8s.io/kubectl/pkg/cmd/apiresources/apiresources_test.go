@@ -51,6 +51,16 @@ See 'kubectl api-resources -h' for help and examples`
 	if err.Error() != expectedError {
 		t.Fatalf("Unexpected error: %v\n expected: %v", err, expectedError)
 	}
+
+	*o.PrintFlags.OutputFormat = "foo"
+	err = o.Complete(tf, cmd, []string{})
+	if err == nil {
+		t.Fatalf("An error was expected but not returned")
+	}
+	expectedError = `unable to match a printer suitable for the output format "foo", allowed formats are: json,name,wide,yaml`
+	if err.Error() != expectedError {
+		t.Fatalf("Unexpected error: %v\n expected: %v", err, expectedError)
+	}
 }
 
 func TestAPIResourcesValidate(t *testing.T) {
@@ -63,13 +73,6 @@ func TestAPIResourcesValidate(t *testing.T) {
 			name:          "no errors",
 			optionSetupFn: func(o *APIResourceOptions) {},
 			expectedError: "",
-		},
-		{
-			name: "invalid output",
-			optionSetupFn: func(o *APIResourceOptions) {
-				*o.PrintFlags.OutputFormat = "foo"
-			},
-			expectedError: "--output foo is not available",
 		},
 		{
 			name: "invalid sort by",
