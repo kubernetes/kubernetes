@@ -105,6 +105,22 @@ func StripUnsupportedFormatsPostProcessorForVersion(compatibilityVersion *versio
 	}
 }
 
+// GetUnrecognizedFormats returns a list of unrecognized formats found in the given schema.
+// It uses the same source of truth as StripUnsupportedFormatsPostProcessorForVersion.
+func GetUnrecognizedFormats(schema *spec.Schema, compatibilityVersion *version.Version) []string {
+	var unrecognizedFormats []string
+	if len(schema.Format) == 0 {
+		return unrecognizedFormats
+	}
+
+	normalized := strings.ReplaceAll(schema.Format, "-", "") // go-openapi default format name normalization
+	if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+		unrecognizedFormats = append(unrecognizedFormats, schema.Format)
+	}
+
+	return unrecognizedFormats
+}
+
 type versionedFormats struct {
 	introducedVersion *version.Version
 	formats           sets.Set[string]
