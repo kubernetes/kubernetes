@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	goruntime "runtime"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
@@ -387,6 +389,7 @@ func TestPlugin(t *testing.T) {
 		enableDRAPrioritizedList         bool
 		enableDRADeviceTaints            bool
 		disableDRASchedulerFilterTimeout bool
+		skipOnWindows                    string
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -1041,6 +1044,10 @@ func TestPlugin(t *testing.T) {
 					status: fwk.NewStatus(fwk.Unschedulable, `still not schedulable`),
 				},
 			},
+			// Skipping this test case on Windows as a 1ns timeout is not guaranteed to
+			// expire immediately on Windows due to its coarser timer granularity -
+			// typically in the range of 0.5 to 15.6 ms
+			skipOnWindows: "coarse timer granularity",
 		},
 		"timeout_disabled": {
 			// This variant uses the normal test objects to avoid excessive runtime.
@@ -1108,6 +1115,9 @@ func TestPlugin(t *testing.T) {
 	}
 
 	for name, tc := range testcases {
+		if len(tc.skipOnWindows) > 0 && goruntime.GOOS == "windows" {
+			t.Skipf("Skipping '%s' test case on Windows, reason: %s", name, tc.skipOnWindows)
+		}
 		// We can run in parallel because logging is per-test.
 		tc := tc
 		t.Run(name, func(t *testing.T) {
