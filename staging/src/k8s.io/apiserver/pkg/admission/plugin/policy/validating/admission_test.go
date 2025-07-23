@@ -360,6 +360,7 @@ func setupTestCommon(
 	shouldStartInformers bool,
 ) *generic.PolicyTestContext[*validating.Policy, *validating.PolicyBinding, validating.Validator] {
 	testContext, testContextCancel, err := generic.NewPolicyTestContext(
+		t,
 		validating.NewValidatingAdmissionPolicyAccessor,
 		validating.NewValidatingAdmissionPolicyBindingAccessor,
 		func(p *validating.Policy) validating.Validator {
