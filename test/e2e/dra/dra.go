@@ -940,7 +940,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 	// The following tests only make sense when there is more than one node.
 	// They get skipped when there's only one node.
 	multiNodeTests := func(withKubelet bool) {
-		nodes := drautils.NewNodes(f, 3, 8)
+		nodes := drautils.NewNodes(f, 2, 8)
 
 		ginkgo.Context("with different ResourceSlices", func() {
 			firstDevice := "pre-defined-device-01"
