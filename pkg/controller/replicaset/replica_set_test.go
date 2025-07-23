@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"math/rand"
 	"net/http/httptest"
 	"net/url"
@@ -333,6 +335,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	rsSpec.Status.Replicas = 1
 	rsSpec.Status.ReadyReplicas = 1
 	rsSpec.Status.AvailableReplicas = 1
+	rsSpec.Status.TerminatingReplicas = ptr.To[int32](0)
 	manager.syncReplicaSet(ctx, GetKey(rsSpec, t))
 	err := validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
 	if err != nil {
@@ -1232,6 +1235,14 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	ok := manager.processNextWorkItem(tCtx)
 	if !ok {
 		t.Fatal("queue is shutting down")
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) {
+		// DeploymentReplicaSetTerminatingReplicas feature results in the "terminatingReplicas nil->0" update, so we need to do empty sync.
+		ok = manager.processNextWorkItem(tCtx)
+		if !ok {
+			t.Fatal("queue is shutting down")
+		}
 	}
 
 	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
