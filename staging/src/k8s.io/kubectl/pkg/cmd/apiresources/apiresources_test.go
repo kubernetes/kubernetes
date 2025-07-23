@@ -329,25 +329,23 @@ bazzes   b            somegroup/v1   true         Baz
 	}
 }
 
-// TestAPIResourcesRunJson is doing same thing as TestAPIResourcesRun but for JSON outputs
+// TestAPIResourcesRunJsonYaml is doing same thing as TestAPIResourcesRun but for JSON and YAML outputs
 // A separate test function is created because we are using apieqaulity.Semantic.DeepEqual
 // to check equality between input and output
-func TestAPIResourcesRunJson(t *testing.T) {
+func TestAPIResourcesRunJsonYaml(t *testing.T) {
+	type commandSetupFn func(cmd *cobra.Command)
+
 	dc := cmdtesting.NewFakeCachedDiscoveryClient()
 	tf := cmdtesting.NewTestFactory().WithDiscoveryClient(dc)
 	defer tf.Cleanup()
 
 	testCases := []struct {
 		name                  string
-		commandSetupFn        func(cmd *cobra.Command)
 		expectedInvalidations int
 		preferredResources    []*v1.APIResourceList
 	}{
 		{
 			name: "one",
-			commandSetupFn: func(cmd *cobra.Command) {
-				cmd.Flags().Set("output", "json")
-			},
 			preferredResources: []*v1.APIResourceList{
 				{
 					GroupVersion: "v1",
@@ -363,13 +361,9 @@ func TestAPIResourcesRunJson(t *testing.T) {
 					},
 				},
 			},
-			expectedInvalidations: 1,
 		},
 		{
 			name: "two",
-			commandSetupFn: func(cmd *cobra.Command) {
-				cmd.Flags().Set("output", "json")
-			},
 			preferredResources: []*v1.APIResourceList{
 				{
 					GroupVersion: "somegroup/v1",
@@ -385,133 +379,42 @@ func TestAPIResourcesRunJson(t *testing.T) {
 					},
 				},
 			},
-			expectedInvalidations: 1,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(tt *testing.T) {
-			dc.Invalidations = 0
 			dc.PreferredResources = tc.preferredResources
 			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
-			cmd := NewCmdAPIResources(tf, ioStreams)
-			tc.commandSetupFn(cmd)
-			cmd.Run(cmd, []string{})
 
-			if errOut.Len() > 0 {
-				t.Fatalf("unexpected error output: %s", errOut.String())
-			}
-			var apiResourceList v1.APIResourceList
-			err := json.Unmarshal(out.Bytes(), &apiResourceList)
-			assert.Nil(tt, err)
+			for _, v := range []string{"json", "yaml"} {
+				cmd := NewCmdAPIResources(tf, ioStreams)
+				cmd.Flags().Set("output", v)
+				cmd.Run(cmd, []string{})
 
-			// this will undo custom value we add in RunAPIResources in the lines:
-			// resource.Group = gv.Group
-			// resource.Version = gv.Version
-			{
+				if errOut.Len() > 0 {
+					t.Fatalf("unexpected error output: %s", errOut.String())
+				}
+				apiResourceList := v1.APIResourceList{}
+				var err error
+				switch v {
+				case "json":
+					err = json.Unmarshal(out.Bytes(), &apiResourceList)
+				case "yaml":
+					err = yaml.Unmarshal(out.Bytes(), &apiResourceList)
+				}
+				assert.Nil(tt, err)
+
+				// this will undo custom value we add in RunAPIResources in the lines:
+				// resource.Group = gv.Group
+				// resource.Version = gv.Version
 				apiResourceList.GroupVersion = apiResourceList.APIResources[0].Group + "/" + apiResourceList.APIResources[0].Version
 				apiResourceList.APIResources[0].Version = ""
 				apiResourceList.APIResources[0].Group = ""
-			}
 
-			if !apiequality.Semantic.DeepEqual(tc.preferredResources[0].APIResources[0], apiResourceList.APIResources[0]) {
-				tt.Fatalf("expected output: [%v]\n, but got [%v]", tc.preferredResources, apiResourceList)
-			}
-			if dc.Invalidations != tc.expectedInvalidations {
-				tt.Fatalf("unexpected invalidations: %d, expected: %d", dc.Invalidations, tc.expectedInvalidations)
-			}
-		})
-	}
-}
-
-// TestAPIResourcesRunYAML is same as TestAPIResourcesJSON, but for YAML outputs
-func TestAPIResourcesRunYAML(t *testing.T) {
-	dc := cmdtesting.NewFakeCachedDiscoveryClient()
-	tf := cmdtesting.NewTestFactory().WithDiscoveryClient(dc)
-	defer tf.Cleanup()
-
-	testCases := []struct {
-		name                  string
-		commandSetupFn        func(cmd *cobra.Command)
-		expectedInvalidations int
-		preferredResources    []*v1.APIResourceList
-	}{
-		{
-			name: "one",
-			commandSetupFn: func(cmd *cobra.Command) {
-				cmd.Flags().Set("output", "json")
-			},
-			preferredResources: []*v1.APIResourceList{
-				{
-					GroupVersion: "v1",
-					APIResources: []v1.APIResource{
-						{
-							Name:       "foos",
-							Namespaced: false,
-							Kind:       "Foo",
-							Verbs:      []string{"get", "list"},
-							ShortNames: []string{"f", "fo"},
-							Categories: []string{"some-category"},
-						},
-					},
-				},
-			},
-			expectedInvalidations: 1,
-		},
-		{
-			name: "two",
-			commandSetupFn: func(cmd *cobra.Command) {
-				cmd.Flags().Set("output", "json")
-			},
-			preferredResources: []*v1.APIResourceList{
-				{
-					GroupVersion: "somegroup/v1",
-					APIResources: []v1.APIResource{
-						{
-							Name:       "bazzes",
-							Namespaced: true,
-							Kind:       "Baz",
-							Verbs:      []string{"get", "list", "create", "delete"},
-							ShortNames: []string{"b"},
-							Categories: []string{"some-category", "another-category"},
-						},
-					},
-				},
-			},
-			expectedInvalidations: 1,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(tt *testing.T) {
-			dc.Invalidations = 0
-			dc.PreferredResources = tc.preferredResources
-			ioStreams, _, out, errOut := genericiooptions.NewTestIOStreams()
-			cmd := NewCmdAPIResources(tf, ioStreams)
-			tc.commandSetupFn(cmd)
-			cmd.Run(cmd, []string{})
-
-			if errOut.Len() > 0 {
-				t.Fatalf("unexpected error output: %s", errOut.String())
-			}
-			var apiResourceList v1.APIResourceList
-			err := yaml.Unmarshal(out.Bytes(), &apiResourceList)
-			assert.Nil(tt, err)
-
-			// this will undo custom value we add in RunAPIResources in the lines:
-			// resource.Group = gv.Group
-			// resource.Version = gv.Version
-			{
-				apiResourceList.GroupVersion = apiResourceList.APIResources[0].Group + "/" + apiResourceList.APIResources[0].Version
-				apiResourceList.APIResources[0].Version = ""
-				apiResourceList.APIResources[0].Group = ""
-			}
-
-			if !apiequality.Semantic.DeepEqual(tc.preferredResources[0].APIResources[0], apiResourceList.APIResources[0]) {
-				tt.Fatalf("expected output: [%v]\n, but got [%v]", tc.preferredResources, apiResourceList)
-			}
-			if dc.Invalidations != tc.expectedInvalidations {
-				tt.Fatalf("unexpected invalidations: %d, expected: %d", dc.Invalidations, tc.expectedInvalidations)
+				if !apiequality.Semantic.DeepEqual(tc.preferredResources[0].APIResources[0], apiResourceList.APIResources[0]) {
+					tt.Fatalf("expected output: [%v]\n, but got [%v]", tc.preferredResources[0].APIResources[0], apiResourceList.APIResources[0])
+				}
 			}
 		})
 	}
