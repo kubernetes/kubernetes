@@ -19,7 +19,11 @@ limitations under the License.
 package eviction
 
 import (
+	context "context"
+
+	logr "github.com/go-logr/logr"
 	mock "github.com/stretchr/testify/mock"
+
 	v1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
@@ -81,9 +85,9 @@ func (_c *MockThresholdNotifier_Description_Call) RunAndReturn(run func() string
 	return _c
 }
 
-// Start provides a mock function with no fields
-func (_m *MockThresholdNotifier) Start() {
-	_m.Called()
+// Start provides a mock function with given fields: ctx
+func (_m *MockThresholdNotifier) Start(ctx context.Context) {
+	_m.Called(ctx)
 }
 
 // MockThresholdNotifier_Start_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Start'
@@ -92,13 +96,14 @@ type MockThresholdNotifier_Start_Call struct {
 }
 
 // Start is a helper method to define mock.On call
-func (_e *MockThresholdNotifier_Expecter) Start() *MockThresholdNotifier_Start_Call {
-	return &MockThresholdNotifier_Start_Call{Call: _e.mock.On("Start")}
+//   - ctx context.Context
+func (_e *MockThresholdNotifier_Expecter) Start(ctx interface{}) *MockThresholdNotifier_Start_Call {
+	return &MockThresholdNotifier_Start_Call{Call: _e.mock.On("Start", ctx)}
 }
 
-func (_c *MockThresholdNotifier_Start_Call) Run(run func()) *MockThresholdNotifier_Start_Call {
+func (_c *MockThresholdNotifier_Start_Call) Run(run func(ctx context.Context)) *MockThresholdNotifier_Start_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		run(args[0].(context.Context))
 	})
 	return _c
 }
@@ -108,22 +113,22 @@ func (_c *MockThresholdNotifier_Start_Call) Return() *MockThresholdNotifier_Star
 	return _c
 }
 
-func (_c *MockThresholdNotifier_Start_Call) RunAndReturn(run func()) *MockThresholdNotifier_Start_Call {
+func (_c *MockThresholdNotifier_Start_Call) RunAndReturn(run func(context.Context)) *MockThresholdNotifier_Start_Call {
 	_c.Run(run)
 	return _c
 }
 
-// UpdateThreshold provides a mock function with given fields: summary
-func (_m *MockThresholdNotifier) UpdateThreshold(summary *v1alpha1.Summary) error {
-	ret := _m.Called(summary)
+// UpdateThreshold provides a mock function with given fields: logger, summary
+func (_m *MockThresholdNotifier) UpdateThreshold(logger logr.Logger, summary *v1alpha1.Summary) error {
+	ret := _m.Called(logger, summary)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateThreshold")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*v1alpha1.Summary) error); ok {
-		r0 = rf(summary)
+	if rf, ok := ret.Get(0).(func(logr.Logger, *v1alpha1.Summary) error); ok {
+		r0 = rf(logger, summary)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -137,14 +142,15 @@ type MockThresholdNotifier_UpdateThreshold_Call struct {
 }
 
 // UpdateThreshold is a helper method to define mock.On call
+//   - logger logr.Logger
 //   - summary *v1alpha1.Summary
-func (_e *MockThresholdNotifier_Expecter) UpdateThreshold(summary interface{}) *MockThresholdNotifier_UpdateThreshold_Call {
-	return &MockThresholdNotifier_UpdateThreshold_Call{Call: _e.mock.On("UpdateThreshold", summary)}
+func (_e *MockThresholdNotifier_Expecter) UpdateThreshold(logger interface{}, summary interface{}) *MockThresholdNotifier_UpdateThreshold_Call {
+	return &MockThresholdNotifier_UpdateThreshold_Call{Call: _e.mock.On("UpdateThreshold", logger, summary)}
 }
 
-func (_c *MockThresholdNotifier_UpdateThreshold_Call) Run(run func(summary *v1alpha1.Summary)) *MockThresholdNotifier_UpdateThreshold_Call {
+func (_c *MockThresholdNotifier_UpdateThreshold_Call) Run(run func(logger logr.Logger, summary *v1alpha1.Summary)) *MockThresholdNotifier_UpdateThreshold_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*v1alpha1.Summary))
+		run(args[0].(logr.Logger), args[1].(*v1alpha1.Summary))
 	})
 	return _c
 }
@@ -154,7 +160,7 @@ func (_c *MockThresholdNotifier_UpdateThreshold_Call) Return(_a0 error) *MockThr
 	return _c
 }
 
-func (_c *MockThresholdNotifier_UpdateThreshold_Call) RunAndReturn(run func(*v1alpha1.Summary) error) *MockThresholdNotifier_UpdateThreshold_Call {
+func (_c *MockThresholdNotifier_UpdateThreshold_Call) RunAndReturn(run func(logr.Logger, *v1alpha1.Summary) error) *MockThresholdNotifier_UpdateThreshold_Call {
 	_c.Call.Return(run)
 	return _c
 }
