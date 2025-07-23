@@ -961,6 +961,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.24"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: MemoryManager
   versionedSpecs:
   - default: false
