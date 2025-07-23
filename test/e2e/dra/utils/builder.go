@@ -53,11 +53,15 @@ type Builder struct {
 	podCounter      int
 	claimCounter    int
 	ClassParameters string // JSON
+	classname       string // Ensures all subsequent resources use the same deviceClass
 }
 
 // ClassName returns the default device class name.
 func (b *Builder) ClassName() string {
-	return b.f.UniqueName + b.driver.NameSuffix + "-class"
+	if b.classname == "" {
+		b.classname = b.f.UniqueName + b.driver.NameSuffix + "-class"
+	}
+	return b.classname
 }
 
 // Class returns the device Class that the builder's other objects
@@ -110,7 +114,7 @@ func (b *Builder) claimSpecWithV1beta1() resourcev1beta1.ResourceClaimSpec {
 		Devices: resourcev1beta1.DeviceClaim{
 			Requests: []resourcev1beta1.DeviceRequest{{
 				Name:            "my-request",
-				DeviceClassName: b.ClassName(),
+				DeviceClassName: b.classname,
 			}},
 			Config: []resourcev1beta1.DeviceClaimConfiguration{{
 				DeviceConfiguration: resourcev1beta1.DeviceConfiguration{
@@ -137,7 +141,7 @@ func (b *Builder) ClaimSpec() resourceapi.ResourceClaimSpec {
 			Requests: []resourceapi.DeviceRequest{{
 				Name: "my-request",
 				Exactly: &resourceapi.ExactDeviceRequest{
-					DeviceClassName: b.ClassName(),
+					DeviceClassName: b.classname,
 				},
 			}},
 			Config: []resourceapi.DeviceClaimConfiguration{{
@@ -153,6 +157,14 @@ func (b *Builder) ClaimSpec() resourceapi.ResourceClaimSpec {
 		},
 	}
 
+	return spec
+}
+
+// ClaimSpecWithAdminAccess returns the device request for a claim or claim template
+// with AdminAccess enabled using the v1beta2 API.
+func (b *Builder) ClaimSpecWithAdminAccess() resourceapi.ResourceClaimSpec {
+	spec := b.ClaimSpec()
+	spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 	return spec
 }
 
@@ -215,6 +227,13 @@ func (b *Builder) PodInlineWithV1beta1() (*v1.Pod, *resourcev1beta1.ResourceClai
 			Spec: b.claimSpecWithV1beta1(),
 		},
 	}
+	return pod, template
+}
+
+// PodInlineWithAdminAccess returns a pod with inline resource claim template that has AdminAccess enabled.
+func (b *Builder) PodInlineWithAdminAccess() (*v1.Pod, *resourceapi.ResourceClaimTemplate) {
+	pod, template := b.PodInline()
+	template.Spec.Spec = b.ClaimSpecWithAdminAccess()
 	return pod, template
 }
 
