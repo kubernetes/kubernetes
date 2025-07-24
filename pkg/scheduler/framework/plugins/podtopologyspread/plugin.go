@@ -31,7 +31,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -60,7 +59,7 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
 	systemDefaulted                              bool
-	parallelizer                                 parallelize.Parallelizer
+	parallelizer                                 fwk.Parallelizer
 	defaultConstraints                           []v1.TopologySpreadConstraint
 	sharedLister                                 fwk.SharedLister
 	services                                     corelisters.ServiceLister

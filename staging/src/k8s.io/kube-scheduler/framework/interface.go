@@ -34,9 +34,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-
-	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 )
 
 // Code is the Status code/type which is returned from plugins.
@@ -680,7 +679,12 @@ type Handle interface {
 	Extenders() []Extender
 
 	// Parallelizer returns a parallelizer holding parallelism for scheduler.
-	Parallelizer() parallelize.Parallelizer
+	Parallelizer() Parallelizer
+}
+
+// Parallelizer holds the parallelism for scheduler.
+type Parallelizer interface {
+	Until(ctx context.Context, pieces int, doWorkPiece workqueue.DoWorkPieceFunc, operation string)
 }
 
 // PodActivator abstracts operations in the scheduling queue.
