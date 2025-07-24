@@ -137,7 +137,7 @@ func (p *criticalPaths) update(tpVal string, num int) {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	s, err := pl.calPreFilterState(ctx, pod, nodes)
 	if err != nil {
 		return nil, fwk.AsStatus(err)
@@ -155,24 +155,24 @@ func (pl *PodTopologySpread) PreFilterExtensions() framework.PreFilterExtensions
 }
 
 // AddPod from pre-computed data in cycleState.
-func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
 
-	pl.updateWithPod(s, podInfoToAdd.Pod, podToSchedule, nodeInfo.Node(), 1)
+	pl.updateWithPod(s, podInfoToAdd.GetPod(), podToSchedule, nodeInfo.Node(), 1)
 	return nil
 }
 
 // RemovePod from pre-computed data in cycleState.
-func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
 
-	pl.updateWithPod(s, podInfoToRemove.Pod, podToSchedule, nodeInfo.Node(), -1)
+	pl.updateWithPod(s, podInfoToRemove.GetPod(), podToSchedule, nodeInfo.Node(), -1)
 	return nil
 }
 
@@ -232,7 +232,7 @@ type topologyCount struct {
 }
 
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
-func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod, allNodes []*framework.NodeInfo) (*preFilterState, error) {
+func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod, allNodes []fwk.NodeInfo) (*preFilterState, error) {
 	constraints, err := pl.getConstraints(pod)
 	if err != nil {
 		return nil, fmt.Errorf("get constraints from pod: %w", err)
@@ -277,7 +277,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 			}
 
 			value := node.Labels[c.TopologyKey]
-			count := countPodsMatchSelector(nodeInfo.Pods, c.Selector, pod.Namespace)
+			count := countPodsMatchSelector(nodeInfo.GetPods(), c.Selector, pod.Namespace)
 			tpCounts = append(tpCounts, topologyCount{
 				topologyValue: value,
 				constraintID:  i,
@@ -308,7 +308,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 }
 
 // Filter invoked at the filter extension point.
-func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	node := nodeInfo.Node()
 
 	s, err := getPreFilterState(cycleState)

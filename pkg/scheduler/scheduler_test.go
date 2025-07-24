@@ -1193,7 +1193,7 @@ func (pl *fakeQueueSortPlugin) Name() string {
 	return queueSort
 }
 
-func (pl *fakeQueueSortPlugin) Less(_, _ *framework.QueuedPodInfo) bool {
+func (pl *fakeQueueSortPlugin) Less(_, _ fwk.QueuedPodInfo) bool {
 	return false
 }
 
@@ -1215,7 +1215,7 @@ type filterWithoutEnqueueExtensionsPlugin struct{}
 
 func (*filterWithoutEnqueueExtensionsPlugin) Name() string { return filterWithoutEnqueueExtensions }
 
-func (*filterWithoutEnqueueExtensionsPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
+func (*filterWithoutEnqueueExtensionsPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1229,7 +1229,7 @@ var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) 
 
 func (*fakeNodePlugin) Name() string { return fakeNode }
 
-func (*fakeNodePlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
+func (*fakeNodePlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1249,7 +1249,7 @@ var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (
 
 func (*fakePodPlugin) Name() string { return fakePod }
 
-func (*fakePodPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
+func (*fakePodPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1263,7 +1263,7 @@ type emptyEventPlugin struct{}
 
 func (*emptyEventPlugin) Name() string { return emptyEventExtensions }
 
-func (*emptyEventPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
+func (*emptyEventPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1276,7 +1276,7 @@ type errorEventsToRegisterPlugin struct{}
 
 func (*errorEventsToRegisterPlugin) Name() string { return errorEventsToRegister }
 
-func (*errorEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
+func (*errorEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1291,7 +1291,7 @@ type emptyEventsToRegisterPlugin struct{}
 
 func (*emptyEventsToRegisterPlugin) Name() string { return emptyEventsToRegister }
 
-func (*emptyEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
+func (*emptyEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 

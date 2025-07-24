@@ -51,7 +51,7 @@ func (pl *ImageLocality) Name() string {
 }
 
 // Score invoked at the score extension point.
-func (pl *ImageLocality) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *ImageLocality) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	nodeInfos, err := pl.handle.SnapshotSharedLister().NodeInfos().List()
 	if err != nil {
 		return 0, fwk.AsStatus(err)
@@ -90,15 +90,15 @@ func calculatePriority(sumScores int64, numContainers int) int64 {
 // sumImageScores returns the sum of image scores of all the containers that are already on the node.
 // Each image receives a raw score of its size, scaled by scaledImageScore. The raw scores are later used to calculate
 // the final score.
-func sumImageScores(nodeInfo *framework.NodeInfo, pod *v1.Pod, totalNumNodes int) int64 {
+func sumImageScores(nodeInfo fwk.NodeInfo, pod *v1.Pod, totalNumNodes int) int64 {
 	var sum int64
 	for _, container := range pod.Spec.InitContainers {
-		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
+		if state, ok := nodeInfo.GetImageStates()[normalizedImageName(container.Image)]; ok {
 			sum += scaledImageScore(state, totalNumNodes)
 		}
 	}
 	for _, container := range pod.Spec.Containers {
-		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
+		if state, ok := nodeInfo.GetImageStates()[normalizedImageName(container.Image)]; ok {
 			sum += scaledImageScore(state, totalNumNodes)
 		}
 	}
@@ -109,7 +109,7 @@ func sumImageScores(nodeInfo *framework.NodeInfo, pod *v1.Pod, totalNumNodes int
 // The size of the image is used as the base score, scaled by a factor which considers how much nodes the image has "spread" to.
 // This heuristic aims to mitigate the undesirable "node heating problem", i.e., pods get assigned to the same or
 // a few nodes due to image locality.
-func scaledImageScore(imageState *framework.ImageStateSummary, totalNumNodes int) int64 {
+func scaledImageScore(imageState *fwk.ImageStateSummary, totalNumNodes int) int64 {
 	spread := float64(imageState.NumNodes) / float64(totalNumNodes)
 	return int64(float64(imageState.Size) * spread)
 }

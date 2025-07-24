@@ -124,14 +124,14 @@ func newTestPlugin(_ context.Context, injArgs runtime.Object, f framework.Handle
 	return &TestPlugin{name: "test-plugin"}, nil
 }
 
-func (pl *TestPlugin) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *TestPlugin) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if nodeInfo.Node().GetLabels()["error"] == "true" {
 		return fwk.AsStatus(fmt.Errorf("failed to add pod: %v", podToSchedule.Name))
 	}
 	return nil
 }
 
-func (pl *TestPlugin) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *TestPlugin) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *fwk.Status {
 	if nodeInfo.Node().GetLabels()["error"] == "true" {
 		return fwk.AsStatus(fmt.Errorf("failed to remove pod: %v", podToSchedule.Name))
 	}
@@ -146,11 +146,11 @@ func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 	return pl
 }
 
-func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	return nil, nil
 }
 
-func (pl *TestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *TestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1458,8 +1458,8 @@ func TestSelectBestCandidate(t *testing.T) {
 
 func TestCustomSelection(t *testing.T) {
 	podLabelIsEligible := func(key, val string) IsEligiblePodFunc {
-		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
-			pval, ok := victim.Pod.Labels[key]
+		return func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool {
+			pval, ok := victim.GetPod().Labels[key]
 			if !ok {
 				return false
 			}
@@ -1467,18 +1467,18 @@ func TestCustomSelection(t *testing.T) {
 		}
 	}
 	nodeNameIsEligible := func(name string) IsEligiblePodFunc {
-		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+		return func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool {
 			return nodeInfo.Node().Name == name
 		}
 	}
 	priorityBelowThresholdCannotPreempt := func(minPreempting int32) IsEligiblePodFunc {
-		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+		return func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool {
 			return corev1helpers.PodPriority(preemptor) >= minPreempting
 		}
 	}
 	priorityAboveThresholdCannotBePreempted := func(maxPreemptible int32) IsEligiblePodFunc {
-		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
-			return corev1helpers.PodPriority(victim.Pod) <= maxPreemptible
+		return func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor *v1.Pod) bool {
+			return corev1helpers.PodPriority(victim.GetPod()) <= maxPreemptible
 		}
 	}
 

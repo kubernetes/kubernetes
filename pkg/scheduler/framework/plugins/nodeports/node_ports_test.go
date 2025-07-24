@@ -51,7 +51,7 @@ func newPod(host string, hostPortInfos ...string) *v1.Pod {
 func TestNodePorts(t *testing.T) {
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
 		wantPreFilterStatus *fwk.Status
 		wantFilterStatus    *fwk.Status
