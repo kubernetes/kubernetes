@@ -289,6 +289,11 @@ func (in *HorizontalPodAutoscalerSpec) DeepCopyInto(out *HorizontalPodAutoscaler
 		*out = new(HorizontalPodAutoscalerBehavior)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.SelectionStrategy != nil {
+		in, out := &in.SelectionStrategy, &out.SelectionStrategy
+		*out = new(SelectionStrategy)
+		**out = **in
+	}
 	return
 }
 

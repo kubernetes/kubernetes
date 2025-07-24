@@ -73,6 +73,17 @@ type CrossVersionObjectReference struct {
 	APIVersion string
 }
 
+// SelectionStrategy defines how pods are selected for metrics collection and scaling decisions
+type SelectionStrategy string
+
+const (
+	// LabelSelector selects pods based on the label selector specified in the HPA's scale target
+	LabelSelector SelectionStrategy = "LabelSelector"
+
+	// OwnerReferences selects pods based on the ownership chain to the HPA's scale target
+	OwnerReferences SelectionStrategy = "OwnerReferences"
+)
+
 // HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.
 type HorizontalPodAutoscalerSpec struct {
 	// scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics
@@ -106,6 +117,25 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default HPAScalingRules for scale up and scale down are used.
 	// +optional
 	Behavior *HorizontalPodAutoscalerBehavior
+
+	// SelectionStrategy determines how pods are selected for metrics collection
+	// and scaling decisions. Valid values are:
+	// - "LabelSelector": uses the label selector from the scale target (default)
+	// - "OwnerReferences": only considers pods owned by the scale target
+	//
+	// If not set, the default value "LabelSelector" is used, which maintains
+	// backward compatibility with existing behavior.
+	//
+	// For example, when using "OwnerReferences" with a Deployment target,
+	// only pods directly owned by the Deployment's ReplicaSets will be considered,
+	// even if other pods match the label selector.
+	//
+	// This is an alpha field and requires enabling the HPASelectionStrategy
+	// feature gate.
+	//
+	// +featureGate=HPASelectionStrategy
+	// +optional
+	SelectionStrategy *SelectionStrategy
 }
 
 // HorizontalPodAutoscalerBehavior configures a scaling behavior for Up and Down direction

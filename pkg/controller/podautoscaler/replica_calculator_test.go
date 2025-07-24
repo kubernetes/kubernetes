@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -102,6 +103,8 @@ type replicaCalcTestCase struct {
 	podStartTime         []metav1.Time
 	podPhase             []v1.PodPhase
 	podDeletionTimestamp []bool
+	podSetup             func([]*v1.Pod)
+	PodFilter            *PodFilter
 }
 
 const (
@@ -176,6 +179,13 @@ func (tc *replicaCalcTestCase) prepareTestClientSet() *fake.Clientset {
 				}
 			}
 			obj.Items = append(obj.Items, pod)
+			if tc.podSetup != nil {
+				pods := make([]*v1.Pod, len(obj.Items))
+				for i := range obj.Items {
+					pods[i] = &obj.Items[i]
+				}
+				tc.podSetup(pods)
+			}
 		}
 		return true, obj, nil
 	})
@@ -367,8 +377,14 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		tolerances = *tc.tolerances
 	}
 
+	// Use default pod filter if no pod filter is specified in test case.
+	podFilter := NewPodFilter(string(autoscalingv2.LabelSelector), FilterOptions{})
+	if tc.PodFilter != nil {
+		podFilter = *tc.PodFilter // Use the existing pointer directly
+	}
+
 	if tc.resource != nil {
-		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, tolerances, testNamespace, selector, tc.container)
+		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, tolerances, testNamespace, selector, tc.container, podFilter)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -391,7 +407,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		if tc.metric.singleObject == nil {
 			t.Fatal("Metric specified as objectMetric but metric.singleObject is nil.")
 		}
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.singleObject, selector, nil)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.singleObject, selector, nil, &podFilter)
 	case objectPerPodMetric:
 		if tc.metric.singleObject == nil {
 			t.Fatal("Metric specified as objectMetric but metric.singleObject is nil.")
@@ -404,7 +420,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		if tc.metric.targetUsage <= 0 {
 			t.Fatalf("Metric specified as externalMetric but metric.targetUsage is %d which is <=0.", tc.metric.targetUsage)
 		}
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.selector, selector)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.selector, selector, &podFilter)
 	case externalPerPodMetric:
 		if tc.metric.selector == nil {
 			t.Fatal("Metric specified as externalPerPodMetric but metric.selector is nil.")
@@ -415,7 +431,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 
 		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.selector)
 	case podMetric:
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, selector, nil)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, selector, nil, &podFilter)
 	default:
 		t.Fatalf("Unknown metric type: %d", tc.metric.metricType)
 	}
@@ -2476,6 +2492,151 @@ func TestCalculatePodRequestsFromContainers_NonExistentContainer(t *testing.T) {
 	expectedErr := "container non-existent-container not found in Pod test-pod"
 	assert.Equal(t, expectedErr, err.Error(), "error message should match expected format")
 	assert.Equal(t, int64(0), request, "request should be 0 when container does not exist")
+
+}
+
+func TestReplicaCalcScaleUpWithOwnerReferencesNoFilters(t *testing.T) {
+	// Setup test environment
+	dynamicClient, _, mockMonitor := setupTestEnv()
+	mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
+	cache := NewControllerCache(dynamicClient, mapper, 5*time.Minute, mockMonitor)
+
+	// Create test deployment
+	deployment := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]interface{}{
+				"name":      "test-deployment",
+				"namespace": testNamespace,
+				"uid":       "test-uid",
+			},
+		},
+	}
+
+	_, err := dynamicClient.
+		Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}).
+		Namespace(testNamespace).
+		Create(context.TODO(), deployment, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	podFilter := NewPodFilter(string(autoscalingv2.OwnerReferences), FilterOptions{
+		ScaleTargetRef: &autoscalingv2.CrossVersionObjectReference{
+			Kind:       "Deployment",
+			Name:       "test-deployment",
+			APIVersion: "apps/v1",
+		},
+	}).WithCache(cache).WithDynamicClient(dynamicClient).WithRESTMapper(mapper)
+
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 5,
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   makePodMetricLevels(300, 500, 700),
+
+			targetUtilization:   30,
+			expectedUtilization: 50,
+			expectedValue:       numContainersPerPod * 500,
+		},
+		podReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue},
+		PodFilter:    &podFilter,
+	}
+
+	// Add owner references to the test pods
+	tc.podSetup = func(pods []*v1.Pod) {
+		for _, pod := range pods {
+			pod.OwnerReferences = []metav1.OwnerReference{
+				{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+					Name:       "test-deployment",
+					UID:        "test-uid",
+				},
+			}
+		}
+	}
+
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpWithOwnerReferencesSomeFilter(t *testing.T) {
+	// Setup test environment
+	dynamicClient, _, mockMonitor := setupTestEnv()
+	mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
+	cache := NewControllerCache(dynamicClient, mapper, 5*time.Minute, mockMonitor)
+
+	// Create test deployment
+	deployment := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]interface{}{
+				"name":      "test-deployment",
+				"namespace": testNamespace,
+				"uid":       "test-uid",
+			},
+		},
+	}
+
+	_, err := dynamicClient.
+		Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}).
+		Namespace(testNamespace).
+		Create(context.TODO(), deployment, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	podFilter := NewPodFilter(string(autoscalingv2.OwnerReferences), FilterOptions{
+		ScaleTargetRef: &autoscalingv2.CrossVersionObjectReference{
+			Kind:       "Deployment",
+			Name:       "test-deployment",
+			APIVersion: "apps/v1",
+		},
+	}).WithCache(cache).WithDynamicClient(dynamicClient).WithRESTMapper(mapper)
+
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		resource: &resourceInfo{
+			name:                v1.ResourceCPU,
+			requests:            []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:              makePodMetricLevels(300, 10000, 700), // Second pod (10000) should be filtered out
+			targetUtilization:   30,
+			expectedUtilization: 50,
+			expectedValue:       numContainersPerPod * 500,
+		},
+		podReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue},
+		PodFilter:    &podFilter,
+	}
+
+	// Add owner references to the test pods
+	tc.podSetup = func(pods []*v1.Pod) {
+		for i, pod := range pods {
+			if i == 1 {
+				// Second pod has different owner
+				pod.OwnerReferences = []metav1.OwnerReference{
+					{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "other-deployment",
+						UID:        "other-uid",
+					},
+				}
+			} else {
+				// Other pods owned by test-deployment
+				pod.OwnerReferences = []metav1.OwnerReference{
+					{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "test-deployment",
+						UID:        "test-uid",
+					},
+				}
+			}
+		}
+	}
+
+	tc.runTest(t)
 }
 
 func TestReplicaCalcExternalMetricUsageOverflow(t *testing.T) {
@@ -2494,4 +2655,5 @@ func TestReplicaCalcExternalMetricUsageOverflow(t *testing.T) {
 		},
 	}
 	tc.runTest(t)
+
 }

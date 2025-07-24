@@ -61,12 +61,28 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"action", "error", "metric_type"})
+	cacheHitsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      hpaControllerSubsystem,
+			Name:           "cache_hits_total",
+			Help:           "Number of cache hits in the HPA controller cache",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"resource_kind"})
+	cacheMissesTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      hpaControllerSubsystem,
+			Name:           "cache_misses_total",
+			Help:           "Number of cache misses in the HPA controller cache",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"resource_kind"})
 
 	metricsList = []metrics.Registerable{
 		reconciliationsTotal,
 		reconciliationsDuration,
 		metricComputationTotal,
 		metricComputationDuration,
+		cacheHitsTotal,
+		cacheMissesTotal,
 	}
 )
 

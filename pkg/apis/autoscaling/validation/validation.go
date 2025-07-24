@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"slices"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
@@ -74,6 +75,10 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 	if refErrs := validateBehavior(autoscaler.Behavior, fldPath.Child("behavior"), opts); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
+	if refErrs := valdidateSelectionStrategy(autoscaler.SelectionStrategy, fldPath.Child("selectionStrategy"), opts); len(refErrs) > 0 {
+		allErrs = append(allErrs, refErrs...)
+	}
+
 	return allErrs
 }
 
@@ -195,6 +200,24 @@ func validateBehavior(behavior *autoscaling.HorizontalPodAutoscalerBehavior, fld
 			allErrs = append(allErrs, scaleDownErrs...)
 		}
 	}
+	return allErrs
+}
+
+func valdidateSelectionStrategy(selectionStrategy *autoscaling.SelectionStrategy, fldPath *field.Path, opts HorizontalPodAutoscalerSpecValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if selectionStrategy == nil {
+		return allErrs
+	}
+
+	supportedSelectionStrategy := []autoscaling.SelectionStrategy{
+		autoscaling.LabelSelector,
+		autoscaling.OwnerReferences,
+	}
+
+	if !slices.Contains(supportedSelectionStrategy, *selectionStrategy) {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("spec").Child("selectionStrategy"), *selectionStrategy, supportedSelectionStrategy))
+	}
+
 	return allErrs
 }
 

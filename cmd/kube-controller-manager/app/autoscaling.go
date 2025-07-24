@@ -75,6 +75,10 @@ func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext 
 	if err != nil {
 		return nil, false, err
 	}
+	dynamicClient, err := dynamic.NewForConfig(hpaClientConfig)
+	if err != nil {
+		return nil, false, err
+	}
 
 	go podautoscaler.NewHorizontalController(
 		ctx,
@@ -90,6 +94,7 @@ func startHPAControllerWithMetricsClient(ctx context.Context, controllerContext 
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
 		controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
+		dynamicClient,
 	).Run(ctx, int(controllerContext.ComponentConfig.HPAController.ConcurrentHorizontalPodAutoscalerSyncs))
 	return nil, true, nil
 }
