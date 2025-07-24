@@ -17,7 +17,7 @@ limitations under the License.
 package deviceattribute
 
 import (
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 )
 
 const (

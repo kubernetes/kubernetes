@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 )
 
 func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
