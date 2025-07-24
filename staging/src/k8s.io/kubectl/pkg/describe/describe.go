@@ -35,6 +35,8 @@ import (
 	"unicode"
 
 	"github.com/fatih/camelcase"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -372,7 +374,7 @@ func smartLabelFor(field string) string {
 		if slice.Contains[string](commonAcronyms, strings.ToUpper(part), nil) {
 			part = strings.ToUpper(part)
 		} else {
-			part = strings.Title(part)
+			part = cases.Title(language.English).String(part)
 		}
 		result = append(result, part)
 	}
@@ -2092,7 +2094,7 @@ func EnvValueRetriever(pod *corev1.Pod) EnvVarResolverFunc {
 		gvk := gv.WithKind("Pod")
 		internalFieldPath, _, err := scheme.Scheme.ConvertFieldLabel(gvk, e.ValueFrom.FieldRef.FieldPath, "")
 		if err != nil {
-			return "" // pod validation should catch this on create
+			return ""
 		}
 
 		valueFrom, err := fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
