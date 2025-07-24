@@ -796,8 +796,8 @@ func (f *FitError) Error() string {
 		// the scheduling cycle went through PreFilter extension point successfully.
 		//
 		// When the prefilter plugin returns unschedulable,
-		// the scheduling framework inserts the same unschedulable status to all nodes in NodeToStatusMap.
-		// So, we shouldn't add the message from NodeToStatusMap when the PreFilter failed.
+		// the scheduling framework inserts the same unschedulable status to all nodes in NodeToStatusReader.
+		// So, we shouldn't add the message from NodeToStatusReader when the PreFilter failed.
 		// Otherwise, we will have duplicated reasons in the error message.
 		reasons := make(map[string]int)
 		f.Diagnosis.NodeToStatus.ForEachExplicitNode(func(_ string, status *fwk.Status) {
@@ -806,7 +806,7 @@ func (f *FitError) Error() string {
 			}
 		})
 		if f.Diagnosis.NodeToStatus.Len() < f.NumAllNodes {
-			// Adding predefined reasons for nodes that are absent in NodeToStatusMap
+			// Adding predefined reasons for nodes that are absent in NodeToStatusReader
 			for _, reason := range f.Diagnosis.NodeToStatus.AbsentNodesStatus().Reasons() {
 				reasons[reason] += f.NumAllNodes - f.Diagnosis.NodeToStatus.Len()
 			}

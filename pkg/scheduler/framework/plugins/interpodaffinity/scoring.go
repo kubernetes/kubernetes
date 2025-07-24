@@ -255,7 +255,7 @@ func (pl *InterPodAffinity) Score(ctx context.Context, cycleState fwk.CycleState
 }
 
 // NormalizeScore normalizes the score for each filteredNode.
-func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *fwk.Status {
+func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
 		return fwk.AsStatus(err)
@@ -280,7 +280,7 @@ func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, cycleState fwk.C
 	for i := range scores {
 		fScore := float64(0)
 		if maxMinDiff > 0 {
-			fScore = float64(framework.MaxNodeScore) * (float64(scores[i].Score-minCount) / float64(maxMinDiff))
+			fScore = float64(fwk.MaxNodeScore) * (float64(scores[i].Score-minCount) / float64(maxMinDiff))
 		}
 
 		scores[i].Score = int64(fScore)
@@ -290,6 +290,6 @@ func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, cycleState fwk.C
 }
 
 // ScoreExtensions of the Score plugin.
-func (pl *InterPodAffinity) ScoreExtensions() framework.ScoreExtensions {
+func (pl *InterPodAffinity) ScoreExtensions() fwk.ScoreExtensions {
 	return pl
 }

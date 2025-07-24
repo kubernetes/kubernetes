@@ -28,7 +28,6 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -48,10 +47,10 @@ type PodStatusPatchCall struct {
 	// newCondition is a condition to update.
 	newCondition *v1.PodCondition
 	// nominatingInfo is a nominating info to update.
-	nominatingInfo *framework.NominatingInfo
+	nominatingInfo *fwk.NominatingInfo
 }
 
-func NewPodStatusPatchCall(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) *PodStatusPatchCall {
+func NewPodStatusPatchCall(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) *PodStatusPatchCall {
 	return &PodStatusPatchCall{
 		podUID:         pod.UID,
 		podRef:         klog.KObj(pod),
@@ -70,8 +69,8 @@ func (psuc *PodStatusPatchCall) UID() types.UID {
 }
 
 // syncStatus syncs the given status with condition and nominatingInfo. It returns true if anything was actually updated.
-func syncStatus(status *v1.PodStatus, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) bool {
-	nnnNeedsUpdate := nominatingInfo.Mode() == framework.ModeOverride && status.NominatedNodeName != nominatingInfo.NominatedNodeName
+func syncStatus(status *v1.PodStatus, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) bool {
+	nnnNeedsUpdate := nominatingInfo.Mode() == fwk.ModeOverride && status.NominatedNodeName != nominatingInfo.NominatedNodeName
 	if condition != nil {
 		if !podutil.UpdatePodCondition(status, condition) && !nnnNeedsUpdate {
 			return false
@@ -144,7 +143,7 @@ func (psuc *PodStatusPatchCall) Merge(oldCall fwk.APICall) error {
 	if !ok {
 		return fmt.Errorf("unexpected error: call of type %T is not of type *PodStatusPatchCall", oldCall)
 	}
-	if psuc.nominatingInfo.Mode() == framework.ModeNoop && oldPsuc.nominatingInfo.Mode() == framework.ModeOverride {
+	if psuc.nominatingInfo.Mode() == fwk.ModeNoop && oldPsuc.nominatingInfo.Mode() == fwk.ModeOverride {
 		// Set a nominatingInfo from an old call if the new one is no-op.
 		psuc.nominatingInfo = oldPsuc.nominatingInfo
 	}
@@ -173,7 +172,7 @@ func conditionNeedsUpdate(status *v1.PodStatus, condition *v1.PodCondition) bool
 }
 
 func (psuc *PodStatusPatchCall) IsNoOp() bool {
-	nnnNeedsUpdate := psuc.nominatingInfo.Mode() == framework.ModeOverride && psuc.podStatus.NominatedNodeName != psuc.nominatingInfo.NominatedNodeName
+	nnnNeedsUpdate := psuc.nominatingInfo.Mode() == fwk.ModeOverride && psuc.podStatus.NominatedNodeName != psuc.nominatingInfo.NominatedNodeName
 	if nnnNeedsUpdate {
 		return false
 	}
