@@ -38,7 +38,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -287,7 +287,7 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		_, failClaimTemplate := b.PodInlineWithAdminAccess()
 		failClaimTemplate.Name = "fail-template"
 		failClaimTemplate.Namespace = namespace.Name
-		_, err = f.ClientSet.ResourceV1beta2().ResourceClaimTemplates(namespace.Name).Create(ctx, failClaimTemplate, metav1.CreateOptions{})
+		_, err = f.ClientSet.ResourceV1().ResourceClaimTemplates(namespace.Name).Create(ctx, failClaimTemplate, metav1.CreateOptions{})
 		if err == nil {
 			tCtx.Fatalf("admin access template should fail in regular namespace but succeeded")
 		}
@@ -325,7 +325,7 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		}).WithTimeout(2*time.Minute).Should(gomega.Succeed(), "regular pod should survive upgrade")
 		tCtx = ktesting.End(tCtx)
 
-		// Test new admin access pod in v1.34 using v1beta2
+		// Test new admin access pod in v1.34 using v1
 		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("test new admin access pods in %s", gitVersion))
 		adminPod2 := b.Pod()
 		adminPod2.Name = "admin-pod-v134"

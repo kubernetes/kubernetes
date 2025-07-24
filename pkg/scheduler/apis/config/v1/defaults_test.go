@@ -51,6 +51,16 @@ var pluginConfigs = []configv1.PluginConfig{
 			}},
 	},
 	{
+		Name: "DynamicResources",
+		Args: runtime.RawExtension{Object: &configv1.DynamicResourcesArgs{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "DynamicResourcesArgs",
+				APIVersion: "kubescheduler.config.k8s.io/v1",
+			},
+			FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+		}},
+	},
+	{
 		Name: "InterPodAffinity",
 		Args: runtime.RawExtension{
 			Object: &configv1.InterPodAffinityArgs{
@@ -263,6 +273,16 @@ func TestSchedulerDefaults(t *testing.T) {
 									}},
 							},
 							{
+								Name: "DynamicResources",
+								Args: runtime.RawExtension{Object: &configv1.DynamicResourcesArgs{
+									TypeMeta: metav1.TypeMeta{
+										Kind:       "DynamicResourcesArgs",
+										APIVersion: "kubescheduler.config.k8s.io/v1",
+									},
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
+								}},
+							},
+							{
 								Name: "InterPodAffinity",
 								Args: runtime.RawExtension{
 									Object: &configv1.InterPodAffinityArgs{
@@ -346,6 +366,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.VolumeZone},
 									{Name: names.PodTopologySpread, Weight: ptr.To[int32](2)},
 									{Name: names.InterPodAffinity, Weight: ptr.To[int32](2)},
+									{Name: names.DynamicResources},
 									{Name: names.DefaultPreemption},
 									{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
@@ -670,22 +691,8 @@ func TestSchedulerDefaults(t *testing.T) {
 				PodMaxBackoffSeconds:     ptr.To[int64](10),
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
-						Plugins: func() *configv1.Plugins {
-							config := getDefaultPlugins()
-							applyDynamicResources(config)
-							return config
-						}(),
-						// Order must match the one from applyDynamicResources.
-						PluginConfig: append([]configv1.PluginConfig{pluginConfigs[0], {
-							Name: "DynamicResources",
-							Args: runtime.RawExtension{Object: &configv1.DynamicResourcesArgs{
-								TypeMeta: metav1.TypeMeta{
-									Kind:       "DynamicResourcesArgs",
-									APIVersion: "kubescheduler.config.k8s.io/v1",
-								},
-								FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
-							}},
-						}}, pluginConfigs[1:]...),
+						Plugins:       getDefaultPlugins(),
+						PluginConfig:  pluginConfigs,
 						SchedulerName: ptr.To("default-scheduler"),
 					},
 				},

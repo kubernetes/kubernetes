@@ -12735,6 +12735,588 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: namespace
       type:
         scalar: string
+- name: io.k8s.api.resource.v1.AllocatedDeviceStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: data
+      type:
+        namedType: __untyped_atomic_
+    - name: device
+      type:
+        scalar: string
+      default: ""
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: networkData
+      type:
+        namedType: io.k8s.api.resource.v1.NetworkDeviceData
+    - name: pool
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1.AllocationResult
+  map:
+    fields:
+    - name: devices
+      type:
+        namedType: io.k8s.api.resource.v1.DeviceAllocationResult
+      default: {}
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+- name: io.k8s.api.resource.v1.CELDeviceSelector
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1.Counter
+  map:
+    fields:
+    - name: value
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1.CounterSet
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1.Counter
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1.Device
+  map:
+    fields:
+    - name: allNodes
+      type:
+        scalar: boolean
+    - name: attributes
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceAttribute
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceCapacity
+    - name: consumesCounters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceCounterConsumption
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: nodeName
+      type:
+        scalar: string
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+    - name: taints
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceTaint
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.DeviceAllocationConfiguration
+  map:
+    fields:
+    - name: opaque
+      type:
+        namedType: io.k8s.api.resource.v1.OpaqueDeviceConfiguration
+    - name: requests
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: source
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1.DeviceAllocationResult
+  map:
+    fields:
+    - name: config
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceAllocationConfiguration
+          elementRelationship: atomic
+    - name: results
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceRequestAllocationResult
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.DeviceAttribute
+  map:
+    fields:
+    - name: bool
+      type:
+        scalar: boolean
+    - name: int
+      type:
+        scalar: numeric
+    - name: string
+      type:
+        scalar: string
+    - name: version
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1.DeviceCapacity
+  map:
+    fields:
+    - name: value
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1.DeviceClaim
+  map:
+    fields:
+    - name: config
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceClaimConfiguration
+          elementRelationship: atomic
+    - name: constraints
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceConstraint
+          elementRelationship: atomic
+    - name: requests
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceRequest
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.DeviceClaimConfiguration
+  map:
+    fields:
+    - name: opaque
+      type:
+        namedType: io.k8s.api.resource.v1.OpaqueDeviceConfiguration
+    - name: requests
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.DeviceClass
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1.DeviceClassSpec
+      default: {}
+- name: io.k8s.api.resource.v1.DeviceClassConfiguration
+  map:
+    fields:
+    - name: opaque
+      type:
+        namedType: io.k8s.api.resource.v1.OpaqueDeviceConfiguration
+- name: io.k8s.api.resource.v1.DeviceClassSpec
+  map:
+    fields:
+    - name: config
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceClassConfiguration
+          elementRelationship: atomic
+    - name: selectors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceSelector
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.DeviceConstraint
+  map:
+    fields:
+    - name: matchAttribute
+      type:
+        scalar: string
+    - name: requests
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.DeviceCounterConsumption
+  map:
+    fields:
+    - name: counterSet
+      type:
+        scalar: string
+      default: ""
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1.Counter
+- name: io.k8s.api.resource.v1.DeviceRequest
+  map:
+    fields:
+    - name: exactly
+      type:
+        namedType: io.k8s.api.resource.v1.ExactDeviceRequest
+    - name: firstAvailable
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceSubRequest
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1.DeviceRequestAllocationResult
+  map:
+    fields:
+    - name: adminAccess
+      type:
+        scalar: boolean
+    - name: device
+      type:
+        scalar: string
+      default: ""
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: pool
+      type:
+        scalar: string
+      default: ""
+    - name: request
+      type:
+        scalar: string
+      default: ""
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceToleration
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.DeviceSelector
+  map:
+    fields:
+    - name: cel
+      type:
+        namedType: io.k8s.api.resource.v1.CELDeviceSelector
+- name: io.k8s.api.resource.v1.DeviceSubRequest
+  map:
+    fields:
+    - name: allocationMode
+      type:
+        scalar: string
+    - name: count
+      type:
+        scalar: numeric
+    - name: deviceClassName
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: selectors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceSelector
+          elementRelationship: atomic
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceToleration
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.DeviceTaint
+  map:
+    fields:
+    - name: effect
+      type:
+        scalar: string
+      default: ""
+    - name: key
+      type:
+        scalar: string
+      default: ""
+    - name: timeAdded
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: value
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1.DeviceToleration
+  map:
+    fields:
+    - name: effect
+      type:
+        scalar: string
+    - name: key
+      type:
+        scalar: string
+    - name: operator
+      type:
+        scalar: string
+      default: Equal
+    - name: tolerationSeconds
+      type:
+        scalar: numeric
+    - name: value
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1.ExactDeviceRequest
+  map:
+    fields:
+    - name: adminAccess
+      type:
+        scalar: boolean
+    - name: allocationMode
+      type:
+        scalar: string
+    - name: count
+      type:
+        scalar: numeric
+    - name: deviceClassName
+      type:
+        scalar: string
+      default: ""
+    - name: selectors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceSelector
+          elementRelationship: atomic
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.DeviceToleration
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.NetworkDeviceData
+  map:
+    fields:
+    - name: hardwareAddress
+      type:
+        scalar: string
+    - name: interfaceName
+      type:
+        scalar: string
+    - name: ips
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1.OpaqueDeviceConfiguration
+  map:
+    fields:
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: parameters
+      type:
+        namedType: __untyped_atomic_
+- name: io.k8s.api.resource.v1.ResourceClaim
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1.ResourceClaimSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.resource.v1.ResourceClaimStatus
+      default: {}
+- name: io.k8s.api.resource.v1.ResourceClaimConsumerReference
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resource
+      type:
+        scalar: string
+      default: ""
+    - name: uid
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1.ResourceClaimSpec
+  map:
+    fields:
+    - name: devices
+      type:
+        namedType: io.k8s.api.resource.v1.DeviceClaim
+      default: {}
+- name: io.k8s.api.resource.v1.ResourceClaimStatus
+  map:
+    fields:
+    - name: allocation
+      type:
+        namedType: io.k8s.api.resource.v1.AllocationResult
+    - name: devices
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.AllocatedDeviceStatus
+          elementRelationship: associative
+          keys:
+          - driver
+          - device
+          - pool
+    - name: reservedFor
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.ResourceClaimConsumerReference
+          elementRelationship: associative
+          keys:
+          - uid
+- name: io.k8s.api.resource.v1.ResourceClaimTemplate
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1.ResourceClaimTemplateSpec
+      default: {}
+- name: io.k8s.api.resource.v1.ResourceClaimTemplateSpec
+  map:
+    fields:
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1.ResourceClaimSpec
+      default: {}
+- name: io.k8s.api.resource.v1.ResourcePool
+  map:
+    fields:
+    - name: generation
+      type:
+        scalar: numeric
+      default: 0
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resourceSliceCount
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.api.resource.v1.ResourceSlice
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1.ResourceSliceSpec
+      default: {}
+- name: io.k8s.api.resource.v1.ResourceSliceSpec
+  map:
+    fields:
+    - name: allNodes
+      type:
+        scalar: boolean
+    - name: devices
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.Device
+          elementRelationship: atomic
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: nodeName
+      type:
+        scalar: string
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+    - name: perDeviceNodeSelection
+      type:
+        scalar: boolean
+    - name: pool
+      type:
+        namedType: io.k8s.api.resource.v1.ResourcePool
+      default: {}
+    - name: sharedCounters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1.CounterSet
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.CELDeviceSelector
   map:
     fields:

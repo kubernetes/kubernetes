@@ -43,8 +43,7 @@ import (
 	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
-	resourceapiv1beta2 "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -100,7 +99,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			// When plugin and kubelet get killed at the end of the tests, they leave ResourceSlices behind.
 			// Perhaps garbage collection would eventually remove them (not sure how the node instance
 			// is managed), but this could take time. Let's clean up explicitly.
-			framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}))
+			framework.ExpectNoError(f.ClientSet.ResourceV1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}))
 		})
 	})
 
@@ -848,7 +847,7 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 				Pools: map[string]resourceslice.Pool{
 					nodeName: {
 						Slices: []resourceslice.Slice{{
-							Devices: []resourceapiv1beta2.Device{
+							Devices: []resourceapi.Device{
 								{
 									Name: "device-00",
 								},
@@ -866,7 +865,7 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		// kubelet should do this eventually, but better make sure.
 		// A separate test checks this explicitly.
-		framework.ExpectNoError(clientSet.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName}))
+		framework.ExpectNoError(clientSet.ResourceV1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName}))
 	})
 	ginkgo.DeferCleanup(plugin.Stop)
 
@@ -936,7 +935,7 @@ func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName
 				Pools: map[string]resourceslice.Pool{
 					nodeName: {
 						Slices: []resourceslice.Slice{{
-							Devices: []resourceapiv1beta2.Device{
+							Devices: []resourceapi.Device{
 								{
 									Name: "device-00",
 								},
@@ -953,7 +952,7 @@ func newDRAService(ctx context.Context, clientSet kubernetes.Interface, nodeName
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		// kubelet should do this eventually, but better make sure.
 		// A separate test checks this explicitly.
-		framework.ExpectNoError(clientSet.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName}))
+		framework.ExpectNoError(clientSet.ResourceV1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName}))
 	})
 	ginkgo.DeferCleanup(plugin.Stop)
 
@@ -973,10 +972,10 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 			Name: className,
 		},
 	}
-	_, err := clientSet.ResourceV1beta1().DeviceClasses().Create(ctx, class, metav1.CreateOptions{})
+	_, err := clientSet.ResourceV1().DeviceClasses().Create(ctx, class, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.DeferCleanup(clientSet.ResourceV1beta1().DeviceClasses().Delete, className, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(clientSet.ResourceV1().DeviceClasses().Delete, className, metav1.DeleteOptions{})
 
 	// ResourceClaim
 	podClaimName := "resource-claim"
@@ -987,16 +986,18 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 		Spec: resourceapi.ResourceClaimSpec{
 			Devices: resourceapi.DeviceClaim{
 				Requests: []resourceapi.DeviceRequest{{
-					Name:            "my-request",
-					DeviceClassName: className,
+					Name: "my-request",
+					Exactly: &resourceapi.ExactDeviceRequest{
+						DeviceClassName: className,
+					},
 				}},
 			},
 		},
 	}
-	createdClaim, err := clientSet.ResourceV1beta1().ResourceClaims(namespace).Create(ctx, claim, metav1.CreateOptions{})
+	createdClaim, err := clientSet.ResourceV1().ResourceClaims(namespace).Create(ctx, claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.DeferCleanup(clientSet.ResourceV1beta1().ResourceClaims(namespace).Delete, claimName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(clientSet.ResourceV1().ResourceClaims(namespace).Delete, claimName, metav1.DeleteOptions{})
 
 	// The pod checks its own env with grep. Each driver injects its own parameters,
 	// with the driver name as part of the variable name. Sorting ensures that a
@@ -1084,7 +1085,7 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 			},
 		},
 	}
-	_, err = clientSet.ResourceV1beta1().ResourceClaims(namespace).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
+	_, err = clientSet.ResourceV1().ResourceClaims(namespace).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
 	framework.ExpectNoError(err)
 
 	return pod
@@ -1096,7 +1097,7 @@ func createTestResourceSlice(ctx context.Context, clientSet kubernetes.Interface
 			Name: nodeName,
 		},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: nodeName,
+			NodeName: &nodeName,
 			Driver:   driverName,
 			Pool: resourceapi.ResourcePool{
 				Name:               nodeName,
@@ -1106,11 +1107,11 @@ func createTestResourceSlice(ctx context.Context, clientSet kubernetes.Interface
 	}
 
 	ginkgo.By(fmt.Sprintf("Creating ResourceSlice %s", nodeName))
-	slice, err := clientSet.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+	slice, err := clientSet.ResourceV1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "create ResourceSlice")
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		ginkgo.By(fmt.Sprintf("Deleting ResourceSlice %s", nodeName))
-		err := clientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
+		err := clientSet.ResourceV1().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.ExpectNoError(err, "delete ResourceSlice")
 		}
@@ -1119,7 +1120,7 @@ func createTestResourceSlice(ctx context.Context, clientSet kubernetes.Interface
 
 func listResources(client kubernetes.Interface) func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
 	return func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
-		slices, err := client.ResourceV1beta1().ResourceSlices().List(ctx, metav1.ListOptions{})
+		slices, err := client.ResourceV1().ResourceSlices().List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -1129,7 +1130,7 @@ func listResources(client kubernetes.Interface) func(ctx context.Context) ([]res
 
 func listAndStoreResources(client kubernetes.Interface, lastSlices *[]resourceapi.ResourceSlice) func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
 	return func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
-		slices, err := client.ResourceV1beta1().ResourceSlices().List(ctx, metav1.ListOptions{})
+		slices, err := client.ResourceV1().ResourceSlices().List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -1139,7 +1140,7 @@ func listAndStoreResources(client kubernetes.Interface, lastSlices *[]resourceap
 }
 
 func matchResourcesByNodeName(nodeName string) types.GomegaMatcher {
-	return gomega.HaveField("Spec.NodeName", gomega.Equal(nodeName))
+	return gomega.HaveField("Spec.NodeName", gstruct.PointTo(gomega.Equal(nodeName)))
 }
 
 // errorOnCloseListener is a mock net.Listener that blocks on Accept()

@@ -24,18 +24,18 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	resourceapi "k8s.io/api/resource/v1beta1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
-	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
+	resourcelisters "k8s.io/client-go/listers/resource/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/dynamic-resource-allocation/cel"
@@ -603,7 +603,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 			oldDevice := oldPatchedSlice.Spec.Devices[i]
 			newDevice := patchedSlice.Spec.Devices[i]
 			sendEvent = sendEvent ||
-				!slices.EqualFunc(getTaints(oldDevice), getTaints(newDevice), taintsEqual)
+				!slices.EqualFunc(oldDevice.Taints, newDevice.Taints, taintsEqual)
 		}
 	}
 
@@ -682,9 +682,6 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 				continue
 			}
 
-			deviceAttributes := getAttributes(device)
-			deviceCapacity := getCapacity(device)
-
 			for i, expr := range deviceClassExprs {
 				if expr.Error != nil {
 					// Could happen if some future apiserver accepted some
@@ -694,7 +691,7 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 					// than the cluster it runs in.
 					return nil, fmt.Errorf("DeviceTaintRule %s: class %s: selector #%d: CEL compile error: %w", taintRule.Name, *deviceSelector.DeviceClassName, i, expr.Error)
 				}
-				matches, details, err := expr.DeviceMatches(ctx, cel.Device{Driver: slice.Spec.Driver, Attributes: deviceAttributes, Capacity: deviceCapacity})
+				matches, details, err := expr.DeviceMatches(ctx, cel.Device{Driver: slice.Spec.Driver, Attributes: device.Attributes, Capacity: device.Capacity})
 				logger.V(7).Info("CEL result", "class", *deviceSelector.DeviceClassName, "selector", i, "expression", expr.Expression, "matches", matches, "actualCost", ptr.Deref(details.ActualCost(), 0), "err", err)
 				if err != nil {
 					continue devices
@@ -713,7 +710,7 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 					// than the cluster it runs in.
 					return nil, fmt.Errorf("DeviceTaintRule %s: selector #%d: CEL compile error: %w", taintRule.Name, i, expr.Error)
 				}
-				matches, details, err := expr.DeviceMatches(ctx, cel.Device{Driver: slice.Spec.Driver, Attributes: deviceAttributes, Capacity: deviceCapacity})
+				matches, details, err := expr.DeviceMatches(ctx, cel.Device{Driver: slice.Spec.Driver, Attributes: device.Attributes, Capacity: device.Capacity})
 				logger.V(7).Info("CEL result", "selector", i, "expression", expr.Expression, "matches", matches, "actualCost", ptr.Deref(details.ActualCost(), 0), "err", err)
 				if err != nil {
 					if t.recorder != nil {
@@ -740,39 +737,11 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 				patchedSlice = slice.DeepCopy()
 			}
 
-			appendTaint(&patchedSlice.Spec.Devices[dIndex], ta)
+			patchedSlice.Spec.Devices[dIndex].Taints = append(patchedSlice.Spec.Devices[dIndex].Taints, ta)
 		}
 	}
 
 	return patchedSlice, nil
-}
-
-func getAttributes(device resourceapi.Device) map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
-	if device.Basic != nil {
-		return device.Basic.Attributes
-	}
-	return nil
-}
-
-func getCapacity(device resourceapi.Device) map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
-	if device.Basic != nil {
-		return device.Basic.Capacity
-	}
-	return nil
-}
-
-func getTaints(device resourceapi.Device) []resourceapi.DeviceTaint {
-	if device.Basic != nil {
-		return device.Basic.Taints
-	}
-	return nil
-}
-
-func appendTaint(device *resourceapi.Device, taint resourceapi.DeviceTaint) {
-	if device.Basic != nil {
-		device.Basic.Taints = append(device.Basic.Taints, taint)
-		return
-	}
 }
 
 func taintsEqual(a, b resourceapi.DeviceTaint) bool {

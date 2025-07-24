@@ -23,7 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1123,10 +1123,12 @@ func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceCl
 	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
 		resourceapi.DeviceRequest{
 			Name: fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1),
-			// Cannot rely on defaulting here, this is used in unit tests.
-			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
-			Count:           1,
-			DeviceClassName: deviceClassName,
+			Exactly: &resourceapi.ExactDeviceRequest{
+				// Cannot rely on defaulting here, this is used in unit tests.
+				AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+				Count:           1,
+				DeviceClassName: deviceClassName,
+			},
 		},
 	)
 	return wrapper
@@ -1187,7 +1189,7 @@ type ResourceSliceWrapper struct {
 func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
 	wrapper := new(ResourceSliceWrapper)
 	wrapper.Name = nodeName + "-" + driverName
-	wrapper.Spec.NodeName = nodeName
+	wrapper.Spec.NodeName = &nodeName
 	wrapper.Spec.Pool.Name = nodeName
 	wrapper.Spec.Pool.ResourceSliceCount = 1
 	wrapper.Spec.Driver = driverName
@@ -1214,15 +1216,15 @@ func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrap
 // Device extends the devices field of the inner object.
 // The device must have a name and may have arbitrary additional fields.
 func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *ResourceSliceWrapper {
-	device := resourceapi.Device{Name: name, Basic: &resourceapi.BasicDevice{}}
+	device := resourceapi.Device{Name: name}
 	for _, field := range otherFields {
 		switch typedField := field.(type) {
 		case map[resourceapi.QualifiedName]resourceapi.DeviceAttribute:
-			device.Basic.Attributes = typedField
+			device.Attributes = typedField
 		case map[resourceapi.QualifiedName]resourceapi.DeviceCapacity:
-			device.Basic.Capacity = typedField
+			device.Capacity = typedField
 		case resourceapi.DeviceTaint:
-			device.Basic.Taints = append(device.Basic.Taints, typedField)
+			device.Taints = append(device.Taints, typedField)
 		default:
 			panic(fmt.Sprintf("expected a type which matches a field in BasicDevice, got %T", field))
 		}

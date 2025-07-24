@@ -34,7 +34,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/component-base/metrics"
 
-	resourceapi "k8s.io/api/resource/v1beta2"
+	resourceapi "k8s.io/api/resource/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"

@@ -33,7 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -211,7 +211,7 @@ var (
 func taintDevices(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 	slice = slice.DeepCopy()
 	for i := range slice.Spec.Devices {
-		slice.Spec.Devices[i].Basic.Taints = append(slice.Spec.Devices[i].Basic.Taints, deviceTaint)
+		slice.Spec.Devices[i].Taints = append(slice.Spec.Devices[i].Taints, deviceTaint)
 	}
 	return slice
 }
@@ -225,7 +225,7 @@ func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.Resourc
 func adminAccess(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 	claim = claim.DeepCopy()
 	for i := range claim.Spec.Devices.Requests {
-		claim.Spec.Devices.Requests[i].AdminAccess = ptr.To(true)
+		claim.Spec.Devices.Requests[i].Exactly.AdminAccess = ptr.To(true)
 	}
 	if claim.Status.Allocation != nil {
 		for i := range claim.Status.Allocation.Devices.Results {
@@ -238,11 +238,11 @@ func adminAccess(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 func breakCELInClaim(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 	claim = claim.DeepCopy()
 	for i := range claim.Spec.Devices.Requests {
-		for e := range claim.Spec.Devices.Requests[i].Selectors {
-			claim.Spec.Devices.Requests[i].Selectors[e] = brokenSelector
+		for e := range claim.Spec.Devices.Requests[i].Exactly.Selectors {
+			claim.Spec.Devices.Requests[i].Exactly.Selectors[e] = brokenSelector
 		}
-		if len(claim.Spec.Devices.Requests[i].Selectors) == 0 {
-			claim.Spec.Devices.Requests[i].Selectors = []resourceapi.DeviceSelector{brokenSelector}
+		if len(claim.Spec.Devices.Requests[i].Exactly.Selectors) == 0 {
+			claim.Spec.Devices.Requests[i].Exactly.Selectors = []resourceapi.DeviceSelector{brokenSelector}
 		}
 	}
 	return claim
@@ -266,7 +266,7 @@ func updateDeviceClassName(claim *resourceapi.ResourceClaim, deviceClassName str
 		// If the firstAvailable list is empty we update the device class name
 		// on the base request.
 		if len(claim.Spec.Devices.Requests[i].FirstAvailable) == 0 {
-			claim.Spec.Devices.Requests[i].DeviceClassName = deviceClassName
+			claim.Spec.Devices.Requests[i].Exactly.DeviceClassName = deviceClassName
 		} else {
 			// If subrequests are specified, update the device class name on
 			// all of them.
@@ -1314,7 +1314,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 
 func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	t.Helper()
-	claims, err := tc.client.ResourceV1beta1().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
+	claims, err := tc.client.ResourceV1().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
 	require.NoError(t, err, "list claims")
 	for _, claim := range claims.Items {
 		claim := claim
@@ -1357,7 +1357,7 @@ func (tc *testContext) updateAPIServer(t *testing.T, objects []metav1.Object, up
 			t.Logf("Updating %T %q, diff (-old, +new):\n%s", obj, obj.GetName(), diff)
 			switch obj := obj.(type) {
 			case *resourceapi.ResourceClaim:
-				obj, err := tc.client.ResourceV1beta1().ResourceClaims(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
+				obj, err := tc.client.ResourceV1().ResourceClaims(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
 				if err != nil {
 					t.Fatalf("unexpected error during prepare update: %v", err)
 				}
@@ -1412,14 +1412,14 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
 	resourceSliceTrackerOpts := resourceslicetracker.Options{
 		EnableDeviceTaints: true,
-		SliceInformer:      tc.informerFactory.Resource().V1beta1().ResourceSlices(),
+		SliceInformer:      tc.informerFactory.Resource().V1().ResourceSlices(),
 		TaintInformer:      tc.informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-		ClassInformer:      tc.informerFactory.Resource().V1beta1().DeviceClasses(),
+		ClassInformer:      tc.informerFactory.Resource().V1().DeviceClasses(),
 		KubeClient:         tc.client,
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
 	require.NoError(t, err, "couldn't start resource slice tracker")
-	tc.draManager = NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1beta1().ResourceClaims().Informer(), "resource claim", "", nil), resourceSliceTracker, tc.informerFactory)
+	tc.draManager = NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1().ResourceClaims().Informer(), "resource claim", "", nil), resourceSliceTracker, tc.informerFactory)
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),
@@ -1442,11 +1442,11 @@ func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, cl
 	// The tests use the API to create the objects because then reactors
 	// get triggered.
 	for _, claim := range claims {
-		_, err := tc.client.ResourceV1beta1().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
+		_, err := tc.client.ResourceV1().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
 		require.NoError(t, err, "create resource claim")
 	}
 	for _, class := range classes {
-		_, err := tc.client.ResourceV1beta1().DeviceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
+		_, err := tc.client.ResourceV1().DeviceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
 		require.NoError(t, err, "create resource class")
 	}
 
@@ -1635,7 +1635,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 					// Some test claims already have it. Clear for create.
 					createClaim := claim.DeepCopy()
 					createClaim.UID = ""
-					storedClaim, err := testCtx.client.ResourceV1beta1().ResourceClaims(createClaim.Namespace).Create(tCtx, createClaim, metav1.CreateOptions{})
+					storedClaim, err := testCtx.client.ResourceV1().ResourceClaims(createClaim.Namespace).Create(tCtx, createClaim, metav1.CreateOptions{})
 					if err != nil {
 						t.Fatalf("create claim: expected no error, got: %v", err)
 					}
@@ -1650,7 +1650,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 					updateClaim.UID = cachedClaim.(*resourceapi.ResourceClaim).UID
 					updateClaim.ResourceVersion = cachedClaim.(*resourceapi.ResourceClaim).ResourceVersion
 
-					storedClaim, err := testCtx.client.ResourceV1beta1().ResourceClaims(updateClaim.Namespace).Update(tCtx, updateClaim, metav1.UpdateOptions{})
+					storedClaim, err := testCtx.client.ResourceV1().ResourceClaims(updateClaim.Namespace).Update(tCtx, updateClaim, metav1.UpdateOptions{})
 					if err != nil {
 						t.Fatalf("update claim: expected no error, got: %v", err)
 					}
