@@ -15,7 +15,7 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v1.13.1
+          image: docker.io/carlory/csi-resizer
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"

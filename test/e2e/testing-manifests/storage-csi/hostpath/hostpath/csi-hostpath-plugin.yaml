@@ -324,7 +324,7 @@ spec:
             name: socket-dir
 
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v5.1.0
+          image: docker.io/carlory/csi-provisioner
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
@@ -340,7 +340,7 @@ spec:
               name: socket-dir
 
         - name: csi-resizer
-          image: registry.k8s.io/sig-storage/csi-resizer:v1.13.1
+          image: docker.io/carlory/csi-resizer
           args:
             - -v=5
             - -csi-address=/csi/csi.sock
