@@ -634,22 +634,27 @@ func DriverResourcesNow(nodes *Nodes, maxAllocations int, devicesPerNode ...map[
 	return driverResources
 }
 
-func ToDriverResources(counters []resourceapi.CounterSet, devices ...resourceapi.Device) driverResourcesGenFunc {
+func ToDriverResources(counters []resourceapi.CounterSet, mixins *resourceapi.ResourceSliceMixins, devices ...resourceapi.Device) driverResourcesGenFunc {
 	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
 		nodename := nodes.NodeNames[0]
-		return map[string]resourceslice.DriverResources{
-			nodename: {
-				Pools: map[string]resourceslice.Pool{
-					nodename: {
-						Slices: []resourceslice.Slice{
-							{
-								SharedCounters: counters,
-								Devices:        devices,
-							},
+		return ToDriverResourcesNow(nodename, counters, mixins, devices...)
+	}
+}
+
+func ToDriverResourcesNow(nodename string, counters []resourceapi.CounterSet, mixins *resourceapi.ResourceSliceMixins, devices ...resourceapi.Device) map[string]resourceslice.DriverResources {
+	return map[string]resourceslice.DriverResources{
+		nodename: {
+			Pools: map[string]resourceslice.Pool{
+				nodename: {
+					Slices: []resourceslice.Slice{
+						{
+							SharedCounters: counters,
+							Devices:        devices,
+							Mixins:         mixins,
 						},
 					},
 				},
 			},
-		}
+		},
 	}
 }

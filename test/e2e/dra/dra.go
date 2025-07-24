@@ -1764,6 +1764,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 					},
 				},
 			},
+			nil,
 			[]resourceapi.Device{
 				{
 					Name: "device-1",
@@ -1831,6 +1832,195 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	}
 
+	resourceSliceMixinsTests := func(withKubelet bool) {
+		f.It("must handle device mixins", func(ctx context.Context) {
+			nodes := drautils.NewNodesNow(ctx, f, 1, 1)
+			driver := drautils.NewDriverInstance(f)
+			driver.WithKubelet = withKubelet
+			nodename := nodes.NodeNames[0]
+			driver.Run(nodes, drautils.ToDriverResourcesNow(nodename, nil,
+				&resourceapi.ResourceSliceMixins{
+					Device: []resourceapi.DeviceMixin{
+						{
+							Name: "device-mixin",
+							Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+								"special": {
+									BoolValue: ptr.To(true),
+								},
+							},
+						},
+					},
+				},
+				resourceapi.Device{
+					Name:     "device",
+					Includes: []string{"device-mixin"},
+				},
+			))
+			b := drautils.NewBuilderNow(ctx, f, driver)
+
+			claim := b.ExternalClaim()
+			claim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{
+				{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: fmt.Sprintf(`device.attributes["%s"].special`, driver.Name),
+					},
+				},
+			}
+			pod := b.PodExternal()
+			b.Create(ctx, claim, pod)
+			b.TestPod(ctx, f, pod)
+		})
+
+		f.It("must handle counter set mixins", func(ctx context.Context) {
+			nodes := drautils.NewNodesNow(ctx, f, 1, 1)
+			driver := drautils.NewDriverInstance(f)
+			driver.WithKubelet = withKubelet
+			nodename := nodes.NodeNames[0]
+			driver.Run(nodes, drautils.ToDriverResourcesNow(nodename,
+				[]resourceapi.CounterSet{
+					{
+						Name: "counter-set",
+						Counters: map[string]resourceapi.Counter{
+							"cpu": {
+								Value: resource.MustParse("2"),
+							},
+						},
+						Includes: []string{"counter-set-mixin"},
+					},
+				},
+				&resourceapi.ResourceSliceMixins{
+					CounterSet: []resourceapi.CounterSetMixin{
+						{
+							Name: "counter-set-mixin",
+							Counters: map[string]resourceapi.Counter{
+								"memory": {
+									Value: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+				resourceapi.Device{
+					Name: "device",
+					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counter-set",
+							Counters: map[string]resourceapi.Counter{
+								"cpu": {
+									Value: resource.MustParse("2"),
+								},
+								"memory": {
+									Value: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			))
+			b := drautils.NewBuilderNow(ctx, f, driver)
+
+			claim := b.ExternalClaim()
+			pod := b.PodExternal()
+			b.Create(ctx, claim, pod)
+			b.TestPod(ctx, f, pod)
+		})
+
+		f.It("must handle device counter consumption mixins", func(ctx context.Context) {
+			nodes := drautils.NewNodesNow(ctx, f, 1, 1)
+			driver := drautils.NewDriverInstance(f)
+			driver.WithKubelet = withKubelet
+			nodename := nodes.NodeNames[0]
+			driver.Run(nodes, drautils.ToDriverResourcesNow(nodename,
+				[]resourceapi.CounterSet{
+					{
+						Name: "counter-set",
+						Counters: map[string]resourceapi.Counter{
+							"cpu": {
+								Value: resource.MustParse("2"),
+							},
+							"memory": {
+								Value: resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+				&resourceapi.ResourceSliceMixins{
+					DeviceCounterConsumption: []resourceapi.DeviceCounterConsumptionMixin{
+						{
+							Name: "device-counter-consumption-mixin",
+							Counters: map[string]resourceapi.Counter{
+								"memory": {
+									Value: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+				resourceapi.Device{
+					Name: "device",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"special": {
+							BoolValue: ptr.To(true),
+						},
+					},
+					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counter-set",
+							Counters: map[string]resourceapi.Counter{
+								"cpu": {
+									Value: resource.MustParse("2"),
+								},
+							},
+							Includes: []string{"device-counter-consumption-mixin"},
+						},
+					},
+				},
+				resourceapi.Device{
+					Name: "otherdevice",
+					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counter-set",
+							Counters: map[string]resourceapi.Counter{
+								"memory": {
+									Value: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			))
+			b := drautils.NewBuilderNow(ctx, f, driver)
+
+			claim := b.ExternalClaim()
+			claim.Spec.Devices.Requests[0].Exactly.Selectors = []resourceapi.DeviceSelector{
+				{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: fmt.Sprintf(`device.attributes["%s"].special`, driver.Name),
+					},
+				},
+			}
+			pod := b.PodExternal()
+			pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+			b.Create(ctx, claim, pod)
+			b.TestPod(ctx, f, pod)
+
+			claim2 := b.ExternalClaim()
+			pod2 := b.PodExternal()
+			pod2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+			b.Create(ctx, claim2, pod2)
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				testPod, err := f.ClientSet.CoreV1().Pods(pod2.Namespace).Get(ctx, pod2.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("expected the test pod %s to exist: %w", pod2.Name, err)
+				}
+				if testPod.Status.Phase != v1.PodPending {
+					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod2.Name, testPod.Status.Phase, v1.PodPending)
+				}
+				return nil
+			}, 20*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
+		})
+	}
+
 	// It is okay to use the same context multiple times (like "control plane"),
 	// as long as the test names the still remain unique overall.
 
@@ -1846,6 +2036,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with v1beta2 API", v1beta2Tests)
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPartitionableDevices), partitionableDevicesTests)
+
+	framework.Context("control plane", f.WithFeatureGate(features.DRAResourceSliceMixins), f.WithFeatureGate(features.DRAPartitionableDevices), func() { resourceSliceMixinsTests(false) })
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := drautils.NewNodes(f, 1, 1)
