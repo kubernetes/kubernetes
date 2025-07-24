@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -65,28 +67,28 @@ type requestHeaderAuthRequestHandler struct {
 }
 
 func New(nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes []string) (authenticator.Request, error) {
-	trimmedNameHeaders, err := trimHeaders(nameHeaders...)
+	trimmedNameHeaders, err := normalizeHeaders(nameHeaders...)
 	if err != nil {
 		return nil, err
 	}
-	trimmedUIDHeaders, err := trimHeaders(uidHeaders...)
+	trimmedUIDHeaders, err := normalizeHeaders(uidHeaders...)
 	if err != nil {
 		return nil, err
 	}
-	trimmedGroupHeaders, err := trimHeaders(groupHeaders...)
+	trimmedGroupHeaders, err := normalizeHeaders(groupHeaders...)
 	if err != nil {
 		return nil, err
 	}
-	trimmedExtraHeaderPrefixes, err := trimHeaders(extraHeaderPrefixes...)
+	trimmedExtraHeaderPrefixes, err := normalizeHeaders(extraHeaderPrefixes...)
 	if err != nil {
 		return nil, err
 	}
 
 	return NewDynamic(
-		StaticStringSlice(trimmedNameHeaders),
-		StaticStringSlice(trimmedUIDHeaders),
-		StaticStringSlice(trimmedGroupHeaders),
-		StaticStringSlice(trimmedExtraHeaderPrefixes),
+		StaticStringSlice(uniqueStrings(trimmedNameHeaders)),
+		StaticStringSlice(uniqueStrings(trimmedUIDHeaders)),
+		StaticStringSlice(uniqueStrings(trimmedGroupHeaders)),
+		StaticStringSlice(uniqueStrings(trimmedExtraHeaderPrefixes)),
 	), nil
 }
 
@@ -99,10 +101,12 @@ func NewDynamic(nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes Strin
 	}
 }
 
-func trimHeaders(headerNames ...string) ([]string, error) {
+// normalizeHeaders trims spaces around the input headerNames and canonicalizes
+// the inputs
+func normalizeHeaders(headerNames ...string) ([]string, error) {
 	ret := []string{}
 	for _, headerName := range headerNames {
-		trimmedHeader := strings.TrimSpace(headerName)
+		trimmedHeader := strings.TrimSpace(http.CanonicalHeaderKey(headerName))
 		if len(trimmedHeader) == 0 {
 			return nil, fmt.Errorf("empty header %q", headerName)
 		}
@@ -110,6 +114,12 @@ func trimHeaders(headerNames ...string) ([]string, error) {
 	}
 
 	return ret, nil
+}
+
+func uniqueStrings(in []string) []string {
+	out := sets.New(in...).UnsortedList()
+	slices.Sort(out)
+	return out
 }
 
 func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, proxyClientNames, nameHeaders, uidHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
