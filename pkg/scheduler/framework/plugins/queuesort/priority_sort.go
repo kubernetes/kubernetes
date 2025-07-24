@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -32,7 +31,7 @@ const Name = names.PrioritySort
 // PrioritySort is a plugin that implements Priority based sorting.
 type PrioritySort struct{}
 
-var _ framework.QueueSortPlugin = &PrioritySort{}
+var _ fwk.QueueSortPlugin = &PrioritySort{}
 
 // Name returns name of the plugin.
 func (pl *PrioritySort) Name() string {
@@ -49,6 +48,6 @@ func (pl *PrioritySort) Less(pInfo1, pInfo2 fwk.QueuedPodInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 	return &PrioritySort{}, nil
 }

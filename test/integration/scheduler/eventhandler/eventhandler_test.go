@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
@@ -46,7 +45,7 @@ import (
 
 var lowPriority, mediumPriority, highPriority int32 = 100, 200, 300
 
-var _ framework.FilterPlugin = &fooPlugin{}
+var _ fwk.FilterPlugin = &fooPlugin{}
 
 type fooPlugin struct {
 }
@@ -74,8 +73,8 @@ func (pl *fooPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWith
 }
 
 // newPlugin returns a plugin factory with specified Plugin.
-func newPlugin(plugin framework.Plugin) frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+func newPlugin(plugin fwk.Plugin) frameworkruntime.PluginFactory {
+	return func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		return plugin, nil
 	}
 }

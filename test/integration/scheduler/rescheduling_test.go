@@ -26,15 +26,14 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
-var _ framework.PermitPlugin = &PermitPlugin{}
-var _ framework.EnqueueExtensions = &PermitPlugin{}
-var _ framework.ReservePlugin = &ReservePlugin{}
-var _ framework.EnqueueExtensions = &ReservePlugin{}
+var _ fwk.PermitPlugin = &PermitPlugin{}
+var _ fwk.EnqueueExtensions = &PermitPlugin{}
+var _ fwk.ReservePlugin = &ReservePlugin{}
+var _ fwk.EnqueueExtensions = &ReservePlugin{}
 
 type ReservePlugin struct {
 	name               string
@@ -119,7 +118,7 @@ func TestReScheduling(t *testing.T) {
 	testContext := testutils.InitTestAPIServer(t, "permit-plugin", nil)
 	tests := []struct {
 		name    string
-		plugins []framework.Plugin
+		plugins []fwk.Plugin
 		action  func() error
 		// The first time for pod scheduling, we make pod scheduled error or unschedulable on purpose.
 		// This is controlled by wantFirstSchedulingError. By default, pod is unschedulable.
@@ -131,7 +130,7 @@ func TestReScheduling(t *testing.T) {
 	}{
 		{
 			name: "Rescheduling pod rejected by Permit Plugin",
-			plugins: []framework.Plugin{
+			plugins: []fwk.Plugin{
 				&PermitPlugin{name: "permit", statusCode: fwk.Unschedulable},
 			},
 			action: func() error {
@@ -142,7 +141,7 @@ func TestReScheduling(t *testing.T) {
 		},
 		{
 			name: "Rescheduling pod rejected by Permit Plugin with unrelated event",
-			plugins: []framework.Plugin{
+			plugins: []fwk.Plugin{
 				&PermitPlugin{name: "permit", statusCode: fwk.Unschedulable},
 			},
 			action: func() error {
@@ -154,7 +153,7 @@ func TestReScheduling(t *testing.T) {
 		},
 		{
 			name: "Rescheduling pod failed by Permit Plugin",
-			plugins: []framework.Plugin{
+			plugins: []fwk.Plugin{
 				&PermitPlugin{name: "permit", statusCode: fwk.Error},
 			},
 			action: func() error {
@@ -166,7 +165,7 @@ func TestReScheduling(t *testing.T) {
 		},
 		{
 			name: "Rescheduling pod rejected by Reserve Plugin",
-			plugins: []framework.Plugin{
+			plugins: []fwk.Plugin{
 				&ReservePlugin{name: "reserve", statusCode: fwk.Unschedulable},
 			},
 			action: func() error {
@@ -177,7 +176,7 @@ func TestReScheduling(t *testing.T) {
 		},
 		{
 			name: "Rescheduling pod rejected by Reserve Plugin with unrelated event",
-			plugins: []framework.Plugin{
+			plugins: []fwk.Plugin{
 				&ReservePlugin{name: "reserve", statusCode: fwk.Unschedulable},
 			},
 			action: func() error {
@@ -189,7 +188,7 @@ func TestReScheduling(t *testing.T) {
 		},
 		{
 			name: "Rescheduling pod failed by Reserve Plugin",
-			plugins: []framework.Plugin{
+			plugins: []fwk.Plugin{
 				&ReservePlugin{name: "reserve", statusCode: fwk.Error},
 			},
 			action: func() error {

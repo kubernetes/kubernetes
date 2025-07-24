@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -37,10 +36,10 @@ const (
 
 // ImageLocality is a score plugin that favors nodes that already have requested pod container's images.
 type ImageLocality struct {
-	handle framework.Handle
+	handle fwk.Handle
 }
 
-var _ framework.ScorePlugin = &ImageLocality{}
+var _ fwk.ScorePlugin = &ImageLocality{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.ImageLocality
@@ -65,12 +64,12 @@ func (pl *ImageLocality) Score(ctx context.Context, state fwk.CycleState, pod *v
 }
 
 // ScoreExtensions of the Score plugin.
-func (pl *ImageLocality) ScoreExtensions() framework.ScoreExtensions {
+func (pl *ImageLocality) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, h fwk.Handle) (fwk.Plugin, error) {
 	return &ImageLocality{handle: h}, nil
 }
 
@@ -84,7 +83,7 @@ func calculatePriority(sumScores int64, numContainers int) int64 {
 		sumScores = maxThreshold
 	}
 
-	return framework.MaxNodeScore * (sumScores - minThreshold) / (maxThreshold - minThreshold)
+	return fwk.MaxNodeScore * (sumScores - minThreshold) / (maxThreshold - minThreshold)
 }
 
 // sumImageScores returns the sum of image scores of all the containers that are already on the node.

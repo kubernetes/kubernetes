@@ -136,7 +136,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	}()
 }
 
-var clearNominatedNode = &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: ""}
+var clearNominatedNode = &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: ""}
 
 // schedulingCycle tries to schedule a single Pod.
 func (sched *Scheduler) schedulingCycle(
@@ -185,7 +185,7 @@ func (sched *Scheduler) schedulingCycle(
 			logger.V(5).Info("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", msg)
 		}
 
-		var nominatingInfo *framework.NominatingInfo
+		var nominatingInfo *fwk.NominatingInfo
 		if result != nil {
 			nominatingInfo = result.NominatingInfo
 		}
@@ -522,7 +522,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 		//
 		// Extender doesn't support any kind of requeueing feature like EnqueueExtensions in the scheduling framework.
 		// When Extenders reject some Nodes and the pod ends up being unschedulable,
-		// we put framework.ExtenderName to pInfo.UnschedulablePlugins.
+		// we put fwk.ExtenderName to pInfo.UnschedulablePlugins.
 		// This Pod will be requeued from unschedulable pod pool to activeQ/backoffQ
 		// by any kind of cluster events.
 		// https://github.com/kubernetes/kubernetes/issues/122019
@@ -694,7 +694,7 @@ func (sched *Scheduler) numFeasibleNodesToFind(percentageOfNodesToScore *int32, 
 	return numNodes
 }
 
-func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Extender, pod *v1.Pod, feasibleNodes []fwk.NodeInfo, statuses *framework.NodeToStatus) ([]fwk.NodeInfo, error) {
+func findNodesThatPassExtenders(ctx context.Context, extenders []fwk.Extender, pod *v1.Pod, feasibleNodes []fwk.NodeInfo, statuses *framework.NodeToStatus) ([]fwk.NodeInfo, error) {
 	logger := klog.FromContext(ctx)
 
 	// Extenders are called sequentially.
@@ -747,19 +747,19 @@ func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Exten
 // All scores are finally combined (added) to get the total weighted scores of all nodes
 func prioritizeNodes(
 	ctx context.Context,
-	extenders []framework.Extender,
+	extenders []fwk.Extender,
 	schedFramework framework.Framework,
 	state fwk.CycleState,
 	pod *v1.Pod,
 	nodes []fwk.NodeInfo,
-) ([]framework.NodePluginScores, error) {
+) ([]fwk.NodePluginScores, error) {
 	logger := klog.FromContext(ctx)
 	// If no priority configs are provided, then all nodes will have a score of one.
 	// This is required to generate the priority list in the required format
 	if len(extenders) == 0 && !schedFramework.HasScorePlugins() {
-		result := make([]framework.NodePluginScores, 0, len(nodes))
+		result := make([]fwk.NodePluginScores, 0, len(nodes))
 		for i := range nodes {
-			result = append(result, framework.NodePluginScores{
+			result = append(result, fwk.NodePluginScores{
 				Name:       nodes[i].Node().Name,
 				TotalScore: 1,
 			})
@@ -792,7 +792,7 @@ func prioritizeNodes(
 	if len(extenders) != 0 && nodes != nil {
 		// allNodeExtendersScores has all extenders scores for all nodes.
 		// It is keyed with node name.
-		allNodeExtendersScores := make(map[string]*framework.NodePluginScores, len(nodes))
+		allNodeExtendersScores := make(map[string]*fwk.NodePluginScores, len(nodes))
 		var mu sync.Mutex
 		var wg sync.WaitGroup
 		for i := range extenders {
@@ -823,15 +823,15 @@ func prioritizeNodes(
 
 					// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
 					// therefore we need to scale the score returned by extenders to the score range used by the scheduler.
-					finalscore := score * weight * (framework.MaxNodeScore / extenderv1.MaxExtenderPriority)
+					finalscore := score * weight * (fwk.MaxNodeScore / extenderv1.MaxExtenderPriority)
 
 					if allNodeExtendersScores[nodename] == nil {
-						allNodeExtendersScores[nodename] = &framework.NodePluginScores{
+						allNodeExtendersScores[nodename] = &fwk.NodePluginScores{
 							Name:   nodename,
-							Scores: make([]framework.PluginScore, 0, len(extenders)),
+							Scores: make([]fwk.PluginScore, 0, len(extenders)),
 						}
 					}
-					allNodeExtendersScores[nodename].Scores = append(allNodeExtendersScores[nodename].Scores, framework.PluginScore{
+					allNodeExtendersScores[nodename].Scores = append(allNodeExtendersScores[nodename].Scores, fwk.PluginScore{
 						Name:  extenders[extIndex].Name(),
 						Score: finalscore,
 					})
@@ -863,7 +863,7 @@ var errEmptyPriorityList = errors.New("empty priorityList")
 // in a reservoir sampling manner from the nodes that had the highest score.
 // It also returns the top {count} Nodes,
 // and the top of the list will be always the selected host.
-func selectHost(nodeScoreList []framework.NodePluginScores, count int) (string, []framework.NodePluginScores, error) {
+func selectHost(nodeScoreList []fwk.NodePluginScores, count int) (string, []fwk.NodePluginScores, error) {
 	if len(nodeScoreList) == 0 {
 		return "", nil, errEmptyPriorityList
 	}
@@ -873,12 +873,12 @@ func selectHost(nodeScoreList []framework.NodePluginScores, count int) (string, 
 	cntOfMaxScore := 1
 	selectedIndex := 0
 	// The top of the heap is the NodeScoreResult with the highest score.
-	sortedNodeScoreList := make([]framework.NodePluginScores, 0, count)
-	sortedNodeScoreList = append(sortedNodeScoreList, heap.Pop(&h).(framework.NodePluginScores))
+	sortedNodeScoreList := make([]fwk.NodePluginScores, 0, count)
+	sortedNodeScoreList = append(sortedNodeScoreList, heap.Pop(&h).(fwk.NodePluginScores))
 
 	// This for-loop will continue until all Nodes with the highest scores get checked for a reservoir sampling,
 	// and sortedNodeScoreList gets (count - 1) elements.
-	for ns := heap.Pop(&h).(framework.NodePluginScores); ; ns = heap.Pop(&h).(framework.NodePluginScores) {
+	for ns := heap.Pop(&h).(fwk.NodePluginScores); ; ns = heap.Pop(&h).(fwk.NodePluginScores) {
 		if ns.TotalScore != sortedNodeScoreList[0].TotalScore && len(sortedNodeScoreList) == count {
 			break
 		}
@@ -912,8 +912,8 @@ func selectHost(nodeScoreList []framework.NodePluginScores, count int) (string, 
 	return sortedNodeScoreList[0].Name, sortedNodeScoreList, nil
 }
 
-// nodeScoreHeap is a heap of framework.NodePluginScores.
-type nodeScoreHeap []framework.NodePluginScores
+// nodeScoreHeap is a heap of fwk.NodePluginScores.
+type nodeScoreHeap []fwk.NodePluginScores
 
 // nodeScoreHeap implements heap.Interface.
 var _ heap.Interface = &nodeScoreHeap{}
@@ -923,7 +923,7 @@ func (h nodeScoreHeap) Less(i, j int) bool { return h[i].TotalScore > h[j].Total
 func (h nodeScoreHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 
 func (h *nodeScoreHeap) Push(x interface{}) {
-	*h = append(*h, x.(framework.NodePluginScores))
+	*h = append(*h, x.(fwk.NodePluginScores))
 }
 
 func (h *nodeScoreHeap) Pop() interface{} {
@@ -1013,7 +1013,7 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
-func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *framework.NominatingInfo, start time.Time) {
+func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *fwk.Status, nominatingInfo *fwk.NominatingInfo, start time.Time) {
 	calledDone := false
 	defer func() {
 		if !calledDone {
@@ -1111,13 +1111,13 @@ func truncateMessage(message string) string {
 	return message[:max-len(suffix)] + suffix
 }
 
-func updatePod(ctx context.Context, client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) error {
+func updatePod(ctx context.Context, client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) error {
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Updating pod condition", "pod", klog.KObj(pod), "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
 	podStatusCopy := pod.Status.DeepCopy()
 	// NominatedNodeName is updated only if we are trying to set it, and the value is
 	// different from the existing one.
-	nnnNeedsUpdate := nominatingInfo.Mode() == framework.ModeOverride && pod.Status.NominatedNodeName != nominatingInfo.NominatedNodeName
+	nnnNeedsUpdate := nominatingInfo.Mode() == fwk.ModeOverride && pod.Status.NominatedNodeName != nominatingInfo.NominatedNodeName
 	if !podutil.UpdatePodCondition(podStatusCopy, condition) && !nnnNeedsUpdate {
 		return nil
 	}

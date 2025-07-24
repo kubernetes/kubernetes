@@ -117,7 +117,7 @@ func (fp *tokenFilter) Filter(ctx context.Context, state fwk.CycleState, pod *v1
 	return fwk.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
 }
 
-func (fp *tokenFilter) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (fp *tokenFilter) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	if !fp.EnablePreFilter || fp.Tokens > 0 {
 		return nil, nil
 	}
@@ -136,18 +136,18 @@ func (fp *tokenFilter) RemovePod(ctx context.Context, state fwk.CycleState, podT
 	return nil
 }
 
-func (fp *tokenFilter) PreFilterExtensions() framework.PreFilterExtensions {
+func (fp *tokenFilter) PreFilterExtensions() fwk.PreFilterExtensions {
 	return fp
 }
 
-var _ framework.FilterPlugin = &tokenFilter{}
+var _ fwk.FilterPlugin = &tokenFilter{}
 
 // TestPreemption tests a few preemption scenarios.
 func TestPreemption(t *testing.T) {
 	// Initialize scheduler with a filter plugin.
 	var filter tokenFilter
 	registry := make(frameworkruntime.Registry)
-	err := registry.Register(filterPluginName, func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+	err := registry.Register(filterPluginName, func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 		return &filter, nil
 	})
 	if err != nil {
@@ -822,7 +822,7 @@ func TestAsyncPreemption(t *testing.T) {
 			}()
 			registry := make(frameworkruntime.Registry)
 			var preemptionPlugin *defaultpreemption.DefaultPreemption
-			err := registry.Register(delayedPreemptionPluginName, func(c context.Context, r runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+			err := registry.Register(delayedPreemptionPluginName, func(c context.Context, r runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 				p, err := frameworkruntime.FactoryAdapter(plfeature.Features{EnableAsyncPreemption: true}, defaultpreemption.New)(c, &config.DefaultPreemptionArgs{
 					// Set default values to pass the validation at the initialization, not related to the test.
 					MinCandidateNodesPercentage: 10,
@@ -1533,7 +1533,7 @@ func (af *alwaysFail) PreBind(_ context.Context, _ fwk.CycleState, p *v1.Pod, _ 
 	return fwk.NewStatus(fwk.Unschedulable)
 }
 
-func newAlwaysFail(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newAlwaysFail(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 	return &alwaysFail{}, nil
 }
 

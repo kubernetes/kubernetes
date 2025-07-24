@@ -22,7 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -32,8 +31,8 @@ type NodeName struct {
 	enableSchedulingQueueHint bool
 }
 
-var _ framework.FilterPlugin = &NodeName{}
-var _ framework.EnqueueExtensions = &NodeName{}
+var _ fwk.FilterPlugin = &NodeName{}
+var _ fwk.EnqueueExtensions = &NodeName{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -83,7 +82,7 @@ func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &NodeName{
 		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
 	}, nil

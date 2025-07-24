@@ -180,7 +180,7 @@ func TestNodePorts(t *testing.T) {
 				t.Fatalf("creating plugin: %v", err)
 			}
 			cycleState := framework.NewCycleState()
-			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
+			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("preFilter status does not match (-want,+got): %s", diff)
 			}
@@ -190,7 +190,7 @@ func TestNodePorts(t *testing.T) {
 			if !preFilterStatus.IsSuccess() {
 				t.Errorf("prefilter failed with status: %v", preFilterStatus)
 			}
-			gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
 			if diff := cmp.Diff(test.wantFilterStatus, gotStatus); diff != "" {
 				t.Errorf("filter status does not match (-want, +got): %s", diff)
 			}
@@ -209,7 +209,7 @@ func TestPreFilterDisabled(t *testing.T) {
 		t.Fatalf("creating plugin: %v", err)
 	}
 	cycleState := framework.NewCycleState()
-	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
+	gotStatus := p.(fwk.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
 	wantStatus := fwk.AsStatus(fwk.ErrNotFound)
 	if diff := cmp.Diff(wantStatus, gotStatus); diff != "" {
 		t.Errorf("status does not match (-want,+got):\n%s", diff)
