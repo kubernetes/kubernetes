@@ -46,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -72,7 +73,7 @@ var (
 				APIVersion: paramsGVK.GroupVersion().String(),
 				Kind:       paramsGVK.Kind,
 			},
-			FailurePolicy: ptrTo(admissionregistrationv1.Fail),
+			FailurePolicy: ptr.To(admissionregistrationv1.Fail),
 			Validations: []admissionregistrationv1.Validation{
 				{
 					Expression: "messageId for deny policy",
@@ -105,7 +106,7 @@ var (
 				Name:      fakeParams.GetName(),
 				Namespace: fakeParams.GetNamespace(),
 				// fake object tracker does not populate defaults
-				ParameterNotFoundAction: ptrTo(admissionregistrationv1.DenyAction),
+				ParameterNotFoundAction: ptr.To(admissionregistrationv1.DenyAction),
 			},
 			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny},
 		},
@@ -438,10 +439,6 @@ func attributeRecord(
 	}
 }
 
-func ptrTo[T any](obj T) *T {
-	return &obj
-}
-
 // //////////////////////////////////////////////////////////////////////////////
 // Functionality Tests
 // //////////////////////////////////////////////////////////////////////////////
@@ -656,7 +653,7 @@ func TestReconfigureBinding(t *testing.T) {
 			ParamRef: &admissionregistrationv1.ParamRef{
 				Name:                    fakeParams2.GetName(),
 				Namespace:               fakeParams2.GetNamespace(),
-				ParameterNotFoundAction: ptrTo(admissionregistrationv1.DenyAction),
+				ParameterNotFoundAction: ptr.To(admissionregistrationv1.DenyAction),
 			},
 			ValidationActions: []admissionregistrationv1.ValidationAction{admissionregistrationv1.Deny},
 		},
@@ -992,7 +989,7 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 			APIVersion: paramsGVK.GroupVersion().String(),
 			Kind:       paramsGVK.Kind,
 		},
-		FailurePolicy: ptrTo(admissionregistrationv1.Fail),
+		FailurePolicy: ptr.To(admissionregistrationv1.Fail),
 		Validations: []admissionregistrationv1.Validation{
 			{
 				Expression: "policy1",
@@ -1007,7 +1004,7 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 			APIVersion: paramsGVK.GroupVersion().String(),
 			Kind:       paramsGVK.Kind,
 		},
-		FailurePolicy: ptrTo(admissionregistrationv1.Fail),
+		FailurePolicy: ptr.To(admissionregistrationv1.Fail),
 		Validations: []admissionregistrationv1.Validation{
 			{
 				Expression: "policy2",
@@ -1584,9 +1581,9 @@ func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIs
 	}
 
 	if denyNotFound {
-		paramRef.ParameterNotFoundAction = ptrTo(admissionregistrationv1.DenyAction)
+		paramRef.ParameterNotFoundAction = ptr.To(admissionregistrationv1.DenyAction)
 	} else {
-		paramRef.ParameterNotFoundAction = ptrTo(admissionregistrationv1.AllowAction)
+		paramRef.ParameterNotFoundAction = ptr.To(admissionregistrationv1.AllowAction)
 	}
 
 	compiler := &fakeCompiler{}
