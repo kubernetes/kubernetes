@@ -755,15 +755,21 @@ func TestStreamTranslator_WebSocketServerErrors(t *testing.T) {
 			t.Errorf("expected websocket bad handshake error, got (%s)", err)
 		}
 	}
-	// Validate the streamtranslator metrics; should have one 500 failure.
+	// Validate the streamtranslator metrics; should have one 400 failure.
+	// Use polling to wait for the metric to be updated asynchronously.
 	metricNames := []string{"apiserver_stream_translator_requests_total"}
 	expected := `
 # HELP apiserver_stream_translator_requests_total [ALPHA] Total number of requests that were handled by the StreamTranslatorProxy, which processes streaming RemoteCommand/V5
 # TYPE apiserver_stream_translator_requests_total counter
 apiserver_stream_translator_requests_total{code="400"} 1
 `
-	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...); err != nil {
-		t.Fatal(err)
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
+		if testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected), metricNames...) == nil {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("Failed to observe metric after waiting 2 seconds: %v", err)
 	}
 }
 
