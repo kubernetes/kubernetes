@@ -259,7 +259,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 					t.Fatalf("Watch should have timed out but it exited without an error!")
 				}
 
-				if err != wait.ErrWaitTimeout && tc.succeed {
+				if !wait.Interrupted(err) && tc.succeed {
 					t.Fatalf("Watch exited with error: %v!", err)
 				}
 
