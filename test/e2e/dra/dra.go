@@ -87,10 +87,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		})
 
 		ginkgo.It("must retry NodePrepareResources", func(ctx context.Context) {
-			// We have exactly one host.
-			m := drautils.MethodInstance{NodeName: driver.Nodenames()[0], FullMethod: drautils.NodePrepareResourcesMethod}
+			// We have exactly one host. The API version depends on the kubelet
+			// we test with (version skew!), so we need to be a bit flexible.
+			mV1Beta1 := drautils.MethodInstance{NodeName: driver.Nodenames()[0], FullMethod: "/k8s.io.kubelet.pkg.apis.dra.v1beta1.DRAPlugin/NodePrepareResources"}
+			mV1 := drautils.MethodInstance{NodeName: driver.Nodenames()[0], FullMethod: "/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"}
 
-			driver.Fail(m, true)
+			driver.Fail(mV1Beta1, true)
+			driver.Fail(mV1, true)
 
 			ginkgo.By("waiting for container startup to fail")
 			pod, template := b.PodInline()
@@ -99,18 +102,19 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 
 			ginkgo.By("wait for NodePrepareResources call")
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				if driver.CallCount(m) == 0 {
+				if driver.CallCount(mV1Beta1)+driver.CallCount(mV1) == 0 {
 					return errors.New("NodePrepareResources not called yet")
 				}
 				return nil
 			}).WithTimeout(podStartTimeout).Should(gomega.Succeed())
 
 			ginkgo.By("allowing container startup to succeed")
-			callCount := driver.CallCount(m)
-			driver.Fail(m, false)
+			callCount := driver.CallCount(mV1Beta1) + driver.CallCount(mV1)
+			driver.Fail(mV1, false)
+			driver.Fail(mV1Beta1, false)
 			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
 			framework.ExpectNoError(err, "start pod with inline resource claim")
-			if driver.CallCount(m) == callCount {
+			if driver.CallCount(mV1Beta1)+driver.CallCount(mV1) == callCount {
 				framework.Fail("NodePrepareResources should have been called again")
 			}
 		})
@@ -302,7 +306,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, forceDelete))
 
 			// Fail NodeUnprepareResources to simulate long grace period
-			unprepareResources := drautils.MethodInstance{NodeName: node, FullMethod: drautils.NodeUnprepareResourcesMethod}
+			unprepareResources := drautils.MethodInstance{NodeName: node, FullMethod: "/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodeUnprepareResources"}
 			driver.Fail(unprepareResources, true)
 
 			// The pod should get deleted immediately.
@@ -2548,14 +2552,16 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		})
 	})
 
-	multipleDrivers := func(nodeV1beta1 bool) {
+	multipleDrivers := func(nodeV1beta1, nodeV1 bool) {
 		nodes := drautils.NewNodes(f, 1, 4)
 		driver1 := drautils.NewDriver(f, nodes, drautils.DriverResources(2))
 		driver1.NodeV1beta1 = nodeV1beta1
+		driver1.NodeV1 = nodeV1
 		b1 := drautils.NewBuilder(f, driver1)
 
 		driver2 := drautils.NewDriver(f, nodes, drautils.DriverResources(2))
 		driver2.NodeV1beta1 = nodeV1beta1
+		driver2.NodeV1 = nodeV1
 		driver2.NameSuffix = "-other"
 		b2 := drautils.NewBuilder(f, driver2)
 
@@ -2578,14 +2584,26 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			b1.TestPod(ctx, f, pod)
 		})
 	}
-	multipleDriversContext := func(prefix string, nodeV1beta1 bool) {
-		ginkgo.Context(prefix, func() {
-			multipleDrivers(nodeV1beta1)
-		})
+	multipleDriversContext := func(prefix string, nodeV1beta1, nodeV1 bool) {
+		args := []any{
+			prefix,
+			func() {
+				multipleDrivers(nodeV1beta1, nodeV1)
+			},
+		}
+		if !nodeV1beta1 {
+			// If the v1beta1 gRPC API is disabled, then
+			// kubelet from 1.34 is required because that is
+			// when v1 was introduced.
+			args = append(args, f.WithLabel("KubeletMinVersion:1.34"))
+		}
+		framework.Context(args...)
 	}
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "with multiple drivers", func() {
-		multipleDriversContext("using only drapbv1beta1", true)
+		multipleDriversContext("using only drapbv1beta1", true, false)
+		multipleDriversContext("using only drapbv1", false, true)
+		multipleDriversContext("using drapbv1beta1 and drapbv1", true, true)
 	})
 })
 

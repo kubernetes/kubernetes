@@ -79,11 +79,6 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-const (
-	NodePrepareResourcesMethod   = "/k8s.io.kubelet.pkg.apis.dra.v1beta1.DRAPlugin/NodePrepareResources"
-	NodeUnprepareResourcesMethod = "/k8s.io.kubelet.pkg.apis.dra.v1beta1.DRAPlugin/NodeUnprepareResources"
-)
-
 type Nodes struct {
 	NodeNames []string
 	tempDir   string
@@ -290,9 +285,10 @@ func NewDriverInstance(f *framework.Framework) *Driver {
 		f:          f,
 		fail:       map[MethodInstance]bool{},
 		callCounts: map[MethodInstance]int64{},
-		// By default, test only with the latest gRPC API.
-		NodeV1alpha4: false,
-		NodeV1beta1:  true,
+		// By default, test with all gRPC APIs.
+		// TODO: should setting this be optional to test the actual helper defaults?
+		NodeV1:      true,
+		NodeV1beta1: true,
 		// By default, assume that the kubelet supports DRA and that
 		// the driver's removal causes ResourceSlice cleanup.
 		WithKubelet:                true,
@@ -355,8 +351,8 @@ type Driver struct {
 	// /var/run/cdi are writable by the current user.
 	IsLocal bool
 
-	NodeV1alpha4 bool
-	NodeV1beta1  bool
+	NodeV1      bool
+	NodeV1beta1 bool
 
 	// Register the DRA test driver with the kubelet and expect DRA to work (= feature.DynamicResourceAllocation).
 	WithKubelet bool
@@ -603,6 +599,8 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 			kubeletplugin.GRPCStreamInterceptor(func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 				return d.streamInterceptor(nodename, srv, ss, info, handler)
 			}),
+			kubeletplugin.NodeV1(d.NodeV1),
+			kubeletplugin.NodeV1beta1(d.NodeV1beta1),
 
 			kubeletplugin.RollingUpdate(rollingUpdateUID),
 			kubeletplugin.Serialize(serialize),
