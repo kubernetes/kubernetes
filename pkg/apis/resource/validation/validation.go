@@ -695,7 +695,7 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	}
 
 	counterSetMixinNames := gatherCounterSetMixinNames(spec.Mixins)
-	allErrs = append(allErrs, validateSet(spec.SharedCounters, -1,
+	allErrs = append(allErrs, validateSet(spec.SharedCounters, resource.ResourceSliceMaxCounterSetsPerResourceSlice,
 		func(counterSet resource.CounterSet, fldPath *field.Path) field.ErrorList {
 			return validateCounterSet(counterSet, fldPath, counterSetMixinNames)
 		},
@@ -715,19 +715,19 @@ func validateResourceSliceMixins(mixins *resource.ResourceSliceMixins, fldPath *
 		return allErrs
 	}
 
-	allErrs = append(allErrs, validateSet(mixins.Device, -1,
+	allErrs = append(allErrs, validateSet(mixins.Device, resource.ResourceSliceMaxDeviceMixinsPerResourceSlice,
 		validateDeviceMixin,
 		func(deviceMixin resource.DeviceMixin) (string, string) {
 			return deviceMixin.Name, "name"
 		}, fldPath.Child("device"))...)
 
-	allErrs = append(allErrs, validateSet(mixins.CounterSet, -1,
+	allErrs = append(allErrs, validateSet(mixins.CounterSet, resource.ResourceSliceMaxCounterSetMixinsPerResourceSlice,
 		validateCounterSetMixin,
 		func(counterSetMixin resource.CounterSetMixin) (string, string) {
 			return counterSetMixin.Name, "name"
 		}, fldPath.Child("counterSet"))...)
 
-	allErrs = append(allErrs, validateSet(mixins.DeviceCounterConsumption, -1,
+	allErrs = append(allErrs, validateSet(mixins.DeviceCounterConsumption, resource.ResourceSliceMaxDeviceCounterConsumptionMixinsPerResourceSlice,
 		validateDeviceCounterConsumptionMixin,
 		func(deviceCounterConsumptionMixin resource.DeviceCounterConsumptionMixin) (string, string) {
 			return deviceCounterConsumptionMixin.Name, "name"
@@ -886,7 +886,7 @@ func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterTo
 	allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceCapacity, fldPath.Child("capacity"))...)
 	allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength, validateDeviceTaint, fldPath.Child("taints"))...)
 
-	allErrs = append(allErrs, validateSet(device.ConsumesCounters, -1,
+	allErrs = append(allErrs, validateSet(device.ConsumesCounters, resource.ResourceSliceMaxConsumesCountersPerDevice,
 		func(deviceCounterConsumption resource.DeviceCounterConsumption, fldPath *field.Path) field.ErrorList {
 			return validateDeviceCounterConsumption(deviceCounterConsumption, fldPath, deviceCounterConsumptionMixinToCounterMap, sharedCounterToCounterNames)
 		},
@@ -1030,7 +1030,7 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 			}
 		}
 	}
-	allErrs = append(allErrs, validateSlice(deviceCounterConsumption.Includes, resource.ResourceSliceMaxIncludes,
+	allErrs = append(allErrs, validateSlice(deviceCounterConsumption.Includes, resource.ResourceSliceMaxIncludesPerDeviceCounterConsumption,
 		func(deviceCounterConsumptionMixinRef string, fldPath *field.Path) field.ErrorList {
 			return validateDeviceCounterConsumptionMixinRef(deviceCounterConsumptionMixinRef, fldPath, deviceCounterConsumptionMixinToCounterMap)
 		}, fldPath.Child("includes"))...)

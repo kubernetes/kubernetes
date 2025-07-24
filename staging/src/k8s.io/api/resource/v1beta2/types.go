@@ -160,7 +160,9 @@ type ResourceSliceSpec struct {
 	//
 	// The names of the SharedCounters must be unique in the ResourceSlice.
 	//
-	// The maximum number of counters in all sets is 32.
+	// The maximum number of counter sets in a ResourceSlice is 32 and the
+	// total number of counters across counter sets and counter set mixins
+	// in a single ResourceSlice must not exceed 256.
 	//
 	// +optional
 	// +listType=atomic
@@ -232,9 +234,9 @@ type ResourceSliceMixins struct {
 	// shared attributes and capacities that an actual device can "include"
 	// to extend the set of attributes and capacities it already defines.
 	//
-	// There are no limits on the number of device mixins, but the total
-	// number of attributes and capacities across device mixins and
-	// devices in a single ResourceSlice must not exceed 4096.
+	// The maximum number of device mixins in a ResourceSlice is 128
+	// and the total number of attributes and capacities across device
+	// mixins and devices in a single ResourceSlice must not exceed 4096.
 	//
 	// +optional
 	// +listType=atomic
@@ -244,8 +246,8 @@ type ResourceSliceMixins struct {
 	// consumption mixins, each of which contains a set of counters
 	// that a device will consume from a counter set.
 	//
-	// There are no limits on the number of device counter consumption
-	// mixins, but the total number of consumed counters across device
+	// The maximum number of device counter consumption mixins in a
+	// ResourceSlice is 128 the total number of consumed counters across device
 	// counter consumption mixins and devices in a single
 	// ResourceSlice must not exceed 2048.
 	//
@@ -257,8 +259,8 @@ type ResourceSliceMixins struct {
 	// a collection of counters that a CounterSet can "include"
 	// to extend the set of counters it already defines.
 	//
-	// There are no limits on the number of counter set mixins, but
-	// the total number of counters across counter set mixins and
+	// The maximum number of counter set mixins in a ResourceSlice is
+	// 32 and the total number of counters across counter set mixins and
 	// counter sets in a single ResourceSlice must not exceed 256.
 	//
 	// +optional
@@ -394,8 +396,11 @@ const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a 
 // both counters defined in counter sets and in counter set mixins.
 const ResourceSliceMaxCountersPerResourceSlice = 256
 
-// Defines the maximum number of include entries allowed.
+// Defines the maximum number of include entries allowed for devices and counter sets.
 const ResourceSliceMaxIncludes = 8
+
+// Defines the maximum number of include entries allowed for device counter consumptions.
+const ResourceSliceMaxIncludesPerDeviceCounterConsumption = 4
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
@@ -434,8 +439,9 @@ type Device struct {
 	//
 	// There can only be a single entry per counterSet.
 	//
-	// The maximum number of consumed counters across all device counter
-	// consumptions and device counter consumption mixins in a
+	// The maximum number of device counter consumption entries per
+	// device 4 and the total number of consumed counters across all
+	// device counter consumptions and device counter consumption mixins in a
 	// ResourceSlice is 2048.
 	//
 	// +optional
@@ -541,7 +547,7 @@ type DeviceCounterConsumption struct {
 	// The mixins referenced here must be defined in the same
 	// ResourceSlice.
 	//
-	// The maximum number of includes is 8.
+	// The maximum number of includes is 4.
 	//
 	// +featureGate=DRAResourceSliceMixins
 	// +optional
@@ -580,6 +586,24 @@ const ResourceSliceMaxAttributesAndCapacitiesPerDeviceAfterMixins = 32
 // a ResourceSlice. With the maximum number of devices in a ResourceSlice
 // (2048) there can be on average 16 counters per device.
 const ResourceSliceMaxConsumedCountersPerResourceSlice = 2048
+
+// Limit for the number of counter sets allowed inside SharedCounters
+// for a ResourceSlice.
+const ResourceSliceMaxCounterSetsPerResourceSlice = 32
+
+// Limit for the number of device mixins allowed in a ResourceSlice.
+const ResourceSliceMaxDeviceMixinsPerResourceSlice = 128
+
+// Limit for the number of counter set mixins allowed in a ResourceSlice.
+const ResourceSliceMaxCounterSetMixinsPerResourceSlice = 32
+
+// Limit for the number of device counter consumption mixins allowed in a ResourceSlice.
+const ResourceSliceMaxDeviceCounterConsumptionMixinsPerResourceSlice = 128
+
+// Limit for the number of entries in the ConsumesCounters list allowed
+// for each device. This limits the number of counter sets from which
+// each device can consume counters.
+const ResourceSliceMaxConsumesCountersPerDevice = 4
 
 // QualifiedName is the name of a device attribute or capacity.
 //

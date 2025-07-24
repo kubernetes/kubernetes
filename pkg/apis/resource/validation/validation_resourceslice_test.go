@@ -68,7 +68,7 @@ func testCapacities(namePrefix string, count int) map[resourceapi.QualifiedName]
 
 func testCounter() map[string]resourceapi.Counter {
 	return map[string]resourceapi.Counter{
-		"memory": {Value: resource.MustParse("1Gi")},
+		"counter-0": {Value: resource.MustParse("1Gi")},
 	}
 }
 
@@ -722,13 +722,24 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"too-many-counter-sets": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "sharedCounters"), resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice+1, resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice + 1)
+				return slice
+			}(),
+		},
 		"too-large-shared-counters": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec"), resourceapi.ResourceSliceMaxCountersPerResourceSlice+1, fmt.Sprintf("the total number of counters in shared counters and counter set mixins must not exceed %d", resourceapi.ResourceSliceMaxCountersPerResourceSlice)),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.SharedCounters = createSharedCounters(resourceapi.ResourceSliceMaxCountersPerResourceSlice + 1)
+				slice.Spec.SharedCounters = createSharedCountersWithMultipleCounters(resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice, resourceapi.ResourceSliceMaxCountersPerResourceSlice/resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice)
+				slice.Spec.SharedCounters[0].Counters["too-many-counters"] = resourceapi.Counter{Value: resource.MustParse("1Gi")}
 				return slice
 			}(),
 		},
@@ -739,9 +750,10 @@ func TestValidateResourceSlice(t *testing.T) {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
-					CounterSet: createCounterSetMixins(resourceapi.ResourceSliceMaxCountersPerResourceSlice/2 + 1),
+					CounterSet: createCounterSetMixinsWithMultipleCounters(resourceapi.ResourceSliceMaxCounterSetMixinsPerResourceSlice, (resourceapi.ResourceSliceMaxCountersPerResourceSlice/2)/resourceapi.ResourceSliceMaxCounterSetMixinsPerResourceSlice),
 				}
-				slice.Spec.SharedCounters = createSharedCounters(resourceapi.ResourceSliceMaxCountersPerResourceSlice / 2)
+				slice.Spec.Mixins.CounterSet[0].Counters["too-many-counters"] = resourceapi.Counter{Value: resource.MustParse("1Gi")}
+				slice.Spec.SharedCounters = createSharedCountersWithMultipleCounters(resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice, (resourceapi.ResourceSliceMaxCountersPerResourceSlice/2)/resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice)
 				return slice
 			}(),
 		},
@@ -846,18 +858,12 @@ func TestValidateResourceSlice(t *testing.T) {
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, resourceapi.ResourceSliceMaxDevices)
-				slice.Spec.SharedCounters = createSharedCounters(16)
+				slice.Spec.SharedCounters = createSharedCountersWithMultipleCounters(resourceapi.ResourceSliceMaxConsumesCountersPerDevice, resourceapi.ResourceSliceMaxConsumedCountersPerResourceSlice/(resourceapi.ResourceSliceMaxConsumesCountersPerDevice*resourceapi.ResourceSliceMaxDevices))
 				for i := 0; i < resourceapi.ResourceSliceMaxDevices; i++ {
 					slice.Spec.Devices[i].ConsumesCounters = createConsumesCountersFromCounterSets(slice.Spec.SharedCounters...)
 				}
-				slice.Spec.SharedCounters = append(slice.Spec.SharedCounters, resourceapi.CounterSet{
-					Name:     "last-counterset",
-					Counters: testCounter(),
-				})
-				slice.Spec.Devices[0].ConsumesCounters = append(slice.Spec.Devices[0].ConsumesCounters, resourceapi.DeviceCounterConsumption{
-					CounterSet: "last-counterset",
-					Counters:   testCounter(),
-				})
+				slice.Spec.SharedCounters[0].Counters["too-many-consumed-counters"] = resourceapi.Counter{Value: resource.MustParse("1Gi")}
+				slice.Spec.Devices[0].ConsumesCounters[0].Counters["too-many-consumed-counters"] = resourceapi.Counter{Value: resource.MustParse("1Gi")}
 				return slice
 			}(),
 		},
@@ -1009,13 +1015,13 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"too-many-device-counter-consumption-mixin-refs": {
 			wantFailures: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("includes"), resourceapi.ResourceSliceMaxIncludes+1, resourceapi.ResourceSliceMaxIncludes),
+				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("includes"), resourceapi.ResourceSliceMaxIncludesPerDeviceCounterConsumption+1, resourceapi.ResourceSliceMaxIncludesPerDeviceCounterConsumption),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Spec.SharedCounters = createSharedCounters(1)
 				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
-					DeviceCounterConsumption: createDeviceCounterConsumptionMixins(resourceapi.ResourceSliceMaxIncludes + 1),
+					DeviceCounterConsumption: createDeviceCounterConsumptionMixins(resourceapi.ResourceSliceMaxIncludesPerDeviceCounterConsumption + 1),
 				}
 				slice.Spec.Devices[0].ConsumesCounters = createConsumesCountersFromCounterSets(slice.Spec.SharedCounters...)
 				slice.Spec.Devices[0].ConsumesCounters[0].Includes = createDeviceCounterConsumptionMixinRefs(slice.Spec.Mixins.DeviceCounterConsumption...)
@@ -1102,6 +1108,108 @@ func TestValidateResourceSlice(t *testing.T) {
 						Includes:   createDeviceCounterConsumptionMixinRefs(slice.Spec.Mixins.DeviceCounterConsumption...),
 					},
 				}
+				return slice
+			}(),
+		},
+		"max-device-mixins": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					Device: createDeviceMixins(resourceapi.ResourceSliceMaxDeviceMixinsPerResourceSlice),
+				}
+				return slice
+			}(),
+		},
+		"too-many-device-mixins": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "mixins", "device"), resourceapi.ResourceSliceMaxDeviceMixinsPerResourceSlice+1, resourceapi.ResourceSliceMaxDeviceMixinsPerResourceSlice),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					Device: createDeviceMixins(resourceapi.ResourceSliceMaxDeviceMixinsPerResourceSlice + 1),
+				}
+				return slice
+			}(),
+		},
+		"max-counter-set-mixins": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					CounterSet: createCounterSetMixins(resourceapi.ResourceSliceMaxCounterSetMixinsPerResourceSlice),
+				}
+				return slice
+			}(),
+		},
+		"too-many-counter-set-mixins": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "mixins", "counterSet"), resourceapi.ResourceSliceMaxCounterSetMixinsPerResourceSlice+1, resourceapi.ResourceSliceMaxCounterSetMixinsPerResourceSlice),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					CounterSet: createCounterSetMixins(resourceapi.ResourceSliceMaxCounterSetMixinsPerResourceSlice + 1),
+				}
+				return slice
+			}(),
+		},
+		"max-device-counter-consumption-mixins": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					DeviceCounterConsumption: func() []resourceapi.DeviceCounterConsumptionMixin {
+						var dccms []resourceapi.DeviceCounterConsumptionMixin
+						for i := 0; i < resourceapi.ResourceSliceMaxDeviceCounterConsumptionMixinsPerResourceSlice; i++ {
+							dccms = append(dccms, resourceapi.DeviceCounterConsumptionMixin{
+								Name:     fmt.Sprintf("device-counter-consumption-mixin-%d", i),
+								Counters: testCounter(),
+							})
+						}
+						return dccms
+					}(),
+				}
+				return slice
+			}(),
+		},
+		"too-many-device-counter-consumption-mixins": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "mixins", "deviceCounterConsumption"), resourceapi.ResourceSliceMaxDeviceCounterConsumptionMixinsPerResourceSlice+1, resourceapi.ResourceSliceMaxDeviceCounterConsumptionMixinsPerResourceSlice),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					DeviceCounterConsumption: func() []resourceapi.DeviceCounterConsumptionMixin {
+						var dccms []resourceapi.DeviceCounterConsumptionMixin
+						for i := 0; i < resourceapi.ResourceSliceMaxDeviceCounterConsumptionMixinsPerResourceSlice+1; i++ {
+							dccms = append(dccms, resourceapi.DeviceCounterConsumptionMixin{
+								Name:     fmt.Sprintf("device-counter-consumption-mixin-%d", i),
+								Counters: testCounter(),
+							})
+						}
+						return dccms
+					}(),
+				}
+				return slice
+			}(),
+		},
+		"max-device-consumes-counters": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCountersWithMultipleCounters(resourceapi.ResourceSliceMaxConsumesCountersPerDevice, 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCountersFromCounterSets(slice.Spec.SharedCounters...)
+				return slice
+			}(),
+		},
+		"too-many-device-consumes-counters": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("consumesCounters"), resourceapi.ResourceSliceMaxConsumesCountersPerDevice+1, resourceapi.ResourceSliceMaxConsumesCountersPerDevice),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCountersWithMultipleCounters(resourceapi.ResourceSliceMaxConsumesCountersPerDevice+1, 1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCountersFromCounterSets(slice.Spec.SharedCounters...)
 				return slice
 			}(),
 		},
@@ -1468,11 +1576,15 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 }
 
 func createSharedCounters(count int) []resourceapi.CounterSet {
-	sharedCounters := make([]resourceapi.CounterSet, count)
-	for i := 0; i < count; i++ {
+	return createSharedCountersWithMultipleCounters(count, 1)
+}
+
+func createSharedCountersWithMultipleCounters(counterSetCount, countersCount int) []resourceapi.CounterSet {
+	sharedCounters := make([]resourceapi.CounterSet, counterSetCount)
+	for i := 0; i < counterSetCount; i++ {
 		sharedCounters[i] = resourceapi.CounterSet{
 			Name:     fmt.Sprintf("counterset-%d", i),
-			Counters: testCounter(),
+			Counters: testCounters(countersCount),
 		}
 	}
 	return sharedCounters
@@ -1514,11 +1626,15 @@ func createDeviceMixinRefs(mixins ...resourceapi.DeviceMixin) []string {
 }
 
 func createCounterSetMixins(count int) []resourceapi.CounterSetMixin {
-	counterSetMixins := make([]resourceapi.CounterSetMixin, count)
-	for i := 0; i < count; i++ {
+	return createCounterSetMixinsWithMultipleCounters(count, 1)
+}
+
+func createCounterSetMixinsWithMultipleCounters(counterSetMixinCount, countersCount int) []resourceapi.CounterSetMixin {
+	counterSetMixins := make([]resourceapi.CounterSetMixin, counterSetMixinCount)
+	for i := 0; i < counterSetMixinCount; i++ {
 		counterSetMixins[i] = resourceapi.CounterSetMixin{
-			Name:     fmt.Sprintf("coumter-set-mixin-%d", i),
-			Counters: testCounter(),
+			Name:     fmt.Sprintf("counter-set-mixin-%d", i),
+			Counters: testCounters(countersCount),
 		}
 	}
 	return counterSetMixins
