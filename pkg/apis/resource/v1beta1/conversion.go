@@ -200,6 +200,7 @@ func Convert_v1beta1_Device_To_resource_Device(in *resourcev1beta1.Device, out *
 			taints = append(taints, taint)
 		}
 		out.Taints = taints
+		out.Includes = in.Basic.Includes
 	}
 	return nil
 }
@@ -245,6 +246,7 @@ func Convert_resource_Device_To_v1beta1_Device(in *resource.Device, out *resourc
 		taints = append(taints, taint)
 	}
 	out.Basic.Taints = taints
+	out.Basic.Includes = in.Includes
 	return nil
 }
 
