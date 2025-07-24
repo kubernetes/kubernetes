@@ -1892,6 +1892,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsstoragev1.VolumeAttachmentSpecApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("VolumeAttachmentStatus"):
 		return &applyconfigurationsstoragev1.VolumeAttachmentStatusApplyConfiguration{}
+	case storagev1.SchemeGroupVersion.WithKind("VolumeAttributesClass"):
+		return &applyconfigurationsstoragev1.VolumeAttributesClassApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("VolumeError"):
 		return &applyconfigurationsstoragev1.VolumeErrorApplyConfiguration{}
 	case storagev1.SchemeGroupVersion.WithKind("VolumeNodeResources"):

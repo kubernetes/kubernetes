@@ -735,7 +735,7 @@ func startVolumeAttributesClassProtectionController(ctx context.Context, control
 		controllerContext.ClientBuilder.ClientOrDie("volumeattributesclass-protection-controller"),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
-		controllerContext.InformerFactory.Storage().V1beta1().VolumeAttributesClasses(),
+		controllerContext.InformerFactory.Storage().V1().VolumeAttributesClasses(),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start the vac protection controller: %w", err)
