@@ -34,6 +34,7 @@ type DeviceApplyConfiguration struct {
 	NodeSelector     *v1.NodeSelectorApplyConfiguration                                  `json:"nodeSelector,omitempty"`
 	AllNodes         *bool                                                               `json:"allNodes,omitempty"`
 	Taints           []DeviceTaintApplyConfiguration                                     `json:"taints,omitempty"`
+	Includes         []string                                                            `json:"includes,omitempty"`
 }
 
 // DeviceApplyConfiguration constructs a declarative configuration of the Device type for use with
@@ -124,6 +125,16 @@ func (b *DeviceApplyConfiguration) WithTaints(values ...*DeviceTaintApplyConfigu
 			panic("nil value passed to WithTaints")
 		}
 		b.Taints = append(b.Taints, *values[i])
+	}
+	return b
+}
+
+// WithIncludes adds the given value to the Includes field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Includes field.
+func (b *DeviceApplyConfiguration) WithIncludes(values ...string) *DeviceApplyConfiguration {
+	for i := range values {
+		b.Includes = append(b.Includes, values[i])
 	}
 	return b
 }
