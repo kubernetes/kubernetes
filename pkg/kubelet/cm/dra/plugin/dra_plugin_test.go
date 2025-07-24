@@ -18,6 +18,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"path"
@@ -83,7 +84,7 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 
 	go func() {
 		go func() {
-			if err := s.Serve(listener); err != nil {
+			if err := s.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 				panic(err)
 			}
 		}()
