@@ -326,7 +326,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			client := clientsetfake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			var extenders []framework.Extender
+			var extenders []fwk.Extender
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
@@ -506,7 +506,7 @@ func TestConvertToVictims(t *testing.T) {
 		nodeNameToMetaVictims map[string]*extenderv1.MetaVictims
 		nodeNames             []string
 		podsInNodeList        []*v1.Pod
-		nodeInfos             framework.NodeInfoLister
+		nodeInfos             fwk.NodeInfoLister
 		want                  map[string]*extenderv1.Victims
 		wantErr               bool
 	}{

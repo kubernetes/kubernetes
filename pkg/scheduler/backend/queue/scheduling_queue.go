@@ -49,7 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
+	apicalls "k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -92,7 +92,7 @@ type PreEnqueueCheck func(pod *v1.Pod) bool
 // The interface follows a pattern similar to cache.FIFO and cache.Heap and
 // makes it easy to use those data structures as a SchedulingQueue.
 type SchedulingQueue interface {
-	framework.PodNominator
+	fwk.PodNominator
 	Add(logger klog.Logger, pod *v1.Pod)
 	// Activate moves the given pods to activeQ.
 	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
@@ -131,7 +131,7 @@ type SchedulingQueue interface {
 
 	// PatchPodStatus handles the pod status update by sending an update API call through API dispatcher.
 	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
-	PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) (<-chan error, error)
+	PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error)
 
 	// The following functions are supposed to be used only for testing or debugging.
 	GetPod(name, namespace string) (*framework.QueuedPodInfo, bool)
@@ -145,7 +145,7 @@ type SchedulingQueue interface {
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
 func NewSchedulingQueue(
-	lessFn framework.LessFunc,
+	lessFn fwk.LessFunc,
 	informerFactory informers.SharedInformerFactory,
 	opts ...Option) SchedulingQueue {
 	return NewPriorityQueue(lessFn, informerFactory, opts...)
@@ -186,7 +186,7 @@ type PriorityQueue struct {
 	moveRequestCycle int64
 
 	// preEnqueuePluginMap is keyed with profile and plugin name, valued with registered preEnqueue plugins.
-	preEnqueuePluginMap map[string]map[string]framework.PreEnqueuePlugin
+	preEnqueuePluginMap map[string]map[string]fwk.PreEnqueuePlugin
 	// queueingHintMap is keyed with profile name, valued with registered queueing hint functions.
 	queueingHintMap QueueingHintMapPerProfile
 	// pluginToEventsMap shows which plugin is interested in which events.
@@ -231,7 +231,7 @@ type priorityQueueOptions struct {
 	podLister                         listersv1.PodLister
 	metricsRecorder                   *metrics.MetricAsyncRecorder
 	pluginMetricsSamplePercent        int
-	preEnqueuePluginMap               map[string]map[string]framework.PreEnqueuePlugin
+	preEnqueuePluginMap               map[string]map[string]fwk.PreEnqueuePlugin
 	queueingHintMap                   QueueingHintMapPerProfile
 	apiDispatcher                     fwk.APIDispatcher
 }
@@ -288,7 +288,7 @@ func WithQueueingHintMapPerProfile(m QueueingHintMapPerProfile) Option {
 }
 
 // WithPreEnqueuePluginMap sets preEnqueuePluginMap for PriorityQueue.
-func WithPreEnqueuePluginMap(m map[string]map[string]framework.PreEnqueuePlugin) Option {
+func WithPreEnqueuePluginMap(m map[string]map[string]fwk.PreEnqueuePlugin) Option {
 	return func(o *priorityQueueOptions) {
 		o.preEnqueuePluginMap = m
 	}
@@ -337,7 +337,7 @@ func newQueuedPodInfoForLookup(pod *v1.Pod, plugins ...string) *framework.Queued
 
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue(
-	lessFn framework.LessFunc,
+	lessFn fwk.LessFunc,
 	informerFactory informers.SharedInformerFactory,
 	opts ...Option,
 ) *PriorityQueue {
@@ -381,8 +381,8 @@ func NewPriorityQueue(
 	return pq
 }
 
-// Helper function that wraps framework.LessFunc and converts it to take *framework.QueuedPodInfo as arguments.
-func convertLessFn(lessFn framework.LessFunc) func(podInfo1, podInfo2 *framework.QueuedPodInfo) bool {
+// Helper function that wraps fwk.LessFunc and converts it to take *framework.QueuedPodInfo as arguments.
+func convertLessFn(lessFn fwk.LessFunc) func(podInfo1, podInfo2 *framework.QueuedPodInfo) bool {
 	return func(podInfo1, podInfo2 *framework.QueuedPodInfo) bool {
 		return lessFn(podInfo1, podInfo2)
 	}
@@ -599,7 +599,7 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framewo
 }
 
 // runPreEnqueuePlugin runs the PreEnqueue plugin and update pInfo's fields accordingly if needed.
-func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Logger, pl framework.PreEnqueuePlugin, pInfo *framework.QueuedPodInfo, shouldRecordMetric bool) *fwk.Status {
+func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Logger, pl fwk.PreEnqueuePlugin, pInfo *framework.QueuedPodInfo, shouldRecordMetric bool) *fwk.Status {
 	pod := pInfo.Pod
 	startTime := p.clock.Now()
 	s := pl.PreEnqueue(ctx, pod)
@@ -625,7 +625,7 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Log
 
 // AddNominatedPod adds the given pod to the nominator.
 // It locks the PriorityQueue to make sure it won't race with any other method.
-func (p *PriorityQueue) AddNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *framework.NominatingInfo) {
+func (p *PriorityQueue) AddNominatedPod(logger klog.Logger, pi fwk.PodInfo, nominatingInfo *fwk.NominatingInfo) {
 	p.lock.Lock()
 	p.nominator.addNominatedPod(logger, pi, nominatingInfo)
 	p.lock.Unlock()
@@ -1352,7 +1352,7 @@ func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 
 // PatchPodStatus handles the pod status update by sending an update API call through API dispatcher.
 // This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
-func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) (<-chan error, error) {
+func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
 	// Don't store anything in the cache. This might be extended in the next releases.
 	onFinish := make(chan error, 1)
 	err := p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, condition, nominatingInfo), fwk.APICallOptions{

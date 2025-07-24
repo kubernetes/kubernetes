@@ -217,7 +217,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 	}
 }
 
-func newDefaultQueueSort() framework.LessFunc {
+func newDefaultQueueSort() fwk.LessFunc {
 	sort := &queuesort.PrioritySort{}
 	return sort.Less
 }

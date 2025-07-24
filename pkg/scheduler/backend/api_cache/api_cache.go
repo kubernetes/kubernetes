@@ -23,7 +23,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // APICache is responsible for sending API calls' requests through scheduling queue or cache.
@@ -42,7 +41,7 @@ func New(schedulingQueue internalqueue.SchedulingQueue, cache internalcache.Cach
 // PatchPodStatus sends a patch request for a Pod's status through a scheduling queue.
 // The patch could be first applied to the cached Pod object and then the API call is executed asynchronously.
 // It returns a channel that can be used to wait for the call's completion.
-func (c *APICache) PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) (<-chan error, error) {
+func (c *APICache) PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
 	return c.schedulingQueue.PatchPodStatus(pod, condition, nominatingInfo)
 }
 

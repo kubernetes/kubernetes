@@ -123,7 +123,7 @@ type TestPlugin struct {
 	name string
 }
 
-func newTestPlugin(_ context.Context, injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+func newTestPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
 	return &TestPlugin{name: "test-plugin"}, nil
 }
 
@@ -145,11 +145,11 @@ func (pl *TestPlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *TestPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
 	return pl
 }
 
-func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	return nil, nil
 }
 
@@ -173,8 +173,8 @@ func TestPostFilter(t *testing.T) {
 		pdbs                  []*policy.PodDisruptionBudget
 		nodes                 []*v1.Node
 		filteredNodesStatuses *framework.NodeToStatus
-		extender              framework.Extender
-		wantResult            *framework.PostFilterResult
+		extender              fwk.Extender
+		wantResult            *fwk.PostFilterResult
 		wantStatus            *fwk.Status
 	}{
 		{
@@ -223,7 +223,7 @@ func TestPostFilter(t *testing.T) {
 			wantStatus: fwk.NewStatus(fwk.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
 		},
 		{
-			name: "preemption should respect absent NodeToStatusMap entry meaning UnschedulableAndUnresolvable",
+			name: "preemption should respect absent NodeToStatusReader entry meaning UnschedulableAndUnresolvable",
 			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
@@ -426,7 +426,7 @@ func TestPostFilter(t *testing.T) {
 					tf.RegisterPluginAsExtensions("test-plugin", newTestPlugin, "PreFilter"),
 					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				}
-				var extenders []framework.Extender
+				var extenders []fwk.Extender
 				if tt.extender != nil {
 					extenders = append(extenders, tt.extender)
 				}
@@ -1156,7 +1156,7 @@ func TestDryRunPreemption(t *testing.T) {
 			registeredPlugins := append([]tf.RegisterPluginFunc{
 				tf.RegisterFilterPlugin(
 					"FakeFilter",
-					func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 						return &fakePlugin, nil
 					},
 				)},
@@ -1939,7 +1939,7 @@ func TestPreempt(t *testing.T) {
 		extenders      []*tf.FakeExtender
 		nodeNames      []string
 		registerPlugin tf.RegisterPluginFunc
-		want           *framework.PostFilterResult
+		want           *fwk.PostFilterResult
 		expectedPods   []string // list of preempted pods
 	}{
 		{
@@ -2196,7 +2196,7 @@ func TestPreempt(t *testing.T) {
 						cachedNodeInfo.SetNode(node)
 						cachedNodeInfoMap[node.Name] = cachedNodeInfo
 					}
-					var extenders []framework.Extender
+					var extenders []fwk.Extender
 					for _, extender := range test.extenders {
 						// Set nodeInfoMap as extenders cached node information.
 						extender.CachedNodeNameToInfo = cachedNodeInfoMap

@@ -19,10 +19,10 @@ package extended
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/resource/v1beta1"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
-func DeviceClassMapping(draManager framework.SharedDRAManager) (map[v1.ResourceName]string, error) {
+func DeviceClassMapping(draManager fwk.SharedDRAManager) (map[v1.ResourceName]string, error) {
 	classes, err := draManager.DeviceClasses().List()
 	extendedResources := make(map[v1.ResourceName]string, len(classes))
 	if err != nil {

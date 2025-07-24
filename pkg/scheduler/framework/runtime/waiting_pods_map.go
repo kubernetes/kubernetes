@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // waitingPodsMap a thread-safe map used to maintain pods waiting in the permit phase.
@@ -62,7 +61,7 @@ func (m *waitingPodsMap) get(uid types.UID) *waitingPod {
 }
 
 // iterate acquires a read lock and iterates over the WaitingPods map.
-func (m *waitingPodsMap) iterate(callback func(framework.WaitingPod)) {
+func (m *waitingPodsMap) iterate(callback func(fwk.WaitingPod)) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for _, v := range m.pods {
@@ -78,7 +77,7 @@ type waitingPod struct {
 	mu             sync.RWMutex
 }
 
-var _ framework.WaitingPod = &waitingPod{}
+var _ fwk.WaitingPod = &waitingPod{}
 
 // newWaitingPod returns a new waitingPod instance.
 func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *waitingPod {

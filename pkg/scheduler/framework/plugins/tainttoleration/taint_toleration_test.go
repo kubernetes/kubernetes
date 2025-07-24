@@ -59,7 +59,7 @@ func TestTaintTolerationScore(t *testing.T) {
 		name         string
 		pod          *v1.Pod
 		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
+		expectedList fwk.NodeScoreList
 	}{
 		// basic test case
 		{
@@ -82,8 +82,8 @@ func TestTaintTolerationScore(t *testing.T) {
 					Effect: v1.TaintEffectPreferNoSchedule,
 				}}),
 			},
-			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: framework.MaxNodeScore},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxNodeScore},
 				{Name: "nodeB", Score: 0},
 			},
 		},
@@ -124,10 +124,10 @@ func TestTaintTolerationScore(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: framework.MaxNodeScore},
-				{Name: "nodeB", Score: framework.MaxNodeScore},
-				{Name: "nodeC", Score: framework.MaxNodeScore},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxNodeScore},
+				{Name: "nodeB", Score: fwk.MaxNodeScore},
+				{Name: "nodeC", Score: fwk.MaxNodeScore},
 			},
 		},
 		// the count of taints on a node that are not tolerated by pod, matters.
@@ -160,8 +160,8 @@ func TestTaintTolerationScore(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: framework.MaxNodeScore},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxNodeScore},
 				{Name: "nodeB", Score: 50},
 				{Name: "nodeC", Score: 0},
 			},
@@ -203,9 +203,9 @@ func TestTaintTolerationScore(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: framework.MaxNodeScore},
-				{Name: "nodeB", Score: framework.MaxNodeScore},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxNodeScore},
+				{Name: "nodeB", Score: fwk.MaxNodeScore},
 				{Name: "nodeC", Score: 0},
 			},
 		},
@@ -224,8 +224,8 @@ func TestTaintTolerationScore(t *testing.T) {
 					},
 				}),
 			},
-			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: framework.MaxNodeScore},
+			expectedList: []fwk.NodeScore{
+				{Name: "nodeA", Score: fwk.MaxNodeScore},
 				{Name: "nodeB", Score: 0},
 			},
 		},
@@ -245,21 +245,21 @@ func TestTaintTolerationScore(t *testing.T) {
 				t.Fatalf("creating plugin: %v", err)
 			}
 			nodeInfos := tf.BuildNodeInfos(test.nodes)
-			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, nodeInfos)
+			status := p.(fwk.PreScorePlugin).PreScore(ctx, state, test.pod, nodeInfos)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
-			var gotList framework.NodeScoreList
+			var gotList fwk.NodeScoreList
 			for _, nodeInfo := range nodeInfos {
 				nodeName := nodeInfo.Node().Name
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
+				score, status := p.(fwk.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
-				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
+				gotList = append(gotList, fwk.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status = p.(framework.ScorePlugin).ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
+			status = p.(fwk.ScorePlugin).ScoreExtensions().NormalizeScore(ctx, state, test.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
@@ -349,7 +349,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
-			gotStatus := p.(framework.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
+			gotStatus := p.(fwk.FilterPlugin).Filter(ctx, nil, test.pod, nodeInfo)
 			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
 				t.Errorf("Unexpected status (-want,+got):\n%s", diff)
 			}

@@ -932,7 +932,7 @@ func (f *fakeExtender) IsIgnorable() bool {
 func (f *fakeExtender) ProcessPreemption(
 	_ *v1.Pod,
 	victims map[string]*extenderv1.Victims,
-	_ framework.NodeInfoLister,
+	_ fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	if f.supportsPreemption {
 		if f.errProcessPreemption {
@@ -1006,21 +1006,21 @@ func TestCallExtenders(t *testing.T) {
 	)
 	tests := []struct {
 		name           string
-		extenders      []framework.Extender
+		extenders      []fwk.Extender
 		candidates     []Candidate
 		wantStatus     *fwk.Status
 		wantCandidates []Candidate
 	}{
 		{
 			name:           "no extenders",
-			extenders:      []framework.Extender{},
+			extenders:      []fwk.Extender{},
 			candidates:     makeCandidates(node1Name, victim),
 			wantStatus:     nil,
 			wantCandidates: makeCandidates(node1Name, victim),
 		},
 		{
 			name: "one extender supports preemption",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true),
 			},
 			candidates:     makeCandidates(node1Name, victim),
@@ -1029,7 +1029,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender with return no victims",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true).WithReturnNoVictims(true),
 			},
 			candidates:     makeCandidates(node1Name, victim),
@@ -1038,7 +1038,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender does not support preemption",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(false),
 			},
 			candidates:     makeCandidates(node1Name, victim),
@@ -1047,7 +1047,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender with no return victims and is ignorable",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true).
 					WithReturnNoVictims(true).WithIgnorable(true),
 			},
@@ -1057,7 +1057,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender returns error and is ignorable",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithIgnorable(true).
 					WithSupportsPreemption(true).WithErrProcessPreemption(true),
 			},
@@ -1067,7 +1067,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender returns error and is not ignorable",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithErrProcessPreemption(true).
 					WithSupportsPreemption(true),
 			},
@@ -1077,7 +1077,7 @@ func TestCallExtenders(t *testing.T) {
 		},
 		{
 			name: "one extender with empty victims input",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				newFakeExtender().WithSupportsPreemption(true),
 			},
 			candidates:     []Candidate{},
@@ -1202,7 +1202,7 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 
-				var apiCacher framework.APICacher
+				var apiCacher fwk.APICacher
 				if asyncAPICallsEnabled {
 					apiDispatcher := apidispatcher.New(cs, 16, apicalls.Relevances)
 					apiDispatcher.Run(logger)
