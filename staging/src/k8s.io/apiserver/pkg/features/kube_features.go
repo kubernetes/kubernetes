@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
 )
 
 // Every feature gate should have an entry here following this template:
@@ -273,6 +274,7 @@ const (
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
+	runtime.Must(zpagesfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
