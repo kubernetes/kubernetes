@@ -304,9 +304,6 @@ github.com/google/go-cmp/cmp/internal/value
 # github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db
 ## explicit; go 1.22
 github.com/google/pprof/profile
-# github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-## explicit; go 1.13
-github.com/google/shlex
 # github.com/google/uuid v1.6.0
 ## explicit
 github.com/google/uuid
@@ -1196,7 +1193,7 @@ sigs.k8s.io/json/internal/golang/encoding/json
 # sigs.k8s.io/knftables v0.0.17
 ## explicit; go 1.20
 sigs.k8s.io/knftables
-# sigs.k8s.io/kustomize/api v0.19.0
+# sigs.k8s.io/kustomize/api v0.20.1
 ## explicit; go 1.22.7
 sigs.k8s.io/kustomize/api/filters/annotations
 sigs.k8s.io/kustomize/api/filters/fieldspec
@@ -1242,10 +1239,10 @@ sigs.k8s.io/kustomize/api/provider
 sigs.k8s.io/kustomize/api/resmap
 sigs.k8s.io/kustomize/api/resource
 sigs.k8s.io/kustomize/api/types
-# sigs.k8s.io/kustomize/kustomize/v5 v5.6.0
+# sigs.k8s.io/kustomize/kustomize/v5 v5.7.1
 ## explicit; go 1.22.7
 sigs.k8s.io/kustomize/kustomize/v5/commands/build
-# sigs.k8s.io/kustomize/kyaml v0.19.0
+# sigs.k8s.io/kustomize/kyaml v0.20.1
 ## explicit; go 1.22.7
 sigs.k8s.io/kustomize/kyaml/comments
 sigs.k8s.io/kustomize/kyaml/errors
@@ -1291,5 +1288,3 @@ sigs.k8s.io/structured-merge-diff/v6/value
 # sigs.k8s.io/yaml v1.5.0
 ## explicit; go 1.22
 sigs.k8s.io/yaml
-sigs.k8s.io/yaml/goyaml.v2
-sigs.k8s.io/yaml/goyaml.v3
