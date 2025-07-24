@@ -56,14 +56,18 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 			// the most expensive option is to have a single counter per CounterSet.
 			SharedCounters: func() []resourceapi.CounterSet {
 				var counterSets []resourceapi.CounterSet
-				for i := 0; i < resourceapi.ResourceSliceMaxCountersPerResourceSlice; i++ {
+				for i := 0; i < resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice; i++ {
 					counterSets = append(counterSets, resourceapi.CounterSet{
 						Name: maxDNSLabel(i),
-						Counters: map[string]resourceapi.Counter{
-							maxDNSLabel(0): {
-								Value: resource.MustParse("80Gi"),
-							},
-						},
+						Counters: func() map[string]resourceapi.Counter {
+							counters := make(map[string]resourceapi.Counter)
+							for j := 0; j < resourceapi.ResourceSliceMaxCountersPerResourceSlice/resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice; j++ {
+								counters[maxDNSLabel(j)] = resourceapi.Counter{
+									Value: resource.MustParse("80Gi"),
+								}
+							}
+							return counters
+						}(),
 					})
 				}
 				return counterSets
@@ -85,14 +89,179 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 						}(),
 						ConsumesCounters: func() []resourceapi.DeviceCounterConsumption {
 							var consumesCounters []resourceapi.DeviceCounterConsumption
-							for i := 0; i < resourceapi.ResourceSliceMaxConsumedCountersPerResourceSlice/resourceapi.ResourceSliceMaxDevices; i++ {
+							requiredConsumedCountersPerDevice := resourceapi.ResourceSliceMaxConsumedCountersPerResourceSlice / resourceapi.ResourceSliceMaxDevices          // 16
+							requiredConsumedCountersPerDeviceCounterConsumption := requiredConsumedCountersPerDevice / resourceapi.ResourceSliceMaxConsumesCountersPerDevice // 4
+							for i := 0; i < resourceapi.ResourceSliceMaxConsumesCountersPerDevice; i++ {
 								consumesCounters = append(consumesCounters, resourceapi.DeviceCounterConsumption{
 									CounterSet: maxDNSLabel(i),
-									Counters: map[string]resourceapi.Counter{
-										maxDNSLabel(0): {
-											Value: resource.MustParse("80Gi"),
-										},
-									},
+									Counters: func() map[string]resourceapi.Counter {
+										counters := make(map[string]resourceapi.Counter)
+										for j := 0; j < requiredConsumedCountersPerDeviceCounterConsumption; j++ {
+											counters[maxDNSLabel(j)] = resourceapi.Counter{
+												Value: resource.MustParse("80Gi"),
+											}
+										}
+										return counters
+									}(),
+								})
+							}
+							return consumesCounters
+						}(),
+						NodeName: ptr.To(maxSubDomain(0)),
+						Taints: func() []resourceapi.DeviceTaint {
+							var taints []resourceapi.DeviceTaint
+							for i := 0; i < resourceapi.DeviceTaintsMaxLength; i++ {
+								taints = append(taints, resourceapi.DeviceTaint{
+									Key:       maxLabelName(i),
+									Value:     maxLabelValue(i),
+									Effect:    resourceapi.DeviceTaintEffectNoSchedule,
+									TimeAdded: &metav1.Time{Time: time.Now().Truncate(time.Second)},
+								})
+							}
+							return taints
+						}(),
+					})
+				}
+				return devices
+			}(),
+		},
+	}
+	return slice
+}
+
+func NewMaxResourceSliceWithMixins() *resourceapi.ResourceSlice {
+	countersPerCounterSet := resourceapi.ResourceSliceMaxCountersPerResourceSlice / resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice
+
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: maxSubDomain(1),
+			// Number of labels is not restricted.
+			Labels: maxKeyValueMap(10),
+			// Total size of annotations is limited to TotalAnnotationSizeLimitB = 256 KB.
+			// Let's be a bit more realistic.
+			Annotations: maxKeyValueMap(10),
+		},
+
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver: strings.Repeat("x", resourceapi.DriverNameMaxLength),
+			Pool: resourceapi.ResourcePool{
+				Name:               strings.Repeat("x", resourceapi.PoolNameMaxLength),
+				Generation:         math.MaxInt64,
+				ResourceSliceCount: math.MaxInt64,
+			},
+			// use PerDeviceNodeSelection as it requires setting the node selection on
+			// every device and therefore will be the most expensive option in terms of
+			// object size.
+			PerDeviceNodeSelection: ptr.To(true),
+			// The validation caps the total number of counters across all CounterSets. So
+			// the most expensive option is to have a single counter per CounterSet.
+			SharedCounters: func() []resourceapi.CounterSet {
+				var counterSets []resourceapi.CounterSet
+				for i := 0; i < resourceapi.ResourceSliceMaxCounterSetsPerResourceSlice; i++ {
+					counterSets = append(counterSets, resourceapi.CounterSet{
+						Name: maxDNSLabel(i),
+						Includes: func() []string {
+							var includes []string
+							for j := 0; j < resourceapi.ResourceSliceMaxIncludes; j++ {
+								includes = append(includes, maxDNSLabel(j))
+							}
+							return includes
+						}(),
+					})
+				}
+				return counterSets
+			}(),
+			Mixins: func() *resourceapi.ResourceSliceMixins {
+				var deviceMixins []resourceapi.DeviceMixin
+				for i := 0; i < resourceapi.ResourceSliceMaxDeviceMixinsPerResourceSlice; i++ {
+					deviceMixins = append(deviceMixins, resourceapi.DeviceMixin{
+						Name: maxDNSLabel(i),
+						Attributes: func() map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
+							attributes := make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
+							for j := 0; j < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerResourceSlice/resourceapi.ResourceSliceMaxDeviceMixinsPerResourceSlice; j++ {
+								attributes[maxResourceQualifiedName(j)] = resourceapi.DeviceAttribute{
+									StringValue: ptr.To(maxDNSLabel(j)),
+								}
+							}
+							return attributes
+						}(),
+					})
+				}
+				var counterSetMixins []resourceapi.CounterSetMixin
+				for i := 0; i < resourceapi.ResourceSliceMaxCounterSetMixinsPerResourceSlice; i++ {
+					counterSetMixins = append(counterSetMixins, resourceapi.CounterSetMixin{
+						Name: maxDNSLabel(i),
+						Counters: func() map[string]resourceapi.Counter {
+							counters := make(map[string]resourceapi.Counter)
+							for j := 0; j < countersPerCounterSet; j++ {
+								counters[maxDNSLabel(j)] = resourceapi.Counter{
+									Value: resource.MustParse("80Gi"),
+								}
+							}
+							return counters
+						}(),
+					})
+				}
+				var DeviceCounterConsumptionMixins []resourceapi.DeviceCounterConsumptionMixin
+				for i := 0; i < resourceapi.ResourceSliceMaxDeviceCounterConsumptionMixinsPerResourceSlice; i++ {
+					DeviceCounterConsumptionMixins = append(DeviceCounterConsumptionMixins, resourceapi.DeviceCounterConsumptionMixin{
+						Name: maxDNSLabel(i),
+						Counters: func() map[string]resourceapi.Counter {
+							counters := make(map[string]resourceapi.Counter)
+							for j := 0; j < countersPerCounterSet; j++ {
+								counters[maxDNSLabel(j)] = resourceapi.Counter{
+									Value: resource.MustParse("80Gi"),
+								}
+							}
+							return counters
+						}(),
+					})
+				}
+				return &resourceapi.ResourceSliceMixins{
+					Device:                   deviceMixins,
+					CounterSet:               counterSetMixins,
+					DeviceCounterConsumption: DeviceCounterConsumptionMixins,
+				}
+			}(),
+			Devices: func() []resourceapi.Device {
+				var devices []resourceapi.Device
+				for i := 0; i < resourceapi.ResourceSliceMaxDevices; i++ {
+					devices = append(devices, resourceapi.Device{
+						Name: maxDNSLabel(i),
+						Includes: func() []string {
+							var includes []string
+							for j := 0; j < resourceapi.ResourceSliceMaxIncludes; j++ {
+								includes = append(includes, maxDNSLabel(j))
+							}
+							return includes
+						}(),
+						ConsumesCounters: func() []resourceapi.DeviceCounterConsumption {
+							var consumesCounters []resourceapi.DeviceCounterConsumption
+							usedConsumesCounters := resourceapi.ResourceSliceMaxDeviceCounterConsumptionMixinsPerResourceSlice * countersPerCounterSet // 1024
+							availableConsumesCounters := resourceapi.ResourceSliceMaxConsumedCountersPerResourceSlice - usedConsumesCounters           // 1024
+							availableConsumesCountersPerDevice := availableConsumesCounters / resourceapi.ResourceSliceMaxDevices                      // 8
+							for i := 0; i < resourceapi.ResourceSliceMaxConsumesCountersPerDevice; i++ {
+								consumesCounters = append(consumesCounters, resourceapi.DeviceCounterConsumption{
+									CounterSet: maxDNSLabel(i),
+									Includes: func() []string {
+										var includes []string
+										for j := 0; j < resourceapi.ResourceSliceMaxIncludesPerDeviceCounterConsumption; j++ {
+											includes = append(includes, maxDNSLabel(j))
+										}
+										return includes
+									}(),
+									Counters: func() map[string]resourceapi.Counter {
+										if i != 0 {
+											return nil
+										}
+										counters := make(map[string]resourceapi.Counter)
+										for j := 0; j < availableConsumesCountersPerDevice; j++ {
+											counters[maxDNSLabel(j)] = resourceapi.Counter{
+												Value: resource.MustParse("80Gi"),
+											}
+										}
+										return counters
+									}(),
 								})
 							}
 							return consumesCounters

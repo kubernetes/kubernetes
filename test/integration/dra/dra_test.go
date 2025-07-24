@@ -293,6 +293,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
+				tCtx.Run("MaxResourceSliceWithMixins", testMaxResourceSliceWithMixins)
 			},
 		},
 	} {
@@ -1153,6 +1154,17 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 // and prints some information about it.
 func testMaxResourceSlice(tCtx ktesting.TContext) {
 	slice := NewMaxResourceSlice()
+	checkResourceSliceSize(tCtx, slice)
+}
+
+// testMaxResourceSliceWithMixins creates a ResourceSlice leveraging mixins that is
+// as large as possible and prints some information about it.
+func testMaxResourceSliceWithMixins(tCtx ktesting.TContext) {
+	slice := NewMaxResourceSliceWithMixins()
+	checkResourceSliceSize(tCtx, slice)
+}
+
+func checkResourceSliceSize(tCtx ktesting.TContext, slice *resourceapi.ResourceSlice) {
 	createdSlice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
 	tCtx.ExpectNoError(err)
 	totalSize := createdSlice.Size()
