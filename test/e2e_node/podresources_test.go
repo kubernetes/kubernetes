@@ -1054,25 +1054,9 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var reservedSystemCPUs cpuset.CPUSet
-	var memoryQuantity resource.Quantity
-	var defaultKubeParams *memoryManagerKubeletParams
 
 	ginkgo.BeforeEach(func() {
 		reservedSystemCPUs = cpuset.New(1)
-		memoryQuantity = resource.MustParse("1100Mi")
-		defaultKubeParams = &memoryManagerKubeletParams{
-			systemReservedMemory: []kubeletconfig.MemoryReservation{
-				{
-					NumaNode: 0,
-					Limits: v1.ResourceList{
-						resourceMemory: memoryQuantity,
-					},
-				},
-			},
-			systemReserved: map[string]string{resourceMemory: "500Mi"},
-			kubeReserved:   map[string]string{resourceMemory: "500Mi"},
-			evictionHard:   map[string]string{evictionHardMemory: "100Mi"},
-		}
 	})
 
 	ginkgo.Context("with SRIOV devices in the system", func() {
@@ -1355,9 +1339,6 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 		ginkgo.When("listing with restricted list output enabled", func() {
 
 			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-				kubeParams := *defaultKubeParams
-				kubeParams.policy = staticPolicy
-				updateKubeletConfigWithMemoryManagerParams(initialConfig, &kubeParams)
 				initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
 				initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Minute} // set it long enough it is practically disabled
 				cpus := reservedSystemCPUs.String()
@@ -1638,9 +1619,6 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 		ginkgo.When("listing with restricted list output disabled for backward compatible defaults", func() {
 
 			tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-				kubeParams := *defaultKubeParams
-				kubeParams.policy = staticPolicy
-				updateKubeletConfigWithMemoryManagerParams(initialConfig, &kubeParams)
 				initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
 				initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Minute} // set it long enough it is practically disabled
 				cpus := reservedSystemCPUs.String()
