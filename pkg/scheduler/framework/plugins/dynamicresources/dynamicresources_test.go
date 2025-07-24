@@ -564,7 +564,7 @@ func (p perNodeResult) forNode(nodeName string) result {
 
 type want struct {
 	preenqueue       result
-	preFilterResult  *framework.PreFilterResult
+	preFilterResult  *fwk.PreFilterResult
 	prefilter        result
 	filter           perNodeResult
 	prescore         result
@@ -573,7 +573,7 @@ type want struct {
 	prebindPreFlight *fwk.Status
 	prebind          result
 	postbind         result
-	postFilterResult *framework.PostFilterResult
+	postFilterResult *fwk.PostFilterResult
 	postfilter       result
 
 	// unreserveAfterBindFailure, if set, triggers a call to Unreserve

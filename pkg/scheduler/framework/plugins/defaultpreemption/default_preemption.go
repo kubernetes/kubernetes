@@ -36,7 +36,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
@@ -66,7 +65,7 @@ type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
-	fh        framework.Handle
+	fh        fwk.Handle
 	fts       feature.Features
 	args      config.DefaultPreemptionArgs
 	podLister corelisters.PodLister
@@ -86,8 +85,8 @@ type DefaultPreemption struct {
 	MoreImportantPod MoreImportantPodFunc
 }
 
-var _ framework.PostFilterPlugin = &DefaultPreemption{}
-var _ framework.PreEnqueuePlugin = &DefaultPreemption{}
+var _ fwk.PostFilterPlugin = &DefaultPreemption{}
+var _ fwk.PreEnqueuePlugin = &DefaultPreemption{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DefaultPreemption) Name() string {
@@ -95,7 +94,7 @@ func (pl *DefaultPreemption) Name() string {
 }
 
 // New initializes a new plugin and returns it. The plugin type is retained to allow modification.
-func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (*DefaultPreemption, error) {
+func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Features) (*DefaultPreemption, error) {
 	args, ok := dpArgs.(*config.DefaultPreemptionArgs)
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DefaultPreemptionArgs", dpArgs)
@@ -129,7 +128,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feat
 }
 
 // PostFilter invoked at the postFilter extension point.
-func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *fwk.Status) {
+func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	defer func() {
 		metrics.PreemptionAttempts.Inc()
 	}()

@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -93,7 +92,7 @@ func Test_PutNominatedNodeNameInBindingCycle(t *testing.T) {
 	cancel := make(chan struct{})
 	tests := []struct {
 		name                    string
-		plugin                  framework.Plugin
+		plugin                  fwk.Plugin
 		expectNominatedNodeName bool
 		cleanup                 func()
 	}{
@@ -131,13 +130,13 @@ func Test_PutNominatedNodeNameInBindingCycle(t *testing.T) {
 				defer test.cleanup()
 			}
 
-			pf := func(plugin framework.Plugin) frameworkruntime.PluginFactory {
-				return func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+			pf := func(plugin fwk.Plugin) frameworkruntime.PluginFactory {
+				return func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return plugin, nil
 				}
 			}
 
-			plugins := []framework.Plugin{&NoNNNPostBindPlugin{cancel: testContext.Ctx.Done(), t: t}}
+			plugins := []fwk.Plugin{&NoNNNPostBindPlugin{cancel: testContext.Ctx.Done(), t: t}}
 			if test.plugin != nil {
 				plugins = append(plugins, test.plugin)
 			}

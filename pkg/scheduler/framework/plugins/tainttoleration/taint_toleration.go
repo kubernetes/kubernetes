@@ -25,7 +25,6 @@ import (
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -34,14 +33,14 @@ import (
 
 // TaintToleration is a plugin that checks if a pod tolerates a node's taints.
 type TaintToleration struct {
-	handle                    framework.Handle
+	handle                    fwk.Handle
 	enableSchedulingQueueHint bool
 }
 
-var _ framework.FilterPlugin = &TaintToleration{}
-var _ framework.PreScorePlugin = &TaintToleration{}
-var _ framework.ScorePlugin = &TaintToleration{}
-var _ framework.EnqueueExtensions = &TaintToleration{}
+var _ fwk.FilterPlugin = &TaintToleration{}
+var _ fwk.PreScorePlugin = &TaintToleration{}
+var _ fwk.ScorePlugin = &TaintToleration{}
+var _ fwk.EnqueueExtensions = &TaintToleration{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -194,17 +193,17 @@ func (pl *TaintToleration) Score(ctx context.Context, state fwk.CycleState, pod 
 }
 
 // NormalizeScore invoked after scoring all nodes.
-func (pl *TaintToleration) NormalizeScore(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *fwk.Status {
-	return helper.DefaultNormalizeScore(framework.MaxNodeScore, true, scores)
+func (pl *TaintToleration) NormalizeScore(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, scores fwk.NodeScoreList) *fwk.Status {
+	return helper.DefaultNormalizeScore(fwk.MaxNodeScore, true, scores)
 }
 
 // ScoreExtensions of the Score plugin.
-func (pl *TaintToleration) ScoreExtensions() framework.ScoreExtensions {
+func (pl *TaintToleration) ScoreExtensions() fwk.ScoreExtensions {
 	return pl
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, _ runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	return &TaintToleration{
 		handle:                    h,
 		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,

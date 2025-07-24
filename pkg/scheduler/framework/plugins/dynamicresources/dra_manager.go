@@ -31,12 +31,12 @@ import (
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
-var _ framework.SharedDRAManager = &DefaultDRAManager{}
+var _ fwk.SharedDRAManager = &DefaultDRAManager{}
 
 // DefaultDRAManager is the default implementation of SharedDRAManager. It obtains the DRA objects
 // from API informers, and uses an AssumeCache and a map of in-flight allocations in order
@@ -68,19 +68,19 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, re
 	return manager
 }
 
-func (s *DefaultDRAManager) ResourceClaims() framework.ResourceClaimTracker {
+func (s *DefaultDRAManager) ResourceClaims() fwk.ResourceClaimTracker {
 	return s.resourceClaimTracker
 }
 
-func (s *DefaultDRAManager) ResourceSlices() framework.ResourceSliceLister {
+func (s *DefaultDRAManager) ResourceSlices() fwk.ResourceSliceLister {
 	return s.resourceSliceLister
 }
 
-func (s *DefaultDRAManager) DeviceClasses() framework.DeviceClassLister {
+func (s *DefaultDRAManager) DeviceClasses() fwk.DeviceClassLister {
 	return s.deviceClassLister
 }
 
-var _ framework.ResourceSliceLister = &resourceSliceLister{}
+var _ fwk.ResourceSliceLister = &resourceSliceLister{}
 
 type resourceSliceLister struct {
 	tracker *resourceslicetracker.Tracker
@@ -90,7 +90,7 @@ func (l *resourceSliceLister) ListWithDeviceTaintRules() ([]*resourceapi.Resourc
 	return l.tracker.ListPatchedResourceSlices()
 }
 
-var _ framework.DeviceClassLister = &deviceClassLister{}
+var _ fwk.DeviceClassLister = &deviceClassLister{}
 
 type deviceClassLister struct {
 	classLister resourcelisters.DeviceClassLister
@@ -104,7 +104,7 @@ func (l *deviceClassLister) List() ([]*resourceapi.DeviceClass, error) {
 	return l.classLister.List(labels.Everything())
 }
 
-var _ framework.ResourceClaimTracker = &claimTracker{}
+var _ fwk.ResourceClaimTracker = &claimTracker{}
 
 type claimTracker struct {
 	// cache enables temporarily storing a newer claim object
