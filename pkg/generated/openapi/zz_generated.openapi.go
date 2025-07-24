@@ -47977,7 +47977,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of consumed counters across all device counter consumptions and device counter consumption mixins in a ResourceSlice is 2048.",
+							Description: "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of device counter consumption entries per device 4 and the total number of consumed counters across all device counter consumptions and device counter consumption mixins in a ResourceSlice is 2048.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -48603,7 +48603,7 @@ func schema_k8sio_api_resource_v1_DeviceCounterConsumption(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Includes defines a list of references to device counter consumption mixins. The counters listed in the mixins will be added to the counters that will be consumed by the device.\n\nThe counters of each included mixin are applied in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the DeviceCounterConsumption will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Description: "Includes defines a list of references to device counter consumption mixins. The counters listed in the mixins will be added to the counters that will be consumed by the device.\n\nThe counters of each included mixin are applied in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the DeviceCounterConsumption will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 4.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49713,7 +49713,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceMixins(ref common.ReferenceCallba
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThere are no limits on the number of device mixins, but the total number of attributes and capacities across device mixins and devices in a single ResourceSlice must not exceed 4096.",
+							Description: "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThe maximum number of device mixins in a ResourceSlice is 128 and the total number of attributes and capacities across device mixins and devices in a single ResourceSlice must not exceed 4096.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49732,7 +49732,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceMixins(ref common.ReferenceCallba
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "DeviceCounterConsumption represents a list of counter consumption mixins, each of which contains a set of counters that a device will consume from a counter set.\n\nThere are no limits on the number of device counter consumption mixins, but the total number of consumed counters across device counter consumption mixins and devices in a single ResourceSlice must not exceed 2048.",
+							Description: "DeviceCounterConsumption represents a list of counter consumption mixins, each of which contains a set of counters that a device will consume from a counter set.\n\nThe maximum number of device counter consumption mixins in a ResourceSlice is 128 the total number of consumed counters across device counter consumption mixins and devices in a single ResourceSlice must not exceed 2048.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49751,7 +49751,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceMixins(ref common.ReferenceCallba
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "CounterSet represents a list of counter set mixins, i.e. a collection of counters that a CounterSet can \"include\" to extend the set of counters it already defines.\n\nThere are no limits on the number of counter set mixins, but the total number of counters across counter set mixins and counter sets in a single ResourceSlice must not exceed 256.",
+							Description: "CounterSet represents a list of counter set mixins, i.e. a collection of counters that a CounterSet can \"include\" to extend the set of counters it already defines.\n\nThe maximum number of counter set mixins in a ResourceSlice is 32 and the total number of counters across counter set mixins and counter sets in a single ResourceSlice must not exceed 256.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49846,7 +49846,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of counters in all sets is 32.",
+							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of counter sets in a ResourceSlice is 32 and the total number of counters across counter sets and counter set mixins in a single ResourceSlice must not exceed 256.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -50294,7 +50294,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of consumed counters across all device counter consumptions and device counter consumption mixins in a ResourceSlice is 2048.",
+							Description: "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of device counter consumption entries per device 4 and the total number of consumed counters across all device counter consumptions and device counter consumption mixins in a ResourceSlice is 2048.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -51091,7 +51091,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Includes defines a list of references to device counter consumption mixins. The counters listed in the mixins will be added to the counters that will be consumed by the device.\n\nThe counters of each included mixin are applied in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the DeviceCounterConsumption will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Description: "Includes defines a list of references to device counter consumption mixins. The counters listed in the mixins will be added to the counters that will be consumed by the device.\n\nThe counters of each included mixin are applied in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the DeviceCounterConsumption will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 4.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -52179,7 +52179,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceMixins(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThere are no limits on the number of device mixins, but the total number of attributes and capacities across device mixins and devices in a single ResourceSlice must not exceed 4096.",
+							Description: "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThe maximum number of device mixins in a ResourceSlice is 128 and the total number of attributes and capacities across device mixins and devices in a single ResourceSlice must not exceed 4096.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -52198,7 +52198,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceMixins(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "DeviceCounterConsumption represents a list of counter consumption mixins, each of which contains a set of counters that a device will consume from a counter set.\n\nThere are no limits on the number of device counter consumption mixins, but the total number of consumed counters across device counter consumption mixins and devices in a single ResourceSlice must not exceed 2048.",
+							Description: "DeviceCounterConsumption represents a list of counter consumption mixins, each of which contains a set of counters that a device will consume from a counter set.\n\nThe maximum number of device counter consumption mixins in a ResourceSlice is 128 the total number of consumed counters across device counter consumption mixins and devices in a single ResourceSlice must not exceed 2048.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -52217,7 +52217,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceMixins(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "CounterSet represents a list of counter set mixins, i.e. a collection of counters that a CounterSet can \"include\" to extend the set of counters it already defines.\n\nThere are no limits on the number of counter set mixins, but the total number of counters across counter set mixins and counter sets in a single ResourceSlice must not exceed 256.",
+							Description: "CounterSet represents a list of counter set mixins, i.e. a collection of counters that a CounterSet can \"include\" to extend the set of counters it already defines.\n\nThe maximum number of counter set mixins in a ResourceSlice is 32 and the total number of counters across counter set mixins and counter sets in a single ResourceSlice must not exceed 256.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -52312,7 +52312,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of SharedCounters is 32.",
+							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of counter sets in a ResourceSlice is 32 and the total number of counters across counter sets and counter set mixins in a single ResourceSlice must not exceed 256.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -52635,7 +52635,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of consumed counters across all device counter consumptions and device counter consumption mixins in a ResourceSlice is 2048.",
+							Description: "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of device counter consumption entries per device 4 and the total number of consumed counters across all device counter consumptions and device counter consumption mixins in a ResourceSlice is 2048.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -53261,7 +53261,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Includes defines a list of references to device counter consumption mixins. The counters listed in the mixins will be added to the counters that will be consumed by the device.\n\nThe counters of each included mixin are applied in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the DeviceCounterConsumption will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Description: "Includes defines a list of references to device counter consumption mixins. The counters listed in the mixins will be added to the counters that will be consumed by the device.\n\nThe counters of each included mixin are applied in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the DeviceCounterConsumption will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 4.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -54371,7 +54371,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceMixins(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThere are no limits on the number of device mixins, but the total number of attributes and capacities across device mixins and devices in a single ResourceSlice must not exceed 4096.",
+							Description: "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThe maximum number of device mixins in a ResourceSlice is 128 and the total number of attributes and capacities across device mixins and devices in a single ResourceSlice must not exceed 4096.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -54390,7 +54390,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceMixins(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "DeviceCounterConsumption represents a list of counter consumption mixins, each of which contains a set of counters that a device will consume from a counter set.\n\nThere are no limits on the number of device counter consumption mixins, but the total number of consumed counters across device counter consumption mixins and devices in a single ResourceSlice must not exceed 2048.",
+							Description: "DeviceCounterConsumption represents a list of counter consumption mixins, each of which contains a set of counters that a device will consume from a counter set.\n\nThe maximum number of device counter consumption mixins in a ResourceSlice is 128 the total number of consumed counters across device counter consumption mixins and devices in a single ResourceSlice must not exceed 2048.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -54409,7 +54409,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceMixins(ref common.ReferenceC
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "CounterSet represents a list of counter set mixins, i.e. a collection of counters that a CounterSet can \"include\" to extend the set of counters it already defines.\n\nThere are no limits on the number of counter set mixins, but the total number of counters across counter set mixins and counter sets in a single ResourceSlice must not exceed 256.",
+							Description: "CounterSet represents a list of counter set mixins, i.e. a collection of counters that a CounterSet can \"include\" to extend the set of counters it already defines.\n\nThe maximum number of counter set mixins in a ResourceSlice is 32 and the total number of counters across counter set mixins and counter sets in a single ResourceSlice must not exceed 256.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -54504,7 +54504,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of counters in all sets is 32.",
+							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of counter sets in a ResourceSlice is 32 and the total number of counters across counter sets and counter set mixins in a single ResourceSlice must not exceed 256.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
