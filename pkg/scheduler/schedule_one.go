@@ -302,7 +302,7 @@ func (sched *Scheduler) bindingCycle(
 
 	assumedPod := assumedPodInfo.Pod
 
-	if feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation) {
 		preFlightStatus := schedFramework.RunPreBindPreFlightPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if preFlightStatus.Code() == fwk.Error ||
 			// Unschedulable status is not supported in PreBindPreFlight and hence we regard it as an error.
