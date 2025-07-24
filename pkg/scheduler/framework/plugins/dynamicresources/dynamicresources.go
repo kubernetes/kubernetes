@@ -115,6 +115,7 @@ type DynamicResources struct {
 	enableDeviceTaints         bool
 	enableFilterTimeout        bool
 	filterTimeout              time.Duration
+	enableResourceSliceMixins  bool
 
 	fh         framework.Handle
 	clientset  kubernetes.Interface
@@ -146,6 +147,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		enableSchedulingQueueHint:  fts.EnableSchedulingQueueHint,
 		enablePartitionableDevices: fts.EnablePartitionableDevices,
 		filterTimeout:              ptr.Deref(args.FilterTimeout, metav1.Duration{}).Duration,
+		enableResourceSliceMixins:  fts.EnableResourceSliceMixins,
 
 		fh:        fh,
 		clientset: fh.ClientSet(),
@@ -481,6 +483,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			PrioritizedList:      pl.enablePrioritizedList,
 			PartitionableDevices: pl.enablePartitionableDevices,
 			DeviceTaints:         pl.enableDeviceTaints,
+			ResourceSliceMixins:  pl.enableResourceSliceMixins,
 		}
 		allocator, err := structured.NewAllocator(ctx, features, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
 		if err != nil {

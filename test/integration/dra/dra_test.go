@@ -284,6 +284,7 @@ func TestDRA(t *testing.T) {
 				features.DRADeviceTaints:         true,
 				features.DRAPartitionableDevices: true,
 				features.DRAPrioritizedList:      true,
+				features.DRAResourceSliceMixins:  true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
@@ -809,12 +810,14 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 							}
 							return expected
 						}()...),
+						"Includes": gomega.Equal(device.Includes),
 					}))
 				}
 				return expected
 			}()...),
 			"PerDeviceNodeSelection": matchPointer(spec.PerDeviceNodeSelection),
 			"SharedCounters":         gomega.Equal(spec.SharedCounters),
+			"Mixins":                 gomega.Equal(spec.Mixins),
 		})))
 	}
 

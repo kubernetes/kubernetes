@@ -61,6 +61,19 @@ type Features struct {
 	DeviceTaints         bool
 	PartitionableDevices bool
 	PrioritizedList      bool
+	// ResourceSliceMixins specified whether the DRA ResourceSlice Mixins feature
+	// should be enabled.
+	//
+	// The allocator handles mixins by merging the values defined directly on devices
+	// or counter sets with the values in the mixins when needed. This means that
+	// capacity and attributes from device mixins are merged when the selectors for
+	// a device is evaluated. For counters, either for consumption in devices or in counter
+	// sets, values from mixins are merged when the allocator needs to determine if there
+	// are sufficient counters available for a specifc device.
+	//
+	// To avoid unnecessary memory consumption, we decided against merging the mixins
+	// into all devices before the allocation process.
+	ResourceSliceMixins bool
 }
 
 // Set returns all features which are set to true.
@@ -83,6 +96,9 @@ func (f Features) Set() sets.Set[string] {
 	if f.PrioritizedList {
 		enabled.Insert("DRAPrioritizedList")
 	}
+	if f.ResourceSliceMixins {
+		enabled.Insert("DRAResourceSliceMixins")
+	}
 	return enabled
 }
 
@@ -91,6 +107,7 @@ var FeaturesAll = Features{
 	DeviceTaints:         true,
 	PartitionableDevices: true,
 	PrioritizedList:      true,
+	ResourceSliceMixins:  true,
 }
 
 type DeviceID struct {
