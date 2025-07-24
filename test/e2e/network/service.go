@@ -4272,6 +4272,76 @@ var _ = common.SIGDescribe("Services", func() {
 
 		checkServiceReachabilityFromExecPod(ctx, f.ClientSet, ns, service.Name, service.Spec.ClusterIP, port)
 	})
+
+	ginkgo.It("should support named targetPorts that resolve to different ports on different endpoints", func(ctx context.Context) {
+		serviceName := "mutable-named-port"
+		ns := f.Namespace.Name
+
+		t := NewServerTest(cs, ns, serviceName)
+		defer func() {
+			defer ginkgo.GinkgoRecover()
+			errs := t.Cleanup()
+			if len(errs) != 0 {
+				framework.Failf("errors in cleanup: %v", errs)
+			}
+		}()
+
+		containerPortName := "mutable-port"
+		oldContainerPortNum := int32(8080)
+		modifiedPortNum := int32(8000)
+		containerPortDesc := []v1.ContainerPort{{Name: containerPortName, ContainerPort: oldContainerPortNum, Protocol: v1.ProtocolTCP}}
+		modifiedPortDesc := []v1.ContainerPort{{Name: containerPortName, ContainerPort: modifiedPortNum, Protocol: v1.ProtocolTCP}}
+		args := []string{"serve-hostname", fmt.Sprintf("--port=%d", oldContainerPortNum)}
+		for _, podName := range []string{"testpod0", "testpod1"} {
+			createPodOrFail(ctx, f, ns, podName, t.Labels, containerPortDesc, args...)
+		}
+
+		service := t.BuildServiceSpec()
+		servicePort := int32(8001)
+		service.Spec.Ports = []v1.ServicePort{
+			{
+				Name:       serviceName,
+				Port:       servicePort,
+				TargetPort: intstr.FromString(containerPortName),
+			},
+		}
+
+		ginkgo.By(fmt.Sprintf("creating Service %v with selectors %v", service.Name, service.Spec.Selector))
+		service, err := t.CreateService(service)
+		framework.ExpectNoError(err)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			framework.Logf("Cleaning up the exec pod")
+			err := cs.CoreV1().Pods(ns).Delete(ctx, execPod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", execPod.Name, ns)
+		})
+
+		err = jig.CheckServiceReachability(ctx, service, execPod)
+		framework.ExpectNoError(err)
+		if !checkAffinity(ctx, cs, execPod, service.Spec.ClusterIP, int(servicePort), false) {
+			framework.Failf("reachability check failed on the service %s (%s:%d), expected to reach both endpoints", service.Name, service.Spec.ClusterIP, servicePort)
+		}
+
+		ginkgo.By(fmt.Sprintf("delete pod %s and recreate with a different port number under port name %s", "testpod0", containerPortName))
+		args[1] = fmt.Sprintf("--port=%d", modifiedPortNum)
+		e2epod.DeletePodOrFail(ctx, f.ClientSet, ns, "testpod0")
+		createPodOrFail(ctx, f, ns, "testpod2", t.Labels, modifiedPortDesc, args...)
+		err = jig.CheckServiceReachability(ctx, service, execPod)
+		framework.ExpectNoError(err)
+		if !checkAffinity(ctx, cs, execPod, service.Spec.ClusterIP, int(servicePort), false) {
+			framework.Failf("reachability check failed on the service %s (%s:%d), expected to reach both endpoints", service.Name, service.Spec.ClusterIP, servicePort)
+		}
+
+		ginkgo.By(fmt.Sprintf("delete pod %s and recreate with a different port number under port name %s", "testpod1", containerPortName))
+		e2epod.DeletePodOrFail(ctx, f.ClientSet, ns, "testpod1")
+		createPodOrFail(ctx, f, ns, "testpod3", t.Labels, modifiedPortDesc, args...)
+		err = jig.CheckServiceReachability(ctx, service, execPod)
+		framework.ExpectNoError(err)
+		if !checkAffinity(ctx, cs, execPod, service.Spec.ClusterIP, int(servicePort), false) {
+			framework.Failf("reachability check failed on the service %s (%s:%d), expected to reach both endpoints", service.Name, service.Spec.ClusterIP, servicePort)
+		}
+	})
 })
 
 // execAffinityTestForSessionAffinityTimeout is a helper function that wrap the logic of
