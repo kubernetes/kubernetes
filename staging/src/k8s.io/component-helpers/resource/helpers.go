@@ -116,6 +116,26 @@ func IsPodLevelRequestsSet(pod *v1.Pod) bool {
 	return false
 }
 
+// IsPodLevelLimitsSet checks if pod-level limits are set. It returns true if
+// Limits map is non-empty and contains at least one supported pod-level resource.
+func IsPodLevelLimitsSet(pod *v1.Pod) bool {
+	if pod.Spec.Resources == nil {
+		return false
+	}
+
+	if len(pod.Spec.Resources.Limits) == 0 {
+		return false
+	}
+
+	for resourceName := range pod.Spec.Resources.Limits {
+		if IsSupportedPodLevelResource(resourceName) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // PodRequests computes the total pod requests per the PodResourcesOptions supplied.
 // If PodResourcesOptions is nil, then the requests are returned including pod overhead.
 // If the PodLevelResources feature is enabled AND the pod-level resources are set,
