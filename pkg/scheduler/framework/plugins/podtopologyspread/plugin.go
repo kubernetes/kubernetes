@@ -31,8 +31,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -61,9 +59,9 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
 type PodTopologySpread struct {
 	systemDefaulted                              bool
-	parallelizer                                 parallelize.Parallelizer
+	parallelizer                                 fwk.Parallelizer
 	defaultConstraints                           []v1.TopologySpreadConstraint
-	sharedLister                                 framework.SharedLister
+	sharedLister                                 fwk.SharedLister
 	services                                     corelisters.ServiceLister
 	replicationCtrls                             corelisters.ReplicationControllerLister
 	replicaSets                                  appslisters.ReplicaSetLister
@@ -73,11 +71,11 @@ type PodTopologySpread struct {
 	enableSchedulingQueueHint                    bool
 }
 
-var _ framework.PreFilterPlugin = &PodTopologySpread{}
-var _ framework.FilterPlugin = &PodTopologySpread{}
-var _ framework.PreScorePlugin = &PodTopologySpread{}
-var _ framework.ScorePlugin = &PodTopologySpread{}
-var _ framework.EnqueueExtensions = &PodTopologySpread{}
+var _ fwk.PreFilterPlugin = &PodTopologySpread{}
+var _ fwk.FilterPlugin = &PodTopologySpread{}
+var _ fwk.PreScorePlugin = &PodTopologySpread{}
+var _ fwk.ScorePlugin = &PodTopologySpread{}
+var _ fwk.EnqueueExtensions = &PodTopologySpread{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = names.PodTopologySpread
@@ -88,7 +86,7 @@ func (pl *PodTopologySpread) Name() string {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, plArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	if h.SnapshotSharedLister() == nil {
 		return nil, fmt.Errorf("SnapshotSharedlister is nil")
 	}

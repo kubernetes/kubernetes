@@ -38,11 +38,11 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-var _ framework.PreFilterPlugin = &Fit{}
-var _ framework.FilterPlugin = &Fit{}
-var _ framework.EnqueueExtensions = &Fit{}
-var _ framework.PreScorePlugin = &Fit{}
-var _ framework.ScorePlugin = &Fit{}
+var _ fwk.PreFilterPlugin = &Fit{}
+var _ fwk.FilterPlugin = &Fit{}
+var _ fwk.EnqueueExtensions = &Fit{}
+var _ fwk.PreScorePlugin = &Fit{}
+var _ fwk.ScorePlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -93,12 +93,12 @@ type Fit struct {
 	enableSchedulingQueueHint       bool
 	enablePodLevelResources         bool
 	enableDRAExtendedResource       bool
-	handle                          framework.Handle
+	handle                          fwk.Handle
 	resourceAllocationScorer
 }
 
 // ScoreExtensions of the Score plugin.
-func (f *Fit) ScoreExtensions() framework.ScoreExtensions {
+func (f *Fit) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
@@ -155,7 +155,7 @@ func (f *Fit) Name() string {
 }
 
 // NewFit initializes a new plugin and returns it.
-func NewFit(_ context.Context, plArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	args, ok := plArgs.(*config.NodeResourcesFitArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", plArgs)
@@ -233,7 +233,7 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 }
 
 // withDeviceClass adds resource to device class mapping to preFilterState.
-func withDeviceClass(result *preFilterState, draManager framework.SharedDRAManager) *fwk.Status {
+func withDeviceClass(result *preFilterState, draManager fwk.SharedDRAManager) *fwk.Status {
 	hasExtendedResource := false
 	for rName, rQuant := range result.ScalarResources {
 		// Skip in case request quantity is zero
@@ -261,7 +261,7 @@ func withDeviceClass(result *preFilterState, draManager framework.SharedDRAManag
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	if !f.enableSidecarContainers && hasRestartableInitContainer(pod) {
 		// Scheduler will calculate resources usage for a Pod containing
 		// restartable init containers that will be equal or more than kubelet will
@@ -282,7 +282,7 @@ func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (f *Fit) PreFilterExtensions() framework.PreFilterExtensions {
+func (f *Fit) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
