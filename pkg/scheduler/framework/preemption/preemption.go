@@ -490,11 +490,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		defer metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
 		defer metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		defer func() {
-			if result == metrics.GoroutineResultError {
-				// When API call isn't successful, the Pod may get stuck in the unschedulable pod pool in the worst case.
-				// So, we should move the Pod to the activeQ.
-				ev.Handler.Activate(logger, map[string]*v1.Pod{pod.Name: pod})
-			}
+			ev.Handler.Activate(logger, map[string]*v1.Pod{pod.Name: pod})
 		}()
 		defer cancel()
 		logger.V(2).Info("Start the preemption asynchronously", "preemptor", klog.KObj(pod), "node", c.Name(), "numVictims", len(c.Victims().Pods))
