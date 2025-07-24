@@ -46,6 +46,7 @@ func setupTest(
 ) *generic.PolicyTestContext[*mutating.Policy, *mutating.PolicyBinding, mutating.PolicyEvaluator] {
 
 	testContext, testCancel, err := generic.NewPolicyTestContext[*mutating.Policy, *mutating.PolicyBinding, mutating.PolicyEvaluator](
+		t,
 		mutating.NewMutatingAdmissionPolicyAccessor,
 		mutating.NewMutatingAdmissionPolicyBindingAccessor,
 		compiler,
