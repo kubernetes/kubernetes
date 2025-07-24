@@ -17,14 +17,19 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -140,7 +145,15 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err != nil {
 		return err
 	}
+
+	effectiveVer := compatibility.DefaultComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent)
+	if effectiveVer == nil {
+		effectiveVer = compatibility.DefaultBuildEffectiveVersion()
+	}
+
+	fmt.Println("JTL RecommendedOptions#ApplyTo calling Admission.ApplyTo")
 	if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, kubeClient, dynamicClient, o.FeatureGate,
+		nil,
 		initializers...); err != nil {
 		return err
 	}

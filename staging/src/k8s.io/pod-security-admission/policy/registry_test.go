@@ -22,6 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/pod-security-admission/api"
@@ -43,7 +44,7 @@ func TestCheckRegistry(t *testing.T) {
 	multiOverride.Versions[1].OverrideCheckIDs = []CheckID{"d"}
 	checks = append(checks, multiOverride)
 
-	reg, err := NewEvaluator(checks)
+	reg, err := NewEvaluator(checks, nil)
 	require.NoError(t, err)
 
 	levelCases := []registryTestCase{
@@ -76,7 +77,7 @@ func TestCheckRegistry_NoBaseline(t *testing.T) {
 		withOverrides(generateCheck("h", api.LevelRestricted, []string{"v1.0"}), []CheckID{"b"}),
 	}
 
-	reg, err := NewEvaluator(checks)
+	reg, err := NewEvaluator(checks, nil)
 	require.NoError(t, err)
 
 	levelCases := []registryTestCase{
@@ -103,7 +104,7 @@ func TestCheckRegistry_NoRestricted(t *testing.T) {
 		generateCheck("d", api.LevelBaseline, []string{"v1.11", "v1.15", "v1.20"}),
 	}
 
-	reg, err := NewEvaluator(checks)
+	reg, err := NewEvaluator(checks, nil)
 	require.NoError(t, err)
 
 	levelCases := []registryTestCase{
@@ -124,7 +125,7 @@ func TestCheckRegistry_NoRestricted(t *testing.T) {
 }
 
 func TestCheckRegistry_Empty(t *testing.T) {
-	reg, err := NewEvaluator(nil)
+	reg, err := NewEvaluator(nil, nil)
 	require.NoError(t, err)
 
 	levelCases := []registryTestCase{
