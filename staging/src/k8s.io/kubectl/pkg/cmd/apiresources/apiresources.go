@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -233,7 +234,7 @@ func (o *APIResourceOptions) RunAPIResources() error {
 
 	if !*o.PrintFlags.NoHeaders && (o.PrintFlags.OutputFormat == nil || *o.PrintFlags.OutputFormat == "" || *o.PrintFlags.OutputFormat == "wide") {
 		if err = printContextHeaders(w, *o.PrintFlags.OutputFormat); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
 
@@ -249,7 +250,11 @@ func (o *APIResourceOptions) RunAPIResources() error {
 
 	sort.Stable(sortableResource{flatList.APIResources, o.SortBy})
 
-	return o.PrintObj(flatList, w)
+	err = o.PrintObj(flatList, w)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 func printContextHeaders(out io.Writer, output string) error {

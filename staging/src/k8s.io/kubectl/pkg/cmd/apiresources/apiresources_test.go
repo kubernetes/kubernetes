@@ -333,8 +333,6 @@ bazzes   b            somegroup/v1   true         Baz
 // A separate test function is created because we are using apieqaulity.Semantic.DeepEqual
 // to check equality between input and output
 func TestAPIResourcesRunJsonYaml(t *testing.T) {
-	type commandSetupFn func(cmd *cobra.Command)
-
 	dc := cmdtesting.NewFakeCachedDiscoveryClient()
 	tf := cmdtesting.NewTestFactory().WithDiscoveryClient(dc)
 	defer tf.Cleanup()
@@ -389,21 +387,21 @@ func TestAPIResourcesRunJsonYaml(t *testing.T) {
 
 			for _, v := range []string{"json", "yaml"} {
 				cmd := NewCmdAPIResources(tf, ioStreams)
-				cmd.Flags().Set("output", v)
+				err := cmd.Flags().Set("output", v)
+				assert.NoError(tt, err)
 				cmd.Run(cmd, []string{})
 
 				if errOut.Len() > 0 {
 					t.Fatalf("unexpected error output: %s", errOut.String())
 				}
 				apiResourceList := v1.APIResourceList{}
-				var err error
 				switch v {
 				case "json":
 					err = json.Unmarshal(out.Bytes(), &apiResourceList)
 				case "yaml":
 					err = yaml.Unmarshal(out.Bytes(), &apiResourceList)
 				}
-				assert.Nil(tt, err)
+				assert.NoError(tt, err)
 
 				// this will undo custom value we add in RunAPIResources in the lines:
 				// resource.Group = gv.Group
