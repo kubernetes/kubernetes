@@ -5886,3 +5886,208 @@ func TestPodFileKeyRefInUse(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateContainerRestartRulesOption(t *testing.T) {
+	policyNever := api.ContainerRestartPolicyNever
+	testCases := []struct {
+		name           string
+		oldPodSpec     *api.PodSpec
+		featureEnabled bool
+		want           bool
+	}{
+		{
+			name:           "feature enabled",
+			featureEnabled: true,
+			want:           true,
+		},
+		{
+			name:           "feature disabled",
+			featureEnabled: false,
+			want:           false,
+		},
+		{
+			name: "old pod spec has regular containers with restart policy",
+			oldPodSpec: &api.PodSpec{
+				Containers: []api.Container{{
+					RestartPolicy: &policyNever,
+				}},
+			},
+			featureEnabled: false,
+			want:           true,
+		},
+		{
+			name: "old pod spec has regular containers with restart policy rules",
+			oldPodSpec: &api.PodSpec{
+				Containers: []api.Container{{
+					RestartPolicy: &policyNever,
+					RestartPolicyRules: []api.ContainerRestartRule{{
+						Action: api.ContainerRestartRuleActionRestart,
+						ExitCodes: &api.ContainerRestartRuleOnExitCodes{
+							Operator: api.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{42},
+						},
+					}},
+				}},
+			},
+			featureEnabled: false,
+			want:           true,
+		},
+		{
+			name: "old pod spec has init containers with restart policy",
+			oldPodSpec: &api.PodSpec{
+				InitContainers: []api.Container{{
+					RestartPolicy: &policyNever,
+				}},
+			},
+			featureEnabled: false,
+			want:           true,
+		},
+		{
+			name: "old pod spec has regular containers with restart policy rules",
+			oldPodSpec: &api.PodSpec{
+				InitContainers: []api.Container{{
+					RestartPolicy: &policyNever,
+					RestartPolicyRules: []api.ContainerRestartRule{{
+						Action: api.ContainerRestartRuleActionRestart,
+						ExitCodes: &api.ContainerRestartRuleOnExitCodes{
+							Operator: api.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{42},
+						},
+					}},
+				}},
+			},
+			featureEnabled: false,
+			want:           true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, tc.featureEnabled)
+			// The new pod doesn't impact the outcome.
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, tc.oldPodSpec, nil, nil)
+			if tc.want != gotOptions.AllowContainerRestartPolicyRules {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, gotOptions.AllowInvalidPodDeletionCost)
+			}
+		})
+	}
+}
+
+func Test_dropContainerRestartRules(t *testing.T) {
+	var (
+		always = api.ContainerRestartPolicyAlways
+		rules  = []api.ContainerRestartRule{{
+			Action: api.ContainerRestartRuleActionRestart,
+			ExitCodes: &api.ContainerRestartRuleOnExitCodes{
+				Operator: api.ContainerRestartRuleOnExitCodesOpIn,
+				Values:   []int32{42},
+			},
+		}}
+	)
+
+	initContainerWithRules := &api.Pod{
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{{
+				RestartPolicy:      &always,
+				RestartPolicyRules: rules,
+			}},
+		},
+	}
+	initContainerWithoutRules := &api.Pod{
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{{
+				RestartPolicy: &always,
+			}},
+		},
+	}
+	regularContainerWithRules := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{{
+				RestartPolicy:      &always,
+				RestartPolicyRules: rules,
+			}},
+		},
+	}
+	regularContainerWithoutRules := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{{}},
+		},
+	}
+	ephemeralContainerWithRules := &api.Pod{
+		Spec: api.PodSpec{
+			EphemeralContainers: []api.EphemeralContainer{{
+				EphemeralContainerCommon: api.EphemeralContainerCommon{
+					RestartPolicy:      &always,
+					RestartPolicyRules: rules,
+				},
+			}},
+		},
+	}
+	ephemeralContainerWithoutRules := &api.Pod{
+		Spec: api.PodSpec{
+			EphemeralContainers: []api.EphemeralContainer{{}},
+		},
+	}
+
+	cases := []struct {
+		name           string
+		oldPod         *api.Pod
+		newPod         *api.Pod
+		featureEnabled bool
+		expected       *api.Pod
+	}{
+		{
+			name:     "drop init container rules",
+			newPod:   initContainerWithRules,
+			expected: initContainerWithoutRules,
+		},
+		{
+			name:     "drop regular container rules",
+			newPod:   regularContainerWithRules,
+			expected: regularContainerWithoutRules,
+		},
+		{
+			name:     "drop ephemeral container rules",
+			newPod:   ephemeralContainerWithRules,
+			expected: ephemeralContainerWithoutRules,
+		},
+		{
+			name:           "not drop init container rules when feature gate enabled",
+			newPod:         initContainerWithRules,
+			featureEnabled: true,
+			expected:       initContainerWithRules,
+		},
+		{
+			name:           "not drop regular container rules when feature gate enabled",
+			newPod:         regularContainerWithRules,
+			featureEnabled: true,
+			expected:       regularContainerWithRules,
+		},
+		{
+			name:     "not drop regular container rules when old container has rules",
+			oldPod:   regularContainerWithRules,
+			newPod:   regularContainerWithRules,
+			expected: regularContainerWithRules,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, tc.featureEnabled)
+
+			oldPod := tc.oldPod.DeepCopy()
+			newPod := tc.newPod.DeepCopy()
+			wantPod := tc.expected
+			DropDisabledPodFields(newPod, oldPod)
+
+			// old pod should never be changed
+			if diff := cmp.Diff(oldPod, tc.oldPod); diff != "" {
+				t.Errorf("old pod changed: %s", diff)
+			}
+
+			if diff := cmp.Diff(wantPod, newPod); diff != "" {
+				t.Errorf("new pod changed (- want, + got): %s", diff)
+			}
+		})
+	}
+}

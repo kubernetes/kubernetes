@@ -2109,6 +2109,145 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 	}
 }
 
+func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+	ctx := context.Background()
+	_, _, m, err := createTestRuntimeManager(ctx)
+	require.NoError(t, err)
+
+	// Creating a pair reference pod and status for the test cases to refer
+	// the specific fields.
+	basePod, baseStatus := makeBasePodAndStatus()
+	noAction := podActions{
+		SandboxID:         baseStatus.SandboxStatuses[0].Id,
+		ContainersToStart: []int{},
+		ContainersToKill:  map[kubecontainer.ContainerID]containerToKillInfo{},
+	}
+
+	for desc, test := range map[string]struct {
+		mutatePodFn    func(*v1.Pod)
+		mutateStatusFn func(*kubecontainer.PodStatus)
+		actions        podActions
+		resetStatusFn  func(*kubecontainer.PodStatus)
+	}{
+		"restart exited containers if RestartPolicy == Always": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].RestartPolicy = &containerRestartPolicyAlways
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyAlways
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The first container completed, restart it,
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+
+				// The second container exited with failure, restart it,
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[1].ExitCode = 111
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{0, 1},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
+		"restart failed containers if RestartPolicy == OnFailure": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].RestartPolicy = &containerRestartPolicyOnFailure
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyOnFailure
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The first container completed, don't restart it,
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+
+				// The second container exited with failure, restart it,
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[1].ExitCode = 111
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{1},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
+		"restart created but not started containers if RestartPolicy == OnFailure": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].RestartPolicy = &containerRestartPolicyOnFailure
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyOnFailure
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The first container completed, don't restart it.
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+
+				// The second container was created, but never started.
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateCreated
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{1},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
+		"don't restart containers if RestartPolicy == Never": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[0].RestartPolicy = &containerRestartPolicyNever
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyNever
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// Don't restart any containers.
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[1].ExitCode = 111
+			},
+			actions: noAction,
+		},
+		"Kill pod and recreate all containers (except for the succeeded one) if the pod sandbox is dead": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.Containers[1].RestartPolicy = &containerRestartPolicyOnFailure
+				pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[1].ExitCode = 0
+			},
+			actions: podActions{
+				KillPod:           true,
+				CreateSandbox:     true,
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				Attempt:           uint32(1),
+				ContainersToStart: []int{0, 2},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
+	} {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+		pod, status := makeBasePodAndStatus()
+		if test.mutatePodFn != nil {
+			test.mutatePodFn(pod)
+		}
+		if test.mutateStatusFn != nil {
+			test.mutateStatusFn(status)
+		}
+		ctx := context.Background()
+		actions := m.computePodActions(ctx, pod, status)
+		verifyActions(t, &test.actions, &actions, desc)
+		if test.resetStatusFn != nil {
+			test.resetStatusFn(status)
+		}
+	}
+}
+
 func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)

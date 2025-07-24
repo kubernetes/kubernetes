@@ -3299,6 +3299,210 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 	}
 }
 
+func TestPodPhaseWithContainerRestartPolicy(t *testing.T) {
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+	tests := []struct {
+		name          string
+		spec          *v1.PodSpec
+		statuses      []v1.ContainerStatus
+		podIsTerminal bool
+		expectedPhase v1.PodPhase
+	}{
+		{
+			name: "container with restart policy Never failed",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyNever,
+				}},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses:      []v1.ContainerStatus{failedState("failed-container")},
+			expectedPhase: v1.PodFailed,
+		},
+		{
+			name: "container with restart policy OnFailure failed",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyOnFailure,
+				}},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses: []v1.ContainerStatus{
+				failedState("failed-container"),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "container with restart policy Always failed",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyAlways,
+				}},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses: []v1.ContainerStatus{
+				failedState("failed-container"),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "At least one container with restartable container-level restart policy failed",
+			// Spec to simulate containerB having RestartPolicy: Always
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:          "containerA",
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+					{Name: "containerB"},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				succeededState("containerA"),
+				failedState("containerB"),
+			},
+			expectedPhase: v1.PodRunning,
+		},
+		{
+			name: "All containers without restartable container-level restart policy failed",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:          "containerA",
+						RestartPolicy: &containerRestartPolicyNever,
+					},
+					{
+						Name:          "containerB",
+						RestartPolicy: &containerRestartPolicyOnFailure,
+					},
+				},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses: []v1.ContainerStatus{
+				failedState("containerA"),
+				succeededState("containerB"),
+			},
+			expectedPhase: v1.PodFailed,
+		},
+		{
+			name: "All containers succeeded",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:          "containerA",
+						RestartPolicy: &containerRestartPolicyNever,
+					},
+					{
+						Name:          "containerB",
+						RestartPolicy: &containerRestartPolicyOnFailure,
+					},
+				},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses: []v1.ContainerStatus{
+				succeededState("containerA"),
+				succeededState("containerB"),
+			},
+			expectedPhase: v1.PodSucceeded,
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: *tc.spec,
+				Status: v1.PodStatus{
+					ContainerStatuses: tc.statuses,
+				},
+			}
+			phase := getPhase(pod, tc.statuses, tc.podIsTerminal, true)
+			assert.Equal(t, tc.expectedPhase, phase)
+		})
+	}
+}
+
+func TestPodPhaseWithContainerRestartPolicyInitContainers(t *testing.T) {
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+	tests := []struct {
+		name          string
+		spec          *v1.PodSpec
+		statuses      []v1.ContainerStatus
+		podIsTerminal bool
+		expectedPhase v1.PodPhase
+	}{
+		{
+			name: "init container with restart policy Never failed",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyNever,
+				}},
+				Containers:    []v1.Container{{Name: "container"}},
+				RestartPolicy: v1.RestartPolicyAlways,
+			},
+			statuses:      []v1.ContainerStatus{failedState("failed-container")},
+			expectedPhase: v1.PodFailed,
+		},
+		{
+			name: "init container with restart policy OnFailure failed",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyOnFailure,
+				}},
+				Containers:    []v1.Container{{Name: "container"}},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				failedState("failed-container"),
+			},
+			expectedPhase: v1.PodPending,
+		},
+		{
+			name: "container with restart policy Always failed",
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{{
+					Name:          "failed-container",
+					RestartPolicy: &containerRestartPolicyAlways,
+				}},
+				Containers:    []v1.Container{{Name: "container"}},
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+			statuses: []v1.ContainerStatus{
+				failedState("failed-container"),
+			},
+			expectedPhase: v1.PodPending,
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				Spec: *tc.spec,
+				Status: v1.PodStatus{
+					ContainerStatuses: tc.statuses,
+				},
+			}
+			phase := getPhase(pod, tc.statuses, tc.podIsTerminal, true)
+			assert.Equal(t, tc.expectedPhase, phase)
+		})
+	}
+}
+
 // No special init-specific logic for this, see RestartAlways case
 // func TestPodPhaseWithRestartOnFailureInitContainers(t *testing.T) {
 // }

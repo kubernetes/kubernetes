@@ -2371,6 +2371,210 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 	}
 }
 
+// Test generateAPIPodStatus with different container-level restart policies.
+func TestGenerateAPIPodStatusWithContainerRestartPolicies(t *testing.T) {
+	var (
+		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
+		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
+		containerRestartPolicyNever     = v1.ContainerRestartPolicyNever
+	)
+	testErrorReason := fmt.Errorf("test-error")
+	emptyContainerID := (&kubecontainer.ContainerID{}).String()
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	pod := podWithUIDNameNs("12345678", "foo", "new")
+	podStatus := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:     "succeed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			{
+				Name:     "failed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 1,
+			},
+			{
+				Name:     "succeed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 2,
+			},
+			{
+				Name:     "failed",
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 3,
+			},
+		},
+	}
+	kubelet.reasonCache.add(pod.UID, "succeed", testErrorReason, "")
+	kubelet.reasonCache.add(pod.UID, "failed", testErrorReason, "")
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	for _, test := range []struct {
+		desc                         string
+		containers                   []v1.Container
+		expectedState                map[string]v1.ContainerState
+		expectedLastTerminationState map[string]v1.ContainerState
+	}{
+		{
+			desc: "container restart policy rules match",
+			containers: []v1.Container{
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyNever,
+					RestartPolicyRules: []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{1},
+						},
+					}},
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"failed": {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy rules not match",
+			containers: []v1.Container{
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyNever,
+					RestartPolicyRules: []v1.ContainerRestartRule{{
+						Action: v1.ContainerRestartRuleActionRestart,
+						ExitCodes: &v1.ContainerRestartRuleOnExitCodes{
+							Operator: v1.ContainerRestartRuleOnExitCodesOpIn,
+							Values:   []int32{2},
+						},
+					}},
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    3,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy never",
+			containers: []v1.Container{
+				{
+					Name:          "succeed",
+					RestartPolicy: &containerRestartPolicyNever,
+				},
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyNever,
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    2,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    3,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy OnFailure",
+			containers: []v1.Container{
+				{
+					Name:          "succeed",
+					RestartPolicy: &containerRestartPolicyOnFailure,
+				},
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyOnFailure,
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    2,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+		{
+			desc: "container restart policy Always",
+			containers: []v1.Container{
+				{
+					Name:          "succeed",
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+				{
+					Name:          "failed",
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+			},
+			expectedState: map[string]v1.ContainerState{
+				"succeed": {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+				"failed":  {Waiting: &v1.ContainerStateWaiting{Reason: testErrorReason.Error()}},
+			},
+			expectedLastTerminationState: map[string]v1.ContainerState{
+				"succeed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    0,
+					ContainerID: emptyContainerID,
+				}},
+				"failed": {Terminated: &v1.ContainerStateTerminated{
+					ExitCode:    1,
+					ContainerID: emptyContainerID,
+				}},
+			},
+		},
+	} {
+		pod.Spec.RestartPolicy = v1.RestartPolicyAlways
+		// Test normal containers
+		pod.Spec.Containers = test.containers
+		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false)
+		expectedState, expectedLastTerminationState := test.expectedState, test.expectedLastTerminationState
+		verifyContainerStatuses(t, apiStatus.ContainerStatuses, expectedState, expectedLastTerminationState, test.desc)
+		pod.Spec.Containers = nil
+	}
+}
+
 // testPodAdmitHandler is a lifecycle.PodAdmitHandler for testing.
 type testPodAdmitHandler struct {
 	// list of pods to reject.
