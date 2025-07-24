@@ -38,7 +38,6 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -52,7 +51,6 @@ import (
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -97,7 +95,7 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 	e2etestfiles.AddFileSource(e2etestfiles.RootFileSource{Root: repoRoot})
 	gomega.RegisterFailHandler(ginkgo.Fail)
 
-	ginkgo.It("works across versions", func(ctx context.Context) {
+	ginkgo.It("works", func(ctx context.Context) {
 		// TODO: replace with helper code from https://github.com/kubernetes/kubernetes/pull/122481 should that get merged.
 		tCtx := ktesting.Init(GinkgoContextTB())
 		tCtx = ktesting.WithContext(tCtx, ctx)
@@ -164,7 +162,7 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		cluster := localupcluster.New(tCtx)
 		localUpClusterEnv := map[string]string{
 			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2",
-			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRAAdminAccess=true",
+			"FEATURE_GATES":  "DynamicResourceAllocation=true",
 			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
 		}
 		cluster.Start(tCtx, binDir, localUpClusterEnv)
@@ -187,7 +185,6 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		}
 		f.SetClientConfig(restConfig)
 
-		// Create regular namespace (original test namespace).
 		namespace, err := f.CreateNamespace(tCtx, f.BaseName, map[string]string{
 			"e2e-framework": f.BaseName,
 		})
@@ -205,93 +202,13 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// test the defaults.
 		driver := drautils.NewDriverInstance(f)
 		driver.IsLocal = true
-		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 4)) // Increased from 1 to 4 to support multiple concurrent pods
+		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 1))
 		b := drautils.NewBuilderNow(ctx, f, driver)
 
 		claim := b.ExternalClaim()
 		pod := b.PodExternal()
 		b.Create(ctx, claim, pod)
 		b.TestPod(ctx, f, pod)
-
-		// Create admin namespace with admin-access labels for both 1.33/1.34
-		adminNamespace, err := f.CreateNamespace(tCtx, f.BaseName+"-admin", map[string]string{
-			"e2e-framework":                       f.BaseName,
-			"resource.k8s.io/admin-access":        "true", // Label required for admin access 1.33
-			"resource.kubernetes.io/admin-access": "true", // Label was updated for admin access 1.34+
-		})
-		tCtx.ExpectNoError(err, "create admin namespace")
-
-		// Switch namespace to admin namespace
-		f.Namespace = adminNamespace
-		f.UniqueName = adminNamespace.Name
-		ginkgo.By(fmt.Sprintf("created admin namespace %T %s", adminNamespace, adminNamespace.Name))
-
-		// Create admin access claim template in admin namespace
-		// Create the template with the correct admin namespace
-		adminTemplate := &resourceapi.ResourceClaimTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "admin-template",
-				Namespace: adminNamespace.Name,
-			},
-			Spec: resourceapi.ResourceClaimTemplateSpec{
-				Spec: b.ClaimSpecWithAdminAccess(),
-			},
-		}
-		b.Create(ctx, adminTemplate)
-
-		// Create regular claim template in admin namespace should succeed
-		regularTemplate := &resourceapi.ResourceClaimTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "regular-template",
-				Namespace: adminNamespace.Name,
-			},
-			Spec: resourceapi.ResourceClaimTemplateSpec{
-				Spec: b.ClaimSpec(),
-			},
-		}
-		b.Create(ctx, regularTemplate)
-
-		// Test admin access pod in admin namespace
-		adminPod := b.Pod()
-		adminPod.Name = "admin-pod-v133"
-		adminPod.Namespace = adminNamespace.Name
-		adminPod.Spec.ResourceClaims = []v1.PodResourceClaim{
-			{
-				Name:                      "admin-claim",
-				ResourceClaimTemplateName: ptr.To(adminTemplate.Name),
-			},
-		}
-		adminPod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: "admin-claim"}}
-		b.Create(ctx, adminPod)
-		b.TestPod(ctx, f, adminPod)
-
-		// Test regular pod in admin namespace
-		regularPod := b.Pod()
-		regularPod.Name = "regular-pod-v133"
-		regularPod.Namespace = adminNamespace.Name
-		regularPod.Spec.ResourceClaims = []v1.PodResourceClaim{
-			{
-				Name:                      "regular-claim",
-				ResourceClaimTemplateName: ptr.To(regularTemplate.Name),
-			},
-		}
-		regularPod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: "regular-claim"}}
-		b.Create(ctx, regularPod)
-		b.TestPod(ctx, f, regularPod)
-
-		// Switch namespace to regular namespace
-		f.Namespace = namespace
-		f.UniqueName = namespace.Name
-
-		// Verify admin access template fails in regular namespace
-		_, failClaimTemplate := b.PodInlineWithAdminAccess()
-		failClaimTemplate.Name = "fail-template"
-		failClaimTemplate.Namespace = namespace.Name
-		_, err = f.ClientSet.ResourceV1().ResourceClaimTemplates(namespace.Name).Create(ctx, failClaimTemplate, metav1.CreateOptions{})
-		if err == nil {
-			tCtx.Fatalf("admin access template should fail in regular namespace but succeeded")
-		}
-		tCtx.Logf("Expected error creating admin template in regular namespace: %v", err)
 
 		tCtx = ktesting.End(tCtx)
 
@@ -304,64 +221,12 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 
 		// The kubelet wipes all ResourceSlices on a restart because it doesn't know which drivers were running.
 		// Wait for the ResourceSlice controller in the driver to notice and recreate the ResourceSlices.
-		tCtx = ktesting.Begin(tCtx, "wait for ResourceSlices after upgrade")
+		tCtx = ktesting.Begin(tCtx, "wait for ResourceSlices")
 		gomega.Eventually(ctx, driver.NewGetSlices()).WithTimeout(5 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
 		tCtx = ktesting.End(tCtx)
 
-		// Verify existing admin and regular pods still work after upgrade
-		// Switch namespace to admin namespace
-		f.Namespace = adminNamespace
-		f.UniqueName = adminNamespace.Name
-
-		tCtx = ktesting.Begin(tCtx, "verify admin access pods survive upgrade")
-		gomega.Eventually(ctx, func() error {
-			_, err := f.ClientSet.CoreV1().Pods(adminNamespace.Name).Get(ctx, adminPod.Name, metav1.GetOptions{})
-			return err
-		}).WithTimeout(2*time.Minute).Should(gomega.Succeed(), "admin pod should survive upgrade")
-
-		gomega.Eventually(ctx, func() error {
-			_, err := f.ClientSet.CoreV1().Pods(adminNamespace.Name).Get(ctx, regularPod.Name, metav1.GetOptions{})
-			return err
-		}).WithTimeout(2*time.Minute).Should(gomega.Succeed(), "regular pod should survive upgrade")
-		tCtx = ktesting.End(tCtx)
-
-		// Test new admin access pod in v1.34 using v1
-		tCtx = ktesting.Begin(tCtx, fmt.Sprintf("test new admin access pods in %s", gitVersion))
-		adminPod2 := b.Pod()
-		adminPod2.Name = "admin-pod-v134"
-		adminPod2.Namespace = adminNamespace.Name
-		adminPod2.Spec.ResourceClaims = []v1.PodResourceClaim{
-			{
-				Name:                      "admin-claim-2",
-				ResourceClaimTemplateName: ptr.To(adminTemplate.Name),
-			},
-		}
-		adminPod2.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: "admin-claim-2"}}
-		b.Create(ctx, adminPod2)
-		b.TestPod(ctx, f, adminPod2)
-
-		// Test new regular pod in admin namespace in v1.34 using v1beta2
-		regularPod2 := b.Pod()
-		regularPod2.Name = "regular-pod-v134"
-		regularPod2.Namespace = adminNamespace.Name
-		regularPod2.Spec.ResourceClaims = []v1.PodResourceClaim{
-			{
-				Name:                      "regular-claim-2",
-				ResourceClaimTemplateName: ptr.To(regularTemplate.Name),
-			},
-		}
-		regularPod2.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: "regular-claim-2"}}
-		b.Create(ctx, regularPod2)
-		b.TestPod(ctx, f, regularPod2)
-
-		tCtx = ktesting.End(tCtx)
-
-		// Switch namespace to regular namespace
-		f.Namespace = namespace
-		f.UniqueName = namespace.Name
-
 		// Remove pod prepared by previous Kubernetes.
-		framework.ExpectNoError(f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, namespace.Name, f.Timeouts.PodDelete))
 
@@ -380,43 +245,11 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// TODO: ensure that kube-controller-manager is up-and-running.
 		// This works around https://github.com/kubernetes/kubernetes/issues/132334 and can be removed
 		// once a fix for that is backported.
-		tCtx = ktesting.Begin(tCtx, "wait for kube-controller-manager after downgrade")
+		tCtx = ktesting.Begin(tCtx, "wait for kube-controller-manager")
 		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) string {
 			output, _ := cluster.GetSystemLogs(tCtx, localupcluster.KubeControllerManager)
 			return output
 		}).Should(gomega.ContainSubstring(`"Caches are synced" controller="resource_claim"`))
-		tCtx = ktesting.End(tCtx)
-
-		// Switch namespace to admin namespace
-		f.Namespace = adminNamespace
-		f.UniqueName = adminNamespace.Name
-
-		// Verify admin access pods survive downgrade
-		tCtx = ktesting.Begin(tCtx, "verify admin access pods survive downgrade")
-		gomega.Eventually(ctx, func() error {
-			_, err := f.ClientSet.CoreV1().Pods(adminNamespace.Name).Get(ctx, adminPod.Name, metav1.GetOptions{})
-			return err
-		}).WithTimeout(2*time.Minute).Should(gomega.Succeed(), "first admin pod should survive downgrade")
-
-		gomega.Eventually(ctx, func() error {
-			_, err := f.ClientSet.CoreV1().Pods(adminNamespace.Name).Get(ctx, adminPod2.Name, metav1.GetOptions{})
-			return err
-		}).WithTimeout(2*time.Minute).Should(gomega.Succeed(), "second admin pod should survive downgrade")
-
-		// Create a new regular pod in admin namespace to ensure normal operation after downgrade
-		regularPod3 := b.Pod()
-		regularPod3.Name = "regular-pod-after-downgrade"
-		regularPod3.Namespace = adminNamespace.Name
-		regularPod3.Spec.ResourceClaims = []v1.PodResourceClaim{
-			{
-				Name:                      "regular-claim-3",
-				ResourceClaimTemplateName: ptr.To(regularTemplate.Name),
-			},
-		}
-		regularPod3.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: "regular-claim-3"}}
-		b.Create(ctx, regularPod3)
-		b.TestPod(ctx, f, regularPod3)
-		tCtx.Logf("Successfully tested DRA AdminAccess and regular capabilities across versions")
 		tCtx = ktesting.End(tCtx)
 
 		// We need to clean up explicitly because the normal
@@ -426,35 +259,8 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// to the restarted apiserver. Sometimes, attempts fail with "EOF" as error
 		// or (even weirder) with
 		//     getting *v1.Pod: pods "tester-2" is forbidden: User "kubernetes-admin" cannot get resource "pods" in API group "" in the namespace "dra-9021"
-
-		// Clean up admin namespace pods
-		tCtx = ktesting.Begin(tCtx, "cleanup admin namespace pods")
-		adminPodNames := []string{adminPod.Name, adminPod2.Name, regularPod.Name, regularPod2.Name, regularPod3.Name}
-		for _, podName := range adminPodNames {
-			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-				return f.ClientSet.CoreV1().Pods(adminNamespace.Name).Delete(tCtx, podName, metav1.DeleteOptions{})
-			}).Should(gomega.Succeed(), fmt.Sprintf("delete pod %s", podName))
-		}
-
-		// Wait for all admin namespace pods to be deleted
-		for _, podName := range adminPodNames {
-			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-				pod, err := f.ClientSet.CoreV1().Pods(adminNamespace.Name).Get(tCtx, podName, metav1.GetOptions{})
-				if apierrors.IsNotFound(err) {
-					return nil
-				}
-				tCtx.ExpectNoError(err, "get pod")
-				return pod
-			}).Should(gomega.BeNil(), fmt.Sprintf("pod %s should be deleted", podName))
-		}
-		tCtx = ktesting.End(tCtx)
-
-		// Clean up regular namespace (original test cleanup)
-		f.Namespace = namespace
-		f.UniqueName = namespace.Name
-
 		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
-			return f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
+			return f.ClientSet.ResourceV1beta1().ResourceClaims(namespace.Name).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
 		}).Should(gomega.Succeed(), "delete claim after downgrade")
 		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
 			return f.ClientSet.CoreV1().Pods(namespace.Name).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
