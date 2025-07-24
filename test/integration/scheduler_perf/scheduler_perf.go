@@ -59,6 +59,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	dracel "k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -1097,6 +1098,16 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// Only emulate v1.33 when QueueingHints is explicitly disabled.
 	if qhEnabled, exists := featureGates[features.SchedulerQueueingHints]; exists && !qhEnabled {
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	}
+	// We need to have DRAConsumableCapacity set allowedByFeatureGate for DRAConsumableCapacity feature gate.
+	if consumableEnabled, exists := featureGates[features.DRAConsumableCapacity]; exists && consumableEnabled {
+		dracel.SetDRAConsumableCapacity()
+		dracel.ResetCompiler()
+		t.Logf("Enabling DRAConsumableCapacity CEL compiler (%v)", dracel.DRAConsumableCapacity())
+		t.Cleanup(func() {
+			dracel.UnsetDRAConsumableCapacity()
+			dracel.ResetCompiler()
+		})
 	}
 	for feature, flag := range featureGates {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)
