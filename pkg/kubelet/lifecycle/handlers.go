@@ -45,7 +45,8 @@ import (
 const (
 	maxRespBodyLength = 10 * 1 << 10 // 10KB
 
-	AppArmorNotAdmittedReason = "AppArmor"
+	AppArmorNotAdmittedReason          = "AppArmor"
+	PodLevelResourcesNotAdmittedReason = "PodLevelResourcesNotSupported"
 )
 
 type handlerRunner struct {
@@ -242,4 +243,16 @@ func isHTTPResponseError(err error) bool {
 		return false
 	}
 	return strings.Contains(urlErr.Err.Error(), "server gave HTTP response to HTTPS client")
+}
+
+// NewPodFeaturesAdmitHandler returns a PodAdmitHandler which is used to evaluate
+// if a pod can be admitted from the perspective of pod features compatibility.
+func NewPodFeaturesAdmitHandler() PodAdmitHandler {
+	return &podFeaturesAdmitHandler{}
+}
+
+type podFeaturesAdmitHandler struct{}
+
+func (h *podFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	return isPodLevelResourcesSupported(attrs.Pod)
 }

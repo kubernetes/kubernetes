@@ -4444,7 +4444,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, podClaimNames, fldPath.Child("ephemeralContainers"), opts, &spec.RestartPolicy, hostUsers)...)
 
 	if opts.PodLevelResourcesEnabled {
-		allErrs = append(allErrs, validatePodResources(spec, podClaimNames, fldPath.Child("resources"), opts)...)
+		allErrs = append(allErrs, validatePodResources(spec, podClaimNames, fldPath, opts)...)
 	}
 
 	allErrs = append(allErrs, validatePodHostNetworkDeps(spec, fldPath, opts)...)
@@ -4535,17 +4535,25 @@ func validatePodResources(spec *core.PodSpec, podClaimNames sets.Set[string], fl
 	if spec.Resources == nil {
 		return nil
 	}
+	resourcesFldPath := fldPath.Child("resources")
+	if spec.OS != nil && spec.OS.Name == core.Windows {
+		// Do not include more detailed errors on the resources field value
+		// if the resources field may not be set on the target OS.
+		return field.ErrorList{
+			field.Forbidden(resourcesFldPath, "may not be set for a windows pod"),
+		}
+	}
 
 	allErrs := field.ErrorList{}
 
 	if spec.Resources.Claims != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("claims"), "claims cannot be set for Resources at pod-level"))
+		allErrs = append(allErrs, field.Forbidden(resourcesFldPath.Child("claims"), "claims may not be set for Resources at pod-level"))
 	}
 
 	// validatePodResourceRequirements checks if resource names and quantities are
 	// valid, and requests are less than limits.
-	allErrs = append(allErrs, validatePodResourceRequirements(spec.Resources, podClaimNames, fldPath, opts)...)
-	allErrs = append(allErrs, validatePodResourceConsistency(spec, fldPath)...)
+	allErrs = append(allErrs, validatePodResourceRequirements(spec.Resources, podClaimNames, resourcesFldPath, opts)...)
+	allErrs = append(allErrs, validatePodResourceConsistency(spec, resourcesFldPath)...)
 	return allErrs
 }
 

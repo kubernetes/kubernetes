@@ -3383,6 +3383,15 @@ func TestRecordAdmissionRejection(t *testing.T) {
             `,
 		},
 		{
+			name:   "PodLevelResources",
+			reason: lifecycle.PodLevelResourcesNotAdmittedReason,
+			wants: `
+				# HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+				# TYPE kubelet_admission_rejections_total counter
+				kubelet_admission_rejections_total{reason="PodLevelResourcesNotSupported"} 1
+			`,
+		},
+		{
 			name:   "OtherReason",
 			reason: "OtherReason",
 			wants: `

@@ -4269,6 +4269,7 @@ type PodSpec struct {
 	// - spec.hostPID
 	// - spec.hostIPC
 	// - spec.hostUsers
+	// - spec.resources
 	// - spec.securityContext.appArmorProfile
 	// - spec.securityContext.seLinuxOptions
 	// - spec.securityContext.seccompProfile
