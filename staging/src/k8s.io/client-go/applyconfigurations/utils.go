@@ -1624,6 +1624,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.AllocatedDeviceStatusApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &applyconfigurationsresourcev1.AllocationResultApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("CapacityRequestPolicy"):
+		return &applyconfigurationsresourcev1.CapacityRequestPolicyApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("CapacityRequestPolicyRange"):
+		return &applyconfigurationsresourcev1.CapacityRequestPolicyRangeApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("CapacityRequirements"):
+		return &applyconfigurationsresourcev1.CapacityRequirementsApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("CELDeviceSelector"):
 		return &applyconfigurationsresourcev1.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("Counter"):
@@ -1714,6 +1720,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.AllocationResultApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("BasicDevice"):
 		return &applyconfigurationsresourcev1beta1.BasicDeviceApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CapacityRequestPolicy"):
+		return &applyconfigurationsresourcev1beta1.CapacityRequestPolicyApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CapacityRequestPolicyRange"):
+		return &applyconfigurationsresourcev1beta1.CapacityRequestPolicyRangeApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CapacityRequirements"):
+		return &applyconfigurationsresourcev1beta1.CapacityRequirementsApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("CELDeviceSelector"):
 		return &applyconfigurationsresourcev1beta1.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("Counter"):
@@ -1786,6 +1798,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.AllocatedDeviceStatusApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &applyconfigurationsresourcev1beta2.AllocationResultApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CapacityRequestPolicy"):
+		return &applyconfigurationsresourcev1beta2.CapacityRequestPolicyApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CapacityRequestPolicyRange"):
+		return &applyconfigurationsresourcev1beta2.CapacityRequestPolicyRangeApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CapacityRequirements"):
+		return &applyconfigurationsresourcev1beta2.CapacityRequirementsApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("CELDeviceSelector"):
 		return &applyconfigurationsresourcev1beta2.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("Counter"):
