@@ -2281,7 +2281,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			mustDelete(f.ClientSet, "admin", createdClusterSlice)
 		})
 
-		f.It("controller manager metrics track ResourceClaim operations with correct labels", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
+		f.It("controller manager metrics track ResourceClaim operations with correct labels", f.WithSerial(), f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
 			b := drautils.NewBuilderNow(ctx, f, driver)
 
 			ginkgo.By("Getting initial controller manager metrics")
