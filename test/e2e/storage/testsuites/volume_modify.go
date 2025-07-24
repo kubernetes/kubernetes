@@ -329,7 +329,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		originPv := pv.DeepCopy()
 		pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimRetain
 		_, err = f.ClientSet.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
-		ginkgo.DeferCleanup(recoverPvReclaimPolicyAndRemoveClaimRef, f.ClientSet, originPv)
+		ginkgo.DeferCleanup(recoverPvReclaimPolicy, f.ClientSet, originPv)
 		framework.ExpectNoError(err, "Failed to update PV %q reclaim policy", pvName)
 
 		// The vac_protection_controller make sure there is a VolumeAttributesClass that is not used by any PVC/PV
@@ -370,7 +370,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		ginkgo.By(fmt.Sprintf("Deleting PV %q to make the vac unused for the PV", newVAC.Name))
 		pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimDelete
-		recoverPvReclaimPolicyAndRemoveClaimRef(ctx, f.ClientSet, pv)
+		recoverPvReclaimPolicy(ctx, f.ClientSet, pv)
 
 		ginkgo.By(fmt.Sprintf("Waiting for PV %q to be deleted", pvName))
 		gomega.Eventually(func() bool {
@@ -433,8 +433,8 @@ func CleanupVAC(ctx context.Context, vac *storagev1.VolumeAttributesClass, c cli
 	}, timeout, modifyPollInterval).Should(gomega.BeNil())
 }
 
-// recoverPvReclaimPolicyAndRemoveClaimRef recovers the test pv's reclaim policy to expected used for clean up test PV
-func recoverPvReclaimPolicyAndRemoveClaimRef(ctx context.Context, c clientset.Interface, expectedPv *v1.PersistentVolume) {
+// recoverPvReclaimPolicy recovers the test pv's reclaim policy to expected used for clean up test PV
+func recoverPvReclaimPolicy(ctx context.Context, c clientset.Interface, expectedPv *v1.PersistentVolume) {
 	setPvReclaimPolicyErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		pv, err := c.CoreV1().PersistentVolumes().Get(ctx, expectedPv.Name, metav1.GetOptions{})
 		if err != nil {
@@ -444,11 +444,10 @@ func recoverPvReclaimPolicyAndRemoveClaimRef(ctx context.Context, c clientset.In
 			}
 			return err
 		}
-		if pv.Spec.PersistentVolumeReclaimPolicy == expectedPv.Spec.PersistentVolumeReclaimPolicy && pv.Spec.ClaimRef == nil {
+		if pv.Spec.PersistentVolumeReclaimPolicy == expectedPv.Spec.PersistentVolumeReclaimPolicy {
 			framework.Logf("PV %q reclaim policy is already recovered to %q", expectedPv.Name, expectedPv.Spec.PersistentVolumeReclaimPolicy)
 			return nil
 		}
-		pv.Spec.ClaimRef = nil
 		pv.Spec.PersistentVolumeReclaimPolicy = expectedPv.Spec.PersistentVolumeReclaimPolicy
 		_, err = c.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
 		return err
