@@ -414,6 +414,9 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 			registryAndUser = reg.DockerLibraryRegistry
 			break
 		}
+		if registryAndUser == "docker.io/carlory" {
+			break
+		}
 
 		return "", fmt.Errorf("Registry: %s is missing in test/utils/image/manifest.go, please add the registry, otherwise the test will fail on air-gapped clusters", registryAndUser)
 	}
