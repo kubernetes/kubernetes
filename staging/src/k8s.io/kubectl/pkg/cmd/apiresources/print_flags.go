@@ -1,5 +1,5 @@
 /*
-Copyright 2025~ The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,6 +49,19 @@ func NewPrintFlags() *PrintFlags {
 		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
 		NamePrintFlags:     APIResourcesNewNamePrintFlags(),
 		HumanReadableFlags: APIResourcesHumanReadableFlags(),
+	}
+}
+
+func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
+	f.JSONYamlPrintFlags.AddFlags(cmd)
+	f.HumanReadableFlags.AddFlags(cmd)
+	f.NamePrintFlags.AddFlags(cmd)
+
+	if f.OutputFormat != nil {
+		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf("Output format. One of: (%s).", strings.Join(f.AllowedFormats(), ", ")))
+	}
+	if f.NoHeaders != nil {
+		cmd.Flags().BoolVar(f.NoHeaders, "no-headers", *f.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
 	}
 }
 

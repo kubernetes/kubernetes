@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -388,7 +388,7 @@ func TestAPIResourcesRunJsonYaml(t *testing.T) {
 			for _, v := range []string{"json", "yaml"} {
 				cmd := NewCmdAPIResources(tf, ioStreams)
 				err := cmd.Flags().Set("output", v)
-				assert.NoError(tt, err)
+				require.NoError(tt, err)
 				cmd.Run(cmd, []string{})
 
 				if errOut.Len() > 0 {
@@ -401,7 +401,7 @@ func TestAPIResourcesRunJsonYaml(t *testing.T) {
 				case "yaml":
 					err = yaml.Unmarshal(out.Bytes(), &apiResourceList)
 				}
-				assert.NoError(tt, err)
+				require.NoError(tt, err)
 
 				// this will undo custom value we add in RunAPIResources in the lines:
 				// resource.Group = gv.Group

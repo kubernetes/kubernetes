@@ -79,19 +79,6 @@ type APIResourceOptions struct {
 	PrintObj   printers.ResourcePrinterFunc
 }
 
-func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
-	f.JSONYamlPrintFlags.AddFlags(cmd)
-	f.HumanReadableFlags.AddFlags(cmd)
-	f.NamePrintFlags.AddFlags(cmd)
-
-	if f.OutputFormat != nil {
-		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf("Output format. One of: (%s).", strings.Join(f.AllowedFormats(), ", ")))
-	}
-	if f.NoHeaders != nil {
-		cmd.Flags().BoolVar(f.NoHeaders, "no-headers", *f.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
-	}
-}
-
 // NewAPIResourceOptions creates the options for APIResource
 func NewAPIResourceOptions(ioStreams genericiooptions.IOStreams) *APIResourceOptions {
 	return &APIResourceOptions{
@@ -162,7 +149,17 @@ func (o *APIResourceOptions) Complete(restClientGetter genericclioptions.RESTCli
 		}
 
 		o.PrintObj = func(object runtime.Object, out io.Writer) error {
-			return printer.PrintObj(object, out)
+			errs := []error{}
+			if !*o.PrintFlags.NoHeaders &&
+				(o.PrintFlags.OutputFormat == nil || *o.PrintFlags.OutputFormat == "" || *o.PrintFlags.OutputFormat == "wide") {
+				if err = printContextHeaders(out, *o.PrintFlags.OutputFormat); err != nil {
+					errs = append(errs, err)
+				}
+			}
+			if err := printer.PrintObj(object, out); err != nil {
+				errs = append(errs, err)
+			}
+			return utilerrors.NewAggregate(errs)
 		}
 	}
 
@@ -230,12 +227,6 @@ func (o *APIResourceOptions) RunAPIResources() error {
 		}
 		apiList.APIResources = apiResources
 		allResources = append(allResources, apiList)
-	}
-
-	if !*o.PrintFlags.NoHeaders && (o.PrintFlags.OutputFormat == nil || *o.PrintFlags.OutputFormat == "" || *o.PrintFlags.OutputFormat == "wide") {
-		if err = printContextHeaders(w, *o.PrintFlags.OutputFormat); err != nil {
-			errs = append(errs, err)
-		}
 	}
 
 	flatList := &metav1.APIResourceList{
