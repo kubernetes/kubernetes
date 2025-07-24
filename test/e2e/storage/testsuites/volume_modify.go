@@ -309,10 +309,10 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		framework.ExpectNoError(err, "While waiting for PVC to have expected VAC")
 
 		ginkgo.By("Attempting to delete the VolumeAttributesClass should be stuck and the vac-protection finalizer is consistently exists")
-		err = f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Delete(ctx, newVAC.Name, metav1.DeleteOptions{})
+		err = f.ClientSet.StorageV1().VolumeAttributesClasses().Delete(ctx, newVAC.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete VolumeAttributesClass %q", newVAC.Name)
 		// Check that the finalizer is consistently exists
-		gomega.Consistently(ctx, framework.GetObject(f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Get, createdVAC.Name, metav1.GetOptions{})).
+		gomega.Consistently(ctx, framework.GetObject(f.ClientSet.StorageV1().VolumeAttributesClasses().Get, createdVAC.Name, metav1.GetOptions{})).
 			WithPolling(framework.Poll).WithTimeout(vacCleanupWaitPeriod).Should(gomega.HaveField("Finalizers",
 			gomega.ContainElement(volumeutil.VACProtectionFinalizer)), "finalizer %s was unexpectedly removed", volumeutil.VACProtectionFinalizer)
 
@@ -362,7 +362,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 			Should(gomega.Equal(v1.VolumeReleased))
 
 		ginkgo.By(fmt.Sprintf("Checking the vac-protection finalizer is still consistently exists on VolumeAttributesClass %q", newVAC.Name))
-		gomega.Consistently(ctx, framework.GetObject(f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Get, createdVAC.Name, metav1.GetOptions{})).
+		gomega.Consistently(ctx, framework.GetObject(f.ClientSet.StorageV1().VolumeAttributesClasses().Get, createdVAC.Name, metav1.GetOptions{})).
 			WithPolling(framework.Poll).
 			WithTimeout(vacCleanupWaitPeriod).
 			Should(gomega.HaveField("Finalizers",
@@ -383,7 +383,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		ginkgo.By(fmt.Sprintf("Confirming final deletion of VolumeAttributesClass %q", newVAC.Name))
 		gomega.Eventually(ctx, func(ctx context.Context) bool {
-			_, err := f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Get(ctx, newVAC.Name, metav1.GetOptions{})
+			_, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Get(ctx, newVAC.Name, metav1.GetOptions{})
 			return apierrors.IsNotFound(err)
 		}).
 			WithPolling(framework.Poll).
@@ -424,7 +424,7 @@ func MakeInvalidVAC(config *storageframework.PerTestConfig) *storagev1.VolumeAtt
 // CleanupVAC cleans up the test VolumeAttributesClass
 func CleanupVAC(ctx context.Context, vac *storagev1.VolumeAttributesClass, c clientset.Interface, timeout time.Duration) {
 	gomega.Eventually(ctx, func() error {
-		err := c.StorageV1beta1().VolumeAttributesClasses().Delete(ctx, vac.Name, metav1.DeleteOptions{})
+		err := c.StorageV1().VolumeAttributesClasses().Delete(ctx, vac.Name, metav1.DeleteOptions{})
 		if apierrors.IsNotFound(err) {
 			framework.Logf("VolumeAttributesClass %q is already cleaned up", vac.Name)
 			return nil
