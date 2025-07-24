@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/blang/semver/v4"
+	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/assert"
@@ -463,4 +464,69 @@ func exemplarGatherAndVerify(t *testing.T,
 			t.Fatalf("Got unexpected label %s", *l.Name)
 		}
 	}
+}
+
+// Prometheus does not support exemplars for metric vectors, but only the metric scalars themselves.
+// The following is the only way Prometheus supports exemplars for vectors.
+// We test this to make sure the same expectations are met.
+func TestCounterVecWithExemplar(t *testing.T) {
+	registry := newKubeRegistry(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	counterVec := NewCounterVec(&CounterOpts{
+		Name:      "metric_test_name",
+		Help:      "counter help",
+		Subsystem: "subsystem",
+		Namespace: "namespace",
+	}, []string{"label_a", "label_b"})
+	registry.MustRegister(counterVec)
+
+	// no-op, but this shouldn't panic.
+	c := counterVec.WithContext(nil)
+
+	c.WithLabelValues("1", "2").Inc()
+	c.WithLabelValues("1", "2").(prometheus.ExemplarAdder).AddWithExemplar(100, prometheus.Labels{
+		"exemplar_label": "42",
+	})
+
+	mfs, err := registry.Gather()
+	require.NoError(t, err, "Gather failed %v", err)
+
+	mf := mfs[0]
+
+	assert.Lenf(t, mfs, 1, "Got %v metric families, Want: 1 metric family", len(mfs))
+	assert.Equal(t, BuildFQName("namespace", "subsystem", "metric_test_name"), *mf.Name)
+	assert.Equal(t, "[ALPHA] counter help", mf.GetHelp())
+	assert.Lenf(t, mf.GetMetric(), 1, "Got %v metrics, wanted 1 as the count", len(mf.GetMetric()))
+
+	var m *dto.Metric
+	switch mf.GetType() {
+	case dto.MetricType_COUNTER:
+		m = mfs[0].GetMetric()[0]
+	default:
+		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_COUNTER)
+	}
+
+	var aValue, bValue string
+	for _, l := range m.GetLabel() {
+		if *l.Name == "label_a" {
+			aValue = *l.Value
+		}
+		if *l.Name == "label_b" {
+			bValue = *l.Value
+		}
+	}
+	labelValuePair := aValue + " " + bValue
+	gotValue := int(m.GetCounter().GetValue())
+	gotExemplarValue := int(m.GetCounter().GetExemplar().GetValue())
+	gotExemplarLabelName := m.GetCounter().GetExemplar().GetLabel()[0].GetName()
+	gotExemplarLabelValue := m.GetCounter().GetExemplar().GetLabel()[0].GetValue()
+
+	assert.Equalf(t, "1 2", labelValuePair, "Got %v, wanted %v as the label values", labelValuePair, "1 2")
+	assert.Equalf(t, 101, gotValue, "Got %v, wanted %v as the count while setting label_a to %v and label b to %v", gotValue, 101, aValue, bValue)
+	assert.Equalf(t, 100, gotExemplarValue, "Got %v, wanted %v as the exemplar value while setting label_a to %v and label b to %v", gotExemplarValue, 100, aValue, bValue)
+	assert.Equalf(t, "exemplar_label", gotExemplarLabelName, "Got %v, wanted %v as the exemplar label name", gotExemplarLabelName, "exemplar_label")
+	assert.Equalf(t, "42", gotExemplarLabelValue, "Got %v, wanted %v as the exemplar label value", gotExemplarLabelValue, "42")
 }

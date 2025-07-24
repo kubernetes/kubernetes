@@ -42,6 +42,9 @@ var _ Registerable = &Counter{}
 // The implementation of the Metric interface is expected by testutil.GetCounterMetricValue.
 var _ Metric = &Counter{}
 
+// The implementation of kubeCollector is expected for collector registration.
+var _ kubeCollector = &Counter{}
+
 // NewCounter returns an object which satisfies the kubeCollector and CounterMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
@@ -55,6 +58,27 @@ func NewCounter(opts *CounterOpts) *Counter {
 	kc.setPrometheusCounter(noop)
 	kc.lazyInit(kc, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return kc
+}
+
+// initializeDeprecatedMetric invocation creates the actual (but deprecated) Counter. Until this method
+// is called the underlying counter is a no-op.
+func (c *Counter) initializeDeprecatedMetric() {
+	c.CounterOpts.markDeprecated()
+	c.initializeMetric()
+}
+
+// initializeMetric invocation creates the actual underlying Counter. Until this method is called
+// the underlying counter is a no-op.
+func (c *Counter) initializeMetric() {
+	c.CounterOpts.annotateStabilityLevel()
+	// this actually creates the underlying prometheus counter.
+	c.setPrometheusCounter(prometheus.NewCounter(c.CounterOpts.toPromCounterOpts()))
+}
+
+// setPrometheusCounter sets the underlying CounterMetric object, i.e. the thing that does the measurement.
+func (c *Counter) setPrometheusCounter(counter prometheus.Counter) {
+	c.CounterMetric = counter
+	c.initSelfCollection(counter)
 }
 
 func (c *Counter) Desc() *prometheus.Desc {
@@ -73,30 +97,9 @@ func (c *Counter) Reset() {
 	c.setPrometheusCounter(prometheus.NewCounter(c.CounterOpts.toPromCounterOpts()))
 }
 
-// setPrometheusCounter sets the underlying CounterMetric object, i.e. the thing that does the measurement.
-func (c *Counter) setPrometheusCounter(counter prometheus.Counter) {
-	c.CounterMetric = counter
-	c.initSelfCollection(counter)
-}
-
 // DeprecatedVersion returns a pointer to the Version or nil
 func (c *Counter) DeprecatedVersion() *semver.Version {
 	return parseSemver(c.CounterOpts.DeprecatedVersion)
-}
-
-// initializeMetric invocation creates the actual underlying Counter. Until this method is called
-// the underlying counter is a no-op.
-func (c *Counter) initializeMetric() {
-	c.CounterOpts.annotateStabilityLevel()
-	// this actually creates the underlying prometheus counter.
-	c.setPrometheusCounter(prometheus.NewCounter(c.CounterOpts.toPromCounterOpts()))
-}
-
-// initializeDeprecatedMetric invocation creates the actual (but deprecated) Counter. Until this method
-// is called the underlying counter is a no-op.
-func (c *Counter) initializeDeprecatedMetric() {
-	c.CounterOpts.markDeprecated()
-	c.initializeMetric()
 }
 
 func (c *Counter) Add(v float64) {
@@ -115,11 +118,10 @@ type CounterWithContext struct {
 }
 
 // Post-equipping a counter with context, folks should be able to use it as a regular counter, with exemplar support.
-var _ Registerable = &Counter{}
 var _ Metric = &CounterWithContext{}
 var _ metricWithExemplar = &CounterWithContext{}
 
-// WithContext allows the normal Counter metric to pass in context.
+// WithContext allows a Counter to bind to a context.
 func (c *Counter) WithContext(ctx context.Context) *CounterWithContext {
 	// Return reference to a new counter as modifying the existing one overrides the older context,
 	// and blocks with semaphores. So this is a better option, see:
@@ -164,14 +166,13 @@ type CounterVec struct {
 	originalLabels []string
 }
 
+// The implementation of kubeCollector is expected for collector registration.
+// CounterVec implements the kubeCollector, but not the CounterVecMetric interface.
 var _ kubeCollector = &CounterVec{}
 
-// TODO: make this true: var _ CounterVecMetric = &CounterVec{}
-
-// NewCounterVec returns an object which satisfies the kubeCollector and (almost) CounterVecMetric interfaces.
-// However, the object returned will not measure anything unless the collector is first
-// registered, since the metric is lazily instantiated, and only members extracted after
-// registration will actually measure anything.
+// NewCounterVec returns an object which satisfies the kubeCollector and (almost) CounterVecMetric interfaces. However,
+// the object returned will not measure anything unless the collector is first registered, since the metric is lazily
+// instantiated, and only members extracted after registration will actually measure anything.
 func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
 	opts.StabilityLevel.setDefaults()
 
@@ -248,6 +249,7 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new Counter is created IFF the counterVec has
 // been registered to a metrics registry.
+// TODO: Do a k8s-wide refactor changing this to prometheus.Labels so CounterVec actually implements CounterVecMetric
 func (v *CounterVec) With(labels map[string]string) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
@@ -298,7 +300,10 @@ func (v *CounterVec) ResetLabelAllowLists() {
 	v.LabelValueAllowLists = nil
 }
 
-// WithContext is a no-op.
+// WithContext is a no-op for now, users should still attach this to vectors for seamless future API upgrades (which rely on the context).
+// This is done to keep extensions (such as exemplars) on the counter and not its derivatives.
+// Note that there are no actual uses for this in the codebase except for chaining it with `WithLabelValues`, which makes no use of the context.
+// Furthermore, Prometheus, which is upstream from this library, does not support contextual vectors, so we don't want to diverge.
 func (v *CounterVec) WithContext(_ context.Context) *CounterVec {
 	return v
 }
