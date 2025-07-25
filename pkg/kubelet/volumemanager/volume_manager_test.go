@@ -31,10 +31,13 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/volume"
@@ -241,6 +244,98 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 		"unattached volumes=[vol02 vol2], failed to process volumes=[vol03 vol3]") {
 		t.Errorf("Unexpected error info: %v", err)
 	}
+}
+
+func TestWaitForAttachAndMountVolumeAttachLimitExceededError(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
+
+	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Errorf("Failed to remove temporary directory %s: %v", tmpDir, err)
+		}
+	})
+
+	podManager := kubepod.NewBasicPodManager()
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "abc",
+			Namespace: "nsA",
+			UID:       "1234",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "container1",
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "vol1",
+							MountPath: "/vol1",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "vol1",
+					VolumeSource: v1.VolumeSource{
+						RBD: &v1.RBDVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(pod)
+
+	attachablePlug := &volumetest.FakeVolumePlugin{
+		PluginName: "fake",
+		CanSupportFn: func(spec *volume.Spec) bool {
+			return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD != nil) ||
+				(spec.Volume != nil && spec.Volume.RBD != nil)
+		},
+		VerifyExhaustedEnabled: true,
+	}
+
+	plugMgr := &volume.VolumePluginMgr{}
+	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, kubeClient, nil)
+	if err := plugMgr.InitPlugins([]volume.VolumePlugin{attachablePlug}, nil, fakeVolumeHost); err != nil {
+		t.Fatalf("Failed to initialize volume plugins: %v", err)
+	}
+
+	manager := NewVolumeManager(
+		true,
+		testHostname,
+		podManager,
+		&fakePodStateProvider{},
+		kubeClient,
+		plugMgr,
+		mount.NewFakeMounter(nil),
+		hostutil.NewFakeHostUtil(nil),
+		"",
+		&record.FakeRecorder{},
+		volumetest.NewBlockVolumePathHandler())
+
+	tCtx := ktesting.Init(t)
+	t.Cleanup(func() { tCtx.Cancel("test has completed") })
+	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
+	go manager.Run(tCtx, sourcesReady)
+	podManager.SetPods([]*v1.Pod{pod})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	err = manager.WaitForAttachAndMount(ctx, pod)
+
+	require.Error(t, err, "Expected an error but got none")
+
+	var attachErr *VolumeAttachLimitExceededError
+	require.ErrorAs(t, err, &attachErr, "Error should be of type VolumeAttachLimitExceededError")
+	require.Equal(t, []string{"vol1"}, attachErr.UnmountedVolumes, "UnmountedVolumes mismatch")
+	require.Equal(t, []string{"vol1"}, attachErr.UnattachedVolumes, "UnattachedVolumes mismatch")
+	require.Empty(t, attachErr.VolumesNotInDSW, "VolumesNotInDSW should be empty")
+	require.ErrorIs(t, attachErr.OriginalError, context.DeadlineExceeded, "OriginalError should be context.DeadlineExceeded")
 }
 
 func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {

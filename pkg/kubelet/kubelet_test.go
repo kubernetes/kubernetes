@@ -3425,6 +3425,15 @@ func TestRecordAdmissionRejection(t *testing.T) {
 			`,
 		},
 		{
+			name:   "VolumeAttachmentLimitExceeded",
+			reason: kubeletvolume.VolumeAttachmentLimitExceededReason,
+			wants: `
+				# HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+				# TYPE kubelet_admission_rejections_total counter
+				kubelet_admission_rejections_total{reason="VolumeAttachmentLimitExceeded"} 1
+			`,
+		},
+		{
 			name:   "PodOSSelectorNodeLabelDoesNotMatch",
 			reason: lifecycle.PodOSSelectorNodeLabelDoesNotMatch,
 			wants: `

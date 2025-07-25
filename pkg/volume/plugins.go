@@ -231,7 +231,7 @@ type AttachableVolumePlugin interface {
 	NewDetacher() (Detacher, error)
 	// CanAttach tests if provided volume spec is attachable
 	CanAttach(spec *Spec) (bool, error)
-	VerifyExhaustedResource(spec *Spec, nodeName types.NodeName)
+	VerifyExhaustedResource(spec *Spec) bool
 }
 
 // DeviceMountableVolumePlugin is an extended interface of VolumePlugin and is used
