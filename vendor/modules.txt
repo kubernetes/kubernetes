@@ -1285,6 +1285,7 @@ sigs.k8s.io/structured-merge-diff/v6/merge
 sigs.k8s.io/structured-merge-diff/v6/schema
 sigs.k8s.io/structured-merge-diff/v6/typed
 sigs.k8s.io/structured-merge-diff/v6/value
-# sigs.k8s.io/yaml v1.5.0
+# sigs.k8s.io/yaml v1.6.0
 ## explicit; go 1.22
 sigs.k8s.io/yaml
+sigs.k8s.io/yaml/kyaml
