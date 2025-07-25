@@ -28,17 +28,17 @@ func SplitHostPort(hostport string) (host string, port int) {
 	port = -1
 
 	if strings.HasPrefix(hostport, "[") {
-		addrEnd := strings.LastIndex(hostport, "]")
+		addrEnd := strings.LastIndexByte(hostport, ']')
 		if addrEnd < 0 {
 			// Invalid hostport.
 			return
 		}
-		if i := strings.LastIndex(hostport[addrEnd:], ":"); i < 0 {
+		if i := strings.LastIndexByte(hostport[addrEnd:], ':'); i < 0 {
 			host = hostport[1:addrEnd]
 			return
 		}
 	} else {
-		if i := strings.LastIndex(hostport, ":"); i < 0 {
+		if i := strings.LastIndexByte(hostport, ':'); i < 0 {
 			host = hostport
 			return
 		}
@@ -70,10 +70,17 @@ func requiredHTTPPort(https bool, port int) int { // nolint:revive
 }
 
 func serverClientIP(xForwardedFor string) string {
-	if idx := strings.Index(xForwardedFor, ","); idx >= 0 {
+	if idx := strings.IndexByte(xForwardedFor, ','); idx >= 0 {
 		xForwardedFor = xForwardedFor[:idx]
 	}
 	return xForwardedFor
+}
+
+func httpRoute(pattern string) string {
+	if idx := strings.IndexByte(pattern, '/'); idx >= 0 {
+		return pattern[idx:]
+	}
+	return ""
 }
 
 func netProtocol(proto string) (name string, version string) {

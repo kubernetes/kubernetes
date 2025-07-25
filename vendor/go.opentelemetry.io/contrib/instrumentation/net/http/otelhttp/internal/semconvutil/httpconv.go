@@ -4,6 +4,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
+// Package semconvutil provides OpenTelemetry semantic convention utilities.
 package semconvutil // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconvutil"
 
 import (
@@ -15,6 +16,11 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 )
+
+type HTTPServerRequestOptions struct {
+	// If set, this is used as value for the "http.client_ip" attribute.
+	HTTPClientIP string
+}
 
 // HTTPClientResponse returns trace attributes for an HTTP response received by a
 // client from a server. It will return the following attributes if the related
@@ -75,8 +81,8 @@ func HTTPClientStatus(code int) (codes.Code, string) {
 // "http.target", "net.host.name". The following attributes are returned if
 // they related values are defined in req: "net.host.port", "net.sock.peer.addr",
 // "net.sock.peer.port", "user_agent.original", "http.client_ip".
-func HTTPServerRequest(server string, req *http.Request) []attribute.KeyValue {
-	return hc.ServerRequest(server, req)
+func HTTPServerRequest(server string, req *http.Request, opts HTTPServerRequestOptions) []attribute.KeyValue {
+	return hc.ServerRequest(server, req, opts)
 }
 
 // HTTPServerRequestMetrics returns metric attributes for an HTTP request received by a
@@ -305,7 +311,7 @@ func (c *httpConv) ClientRequestMetrics(req *http.Request) []attribute.KeyValue 
 // related values are defined in req: "net.host.port", "net.sock.peer.addr",
 // "net.sock.peer.port", "user_agent.original", "http.client_ip",
 // "net.protocol.name", "net.protocol.version".
-func (c *httpConv) ServerRequest(server string, req *http.Request) []attribute.KeyValue {
+func (c *httpConv) ServerRequest(server string, req *http.Request, opts HTTPServerRequestOptions) []attribute.KeyValue {
 	/* The following semantic conventions are returned if present:
 	http.method             string
 	http.scheme             string
@@ -358,7 +364,17 @@ func (c *httpConv) ServerRequest(server string, req *http.Request) []attribute.K
 		n++
 	}
 
-	clientIP := serverClientIP(req.Header.Get("X-Forwarded-For"))
+	// For client IP, use, in order:
+	// 1. The value passed in the options
+	// 2. The value in the X-Forwarded-For header
+	// 3. The peer address
+	clientIP := opts.HTTPClientIP
+	if clientIP == "" {
+		clientIP = serverClientIP(req.Header.Get("X-Forwarded-For"))
+		if clientIP == "" {
+			clientIP = peer
+		}
+	}
 	if clientIP != "" {
 		n++
 	}

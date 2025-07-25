@@ -4,6 +4,8 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
+// Package request provides types and functionality to handle HTTP request
+// handling.
 package request // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request"
 
 import (
@@ -56,7 +58,7 @@ func (w *BodyWrapper) updateReadData(n int64, err error) {
 	}
 }
 
-// Closes closes the io.ReadCloser.
+// Close closes the io.ReadCloser.
 func (w *BodyWrapper) Close() error {
 	return w.ReadCloser.Close()
 }

@@ -4,6 +4,8 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
+// Package semconv provides OpenTelemetry semantic convention types and
+// functionality.
 package semconv // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv"
 
 import (
@@ -20,9 +22,14 @@ import (
 	semconvNew "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
+type RequestTraceAttrsOpts struct {
+	// If set, this is used as value for the "http.client_ip" attribute.
+	HTTPClientIP string
+}
+
 type CurrentHTTPServer struct{}
 
-// TraceRequest returns trace attributes for an HTTP request received by a
+// RequestTraceAttrs returns trace attributes for an HTTP request received by a
 // server.
 //
 // The server must be the primary server name if it is known. For example this
@@ -38,7 +45,7 @@ type CurrentHTTPServer struct{}
 //
 // If the primary server name is not known, server should be an empty string.
 // The req Host will be used to determine the server instead.
-func (n CurrentHTTPServer) RequestTraceAttrs(server string, req *http.Request) []attribute.KeyValue {
+func (n CurrentHTTPServer) RequestTraceAttrs(server string, req *http.Request, opts RequestTraceAttrsOpts) []attribute.KeyValue {
 	count := 3 // ServerAddress, Method, Scheme
 
 	var host string
@@ -65,7 +72,8 @@ func (n CurrentHTTPServer) RequestTraceAttrs(server string, req *http.Request) [
 
 	scheme := n.scheme(req.TLS != nil)
 
-	if peer, peerPort := SplitHostPort(req.RemoteAddr); peer != "" {
+	peer, peerPort := SplitHostPort(req.RemoteAddr)
+	if peer != "" {
 		// The Go HTTP server sets RemoteAddr to "IP:port", this will not be a
 		// file-path that would be interpreted with a sock family.
 		count++
@@ -79,7 +87,17 @@ func (n CurrentHTTPServer) RequestTraceAttrs(server string, req *http.Request) [
 		count++
 	}
 
-	clientIP := serverClientIP(req.Header.Get("X-Forwarded-For"))
+	// For client IP, use, in order:
+	// 1. The value passed in the options
+	// 2. The value in the X-Forwarded-For header
+	// 3. The peer address
+	clientIP := opts.HTTPClientIP
+	if clientIP == "" {
+		clientIP = serverClientIP(req.Header.Get("X-Forwarded-For"))
+		if clientIP == "" {
+			clientIP = peer
+		}
+	}
 	if clientIP != "" {
 		count++
 	}
@@ -93,6 +111,11 @@ func (n CurrentHTTPServer) RequestTraceAttrs(server string, req *http.Request) [
 		count++
 	}
 	if protoVersion != "" {
+		count++
+	}
+
+	route := httpRoute(req.Pattern)
+	if route != "" {
 		count++
 	}
 
@@ -119,7 +142,7 @@ func (n CurrentHTTPServer) RequestTraceAttrs(server string, req *http.Request) [
 		}
 	}
 
-	if useragent := req.UserAgent(); useragent != "" {
+	if useragent != "" {
 		attrs = append(attrs, semconvNew.UserAgentOriginal(useragent))
 	}
 
@@ -138,10 +161,14 @@ func (n CurrentHTTPServer) RequestTraceAttrs(server string, req *http.Request) [
 		attrs = append(attrs, semconvNew.NetworkProtocolVersion(protoVersion))
 	}
 
+	if route != "" {
+		attrs = append(attrs, n.Route(route))
+	}
+
 	return attrs
 }
 
-func (o CurrentHTTPServer) NetworkTransportAttr(network string) attribute.KeyValue {
+func (n CurrentHTTPServer) NetworkTransportAttr(network string) attribute.KeyValue {
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 		return semconvNew.NetworkTransportTCP
@@ -176,9 +203,11 @@ func (n CurrentHTTPServer) scheme(https bool) attribute.KeyValue { // nolint:rev
 	return semconvNew.URLScheme("http")
 }
 
-// TraceResponse returns trace attributes for telemetry from an HTTP response.
+// ResponseTraceAttrs returns trace attributes for telemetry from an HTTP
+// response.
 //
-// If any of the fields in the ResponseTelemetry are not set the attribute will be omitted.
+// If any of the fields in the ResponseTelemetry are not set the attribute will
+// be omitted.
 func (n CurrentHTTPServer) ResponseTraceAttrs(resp ResponseTelemetry) []attribute.KeyValue {
 	var count int
 
@@ -241,6 +270,7 @@ func (n CurrentHTTPServer) createMeasures(meter metric.Meter) (metric.Int64Histo
 		semconvNew.HTTPServerRequestDurationName,
 		metric.WithUnit(semconvNew.HTTPServerRequestDurationUnit),
 		metric.WithDescription(semconvNew.HTTPServerRequestDurationDescription),
+		metric.WithExplicitBucketBoundaries(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10),
 	)
 	handleErr(err)
 
@@ -459,6 +489,7 @@ func (n CurrentHTTPClient) createMeasures(meter metric.Meter) (metric.Int64Histo
 		semconvNew.HTTPClientRequestDurationName,
 		metric.WithUnit(semconvNew.HTTPClientRequestDurationUnit),
 		metric.WithDescription(semconvNew.HTTPClientRequestDurationDescription),
+		metric.WithExplicitBucketBoundaries(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10),
 	)
 	handleErr(err)
 
@@ -520,7 +551,7 @@ func (n CurrentHTTPClient) MetricAttributes(req *http.Request, statusCode int, a
 	return attributes
 }
 
-// Attributes for httptrace.
+// TraceAttributes returns attributes for httptrace.
 func (n CurrentHTTPClient) TraceAttributes(host string) []attribute.KeyValue {
 	return []attribute.KeyValue{
 		semconvNew.ServerAddress(host),

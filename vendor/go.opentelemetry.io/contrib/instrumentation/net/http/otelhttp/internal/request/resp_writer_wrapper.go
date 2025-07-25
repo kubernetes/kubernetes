@@ -105,7 +105,7 @@ func (w *RespWriterWrapper) BytesWritten() int64 {
 	return w.written
 }
 
-// BytesWritten returns the HTTP status code that was sent.
+// StatusCode returns the HTTP status code that was sent.
 func (w *RespWriterWrapper) StatusCode() int {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
