@@ -68,12 +68,12 @@ func GetPCIeRootAttributeByPCIBusID(pciBusID string) (DeviceAttribute, error) {
 // But, fortunately, /sys/bus/pci/devices/<address> is a symlink to the actual device path in /sys/devices.
 // So we can resolve the actual device path by reading the symlink at /sys/bus/pci/devices/<address>.
 //
-// For example, if the PCIAddress is "0000:00:1f.0",
-// /sys/bus/pci/devices/0000:00:1f.0 points to
-// /sys/devices/pci0000:01/...<intermediate PCI devices>.../0000:00:1f.0,
-// where "pci0000:01" is the PCIe Root.
+// For example, if the PCIAddress is "0000:04:1f.0",
+// /sys/bus/pci/devices/0000:04:1f.0 points to
+// /sys/devices/pci0000:00/...<intermediate PCI devices>.../0000:04:1f.0,
+// where "pci0000:00" is the PCIe Root.
 func resolvePCIeRoot(pciBusID string) (string, error) {
-	// e.g. /sys/bus/pci/devices/0000:00:1f.0
+	// e.g. /sys/bus/pci/devices/0000:04:1f.0
 	sysBusPath := sysfs.bus(filepath.Join("pci", "devices", pciBusID))
 
 	target, err := os.Readlink(sysBusPath)
@@ -86,7 +86,7 @@ func resolvePCIeRoot(pciBusID string) (string, error) {
 		target = filepath.Join(filepath.Dir(sysBusPath), target)
 	}
 
-	// targetAbs must be /sys/devices/pci0000:01/...<intermediate PCI devices>.../0000:00:1f.0
+	// targetAbs must be /sys/devices/pci0000:00/...<intermediate PCI devices>.../0000:04:1f.0
 	devicePathPrefix := sysfs.devices("pci")
 	if !strings.HasPrefix(target, devicePathPrefix) {
 		return "", fmt.Errorf("symlink target for PCI Bus ID %s is invalid: it must start with %s: %s", pciBusID, devicePathPrefix, target)
