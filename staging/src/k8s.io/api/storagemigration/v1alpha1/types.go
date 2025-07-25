@@ -25,6 +25,7 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.30
+// +k8s:prerelease-lifecycle-gen:deprecated=1.33
 
 // StorageVersionMigration represents a migration of stored data to the latest
 // storage version.
@@ -113,6 +114,7 @@ type StorageVersionMigrationStatus struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.30
+// +k8s:prerelease-lifecycle-gen:deprecated=1.33
 
 // StorageVersionMigrationList is a collection of storage version migrations.
 type StorageVersionMigrationList struct {
