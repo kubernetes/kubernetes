@@ -66,6 +66,33 @@ const (
 	podStartTimeout = 5 * time.Minute
 )
 
+// Tests that have the `withKubelet` argument can run with or without kubelet support for plugins and DRA, aka feature.DynamicResourceAllocation.
+// Without it, the test driver publishes ResourceSlices, but does not attempt to register itself.
+// Tests only expect pods to get scheduled, but not to become running.
+//
+// In 1.35, only a single test really gets promoted to conformance. Those which could get promoted because they don't depend on the kubelet's
+// support for a DRA driver are labeled as ConformanceCandidates.
+type test struct {
+	withKubelet bool
+	conformance bool
+}
+
+func (t test) it(args ...any) {
+	ginkgo.GinkgoHelper()
+	switch {
+	case t.withKubelet:
+		// Cannot become a conformance test unless https://github.com/kubernetes/kubernetes/issues/132364 gets addressed.
+		framework.It(args...)
+	case t.conformance:
+		// Yes, this is a conformance test.
+		framework.ConformanceIt(args...)
+	default:
+		// Conformance candidate. Append the label, similar to framework.ConformanceIt.
+		args = append(args, framework.WithLabel("ConformanceCandidate"))
+		framework.It(args...)
+	}
+}
+
 // The "DRA" label is used to select tests related to DRA in a Ginkgo label filter.
 //
 // Sub-tests starting with "control plane" when testing only the control plane components, without depending
@@ -699,12 +726,6 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	})
 
-	// Tests that have the `withKubelet` argument can run with or without kubelet support for plugins and DRA, aka feature.DynamicResourceAllocation.
-	// Without it, the test driver publishes ResourceSlices, but does not attempt to register itself.
-	// Tests only expect pods to get scheduled, but not to become running.
-	//
-	// TODO before conformance promotion: add https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/conformance-tests.md#sample-conformance-test meta data
-
 	singleNodeTests := func(withKubelet bool) {
 		nodes := drautils.NewNodes(f, 1, 1)
 		maxAllocations := 1
@@ -718,13 +739,27 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		_, expected := b.ParametersEnv()
 		expectedEnv = append(expectedEnv, expected...)
 
-		ginkgo.It("supports claim and class parameters", func(ctx context.Context) {
+		/*
+		   Release: v1.34
+		   Testname: Dynamic Resource Allocation: supports claim and class parameters
+		   Description: The Kubernetes API must support specifying parameters in a ResourceClaimTemplate and DeviceClass.
+		   kube-controller-manager must create the ResourceClaim for a Pod referencing the ResourceClaimTemplate.
+		   kube-scheduler must allocate a suitable device from a ResourceSlice and copy the parameters into the allocation result.
+		   kubelet must invoke a DRA driver such these parameters are active for the Pod (not part of conformance).
+		*/
+		test{withKubelet: withKubelet, conformance: true}.it("supports claim and class parameters", func(ctx context.Context) {
 			pod, template := b.PodInline()
 			b.Create(ctx, pod, template)
 			b.TestPod(ctx, f, pod, expectedEnv...)
 		})
 
-		ginkgo.It("supports reusing resources", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: supports reusing resources
+		   Description: The kube-controller-manager must deallocate ResourceClaims as soon as they are not in use anymore.
+		   kube-scheduler then must use the resources that are available again to schedule pending pods.
+		*/
+		test{withKubelet: withKubelet}.it("supports reusing resources", func(ctx context.Context) {
 			var objects []klog.KMetadata
 			pods := make([]*v1.Pod, numPods)
 			for i := 0; i < numPods; i++ {
@@ -752,7 +787,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			wg.Wait()
 		})
 
-		ginkgo.It("supports sharing a claim concurrently", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: supports sharing a claim concurrently
+		   Description: kube-scheduler must allow different pods to reference the same ResourceClaim and schedule all of them.
+		   kube-controller-manager must deallocate once the last pod has terminated.
+		*/
+		test{withKubelet: withKubelet}.it("supports sharing a claim concurrently", func(ctx context.Context) {
 			var objects []klog.KMetadata
 			objects = append(objects, b.ExternalClaim())
 			pods := make([]*v1.Pod, numPods)
@@ -779,7 +820,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			wg.Wait()
 		})
 
-		ginkgo.It("retries pod scheduling after creating device class", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: kube-scheduler: retries pod scheduling after creating device class
+		   Description: kube-scheduler must retry pod scheduling when a DeviceClass that was missing initially gets created later.
+		*/
+		test{withKubelet: withKubelet}.it("retries pod scheduling after creating device class", func(ctx context.Context) {
 			var objects []klog.KMetadata
 			pod, template := b.PodInline()
 			deviceClassName := template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName
@@ -800,7 +846,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(ctx, f, pod, expectedEnv...)
 		})
 
-		ginkgo.It("retries pod scheduling after updating device class", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: kube-scheduler: retries pod scheduling after updating device class
+		   Description: kube-scheduler must retry pod scheduling when a DeviceClass that initially did not match any devices gets updated later such that it does.
+		*/
+		test{withKubelet: withKubelet}.it("retries pod scheduling after updating device class", func(ctx context.Context) {
 			var objects []klog.KMetadata
 			pod, template := b.PodInline()
 
@@ -831,7 +882,14 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(ctx, f, pod, expectedEnv...)
 		})
 
-		ginkgo.It("runs a pod without a generated resource claim", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: runs a pod without a generated resource claim
+		   Description: kube-controller-manager is allowed to skip creating a ResourceClaim for a ResourceClaimTemplate.
+		   kube-scheduler and the kubelet (not part of conformance) the must proceed as if the ResourceClaimTemplate had
+		   not been referenced in the first place.
+		*/
+		test{withKubelet: withKubelet}.it("runs a pod without a generated resource claim", func(ctx context.Context) {
 			pod, _ /* template */ := b.PodInline()
 			created := b.Create(ctx, pod)
 			pod = created[0].(*v1.Pod)
@@ -849,26 +907,57 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 		})
 
-		ginkgo.It("supports simple pod referencing inline resource claim", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: supports simple pod referencing inline resource claim
+		   Description: The Kubernetes API must support creating a pod which references a ResourceClaimTemplate for a single container.
+		   kube-controller-manager must create a ResourceClaim for it.
+		   kube-scheduler must wait for that ResourceClaim and then schedule the pod.
+		   kubelet must invoke a DRA driver referencing that ResourceClaim (not part of conformance).
+		*/
+		test{withKubelet: withKubelet}.it("supports simple pod referencing inline resource claim", func(ctx context.Context) {
 			pod, template := b.PodInline()
 			b.Create(ctx, pod, template)
 			b.TestPod(ctx, f, pod)
 		})
 
-		ginkgo.It("supports inline claim referenced by multiple containers", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: supports inline claim referenced by multiple containers
+		   Description: The Kubernetes API must support creating a pod which references a ResourceClaimTemplate for different containers.
+		   kube-controller-manager must create a ResourceClaim for it.
+		   kube-scheduler must wait for that ResourceClaim and then schedule the pod.
+		   kubelet must invoke a DRA driver referencing that ResourceClaim (not part of conformance).
+		*/
+		test{withKubelet: withKubelet}.it("supports inline claim referenced by multiple containers", func(ctx context.Context) {
 			pod, template := b.PodInlineMultiple()
 			b.Create(ctx, pod, template)
 			b.TestPod(ctx, f, pod)
 		})
 
-		ginkgo.It("supports simple pod referencing external resource claim", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: supports simple pod referencing external resource claim
+		   Description: The Kubernetes API must support creating a pod which references a ResourceClaim for a single container.
+		   kube-scheduler must wait for that ResourceClaim and then schedule the pod.
+		   kubelet must invoke a DRA driver referencing that ResourceClaim (not part of conformance).
+		*/
+		test{withKubelet: withKubelet}.it("supports simple pod referencing external resource claim", func(ctx context.Context) {
 			pod := b.PodExternal()
 			claim := b.ExternalClaim()
 			b.Create(ctx, claim, pod)
 			b.TestPod(ctx, f, pod)
 		})
 
-		ginkgo.It("supports external claim referenced by multiple pods", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: supports external claim referenced by multiple pods
+		   Description: The Kubernetes API must support creating multiple pods which reference the same ResourceClaim.
+		   kube-scheduler must wait for that ResourceClaim and then schedule all pods.
+		   kubelet must invoke a DRA driver once referencing that ResourceClaim when the first pod
+		   gets started and again when last pod terminates (not part of conformance).
+		*/
+		test{withKubelet: withKubelet}.it("supports external claim referenced by multiple pods", func(ctx context.Context) {
 			pod1 := b.PodExternal()
 			pod2 := b.PodExternal()
 			pod3 := b.PodExternal()
@@ -880,7 +969,15 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}
 		})
 
-		ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: supports external claim referenced by multiple containers of multiple pods
+		   Description: The Kubernetes API must support creating multiple pods which reference the same ResourceClaim for different containers in each pod.
+		   kube-scheduler must wait for that ResourceClaim and then schedule all pods.
+		   kubelet must invoke a DRA driver once referencing that ResourceClaim when the first pod
+		   gets started and again when last pod terminates (not part of conformance).
+		*/
+		test{withKubelet: withKubelet}.it("supports external claim referenced by multiple containers of multiple pods", func(ctx context.Context) {
 			pod1 := b.PodExternalMultiple()
 			pod2 := b.PodExternalMultiple()
 			pod3 := b.PodExternalMultiple()
@@ -892,7 +989,15 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}
 		})
 
-		ginkgo.It("supports init containers", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: supports init containers
+		   Description: The Kubernetes API must support creating a pod where init containers depend on a ResourceClaimTemplate.
+		   kube-controller-manager must create a ResourceClaim for it.
+		   kube-scheduler must wait for that ResourceClaim and then schedule the pod.
+		   kubelet must invoke a DRA driver referencing that ResourceClaim (not part of conformance).
+		*/
+		test{withKubelet: withKubelet}.it("supports init containers", func(ctx context.Context) {
 			pod, template := b.PodInline()
 			pod.Spec.InitContainers = []v1.Container{pod.Spec.Containers[0]}
 			pod.Spec.InitContainers[0].Name += "-init"
@@ -903,7 +1008,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(ctx, f, pod)
 		})
 
-		ginkgo.It("must deallocate after use", func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: must deallocate after use
+		   Description: The kube-controller-manager must deallocate ResourceClaims as soon as a pod got deleted and kubelet acknowledges that the pod has terminated.
+		*/
+		test{withKubelet: withKubelet}.it("must deallocate after use", func(ctx context.Context) {
 			pod := b.PodExternal()
 			claim := b.ExternalClaim()
 			b.Create(ctx, claim, pod)
@@ -967,7 +1077,14 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			driver.WithKubelet = withKubelet
 			b := drautils.NewBuilder(f, driver)
 
-			ginkgo.It("keeps pod pending because of CEL runtime errors", func(ctx context.Context) {
+			/*
+			   Release: v1.??
+			   Testname: Dynamic Resource Allocation: keeps pod pending because of CEL runtime errors
+			   Description: kube-scheduler must handle CEL runtime errors that occur when checking
+			   some node by not scheduling the pod at all, even if the problem does not occur for
+			   other nodes, because the CEL expression supplied by the user is faulty.
+			*/
+			test{withKubelet: withKubelet}.it("keeps pod pending because of CEL runtime errors", func(ctx context.Context) {
 				// When pod scheduling encounters CEL runtime errors for some nodes, but not all,
 				// it should still not schedule the pod because there is something wrong with it.
 				// Scheduling it would make it harder to detect that there is a problem.
@@ -1026,7 +1143,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			driver.WithKubelet = withKubelet
 			b := drautils.NewBuilder(f, driver)
 
-			ginkgo.It("uses all resources", func(ctx context.Context) {
+			/*
+			   Release: v1.??
+			   Testname: Dynamic Resource Allocation: with node-local resources uses all resources
+			   Description: kube-scheduler must be able to schedule pods such that they
+			   use all available devices on a node.
+			*/
+			test{withKubelet: withKubelet}.it("uses all resources", func(ctx context.Context) {
 				var objs []klog.KMetadata
 				var pods []*v1.Pod
 				for i := 0; i < len(nodes.NodeNames); i++ {
@@ -1074,9 +1197,17 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			driver.WithKubelet = withKubelet
 			b := drautils.NewBuilder(f, driver)
 
-			// This test needs the entire test cluster for itself, therefore it is marked as serial.
-			// Running it in parallel happened to cause resource issues.
+			/*
+			   Release: v1.??
+			   Testname: Dynamic Resource Allocation: with network-attached resources supports sharing a claim sequentially
+			   Description: kube-scheduler must be able to schedule pods such that they
+			   share the same ResourceClaim, with as many pods running in parallel as allowed
+			   by the ResourceClaim.Status.ReservedFor field and the others getting scheduled
+			   as soon as one pod stops using the ResourceClaim.
+			*/
 			f.It("supports sharing a claim sequentially", f.WithSlow(), f.WithSerial(), func(ctx context.Context) {
+				// This test needs the entire test cluster for itself, therefore it is marked as serial.
+				// Running it in parallel happened to cause resource issues.
 				var objects []klog.KMetadata
 				objects = append(objects, b.ExternalClaim())
 
@@ -1834,10 +1965,10 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	// It is okay to use the same context multiple times (like "control plane"),
 	// as long as the test names the still remain unique overall.
 
-	framework.Context("control plane", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func() { singleNodeTests(false) })
+	framework.Context("control plane", func() { singleNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on single node", func() { singleNodeTests(true) })
 
-	framework.Context("control plane", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func() { multiNodeTests(false) })
+	framework.Context("control plane", func() { multiNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on multiple nodes", func() { multiNodeTests(true) })
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPrioritizedList), prioritizedListTests)
@@ -1937,12 +2068,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 	})
 
 	ginkgo.Context("ResourceSlice Controller", func() {
-		// This is a stress test for creating many large slices.
-		// Each slice is as large as API limits allow.
-		//
-		// Could become a conformance test because it only depends
-		// on the apiserver.
-		f.It("creates slices", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: DRA driver: creates slices
+		   Description: The kube-apiserver must be able to store large ResourceSlices.
+		*/
+		test{}.it("creates slices", func(ctx context.Context) {
 			// Define desired resource slices.
 			driverName := f.Namespace.Name
 			numSlices := 100
@@ -2032,6 +2163,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 	})
 
+	// Tests here only run without kubelet.
+	// Some of them may be conformance tests.
 	framework.Context("control plane", func() {
 		nodes := drautils.NewNodes(f, 1, 1)
 		driver := drautils.NewDriver(f, nodes, drautils.NetworkResources(10, false))
@@ -2078,7 +2211,13 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}).Should(gomega.Succeed())
 		})
 
-		f.It("truncates the name of a generated resource claim", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: truncates the name of a generated resource claim
+		   Description: When the name of a ResourceClaim is too large to be stored completely in the generated ResourceClaim,
+		   then kube-controller-manager and kube-apiserver must shorten the generated name.
+		*/
+		test{}.it("truncates the name of a generated resource claim", func(ctx context.Context) {
 			pod, template := b.PodInline()
 			pod.Name = strings.Repeat("p", 63)
 			pod.Spec.ResourceClaims[0].Name = strings.Repeat("c", 63)
@@ -2088,7 +2227,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			b.TestPod(ctx, f, pod)
 		})
 
-		f.It("supports count/resourceclaims.resource.k8s.io ResourceQuota", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
+		// This could be required for conformance, but there have been some rare known flakes in the quota controller, so it's not considered
+		// for immmediate promotion.
+		test{}.it("supports count/resourceclaims.resource.k8s.io ResourceQuota", func(ctx context.Context) {
 			claim := &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "claim-0",
@@ -2216,7 +2357,15 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		driver := drautils.NewDriver(f, nodes, drautils.DriverResources(1))
 		driver.WithKubelet = false
 
-		f.It("must apply per-node permission checks", framework.WithLabel("ConformanceCandidate") /* TODO: replace with framework.WithConformance() */, func(ctx context.Context) {
+		/*
+		   Release: v1.??
+		   Testname: Dynamic Resource Allocation: must apply per-node permission checks
+		   Description: kube-apiserver must apply a DRA driver's validating admission policy (VAP)
+		   when the DRA driver creates, updates or deletes ResourceSlices such that each driver
+		   instance is only allowed to access ResourceSlices associated with the node that it is
+		   running on.
+		*/
+		test{}.it("must apply per-node permission checks", func(ctx context.Context) {
 			// All of the operations use the client set of a kubelet plugin for
 			// a fictional node which both don't exist, so nothing interferes
 			// when we actually manage to create a slice.
