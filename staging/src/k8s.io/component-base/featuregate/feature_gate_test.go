@@ -17,6 +17,7 @@ limitations under the License.
 package featuregate
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -1904,4 +1905,56 @@ func TestAddVersioned(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetEmulationVersionWarningSuppression(t *testing.T) {
+	// Test that warnings are suppressed when using context
+	f := NewVersionedFeatureGate(version.MustParse("1.29"))
+
+	// Add a test feature
+	err := f.AddVersioned(map[Feature]VersionedSpecs{
+		"TestFeature": {
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+		},
+	})
+	require.NoError(t, err)
+
+	// Query the feature to mark it as queried
+	_ = f.Enabled("TestFeature")
+
+	// Test 1: Warning should be emitted in normal context
+	err = f.SetEmulationVersion(version.MustParse("1.28"))
+	require.NoError(t, err)
+
+	// Test 2: Warning should be suppressed when using context
+	ctx := WithWarningSuppressionContext(context.Background())
+	err = f.SetEmulationVersionWithContext(ctx, version.MustParse("1.29"))
+	require.NoError(t, err)
+
+	// Test 3: Warning should be emitted again without context
+	err = f.SetEmulationVersion(version.MustParse("1.28"))
+	require.NoError(t, err)
+}
+
+func TestSetEmulationVersionWarningRedirection(t *testing.T) {
+	// Test that warnings can be redirected to test output
+	f := NewVersionedFeatureGate(version.MustParse("1.29"))
+
+	// Add a test feature
+	err := f.AddVersioned(map[Feature]VersionedSpecs{
+		"TestFeature": {
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: Alpha},
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: Beta},
+		},
+	})
+	require.NoError(t, err)
+
+	// Query the feature to mark it as queried
+	_ = f.Enabled("TestFeature")
+
+	// Test: Warning should be redirected to test output instead of global klog
+	ctx := WithTestLoggerContext(context.Background(), t)
+	err = f.SetEmulationVersionWithContext(ctx, version.MustParse("1.28"))
+	require.NoError(t, err)
 }
