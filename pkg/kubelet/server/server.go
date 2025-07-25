@@ -142,6 +142,7 @@ type containerInterface interface {
 	Filter(filter restful.FilterFunction)
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
 	RegisteredWebServices() []*restful.WebService
+	ListedPaths() []string
 
 	// RegisteredHandlePaths returns the paths of handlers registered directly with the container (non-web-services)
 	// Used to test filters are being applied on non-web-service handlers
@@ -160,8 +161,18 @@ func (a *filteringContainer) Handle(path string, handler http.Handler) {
 	a.HandleWithFilter(path, handler)
 	a.registeredHandlePaths = append(a.registeredHandlePaths, path)
 }
+
 func (a *filteringContainer) RegisteredHandlePaths() []string {
 	return a.registeredHandlePaths
+}
+
+func (a *filteringContainer) ListedPaths() []string {
+	return []string{
+		healthz.DefaultHealthzPath,
+		metricsPath,
+		statsPath,
+		podsPath,
+	}
 }
 
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
@@ -576,7 +587,7 @@ func (s *Server) InstallAuthRequiredHandlers() {
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 		s.addMetricsBucketMatcher("statusz")
-		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
+		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(s.restfulCont.ListedPaths())))
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
