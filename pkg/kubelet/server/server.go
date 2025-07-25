@@ -160,6 +160,7 @@ func (a *filteringContainer) Handle(path string, handler http.Handler) {
 	a.HandleWithFilter(path, handler)
 	a.registeredHandlePaths = append(a.registeredHandlePaths, path)
 }
+
 func (a *filteringContainer) RegisteredHandlePaths() []string {
 	return a.registeredHandlePaths
 }
@@ -576,7 +577,7 @@ func (s *Server) InstallAuthRequiredHandlers() {
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 		s.addMetricsBucketMatcher("statusz")
-		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
+		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion(), statusz.WithListedPaths(s.restfulCont.RegisteredHandlePaths())))
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {

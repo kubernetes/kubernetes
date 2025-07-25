@@ -28,6 +28,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -1829,6 +1830,35 @@ func TestTrimURLPath(t *testing.T) {
 
 	for _, test := range tests {
 		assert.Equalf(t, test.expected, getURLRootPath(test.path), "path is: %s", test.path)
+	}
+}
+
+func TestComponentStatusz(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	req, err := http.NewRequest(http.MethodGet, fw.testHTTPServer.URL+"/statusz", nil)
+	require.NoError(t, err)
+	req.Header.Set("Accept", "text/plain")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	respByte, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	respStr := string(respByte)
+	statuszPathOutput := regexp.MustCompile("Paths.*\n").FindString(respStr)
+	require.NotEmpty(t, statuszPathOutput, "/statusz response should contain listed paths when ComponentStatusz feature gate enabled")
+	listedPaths := regexp.MustCompile(`/\S+`).FindAllString(statuszPathOutput, -1)
+	require.NotEmpty(t, listedPaths, "/statusz response should contain listed paths when ComponentStatusz feature gate enabled")
+	for _, path := range listedPaths {
+		resp, err := http.Get(fw.testHTTPServer.URL + path)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode, "/statusz provided listed paths should return 200 status code")
 	}
 }
 
