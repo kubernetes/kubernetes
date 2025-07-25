@@ -58,6 +58,8 @@ type Features struct {
 	// Sorted alphabetically. When adding a new entry, also extend Set and FeaturesAll.
 
 	AdminAccess          bool
+	DeviceBinding        bool
+	DeviceStatus         bool
 	DeviceTaints         bool
 	PartitionableDevices bool
 	PrioritizedList      bool
@@ -83,11 +85,19 @@ func (f Features) Set() sets.Set[string] {
 	if f.PrioritizedList {
 		enabled.Insert("DRAPrioritizedList")
 	}
+	if f.DeviceBinding {
+		enabled.Insert("DRADeviceBindingConditions")
+	}
+	if f.DeviceStatus {
+		enabled.Insert("DRAResourceClaimDeviceStatus")
+	}
 	return enabled
 }
 
 var FeaturesAll = Features{
 	AdminAccess:          true,
+	DeviceBinding:        true,
+	DeviceStatus:         true,
 	DeviceTaints:         true,
 	PartitionableDevices: true,
 	PrioritizedList:      true,
