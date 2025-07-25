@@ -113,7 +113,7 @@ func TestStatus(t *testing.T) {
 				t.Errorf("status.IsSkip() returns %v, but want %v", test.status.IsSkip(), test.expectedIsSkip)
 			}
 
-			if test.status.AsError() == test.expectedAsError {
+			if errors.Is(test.status.AsError(), test.expectedAsError) {
 				return
 			}
 
