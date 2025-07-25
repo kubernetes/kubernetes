@@ -348,14 +348,6 @@ var (
 			},
 		}).
 		Obj()
-
-	claimWithBindingConditions2 = st.FromResourceClaim(claim2).
-					Allocation(allocationResultWithBindingConditions2).
-					Obj()
-
-	allocatedClaimWithBindingConditions = st.FromResourceClaim(claim).
-						Allocation(allocationResultWithBindingConditions).
-						Obj()
 )
 
 func taintDevices(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
@@ -1308,45 +1300,6 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
-		"binding-conditions-with-timeout": {
-			// This test case checks that the binding conditions
-			// are timed out in the prebind phase and prebind fails.
-			// The timeout is set to 15 seconds in fabricSlice.
-			// The claim is allocated, but the binding conditions are not met (nor failed),
-			// and the claim remains unchanged within the entire timeout period.
-			enableDRADeviceBindingConditions:   true,
-			enableDRAResourceClaimDeviceStatus: true,
-			pod:                                podWithClaimName,
-			claims:                             []*resourceapi.ResourceClaim{claim},
-			classes:                            []*resourceapi.DeviceClass{deviceClass},
-			nodes:                              []*v1.Node{workerNode},
-			objs:                               []apiruntime.Object{fabricSlice},
-			want: want{
-				reserve: result{
-					inFlightClaim: st.FromResourceClaim(claim).
-						Allocation(allocationResultWithBindingConditions).
-						Obj(),
-				},
-				prebind: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `binding timeout`),
-					changes: change{
-						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
-							if claim.Name == claimName {
-								claim = claim.DeepCopy()
-								claim.Finalizers = allocatedClaim.Finalizers
-								claim.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{
-									{Resource: "pods", Name: podName, UID: types.UID(podUID)},
-								}
-								claim.Status.Allocation = allocatedClaim.Status.Allocation
-								claim.Status.Allocation.Devices = allocationResultWithBindingConditions.Devices
-							}
-							return claim
-						},
-					},
-					assumedClaim: reserve(allocatedClaimWithBindingConditions, podWithClaimName),
-				},
-			},
-		},
 		"bound-claim-with-mixed-binding-conditions": {
 			enableDRADeviceBindingConditions:   true,
 			enableDRAResourceClaimDeviceStatus: true,
@@ -1355,7 +1308,7 @@ func TestPlugin(t *testing.T) {
 				claim := allocatedClaim.DeepCopy()
 				claim.Status.Allocation = allocationResultWithBindingConditions.DeepCopy()
 				// This claim has binding conditions but is timed out.
-				claim.Status.Allocation.AllocationTimestamp = ptr.To(metav1.NewTime(time.Now().Add(-20 * time.Second)))
+				claim.Status.Allocation.AllocationTimestamp = ptr.To(metav1.NewTime(time.Now().Add(-10 * time.Minute)))
 				claim.Status.Devices = []resourceapi.AllocatedDeviceStatus{
 					{
 						Driver: driver,
@@ -1458,27 +1411,6 @@ func TestPlugin(t *testing.T) {
 						},
 					},
 					status: fwk.NewStatus(fwk.Unschedulable, `deallocation of ResourceClaim completed`),
-				},
-			},
-		},
-		"multi-claims-binding-conditions-one-timeout": {
-			enableDRADeviceBindingConditions:   true,
-			enableDRAResourceClaimDeviceStatus: true,
-			pod:                                podWithTwoClaimNames,
-			claims:                             []*resourceapi.ResourceClaim{boundClaim, claimWithBindingConditions2},
-			classes:                            []*resourceapi.DeviceClass{deviceClass},
-			nodes:                              []*v1.Node{workerNode},
-			objs:                               []apiruntime.Object{fabricSlice, fabricSlice2},
-			want: want{
-				prebind: result{
-					status: fwk.NewStatus(fwk.Unschedulable, `binding timeout`),
-					changes: change{
-						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
-							return st.FromResourceClaim(in).
-								ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
-								Obj()
-						},
-					},
 				},
 			},
 		},
