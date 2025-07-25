@@ -26,14 +26,17 @@ import (
 // DeviceApplyConfiguration represents a declarative configuration of the Device type for use
 // with apply.
 type DeviceApplyConfiguration struct {
-	Name             *string                                                             `json:"name,omitempty"`
-	Attributes       map[resourcev1beta2.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
-	Capacity         map[resourcev1beta2.QualifiedName]DeviceCapacityApplyConfiguration  `json:"capacity,omitempty"`
-	ConsumesCounters []DeviceCounterConsumptionApplyConfiguration                        `json:"consumesCounters,omitempty"`
-	NodeName         *string                                                             `json:"nodeName,omitempty"`
-	NodeSelector     *v1.NodeSelectorApplyConfiguration                                  `json:"nodeSelector,omitempty"`
-	AllNodes         *bool                                                               `json:"allNodes,omitempty"`
-	Taints           []DeviceTaintApplyConfiguration                                     `json:"taints,omitempty"`
+	Name                     *string                                                             `json:"name,omitempty"`
+	Attributes               map[resourcev1beta2.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
+	Capacity                 map[resourcev1beta2.QualifiedName]DeviceCapacityApplyConfiguration  `json:"capacity,omitempty"`
+	ConsumesCounters         []DeviceCounterConsumptionApplyConfiguration                        `json:"consumesCounters,omitempty"`
+	NodeName                 *string                                                             `json:"nodeName,omitempty"`
+	NodeSelector             *v1.NodeSelectorApplyConfiguration                                  `json:"nodeSelector,omitempty"`
+	AllNodes                 *bool                                                               `json:"allNodes,omitempty"`
+	Taints                   []DeviceTaintApplyConfiguration                                     `json:"taints,omitempty"`
+	BindsToNode              *bool                                                               `json:"bindsToNode,omitempty"`
+	BindingConditions        []string                                                            `json:"bindingConditions,omitempty"`
+	BindingFailureConditions []string                                                            `json:"bindingFailureConditions,omitempty"`
 }
 
 // DeviceApplyConfiguration constructs a declarative configuration of the Device type for use with
@@ -124,6 +127,34 @@ func (b *DeviceApplyConfiguration) WithTaints(values ...*DeviceTaintApplyConfigu
 			panic("nil value passed to WithTaints")
 		}
 		b.Taints = append(b.Taints, *values[i])
+	}
+	return b
+}
+
+// WithBindsToNode sets the BindsToNode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BindsToNode field is set to the value of the last call.
+func (b *DeviceApplyConfiguration) WithBindsToNode(value bool) *DeviceApplyConfiguration {
+	b.BindsToNode = &value
+	return b
+}
+
+// WithBindingConditions adds the given value to the BindingConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BindingConditions field.
+func (b *DeviceApplyConfiguration) WithBindingConditions(values ...string) *DeviceApplyConfiguration {
+	for i := range values {
+		b.BindingConditions = append(b.BindingConditions, values[i])
+	}
+	return b
+}
+
+// WithBindingFailureConditions adds the given value to the BindingFailureConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BindingFailureConditions field.
+func (b *DeviceApplyConfiguration) WithBindingFailureConditions(values ...string) *DeviceApplyConfiguration {
+	for i := range values {
+		b.BindingFailureConditions = append(b.BindingFailureConditions, values[i])
 	}
 	return b
 }

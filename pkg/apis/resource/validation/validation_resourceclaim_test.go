@@ -95,7 +95,8 @@ var (
 			},
 		},
 	}
-	validClaim = testClaim(goodName, goodNS, validClaimSpec)
+	validClaim                    = testClaim(goodName, goodNS, validClaimSpec)
+	conditionValidationErrMessage = "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"
 )
 
 func TestValidateClaim(t *testing.T) {
@@ -1700,6 +1701,145 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				return claim
 			},
 			prioritizedListFeatureGate: false,
+		},
+		"good-binding-conditions": {
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"example.com/condition1", "condition2", "condition3", "condition4"},
+							BindingFailureConditions: []string{"example.com/condition5", "condition6", "condition7", "condition8"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"too-many-binding-conditions": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), 5, 4)},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2", "condition3", "condition4", "condition5"},
+							BindingFailureConditions: []string{"condition6", "condition7"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"too-many-binding-failure-conditions": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), 5, 4)},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2"},
+							BindingFailureConditions: []string{"condition3", "condition4", "condition5", "condition6", "condition7"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-binding-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions").Index(1), "condition2!", conditionValidationErrMessage)},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2!"},
+							BindingFailureConditions: []string{"condition3", "condition4"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-binding-failure-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions").Index(1), "condition4!", conditionValidationErrMessage)},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2"},
+							BindingFailureConditions: []string{"condition3", "condition4!"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"lacking-binding-conditions-claim-has-binding-failure-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), []string(nil), "bindingConditions are required to use bindingFailureConditions")},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        nil,
+							BindingFailureConditions: []string{"condition3", "condition4"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"lacking-binding-failure-conditions-claim-has-binding-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), []string(nil), "bindingFailureConditions are required to use bindingConditions")},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2"},
+							BindingFailureConditions: nil,
+						}},
+					},
+				}
+				return claim
+			},
 		},
 	}
 
