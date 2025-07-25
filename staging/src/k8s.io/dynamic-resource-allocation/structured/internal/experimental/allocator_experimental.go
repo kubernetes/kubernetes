@@ -1329,25 +1329,9 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult, target
 			nodeName = slice.Spec.NodeName
 			nodeSelector = slice.Spec.NodeSelector
 		}
-		if nodeName != nil {
-			// At least one device is local to one node. This
-			// restricts the allocation to that node.
-			return &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{{
-					MatchFields: []v1.NodeSelectorRequirement{{
-						Key:      "metadata.name",
-						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{*nodeName},
-					}},
-				}},
-			}, nil
-		}
-		if result[i].BindsToNode {
-			// This device binds to a node, so we need to
-			// restrict the allocation to that node.
-			if targetNodeName == "" {
-				return nil, fmt.Errorf("device %s binds to a node, but no target node name is provided", result[i].id.Device)
-			}
+		if nodeName != nil || result[i].BindsToNode {
+			// At least one device is local to one node or binds to a node,
+			// so we need to restrict the allocation to that node.
 			return &v1.NodeSelector{
 				NodeSelectorTerms: []v1.NodeSelectorTerm{{
 					MatchFields: []v1.NodeSelectorRequirement{{
