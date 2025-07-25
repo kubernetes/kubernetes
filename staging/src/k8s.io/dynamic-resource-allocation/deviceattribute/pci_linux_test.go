@@ -29,7 +29,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 )
 
-func TestGetPCIeRootBAttributeyPCIBusID(t *testing.T) {
+func TestGetPCIeRootAttributePCIBusID(t *testing.T) {
 	pciBusID := "0000:01:02.3"
 	pcieRoot := "pci0000:01"
 	expectedAttribute := DeviceAttribute{
