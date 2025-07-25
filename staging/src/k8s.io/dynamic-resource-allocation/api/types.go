@@ -51,14 +51,17 @@ type ResourcePool struct {
 	ResourceSliceCount int64
 }
 type Device struct {
-	Name             UniqueString
-	Attributes       map[QualifiedName]DeviceAttribute
-	Capacity         map[QualifiedName]DeviceCapacity
-	ConsumesCounters []DeviceCounterConsumption
-	NodeName         *string
-	NodeSelector     *v1.NodeSelector
-	AllNodes         *bool
-	Taints           []resourceapi.DeviceTaint
+	Name                     UniqueString
+	Attributes               map[QualifiedName]DeviceAttribute
+	Capacity                 map[QualifiedName]DeviceCapacity
+	ConsumesCounters         []DeviceCounterConsumption
+	NodeName                 *string
+	NodeSelector             *v1.NodeSelector
+	AllNodes                 *bool
+	Taints                   []resourceapi.DeviceTaint
+	BindsToNode              bool
+	BindingConditions        []string
+	BindingFailureConditions []string
 }
 
 type DeviceCounterConsumption struct {
