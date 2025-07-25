@@ -49,6 +49,7 @@ import (
 	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -111,6 +112,12 @@ func TestSchedulingGates(t *testing.T) {
 				scheduler.WithPodMaxBackoffSeconds(0),
 			)
 			testutils.SyncSchedulerInformerFactory(testCtx)
+
+			if testCtx.Scheduler.APIDispatcher != nil {
+				logger, _ := ktesting.NewTestContext(t)
+				testCtx.Scheduler.APIDispatcher.Run(logger)
+				defer testCtx.Scheduler.APIDispatcher.Close()
+			}
 
 			cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
 

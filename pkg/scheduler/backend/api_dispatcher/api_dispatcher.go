@@ -65,11 +65,11 @@ func (ad *APIDispatcher) SyncObject(obj metav1.Object) (metav1.Object, error) {
 // Run starts the main processing loop of the APIDispatcher, which pops calls
 // from the queue and dispatches them to worker goroutines for execution.
 func (ad *APIDispatcher) Run(logger klog.Logger) {
-	go func() {
-		// Create a new context to allow to cancel the APICalls' execution when the APIDispatcher is closed.
-		ctx, cancel := context.WithCancel(context.Background())
-		ad.cancel = cancel
+	// Create a new context to allow to cancel the APICalls' execution when the APIDispatcher is closed.
+	ctx, cancel := context.WithCancel(context.Background())
+	ad.cancel = cancel
 
+	go func() {
 		for {
 			select {
 			case <-ctx.Done():

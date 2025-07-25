@@ -37,6 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -86,6 +87,8 @@ type frameworkImpl struct {
 	extenders []framework.Extender
 	framework.PodNominator
 	framework.PodActivator
+	apiDispatcher *apidispatcher.APIDispatcher
+	apiCacher     framework.APICacher
 
 	parallelizer parallelize.Parallelizer
 }
@@ -138,6 +141,7 @@ type frameworkOptions struct {
 	captureProfile         CaptureProfile
 	parallelizer           parallelize.Parallelizer
 	waitingPods            *waitingPodsMap
+	apiDispatcher          *apidispatcher.APIDispatcher
 	logger                 *klog.Logger
 }
 
@@ -223,6 +227,13 @@ func WithParallelism(parallelism int) Option {
 	}
 }
 
+// WithAPIDispatcher sets API dispatcher for the scheduling frameworkImpl.
+func WithAPIDispatcher(apiDispatcher *apidispatcher.APIDispatcher) Option {
+	return func(o *frameworkOptions) {
+		o.apiDispatcher = apiDispatcher
+	}
+}
+
 // CaptureProfile is a callback to capture a finalized profile.
 type CaptureProfile func(config.KubeSchedulerProfile)
 
@@ -289,6 +300,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		extenders:            options.extenders,
 		PodNominator:         options.podNominator,
 		PodActivator:         options.podActivator,
+		apiDispatcher:        options.apiDispatcher,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
 	}
@@ -439,6 +451,10 @@ func (f *frameworkImpl) SetPodNominator(n framework.PodNominator) {
 
 func (f *frameworkImpl) SetPodActivator(a framework.PodActivator) {
 	f.PodActivator = a
+}
+
+func (f *frameworkImpl) SetAPICacher(c framework.APICacher) {
+	f.apiCacher = c
 }
 
 // Close closes each plugin, when they implement io.Closer interface.
@@ -1678,4 +1694,23 @@ func (f *frameworkImpl) PercentageOfNodesToScore() *int32 {
 // Parallelizer returns a parallelizer holding parallelism for scheduler.
 func (f *frameworkImpl) Parallelizer() parallelize.Parallelizer {
 	return f.parallelizer
+}
+
+// APIDispatcher returns an apiDispatcher that can be used to dispatch API calls.
+// This requires SchedulerAsyncAPICalls feature gate to be enabled.
+func (f *frameworkImpl) APIDispatcher() fwk.APIDispatcher {
+	if f.apiDispatcher == nil {
+		return nil
+	}
+	return f.apiDispatcher
+}
+
+// APICacher returns an apiCacher that can be used to dispatch API calls through scheduler's cache
+// instead of directly using APIDispatcher().
+// This requires SchedulerAsyncAPICalls feature gate to be enabled.
+func (f *frameworkImpl) APICacher() framework.APICacher {
+	if f.apiCacher == nil {
+		return nil
+	}
+	return f.apiCacher
 }
