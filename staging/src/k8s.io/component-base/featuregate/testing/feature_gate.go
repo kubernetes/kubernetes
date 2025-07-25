@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -124,13 +125,17 @@ func SetFeatureGateEmulationVersionDuringTest(tb TB, gate featuregate.FeatureGat
 	tb.Helper()
 	detectParallelOverrideCleanup := detectParallelOverrideEmulationVersion(tb, ver)
 	originalEmuVer := gate.(featuregate.MutableVersionedFeatureGate).EmulationVersion()
-	if err := gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersion(ver); err != nil {
+	// Use context with test logger to redirect warnings to test output
+	ctx := featuregate.WithTestLoggerContext(context.Background(), tb)
+	if err := gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersionWithContext(ctx, ver); err != nil {
 		tb.Fatalf("failed to set emulation version to %s during test: %v", ver.String(), err)
 	}
 	tb.Cleanup(func() {
 		tb.Helper()
 		detectParallelOverrideCleanup()
-		if err := gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersion(originalEmuVer); err != nil {
+		// Use context with test logger to redirect warnings to test output during cleanup
+		ctx := featuregate.WithTestLoggerContext(context.Background(), tb)
+		if err := gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersionWithContext(ctx, originalEmuVer); err != nil {
 			tb.Fatalf("failed to restore emulation version to %s during test", originalEmuVer.String())
 		}
 	})
@@ -196,5 +201,6 @@ type TB interface {
 	Fatal(args ...any)
 	Fatalf(format string, args ...any)
 	Helper()
+	Logf(format string, args ...interface{})
 	Name() string
 }
