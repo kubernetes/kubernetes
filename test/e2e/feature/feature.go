@@ -242,6 +242,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
 
+	// Owner: sig-node
+	// Testing kubelet PSI metrics KEP
+	KubeletPSI = framework.WithFeature(framework.ValidFeatures.Add("KubeletPSI"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletSecurity = framework.WithFeature(framework.ValidFeatures.Add("KubeletSecurity"))
 
