@@ -32,6 +32,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/generate"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -56,7 +57,10 @@ var (
 	kubectl create deployment my-dep --image=busybox --port=5701
 
 	# Create a deployment named my-dep that runs multiple containers
-	kubectl create deployment my-dep --image=busybox:latest --image=ubuntu:latest --image=nginx`))
+	kubectl create deployment my-dep --image=busybox:latest --image=ubuntu:latest --image=nginx
+
+	# Create a deployment with custom pod labels
+	kubectl create deployment my-dep --image=nginx --pod-labels=app=frontend,version=v1,env=prod`))
 )
 
 // CreateDeploymentOptions is returned by NewCmdCreateDeployment
@@ -74,6 +78,7 @@ type CreateDeploymentOptions struct {
 	EnforceNamespace bool
 	FieldManager     string
 	CreateAnnotation bool
+	PodLabels        string
 
 	Client              appsv1client.AppsV1Interface
 	DryRunStrategy      cmdutil.DryRunStrategy
@@ -119,6 +124,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericiooptions.IOStre
 	cmd.MarkFlagRequired("image")
 	cmd.Flags().Int32Var(&o.Port, "port", o.Port, "The containerPort that this deployment exposes.")
 	cmd.Flags().Int32VarP(&o.Replicas, "replicas", "r", o.Replicas, "Number of replicas to create. Default is 1.")
+	cmd.Flags().StringVar(&o.PodLabels, "pod-labels", o.PodLabels, "Comma separated labels to apply to the pods. Will override previous values.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
 	return cmd
@@ -178,6 +184,15 @@ func (o *CreateDeploymentOptions) Validate() error {
 	if len(o.Images) > 1 && len(o.Command) > 0 {
 		return fmt.Errorf("cannot specify multiple --image options and command")
 	}
+
+	// Validate pod labels if provided
+	if o.PodLabels != "" {
+		_, err := generate.ParseLabels(o.PodLabels)
+		if err != nil {
+			return fmt.Errorf("invalid pod labels: %v", err)
+		}
+	}
+
 	return nil
 }
 
@@ -210,6 +225,21 @@ func (o *CreateDeploymentOptions) Run() error {
 
 func (o *CreateDeploymentOptions) createDeployment() *appsv1.Deployment {
 	labels := map[string]string{"app": o.Name}
+
+	// Parse pod labels if provided
+	if o.PodLabels != "" {
+		podLabels, err := generate.ParseLabels(o.PodLabels)
+		if err != nil {
+			// This should not happen since we validate in the Validate() function
+			// But we'll handle it gracefully by using default labels
+		} else {
+			// Merge pod labels with default labels
+			for k, v := range podLabels {
+				labels[k] = v
+			}
+		}
+	}
+
 	selector := metav1.LabelSelector{MatchLabels: labels}
 	namespace := ""
 	if o.EnforceNamespace {
