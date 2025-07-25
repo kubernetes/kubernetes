@@ -31,14 +31,14 @@ import (
 	"time"
 	"unsafe"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
+
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -92,10 +92,10 @@ var (
 const allProcessorGroups = 0xFFFF
 
 // NewPerfCounterClient creates a client using perf counters
-func NewPerfCounterClient() (Client, error) {
+func NewPerfCounterClient(logger klog.Logger) (Client, error) {
 	// Initialize the cache
 	initCache := cpuUsageCoreNanoSecondsCache{0, 0}
-	return newClient(&perfCounterNodeStatsClient{
+	return newClient(logger, &perfCounterNodeStatsClient{
 		cpuUsageCoreNanoSecondsCache: initCache,
 	})
 }
@@ -109,7 +109,7 @@ type perfCounterNodeStatsClient struct {
 	cpuUsageCoreNanoSecondsCache
 }
 
-func (p *perfCounterNodeStatsClient) startMonitoring() error {
+func (p *perfCounterNodeStatsClient) startMonitoring(logger klog.Logger) error {
 	memory, err := getPhysicallyInstalledSystemMemoryBytes()
 	if err != nil {
 		return err
@@ -148,7 +148,7 @@ func (p *perfCounterNodeStatsClient) startMonitoring() error {
 	}
 
 	go wait.Forever(func() {
-		p.collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
+		p.collectMetricsData(logger, cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
 	}, perfCounterUpdatePeriod)
 
 	// Cache the CPU usage every defaultCachePeriod
@@ -165,7 +165,7 @@ func (p *perfCounterNodeStatsClient) startMonitoring() error {
 	return nil
 }
 
-func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo, error) {
+func (p *perfCounterNodeStatsClient) getMachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func (p *perfCounterNodeStatsClient) getMachineInfo() (*cadvisorapi.MachineInfo,
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
-		numOfPysicalCores, numOfSockets, topology, err := processorInfo(relationAll)
+		numOfPysicalCores, numOfSockets, topology, err := processorInfo(logger, relationAll)
 		if err != nil {
 			return nil, err
 		}
@@ -241,29 +241,29 @@ func (p *perfCounterNodeStatsClient) getNodeInfo() nodeInfo {
 	return p.nodeInfo
 }
 
-func (p *perfCounterNodeStatsClient) collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter perfCounter, networkAdapterCounter *networkCounter) {
+func (p *perfCounterNodeStatsClient) collectMetricsData(logger klog.Logger, cpuCounter, memWorkingSetCounter, memCommittedBytesCounter perfCounter, networkAdapterCounter *networkCounter) {
 	cpuValue, err := cpuCounter.getData()
 	cpuCores := ProcessorCount()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get cpu perf counter data")
+		logger.Error(err, "Unable to get cpu perf counter data")
 		return
 	}
 
 	memWorkingSetValue, err := memWorkingSetCounter.getData()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get memWorkingSet perf counter data")
+		logger.Error(err, "Unable to get memWorkingSet perf counter data")
 		return
 	}
 
 	memCommittedBytesValue, err := memCommittedBytesCounter.getData()
 	if err != nil {
-		klog.ErrorS(err, "Unable to get memCommittedBytes perf counter data")
+		logger.Error(err, "Unable to get memCommittedBytes perf counter data")
 		return
 	}
 
-	networkAdapterStats, err := networkAdapterCounter.getData()
+	networkAdapterStats, err := networkAdapterCounter.getData(logger)
 	if err != nil {
-		klog.ErrorS(err, "Unable to get network adapter perf counter data")
+		logger.Error(err, "Unable to get network adapter perf counter data")
 		return
 	}
 
