@@ -106,6 +106,10 @@ const (
 	StartedHostProcessContainersTotalKey       = "started_host_process_containers_total"
 	StartedHostProcessContainersErrorsTotalKey = "started_host_process_containers_errors_total"
 
+	// Metrics to track UserNamespaced (hostUsers = false) pods.
+	StartedUserNamespacedPodsTotalKey       = "started_user_namespaced_pods_total"
+	StartedUserNamespacedPodsErrorsTotalKey = "started_user_namespaced_pods_errors_total"
+
 	// Metrics to track ephemeral container usage by this kubelet
 	ManagedEphemeralContainersKey = "managed_ephemeral_containers"
 
@@ -752,6 +756,24 @@ var (
 		},
 		[]string{"container_type", "code"},
 	)
+	// StartedUserNamespacedPodsTotal is a counter that tracks the number of user namespaced pods that are attempted to be created.
+	StartedUserNamespacedPodsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedUserNamespacedPodsTotalKey,
+			Help:           "Cumulative number of pods with user namespaces started. This metric will only be collected on Linux.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// StartedUserNamespacedPodsErrorsTotal is a counter that tracks the number of errors creating user namespaced pods
+	StartedUserNamespacedPodsErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedUserNamespacedPodsErrorsTotalKey,
+			Help:           "Cumulative number of errors when starting pods with user namespaces. This metric will only be collected on Linux.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 	// ManagedEphemeralContainers is a gauge that indicates how many ephemeral containers are managed by this kubelet.
 	ManagedEphemeralContainers = metrics.NewGauge(
 		&metrics.GaugeOpts{
@@ -1224,6 +1246,10 @@ func Register(collectors ...metrics.StableCollector) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
 			legacyregistry.MustRegister(PodResourcesEndpointRequestsGetCount)
 			legacyregistry.MustRegister(PodResourcesEndpointErrorsGetCount)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+			legacyregistry.MustRegister(StartedUserNamespacedPodsTotal)
+			legacyregistry.MustRegister(StartedUserNamespacedPodsErrorsTotal)
 		}
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
