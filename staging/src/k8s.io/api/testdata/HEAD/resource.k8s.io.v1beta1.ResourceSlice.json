@@ -136,6 +136,13 @@
               "effect": "effectValue",
               "timeAdded": "2004-01-01T01:01:01Z"
             }
+          ],
+          "bindsToNode": true,
+          "bindingConditions": [
+            "bindingConditionsValue"
+          ],
+          "bindingFailureConditions": [
+            "bindingFailureConditionsValue"
           ]
         }
       }
