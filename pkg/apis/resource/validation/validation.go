@@ -462,6 +462,7 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"))...)
 	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool"))...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
+	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, fldPath)...)
 	return allErrs
 }
 
@@ -788,6 +789,8 @@ func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterTo
 	} else if (perDeviceNodeSelection == nil || !*perDeviceNodeSelection) && (device.NodeName != nil || device.NodeSelector != nil || device.AllNodes != nil) {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "`nodeName`, `nodeSelector` and `allNodes` can only be set if `perDeviceNodeSelection` is set to true in the ResourceSlice spec"))
 	}
+
+	allErrs = append(allErrs, validateDeviceBindingParameters(device.BindingConditions, device.BindingFailureConditions, fldPath)...)
 	return allErrs
 }
 
@@ -1188,6 +1191,45 @@ func validateLabelValue(value string, fldPath *field.Path) field.ErrorList {
 	// There's no metav1validation.ValidateLabelValue.
 	for _, msg := range validation.IsValidLabelValue(value) {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+
+	return allErrs
+}
+
+func validateDeviceBindingParameters(bindingConditions, bindingFailureConditions []string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateSlice(bindingConditions, resource.BindingConditionsMaxSize,
+		metav1validation.ValidateLabelName, fldPath.Child("bindingConditions"))...)
+
+	allErrs = append(allErrs, validateSlice(bindingFailureConditions, resource.BindingFailureConditionsMaxSize,
+		metav1validation.ValidateLabelName, fldPath.Child("bindingFailureConditions"))...)
+
+	// ensure BindingConditions and BindingFailureConditions contain no duplicate items and do not overlap with each other
+	conditionsSet := sets.New[string]()
+	for i, condition := range bindingConditions {
+		if conditionsSet.Has(condition) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("bindingConditions").Index(i), condition))
+		} else {
+			conditionsSet.Insert(condition)
+		}
+	}
+	failureConditionsSet := sets.New[string]()
+	for i, condition := range bindingFailureConditions {
+		if failureConditionsSet.Has(condition) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("bindingFailureConditions").Index(i), condition))
+		} else {
+			failureConditionsSet.Insert(condition)
+		}
+		if sets.New(bindingConditions...).Has(condition) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingFailureConditions").Index(i), condition, "bindingFailureConditions must not overlap with bindingConditions"))
+		}
+	}
+
+	if len(bindingConditions) == 0 && len(bindingFailureConditions) > 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingConditions"), bindingConditions, "bindingConditions are required to use bindingFailureConditions"))
+	}
+	if len(bindingFailureConditions) == 0 && len(bindingConditions) > 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingFailureConditions"), bindingFailureConditions, "bindingFailureConditions are required to use bindingConditions"))
 	}
 
 	return allErrs

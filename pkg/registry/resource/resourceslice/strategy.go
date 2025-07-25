@@ -170,6 +170,7 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
+	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -210,6 +211,19 @@ func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.Reso
 	}
 }
 
+func dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) ||
+		draBindingConditionsFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].BindingConditions = nil
+		newSlice.Spec.Devices[i].BindingFailureConditions = nil
+		newSlice.Spec.Devices[i].BindsToNode = nil
+	}
+}
+
 func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
 	if slice == nil {
 		return false
@@ -225,6 +239,21 @@ func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
 			return true
 		}
 		if device.NodeName != nil || device.NodeSelector != nil || device.AllNodes != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func draBindingConditionsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		if len(device.BindingConditions) > 0 ||
+			len(device.BindingFailureConditions) > 0 ||
+			device.BindsToNode != nil {
 			return true
 		}
 	}
