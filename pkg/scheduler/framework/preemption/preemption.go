@@ -499,7 +499,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 	preemptPod := func(index int) {
 		victim := victimPods[index]
 		if err := ev.PreemptPod(ctx, c, pod, victim, pluginName); err != nil {
-			errCh.SendErrorWithCancel(err, cancel)
+			errCh.SendError(err)
 		}
 	}
 
@@ -553,6 +553,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 				logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(pod), "node", c.Name(), "err", err)
 			case err != nil:
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
+				cancel()
 				result = metrics.GoroutineResultError
 			default:
 				allPodsAlreadyDeleted = false
@@ -569,6 +570,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(pod), "node", c.Name(), "err", err)
 		case err != nil:
 			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
+			cancel()
 			result = metrics.GoroutineResultError
 		default:
 			allPodsAlreadyDeleted = false
