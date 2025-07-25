@@ -18,7 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"slices"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
@@ -49,6 +48,11 @@ func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	return allErrs
 }
 
+var validSelectionStrategy = sets.NewString(
+	string(autoscaling.LabelSelector),
+	string(autoscaling.OwnerReferences),
+)
+
 // ValidateHorizontalPodAutoscalerName can be used to check whether the given autoscaler name is valid.
 // Prefix indicates this name will be used as part of generation, in which case trailing dashes are allowed.
 var ValidateHorizontalPodAutoscalerName = apivalidation.ValidateReplicationControllerName
@@ -75,8 +79,8 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 	if refErrs := validateBehavior(autoscaler.Behavior, fldPath.Child("behavior"), opts); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
-	if refErrs := valdidateSelectionStrategy(autoscaler.SelectionStrategy, fldPath.Child("selectionStrategy"), opts); len(refErrs) > 0 {
-		allErrs = append(allErrs, refErrs...)
+	if autoscaler.SelectionStrategy != nil && !validSelectionStrategy.Has(string(*autoscaler.SelectionStrategy)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("selectionStrategy"), *autoscaler.SelectionStrategy, validSelectionStrategy.List()))
 	}
 
 	return allErrs
@@ -200,24 +204,6 @@ func validateBehavior(behavior *autoscaling.HorizontalPodAutoscalerBehavior, fld
 			allErrs = append(allErrs, scaleDownErrs...)
 		}
 	}
-	return allErrs
-}
-
-func valdidateSelectionStrategy(selectionStrategy *autoscaling.SelectionStrategy, fldPath *field.Path, opts HorizontalPodAutoscalerSpecValidationOptions) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if selectionStrategy == nil {
-		return allErrs
-	}
-
-	supportedSelectionStrategy := []autoscaling.SelectionStrategy{
-		autoscaling.LabelSelector,
-		autoscaling.OwnerReferences,
-	}
-
-	if !slices.Contains(supportedSelectionStrategy, *selectionStrategy) {
-		allErrs = append(allErrs, field.NotSupported(field.NewPath("spec").Child("selectionStrategy"), *selectionStrategy, supportedSelectionStrategy))
-	}
-
 	return allErrs
 }
 
