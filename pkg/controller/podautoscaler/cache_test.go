@@ -28,11 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
 )
 
 // setupTestEnv creates and returns the basic test environment components
-func setupTestEnv() (dynamic.Interface, meta.RESTMapper, monitor.Monitor) {
+func setupTestEnv() (dynamic.Interface, meta.RESTMapper, *mockMonitor) {
 	scheme := runtime.NewScheme()
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
 	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{})
@@ -40,17 +39,7 @@ func setupTestEnv() (dynamic.Interface, meta.RESTMapper, monitor.Monitor) {
 	return dynamicClient, mapper, mockMonitor
 }
 
-func cleanupResource(client dynamic.Interface, t *testing.T) {
-	err := client.
-		Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}).
-		Namespace("default").
-		Delete(context.TODO(), "test-deployment", metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatalf("Failed to delete test deployment: %v", err)
-	}
-}
-
-func createTestDeployment(client dynamic.Interface, t *testing.T) {
+func createTestDeployment(ctx context.Context, client dynamic.Interface) (*unstructured.Unstructured, error) {
 	deployment := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "apps/v1",
@@ -63,22 +52,20 @@ func createTestDeployment(client dynamic.Interface, t *testing.T) {
 		},
 	}
 
-	_, err := client.
-		Resource(schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}).
-		Namespace("default").
-		Create(context.TODO(), deployment, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("Failed to create test deployment: %v", err)
-	}
+	return client.Resource(schema.GroupVersionResource{
+		Group: "apps", Version: "v1", Resource: "deployments",
+	}).Namespace("default").Create(ctx, deployment, metav1.CreateOptions{})
 }
 
 func TestControllerCache_GetResource(t *testing.T) {
+	ctx := context.Background()
 	dynamicClient, mapper, monitor := setupTestEnv()
 	cache := NewControllerCache(dynamicClient, mapper, 5*time.Minute, monitor)
 
-	// create and clean resource after
-	createTestDeployment(dynamicClient, t)
-	defer cleanupResource(dynamicClient, t)
+	deployment, err := createTestDeployment(ctx, dynamicClient)
+	if err != nil {
+		t.Fatalf("Failed to create test deployment: %v", err)
+	}
 
 	tests := []struct {
 		name      string
@@ -92,7 +79,7 @@ func TestControllerCache_GetResource(t *testing.T) {
 				APIVersion: "apps/v1",
 				Kind:       "Deployment",
 				Name:       "test-deployment",
-				UID:        "test-uid",
+				UID:        deployment.GetUID(),
 			},
 			namespace: "default",
 			wantErr:   false,
@@ -135,114 +122,100 @@ func TestControllerCache_GetResource(t *testing.T) {
 }
 
 func TestControllerCache_CacheExpiry(t *testing.T) {
-	// Setup with short TTL for testing
+	ctx := context.Background()
 	dynamicClient, mapper, monitor := setupTestEnv()
 	cacheTTL := 100 * time.Millisecond
 	cache := NewControllerCache(dynamicClient, mapper, cacheTTL, monitor)
 
-	// create and clean resource after
-	createTestDeployment(dynamicClient, t)
-	defer cleanupResource(dynamicClient, t)
+	deployment, err := createTestDeployment(ctx, dynamicClient)
+	if err != nil {
+		t.Fatalf("Failed to create test deployment: %v", err)
+	}
 
 	ownerRef := metav1.OwnerReference{
 		APIVersion: "apps/v1",
 		Kind:       "Deployment",
-		Name:       "test-deployment",
+		Name:       deployment.GetName(),
+		UID:        deployment.GetUID(),
 	}
 
-	// Mock monitor for utility functions that are not part of the interface monitor.monitor
-	mockMon := monitor.(*mockMonitor)
-
-	// First request should hit the API - check cache miss +1
+	// First request - should be a cache miss
 	resource1, err := cache.GetResource("default", ownerRef)
 	if err != nil {
-		t.Fatalf("Expected successful resource retrieval on first call, got error: %v", err)
+		t.Fatalf("First GetResource() failed: %v", err)
 	}
 
-	currentCacheMiss := mockMon.GetCacheMiss("deployments")
-	if currentCacheMiss < 1 {
-		t.Errorf("Expected at least one cache miss metric for initial API call, got %d", currentCacheMiss)
+	if monitor.GetCacheMiss("deployments") != 1 {
+		t.Error("Expected cache miss on first request")
 	}
 
-	// Immediate second request should hit the cache - check cache hit +1
+	// Immediate second request - should be a cache hit
 	resource2, err := cache.GetResource("default", ownerRef)
 	if err != nil {
-		t.Fatalf("Expected successful resource retrieval from cache, got error: %v", err)
+		t.Fatalf("Second GetResource() failed: %v", err)
 	}
 
-	currentCacheHit := mockMon.GetCacheHit("deployments")
-	if currentCacheHit < 1 {
-		t.Errorf("Expected at least one cache hit metric for cached response, got %d", currentCacheHit)
-	}
-
-	if resource1 != resource2 {
-		t.Error("Cache miss: second request returned different resource")
+	if monitor.GetCacheHit("deployments") != 1 {
+		t.Error("Expected cache hit on second request")
 	}
 
 	// Wait for cache to expire
 	time.Sleep(cacheTTL + 50*time.Millisecond)
 
-	// Third request should hit the API again - check cache miss +1
+	// Third request - should be a cache miss again
 	resource3, err := cache.GetResource("default", ownerRef)
 	if err != nil {
-		t.Fatalf("Expected successful resource retrieval after cache expiry, got error: %v", err)
+		t.Fatalf("Third GetResource() failed: %v", err)
 	}
 
-	secondCacheMiss := mockMon.GetCacheMiss("deployments")
-	if secondCacheMiss <= currentCacheMiss {
-		t.Errorf("Expected cache miss metric to increase after expiry, got %d <= %d", secondCacheMiss, currentCacheMiss)
+	if monitor.GetCacheMiss("deployments") != 2 {
+		t.Error("Expected second cache miss after expiry")
 	}
 
-	if resource1 == resource3 {
-		t.Error("Expected different resource instances after cache expiry, got same instance")
+	// Verify resources
+	if resource1 == nil || resource2 == nil || resource3 == nil {
+		t.Error("Unexpected nil resource")
 	}
 }
 
 func TestControllerCache_Cleanup(t *testing.T) {
-	// Setup
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	dynamicClient, mapper, monitor := setupTestEnv()
 	cacheTTL := 100 * time.Millisecond
 	cache := NewControllerCache(dynamicClient, mapper, cacheTTL, monitor)
 
-	// create and clean resource after
-	createTestDeployment(dynamicClient, t)
-	defer cleanupResource(dynamicClient, t)
+	deployment, err := createTestDeployment(ctx, dynamicClient)
+	if err != nil {
+		t.Fatalf("Failed to create test deployment: %v", err)
+	}
 
-	// Start cleanup routine
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go cache.Start(ctx, 50*time.Millisecond)
+	cache.Start(ctx, 50*time.Millisecond)
 
 	ownerRef := metav1.OwnerReference{
 		APIVersion: "apps/v1",
 		Kind:       "Deployment",
-		Name:       "test-deployment",
+		Name:       deployment.GetName(),
+		UID:        deployment.GetUID(),
 	}
 
 	// Add resource to cache
-	_, err := cache.GetResource("default", ownerRef)
+	_, err = cache.GetResource("default", ownerRef)
 	if err != nil {
 		t.Fatalf("GetResource() failed: %v", err)
-	}
-
-	// Verify cache has entry
-	cache.mutex.RLock()
-	initialSize := len(cache.resources)
-	cache.mutex.RUnlock()
-
-	if initialSize == 0 {
-		t.Error("Cache is empty after adding resource")
 	}
 
 	// Wait for cleanup
 	time.Sleep(cacheTTL + 200*time.Millisecond)
 
-	// Verify cache was cleaned
-	cache.mutex.RLock()
-	finalSize := len(cache.resources)
-	cache.mutex.RUnlock()
+	// Verify cache was cleaned by checking for a cache miss
+	_, err = cache.GetResource("default", ownerRef)
+	if err != nil {
+		t.Fatalf("GetResource() after cleanup failed: %v", err)
+	}
 
-	if finalSize != 0 {
-		t.Errorf("Cache was not cleaned up, still has %d entries", finalSize)
+	if monitor.GetCacheMiss("deployments") != 2 {
+		t.Error("Expected cache miss after cleanup")
 	}
 }

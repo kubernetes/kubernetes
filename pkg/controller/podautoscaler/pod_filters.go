@@ -134,8 +134,8 @@ func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, er
 
 func (f *OwnerReferencesFilter) isPodOwnedByTarget(pod *v1.Pod, targetRef autoscalingv2.CrossVersionObjectReference, namespace string) (bool, error) {
 	// TODO(omerap12): Add a cache to remember ownership results for each HPA check.
-    // This would help when many pods have the same owners, so we don't need
-    // to check the same ownership path multiple times.
+	// This would help when many pods have the same owners, so we don't need
+	// to check the same ownership path multiple times.
 	const maxOwnershipChainLength = 10
 
 	// Use BFS to traverse all possible ownership paths
