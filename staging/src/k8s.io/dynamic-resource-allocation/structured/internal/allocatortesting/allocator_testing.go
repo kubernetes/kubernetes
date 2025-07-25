@@ -606,7 +606,7 @@ func toCounters(counters map[string]resource.Quantity) map[string]resourceapi.Co
 // deviceRequestAllocationResultWithBindingConditions returns an DeviceRequestAllocationResult object for testing purposes,
 // specifying the driver, pool, device, usage restriction, binding conditions,
 // binding failure conditions, and binding timeout.
-func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, device string, bindingConditions, bindingFailureConditions []string, bindingTimeout *int32) resourceapi.DeviceRequestAllocationResult {
+func deviceRequestAllocationResultWithBindingConditions(request, driver, pool, device string, bindingConditions, bindingFailureConditions []string) resourceapi.DeviceRequestAllocationResult {
 	return resourceapi.DeviceRequestAllocationResult{
 		Request:                  request,
 		Driver:                   driver,
@@ -3629,7 +3629,7 @@ func TestAllocator(t *testing.T,
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}),
 						},
 					},
 					NodeSelector: localNodeSelector(node1),
@@ -3656,9 +3656,9 @@ func TestAllocator(t *testing.T,
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, []string{"IsPrepare2"}, []string{"BindingFailed2"}, nil),
-							deviceRequestAllocationResultWithBindingConditions(req1, driverA, pool1, device3, []string{"IsPrepare3"}, []string{"BindingFailed3"}, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, []string{"IsPrepare2"}, []string{"BindingFailed2"}),
+							deviceRequestAllocationResultWithBindingConditions(req1, driverA, pool1, device3, []string{"IsPrepare3"}, []string{"BindingFailed3"}),
 						},
 					},
 					NodeSelector: localNodeSelector(node1),
@@ -3749,7 +3749,7 @@ func TestAllocator(t *testing.T,
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}),
 						},
 					},
 					NodeSelector: localNodeSelector(node1),
@@ -3795,8 +3795,8 @@ func TestAllocator(t *testing.T,
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, []string{"IsPrepare2"}, []string{"BindingFailed2"}, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, []string{"IsPrepare2"}, []string{"BindingFailed2"}),
 						},
 					},
 					NodeSelector: localNodeSelector(node1),
@@ -3848,9 +3848,9 @@ func TestAllocator(t *testing.T,
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil, nil),
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device3, []string{"IsReady"}, []string{"BindingTimeout"}, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device3, []string{"IsReady"}, []string{"BindingTimeout"}),
 						},
 					},
 					NodeSelector: localNodeSelector(node1),
@@ -3899,8 +3899,8 @@ func TestAllocator(t *testing.T,
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil, nil),
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}),
 						},
 					},
 					NodeSelector: localNodeSelector(node1),
@@ -3993,8 +3993,8 @@ func TestAllocator(t *testing.T,
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
-							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil, nil),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}),
+							deviceRequestAllocationResultWithBindingConditions(req0, driverA, pool1, device2, nil, nil),
 						},
 					},
 					NodeSelector: localNodeSelector(node1),

@@ -242,7 +242,6 @@ var (
 	// for DRA Device Binding Conditions
 	bindingConditions        = []string{"condition"}
 	bindingFailureConditions = []string{"failed"}
-	bindingTimeout           = int32(15)
 
 	fabricSlice = func() *resourceapi.ResourceSlice {
 		res := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
