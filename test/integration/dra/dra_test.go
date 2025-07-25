@@ -242,7 +242,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices)
+					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
 				})
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
 				tCtx.Run("DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, false) })
@@ -256,7 +256,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRAPartitionableDevices)
+					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
 				})
 			},
 		},
@@ -268,7 +268,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRAPartitionableDevices)
+					testPublishResourceSlices(tCtx, false, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
 				})
 			},
 		},
@@ -730,6 +730,18 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 									},
 								}},
 							},
+							{
+								Name: "device-binding-conditions",
+								BindingConditions: []string{
+									"condition-1",
+									"condition-2",
+								},
+								BindingFailureConditions: []string{
+									"failure-condition-1",
+									"failure-condition-2",
+								},
+								BindsToNode: ptr.To(true),
+							},
 						},
 					},
 				},
@@ -765,6 +777,14 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 				expectedSliceSpecs[i].SharedCounters = nil
 				for e := range expectedSliceSpecs[i].Devices {
 					expectedSliceSpecs[i].Devices[e].ConsumesCounters = nil
+				}
+			}
+		case features.DRADeviceBindingConditions:
+			for i := range expectedSliceSpecs {
+				for e := range expectedSliceSpecs[i].Devices {
+					expectedSliceSpecs[i].Devices[e].BindingConditions = nil
+					expectedSliceSpecs[i].Devices[e].BindingFailureConditions = nil
+					expectedSliceSpecs[i].Devices[e].BindsToNode = nil
 				}
 			}
 		default:
