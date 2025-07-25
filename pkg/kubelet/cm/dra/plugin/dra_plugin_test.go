@@ -19,23 +19,27 @@ package plugin
 import (
 	"context"
 	"errors"
-	"fmt"
+	"io"
 	"net"
 	"path"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type fakeGRPCServer struct {
+	drapbv1beta1.UnimplementedDRAPluginServer
+	drahealthv1alpha1.UnimplementedDRAResourceHealthServer
 }
 
 var _ drapbv1.DRAPluginServer = &fakeGRPCServer{}
@@ -56,6 +60,24 @@ func (f *fakeGRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1
 	return &drapbv1.NodeUnprepareResourcesResponse{}, nil
 }
 
+func (f *fakeGRPCServer) NodeWatchResources(in *drahealthv1alpha1.NodeWatchResourcesRequest, srv drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesServer) error {
+	resp := &drahealthv1alpha1.NodeWatchResourcesResponse{
+		Devices: []*drahealthv1alpha1.DeviceHealth{
+			{
+				Device: &drahealthv1alpha1.DeviceIdentifier{
+					PoolName:   "pool1",
+					DeviceName: "dev1",
+				},
+				Health: drahealthv1alpha1.HealthStatus_HEALTHY,
+			},
+		},
+	}
+	if err := srv.Send(resp); err != nil {
+		return err
+	}
+	return nil
+}
+
 // tearDown is an idempotent cleanup function.
 type tearDown func()
 
@@ -73,13 +95,22 @@ func setupFakeGRPCServer(service, addr string) (tearDown, error) {
 
 	s := grpc.NewServer()
 	fakeGRPCServer := &fakeGRPCServer{}
+
 	switch service {
 	case drapbv1.DRAPluginService:
 		drapbv1.RegisterDRAPluginServer(s, fakeGRPCServer)
 	case drapbv1beta1.DRAPluginService:
 		drapbv1beta1.RegisterDRAPluginServer(s, drapbv1beta1.V1ServerWrapper{DRAPluginServer: fakeGRPCServer})
+	case drahealthv1alpha1.DRAResourceHealth_ServiceDesc.ServiceName:
+		drahealthv1alpha1.RegisterDRAResourceHealthServer(s, fakeGRPCServer)
 	default:
-		return nil, fmt.Errorf("unsupported gRPC service: %s", service)
+		if service == "" {
+			drapbv1.RegisterDRAPluginServer(s, fakeGRPCServer)
+			drapbv1beta1.RegisterDRAPluginServer(s, drapbv1beta1.V1ServerWrapper{DRAPluginServer: fakeGRPCServer})
+			drahealthv1alpha1.RegisterDRAResourceHealthServer(s, fakeGRPCServer)
+		} else {
+			return nil, err
+		}
 	}
 
 	go func() {
@@ -100,9 +131,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	service := drapbv1.DRAPluginService
 	addr := path.Join(t.TempDir(), "dra.sock")
 	teardown, err := setupFakeGRPCServer(service, addr)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer teardown()
 
 	reusedConns := make(map[*grpc.ClientConn]int)
@@ -112,7 +141,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	driverName := "dummy-driver"
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
 	plugin, err := draPlugins.GetPlugin(driverName)
 	tCtx.ExpectNoError(err, "get plugin")
@@ -152,12 +181,8 @@ func TestGRPCConnIsReused(t *testing.T) {
 
 	wg.Wait()
 	// We should have only one entry otherwise it means another gRPC connection has been created
-	if len(reusedConns) != 1 {
-		t.Errorf("expected length to be 1 but got %d", len(reusedConns))
-	}
-	if counter, ok := reusedConns[conn]; ok && counter != 2 {
-		t.Errorf("expected counter to be 2 but got %d", counter)
-	}
+	require.Len(t, reusedConns, 1, "expected length to be 1 but got %d", len(reusedConns))
+	require.Equal(t, 2, reusedConns[conn], "expected counter to be 2 but got %d", reusedConns[conn])
 }
 
 func TestGetDRAPlugin(t *testing.T) {
@@ -186,7 +211,7 @@ func TestGetDRAPlugin(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 			if test.setup != nil {
 				require.NoError(t, test.setup(draPlugins), "setup plugin")
 			}
@@ -244,8 +269,9 @@ func TestGRPCMethods(t *testing.T) {
 			defer teardown()
 
 			driverName := "dummy-driver"
-			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
 			tCtx.ExpectNoError(draPlugins.add(driverName, addr, test.chosenService, defaultClientCallTimeout))
+
 			plugin, err := draPlugins.GetPlugin(driverName)
 			if err != nil {
 				t.Fatal(err)
@@ -270,4 +296,42 @@ func assertError(t *testing.T, expectError string, err error) {
 	case err != nil && !strings.Contains(err.Error(), expectError):
 		t.Errorf("Expected error %q, got: %v", expectError, err)
 	}
+}
+
+func TestPlugin_WatchResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+
+	driverName := "test-driver"
+	addr := path.Join(t.TempDir(), "dra.sock")
+
+	teardown, err := setupFakeGRPCServer("", addr)
+	require.NoError(t, err)
+	defer teardown()
+
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, &mockStreamHandler{}, 0)
+	err = draPlugins.add(driverName, addr, drapbv1beta1.DRAPluginService, 5*time.Second)
+	require.NoError(t, err)
+	defer draPlugins.remove(driverName, addr)
+
+	p, err := draPlugins.GetPlugin(driverName)
+	require.NoError(t, err)
+
+	stream, err := p.NodeWatchResources(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, stream)
+
+	// 1. Receive the first message that our fake server sends.
+	resp, err := stream.Recv()
+	require.NoError(t, err, "The first Recv() should succeed with the message from the server")
+	require.NotNil(t, resp)
+	require.Len(t, resp.Devices, 1)
+	assert.Equal(t, "pool1", resp.Devices[0].GetDevice().GetPoolName())
+	assert.Equal(t, drahealthv1alpha1.HealthStatus_HEALTHY, resp.Devices[0].GetHealth())
+
+	// 2. The second receive should fail with io.EOF because the server
+	//    closed the stream by returning nil. This confirms the stream ended cleanly.
+	_, err = stream.Recv()
+	require.ErrorIs(t, err, io.EOF, "The second Recv() should return an io.EOF error to signal a clean stream closure")
 }
