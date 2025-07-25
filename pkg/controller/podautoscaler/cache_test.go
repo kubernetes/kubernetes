@@ -191,7 +191,7 @@ func TestControllerCache_Cleanup(t *testing.T) {
 		t.Fatalf("Failed to create test deployment: %v", err)
 	}
 
-	cache.Start(ctx, 50*time.Millisecond)
+	go cache.Start(ctx, 50*time.Millisecond)
 
 	ownerRef := metav1.OwnerReference{
 		APIVersion: "apps/v1",

@@ -68,8 +68,6 @@ type ControllerCache struct {
 	restMapper    apimeta.RESTMapper
 	cacheTTL      time.Duration
 	monitor       monitor.Monitor
-	hits          int64
-	misses        int64
 }
 
 // NewControllerCache creates a new controller cache
