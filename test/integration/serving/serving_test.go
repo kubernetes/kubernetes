@@ -29,6 +29,8 @@ import (
 	"strings"
 	"testing"
 
+	"reflect"
+
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -352,15 +354,24 @@ users:
 		anonymous      bool // to use the token or not
 		wantErr        bool
 		wantSecureCode *int
+		wantPaths      []string
 	}{
-		{"serving /statusz", []string{
-			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
-			"--authentication-kubeconfig", apiserverConfig.Name(),
-			"--authorization-kubeconfig", apiserverConfig.Name(),
-			"--authorization-always-allow-paths", "/statusz",
-			"--kubeconfig", apiserverConfig.Name(),
-			"--leader-elect=false",
-		}, "/statusz", false, false, ptr.To(http.StatusOK)},
+		{
+			name: "serving /statusz",
+			flags: []string{
+				"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
+				"--authentication-kubeconfig", apiserverConfig.Name(),
+				"--authorization-kubeconfig", apiserverConfig.Name(),
+				"--authorization-always-allow-paths", "/statusz",
+				"--kubeconfig", apiserverConfig.Name(),
+				"--leader-elect=false",
+			},
+			path:           "/statusz",
+			anonymous:      false,
+			wantErr:        false,
+			wantSecureCode: ptr.To(http.StatusOK),
+			wantPaths:      []string{"/configz", "/healthz", "/metrics"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -416,7 +427,8 @@ users:
 					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
 
-				if _, err = io.ReadAll(r.Body); err != nil {
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
 					t.Fatalf("failed to read response body: %v", err)
 				}
 				defer func() {
@@ -427,6 +439,39 @@ users:
 
 				if got, expected := r.StatusCode, *tt.wantSecureCode; got != expected {
 					t.Fatalf("expected http %d at %s of component, got: %d", expected, tt.path, got)
+				}
+
+				bodyStr := string(body)
+
+				if !strings.Contains(bodyStr, "Paths") {
+					t.Error("response does not contain Paths section")
+				}
+
+				var foundPathsRaw []string
+				for _, line := range strings.Split(bodyStr, "\n") {
+					if strings.HasPrefix(line, "Paths") {
+						parts := strings.Fields(line)
+						if len(parts) > 1 {
+							foundPathsRaw = parts[1:] // Skip "Paths" label
+						}
+						break
+					}
+				}
+
+				expectedPaths := tt.wantPaths
+
+				foundPathsSet := make(map[string]struct{})
+				for _, p := range foundPathsRaw {
+					foundPathsSet[p] = struct{}{}
+				}
+
+				expectedPathsSet := make(map[string]struct{})
+				for _, p := range expectedPaths {
+					expectedPathsSet[p] = struct{}{}
+				}
+
+				if !reflect.DeepEqual(foundPathsSet, expectedPathsSet) {
+					t.Errorf("path mismatch:\n- want: %v\n- got:  %v", expectedPaths, foundPathsRaw)
 				}
 			}
 		})
