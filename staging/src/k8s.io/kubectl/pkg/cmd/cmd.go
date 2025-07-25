@@ -495,7 +495,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	if !cmdutil.KubeRC.IsDisabled() {
 		_, kubercCommandExecuted, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
-		klog.V(1).Info(fmt.Sprintf("Command executed using kuberc: %s %s", o.Arguments[0], kubercCommandExecuted))
+		klog.V(1).Info(fmt.Sprintf("kuberc command executed: %s %s", o.Arguments[0], kubercCommandExecuted))
 		if err != nil {
 			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
 			os.Exit(1)

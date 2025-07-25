@@ -103,15 +103,18 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 		return args, "", err
 	}
 
-	args, kubercCommandExecuted, err := p.applyAliases(rootCmd, kuberc, args, errOut)
+	args, aliasCmdTrace, err := p.applyAliases(rootCmd, kuberc, args, errOut)
 	if err != nil {
-		return args, kubercCommandExecuted, err
+		return args, aliasCmdTrace, err
 	}
-	kubercCommandExecuted, err = p.applyOverrides(rootCmd, kuberc, args, errOut)
+	overrideCmdTrace, err := p.applyOverrides(rootCmd, kuberc, args, errOut)
 	if err != nil {
-		return args, kubercCommandExecuted, err
+		return args, overrideCmdTrace, err
 	}
-	return args, kubercCommandExecuted, nil
+	if aliasCmdTrace != "" {
+		return args, aliasCmdTrace, nil
+	}
+	return args, overrideCmdTrace, nil
 }
 
 // applyOverrides finds the command and sets the defaulted flag values in kuberc.
@@ -122,7 +125,7 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 		return "", nil
 	}
 
-	var kubercCommandExecuted string
+	var kubercCmdTrace string
 	for _, c := range kuberc.Defaults {
 		parsedCmds := strings.Fields(c.Command)
 		overrideCmd, _, err := rootCmd.Find(parsedCmds)
@@ -165,10 +168,10 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 				return "", fmt.Errorf("could not apply override value %s to flag %s in command %s err: %w", fl.Default, fl.Name, c.Command, err)
 			}
 		}
-		kubercCommandExecuted = fmt.Sprintf("%s %s", strings.Join(args, " "), strings.Join(overrideNameValueFlags, " "))
+		kubercCmdTrace = fmt.Sprintf("%s %s", strings.Join(args, " "), strings.Join(overrideNameValueFlags, " "))
 	}
 
-	return kubercCommandExecuted, nil
+	return kubercCmdTrace, nil
 }
 
 // applyAliases firstly appends all defined aliases in kuberc file to the root command.
@@ -217,7 +220,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		newCmd.Use = alias.Name
 		newCmd.Aliases = []string{}
 		aliasCmd := &newCmd
-		aliasCommandName = existingCmd.Name()
+		aliasCommandName = alias.Command
 
 		aliasArgs = &aliasing{
 			prependArgs: alias.PrependArgs,
@@ -283,8 +286,8 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 	// We are appending the additional args defined in kuberc in here and
 	// expect that it will be passed along to the actual command.
 	rootCmd.SetArgs(args[1:])
-	kubercCommandExecuted := fmt.Sprintf("%s %s %s %s", aliasCommandName, strings.Join(aliasArgs.prependArgs, " "), strings.Join(aliasNameValueFlags, " "), strings.Join(aliasArgs.appendArgs, " "))
-	return args, kubercCommandExecuted, nil
+	kubercCmdTrace := fmt.Sprintf("%s %s %s %s", aliasCommandName, strings.Join(aliasArgs.prependArgs, " "), strings.Join(aliasNameValueFlags, " "), strings.Join(aliasArgs.appendArgs, " "))
+	return args, kubercCmdTrace, nil
 }
 
 // DefaultGetPreferences returns KubeRCConfiguration.
