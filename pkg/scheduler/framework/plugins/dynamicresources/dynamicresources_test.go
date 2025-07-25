@@ -1272,6 +1272,7 @@ func TestPlugin(t *testing.T) {
 								Obj()
 						},
 					},
+					status: nil,
 				},
 			},
 		},
@@ -1360,6 +1361,7 @@ func TestPlugin(t *testing.T) {
 							return claim
 						},
 					},
+					status: nil,
 				},
 			},
 		},
@@ -1380,6 +1382,7 @@ func TestPlugin(t *testing.T) {
 								Obj()
 						},
 					},
+					status: nil,
 				},
 			},
 		},
