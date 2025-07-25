@@ -189,7 +189,9 @@ func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsy
 				}
 			}
 			if err := util.DeletePod(ctx, ev.Handler.ClientSet(), victim); err != nil {
-				if !apierrors.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
+					logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(preemptor), "victim", klog.KObj(victim), "node", c.Name())
+				} else {
 					logger.Error(err, "Tried to preempted pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
 				}
 				return err
@@ -441,11 +443,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 			return
 		}
 
-		if err := ev.PreemptPod(ctx, c, pod, victimPod, pluginName); err != nil {
-			if apierrors.IsNotFound(err) {
-				logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(pod), "victim", klog.KObj(victimPod), "node", c.Name())
-				return
-			}
+		if err := ev.PreemptPod(ctx, c, pod, victimPod, pluginName); err != nil && !apierrors.IsNotFound(err) {
 			errCh.SendErrorWithCancel(err, cancel)
 		}
 	}, ev.PluginName)
@@ -522,10 +520,18 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 	}
 
 	errCh := parallelize.NewErrorChannel()
+	// Whether all victim pods are already deleted before making API call.
+	var allPodsAlreadyDeleted atomic.Bool
+	allPodsAlreadyDeleted.Store(true)
 	preemptPod := func(index int) {
 		victim := victimPods[index]
-		if err := ev.PreemptPod(ctx, c, pod, victim, pluginName); err != nil {
+		err := ev.PreemptPod(ctx, c, pod, victim, pluginName)
+		switch {
+		case err != nil && !apierrors.IsNotFound(err):
+			// We don't have to handle NotFound error here, because it means the victim Pod is already deleted, and the preemption didn't have to remove it.
 			errCh.SendErrorWithCancel(err, cancel)
+		case err == nil:
+			allPodsAlreadyDeleted.Store(false)
 		}
 	}
 
@@ -537,8 +543,6 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		startTime := time.Now()
 		result := metrics.GoroutineResultSuccess
 
-		// Whether all victim pods are already deleted before making API call.
-		allPodsAlreadyDeleted := true
 		defer metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
 		defer metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
 		defer func() {
@@ -547,7 +551,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			if result == metrics.GoroutineResultError ||
 				// When all pods are already deleted (which is very rare, but could happen in theory),
 				// it's safe to activate the preemptor Pod because it might miss Pod/delete event that requeues the pod.
-				allPodsAlreadyDeleted {
+				allPodsAlreadyDeleted.Load() {
 				ev.Handler.Activate(logger, map[string]*v1.Pod{pod.Name: pod})
 			}
 		}()
@@ -573,15 +577,9 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 			// and the pod could end up stucking at the unschedulable pod pool
 			// by all the pod removal events being ignored.
 			ev.Handler.Parallelizer().Until(ctx, len(victimPods)-1, preemptPod, ev.PluginName)
-			err := errCh.ReceiveError()
-			switch {
-			case apierrors.IsNotFound(err):
-				logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(pod), "node", c.Name(), "err", err)
-			case err != nil:
+			if err := errCh.ReceiveError(); err != nil {
 				utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 				result = metrics.GoroutineResultError
-			default:
-				allPodsAlreadyDeleted = false
 			}
 		}
 
@@ -591,13 +589,12 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 
 		err := ev.PreemptPod(ctx, c, pod, victimPods[len(victimPods)-1], pluginName)
 		switch {
-		case apierrors.IsNotFound(err):
-			logger.V(2).Info("Victim Pod is already deleted", "preemptor", klog.KObj(pod), "node", c.Name(), "err", err)
-		case err != nil:
+		case err != nil && !apierrors.IsNotFound(err):
+			// We don't have to handle NotFound error here, because it means the victim Pod is already deleted, and the preemption didn't have to remove it.
 			utilruntime.HandleErrorWithContext(ctx, err, "Error occurred during async preemption")
 			result = metrics.GoroutineResultError
-		default:
-			allPodsAlreadyDeleted = false
+		case err == nil:
+			allPodsAlreadyDeleted.Store(false)
 		}
 
 		logger.V(2).Info("Async Preemption finished completely", "preemptor", klog.KObj(pod), "node", c.Name(), "result", result)
