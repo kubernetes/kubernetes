@@ -21,8 +21,10 @@ CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 # as they do not exist anymore in the debian repositories for jessie. So we do not recommend using this
 # image for any production use and limit use of this image to just test scenarios.
 
-COPY fixup-apt-list.sh /
-RUN ["/fixup-apt-list.sh"]
+# @TinaMor: This script is used to fix the apt list files in the image to use archive mirros.
+# However, it's no longer needed since we are using a newer Debian base image.
+# COPY fixup-apt-list.sh /
+# RUN ["/fixup-apt-list.sh"]
 
 RUN apt-get -q update && \
     apt-get install -y --force-yes dnsutils && \
