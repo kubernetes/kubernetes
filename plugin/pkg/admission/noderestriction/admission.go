@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -358,6 +359,9 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !resourceClaimStatusesEqual(oldPod.Status.ResourceClaimStatuses, newPod.Status.ResourceClaimStatuses) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update resource claim statues", nodeName))
 		}
+		if !extendedResourceClaimStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, newPod.Status.ExtendedResourceClaimStatus) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update extended resource claim status", nodeName))
+		}
 		return nil
 
 	default:
@@ -386,6 +390,22 @@ func resourceClaimStatusesEqual(statusA, statusB []api.PodResourceClaimStatus) b
 		}
 	}
 	return true
+}
+
+func extendedResourceClaimStatusEqual(statusA, statusB *api.PodExtendedResourceClaimStatus) bool {
+	if statusA == nil && statusB == nil {
+		return true
+	}
+	if statusA == nil || statusB == nil {
+		return false
+	}
+	if statusA.ResourceClaimName != statusB.ResourceClaimName {
+		return false
+	}
+	// In most cases, status entries only get added once and not modified.
+	// But this cannot be guaranteed, so for the sake of correctness in all
+	// cases this code here has to check.
+	return slices.Equal(statusA.RequestMappings, statusB.RequestMappings)
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.

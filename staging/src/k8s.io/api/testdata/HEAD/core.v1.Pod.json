@@ -2103,6 +2103,16 @@
         "name": "nameValue",
         "resourceClaimName": "resourceClaimNameValue"
       }
-    ]
+    ],
+    "extendedResourceClaimStatus": {
+      "requestMappings": [
+        {
+          "containerName": "containerNameValue",
+          "resourceName": "resourceNameValue",
+          "requestName": "requestNameValue"
+        }
+      ],
+      "resourceClaimName": "resourceClaimNameValue"
+    }
   }
 }

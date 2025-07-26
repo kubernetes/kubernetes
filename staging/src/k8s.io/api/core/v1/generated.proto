@@ -904,6 +904,19 @@ message Container {
   optional bool tty = 18;
 }
 
+// ContainerExtendedResourceRequest has the mapping of container name,
+// extended resource name to the device request name.
+message ContainerExtendedResourceRequest {
+  // The name of the container requesting resources.
+  optional string containerName = 1;
+
+  // The name of the extended resource in that container which gets backed by DRA.
+  optional string resourceName = 2;
+
+  // The name of the request in the special ResourceClaim which corresponds to the extended resource.
+  optional string requestName = 3;
+}
+
 // Describe a container image
 message ContainerImage {
   // Names by which this image is known.
@@ -3991,6 +4004,20 @@ message PodExecOptions {
   repeated string command = 6;
 }
 
+// PodExtendedResourceClaimStatus is stored in the PodStatus for the extended
+// resource requests backed by DRA. It stores the generated name for
+// the corresponding special ResourceClaim created by the scheduler.
+message PodExtendedResourceClaimStatus {
+  // RequestMappings identifies the mapping of <container, extended resource backed by DRA> to  device request
+  // in the generated ResourceClaim.
+  // +listType=atomic
+  repeated ContainerExtendedResourceRequest requestMappings = 1;
+
+  // ResourceClaimName is the name of the ResourceClaim that was
+  // generated for the Pod in the namespace of the Pod.
+  optional string resourceClaimName = 2;
+}
+
 // PodIP represents a single IP address allocated to the pod.
 message PodIP {
   // IP is the IP address assigned to the pod
@@ -4854,6 +4881,11 @@ message PodStatus {
   // +featureGate=DynamicResourceAllocation
   // +optional
   repeated PodResourceClaimStatus resourceClaimStatuses = 15;
+
+  // Status of extended resource claim backed by DRA.
+  // +featureGate=DRAExtendedResource
+  // +optional
+  optional PodExtendedResourceClaimStatus extendedResourceClaimStatus = 18;
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

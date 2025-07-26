@@ -349,6 +349,18 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 		Name:              "my-claim-2",
 		ResourceClaimName: ptr.To("claim-2"),
 	}
+	extendedClaimStatusA := &v1.PodExtendedResourceClaimStatus{
+		RequestMappings: []v1.ContainerExtendedResourceRequest{
+			{RequestName: "request", ContainerName: "c", ResourceName: "example.com/gpu"},
+		},
+		ResourceClaimName: "claim",
+	}
+	extendedClaimStatusB := &v1.PodExtendedResourceClaimStatus{
+		RequestMappings: []v1.ContainerExtendedResourceRequest{
+			{RequestName: "request", ContainerName: "c", ResourceName: "example.com/gpu"},
+		},
+		ResourceClaimName: "claim-2",
+	}
 	tests := []struct {
 		name        string
 		newPod      *v1.Pod
@@ -433,9 +445,22 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
 		},
 		{
-			name:   "pod claim statuses extended",
-			newPod: st.MakePod().ResourceClaimStatuses(claimStatusA, claimStatusB).Obj(),
-			oldPod: st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
+			name:        "pod extended resource claim status change, feature disabled",
+			draDisabled: true,
+			newPod:      st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusA).Obj(),
+			oldPod:      st.MakePod().Obj(),
+			want:        []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.Update}},
+		},
+		{
+			name:   "pod extended resource claim status change, feature enabled",
+			newPod: st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusA).Obj(),
+			oldPod: st.MakePod().Obj(),
+			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
+		},
+		{
+			name:   "pod extended resource claim status swapped",
+			newPod: st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusB).Obj(),
+			oldPod: st.MakePod().ExtendedResourceClaimStatus(extendedClaimStatusA).Obj(),
 			want:   []fwk.ClusterEvent{{Resource: unschedulablePod, ActionType: fwk.UpdatePodGeneratedResourceClaim}},
 		},
 	}
