@@ -52,6 +52,8 @@ shopt -s dotglob
 shopt -s extglob
 set -o pipefail
 
+GIMME_DEBUG=true
+
 [[ ${GIMME_DEBUG} ]] && set -x
 
 readonly GIMME_VERSION="v1.5.4"
