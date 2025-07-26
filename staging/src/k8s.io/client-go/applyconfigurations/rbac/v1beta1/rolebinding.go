@@ -47,29 +47,15 @@ func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 	return b
 }
 
-// ExtractRoleBinding extracts the applied configuration owned by fieldManager from
-// roleBinding. If no managedFields are found in roleBinding for fieldManager, a
-// RoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractRoleBindingFrom extracts the applied configuration owned by fieldManager from
+// roleBinding for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // roleBinding must be a unmodified RoleBinding API object that was retrieved from the Kubernetes API.
-// ExtractRoleBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractRoleBindingFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractRoleBinding(roleBinding *rbacv1beta1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
-	return extractRoleBinding(roleBinding, fieldManager, "")
-}
-
-// ExtractRoleBindingStatus is the same as ExtractRoleBinding except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractRoleBindingStatus(roleBinding *rbacv1beta1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
-	return extractRoleBinding(roleBinding, fieldManager, "status")
-}
-
-func extractRoleBinding(roleBinding *rbacv1beta1.RoleBinding, fieldManager string, subresource string) (*RoleBindingApplyConfiguration, error) {
+func ExtractRoleBindingFrom(roleBinding *rbacv1beta1.RoleBinding, fieldManager string, subresource string) (*RoleBindingApplyConfiguration, error) {
 	b := &RoleBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(roleBinding, internal.Parser().Type("io.k8s.api.rbac.v1beta1.RoleBinding"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +68,22 @@ func extractRoleBinding(roleBinding *rbacv1beta1.RoleBinding, fieldManager strin
 	b.WithAPIVersion("rbac.authorization.k8s.io/v1beta1")
 	return b, nil
 }
+
+// ExtractRoleBinding extracts the applied configuration owned by fieldManager from
+// roleBinding. If no managedFields are found in roleBinding for fieldManager, a
+// RoleBindingApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// roleBinding must be a unmodified RoleBinding API object that was retrieved from the Kubernetes API.
+// ExtractRoleBinding provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractRoleBinding(roleBinding *rbacv1beta1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
+	return ExtractRoleBindingFrom(roleBinding, fieldManager, "")
+}
+
 func (b RoleBindingApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value

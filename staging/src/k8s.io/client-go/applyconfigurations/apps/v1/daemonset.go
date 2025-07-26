@@ -47,29 +47,15 @@ func DaemonSet(name, namespace string) *DaemonSetApplyConfiguration {
 	return b
 }
 
-// ExtractDaemonSet extracts the applied configuration owned by fieldManager from
-// daemonSet. If no managedFields are found in daemonSet for fieldManager, a
-// DaemonSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. It is possible that no managed fields were found for because other
-// field managers have taken ownership of all the fields previously owned by fieldManager, or because
-// the fieldManager never owned fields any fields.
+// ExtractDaemonSetFrom extracts the applied configuration owned by fieldManager from
+// daemonSet for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
 // daemonSet must be a unmodified DaemonSet API object that was retrieved from the Kubernetes API.
-// ExtractDaemonSet provides a way to perform a extract/modify-in-place/apply workflow.
+// ExtractDaemonSetFrom provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractDaemonSet(daemonSet *appsv1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
-	return extractDaemonSet(daemonSet, fieldManager, "")
-}
-
-// ExtractDaemonSetStatus is the same as ExtractDaemonSet except
-// that it extracts the status subresource applied configuration.
-// Experimental!
-func ExtractDaemonSetStatus(daemonSet *appsv1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
-	return extractDaemonSet(daemonSet, fieldManager, "status")
-}
-
-func extractDaemonSet(daemonSet *appsv1.DaemonSet, fieldManager string, subresource string) (*DaemonSetApplyConfiguration, error) {
+func ExtractDaemonSetFrom(daemonSet *appsv1.DaemonSet, fieldManager string, subresource string) (*DaemonSetApplyConfiguration, error) {
 	b := &DaemonSetApplyConfiguration{}
 	err := managedfields.ExtractInto(daemonSet, internal.Parser().Type("io.k8s.api.apps.v1.DaemonSet"), fieldManager, b, subresource)
 	if err != nil {
@@ -82,6 +68,29 @@ func extractDaemonSet(daemonSet *appsv1.DaemonSet, fieldManager string, subresou
 	b.WithAPIVersion("apps/v1")
 	return b, nil
 }
+
+// ExtractDaemonSet extracts the applied configuration owned by fieldManager from
+// daemonSet. If no managedFields are found in daemonSet for fieldManager, a
+// DaemonSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// daemonSet must be a unmodified DaemonSet API object that was retrieved from the Kubernetes API.
+// ExtractDaemonSet provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+// Experimental!
+func ExtractDaemonSet(daemonSet *appsv1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+	return ExtractDaemonSetFrom(daemonSet, fieldManager, "")
+}
+
+// ExtractDaemonSetStatus extracts the applied configuration owned by fieldManager from
+// daemonSet for the status subresource.
+// Experimental!
+func ExtractDaemonSetStatus(daemonSet *appsv1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+	return ExtractDaemonSetFrom(daemonSet, fieldManager, "status")
+}
+
 func (b DaemonSetApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
