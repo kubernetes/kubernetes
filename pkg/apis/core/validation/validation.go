@@ -3827,7 +3827,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	return allErrs
 }
 
-func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+func validateHostUsers(spec *core.PodSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// Only make the following checks if hostUsers is false (otherwise, the container uses the
@@ -3843,15 +3843,45 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList 
 
 	// Note we already validated above spec.SecurityContext is not nil.
 	if spec.SecurityContext.HostNetwork {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostNetwork"), "when `pod.Spec.HostUsers` is false"))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostNetwork"), "when `hostUsers` is false"))
 	}
 	if spec.SecurityContext.HostPID {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostPID"), "when `pod.Spec.HostUsers` is false"))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostPID"), "when `hostUsers` is false"))
 	}
 	if spec.SecurityContext.HostIPC {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostIPC"), "when `pod.Spec.HostUsers` is false"))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("HostIPC"), "when `hostUsers` is false"))
+	}
+	if !opts.AllowUserNamespacesWithVolumeDevices {
+		allErrs = append(allErrs, ValidateHostUsersVolumeDevices(spec, fldPath)...)
+	}
+	return allErrs
+}
+
+// ValidateHostUsersVolumeDevices checks if the pod has hostUsers set to false and volumeDevices
+// defined in any of the containers.
+func ValidateHostUsersVolumeDevices(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if spec.SecurityContext == nil || spec.SecurityContext.HostUsers == nil || *spec.SecurityContext.HostUsers {
+		return allErrs
 	}
 
+	// volumeDevices won't work, as they don't support idmap mounts nor we are chown-ing them.
+	// Let's return a clear error in this case.
+	for i, c := range spec.EphemeralContainers {
+		if len(c.VolumeDevices) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("ephemeralContainers").Index(i).Child("volumeDevices"), "when `hostUsers` is false"))
+		}
+	}
+	for i, c := range spec.InitContainers {
+		if len(c.VolumeDevices) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("initContainers").Index(i).Child("volumeDevices"), "when `hostUsers` is false"))
+		}
+	}
+	for i, c := range spec.Containers {
+		if len(c.VolumeDevices) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("containers").Index(i).Child("volumeDevices"), "when `hostUsers` is false"))
+		}
+	}
 	return allErrs
 }
 
@@ -4363,6 +4393,8 @@ type PodValidationOptions struct {
 	AllowEnvFilesValidation bool
 	// Allows containers have restart policy and restart policy rules.
 	AllowContainerRestartPolicyRules bool
+	// Allow user namespaces with volume devices.
+	AllowUserNamespacesWithVolumeDevices bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4528,9 +4560,8 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, validateSchedulingGates(spec.SchedulingGates, fldPath.Child("schedulingGates"))...)
 	allErrs = append(allErrs, validateTopologySpreadConstraints(spec.TopologySpreadConstraints, fldPath.Child("topologySpreadConstraints"), opts)...)
 	allErrs = append(allErrs, validateWindowsHostProcessPod(spec, fldPath)...)
-	allErrs = append(allErrs, validateHostUsers(spec, fldPath)...)
+	allErrs = append(allErrs, validateHostUsers(spec, fldPath, opts)...)
 	allErrs = append(allErrs, validatePodHostName(spec, fldPath)...)
-
 	if len(spec.ServiceAccountName) > 0 {
 		for _, msg := range ValidateServiceAccountName(spec.ServiceAccountName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountName"), spec.ServiceAccountName, msg))

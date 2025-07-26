@@ -6091,3 +6091,96 @@ func Test_dropContainerRestartRules(t *testing.T) {
 		})
 	}
 }
+
+func TestHasUserNamespacesWithVolumeDevices(t *testing.T) {
+	falseVar := false
+	trueVar := true
+
+	tests := []struct {
+		name     string
+		spec     *api.PodSpec
+		expected bool
+	}{
+		{
+			name: "hostUsers=nil",
+			spec: &api.PodSpec{},
+		}, {
+			name: "hostUsers=false & no volume devices",
+			spec: &api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					HostUsers: &falseVar,
+				},
+			},
+		}, {
+			name: "hostUsers=true & container volumeDevice",
+			spec: &api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					HostUsers: &trueVar,
+				},
+				Containers: []api.Container{{
+					Name: "test-container",
+					VolumeDevices: []api.VolumeDevice{{
+						Name:       "test-volume",
+						DevicePath: "/dev/test-device",
+					}},
+				}},
+			},
+		}, {
+			name:     "hostUsers=false & container volumeDevice",
+			expected: true,
+			spec: &api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					HostUsers: &falseVar,
+				},
+				Containers: []api.Container{{
+					Name: "test-container",
+					VolumeDevices: []api.VolumeDevice{{
+						Name:       "test-volume",
+						DevicePath: "/dev/test-device",
+					}},
+				}},
+			},
+		}, {
+
+			name:     "hostUsers=false & initContainer volumeDevice",
+			expected: true,
+			spec: &api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					HostUsers: &falseVar,
+				},
+				InitContainers: []api.Container{{
+					Name: "test-container",
+					VolumeDevices: []api.VolumeDevice{{
+						Name:       "test-volume",
+						DevicePath: "/dev/test-device",
+					}},
+				}},
+			},
+		}, {
+			name:     "hostUsers=false & ephemeralContainer volumeDevice",
+			expected: true,
+			spec: &api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					HostUsers: &falseVar,
+				},
+				EphemeralContainers: []api.EphemeralContainer{{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name: "test-container",
+						VolumeDevices: []api.VolumeDevice{{
+							Name:       "test-volume",
+							DevicePath: "/dev/test-device",
+						}}},
+				}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := hasUserNamespacesWithVolumeDevices(test.spec)
+			if test.expected != actual {
+				t.Errorf("expected %v, got %v", test.expected, actual)
+			}
+		})
+	}
+}
