@@ -178,41 +178,15 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		return "", message, err
 	}
 
-	if imageRef != "" && !utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
-		msg := fmt.Sprintf("Container image %q already present on machine", requestedImage)
-		m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
-		return imageRef, msg, nil
-	}
+	// wrap the lookup in a function to ensure that we only look up credentials once and no earlier than needed
+	lookupPullCredentials := m.makeLookupPullCredentialsFunc(spec.Image, pod, pullSecrets, podSandboxConfig)
 
-	repoToPull, _, _, err := parsers.ParseImageName(spec.Image)
-	if err != nil {
-		return "", err.Error(), err
-	}
+	getPodCredentials := func() ([]kubeletconfiginternal.ImagePullSecret, *kubeletconfiginternal.ImagePullServiceAccount, error) {
+		pullCredentials, err := lookupPullCredentials()
+		if err != nil {
+			return nil, nil, err
+		}
 
-	// construct the dynamic keyring using the providers we have in the kubelet
-	var podName, podNamespace, podUID string
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
-		sandboxMetadata := podSandboxConfig.GetMetadata()
-
-		podName = sandboxMetadata.Name
-		podNamespace = sandboxMetadata.Namespace
-		podUID = sandboxMetadata.Uid
-	}
-
-	externalCredentialProviderKeyring := credentialproviderplugin.NewExternalCredentialProviderDockerKeyring(
-		podNamespace,
-		podName,
-		podUID,
-		pod.Spec.ServiceAccountName)
-
-	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, credentialprovider.UnionDockerKeyring{m.nodeKeyring, externalCredentialProviderKeyring})
-	if err != nil {
-		return "", err.Error(), err
-	}
-
-	pullCredentials, _ := keyring.Lookup(repoToPull)
-
-	if imageRef != "" {
 		var imagePullSecrets []kubeletconfiginternal.ImagePullSecret
 		// we don't take the audience of the service account into account, so there can only
 		// be one imagePullServiceAccount per pod when we try to make a decision.
@@ -239,8 +213,18 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 			}
 		}
 
-		pullRequired := m.imagePullManager.MustAttemptImagePull(requestedImage, imageRef, imagePullSecrets, imagePullServiceAccount)
-		if !pullRequired {
+		return imagePullSecrets, imagePullServiceAccount, nil
+	}
+
+	if imageRef != "" {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+			msg := fmt.Sprintf("Container image %q already present on machine", requestedImage)
+			m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
+			return imageRef, msg, nil
+		}
+		if pullRequired, err := m.imagePullManager.MustAttemptImagePull(requestedImage, imageRef, getPodCredentials); err != nil {
+			return "", err.Error(), err
+		} else if !pullRequired {
 			msg := fmt.Sprintf("Container image %q already present on machine and can be accessed by the pod", requestedImage)
 			m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
 			return imageRef, msg, nil
@@ -254,7 +238,45 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		return "", msg, err
 	}
 
+	pullCredentials, err := lookupPullCredentials()
+	if err != nil {
+		return "", err.Error(), err
+	}
+
 	return m.pullImage(ctx, logPrefix, objRef, pod.UID, requestedImage, spec, pullCredentials, podSandboxConfig)
+}
+
+func (m *imageManager) makeLookupPullCredentialsFunc(image string, pod *v1.Pod, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) func() ([]credentialprovider.TrackedAuthConfig, error) {
+	return sync.OnceValues(func() ([]credentialprovider.TrackedAuthConfig, error) {
+		repoToPull, _, _, err := parsers.ParseImageName(image)
+		if err != nil {
+			return nil, err
+		}
+
+		// construct the dynamic keyring using the providers we have in the kubelet
+		var podName, podNamespace, podUID string
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
+			sandboxMetadata := podSandboxConfig.GetMetadata()
+
+			podName = sandboxMetadata.Name
+			podNamespace = sandboxMetadata.Namespace
+			podUID = sandboxMetadata.Uid
+		}
+
+		externalCredentialProviderKeyring := credentialproviderplugin.NewExternalCredentialProviderDockerKeyring(
+			podNamespace,
+			podName,
+			podUID,
+			pod.Spec.ServiceAccountName)
+
+		keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, credentialprovider.UnionDockerKeyring{m.nodeKeyring, externalCredentialProviderKeyring})
+		if err != nil {
+			return nil, err
+		}
+
+		pullCredentials, _ := keyring.Lookup(repoToPull)
+		return pullCredentials, nil
+	})
 }
 
 func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *v1.ObjectReference, podUID types.UID, image string, imgSpec kubecontainer.ImageSpec, pullCredentials []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (imageRef, message string, err error) {

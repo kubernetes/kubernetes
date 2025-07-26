@@ -694,9 +694,14 @@ type mockImagePullManager struct {
 	config *mockImagePullManagerConfig
 }
 
-func (m *mockImagePullManager) MustAttemptImagePull(image, _ string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
+func (m *mockImagePullManager) MustAttemptImagePull(image, _ string, getPodCredentials pullmanager.GetPodCredentials) (bool, error) {
 	if m.config == nil || m.config.allowAll {
-		return false
+		return false, nil
+	}
+
+	podSecrets, podServiceAccount, err := getPodCredentials()
+	if err != nil {
+		return true, err
 	}
 
 	// Check secrets
@@ -704,7 +709,7 @@ func (m *mockImagePullManager) MustAttemptImagePull(image, _ string, podSecrets 
 		for _, s := range podSecrets {
 			for _, allowed := range allowedSecrets {
 				if s.Namespace == allowed.Namespace && s.Name == allowed.Name && s.UID == allowed.UID {
-					return false
+					return false, nil
 				}
 			}
 		}
@@ -714,12 +719,12 @@ func (m *mockImagePullManager) MustAttemptImagePull(image, _ string, podSecrets 
 	if podServiceAccount != nil {
 		if allowedServiceAccounts, ok := m.config.allowedServiceAccounts[image]; ok {
 			if slices.Contains(allowedServiceAccounts, *podServiceAccount) {
-				return false
+				return false, nil
 			}
 		}
 	}
 
-	return true
+	return true, nil
 }
 
 // mockImagePullManagerWithTracking tracks calls to MustAttemptImagePull for service account testing
@@ -736,19 +741,25 @@ type mockImagePullManagerWithTracking struct {
 	recordedCredentials *kubeletconfiginternal.ImagePullCredentials
 }
 
-func (m *mockImagePullManagerWithTracking) MustAttemptImagePull(image, imageRef string, podSecrets []kubeletconfiginternal.ImagePullSecret, podServiceAccount *kubeletconfiginternal.ImagePullServiceAccount) bool {
+func (m *mockImagePullManagerWithTracking) MustAttemptImagePull(image, imageRef string, getPodCredentials pullmanager.GetPodCredentials) (bool, error) {
 	m.mustAttemptCalled = true
 	m.lastImage = image
 	m.lastImageRef = imageRef
+
+	podSecrets, podServiceAccount, err := getPodCredentials()
+	if err != nil {
+		return true, err
+	}
+
 	m.lastSecrets = podSecrets
 	if podServiceAccount != nil {
 		m.lastServiceAccounts = []kubeletconfiginternal.ImagePullServiceAccount{*podServiceAccount}
 	}
 
 	if m.allowAll {
-		return false
+		return false, nil
 	}
-	return m.mustAttemptReturn
+	return m.mustAttemptReturn, nil
 }
 
 func (m *mockImagePullManagerWithTracking) RecordImagePulled(image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) {
