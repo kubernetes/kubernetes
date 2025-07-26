@@ -166,7 +166,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 	}
 }
 
-func newDefaultQueueSort() framework.LessFunc {
+func newDefaultQueueSort() fwk.LessFunc {
 	sort := &queuesort.PrioritySort{}
 	return sort.Less
 }
@@ -1547,7 +1547,7 @@ func (pl *preEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Stat
 func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 	tests := []struct {
 		name                   string
-		plugins                []framework.PreEnqueuePlugin
+		plugins                []fwk.PreEnqueuePlugin
 		pod                    *v1.Pod
 		event                  string
 		popFromBackoffQEnabled []bool
@@ -1563,7 +1563,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 		},
 		{
 			name:                  "preEnqueue plugin registered, pod name not in allowlists",
-			plugins:               []framework.PreEnqueuePlugin{&preEnqueuePlugin{}, &preEnqueuePlugin{}},
+			plugins:               []fwk.PreEnqueuePlugin{&preEnqueuePlugin{}, &preEnqueuePlugin{}},
 			pod:                   st.MakePod().Name("p").Label("p", "").Obj(),
 			event:                 framework.EventUnscheduledPodAdd.Label(),
 			wantUnschedulablePods: 1,
@@ -1571,7 +1571,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 		},
 		{
 			name: "preEnqueue plugin registered, pod failed one preEnqueue plugin",
-			plugins: []framework.PreEnqueuePlugin{
+			plugins: []fwk.PreEnqueuePlugin{
 				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
 				&preEnqueuePlugin{allowlists: []string{"foo"}},
 			},
@@ -1584,7 +1584,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 			// With SchedulerPopFromBackoffQ enabled, the queue assumes the pod has already passed PreEnqueue,
 			// and it doesn't run PreEnqueue again, always puts the pod to activeQ.
 			name: "preEnqueue plugin registered, preEnqueue plugin would reject the pod, but isn't run",
-			plugins: []framework.PreEnqueuePlugin{
+			plugins: []fwk.PreEnqueuePlugin{
 				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
 				&preEnqueuePlugin{allowlists: []string{"foo"}},
 			},
@@ -1596,7 +1596,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 		},
 		{
 			name: "preEnqueue plugin registered, pod would fail one preEnqueue plugin, but is after backoff",
-			plugins: []framework.PreEnqueuePlugin{
+			plugins: []fwk.PreEnqueuePlugin{
 				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
 				&preEnqueuePlugin{allowlists: []string{"foo"}},
 			},
@@ -1608,7 +1608,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 		},
 		{
 			name: "preEnqueue plugin registered, pod passed all preEnqueue plugins",
-			plugins: []framework.PreEnqueuePlugin{
+			plugins: []fwk.PreEnqueuePlugin{
 				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
 				&preEnqueuePlugin{allowlists: []string{"bar"}},
 			},
@@ -1630,7 +1630,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 
-				m := map[string]map[string]framework.PreEnqueuePlugin{"": make(map[string]framework.PreEnqueuePlugin, len(tt.plugins))}
+				m := map[string]map[string]fwk.PreEnqueuePlugin{"": make(map[string]fwk.PreEnqueuePlugin, len(tt.plugins))}
 				for _, plugin := range tt.plugins {
 					m[""][plugin.Name()] = plugin
 				}
@@ -1660,7 +1660,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 func TestPriorityQueue_moveToBackoffQ(t *testing.T) {
 	tests := []struct {
 		name                   string
-		plugins                []framework.PreEnqueuePlugin
+		plugins                []fwk.PreEnqueuePlugin
 		pod                    *v1.Pod
 		popFromBackoffQEnabled []bool
 		wantSuccess            bool
@@ -1672,21 +1672,21 @@ func TestPriorityQueue_moveToBackoffQ(t *testing.T) {
 		},
 		{
 			name:                   "preEnqueue plugin registered, pod name would not be in allowlists",
-			plugins:                []framework.PreEnqueuePlugin{&preEnqueuePlugin{}, &preEnqueuePlugin{}},
+			plugins:                []fwk.PreEnqueuePlugin{&preEnqueuePlugin{}, &preEnqueuePlugin{}},
 			pod:                    st.MakePod().Name("p").Label("p", "").Obj(),
 			popFromBackoffQEnabled: []bool{false},
 			wantSuccess:            true,
 		},
 		{
 			name:                   "preEnqueue plugin registered, pod name not in allowlists",
-			plugins:                []framework.PreEnqueuePlugin{&preEnqueuePlugin{}, &preEnqueuePlugin{}},
+			plugins:                []fwk.PreEnqueuePlugin{&preEnqueuePlugin{}, &preEnqueuePlugin{}},
 			pod:                    st.MakePod().Name("p").Label("p", "").Obj(),
 			popFromBackoffQEnabled: []bool{true},
 			wantSuccess:            false,
 		},
 		{
 			name: "preEnqueue plugin registered, preEnqueue plugin would reject the pod, but isn't run",
-			plugins: []framework.PreEnqueuePlugin{
+			plugins: []fwk.PreEnqueuePlugin{
 				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
 				&preEnqueuePlugin{allowlists: []string{"foo"}},
 			},
@@ -1696,7 +1696,7 @@ func TestPriorityQueue_moveToBackoffQ(t *testing.T) {
 		},
 		{
 			name: "preEnqueue plugin registered, pod failed one preEnqueue plugin",
-			plugins: []framework.PreEnqueuePlugin{
+			plugins: []fwk.PreEnqueuePlugin{
 				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
 				&preEnqueuePlugin{allowlists: []string{"foo"}},
 			},
@@ -1706,7 +1706,7 @@ func TestPriorityQueue_moveToBackoffQ(t *testing.T) {
 		},
 		{
 			name: "preEnqueue plugin registered, pod passed all preEnqueue plugins",
-			plugins: []framework.PreEnqueuePlugin{
+			plugins: []fwk.PreEnqueuePlugin{
 				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
 				&preEnqueuePlugin{allowlists: []string{"bar"}},
 			},
@@ -1726,7 +1726,7 @@ func TestPriorityQueue_moveToBackoffQ(t *testing.T) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 
-				m := map[string]map[string]framework.PreEnqueuePlugin{"": make(map[string]framework.PreEnqueuePlugin, len(tt.plugins))}
+				m := map[string]map[string]fwk.PreEnqueuePlugin{"": make(map[string]fwk.PreEnqueuePlugin, len(tt.plugins))}
 				for _, plugin := range tt.plugins {
 					m[""][plugin.Name()] = plugin
 				}
@@ -1960,8 +1960,8 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			}
 			cl := testingclock.NewFakeClock(now)
 			plugin, _ := schedulinggates.New(ctx, nil, nil, plfeature.Features{})
-			preEnqM := map[string]map[string]framework.PreEnqueuePlugin{"": {
-				names.SchedulingGates: plugin.(framework.PreEnqueuePlugin),
+			preEnqM := map[string]map[string]fwk.PreEnqueuePlugin{"": {
+				names.SchedulingGates: plugin.(fwk.PreEnqueuePlugin),
 				"foo":                 &preEnqueuePlugin{allowlists: []string{"foo"}},
 			}}
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m), WithClock(cl), WithPreEnqueuePluginMap(preEnqM))
@@ -2633,11 +2633,11 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 	q.Add(logger, medPriorityPodInfo.Pod)
 	// Update unschedulablePodInfo on a different node than specified in the pod.
 	q.AddNominatedPod(logger, mustNewTestPodInfo(t, unschedulablePodInfo.Pod),
-		&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node5"})
+		&fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node5"})
 
 	// Update nominated node name of a pod on a node that is not specified in the pod object.
 	q.AddNominatedPod(logger, mustNewTestPodInfo(t, highPriorityPodInfo.Pod),
-		&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node2"})
+		&fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node2"})
 	expectedNominatedPods := &nominator{
 		nominatedPodToNode: map[types.UID]string{
 			medPriorityPodInfo.Pod.UID:   "node1",
@@ -2662,7 +2662,7 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 	}
 	// Update one of the nominated pods that doesn't have nominatedNodeName in the
 	// pod object. It should be updated correctly.
-	q.AddNominatedPod(logger, highPriorityPodInfo, &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node4"})
+	q.AddNominatedPod(logger, highPriorityPodInfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node4"})
 	expectedNominatedPods = &nominator{
 		nominatedPodToNode: map[types.UID]string{
 			medPriorityPodInfo.Pod.UID:   "node1",
@@ -2681,7 +2681,7 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 
 	// Attempt to nominate a pod that was deleted from the informer cache.
 	// Nothing should change.
-	q.AddNominatedPod(logger, nonExistentPodInfo, &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"})
+	q.AddNominatedPod(logger, nonExistentPodInfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after nominating a deleted pod (-want, +got):\n%s", diff)
 	}
@@ -2689,7 +2689,7 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 	// Nothing should change.
 	scheduledPodCopy := scheduledPodInfo.Pod.DeepCopy()
 	scheduledPodInfo.Pod.Spec.NodeName = ""
-	q.AddNominatedPod(logger, mustNewTestPodInfo(t, scheduledPodCopy), &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"})
+	q.AddNominatedPod(logger, mustNewTestPodInfo(t, scheduledPodCopy), &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"})
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
 		t.Errorf("Unexpected diff after nominating a scheduled pod (-want, +got):\n%s", diff)
 	}
@@ -3540,7 +3540,7 @@ scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",p
 					QueueingHintFn: queueHintReturnQueue,
 				},
 			}
-			preenq := map[string]map[string]framework.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{queueable}}}}
+			preenq := map[string]map[string]fwk.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{queueable}}}}
 			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
 			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(preenq), WithPluginMetricsSamplePercent(test.pluginMetricsSamplePercent), WithMetricsRecorder(*recorder), WithQueueingHintMapPerProfile(m))
 			for i, op := range test.operations {
@@ -3631,7 +3631,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 			name: "A gated pod is created and scheduled after lifting gate",
 			perPodSchedulingMetricsScenario: func(c *testingclock.FakeClock, queue *PriorityQueue, pod *v1.Pod) {
 				// Create a queue with PreEnqueuePlugin
-				queue.preEnqueuePluginMap = map[string]map[string]framework.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{"foo"}}}}
+				queue.preEnqueuePluginMap = map[string]map[string]fwk.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{"foo"}}}}
 				queue.pluginMetricsSamplePercent = 0
 				queue.Add(logger, pod)
 				// Check pod is added to the unschedulablePods queue.
@@ -4281,7 +4281,7 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	plugin, _ := schedulinggates.New(ctx, nil, nil, plfeature.Features{})
-	m := map[string]map[string]framework.PreEnqueuePlugin{"": {names.SchedulingGates: plugin.(framework.PreEnqueuePlugin)}}
+	m := map[string]map[string]fwk.PreEnqueuePlugin{"": {names.SchedulingGates: plugin.(fwk.PreEnqueuePlugin)}}
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithPreEnqueuePluginMap(m))
 
 	gatedPod := st.MakePod().SchedulingGates([]string{"hello world"}).Obj()

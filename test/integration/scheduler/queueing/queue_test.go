@@ -179,8 +179,8 @@ func TestSchedulingGates(t *testing.T) {
 	}
 }
 
-var _ framework.FilterPlugin = &fakeCRPlugin{}
-var _ framework.EnqueueExtensions = &fakeCRPlugin{}
+var _ fwk.FilterPlugin = &fakeCRPlugin{}
+var _ fwk.EnqueueExtensions = &fakeCRPlugin{}
 
 type fakeCRPlugin struct{}
 
@@ -256,7 +256,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	registry := frameworkruntime.Registry{
-		"fakeCRPlugin": func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+		"fakeCRPlugin": func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 			return &fakeCRPlugin{}, nil
 		},
 	}
@@ -363,13 +363,13 @@ func TestCustomResourceEnqueue(t *testing.T) {
 func TestRequeueByBindFailure(t *testing.T) {
 	fakeBind := &firstFailBindPlugin{}
 	registry := frameworkruntime.Registry{
-		"firstFailBindPlugin": func(ctx context.Context, o runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+		"firstFailBindPlugin": func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 			binder, err := defaultbinder.New(ctx, nil, fh)
 			if err != nil {
 				return nil, err
 			}
 
-			fakeBind.defaultBinderPlugin = binder.(framework.BindPlugin)
+			fakeBind.defaultBinderPlugin = binder.(fwk.BindPlugin)
 			return fakeBind, nil
 		},
 	}
@@ -432,7 +432,7 @@ func TestRequeueByBindFailure(t *testing.T) {
 // firstFailBindPlugin rejects the Pod in the first Bind call.
 type firstFailBindPlugin struct {
 	counter             int
-	defaultBinderPlugin framework.BindPlugin
+	defaultBinderPlugin fwk.BindPlugin
 }
 
 func (*firstFailBindPlugin) Name() string {
@@ -455,7 +455,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 	queueingHintCalledCounter := 0
 	fakePermit := &fakePermitPlugin{}
 	registry := frameworkruntime.Registry{
-		fakePermitPluginName: func(ctx context.Context, o runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+		fakePermitPluginName: func(ctx context.Context, o runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 			fakePermit = &fakePermitPlugin{
 				frameworkHandler: fh,
 				schedulingHint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
@@ -518,7 +518,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 
 	// reject pod-1 to simulate the failure in Permit plugins.
 	// This pod-1 should be enqueued to activeQ because the NodeUpdate event has happened.
-	fakePermit.frameworkHandler.IterateOverWaitingPods(func(wp framework.WaitingPod) {
+	fakePermit.frameworkHandler.IterateOverWaitingPods(func(wp fwk.WaitingPod) {
 		if wp.GetPod().Name == "pod-1" {
 			wp.Reject(fakePermitPluginName, "fakePermitPlugin rejects the Pod")
 			return
@@ -527,7 +527,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 
 	// Wait for pod-2 to be scheduled.
 	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
-		fakePermit.frameworkHandler.IterateOverWaitingPods(func(wp framework.WaitingPod) {
+		fakePermit.frameworkHandler.IterateOverWaitingPods(func(wp fwk.WaitingPod) {
 			if wp.GetPod().Name == "pod-2" {
 				wp.Allow(fakePermitPluginName)
 			}
@@ -541,7 +541,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 
 	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (done bool, err error) {
 		pod1Found := false
-		fakePermit.frameworkHandler.IterateOverWaitingPods(func(wp framework.WaitingPod) {
+		fakePermit.frameworkHandler.IterateOverWaitingPods(func(wp fwk.WaitingPod) {
 			if wp.GetPod().Name == "pod-1" {
 				pod1Found = true
 				wp.Allow(fakePermitPluginName)
@@ -559,7 +559,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 }
 
 type fakePermitPlugin struct {
-	frameworkHandler framework.Handle
+	frameworkHandler fwk.Handle
 	schedulingHint   fwk.QueueingHintFn
 }
 

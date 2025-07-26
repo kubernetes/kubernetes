@@ -44,7 +44,6 @@ import (
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -116,14 +115,14 @@ type DynamicResources struct {
 	enableFilterTimeout        bool
 	filterTimeout              time.Duration
 
-	fh         framework.Handle
+	fh         fwk.Handle
 	clientset  kubernetes.Interface
 	celCache   *cel.Cache
-	draManager framework.SharedDRAManager
+	draManager fwk.SharedDRAManager
 }
 
 // New initializes a new plugin and returns it.
-func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
 	if !fts.EnableDynamicResourceAllocation {
 		// Disabled, won't do anything.
 		return &DynamicResources{}, nil
@@ -159,13 +158,13 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	return pl, nil
 }
 
-var _ framework.PreEnqueuePlugin = &DynamicResources{}
-var _ framework.PreFilterPlugin = &DynamicResources{}
-var _ framework.FilterPlugin = &DynamicResources{}
-var _ framework.PostFilterPlugin = &DynamicResources{}
-var _ framework.ReservePlugin = &DynamicResources{}
-var _ framework.EnqueueExtensions = &DynamicResources{}
-var _ framework.PreBindPlugin = &DynamicResources{}
+var _ fwk.PreEnqueuePlugin = &DynamicResources{}
+var _ fwk.PreFilterPlugin = &DynamicResources{}
+var _ fwk.FilterPlugin = &DynamicResources{}
+var _ fwk.PostFilterPlugin = &DynamicResources{}
+var _ fwk.ReservePlugin = &DynamicResources{}
+var _ fwk.EnqueueExtensions = &DynamicResources{}
+var _ fwk.PreBindPlugin = &DynamicResources{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *DynamicResources) Name() string {
@@ -365,7 +364,7 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate claims bound. UnschedulableAndUnresolvable is returned if
 // the pod cannot be scheduled at the moment on any node.
-func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
 	if !pl.enabled {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
@@ -513,7 +512,7 @@ func (pl *DynamicResources) validateDeviceClass(logger klog.Logger, deviceClassN
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
-func (pl *DynamicResources) PreFilterExtensions() framework.PreFilterExtensions {
+func (pl *DynamicResources) PreFilterExtensions() fwk.PreFilterExtensions {
 	return nil
 }
 
@@ -637,7 +636,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 // deallocated to help get the Pod schedulable. If yes, it picks one and
 // requests its deallocation.  This only gets called when filtering found no
 // suitable node.
-func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *fwk.Status) {
+func (pl *DynamicResources) PostFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
 	if !pl.enabled {
 		return nil, fwk.NewStatus(fwk.Unschedulable, "plugin disabled")
 	}

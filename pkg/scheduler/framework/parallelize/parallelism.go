@@ -21,6 +21,7 @@ import (
 	"math"
 
 	"k8s.io/client-go/util/workqueue"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -31,6 +32,8 @@ const DefaultParallelism int = 16
 type Parallelizer struct {
 	parallelism int
 }
+
+var _ fwk.Parallelizer = &Parallelizer{}
 
 // NewParallelizer returns an object holding the parallelism.
 func NewParallelizer(p int) Parallelizer {

@@ -112,7 +112,7 @@ func (f *fakeExtender) IsIgnorable() bool {
 func (f *fakeExtender) ProcessPreemption(
 	_ *v1.Pod,
 	_ map[string]*extenderv1.Victims,
-	_ framework.NodeInfoLister,
+	_ fwk.NodeInfoLister,
 ) (map[string]*extenderv1.Victims, error) {
 	return nil, nil
 }
@@ -162,7 +162,7 @@ func (f *fakeExtender) IsFilter() bool {
 type falseMapPlugin struct{}
 
 func newFalseMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &falseMapPlugin{}, nil
 	}
 }
@@ -175,14 +175,14 @@ func (pl *falseMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, 
 	return 0, fwk.AsStatus(errPrioritize)
 }
 
-func (pl *falseMapPlugin) ScoreExtensions() framework.ScoreExtensions {
+func (pl *falseMapPlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
 type numericMapPlugin struct{}
 
 func newNumericMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &numericMapPlugin{}, nil
 	}
 }
@@ -200,12 +200,12 @@ func (pl *numericMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod
 	return int64(score), nil
 }
 
-func (pl *numericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
+func (pl *numericMapPlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
 // NewNoPodsFilterPlugin initializes a noPodsFilterPlugin and returns it.
-func NewNoPodsFilterPlugin(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewNoPodsFilterPlugin(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 	return &noPodsFilterPlugin{}, nil
 }
 
@@ -224,11 +224,11 @@ func (pl *reverseNumericMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ 
 	return int64(score), nil
 }
 
-func (pl *reverseNumericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
+func (pl *reverseNumericMapPlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return pl
 }
 
-func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeScores framework.NodeScoreList) *fwk.Status {
+func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeScores fwk.NodeScoreList) *fwk.Status {
 	var maxScore float64
 	minScore := math.MaxFloat64
 
@@ -237,7 +237,7 @@ func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ fwk.Cycle
 		minScore = math.Min(minScore, float64(hostPriority.Score))
 	}
 	for i, hostPriority := range nodeScores {
-		nodeScores[i] = framework.NodeScore{
+		nodeScores[i] = fwk.NodeScore{
 			Name:  hostPriority.Name,
 			Score: int64(maxScore + minScore - float64(hostPriority.Score)),
 		}
@@ -246,7 +246,7 @@ func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ fwk.Cycle
 }
 
 func newReverseNumericMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &reverseNumericMapPlugin{}, nil
 	}
 }
@@ -261,11 +261,11 @@ func (pl *trueMapPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _
 	return 1, nil
 }
 
-func (pl *trueMapPlugin) ScoreExtensions() framework.ScoreExtensions {
+func (pl *trueMapPlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return pl
 }
 
-func (pl *trueMapPlugin) NormalizeScore(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeScores framework.NodeScoreList) *fwk.Status {
+func (pl *trueMapPlugin) NormalizeScore(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeScores fwk.NodeScoreList) *fwk.Status {
 	for _, host := range nodeScores {
 		if host.Name == "" {
 			return fwk.NewStatus(fwk.Error, "unexpected empty host name")
@@ -275,7 +275,7 @@ func (pl *trueMapPlugin) NormalizeScore(_ context.Context, _ fwk.CycleState, _ *
 }
 
 func newTrueMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 		return &trueMapPlugin{}, nil
 	}
 }
@@ -314,7 +314,7 @@ func (s *fakeNodeSelector) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod
 	return nil
 }
 
-func newFakeNodeSelector(_ context.Context, args runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newFakeNodeSelector(_ context.Context, args runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 	pl := &fakeNodeSelector{}
 	if err := frameworkruntime.DecodeInto(args, &pl.fakeNodeSelectorArgs); err != nil {
 		return nil, err
@@ -356,7 +356,7 @@ func (f *fakeNodeSelectorDependOnPodAnnotation) Filter(_ context.Context, _ fwk.
 	return nil
 }
 
-func newFakeNodeSelectorDependOnPodAnnotation(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func newFakeNodeSelectorDependOnPodAnnotation(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
 	return &fakeNodeSelectorDependOnPodAnnotation{}, nil
 }
 
@@ -364,8 +364,8 @@ type TestPlugin struct {
 	name string
 }
 
-var _ framework.ScorePlugin = &TestPlugin{}
-var _ framework.FilterPlugin = &TestPlugin{}
+var _ fwk.ScorePlugin = &TestPlugin{}
+var _ fwk.FilterPlugin = &TestPlugin{}
 
 func (t *TestPlugin) Name() string {
 	return t.name
@@ -375,7 +375,7 @@ func (t *TestPlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod,
 	return 1, nil
 }
 
-func (t *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
+func (t *TestPlugin) ScoreExtensions() fwk.ScoreExtensions {
 	return nil
 }
 
@@ -886,7 +886,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 					return item.mockScheduleResult, item.injectSchedulingError
 				}
-				sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *framework.NominatingInfo, start time.Time) {
+				sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
 					gotPod = p.Pod
 					gotError = status.AsError()
 
@@ -1194,7 +1194,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 					return item.mockScheduleResult, item.injectSchedulingError
 				}
-				sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *framework.NominatingInfo, _ time.Time) {
+				sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 					gotCallsToFailureHandler++
 					gotPodIsInFlightAtFailureHandler = podListContainsPod(queue.InFlightPods(), p.Pod)
 
@@ -1675,14 +1675,14 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 func TestSchedulerBinding(t *testing.T) {
 	table := []struct {
 		podName      string
-		extenders    []framework.Extender
+		extenders    []fwk.Extender
 		wantBinderID int
 		name         string
 	}{
 		{
 			name:    "the extender is not a binder",
 			podName: "pod0",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 			},
 			wantBinderID: -1, // default binding.
@@ -1690,7 +1690,7 @@ func TestSchedulerBinding(t *testing.T) {
 		{
 			name:    "one of the extenders is a binder and interested in pod",
 			podName: "pod0",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
 			},
@@ -1699,7 +1699,7 @@ func TestSchedulerBinding(t *testing.T) {
 		{
 			name:    "one of the extenders is a binder, but not interested in pod",
 			podName: "pod1",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod1"},
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
 			},
@@ -1708,7 +1708,7 @@ func TestSchedulerBinding(t *testing.T) {
 		{
 			name:    "ignore when extender bind failed",
 			podName: "pod1",
-			extenders: []framework.Extender{
+			extenders: []fwk.Extender{
 				&fakeExtender{isBinder: true, errBind: true, interestedPodName: "pod1", ignorable: true},
 			},
 			wantBinderID: -1, // default binding.
@@ -1772,7 +1772,7 @@ func TestUpdatePod(t *testing.T) {
 		currentPodConditions     []v1.PodCondition
 		newPodCondition          *v1.PodCondition
 		currentNominatedNodeName string
-		newNominatingInfo        *framework.NominatingInfo
+		newNominatingInfo        *fwk.NominatingInfo
 		expectedPatchRequests    int
 		expectedPatchDataPattern string
 	}{
@@ -1902,7 +1902,7 @@ func TestUpdatePod(t *testing.T) {
 				Reason:             "currentReason",
 				Message:            "currentMessage",
 			},
-			newNominatingInfo:        &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "node1"},
+			newNominatingInfo:        &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "node1"},
 			expectedPatchRequests:    1,
 			expectedPatchDataPattern: `{"status":{"nominatedNodeName":"node1"}}`,
 		},
@@ -1949,21 +1949,21 @@ func TestUpdatePod(t *testing.T) {
 func Test_SelectHost(t *testing.T) {
 	tests := []struct {
 		name              string
-		list              []framework.NodePluginScores
+		list              []fwk.NodePluginScores
 		topNodesCnt       int
 		possibleNodes     sets.Set[string]
-		possibleNodeLists [][]framework.NodePluginScores
+		possibleNodeLists [][]fwk.NodePluginScores
 		wantError         error
 	}{
 		{
 			name: "unique properly ordered scores",
-			list: []framework.NodePluginScores{
+			list: []fwk.NodePluginScores{
 				{Name: "node1", TotalScore: 1},
 				{Name: "node2", TotalScore: 2},
 			},
 			topNodesCnt:   2,
 			possibleNodes: sets.New("node2"),
-			possibleNodeLists: [][]framework.NodePluginScores{
+			possibleNodeLists: [][]fwk.NodePluginScores{
 				{
 					{Name: "node2", TotalScore: 2},
 					{Name: "node1", TotalScore: 1},
@@ -1972,13 +1972,13 @@ func Test_SelectHost(t *testing.T) {
 		},
 		{
 			name: "numberOfNodeScoresToReturn > len(list)",
-			list: []framework.NodePluginScores{
+			list: []fwk.NodePluginScores{
 				{Name: "node1", TotalScore: 1},
 				{Name: "node2", TotalScore: 2},
 			},
 			topNodesCnt:   100,
 			possibleNodes: sets.New("node2"),
-			possibleNodeLists: [][]framework.NodePluginScores{
+			possibleNodeLists: [][]fwk.NodePluginScores{
 				{
 					{Name: "node2", TotalScore: 2},
 					{Name: "node1", TotalScore: 1},
@@ -1987,14 +1987,14 @@ func Test_SelectHost(t *testing.T) {
 		},
 		{
 			name: "equal scores",
-			list: []framework.NodePluginScores{
+			list: []fwk.NodePluginScores{
 				{Name: "node2.1", TotalScore: 2},
 				{Name: "node2.2", TotalScore: 2},
 				{Name: "node2.3", TotalScore: 2},
 			},
 			topNodesCnt:   2,
 			possibleNodes: sets.New("node2.1", "node2.2", "node2.3"),
-			possibleNodeLists: [][]framework.NodePluginScores{
+			possibleNodeLists: [][]fwk.NodePluginScores{
 				{
 					{Name: "node2.1", TotalScore: 2},
 					{Name: "node2.2", TotalScore: 2},
@@ -2023,7 +2023,7 @@ func Test_SelectHost(t *testing.T) {
 		},
 		{
 			name: "out of order scores",
-			list: []framework.NodePluginScores{
+			list: []fwk.NodePluginScores{
 				{Name: "node3.1", TotalScore: 3},
 				{Name: "node2.1", TotalScore: 2},
 				{Name: "node1.1", TotalScore: 1},
@@ -2031,7 +2031,7 @@ func Test_SelectHost(t *testing.T) {
 			},
 			topNodesCnt:   3,
 			possibleNodes: sets.New("node3.1", "node3.2"),
-			possibleNodeLists: [][]framework.NodePluginScores{
+			possibleNodeLists: [][]fwk.NodePluginScores{
 				{
 					{Name: "node3.1", TotalScore: 3},
 					{Name: "node3.2", TotalScore: 3},
@@ -2046,7 +2046,7 @@ func Test_SelectHost(t *testing.T) {
 		},
 		{
 			name:          "empty priority list",
-			list:          []framework.NodePluginScores{},
+			list:          []fwk.NodePluginScores{},
 			possibleNodes: sets.Set[string]{},
 			wantError:     errEmptyPriorityList,
 		},
@@ -2233,7 +2233,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			var extenders []framework.Extender
+			var extenders []fwk.Extender
 			for ii := range tt.extenders {
 				extenders = append(extenders, &tt.extenders[ii])
 			}
@@ -2763,11 +2763,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterPreFilterPlugin(
 					"FakePreFilter2",
-					tf.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.New("node2")}, nil),
+					tf.NewFakePreFilterPlugin("FakePreFilter2", &fwk.PreFilterResult{NodeNames: sets.New("node2")}, nil),
 				),
 				tf.RegisterPreFilterPlugin(
 					"FakePreFilter3",
-					tf.NewFakePreFilterPlugin("FakePreFilter3", &framework.PreFilterResult{NodeNames: sets.New("node1", "node2")}, nil),
+					tf.NewFakePreFilterPlugin("FakePreFilter3", &fwk.PreFilterResult{NodeNames: sets.New("node1", "node2")}, nil),
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -2791,11 +2791,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterPreFilterPlugin(
 					"FakePreFilter2",
-					tf.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.New("node2")}, nil),
+					tf.NewFakePreFilterPlugin("FakePreFilter2", &fwk.PreFilterResult{NodeNames: sets.New("node2")}, nil),
 				),
 				tf.RegisterPreFilterPlugin(
 					"FakePreFilter3",
-					tf.NewFakePreFilterPlugin("FakePreFilter3", &framework.PreFilterResult{NodeNames: sets.New("node1")}, nil),
+					tf.NewFakePreFilterPlugin("FakePreFilter3", &fwk.PreFilterResult{NodeNames: sets.New("node1")}, nil),
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -2825,7 +2825,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterPreFilterPlugin(
 					"FakePreFilter2",
-					tf.NewFakePreFilterPlugin("FakePreFilter2", &framework.PreFilterResult{NodeNames: sets.New[string]()}, nil),
+					tf.NewFakePreFilterPlugin("FakePreFilter2", &fwk.PreFilterResult{NodeNames: sets.New[string]()}, nil),
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -2849,7 +2849,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterPreFilterPlugin(
 					"FakePreFilter",
-					tf.NewFakePreFilterPlugin("FakePreFilter", &framework.PreFilterResult{NodeNames: sets.New[string]("node2")}, nil),
+					tf.NewFakePreFilterPlugin("FakePreFilter", &fwk.PreFilterResult{NodeNames: sets.New[string]("node2")}, nil),
 				),
 				tf.RegisterFilterPlugin(
 					"FakeFilter",
@@ -2888,7 +2888,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"node1": fwk.Unschedulable,
 					}),
 				),
-				tf.RegisterPluginAsExtensions("FakeFilter2", func(_ context.Context, configuration runtime.Object, f framework.Handle) (framework.Plugin, error) {
+				tf.RegisterPluginAsExtensions("FakeFilter2", func(_ context.Context, configuration runtime.Object, f fwk.Handle) (fwk.Plugin, error) {
 					return tf.FakePreFilterAndFilterPlugin{
 						FakePreFilterPlugin: &tf.FakePreFilterPlugin{
 							Result: nil,
@@ -2955,7 +2955,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterPreFilterPlugin(
 					"FakePreFilter",
-					tf.NewFakePreFilterPlugin("FakePreFilter", &framework.PreFilterResult{NodeNames: sets.New("node1", "node2")}, nil),
+					tf.NewFakePreFilterPlugin("FakePreFilter", &fwk.PreFilterResult{NodeNames: sets.New("node1", "node2")}, nil),
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -2975,7 +2975,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterPreFilterPlugin(
 					"FakePreFilter",
-					tf.NewFakePreFilterPlugin("FakePreFilter", &framework.PreFilterResult{
+					tf.NewFakePreFilterPlugin("FakePreFilter", &fwk.PreFilterResult{
 						NodeNames: sets.New("invalid-node"),
 					}, nil),
 				),
@@ -3067,7 +3067,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				_, _ = cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
 			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
-			fwk, err := tf.NewFramework(
+			schedFramework, err := tf.NewFramework(
 				ctx,
 				test.registerPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
@@ -3078,7 +3078,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var extenders []framework.Extender
+			var extenders []fwk.Extender
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
@@ -3093,7 +3093,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), test.pod)
+			result, err := sched.SchedulePod(ctx, schedFramework, framework.NewCycleState(), test.pod)
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
@@ -3244,7 +3244,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			plugin := tf.FakeFilterPlugin{}
 			registerFakeFilterFunc := tf.RegisterFilterPlugin(
 				"FakeFilter",
-				func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return &plugin, nil
 				},
 			)
@@ -3267,7 +3267,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			if err := scheduler.Cache.UpdateSnapshot(logger, scheduler.nodeInfoSnapshot); err != nil {
 				t.Fatal(err)
 			}
-			fwk, err := tf.NewFramework(
+			schedFramework, err := tf.NewFramework(
 				ctx,
 				registerPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
@@ -3285,9 +3285,9 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error adding nominated pod to podInformer: %s", err)
 			}
-			fwk.AddNominatedPod(logger, podinfo, &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "1"})
+			schedFramework.AddNominatedPod(logger, podinfo, &fwk.NominatingInfo{NominatingMode: fwk.ModeOverride, NominatedNodeName: "1"})
 
-			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(ctx, schedFramework, framework.NewCycleState(), test.pod)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3509,7 +3509,7 @@ func Test_prioritizeNodes(t *testing.T) {
 		nodes               []*v1.Node
 		pluginRegistrations []tf.RegisterPluginFunc
 		extenders           []tf.FakeExtender
-		want                []framework.NodePluginScores
+		want                []fwk.NodePluginScores
 	}{
 		{
 			name:  "the score from all plugins should be recorded in PluginToNodeScores",
@@ -3522,10 +3522,10 @@ func Test_prioritizeNodes(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			extenders: nil,
-			want: []framework.NodePluginScores{
+			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
 							Score: 10,
@@ -3539,7 +3539,7 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
 							Score: 100,
@@ -3584,10 +3584,10 @@ func Test_prioritizeNodes(t *testing.T) {
 					},
 				},
 			},
-			want: []framework.NodePluginScores{
+			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 
 						{
 							Name:  "FakeExtender1",
@@ -3606,7 +3606,7 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "FakeExtender1",
 							Score: 30,
@@ -3639,10 +3639,10 @@ func Test_prioritizeNodes(t *testing.T) {
 				), "PreScore", "Score"),
 			},
 			extenders: nil,
-			want: []framework.NodePluginScores{
+			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
 							Score: 10,
@@ -3656,7 +3656,7 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
 							Score: 100,
@@ -3683,9 +3683,9 @@ func Test_prioritizeNodes(t *testing.T) {
 				), "PreScore", "Score"),
 			},
 			extenders: nil,
-			want: []framework.NodePluginScores{
-				{Name: "node1", Scores: []framework.PluginScore{}},
-				{Name: "node2", Scores: []framework.PluginScore{}},
+			want: []fwk.NodePluginScores{
+				{Name: "node1", Scores: []fwk.PluginScore{}},
+				{Name: "node2", Scores: []fwk.PluginScore{}},
 			},
 		},
 		{
@@ -3710,10 +3710,10 @@ func Test_prioritizeNodes(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			extenders: nil,
-			want: []framework.NodePluginScores{
+			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
 							Score: 5,
@@ -3723,7 +3723,7 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
 							Score: 5,
@@ -3733,7 +3733,7 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node3",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
 							Score: 5,
@@ -3764,10 +3764,10 @@ func Test_prioritizeNodes(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			extenders: nil,
-			want: []framework.NodePluginScores{
+			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
 							Score: 18,
@@ -3777,7 +3777,7 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
 							Score: 18,
@@ -3787,7 +3787,7 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node3",
-					Scores: []framework.PluginScore{
+					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
 							Score: 0,
@@ -3815,7 +3815,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			if err := cache.UpdateSnapshot(klog.FromContext(ctx), snapshot); err != nil {
 				t.Fatal(err)
 			}
-			fwk, err := tf.NewFramework(
+			schedFramework, err := tf.NewFramework(
 				ctx,
 				test.pluginRegistrations, "",
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -3828,7 +3828,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			}
 
 			state := framework.NewCycleState()
-			var extenders []framework.Extender
+			var extenders []fwk.Extender
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
@@ -3836,7 +3836,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to list node from snapshot: %v", err)
 			}
-			nodesscores, err := prioritizeNodes(ctx, extenders, fwk, state, test.pod, nodeInfos)
+			nodesscores, err := prioritizeNodes(ctx, extenders, schedFramework, state, test.pod, nodeInfos)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -4013,7 +4013,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			plugin := tf.FakeFilterPlugin{FailedNodeReturnCodeMap: test.nodeReturnCodeMap}
 			registerFakeFilterFunc := tf.RegisterFilterPlugin(
 				"FakeFilter",
-				func(_ context.Context, _ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+				func(_ context.Context, _ runtime.Object, fh fwk.Handle) (fwk.Plugin, error) {
 					return &plugin, nil
 				},
 			)
@@ -4206,7 +4206,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 	}
 
 	sched.SchedulePod = sched.schedulePod
-	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *framework.NominatingInfo, _ time.Time) {
+	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, _ *fwk.NominatingInfo, _ time.Time) {
 		err := status.AsError()
 		errChan <- err
 
@@ -4236,7 +4236,7 @@ func setupTestSchedulerWithVolumeBinding(ctx context.Context, t *testing.T, volu
 	fns := []tf.RegisterPluginFunc{
 		tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		tf.RegisterPluginAsExtensions(volumebinding.Name, func(ctx context.Context, plArgs runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+		tf.RegisterPluginAsExtensions(volumebinding.Name, func(ctx context.Context, plArgs runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
 			return &volumebinding.VolumeBinding{Binder: volumeBinder, PVCLister: pvcInformer.Lister()}, nil
 		}, "PreFilter", "Filter", "Reserve", "PreBind"),
 	}
