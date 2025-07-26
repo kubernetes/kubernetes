@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -129,10 +130,17 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store, socketRootPath ...string) (*ManagerImpl, error) {
 	socketPath := pluginapi.KubeletSocket
-	if runtime.GOOS == "windows" {
-		socketPath = os.Getenv("SYSTEMDRIVE") + pluginapi.KubeletSocketWindows
+	if len(socketRootPath) == 0 {
+		if runtime.GOOS == "windows" {
+			socketPath = os.Getenv("SYSTEMDRIVE") + pluginapi.KubeletSocket
+		}
+	} else {
+		socketPath = strings.ReplaceAll(pluginapi.KubeletSocket, "/var/lib/kubelet/", socketRootPath[0]+"/")
+		if runtime.GOOS == "windows" {
+			socketPath = os.Getenv("SYSTEMDRIVE") + strings.ReplaceAll(pluginapi.KubeletSocketWindows, "\\var\\lib\\kubelet\\", socketRootPath[0]+"\\")
+		}
 	}
 	return newManagerImpl(socketPath, topology, topologyAffinityStore)
 }

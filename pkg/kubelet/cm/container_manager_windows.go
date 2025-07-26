@@ -184,7 +184,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 
 	klog.InfoS("Creating device plugin manager")
-	cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
+	cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager, nodeConfig.KubeletRootDir)
 	if err != nil {
 		return nil, err
 	}
