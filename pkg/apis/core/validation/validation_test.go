@@ -20498,8 +20498,9 @@ func TestValidateLimitRangeForLocalStorage(t *testing.T) {
 
 func TestValidateLimitRange(t *testing.T) {
 	successCases := []struct {
-		name string
-		spec core.LimitRangeSpec
+		name              string
+		spec              core.LimitRangeSpec
+		podLevelResources bool
 	}{{
 		name: "all-fields-valid",
 		spec: core.LimitRangeSpec{
@@ -20574,9 +20575,49 @@ func TestValidateLimitRange(t *testing.T) {
 			}},
 		},
 	},
+		{
+			name: "default-limit-type-pod",
+			spec: core.LimitRangeSpec{
+				Limits: []core.LimitRangeItem{{
+					Type:    core.LimitTypePod,
+					Max:     getResources("100m", "10000Mi", "", ""),
+					Min:     getResources("0m", "100m", "", ""),
+					Default: getResources("10m", "100m", "", ""),
+				}},
+			},
+			podLevelResources: true,
+		},
+		{
+			name: "default-request-limit-type-pod",
+			spec: core.LimitRangeSpec{
+				Limits: []core.LimitRangeItem{{
+					Type:           core.LimitTypePod,
+					Max:            getResources("100m", "10000Mi", "", ""),
+					Min:            getResources("0m", "100m", "", ""),
+					DefaultRequest: getResources("10m", "100m", "", ""),
+				}},
+			},
+			podLevelResources: true,
+		},
+		{
+			name: "default-default-request-limit-type-pod",
+			spec: core.LimitRangeSpec{
+				Limits: []core.LimitRangeItem{{
+					Type:                 core.LimitTypePod,
+					Max:                  getResources("100m", "1000Mi", "", ""),
+					Min:                  getResources("5m", "100Mi", "", ""),
+					Default:              getResources("50m", "500Mi", "", ""),
+					DefaultRequest:       getResources("10m", "200Mi", "", ""),
+					MaxLimitRequestRatio: getResources("10", "", "", ""),
+				}},
+			},
+			podLevelResources: true,
+		},
 	}
 
 	for _, successCase := range successCases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, successCase.podLevelResources)
+
 		limitRange := &core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: successCase.name, Namespace: "foo"}, Spec: successCase.spec}
 		if errs := ValidateLimitRange(limitRange); len(errs) != 0 {
 			t.Errorf("Case %v, unexpected error: %v", successCase.name, errs)
@@ -20584,24 +20625,29 @@ func TestValidateLimitRange(t *testing.T) {
 	}
 
 	errorCases := map[string]struct {
-		R core.LimitRange
-		D string
+		R                 core.LimitRange
+		D                 string
+		podLevelResources bool
 	}{
 		"zero-length-name": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "foo"}, Spec: core.LimitRangeSpec{}},
 			"name or generateName is required",
+			false,
 		},
 		"zero-length-namespace": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: ""}, Spec: core.LimitRangeSpec{}},
 			"",
+			false,
 		},
 		"invalid-name": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "^Invalid", Namespace: "foo"}, Spec: core.LimitRangeSpec{}},
 			dnsSubdomainLabelErrMsg,
+			false,
 		},
 		"invalid-namespace": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "^Invalid"}, Spec: core.LimitRangeSpec{}},
 			dnsLabelErrMsg,
+			false,
 		},
 		"duplicate-limit-type": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20615,6 +20661,7 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"",
+			false,
 		},
 		"default-limit-type-pod": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20626,6 +20673,7 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"may not be specified when `type` is 'Pod'",
+			false,
 		},
 		"default-request-limit-type-pod": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20637,6 +20685,7 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"may not be specified when `type` is 'Pod'",
+			false,
 		},
 		"min value 100m is greater than max value 10m": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20647,6 +20696,44 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"min value 100m is greater than max value 10m",
+			false,
+		},
+		"invalid spec pod default outside range": {
+			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
+				Limits: []core.LimitRangeItem{{
+					Type:    core.LimitTypePod,
+					Max:     getResources("1", "", "", ""),
+					Min:     getResources("100m", "", "", ""),
+					Default: getResources("2000m", "", "", ""),
+				}},
+			}},
+			"default value 2 is greater than max value 1",
+			true,
+		},
+		"invalid spec pod default request outside range": {
+			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
+				Limits: []core.LimitRangeItem{{
+					Type:           core.LimitTypePod,
+					Max:            getResources("1", "", "", ""),
+					Min:            getResources("100m", "", "", ""),
+					DefaultRequest: getResources("2000m", "", "", ""),
+				}},
+			}},
+			"default request value 2 is greater than max value 1",
+			true,
+		},
+		"invalid spec pod default request more than default": {
+			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
+				Limits: []core.LimitRangeItem{{
+					Type:           core.LimitTypePod,
+					Max:            getResources("2", "", "", ""),
+					Min:            getResources("100m", "", "", ""),
+					Default:        getResources("500m", "", "", ""),
+					DefaultRequest: getResources("800m", "", "", ""),
+				}},
+			}},
+			"default request value 800m is greater than default limit value 500m",
+			true,
 		},
 		"invalid spec default outside range": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20658,6 +20745,7 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"default value 2 is greater than max value 1",
+			false,
 		},
 		"invalid spec default request outside range": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20669,6 +20757,7 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"default request value 2 is greater than max value 1",
+			false,
 		},
 		"invalid spec default request more than default": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20681,6 +20770,7 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"default request value 800m is greater than default limit value 500m",
+			false,
 		},
 		"invalid spec maxLimitRequestRatio less than 1": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20690,6 +20780,7 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"ratio 800m is less than 1",
+			false,
 		},
 		"invalid spec maxLimitRequestRatio greater than max/min": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20701,6 +20792,7 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"ratio 10 is greater than max/min = 4.000000",
+			false,
 		},
 		"invalid non standard limit type": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20714,6 +20806,7 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"must be a standard limit type or fully qualified",
+			false,
 		},
 		"min and max values missing, one required": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20722,6 +20815,7 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"either minimum or maximum storage value is required, but neither was provided",
+			false,
 		},
 		"invalid min greater than max": {
 			core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: core.LimitRangeSpec{
@@ -20732,10 +20826,13 @@ func TestValidateLimitRange(t *testing.T) {
 				}},
 			}},
 			"min value 10Gi is greater than max value 1Gi",
+			false,
 		},
 	}
 
 	for k, v := range errorCases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, v.podLevelResources)
+
 		errs := ValidateLimitRange(&v.R)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
@@ -20747,7 +20844,6 @@ func TestValidateLimitRange(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
