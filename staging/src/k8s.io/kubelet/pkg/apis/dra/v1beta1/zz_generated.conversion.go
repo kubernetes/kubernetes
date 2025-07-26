@@ -130,11 +130,12 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1beta1_Claim_To_v1_Claim(in *Claim, out *v1.Claim, s conversion.Scope) error {
+	out.state = in.state
 	out.Namespace = in.Namespace
-	out.UID = in.UID
+	out.Uid = in.Uid
 	out.Name = in.Name
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -144,11 +145,12 @@ func Convert_v1beta1_Claim_To_v1_Claim(in *Claim, out *v1.Claim, s conversion.Sc
 }
 
 func autoConvert_v1_Claim_To_v1beta1_Claim(in *v1.Claim, out *Claim, s conversion.Scope) error {
+	out.state = in.state
 	out.Namespace = in.Namespace
-	out.UID = in.UID
+	out.Uid = in.Uid
 	out.Name = in.Name
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -158,12 +160,13 @@ func Convert_v1_Claim_To_v1beta1_Claim(in *v1.Claim, out *Claim, s conversion.Sc
 }
 
 func autoConvert_v1beta1_Device_To_v1_Device(in *Device, out *v1.Device, s conversion.Scope) error {
+	out.state = in.state
 	out.RequestNames = *(*[]string)(unsafe.Pointer(&in.RequestNames))
 	out.PoolName = in.PoolName
 	out.DeviceName = in.DeviceName
-	out.CDIDeviceIDs = *(*[]string)(unsafe.Pointer(&in.CDIDeviceIDs))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.CdiDeviceIds = *(*[]string)(unsafe.Pointer(&in.CdiDeviceIds))
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -173,12 +176,13 @@ func Convert_v1beta1_Device_To_v1_Device(in *Device, out *v1.Device, s conversio
 }
 
 func autoConvert_v1_Device_To_v1beta1_Device(in *v1.Device, out *Device, s conversion.Scope) error {
+	out.state = in.state
 	out.RequestNames = *(*[]string)(unsafe.Pointer(&in.RequestNames))
 	out.PoolName = in.PoolName
 	out.DeviceName = in.DeviceName
-	out.CDIDeviceIDs = *(*[]string)(unsafe.Pointer(&in.CDIDeviceIDs))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.CdiDeviceIds = *(*[]string)(unsafe.Pointer(&in.CdiDeviceIds))
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -188,10 +192,11 @@ func Convert_v1_Device_To_v1beta1_Device(in *v1.Device, out *Device, s conversio
 }
 
 func autoConvert_v1beta1_NodePrepareResourceResponse_To_v1_NodePrepareResourceResponse(in *NodePrepareResourceResponse, out *v1.NodePrepareResourceResponse, s conversion.Scope) error {
+	out.state = in.state
 	out.Devices = *(*[]*v1.Device)(unsafe.Pointer(&in.Devices))
 	out.Error = in.Error
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -201,10 +206,11 @@ func Convert_v1beta1_NodePrepareResourceResponse_To_v1_NodePrepareResourceRespon
 }
 
 func autoConvert_v1_NodePrepareResourceResponse_To_v1beta1_NodePrepareResourceResponse(in *v1.NodePrepareResourceResponse, out *NodePrepareResourceResponse, s conversion.Scope) error {
+	out.state = in.state
 	out.Devices = *(*[]*Device)(unsafe.Pointer(&in.Devices))
 	out.Error = in.Error
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -214,9 +220,10 @@ func Convert_v1_NodePrepareResourceResponse_To_v1beta1_NodePrepareResourceRespon
 }
 
 func autoConvert_v1beta1_NodePrepareResourcesRequest_To_v1_NodePrepareResourcesRequest(in *NodePrepareResourcesRequest, out *v1.NodePrepareResourcesRequest, s conversion.Scope) error {
+	out.state = in.state
 	out.Claims = *(*[]*v1.Claim)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -226,9 +233,10 @@ func Convert_v1beta1_NodePrepareResourcesRequest_To_v1_NodePrepareResourcesReque
 }
 
 func autoConvert_v1_NodePrepareResourcesRequest_To_v1beta1_NodePrepareResourcesRequest(in *v1.NodePrepareResourcesRequest, out *NodePrepareResourcesRequest, s conversion.Scope) error {
+	out.state = in.state
 	out.Claims = *(*[]*Claim)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -238,9 +246,10 @@ func Convert_v1_NodePrepareResourcesRequest_To_v1beta1_NodePrepareResourcesReque
 }
 
 func autoConvert_v1beta1_NodePrepareResourcesResponse_To_v1_NodePrepareResourcesResponse(in *NodePrepareResourcesResponse, out *v1.NodePrepareResourcesResponse, s conversion.Scope) error {
+	out.state = in.state
 	out.Claims = *(*map[string]*v1.NodePrepareResourceResponse)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -250,9 +259,10 @@ func Convert_v1beta1_NodePrepareResourcesResponse_To_v1_NodePrepareResourcesResp
 }
 
 func autoConvert_v1_NodePrepareResourcesResponse_To_v1beta1_NodePrepareResourcesResponse(in *v1.NodePrepareResourcesResponse, out *NodePrepareResourcesResponse, s conversion.Scope) error {
+	out.state = in.state
 	out.Claims = *(*map[string]*NodePrepareResourceResponse)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -262,9 +272,10 @@ func Convert_v1_NodePrepareResourcesResponse_To_v1beta1_NodePrepareResourcesResp
 }
 
 func autoConvert_v1beta1_NodeUnprepareResourceResponse_To_v1_NodeUnprepareResourceResponse(in *NodeUnprepareResourceResponse, out *v1.NodeUnprepareResourceResponse, s conversion.Scope) error {
+	out.state = in.state
 	out.Error = in.Error
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -274,9 +285,10 @@ func Convert_v1beta1_NodeUnprepareResourceResponse_To_v1_NodeUnprepareResourceRe
 }
 
 func autoConvert_v1_NodeUnprepareResourceResponse_To_v1beta1_NodeUnprepareResourceResponse(in *v1.NodeUnprepareResourceResponse, out *NodeUnprepareResourceResponse, s conversion.Scope) error {
+	out.state = in.state
 	out.Error = in.Error
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -286,9 +298,10 @@ func Convert_v1_NodeUnprepareResourceResponse_To_v1beta1_NodeUnprepareResourceRe
 }
 
 func autoConvert_v1beta1_NodeUnprepareResourcesRequest_To_v1_NodeUnprepareResourcesRequest(in *NodeUnprepareResourcesRequest, out *v1.NodeUnprepareResourcesRequest, s conversion.Scope) error {
+	out.state = in.state
 	out.Claims = *(*[]*v1.Claim)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -298,9 +311,10 @@ func Convert_v1beta1_NodeUnprepareResourcesRequest_To_v1_NodeUnprepareResourcesR
 }
 
 func autoConvert_v1_NodeUnprepareResourcesRequest_To_v1beta1_NodeUnprepareResourcesRequest(in *v1.NodeUnprepareResourcesRequest, out *NodeUnprepareResourcesRequest, s conversion.Scope) error {
+	out.state = in.state
 	out.Claims = *(*[]*Claim)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -310,9 +324,10 @@ func Convert_v1_NodeUnprepareResourcesRequest_To_v1beta1_NodeUnprepareResourcesR
 }
 
 func autoConvert_v1beta1_NodeUnprepareResourcesResponse_To_v1_NodeUnprepareResourcesResponse(in *NodeUnprepareResourcesResponse, out *v1.NodeUnprepareResourcesResponse, s conversion.Scope) error {
+	out.state = in.state
 	out.Claims = *(*map[string]*v1.NodeUnprepareResourceResponse)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
@@ -322,9 +337,10 @@ func Convert_v1beta1_NodeUnprepareResourcesResponse_To_v1_NodeUnprepareResources
 }
 
 func autoConvert_v1_NodeUnprepareResourcesResponse_To_v1beta1_NodeUnprepareResourcesResponse(in *v1.NodeUnprepareResourcesResponse, out *NodeUnprepareResourcesResponse, s conversion.Scope) error {
+	out.state = in.state
 	out.Claims = *(*map[string]*NodeUnprepareResourceResponse)(unsafe.Pointer(&in.Claims))
-	out.XXX_NoUnkeyedLiteral = in.XXX_NoUnkeyedLiteral
-	out.XXX_sizecache = in.XXX_sizecache
+	out.unknownFields = *(*[]byte)(unsafe.Pointer(&in.unknownFields))
+	out.sizeCache = in.sizeCache
 	return nil
 }
 
