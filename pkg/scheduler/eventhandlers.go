@@ -136,6 +136,20 @@ func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 	sched.SchedulingQueue.Add(logger, pod)
 }
 
+func (sched *Scheduler) syncPodWithDispatcher(pod *v1.Pod) *v1.Pod {
+	enrichedObj, err := sched.APIDispatcher.SyncObject(pod)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to sync pod %s/%s with API dispatcher: %w", pod.Namespace, pod.Name, err))
+		return pod
+	}
+	enrichedPod, ok := enrichedObj.(*v1.Pod)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("cannot convert enrichedObj of type %T to *v1.Pod", enrichedObj))
+		return pod
+	}
+	return enrichedPod
+}
+
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	start := time.Now()
 	logger := sched.logger
@@ -151,6 +165,12 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 		if evt.Label() != framework.EventUnscheduledPodUpdate.Label() {
 			defer metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
 		}
+	}
+
+	if sched.APIDispatcher != nil {
+		// If the API dispatcher is available, sync the new pod with the details.
+		// However, at the moment the updated newPod is discarded and this logic will be handled in the future releases.
+		_ = sched.syncPodWithDispatcher(newPod)
 	}
 
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
@@ -272,6 +292,12 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	if !ok {
 		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
 		return
+	}
+
+	if sched.APIDispatcher != nil {
+		// If the API dispatcher is available, sync the new pod with the details.
+		// However, at the moment the updated newPod is discarded and this logic will be handled in the future releases.
+		_ = sched.syncPodWithDispatcher(newPod)
 	}
 
 	logger.V(4).Info("Update event for scheduled pod", "pod", klog.KObj(oldPod))

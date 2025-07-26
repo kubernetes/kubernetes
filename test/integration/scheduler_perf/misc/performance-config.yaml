@@ -39,6 +39,16 @@
   - name: 5Nodes_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 5
+      measurePods: 10
+  - name: 5Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [integration-test, short]
     params:
       initNodes: 5
@@ -77,6 +87,16 @@
   - name: 5000Nodes_50000Pods_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 50000
+  - name: 5000Nodes_50000Pods_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [performance]
     params:
       initNodes: 5000
@@ -158,6 +178,16 @@
   - name: 5Nodes_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 5Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [integration-test, short]
     params:
       initNodes: 5
@@ -174,6 +204,16 @@
   - name: 1000Nodes_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: false
+    labels: [performance, short]
+    params:
+      initNodes: 1000
+      initPods: 4000
+      measurePods: 1000
+  - name: 1000Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [performance, short]
     params:
       initNodes: 1000
@@ -222,6 +262,16 @@
   - name: 5Nodes_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 20
+      measurePods: 5
+  - name: 5Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [integration-test, short]
     params:
       initNodes: 5
@@ -248,6 +298,7 @@
     labels: [performance]
     featureGates:
       SchedulerAsyncPreemption: true
+      SchedulerAsyncAPICalls: false
     params:
       initNodes: 5000
       initPods: 20000
@@ -255,6 +306,17 @@
   - name: 5000Nodes_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    threshold: 160
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 5000
+  - name: 5000Nodes_AsyncAPICallsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+      SchedulerAsyncAPICalls: true
     labels: [performance]
     threshold: 160
     params:

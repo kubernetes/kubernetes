@@ -33,6 +33,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
@@ -182,7 +183,7 @@ func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsy
 			newStatus := victim.Status.DeepCopy()
 			updated := apipod.UpdatePodCondition(newStatus, condition)
 			if updated {
-				if err := util.PatchPodStatus(ctx, ev.Handler.ClientSet(), victim, newStatus); err != nil {
+				if err := util.PatchPodStatus(ctx, ev.Handler.ClientSet(), victim.Name, victim.Namespace, &victim.Status, newStatus); err != nil {
 					logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(preemptor))
 					return err
 				}
@@ -450,12 +451,37 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	// nomination updates these pods and moves them to the active queue. It
 	// lets scheduler find another place for them.
 	nominatedPods := getLowerPriorityNominatedPods(logger, fh, pod, c.Name())
-	if err := util.ClearNominatedNodeName(ctx, cs, nominatedPods...); err != nil {
+	if err := clearNominatedNodeName(ctx, cs, ev.Handler.APICacher(), nominatedPods...); err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field")
 		// We do not return as this error is not critical.
 	}
 
 	return nil
+}
+
+// clearNominatedNodeName internally submit a patch request to API server
+// to set each pods[*].Status.NominatedNodeName> to "".
+func clearNominatedNodeName(ctx context.Context, cs clientset.Interface, apiCacher framework.APICacher, pods ...*v1.Pod) utilerrors.Aggregate {
+	var errs []error
+	for _, p := range pods {
+		if apiCacher != nil {
+			// When API cacher is available, use it to clear the NominatedNodeName.
+			_, err := apiCacher.PatchPodStatus(p, nil, &framework.NominatingInfo{NominatedNodeName: "", NominatingMode: framework.ModeOverride})
+			if err != nil {
+				errs = append(errs, err)
+			}
+		} else {
+			if len(p.Status.NominatedNodeName) == 0 {
+				continue
+			}
+			podStatusCopy := p.Status.DeepCopy()
+			podStatusCopy.NominatedNodeName = ""
+			if err := util.PatchPodStatus(ctx, cs, p.Name, p.Namespace, &p.Status, podStatusCopy); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 // prepareCandidateAsync triggers a goroutine for some preparation work:
@@ -504,7 +530,7 @@ func (ev *Evaluator) prepareCandidateAsync(c Candidate, pod *v1.Pod, pluginName 
 		// nomination updates these pods and moves them to the active queue. It
 		// lets scheduler find another place for them.
 		nominatedPods := getLowerPriorityNominatedPods(logger, ev.Handler, pod, c.Name())
-		if err := util.ClearNominatedNodeName(ctx, ev.Handler.ClientSet(), nominatedPods...); err != nil {
+		if err := clearNominatedNodeName(ctx, ev.Handler.ClientSet(), ev.Handler.APICacher(), nominatedPods...); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Cannot clear 'NominatedNodeName' field from lower priority pods on the same target node", "node", c.Name())
 			result = metrics.GoroutineResultError
 			// We do not return as this error is not critical.

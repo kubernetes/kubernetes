@@ -161,63 +161,6 @@ func TestMoreImportantPod(t *testing.T) {
 	}
 }
 
-func TestRemoveNominatedNodeName(t *testing.T) {
-	tests := []struct {
-		name                     string
-		currentNominatedNodeName string
-		newNominatedNodeName     string
-		expectedPatchRequests    int
-		expectedPatchData        string
-	}{
-		{
-			name:                     "Should make patch request to clear node name",
-			currentNominatedNodeName: "node1",
-			expectedPatchRequests:    1,
-			expectedPatchData:        `{"status":{"nominatedNodeName":null}}`,
-		},
-		{
-			name:                     "Should not make patch request if nominated node is already cleared",
-			currentNominatedNodeName: "",
-			expectedPatchRequests:    0,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			actualPatchRequests := 0
-			var actualPatchData string
-			cs := &clientsetfake.Clientset{}
-			cs.AddReactor("patch", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
-				actualPatchRequests++
-				patch := action.(clienttesting.PatchAction)
-				actualPatchData = string(patch.GetPatch())
-				// For this test, we don't care about the result of the patched pod, just that we got the expected
-				// patch request, so just returning &v1.Pod{} here is OK because scheduler doesn't use the response.
-				return true, &v1.Pod{}, nil
-			})
-
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status:     v1.PodStatus{NominatedNodeName: test.currentNominatedNodeName},
-			}
-
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
-			if err := ClearNominatedNodeName(ctx, cs, pod); err != nil {
-				t.Fatalf("Error calling removeNominatedNodeName: %v", err)
-			}
-
-			if actualPatchRequests != test.expectedPatchRequests {
-				t.Fatalf("Actual patch requests (%d) dos not equal expected patch requests (%d)", actualPatchRequests, test.expectedPatchRequests)
-			}
-
-			if test.expectedPatchRequests > 0 && actualPatchData != test.expectedPatchData {
-				t.Fatalf("Patch data mismatch: Actual was %v, but expected %v", actualPatchData, test.expectedPatchData)
-			}
-		})
-	}
-}
-
 func TestPatchPodStatus(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -366,7 +309,7 @@ func TestPatchPodStatus(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			err = PatchPodStatus(ctx, client, &tc.pod, &tc.statusToUpdate)
+			err = PatchPodStatus(ctx, client, tc.pod.Name, tc.pod.Namespace, &tc.pod.Status, &tc.statusToUpdate)
 			if err != nil && tc.validateErr == nil {
 				// shouldn't be error
 				t.Fatal(err)

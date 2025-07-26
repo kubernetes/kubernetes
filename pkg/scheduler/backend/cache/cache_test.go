@@ -235,7 +235,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache := newCache(ctx, time.Second, time.Second)
+			cache := newCache(ctx, time.Second, time.Second, nil)
 			for _, pod := range tc.pods {
 				if err := cache.AssumePod(logger, pod); err != nil {
 					t.Fatalf("AssumePod failed: %v", err)
@@ -354,7 +354,7 @@ func TestExpirePod(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache := newCache(ctx, tc.ttl, time.Second)
+			cache := newCache(ctx, tc.ttl, time.Second, nil)
 
 			for _, pod := range tc.pods {
 				if err := cache.AssumePod(logger, pod.pod); err != nil {
@@ -415,7 +415,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, ttl, time.Second)
+	cache := newCache(ctx, ttl, time.Second, nil)
 	for _, podToAssume := range test.podsToAssume {
 		if err := assumeAndFinishBinding(logger, cache, podToAssume, now); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -458,7 +458,7 @@ func TestDump(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, ttl, time.Second)
+	cache := newCache(ctx, ttl, time.Second, nil)
 	for _, podToAssume := range test.podsToAssume {
 		if err := assumeAndFinishBinding(logger, cache, podToAssume, now); err != nil {
 			t.Errorf("assumePod failed: %v", err)
@@ -526,7 +526,7 @@ func TestAddPodAlwaysUpdatesPodInfoInNodeInfo(t *testing.T) {
 		},
 	}
 
-	cache := newCache(ctx, ttl, time.Second)
+	cache := newCache(ctx, ttl, time.Second, nil)
 	for _, podToAssume := range test.podsToAssume {
 		if err := assumeAndFinishBinding(logger, cache, podToAssume, now); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -585,7 +585,7 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, ttl, time.Second)
+	cache := newCache(ctx, ttl, time.Second, nil)
 	for _, podToAssume := range test.podsToAssume {
 		if err := assumeAndFinishBinding(logger, cache, podToAssume, now); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -638,7 +638,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
-	cache := newCache(ctx, ttl, time.Second)
+	cache := newCache(ctx, ttl, time.Second, nil)
 	if err := assumeAndFinishBinding(logger, cache, test.pod, now); err != nil {
 		t.Fatalf("assumePod failed: %v", err)
 	}
@@ -703,7 +703,7 @@ func TestUpdatePod(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, ttl, time.Second)
+	cache := newCache(ctx, ttl, time.Second, nil)
 	for _, podToAdd := range test.podsToAdd {
 		if err := cache.AddPod(logger, podToAdd); err != nil {
 			t.Fatalf("AddPod failed: %v", err)
@@ -765,7 +765,7 @@ func TestUpdatePodAndGet(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache := newCache(ctx, ttl, time.Second)
+			cache := newCache(ctx, ttl, time.Second, nil)
 			// trying to get an unknown pod should return an error
 			// podToUpdate has not been added yet
 			if _, err := cache.GetPod(tc.podToUpdate); err == nil {
@@ -848,7 +848,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
-	cache := newCache(ctx, ttl, time.Second)
+	cache := newCache(ctx, ttl, time.Second, nil)
 	for _, podToAssume := range test.podsToAssume {
 		if err := assumeAndFinishBinding(logger, cache, podToAssume, now); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -909,7 +909,7 @@ func TestEphemeralStorageResource(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, time.Second, time.Second)
+	cache := newCache(ctx, time.Second, time.Second, nil)
 	if err := cache.AddPod(logger, test.pod); err != nil {
 		t.Fatalf("AddPod failed: %v", err)
 	}
@@ -963,7 +963,7 @@ func TestRemovePod(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			nodeName := pod.Spec.NodeName
-			cache := newCache(ctx, time.Second, time.Second)
+			cache := newCache(ctx, time.Second, time.Second, nil)
 			// Add/Assume pod succeeds even before adding the nodes.
 			if tt.assume {
 				if err := cache.AddPod(logger, pod); err != nil {
@@ -1013,7 +1013,7 @@ func TestForgetPod(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	cache := newCache(ctx, ttl, time.Second)
+	cache := newCache(ctx, ttl, time.Second, nil)
 	for _, pod := range pods {
 		if err := assumeAndFinishBinding(logger, cache, pod, now); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -1226,7 +1226,7 @@ func TestNodeOperators(t *testing.T) {
 			imageStates := buildImageStates(tc.nodes)
 			expected := buildNodeInfo(node, tc.pods, imageStates)
 
-			cache := newCache(ctx, time.Second, time.Second)
+			cache := newCache(ctx, time.Second, time.Second, nil)
 			for _, nodeItem := range tc.nodes {
 				cache.AddNode(logger, nodeItem)
 			}
@@ -1720,7 +1720,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache = newCache(ctx, time.Second, time.Second)
+			cache = newCache(ctx, time.Second, time.Second, nil)
 			snapshot = NewEmptySnapshot()
 
 			for _, op := range test.operations {
@@ -1954,7 +1954,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			cache = newCache(ctx, time.Second, time.Second)
+			cache = newCache(ctx, time.Second, time.Second, nil)
 			snapshot = NewEmptySnapshot()
 
 			test.operations(t)
@@ -2060,7 +2060,7 @@ func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
 	logger, ctx := ktesting.NewTestContext(b)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	cache := newCache(ctx, time.Second, time.Second)
+	cache := newCache(ctx, time.Second, time.Second, nil)
 	for i := 0; i < 1000; i++ {
 		nodeName := fmt.Sprintf("node-%d", i)
 		cache.AddNode(logger, st.MakeNode().Name(nodeName).Obj())
@@ -2081,7 +2081,7 @@ func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) 
 	ctx, cancel := context.WithCancel(ctx)
 	addedNodes := make(map[string]struct{})
 	defer cancel()
-	cache := newCache(ctx, time.Second, time.Second)
+	cache := newCache(ctx, time.Second, time.Second, nil)
 	for i := 0; i < podNum; i++ {
 		nodeName := fmt.Sprintf("node-%d", i/10)
 		if _, ok := addedNodes[nodeName]; !ok {
