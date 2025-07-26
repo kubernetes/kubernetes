@@ -83,6 +83,16 @@ type worker struct {
 	proberDurationUnknownMetricLabels    metrics.Labels
 }
 
+// isInitContainer checks if the worker's container is in the pod's init containers
+func (w *worker) isInitContainer() bool {
+	for _, initContainer := range w.pod.Spec.InitContainers {
+		if initContainer.Name == w.container.Name {
+			return true
+		}
+	}
+	return false
+}
+
 // Creates and starts a new probe worker.
 func newWorker(
 	m *manager,
@@ -258,7 +268,8 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 			return c.State.Terminated != nil || podutil.IsContainerRestartable(w.pod.Spec, w.container)
 		}
 		return c.State.Terminated == nil ||
-			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
+			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever ||
+			(w.isInitContainer() && w.container.RestartPolicy != nil && *w.container.RestartPolicy == v1.ContainerRestartPolicyAlways)
 	}
 
 	// Graceful shutdown of the pod.
