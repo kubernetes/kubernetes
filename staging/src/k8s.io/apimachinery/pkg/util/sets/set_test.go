@@ -284,6 +284,41 @@ func TestStringIntersection(t *testing.T) {
 	}
 }
 
+func TestClone(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		var s Set[string]
+
+		c := s.Clone()
+
+		if c == nil {
+			t.Error("Clone returned nil")
+		}
+		if c.Len() != 0 {
+			t.Error("Clone returned non-zero length")
+		}
+	})
+	t.Run("empty", func(t *testing.T) {
+		s := Set[string]{}
+		c := s.Clone()
+
+		if c.Len() != 0 {
+			t.Error("Clone returned non-zero length")
+		}
+	})
+	t.Run("non-empty", func(t *testing.T) {
+		s := Set[string]{}
+		s.Insert("1")
+		c := s.Clone()
+
+		if c.Len() != 1 {
+			t.Errorf("Clone returned len %d", c.Len())
+		}
+		if !c.Has("1") {
+			t.Error("Expected '1' to be present")
+		}
+	})
+}
+
 type randomStringAlphabet string
 
 func (a randomStringAlphabet) makeString(minLen, maxLen int) string {

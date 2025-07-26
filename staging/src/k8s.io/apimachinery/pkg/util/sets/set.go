@@ -18,6 +18,7 @@ package sets
 
 import (
 	"cmp"
+	"maps"
 	"sort"
 )
 
@@ -101,11 +102,10 @@ func (s Set[T]) HasAny(items ...T) bool {
 
 // Clone returns a new set which is a copy of the current set.
 func (s Set[T]) Clone() Set[T] {
-	result := make(Set[T], len(s))
-	for key := range s {
-		result.Insert(key)
+	if s == nil {
+		return Set[T]{}
 	}
-	return result
+	return maps.Clone(s)
 }
 
 // Difference returns a set of objects that are not in s2.
