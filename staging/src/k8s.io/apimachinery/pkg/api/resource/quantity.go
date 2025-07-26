@@ -365,6 +365,13 @@ func ParseQuantity(str string) (Quantity, error) {
 		amount.Neg(amount)
 	}
 
+	copyAmount := new(inf.Dec)
+	if sign == -1 {
+		copyAmount.Neg(amount)
+	} else {
+		copyAmount.Set(amount)
+	}
+
 	// This rounds non-zero values up to the minimum representable value, under the theory that
 	// if you want some resources, you should get some resources, even if you asked for way too small
 	// of an amount.  Arguably, this should be inf.RoundHalfUp (normal rounding), but that would have
@@ -387,7 +394,11 @@ func ParseQuantity(str string) (Quantity, error) {
 		amount.Neg(amount)
 	}
 
-	return Quantity{d: infDecAmount{amount}, Format: format}, nil
+	q := Quantity{d: infDecAmount{amount}, Format: format}
+	if copyAmount.Cmp(amount) == 0 {
+		q.s = str
+	}
+	return q, nil
 }
 
 // DeepCopy returns a deep-copy of the Quantity value.  Note that the method
