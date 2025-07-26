@@ -191,8 +191,9 @@ func pluginCompletion(cmd *cobra.Command, args []string, toComplete string) ([]s
 
 	path, found := lookupCompletionExec(pluginName)
 	if !found {
-		cobra.CompDebugln(fmt.Sprintf("Plugin %s does not provide a matching completion executable", pluginName), true)
-		return nil, cobra.ShellCompDirectiveDefault
+		// if the completion executable is not found, assume the `kubectl-<plugin> __complete <args>` is a valid call and provides completions (as cobra does).
+		path = pluginName
+		args = append([]string{"__complete"}, args...)
 	}
 
 	args = append(args, toComplete)
