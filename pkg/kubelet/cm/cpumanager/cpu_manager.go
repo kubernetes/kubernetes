@@ -18,6 +18,7 @@ package cpumanager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -261,6 +262,13 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 
 	// Call down into the policy to assign this container CPUs if required.
 	err := m.policy.Allocate(m.state, p, c)
+
+	// If it gets this error it means that the pod requires pod level resources but this is not aligned.
+	// We do not want the pod to fail to schedule on this error so we Admit it, this is just a warning
+	if errors.As(err, &CPUManagerPodLevelResourcesError{}) {
+		return err
+	}
+
 	if err != nil {
 		klog.ErrorS(err, "Allocate error")
 		return err

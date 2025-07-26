@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	corehelper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -38,7 +39,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
-const PolicyTypeStatic policyType = "Static"
+const (
+	PolicyTypeStatic policyType = "Static"
+
+	// ErrorMemoryManagerPodLevelResources represents the type of a MemoryManagerPodLevelResourcesError
+	ErrorMemoryManagerPodLevelResources = "MemoryManagerPodLevelResourcesError"
+)
 
 type systemReservedMemory map[int]map[v1.ResourceName]uint64
 type reusableMemory map[string]map[string]map[v1.ResourceName]uint64
@@ -59,6 +65,16 @@ type staticPolicy struct {
 }
 
 var _ Policy = &staticPolicy{}
+
+type MemoryManagerPodLevelResourcesError struct{}
+
+func (e MemoryManagerPodLevelResourcesError) Type() string {
+	return ErrorMemoryManagerPodLevelResources
+}
+
+func (e MemoryManagerPodLevelResourcesError) Error() string {
+	return "Memory Manager static policy does not support pod-level resources"
+}
 
 // NewPolicyStatic returns new static policy instance
 func NewPolicyStatic(ctx context.Context, machineInfo *cadvisorapi.MachineInfo, reserved systemReservedMemory, affinity topologymanager.Store) (Policy, error) {
@@ -105,6 +121,10 @@ func (p *staticPolicy) Allocate(ctx context.Context, s state.State, pod *v1.Pod,
 	if qos != v1.PodQOSGuaranteed {
 		logger.V(5).Info("Exclusive memory allocation skipped, pod QoS is not guaranteed", "qos", qos)
 		return nil
+	}
+
+	if p.isPodWithPodLevelResources(ctx, pod) {
+		return MemoryManagerPodLevelResourcesError{}
 	}
 
 	podUID := string(pod.UID)
@@ -406,6 +426,10 @@ func (p *staticPolicy) GetPodTopologyHints(ctx context.Context, s state.State, p
 		return nil
 	}
 
+	if p.isPodWithPodLevelResources(ctx, pod) {
+		return nil
+	}
+
 	reqRsrcs, err := getPodRequestedResources(pod)
 	if err != nil {
 		logger.Error(err, "Failed to get pod requested resources", "podUID", pod.UID)
@@ -433,6 +457,10 @@ func (p *staticPolicy) GetTopologyHints(ctx context.Context, s state.State, pod 
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod))
 
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
+		return nil
+	}
+
+	if p.isPodWithPodLevelResources(ctx, pod) {
 		return nil
 	}
 
@@ -1074,5 +1102,18 @@ func isAffinityViolatingNUMAAllocations(machineState state.NUMANodeMap, mask bit
 			return true
 		}
 	}
+	return false
+}
+
+func (p *staticPolicy) isPodWithPodLevelResources(ctx context.Context, pod *v1.Pod) bool {
+	logger := klog.FromContext(ctx)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		// The Memory manager static policy does not support pod-level resources.
+		logger.V(5).Info("Memory manager allocation skipped, pod is using pod-level resources which are not supported by the static Memory manager policy", "pod", klog.KObj(pod))
+
+		return true
+	}
+
 	return false
 }
