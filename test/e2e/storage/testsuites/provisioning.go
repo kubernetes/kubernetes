@@ -32,6 +32,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -297,12 +299,73 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(f.DeleteNamespace, valNamespace.Name)
 
+		crdManifestPath := "test/e2e/testing-manifests/storage-csi/any-volume-datasource/crd/populator.storage.k8s.io_volumepopulators.yaml"
+		crdItems, err := storageutils.LoadFromManifests(crdManifestPath)
+		framework.ExpectNoError(err, "Failed to load VolumePopulator CRD manifest")
+		gomega.Expect(crdItems).To(gomega.HaveLen(1), "Expected exactly one CRD in manifest")
+
+		crd, ok := crdItems[0].(*apiextensionsv1.CustomResourceDefinition)
+		gomega.Expect(ok).To(gomega.BeTrue(), fmt.Sprintf("Resource in loaded manifest file is not a CustomResourceDefinition: %s", crdManifestPath))
+
+		config, err := framework.LoadConfig()
+		framework.ExpectNoError(err)
+		apiExtensionClient, err := crdclientset.NewForConfig(config)
+		framework.ExpectNoError(err)
+
+		var crdCreatedByTest bool
+
+		ginkgo.By(fmt.Sprintf("Checking if %s CRD exists", crd.Name))
+		_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
+		if err != nil && apierrors.IsNotFound(err) {
+			ginkgo.By("VolumePopulator CRD not found, test will create it and remove when done")
+			crdCreatedByTest = true
+		} else if err != nil {
+			framework.ExpectNoError(err, "Error checking for VolumePopulator CRD existence")
+		} else {
+			ginkgo.By(fmt.Sprintf("%s CRD already exists, leaving unchanged", crd.Name))
+			crdCreatedByTest = false
+		}
+
 		ginkgo.By("Deploying validator")
 		valManifests := []string{
-			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/crd/populator.storage.k8s.io_volumepopulators.yaml",
 			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/rbac-data-source-validator.yaml",
 			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/setup-data-source-validator.yaml",
 		}
+
+		if crdCreatedByTest {
+			ginkgo.By("Creating VolumePopulator CRD")
+			err = storageutils.CreateFromManifests(ctx, f, valNamespace,
+				func(item interface{}) error { return nil },
+				crdManifestPath)
+			framework.ExpectNoError(err)
+
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				ginkgo.By(fmt.Sprintf("Cleaning up %s CRD", crd.Name))
+				err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, crd.Name, metav1.DeleteOptions{})
+				if err != nil && !apierrors.IsNotFound(err) {
+					framework.Logf("Failed to delete %s CRD: %v", crd.Name, err)
+				}
+			})
+
+			ginkgo.By(fmt.Sprintf("Waiting for %s CRD to be created", crd.Name))
+
+			clusterCrds := framework.RetryNotFound(framework.HandleRetry(func(ctx context.Context) (*metav1.APIResourceList, error) {
+				return apiExtensionClient.Discovery().ServerResourcesForGroupVersion("populator.storage.k8s.io/v1beta1")
+			}))
+			includePopulatorCrd := framework.MakeMatcher(func(actual *metav1.APIResourceList) (func() string, error) {
+				for _, resource := range actual.APIResources {
+					if resource.Kind == crd.Kind {
+						return nil, nil
+					}
+				}
+				return func() string {
+					return "VolumePopulator CRD not found"
+				}, nil
+			})
+			err = framework.Gomega().Eventually(ctx, clusterCrds).Should(includePopulatorCrd)
+			framework.ExpectNoError(err)
+		}
+
 		err = storageutils.CreateFromManifests(ctx, f, valNamespace,
 			func(item interface{}) error { return nil },
 			valManifests...)
