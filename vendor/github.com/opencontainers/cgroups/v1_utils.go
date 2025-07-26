@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -144,10 +145,8 @@ func FindCgroupMountpointAndRoot(cgroupPath, subsystem string) (string, string, 
 func findCgroupMountpointAndRootFromMI(mounts []*mountinfo.Info, cgroupPath, subsystem string) (string, string, error) {
 	for _, mi := range mounts {
 		if strings.HasPrefix(mi.Mountpoint, cgroupPath) {
-			for _, opt := range strings.Split(mi.VFSOptions, ",") {
-				if opt == subsystem {
-					return mi.Mountpoint, mi.Root, nil
-				}
+			if slices.Contains(strings.Split(mi.VFSOptions, ","), subsystem) {
+				return mi.Mountpoint, mi.Root, nil
 			}
 		}
 	}
