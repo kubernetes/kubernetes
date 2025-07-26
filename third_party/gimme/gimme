@@ -503,6 +503,12 @@ _try_git() {
 	# Any tags should have been resolved when we asserted that we were
 	# given a version, so no need to handle that here.
 	_checkout "${GIMME_GO_VERSION}" "${git_dir}" >/dev/null || return 1
+	pushd "${git_dir}"
+	#git checkout 98a031193b (works!)
+	#git checkout 18dbe5b941e03a61cebbb441a9e4dfef43adf425 (Failed!)
+	#git checkout e84ed3864191fad224ad377054199661c34dd665 (Failed!)
+	git checkout c641900f72a595ff2e826367b64e3e418c265409
+	popd
 	_compile "${git_dir}" || return 1
 	_try_install_race "${git_dir}" || return 1
 	_env "${git_dir}" | tee "${git_env}" || return 1
