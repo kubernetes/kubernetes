@@ -109,9 +109,13 @@ func (c *ControllerCache) makeResourceKey(gvr schema.GroupVersionResource, names
 }
 
 func (c *ControllerCache) DeleteResource(gvr schema.GroupVersionResource, namespace, name string) {
+	logger := klog.Background() // TODO(omerap12): propagate context
+
 	key := c.makeResourceKey(gvr, namespace, name)
 	if item, exists, _ := c.store.GetByKey(key); exists {
-		c.store.Delete(item)
+		if err := c.store.Delete(item); err != nil {
+			logger.Error(err, "Could not delete cached resource", "key", item)
+		}
 	}
 }
 
@@ -199,6 +203,7 @@ func (c *ControllerCache) getResourceByGVR(gvr schema.GroupVersionResource, name
 }
 
 func (c *ControllerCache) getResourceByKey(key string) (*unstructured.Unstructured, error) {
+	logger := klog.Background() // TODO(omerap12): propagate context
 	item, exists, err := c.store.GetByKey(key)
 	if err != nil {
 		return nil, err
@@ -209,7 +214,9 @@ func (c *ControllerCache) getResourceByKey(key string) (*unstructured.Unstructur
 
 	entry := item.(*controllerCacheEntry)
 	if entry.IsExpired(c.cacheTTL) {
-		c.store.Delete(entry)
+		if err := c.store.Delete(entry); err != nil {
+			logger.Error(err, "Could not delete cached resource", "key", item)
+		}
 		return nil, nil
 	}
 
@@ -217,12 +224,15 @@ func (c *ControllerCache) getResourceByKey(key string) (*unstructured.Unstructur
 }
 
 func (c *ControllerCache) cleanup() {
+	logger := klog.Background() // TODO(omerap12): propagate context
 	// Get all items and check expiration
 	items := c.store.List()
 	for _, item := range items {
 		if entry, ok := item.(*controllerCacheEntry); ok {
 			if entry.IsExpired(c.cacheTTL) {
-				c.store.Delete(entry)
+				if err := c.store.Delete(entry); err != nil {
+					logger.Error(err, "Could not delete cached resource", "key", item)
+				}
 			}
 		}
 	}
