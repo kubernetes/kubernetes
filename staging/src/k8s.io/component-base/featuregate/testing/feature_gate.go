@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -130,7 +131,9 @@ func SetFeatureGateEmulationVersionDuringTest(tb TB, gate featuregate.FeatureGat
 	tb.Cleanup(func() {
 		tb.Helper()
 		detectParallelOverrideCleanup()
-		if err := gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersion(originalEmuVer); err != nil {
+		// Use context to suppress warnings during test cleanup
+		ctx := featuregate.WithWarningSuppressionContext(context.Background())
+		if err := gate.(featuregate.MutableVersionedFeatureGate).SetEmulationVersionWithContext(ctx, originalEmuVer); err != nil {
 			tb.Fatalf("failed to restore emulation version to %s during test", originalEmuVer.String())
 		}
 	})

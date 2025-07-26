@@ -165,6 +165,8 @@ type MutableVersionedFeatureGate interface {
 	// Otherwise, the emulationVersion will be the same as the binary version.
 	// If set, the feature defaults and availability will be as if the binary is at the emulated version.
 	SetEmulationVersion(emulationVersion *version.Version) error
+	// SetEmulationVersionWithContext is like SetEmulationVersion but accepts a context for controlling behavior.
+	SetEmulationVersionWithContext(ctx context.Context, emulationVersion *version.Version) error
 	// GetAll returns a copy of the map of known feature names to versioned feature specs.
 	GetAllVersioned() map[Feature]VersionedSpecs
 	// AddVersioned adds versioned feature specs to the featureGate.
@@ -543,6 +545,10 @@ func (f *featureGate) GetAllVersioned() map[Feature]VersionedSpecs {
 }
 
 func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) error {
+	return f.SetEmulationVersionWithContext(context.Background(), emulationVersion)
+}
+
+func (f *featureGate) SetEmulationVersionWithContext(ctx context.Context, emulationVersion *version.Version) error {
 	if emulationVersion.EqualTo(f.EmulationVersion()) {
 		return nil
 	}
@@ -565,7 +571,16 @@ func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) err
 		newVal := featureEnabled(feature, enabled, known, emulationVersion)
 		oldVal := featureEnabled(feature, f.enabled.Load().(map[Feature]bool), known, f.EmulationVersion())
 		if newVal != oldVal {
-			klog.Warningf("SetEmulationVersion will change already queried feature:%s from %v to %v", feature, oldVal, newVal)
+			// Suppress warning during test restoration to avoid noise in test output
+			if !shouldSuppressWarning(ctx) {
+				warningMsg := fmt.Sprintf("SetEmulationVersion will change already queried feature:%s from %v to %v", feature, oldVal, newVal)
+				// Try to log to test output first, fallback to global klog
+				if logger := getTestLogger(ctx); logger != nil {
+					logger.Logf("WARNING: %s", warningMsg)
+				} else {
+					klog.Warningf("%s", warningMsg)
+				}
+			}
 		}
 	}
 
@@ -667,6 +682,49 @@ func (f *featureGate) AddMetrics() {
 	for feature, featureSpec := range f.GetAll() {
 		featuremetrics.RecordFeatureInfo(context.Background(), string(feature), string(featureSpec.PreRelease), f.Enabled(feature))
 	}
+}
+
+// contextKey is used to store warning suppression flag in context
+type contextKey struct{}
+
+// testLoggerKey is used to store test logger in context
+type testLoggerKey struct{}
+
+// WithWarningSuppressionContext returns a context with warning suppression flag
+func WithWarningSuppressionContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, contextKey{}, true)
+}
+
+// WithTestLoggerContext returns a context with test logger for redirecting warnings to test output
+func WithTestLoggerContext(ctx context.Context, logger interface {
+	Logf(format string, args ...interface{})
+}) context.Context {
+	return context.WithValue(ctx, testLoggerKey{}, logger)
+}
+
+// shouldSuppressWarning checks whether warnings should be suppressed
+func shouldSuppressWarning(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	suppress, ok := ctx.Value(contextKey{}).(bool)
+	return ok && suppress
+}
+
+// getTestLogger retrieves test logger from context if available
+func getTestLogger(ctx context.Context) interface {
+	Logf(format string, args ...interface{})
+} {
+	if ctx == nil {
+		return nil
+	}
+	logger, ok := ctx.Value(testLoggerKey{}).(interface {
+		Logf(format string, args ...interface{})
+	})
+	if ok {
+		return logger
+	}
+	return nil
 }
 
 // KnownFeatures returns a slice of strings describing the FeatureGate's known features.
