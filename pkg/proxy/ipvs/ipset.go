@@ -157,10 +157,7 @@ func (set *IPSet) syncIPSetEntries() {
 	}
 
 	// currentIPSetEntries represents Endpoints watched from API Server.
-	currentIPSetEntries := sets.New[string]()
-	for _, appliedEntry := range appliedEntries {
-		currentIPSetEntries.Insert(appliedEntry)
-	}
+	currentIPSetEntries := sets.New(appliedEntries...)
 
 	if !set.activeEntries.Equal(currentIPSetEntries) {
 		// Clean legacy entries
