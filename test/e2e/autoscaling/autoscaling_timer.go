@@ -86,7 +86,7 @@ var _ = SIGDescribe(feature.ClusterSizeAutoscalingScaleUp, framework.WithSlow(),
 				nodeMemoryMB := (&nodeMemoryBytes).Value() / 1024 / 1024
 				memRequestMB := nodeMemoryMB / 10 // Ensure each pod takes not more than 10% of node's allocatable memory.
 				replicas := 1
-				resourceConsumer := e2eautoscaling.NewDynamicResourceConsumer(ctx, "resource-consumer", f.Namespace.Name, e2eautoscaling.KindDeployment, replicas, 0, 0, 0, cpuRequestMillis, memRequestMB, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle)
+				resourceConsumer := e2eautoscaling.NewDynamicResourceConsumer(ctx, "resource-consumer", f.Namespace.Name, e2eautoscaling.KindDeployment, replicas, 0, 0, 0, cpuRequestMillis, memRequestMB, f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle, nil)
 				ginkgo.DeferCleanup(resourceConsumer.CleanUp)
 				resourceConsumer.WaitForReplicas(ctx, replicas, 1*time.Minute) // Should finish ~immediately, so 1 minute is more than enough.
 
