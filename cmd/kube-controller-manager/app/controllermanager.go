@@ -225,7 +225,14 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-			statusz.Install(unsecuredMux, kubeControllerManager, statusz.NewRegistry(c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent)))
+			statusz.Install(
+				unsecuredMux,
+				kubeControllerManager,
+				statusz.NewRegistry(
+					c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent),
+					statusz.WithListedPaths([]string{"/healthz", "/livez", "/metrics", "/readyz"}),
+				),
+			)
 		}
 
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
