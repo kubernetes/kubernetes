@@ -727,6 +727,14 @@ items:
     - list
     - watch
   - apiGroups:
+    - '*'
+    resources:
+    - '*'
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
     - metrics.k8s.io
     resources:
     - pods

@@ -125,6 +125,7 @@ spec:
     apiVersion: apiVersionValue
     kind: kindValue
     name: nameValue
+  selectionStrategy: selectionStrategyValue
 status:
   conditions:
   - lastTransitionTime: "2003-01-01T01:01:01Z"
