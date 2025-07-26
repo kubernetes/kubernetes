@@ -333,7 +333,8 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	if w.httpProbeRequest != nil {
 		req, err = w.httpProbeRequest.getRequest(&w.container) // either returns cached request or creates a new one
 		if err != nil {
-			klog.V(4).InfoS("HTTP-Probe failed to create request", "error", err)
+			// Request creation/reuse failed, try again next time.
+			klog.V(4).InfoS("HTTP-Probe worker failed to create request", "error", err)
 			return true
 		}
 	}
