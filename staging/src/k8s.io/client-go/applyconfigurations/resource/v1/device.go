@@ -26,14 +26,15 @@ import (
 // DeviceApplyConfiguration represents a declarative configuration of the Device type for use
 // with apply.
 type DeviceApplyConfiguration struct {
-	Name             *string                                                        `json:"name,omitempty"`
-	Attributes       map[resourcev1.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
-	Capacity         map[resourcev1.QualifiedName]DeviceCapacityApplyConfiguration  `json:"capacity,omitempty"`
-	ConsumesCounters []DeviceCounterConsumptionApplyConfiguration                   `json:"consumesCounters,omitempty"`
-	NodeName         *string                                                        `json:"nodeName,omitempty"`
-	NodeSelector     *corev1.NodeSelectorApplyConfiguration                         `json:"nodeSelector,omitempty"`
-	AllNodes         *bool                                                          `json:"allNodes,omitempty"`
-	Taints           []DeviceTaintApplyConfiguration                                `json:"taints,omitempty"`
+	Name                     *string                                                        `json:"name,omitempty"`
+	Attributes               map[resourcev1.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
+	Capacity                 map[resourcev1.QualifiedName]DeviceCapacityApplyConfiguration  `json:"capacity,omitempty"`
+	ConsumesCounters         []DeviceCounterConsumptionApplyConfiguration                   `json:"consumesCounters,omitempty"`
+	NodeName                 *string                                                        `json:"nodeName,omitempty"`
+	NodeSelector             *corev1.NodeSelectorApplyConfiguration                         `json:"nodeSelector,omitempty"`
+	AllNodes                 *bool                                                          `json:"allNodes,omitempty"`
+	Taints                   []DeviceTaintApplyConfiguration                                `json:"taints,omitempty"`
+	AllowMultipleAllocations *bool                                                          `json:"allowMultipleAllocations,omitempty"`
 }
 
 // DeviceApplyConfiguration constructs a declarative configuration of the Device type for use with
@@ -125,5 +126,13 @@ func (b *DeviceApplyConfiguration) WithTaints(values ...*DeviceTaintApplyConfigu
 		}
 		b.Taints = append(b.Taints, *values[i])
 	}
+	return b
+}
+
+// WithAllowMultipleAllocations sets the AllowMultipleAllocations field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllowMultipleAllocations field is set to the value of the last call.
+func (b *DeviceApplyConfiguration) WithAllowMultipleAllocations(value bool) *DeviceApplyConfiguration {
+	b.AllowMultipleAllocations = &value
 	return b
 }

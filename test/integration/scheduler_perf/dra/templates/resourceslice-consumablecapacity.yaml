@@ -1,0 +1,63 @@
+kind: ResourceSlice
+apiVersion: resource.k8s.io/v1beta2
+metadata:
+  name: resourceslice-{{.Index}}
+spec:
+  pool:
+    name: resourceslice-{{.Index}}
+    generation: 1
+    resourceSliceCount: 1
+  driver: test-driver.cdi.k8s.io
+  nodeSelector:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: node-with-dra
+        operator: In
+        values:
+        - "true"
+  sharedCounters:
+  - name: counter-set
+    counters:
+      counter1:
+        value: "1"
+      counter2:
+        value: "1"
+  devices:
+  - name: shareable-device
+    allowMultipleAllocations: true
+    attributes:
+      preallocate:
+        bool: false
+      dra.example.com/slice:
+        int: {{.Index}}
+    capacity:
+      memory:
+        value: 80Gi
+        requestPolicy:
+          default: 1Gi
+          validRange:
+            min: 1Gi
+  # 2 counter devices
+  - name: device-2-counters-1
+    allowMultipleAllocations: true
+    attributes:
+      preallocate:
+        bool: true
+      dra.example.com/slice:
+        int: {{.Index}}
+    capacity:
+      counters:
+        value: "2"
+      memory:
+        value: 80Gi
+        requestPolicy:
+          default: 1Gi
+          validRange:
+            min: 1Gi
+    consumesCounters:
+    - counterSet: counter-set
+      counters:
+        counter1:
+          value: "1"
+        counter2:
+          value: "1"

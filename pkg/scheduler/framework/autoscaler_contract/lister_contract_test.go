@@ -101,6 +101,10 @@ func (r *resourceClaimTrackerContract) ListAllAllocatedDevices() (sets.Set[struc
 	return nil, nil
 }
 
+func (r *resourceClaimTrackerContract) GatherAllocatedState() (*structured.AllocatedState, error) {
+	return nil, nil
+}
+
 func (r *resourceClaimTrackerContract) SignalClaimPendingAllocation(_ types.UID, _ *resourceapi.ResourceClaim) error {
 	return nil
 }

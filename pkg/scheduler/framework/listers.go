@@ -84,6 +84,9 @@ type ResourceClaimTracker interface {
 	// ListAllAllocatedDevices lists all allocated Devices from allocated ResourceClaims. The result is guaranteed to immediately include
 	// any changes made via AssumeClaimAfterAPICall(), and SignalClaimPendingAllocation().
 	ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error)
+	// GatherAllocatedState gathers information about allocated devices from allocated ResourceClaims. The result is guaranteed to immediately include
+	// any changes made via AssumeClaimAfterAPICall(), and SignalClaimPendingAllocation().
+	GatherAllocatedState() (*structured.AllocatedState, error)
 
 	// SignalClaimPendingAllocation signals to the tracker that the given ResourceClaim will be allocated via an API call in the
 	// binding phase. This change is immediately reflected in the result of List() and the other accessors.

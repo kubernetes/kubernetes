@@ -79,3 +79,22 @@ func (c *Cache) get(expression string) *CompilationResult {
 	}
 	return expr.(*CompilationResult)
 }
+
+func (c *Cache) Check(expression string) CompilationResult {
+	// Compiling a CEL expression is expensive enough that it is cheaper
+	// to lock a mutex than doing it several times in parallel.
+	c.compileMutex.LockKey(expression)
+	//nolint:errcheck // Only returns an error for unknown keys, which isn't the case here.
+	defer c.compileMutex.UnlockKey(expression)
+
+	cached := c.get(expression)
+	if cached != nil {
+		return *cached
+	}
+
+	expr := GetCompiler().CompileCELExpression(expression, Options{DisableCostEstimation: true})
+	if expr.Error == nil {
+		c.add(expression, &expr)
+	}
+	return expr
+}
