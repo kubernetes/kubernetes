@@ -275,6 +275,9 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 	if cset, exists := m.state.GetCPUSet(string(pod.UID), container.Name); exists {
 		m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
 	}
+	if cset, exists := m.state.GetPromisedCPUSet(string(pod.UID), container.Name); exists {
+		m.lastUpdateState.SetPromisedCPUSet(string(pod.UID), container.Name, cset)
+	}
 	m.containerMap.Add(string(pod.UID), container.Name, containerID)
 }
 
