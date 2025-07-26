@@ -84,9 +84,7 @@ func (strategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user.
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	newObj := obj.(*rbac.Role)
-	errorList := validation.ValidateRole(newObj)
-	return append(errorList, validation.ValidateRoleUpdate(newObj, old.(*rbac.Role))...)
+	return validation.ValidateRoleUpdate(obj.(*rbac.Role), old.(*rbac.Role))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
