@@ -18,6 +18,7 @@ package sets
 
 import (
 	"cmp"
+	"iter"
 	"maps"
 	"sort"
 )
@@ -108,6 +109,19 @@ func (s Set[T]) Clone() Set[T] {
 	return maps.Clone(s)
 }
 
+// DifferenceSeq is an iterator version of Difference.
+func (s1 Set[T]) DifferenceSeq(s2 Set[T]) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for key := range s1 {
+			if !s2.Has(key) {
+				if !yield(key) {
+					return
+				}
+			}
+		}
+	}
+}
+
 // Difference returns a set of objects that are not in s2.
 // For example:
 // s1 = {a1, a2, a3}
@@ -116,10 +130,8 @@ func (s Set[T]) Clone() Set[T] {
 // s2.Difference(s1) = {a4, a5}
 func (s1 Set[T]) Difference(s2 Set[T]) Set[T] {
 	result := New[T]()
-	for key := range s1 {
-		if !s2.Has(key) {
-			result.Insert(key)
-		}
+	for key := range s1.DifferenceSeq(s2) {
+		result.Insert(key)
 	}
 	return result
 }
