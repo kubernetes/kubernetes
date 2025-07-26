@@ -553,6 +553,9 @@ kube::golang::internal::verify_go_version() {
       export GIMME_ENV_PREFIX=${GIMME_ENV_PREFIX:-"${KUBE_OUTPUT}/.gimme/envs"}
       export GIMME_VERSION_PREFIX=${GIMME_VERSION_PREFIX:-"${KUBE_OUTPUT}/.gimme/versions"}
       # eval because the output of this is shell to set PATH etc.
+      set -x
+      env
+      echo "$("${KUBE_ROOT}/third_party/gimme/gimme" "${GO_VERSION}")"
       eval "$("${KUBE_ROOT}/third_party/gimme/gimme" "${GO_VERSION}")"
     fi
   fi
