@@ -26,7 +26,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/component-base/metrics/testutil"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
 var queuedAPICallCmpOpts = []cmp.Option{
@@ -35,12 +37,25 @@ var queuedAPICallCmpOpts = []cmp.Option{
 	cmpopts.IgnoreFields(mockAPICall{}, "executeFn", "mergeFn", "syncFn"),
 }
 
-// verifyQueueLen is a test helper to check the length of the callsQueue.
-func verifyQueueLen(t *testing.T, cq *callQueue, len int) {
+// verifyQueueState is a test helper to check both the queue length and pending call metrics.
+func verifyQueueState(t *testing.T, cq *callQueue, expectedPendingCalls map[string]int) {
 	t.Helper()
 
-	if got := cq.callsQueue.Len(); got != len {
-		t.Errorf("Expected callsQueue to have %d item(s), but has %d", len, got)
+	expectedQueueLen := 0
+	// Check pending call metrics
+	for callType, expected := range expectedPendingCalls {
+		expectedQueueLen += expected
+
+		value, err := testutil.GetGaugeMetricValue(metrics.AsyncAPIPendingCalls.WithLabelValues(callType))
+		if err != nil {
+			t.Errorf("Failed to get pending calls metric for %s: %v", callType, err)
+		} else if int(value) != expected {
+			t.Errorf("Expected pending calls metric for %s to be %d, got %d", callType, expected, int(value))
+		}
+	}
+
+	if got := cq.callsQueue.Len(); got != expectedQueueLen {
+		t.Errorf("Expected callsQueue to have %d item(s), but has %d", expectedQueueLen, got)
 	}
 }
 
@@ -91,6 +106,8 @@ func TestCallQueueAdd(t *testing.T) {
 	uid2 := types.UID("uid2")
 
 	t.Run("First call is added without collision", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		call := &queuedAPICall{
 			APICall: &mockAPICall{
@@ -102,11 +119,13 @@ func TestCallQueueAdd(t *testing.T) {
 		if err := cq.add(call); err != nil {
 			t.Fatalf("Unexpected error while adding call: %v", err)
 		}
-		verifyQueueLen(t, cq, 1)
+		verifyQueueState(t, cq, map[string]int{"low": 1})
 		verifyCalls(t, cq, call)
 	})
 
 	t.Run("No-op call is skipped", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		onFinishCh := make(chan error, 1)
 		call := &queuedAPICall{
@@ -124,12 +143,14 @@ func TestCallQueueAdd(t *testing.T) {
 		if !errors.Is(err, fwk.ErrCallSkipped) {
 			t.Fatalf("Expected call to be skipped, but got %v", err)
 		}
-		verifyQueueLen(t, cq, 0)
+		verifyQueueState(t, cq, map[string]int{"low": 0})
 		verifyCalls(t, cq)
 		expectOnFinish(t, onFinishCh, fwk.ErrCallSkipped)
 	})
 
 	t.Run("Two calls for different objects don't collide", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		call1 := &queuedAPICall{
 			APICall: &mockAPICall{
@@ -150,11 +171,13 @@ func TestCallQueueAdd(t *testing.T) {
 		if err := cq.add(call2); err != nil {
 			t.Fatalf("Unexpected error while adding call2: %v", err)
 		}
-		verifyQueueLen(t, cq, 2)
+		verifyQueueState(t, cq, map[string]int{"low": 1, "high": 1})
 		verifyCalls(t, cq, call1, call2)
 	})
 
 	t.Run("New call overwrites less relevant call", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		onFinishCh := make(chan error, 1)
 		callLow := &queuedAPICall{
@@ -177,12 +200,14 @@ func TestCallQueueAdd(t *testing.T) {
 		if err := cq.add(callHigh); err != nil {
 			t.Fatalf("Unexpected error while adding callHigh: %v", err)
 		}
-		verifyQueueLen(t, cq, 1)
+		verifyQueueState(t, cq, map[string]int{"high": 1})
 		verifyCalls(t, cq, callHigh)
 		expectOnFinish(t, onFinishCh, fwk.ErrCallOverwritten)
 	})
 
 	t.Run("New call is skipped if less relevant", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		onFinishCh := make(chan error, 1)
 		callLow := &queuedAPICall{
@@ -206,12 +231,14 @@ func TestCallQueueAdd(t *testing.T) {
 		if !errors.Is(err, fwk.ErrCallSkipped) {
 			t.Fatalf("Expected callLow to be skipped, but got %v", err)
 		}
-		verifyQueueLen(t, cq, 1)
+		verifyQueueState(t, cq, map[string]int{"high": 1})
 		verifyCalls(t, cq, callHigh)
 		expectOnFinish(t, onFinishCh, fwk.ErrCallSkipped)
 	})
 
 	t.Run("New call merges with old call and skips if no-op", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		onFinishCh1 := make(chan error, 1)
 		call1 := &queuedAPICall{
@@ -261,7 +288,7 @@ func TestCallQueueAdd(t *testing.T) {
 		if err := cq.add(call2); err != nil {
 			t.Fatalf("Unexpected error while adding call2: %v", err)
 		}
-		verifyQueueLen(t, cq, 1)
+		verifyQueueState(t, cq, map[string]int{"low": 1})
 		verifyCalls(t, cq, call2)
 		expectOnFinish(t, onFinishCh1, fwk.ErrCallOverwritten)
 
@@ -269,7 +296,7 @@ func TestCallQueueAdd(t *testing.T) {
 		if !errors.Is(err, fwk.ErrCallSkipped) {
 			t.Fatalf("Expected call3 to be skipped, but got %v", err)
 		}
-		verifyQueueLen(t, cq, 0)
+		verifyQueueState(t, cq, map[string]int{"low": 0})
 		verifyCalls(t, cq)
 		expectOnFinish(t, onFinishCh2, fwk.ErrCallOverwritten)
 		expectOnFinish(t, onFinishCh3, fwk.ErrCallSkipped)
@@ -281,6 +308,8 @@ func TestCallQueuePop(t *testing.T) {
 	uid2 := types.UID("uid2")
 
 	t.Run("Calls are popped from the queue in FIFO order", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		call1 := &queuedAPICall{
 			APICall: &mockAPICall{
@@ -301,6 +330,9 @@ func TestCallQueuePop(t *testing.T) {
 			t.Fatalf("Unexpected error while adding call2: %v", err)
 		}
 
+		// Verify pending calls after adding
+		verifyQueueState(t, cq, map[string]int{"low": 2})
+
 		poppedCall, err := cq.pop()
 		if err != nil {
 			t.Fatalf("Unexpected error while popping call1: %v", err)
@@ -308,7 +340,7 @@ func TestCallQueuePop(t *testing.T) {
 		if diff := cmp.Diff(call1, poppedCall, queuedAPICallCmpOpts...); diff != "" {
 			t.Errorf("First popped call does not patch call1 (-want +got):\n%s", diff)
 		}
-		verifyQueueLen(t, cq, 1)
+		verifyQueueState(t, cq, map[string]int{"low": 1})
 		verifyCalls(t, cq, call1, call2)
 		verifyInFlight(t, cq, uid1)
 
@@ -319,7 +351,7 @@ func TestCallQueuePop(t *testing.T) {
 		if diff := cmp.Diff(call2, poppedCall, queuedAPICallCmpOpts...); diff != "" {
 			t.Errorf("Second popped call does not match call2 (-want +got):\n%s", diff)
 		}
-		verifyQueueLen(t, cq, 0)
+		verifyQueueState(t, cq, map[string]int{"low": 0})
 		verifyCalls(t, cq, call1, call2)
 		verifyInFlight(t, cq, uid1, uid2)
 	})
@@ -363,6 +395,8 @@ func TestCallQueueFinalize(t *testing.T) {
 	uid := types.UID("uid")
 
 	t.Run("Call details are cleared if there is no waiting call", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		call := &queuedAPICall{
 			APICall: &mockAPICall{
@@ -380,13 +414,14 @@ func TestCallQueueFinalize(t *testing.T) {
 		}
 
 		cq.finalize(poppedCall)
-
-		verifyQueueLen(t, cq, 0)
+		verifyQueueState(t, cq, map[string]int{"low": 0})
 		verifyCalls(t, cq)
 		verifyInFlight(t, cq)
 	})
 
 	t.Run("UID is re-queued if a new call arrived while one was in-flight", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		call1 := &queuedAPICall{
 			APICall: &mockAPICall{
@@ -416,7 +451,7 @@ func TestCallQueueFinalize(t *testing.T) {
 
 		cq.finalize(poppedCall)
 
-		verifyQueueLen(t, cq, 1)
+		verifyQueueState(t, cq, map[string]int{"low": 1})
 		verifyCalls(t, cq, call2)
 		verifyInFlight(t, cq)
 	})
@@ -427,6 +462,8 @@ func TestCallQueueSyncObject(t *testing.T) {
 	uid2 := types.UID("uid2")
 
 	t.Run("Object is synced with pending call details", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		obj := &metav1.ObjectMeta{
 			UID: uid1,
@@ -449,7 +486,7 @@ func TestCallQueueSyncObject(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error while syncing object: %v", err)
 		}
-		verifyQueueLen(t, cq, 1)
+		verifyQueueState(t, cq, map[string]int{"low": 1})
 		verifyCalls(t, cq, call)
 		verifyInFlight(t, cq)
 
@@ -460,6 +497,8 @@ func TestCallQueueSyncObject(t *testing.T) {
 	})
 
 	t.Run("Pending call is canceled if sync results in no-op", func(t *testing.T) {
+		resetMetrics()
+
 		cq := newCallQueue(mockRelevances)
 		obj := &metav1.ObjectMeta{UID: uid1}
 		onFinishCh := make(chan error, 1)
@@ -486,7 +525,7 @@ func TestCallQueueSyncObject(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error while syncing object: %v", err)
 		}
-		verifyQueueLen(t, cq, 0)
+		verifyQueueState(t, cq, map[string]int{"low": 0})
 		verifyCalls(t, cq)
 		verifyInFlight(t, cq)
 		expectOnFinish(t, onFinishCh, fwk.ErrCallSkipped)
