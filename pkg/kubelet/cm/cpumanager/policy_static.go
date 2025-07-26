@@ -651,7 +651,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 }
 
 // generateCPUTopologyHints generates a set of TopologyHints given the set of
-// available CPUs and the number of CPUs being requested.
+// available CPUs, a set of reusable CPUs and the number of CPUs being requested.
 //
 // It follows the convention of marking all hints that have the same number of
 // bits set as the narrowest matching NUMANodeAffinity with 'Preferred: true', and
