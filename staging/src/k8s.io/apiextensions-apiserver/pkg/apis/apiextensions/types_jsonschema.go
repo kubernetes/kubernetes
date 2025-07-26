@@ -149,6 +149,40 @@ type JSONSchemaProps struct {
 	// +listType=map
 	// +listMapKey=rule
 	XValidations ValidationRules
+
+	// x-kubernetes-unions defines a list of unions for a struct or an array of list-type map.
+	// Note that at most one member of a union can be specified.
+	// +listType=atomic
+	// +optional
+	XUnions Unions `json:"x-kubernetes-unions,omitempty"`
+}
+
+type Unions []Union
+
+// Union represents a union of fields.
+// At most one of the fields across all union members may be set.
+// +k8s:deepcopy-gen=true
+type Union struct {
+	// +optional
+	ZeroOrOneOf bool `json:"zeroOrOneOf,omitempty"`
+	// discriminator is the name of the field that determines which type is used.
+	// Required when multiple members are specified.
+	// +optional
+	Discriminator string `json:"discriminator,omitempty"`
+	// members lists the members of the union.
+	// +listType=map
+	// +listMapKey=fieldName
+	Members []UnionMember `json:"members"`
+}
+
+// +k8s:deepcopy-gen=true
+// +k8s:conversion-gen=true
+// UnionMember represents a single member of a union.
+type UnionMember struct {
+	// fieldName is the name of the field.
+	FieldName string `json:"fieldName" protobuf:"bytes,1,opt,name=fieldName"`
+	// discriminatorValue is the value of the discriminator field that indicates that this member is active.
+	DiscriminatorValue string `json:"discriminatorValue" protobuf:"bytes,2,opt,name=discriminatorValue"`
 }
 
 // ValidationRules describes a list of validation rules written in the CEL expression language.

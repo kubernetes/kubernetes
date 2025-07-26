@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/union"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -213,6 +214,9 @@ func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object
 	// validate x-kubernetes-list-type "map" and "set" invariant
 	errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, u.Object)...)
 
+	// validate x-kubernetes-unions
+	errs = append(errs, union.Validate(nil, a.structuralSchema, u.Object)...)
+
 	// validate x-kubernetes-validations rules
 	if celValidator := a.celValidator; celValidator != nil {
 		if has, err := hasBlockingErr(errs); has {
@@ -299,6 +303,12 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	// ratcheting validation of x-kubernetes-list-type value map and set
 	if oldErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, uOld.Object); len(oldErrs) == 0 {
 		errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, uNew.Object)...)
+	}
+
+	// ratcheting validation of x-kubernetes-unions
+	if oldErrs := union.Validate(nil, a.structuralSchema, uOld.Object); len(oldErrs) == 0 {
+		fmt.Println("DEBUG: customResourceStrategy.ValidateUpdate: validating unions on update")
+		errs = append(errs, union.Validate(nil, a.structuralSchema, uNew.Object)...)
 	}
 
 	// validate x-kubernetes-validations rules

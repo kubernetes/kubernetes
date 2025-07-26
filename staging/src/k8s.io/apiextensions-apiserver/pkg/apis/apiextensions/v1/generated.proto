@@ -578,6 +578,12 @@ message JSONSchemaProps {
   // +listType=map
   // +listMapKey=rule
   repeated ValidationRule xKubernetesValidations = 44;
+
+  // x-kubernetes-unions defines a list of unions for a struct.
+  // Note that at most one member of a union can be specified.
+  // +listType=atomic
+  // +optional
+  repeated Union xKubernetesUnions = 45;
 }
 
 // JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps
@@ -637,6 +643,37 @@ message ServiceReference {
   // Defaults to 443 for backward compatibility.
   // +optional
   optional int32 port = 4;
+}
+
+// +k8s:deepcopy-gen=true
+// Union represents a union of fields.
+// At most one of the fields across all union members may be set.
+message Union {
+  // discriminator is the name of the field that determines which type is used.
+  // Required when multiple members are specified.
+  // +optional
+  optional string discriminator = 1;
+
+  // members lists the members of the union.
+  // +listType=map
+  // +listMapKey=fieldName
+  repeated UnionMember members = 2;
+
+  // zeroOrOneOf indicates that at most one of the members of a non-discriminated union may be specified.
+  // This is for non-discriminated unions.
+  // This field is mutually exclusive with discriminator.
+  // +optional
+  optional bool zeroOrOneOf = 3;
+}
+
+// +k8s:deepcopy-gen=true
+// UnionMember represents a single member of a union.
+message UnionMember {
+  // fieldName is the name of the field.
+  optional string fieldName = 1;
+
+  // discriminatorValue is the value of the discriminator field that indicates that this member is active.
+  optional string discriminatorValue = 2;
 }
 
 // ValidationRule describes a validation rule written in the CEL expression language.
