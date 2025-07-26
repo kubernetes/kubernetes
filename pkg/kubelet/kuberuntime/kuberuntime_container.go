@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -1093,7 +1094,13 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 			// it is likely that the container runtime failed to start it. To
 			// prevent the container from getting stuck in the 'created' state,
 			// restart it.
-			changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+			shouldStart := true
+			if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+				shouldStart = !pleg.IsEventedPLEGInUse() || !kubecontainer.IsContainerPendingStart(status)
+			}
+			if shouldStart {
+				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
+			}
 
 		case kubecontainer.ContainerStateRunning:
 			if !podutil.IsRestartableInitContainer(container) {
