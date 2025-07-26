@@ -2696,8 +2696,8 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 				},
 			},
 			errors: []string{
-				`root.myProperty[key]: Invalid value: "string": must be value2 or not value`,
-				`root.myProperty[key2]: Invalid value: "string": len must be 5`,
+				`root.myProperty[key]: Invalid value: "value": must be value2 or not value`,
+				`root.myProperty[key2]: Invalid value: "value2": len must be 5`,
 			},
 			schema: &schema.Structural{
 				Generic: schema.Generic{
@@ -2742,8 +2742,8 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 				"key2": "value2",
 			},
 			errors: []string{
-				`root.key: Invalid value: "string": must be value2 or not value`,
-				`root.key2: Invalid value: "string": len must be 5`,
+				`root.key: Invalid value: "value": must be value2 or not value`,
+				`root.key2: Invalid value: "value2": len must be 5`,
 			},
 			schema: &schema.Structural{
 				Generic: schema.Generic{
@@ -3924,7 +3924,7 @@ func TestRatcheting(t *testing.T) {
 						type: string
 						x-kubernetes-validations:
 						- rule: self == "bar"
-						  message: "gotta be baz"
+						  message: "gotta be bar"
 				`),
 			oldObj: mustUnstructured(`
 				foo: baz
@@ -3933,7 +3933,7 @@ func TestRatcheting(t *testing.T) {
 				foo: baz
 			`),
 			warnings: []string{
-				`root.foo: Invalid value: "string": gotta be baz`,
+				`root.foo: Invalid value: "baz": gotta be bar`,
 			},
 		},
 		{
@@ -3960,7 +3960,7 @@ func TestRatcheting(t *testing.T) {
 				- bar: bar
 			`),
 			warnings: []string{
-				`root[0].bar: Invalid value: "string": gotta be baz`,
+				`root[0].bar: Invalid value: "bar": gotta be baz`,
 			},
 		},
 		{
@@ -3986,7 +3986,7 @@ func TestRatcheting(t *testing.T) {
 				- 2
 			`),
 			warnings: []string{
-				`root[1]: Invalid value: "number": gotta be odd`,
+				`root[1]: Invalid value: 2: gotta be odd`,
 			},
 		},
 		{
@@ -4020,7 +4020,7 @@ func TestRatcheting(t *testing.T) {
 				- 2
 			`),
 			warnings: []string{
-				`root.setArray[2]: Invalid value: "number": gotta be odd`,
+				`root.setArray[2]: Invalid value: 2: gotta be odd`,
 			},
 		},
 		{
@@ -4055,8 +4055,8 @@ func TestRatcheting(t *testing.T) {
 				  value: baz
 			`),
 			warnings: []string{
-				`root[0].value: Invalid value: "string": gotta be baz`,
-				`root[1].value: Invalid value: "string": gotta be baz`,
+				`root[0].value: Invalid value: "notbaz": gotta be baz`,
+				`root[1].value: Invalid value: "notbaz": gotta be baz`,
 			},
 		},
 		{
@@ -4089,7 +4089,7 @@ func TestRatcheting(t *testing.T) {
 				  value: notbaz
 			`),
 			warnings: []string{
-				`root[1].value: Invalid value: "string": gotta be baz`,
+				`root[1].value: Invalid value: "notbaz": gotta be baz`,
 			},
 		},
 		{
@@ -4131,8 +4131,8 @@ func TestRatcheting(t *testing.T) {
 						bar: notbaz
 			`),
 			warnings: []string{
-				`root.mapField.foo: Invalid value: "string": gotta be baz`,
-				`root.mapField.mapField.bar: Invalid value: "string": gotta be nested baz`,
+				`root.mapField.foo: Invalid value: "notbaz": gotta be baz`,
+				`root.mapField.mapField.bar: Invalid value: "notbaz": gotta be nested baz`,
 			},
 		},
 		{
@@ -4182,11 +4182,11 @@ func TestRatcheting(t *testing.T) {
 			`),
 			errors: []string{
 				// Didn't get ratcheted because we changed its value from baz to notbaz
-				`root.mapField.foo: Invalid value: "string": gotta be baz`,
+				`root.mapField.foo: Invalid value: "notbaz": gotta be baz`,
 			},
 			warnings: []string{
 				// Ratcheted because its value remained the same, even though it is invalid
-				`root.mapField.mapField.bar: Invalid value: "string": gotta be baz`,
+				`root.mapField.mapField.bar: Invalid value: "notbaz": gotta be baz`,
 			},
 		},
 		{
@@ -4219,7 +4219,7 @@ func TestRatcheting(t *testing.T) {
 				- bar: bar
 			`),
 			warnings: []string{
-				`root.atomicArray[0].bar: Invalid value: "string": gotta be baz`,
+				`root.atomicArray[0].bar: Invalid value: "bar": gotta be baz`,
 			},
 		},
 		{
@@ -4247,7 +4247,7 @@ func TestRatcheting(t *testing.T) {
 				- bar: baz
 			`),
 			errors: []string{
-				`root[0].bar: Invalid value: "string": gotta be baz`,
+				`root[0].bar: Invalid value: "bar": gotta be baz`,
 			},
 		},
 		{
@@ -4268,7 +4268,7 @@ func TestRatcheting(t *testing.T) {
 				foo: bar
 			`),
 			errors: []string{
-				`root.foo: Invalid value: "string": gotta be baz`,
+				`root.foo: Invalid value: "bar": gotta be baz`,
 			},
 		},
 		{
@@ -4351,8 +4351,8 @@ func TestRatcheting(t *testing.T) {
 				kind: Baz
 			`),
 			errors: []string{
-				`root.apiVersion: Invalid value: "string": failed rule: self == "v1"`,
-				`root.kind: Invalid value: "string": failed rule: self == "Pod"`,
+				`root.apiVersion: Invalid value: "v2": failed rule: self == "v1"`,
+				`root.kind: Invalid value: "Baz": failed rule: self == "Pod"`,
 			},
 		},
 		{
@@ -4420,12 +4420,12 @@ func TestRatcheting(t *testing.T) {
 				  otherField: newValue3
 			`),
 			warnings: []string{
-				`root.subField.apiVersion: Invalid value: "string": failed rule: self == "v1"`,
-				`root.subField.kind: Invalid value: "string": failed rule: self == "Pod"`,
-				`root.list[0].apiVersion: Invalid value: "string": failed rule: self == "v1"`,
-				`root.list[0].kind: Invalid value: "string": failed rule: self == "Pod"`,
-				`root.list[1].apiVersion: Invalid value: "string": failed rule: self == "v1"`,
-				`root.list[1].kind: Invalid value: "string": failed rule: self == "Pod"`,
+				`root.subField.apiVersion: Invalid value: "v2": failed rule: self == "v1"`,
+				`root.subField.kind: Invalid value: "Baz": failed rule: self == "Pod"`,
+				`root.list[0].apiVersion: Invalid value: "v2": failed rule: self == "v1"`,
+				`root.list[0].kind: Invalid value: "Baz": failed rule: self == "Pod"`,
+				`root.list[1].apiVersion: Invalid value: "v3": failed rule: self == "v1"`,
+				`root.list[1].kind: Invalid value: "Bar": failed rule: self == "Pod"`,
 			},
 		},
 	}
