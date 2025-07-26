@@ -185,7 +185,9 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 		containerReqs := container.Resources.Requests
 		if opts.UseStatusResources {
 			cs, found := containerStatuses[container.Name]
-			if found && cs.Resources != nil {
+			if found &&
+				containerReqs != nil &&
+				cs.Resources != nil && cs.Resources.Requests != nil {
 				containerReqs = determineContainerReqs(pod, &container, cs)
 			}
 		}
@@ -215,7 +217,9 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 		if opts.UseStatusResources {
 			if container.RestartPolicy != nil && *container.RestartPolicy == v1.ContainerRestartPolicyAlways {
 				cs, found := containerStatuses[container.Name]
-				if found && cs.Resources != nil {
+				if found &&
+					containerReqs != nil &&
+					cs.Resources != nil && cs.Resources.Requests != nil {
 					containerReqs = determineContainerReqs(pod, &container, cs)
 				}
 			}
