@@ -5477,6 +5477,11 @@ func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList
 	if pod.Spec.NodeName != "" && len(pod.Spec.SchedulingGates) != 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nodeName"), "cannot be set until all schedulingGates have been cleared"))
 	}
+	// A Pod cannot have both NodeName and NominatedNodeName set simultaneously.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClearingNominatedNodeNameAfterBinding) &&
+		pod.Spec.NodeName != "" && pod.Status.NominatedNodeName != "" {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("status").Child("nominatedNodeName"), "cannot be set when spec.nodeName is set"))
+	}
 	allErrs = append(allErrs, validateSeccompAnnotationsAndFields(pod.ObjectMeta, &pod.Spec, fldPath)...)
 	allErrs = append(allErrs, validateAppArmorAnnotationsAndFieldsMatchOnCreate(pod.ObjectMeta, &pod.Spec, fldPath)...)
 
@@ -5834,6 +5839,15 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 		for _, msg := range ValidateNodeName(newPod.Status.NominatedNodeName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nominatedNodeName"), newPod.Status.NominatedNodeName, msg))
 		}
+	}
+
+	// Prevent setting NominatedNodeName on already bound pods
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClearingNominatedNodeNameAfterBinding) &&
+		oldPod.Spec.NodeName != "" &&
+		newPod.Status.NominatedNodeName != "" &&
+		newPod.Status.NominatedNodeName != oldPod.Status.NominatedNodeName {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nominatedNodeName"),
+			"may not be set on pods that are already bound to a node"))
 	}
 
 	if newPod.Status.ObservedGeneration < 0 {
