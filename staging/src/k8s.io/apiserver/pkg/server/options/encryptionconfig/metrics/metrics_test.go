@@ -32,7 +32,7 @@ const (
 
 func TestRecordEncryptionConfigAutomaticReloadFailure(t *testing.T) {
 	expectedValue := `
-	# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
+	# HELP apiserver_encryption_config_controller_automatic_reloads_total [BETA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
     # TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
     apiserver_encryption_config_controller_automatic_reloads_total {apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",status="failure"} 1
 	`
@@ -51,7 +51,7 @@ func TestRecordEncryptionConfigAutomaticReloadFailure(t *testing.T) {
 
 func TestRecordEncryptionConfigAutomaticReloadSuccess(t *testing.T) {
 	expectedValue := `
-	# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
+	# HELP apiserver_encryption_config_controller_automatic_reloads_total [BETA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
     # TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
     apiserver_encryption_config_controller_automatic_reloads_total {apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",status="success"} 1
 	# HELP apiserver_encryption_config_controller_last_config_info [ALPHA] Information about the last applied encryption configuration with hash as label, split by apiserver identity.
@@ -80,7 +80,7 @@ func TestEncryptionConfigAutomaticReloadLastTimestampSeconds(t *testing.T) {
 	}{
 		{
 			expectedValue: `
-                # HELP apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds [ALPHA] Timestamp of the last successful or failed automatic reload of encryption configuration split by apiserver identity.
+                # HELP apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds [BETA] Timestamp of the last successful or failed automatic reload of encryption configuration split by apiserver identity.
                 # TYPE apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds gauge
                 apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",status="failure"} 1.689101941e+09
             `,
@@ -89,7 +89,7 @@ func TestEncryptionConfigAutomaticReloadLastTimestampSeconds(t *testing.T) {
 		},
 		{
 			expectedValue: `
-                # HELP apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds [ALPHA] Timestamp of the last successful or failed automatic reload of encryption configuration split by apiserver identity.
+                # HELP apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds [BETA] Timestamp of the last successful or failed automatic reload of encryption configuration split by apiserver identity.
                 # TYPE apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds gauge
                 apiserver_encryption_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",status="success"} 1.689101941e+09
             `,

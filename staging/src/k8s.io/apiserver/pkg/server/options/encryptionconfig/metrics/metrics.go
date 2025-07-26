@@ -39,7 +39,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "automatic_reloads_total",
 			Help:           "Total number of reload successes and failures of encryption configuration split by apiserver identity.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"status", "apiserver_id_hash"},
 	)
@@ -50,7 +50,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "automatic_reload_last_timestamp_seconds",
 			Help:           "Timestamp of the last successful or failed automatic reload of encryption configuration split by apiserver identity.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"status", "apiserver_id_hash"},
 	)
