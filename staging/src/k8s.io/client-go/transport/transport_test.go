@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"net/url"
 	"testing"
 )
 
@@ -556,3 +558,4 @@ func Test_contextCanceller_RoundTrip(t *testing.T) {
 		})
 	}
 }
+
