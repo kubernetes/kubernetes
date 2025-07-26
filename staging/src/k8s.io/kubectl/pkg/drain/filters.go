@@ -88,7 +88,11 @@ func (l *PodDeleteList) errors() []error {
 	}
 	errs := make([]error, 0, len(failedPods))
 	for msg, pods := range failedPods {
-		errs = append(errs, fmt.Errorf("cannot delete %s: %s", msg, strings.Join(pods, ", ")))
+		if strings.HasPrefix(strings.ToLower(msg), "cannot delete") {
+			errs = append(errs, fmt.Errorf("%s: %s", msg, strings.Join(pods, ", ")))
+		} else {
+			errs = append(errs, fmt.Errorf("cannot delete %s: %s", msg, strings.Join(pods, ", ")))
+		}
 	}
 	return errs
 }
