@@ -284,6 +284,57 @@ func TestStringIntersection(t *testing.T) {
 	}
 }
 
+func TestInsertSet(t *testing.T) {
+	s1 := New("1")
+	s2 := New("2")
+	s1.InsertSet(s2)
+
+	if s1.Len() != 2 {
+		t.Errorf("Expected Len()=2 but got %d", s1.Len())
+	}
+	if !s1.Has("1") {
+		t.Error(`Expected Has("1") to be true`)
+	}
+	if !s1.Has("2") {
+		t.Error(`Expected Has("2") to be true`)
+	}
+}
+
+func TestClone(t *testing.T) {
+	t.Run("nil", func(t *testing.T) {
+		var s Set[string]
+
+		c := s.Clone()
+
+		if c == nil {
+			t.Error("Clone returned nil")
+		}
+		if c.Len() != 0 {
+			t.Error("Clone returned non-zero length")
+		}
+	})
+	t.Run("empty", func(t *testing.T) {
+		s := Set[string]{}
+		c := s.Clone()
+
+		if c.Len() != 0 {
+			t.Error("Clone returned non-zero length")
+		}
+	})
+	t.Run("non-empty", func(t *testing.T) {
+		s := Set[string]{}
+		s.Insert("1")
+		c := s.Clone()
+
+		if c.Len() != 1 {
+			t.Errorf("Clone returned len %d", c.Len())
+		}
+		if !c.Has("1") {
+			t.Error("Expected '1' to be present")
+		}
+	})
+}
+
 type randomStringAlphabet string
 
 func (a randomStringAlphabet) makeString(minLen, maxLen int) string {

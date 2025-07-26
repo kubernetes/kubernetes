@@ -194,7 +194,7 @@ func TestEdit(t *testing.T) {
 		t.Fatalf("Error locating edit testcases")
 	}
 
-	for _, testcaseName := range testcases.UnsortedList() {
+	for testcaseName := range testcases {
 		t.Run(testcaseName, func(t *testing.T) {
 			i = 0
 			name = testcaseName
