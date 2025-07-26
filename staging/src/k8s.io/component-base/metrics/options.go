@@ -27,11 +27,22 @@ import (
 )
 
 // Options has all parameters needed for exposing metrics from components
+// +k8s:deepcopy-gen=true
 type Options struct {
-	ShowHiddenMetricsForVersion string
-	DisabledMetrics             []string
-	AllowListMapping            map[string]string
-	AllowListMappingManifest    string
+	// ShowHiddenMetricsForVersion is the previous version for which you want to show hidden metrics.
+	// Only the previous minor version is meaningful, other values will not be allowed.
+	// The format is <major>.<minor>, e.g.: '1.16'.
+	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
+	// rather than being surprised when they are permanently removed in the release after that.
+	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
+	// DisabledMetrics is a list of fully qualified metric names that should be disabled.
+	// Disabling metrics is higher in precedence than showing hidden metrics.
+	DisabledMetrics []string `json:"disabledMetrics,omitempty"`
+	// AllowListMapping is the map from metric-label to value allow-list of this label.
+	// The key's format is <MetricName>,<LabelName>, while its value is a list of allowed values for that label of that metric. For e.g., "metric1,label1": "v1,v2,v3".
+	AllowListMapping map[string]string `json:"allowListMapping,omitempty"`
+	// The path to the manifest file that contains the allow-list mapping. Provided for convenience over AllowListMapping.
+	AllowListMappingManifest string `json:"allowListMappingManifest,omitempty"`
 }
 
 // NewOptions returns default metrics options
