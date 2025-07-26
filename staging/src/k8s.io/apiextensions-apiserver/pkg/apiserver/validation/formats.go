@@ -90,14 +90,14 @@ func StripUnsupportedFormatsPostProcess(s *spec.Schema) error {
 
 // StripUnsupportedFormatsPostProcessorForVersion determines the supported formats at the given compatibility version and
 // sets unsupported formats to empty string.
-func StripUnsupportedFormatsPostProcessorForVersion(compatibilityVersion *version.Version) func(s *spec.Schema) error {
+func StripUnsupportedFormatsPostProcessorForVersion(emulationVersion *version.Version) func(s *spec.Schema) error {
 	return func(s *spec.Schema) error {
 		if len(s.Format) == 0 {
 			return nil
 		}
 
 		normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
-		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
+		if !supportedFormatsAtVersion(emulationVersion).supported.Has(normalized) {
 			s.Format = ""
 		}
 
