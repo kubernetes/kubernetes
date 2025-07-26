@@ -218,6 +218,7 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 // dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
 	dropDisabledDRAPrioritizedListFields(newClaim, oldClaim)
+	dropDisabledDRADeviceTaintsFields(newClaim, oldClaim) // Intentionally after dropDisabledDRAPrioritizedListFields to avoid iterating over FirstAvailable slice which needs to be dropped.
 	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
 	dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim)
 }
@@ -300,6 +301,41 @@ func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
 	return false
 }
 
+func dropDisabledDRADeviceTaintsFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) ||
+		draDeviceTaintsInUse(oldClaim) {
+		return
+	}
+
+	for i, req := range newClaim.Spec.Devices.Requests {
+		if exactly := req.Exactly; exactly != nil {
+			exactly.Tolerations = nil
+		}
+		for e := range req.FirstAvailable {
+			newClaim.Spec.Devices.Requests[i].FirstAvailable[e].Tolerations = nil
+		}
+	}
+}
+
+func draDeviceTaintsInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil {
+		return false
+	}
+
+	for _, req := range claim.Spec.Devices.Requests {
+		if exactly := req.Exactly; exactly != nil && len(exactly.Tolerations) > 0 {
+			return true
+		}
+		for _, sub := range req.FirstAvailable {
+			if len(sub.Tolerations) > 0 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
 	isDRAResourceClaimDeviceStatusInUse := (oldClaim != nil && len(oldClaim.Status.Devices) > 0)
 	// drop resourceClaim.Status.Devices field if feature gate is not enabled and it was not in use
@@ -349,5 +385,3 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 		newClaim.Status.Devices = nil
 	}
 }
-
-// TODO: add tests after partitionable devices is merged (code conflict!)
