@@ -164,7 +164,7 @@ func (set *IPSet) syncIPSetEntries() {
 
 	if !set.activeEntries.Equal(currentIPSetEntries) {
 		// Clean legacy entries
-		for _, entry := range currentIPSetEntries.Difference(set.activeEntries).UnsortedList() {
+		for entry := range currentIPSetEntries.DifferenceSeq(set.activeEntries) {
 			if err := set.handle.DelEntry(entry, set.Name); err != nil {
 				if !utilipset.IsNotFoundError(err) {
 					klog.ErrorS(err, "Failed to delete ip set entry from ip set", "ipSetEntry", entry, "ipSet", set.Name)
@@ -174,7 +174,7 @@ func (set *IPSet) syncIPSetEntries() {
 			}
 		}
 		// Create active entries
-		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).UnsortedList() {
+		for entry := range set.activeEntries.DifferenceSeq(currentIPSetEntries) {
 			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
 				klog.ErrorS(err, "Failed to add ip set entry to ip set", "ipSetEntry", entry, "ipSet", set.Name)
 			} else {
