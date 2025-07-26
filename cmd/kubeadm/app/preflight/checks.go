@@ -44,6 +44,8 @@ import (
 	utilsexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -104,7 +106,7 @@ func (sc ServiceCheck) Name() string {
 	if sc.Label != "" {
 		return sc.Label
 	}
-	return fmt.Sprintf("Service-%s", strings.Title(sc.Service))
+	return fmt.Sprintf("Service-%s", cases.Title(language.English).String(sc.Service))
 }
 
 // Check validates if the service is enabled and active.
