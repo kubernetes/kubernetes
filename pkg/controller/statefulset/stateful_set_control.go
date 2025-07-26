@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -742,11 +743,17 @@ func updateStatefulSetAfterInvariantEstablished(
 		}
 	}
 
-	if unavailablePods >= maxUnavailable {
-		logger.V(2).Info("StatefulSet found unavailablePods, more than or equal to allowed maxUnavailable",
+	if unavailablePods > maxUnavailable {
+		logger.V(4).Info("StatefulSet found unavailablePods, more than the allowed maxUnavailable",
 			"statefulSet", klog.KObj(set),
 			"unavailablePods", unavailablePods,
 			"maxUnavailable", maxUnavailable)
+
+		// Only increment metric if StatefulSet status is consistent (not changing) to avoid false positives
+		// during initial rollouts, scaling operations, or updates
+		if !inconsistentStatus(set, &status) {
+			metrics.MaxUnavailableViolations.WithLabelValues(set.Namespace, set.Name, string(set.Spec.PodManagementPolicy)).Inc()
+		}
 		return &status, nil
 	}
 
@@ -797,6 +804,32 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	}
 
 	return nil
+}
+
+// wasStatefulSetPreviouslyHealthy determines if a StatefulSet was previously healthy
+// to distinguish between expected unavailability (during initial rollouts, scaling)
+// and unexpected unavailability that should be reported as violations
+func wasStatefulSetPreviouslyHealthy(set *apps.StatefulSet, status *apps.StatefulSetStatus) bool {
+	// Don't report violations during initial rollout - if ObservedGeneration is 0 or
+	// less than current generation, this is likely an initial deployment
+	if status.ObservedGeneration == 0 || status.ObservedGeneration < set.Generation {
+		return false
+	}
+
+	// Don't report if this is the first time we're seeing this StatefulSet
+	// (no previous status exists)
+	if set.Status.Replicas == 0 && set.Status.ReadyReplicas == 0 {
+		return false
+	}
+
+	// Don't report if we're in a scaling operation (replica count changed)
+	if set.Status.Replicas != *set.Spec.Replicas {
+		return false
+	}
+
+	// Only report if the StatefulSet was previously at desired state
+	// (had all replicas ready and available)
+	return set.Status.ReadyReplicas == *set.Spec.Replicas
 }
 
 var _ StatefulSetControlInterface = &defaultStatefulSetControl{}
