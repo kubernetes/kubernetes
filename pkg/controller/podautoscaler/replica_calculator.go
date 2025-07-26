@@ -523,7 +523,7 @@ func calculatePodRequestsFromContainers(pod *v1.Pod, container string, resource 
 }
 
 func removeMetricsForPods(metrics metricsclient.PodMetricsInfo, pods sets.Set[string]) {
-	for _, pod := range pods.UnsortedList() {
+	for pod := range pods {
 		delete(metrics, pod)
 	}
 }

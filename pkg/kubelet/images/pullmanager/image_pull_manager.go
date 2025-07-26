@@ -360,7 +360,7 @@ func (f *PullManager) initialize(ctx context.Context) {
 	for _, imageObj := range imageObjs {
 		existingRecordedImages := searchForExistingTagDigest(inFlightPulls, imageObj)
 
-		for _, image := range existingRecordedImages.UnsortedList() {
+		for image := range existingRecordedImages {
 
 			if err := f.writePulledRecordIfChanged(image, imageObj.ID, nil); err != nil {
 				klog.ErrorS(err, "failed to write an image pull record", "imageRef", imageObj.ID)
