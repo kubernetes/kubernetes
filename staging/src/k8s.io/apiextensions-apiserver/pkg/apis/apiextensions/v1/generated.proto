@@ -764,6 +764,15 @@ message ValidationRule {
   // +featureGate=CRDValidationRatcheting
   // +optional
   optional bool optionalOldSelf = 6;
+
+  // optionalSelf is used to opt  a transition rule into evaluation even when the object is unset from set.
+  //
+  // You may check for presence of self using `self.hasValue()` and
+  // unwrap it after checking using `self.value()`. Check the CEL
+  // documentation for Optional types for more information:
+  // https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes
+  // +optional
+  optional bool optionalSelf = 7;
 }
 
 // WebhookClientConfig contains the information to make a TLS connection with the webhook.

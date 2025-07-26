@@ -321,6 +321,20 @@ type ValidationRule struct {
 	// +featureGate=CRDValidationRatcheting
 	// +optional
 	OptionalOldSelf *bool `json:"optionalOldSelf,omitempty" protobuf:"bytes,6,opt,name=optionalOldSelf"`
+
+	// optionalSelf is used to opt into evaluation of the rule even when the value of the object is not present.
+	//
+	// When enabled `self` will be a CEL optional whose value will be
+	// `None` if there is no value on the object, or if the object is initially created.
+	//
+	// You may check for presence of self using `self.hasValue()` and
+	// unwrap it after checking using `self.value()`. Check the CEL
+	// documentation for Optional types for more information:
+	// https://pkg.go.dev/github.com/google/cel-go/cel#OptionalTypes
+	//
+	// +featureGate=CRDValidationRatcheting
+	// +optional
+	OptionalSelf *bool `json:"optionalSelf,omitempty" protobuf:"bytes,7,opt,name=optionalSelf"`
 }
 
 // JSON represents any valid JSON value.
