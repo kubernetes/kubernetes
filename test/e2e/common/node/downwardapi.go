@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
@@ -416,7 +417,7 @@ var _ = SIGDescribe("Downward API", framework.WithSerial(), framework.WithDisrup
 
 })
 
-var _ = SIGDescribe("Downward API", feature.PodLevelResources, func() {
+var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
 	f := framework.NewDefaultFramework("downward-api")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
