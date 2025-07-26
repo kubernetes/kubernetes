@@ -572,7 +572,7 @@ func (r *Reconciler) reconcileByPortMapping(
 	//    iterate through the slices and fill them up with the desired endpoints.
 	if desiredSet.Len() > 0 && sliceNamesToUpdate.Len() > 0 {
 		slices := []*discovery.EndpointSlice{}
-		for _, sliceName := range sliceNamesToUpdate.UnsortedList() {
+		for sliceName := range sliceNamesToUpdate {
 			slices = append(slices, slicesByName[sliceName])
 		}
 		// Sort endpoint slices by length so we're filling up the fullest ones
@@ -601,7 +601,7 @@ func (r *Reconciler) reconcileByPortMapping(
 		// filled, try to fit them in one.
 		if desiredSet.Len() < int(r.maxEndpointsPerSlice) && sliceNamesUnchanged.Len() > 0 {
 			unchangedSlices := []*discovery.EndpointSlice{}
-			for _, sliceName := range sliceNamesUnchanged.UnsortedList() {
+			for sliceName := range sliceNamesUnchanged {
 				unchangedSlices = append(unchangedSlices, slicesByName[sliceName])
 			}
 			sliceToFill = getSliceToFill(unchangedSlices, desiredSet.Len(), int(r.maxEndpointsPerSlice))
@@ -634,13 +634,13 @@ func (r *Reconciler) reconcileByPortMapping(
 
 	// Build slicesToUpdate from slice names.
 	slicesToUpdate := []*discovery.EndpointSlice{}
-	for _, sliceName := range sliceNamesToUpdate.UnsortedList() {
+	for sliceName := range sliceNamesToUpdate {
 		slicesToUpdate = append(slicesToUpdate, slicesByName[sliceName])
 	}
 
 	// Build slicesToDelete from slice names.
 	slicesToDelete := []*discovery.EndpointSlice{}
-	for _, sliceName := range sliceNamesToDelete.UnsortedList() {
+	for sliceName := range sliceNamesToDelete {
 		slicesToDelete = append(slicesToDelete, slicesByName[sliceName])
 	}
 
