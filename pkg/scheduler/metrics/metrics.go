@@ -73,6 +73,7 @@ const (
 	Score                       = "Score"
 	ScoreExtensionNormalize     = "ScoreExtensionNormalize"
 	PreBind                     = "PreBind"
+	PreBindPreFlight            = "PreBindPreFlight"
 	Bind                        = "Bind"
 	PostBind                    = "PostBind"
 	Reserve                     = "Reserve"
