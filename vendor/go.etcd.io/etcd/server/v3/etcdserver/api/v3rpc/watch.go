@@ -305,12 +305,7 @@ func (sws *serverWatchStream) recvLoop() error {
 
 			filters := FiltersFromRequest(creq)
 
-			wsrev := sws.watchStream.Rev()
-			rev := creq.StartRevision
-			if rev == 0 {
-				rev = wsrev + 1
-			}
-			id, err := sws.watchStream.Watch(mvcc.WatchID(creq.WatchId), creq.Key, creq.RangeEnd, rev, filters...)
+			id, err := sws.watchStream.Watch(mvcc.WatchID(creq.WatchId), creq.Key, creq.RangeEnd, creq.StartRevision, filters...)
 			if err == nil {
 				sws.mu.Lock()
 				if creq.ProgressNotify {
@@ -328,7 +323,7 @@ func (sws *serverWatchStream) recvLoop() error {
 			}
 
 			wr := &pb.WatchResponse{
-				Header:   sws.newResponseHeader(wsrev),
+				Header:   sws.newResponseHeader(sws.watchStream.Rev()),
 				WatchId:  int64(id),
 				Created:  true,
 				Canceled: err != nil,

@@ -15,12 +15,14 @@
 package mvcc
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
 	"go.etcd.io/etcd/api/v3/mvccpb"
+	"go.etcd.io/etcd/client/pkg/v3/verify"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/pkg/v3/traceutil"
 	"go.etcd.io/etcd/server/v3/lease"
@@ -37,6 +39,9 @@ var (
 
 	// maxWatchersPerSync is the number of watchers to sync in a single batch
 	maxWatchersPerSync = 512
+
+	// maxResyncPeriod is the period of executing resync.
+	watchResyncPeriod = 100 * time.Millisecond
 )
 
 func ChanBufLen() int { return chanBufLen }
@@ -122,12 +127,13 @@ func (s *watchableStore) NewWatchStream() WatchStream {
 
 func (s *watchableStore) watch(key, end []byte, startRev int64, id WatchID, ch chan<- WatchResponse, fcs ...FilterFunc) (*watcher, cancelFunc) {
 	wa := &watcher{
-		key:    key,
-		end:    end,
-		minRev: startRev,
-		id:     id,
-		ch:     ch,
-		fcs:    fcs,
+		key:      key,
+		end:      end,
+		startRev: startRev,
+		minRev:   startRev,
+		id:       id,
+		ch:       ch,
+		fcs:      fcs,
 	}
 
 	s.mu.Lock()
@@ -218,8 +224,7 @@ func (s *watchableStore) Restore(b backend.Backend) error {
 func (s *watchableStore) syncWatchersLoop() {
 	defer s.wg.Done()
 
-	waitDuration := 100 * time.Millisecond
-	delayTicker := time.NewTicker(waitDuration)
+	delayTicker := time.NewTicker(watchResyncPeriod)
 	defer delayTicker.Stop()
 	var evs []mvccpb.Event
 
@@ -235,7 +240,7 @@ func (s *watchableStore) syncWatchersLoop() {
 		}
 		syncDuration := time.Since(st)
 
-		delayTicker.Reset(waitDuration)
+		delayTicker.Reset(watchResyncPeriod)
 		// more work pending?
 		if unsyncedWatchers != 0 && lastUnsyncedWatchers > unsyncedWatchers {
 			// be fair to other store operations by yielding time taken
@@ -367,7 +372,7 @@ func (s *watchableStore) syncWatchers(evs []mvccpb.Event) (int, []mvccpb.Event) 
 			// Next retry of syncWatchers would try to resend the compacted watch response to w.ch
 			continue
 		}
-		w.minRev = curRev + 1
+		w.minRev = max(curRev+1, w.minRev)
 
 		eb, ok := wb[w]
 		if !ok {
@@ -532,9 +537,13 @@ func (s *watchableStore) progressIfSync(watchers map[WatchID]*watcher, responseW
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	rev := s.rev()
 	// Any watcher unsynced?
 	for _, w := range watchers {
 		if _, ok := s.synced.watchers[w]; !ok {
+			return false
+		}
+		if rev < w.startRev {
 			return false
 		}
 	}
@@ -545,7 +554,7 @@ func (s *watchableStore) progressIfSync(watchers map[WatchID]*watcher, responseW
 	// notification will be broadcasted client-side if required
 	// (see dispatchEvent in client/v3/watch.go)
 	for _, w := range watchers {
-		w.send(WatchResponse{WatchID: responseWatchID, Revision: s.rev()})
+		w.send(WatchResponse{WatchID: responseWatchID, Revision: rev})
 		return true
 	}
 	return true
@@ -572,6 +581,7 @@ type watcher struct {
 	// except when the watcher were to be moved from "synced" watcher group
 	restore bool
 
+	startRev int64
 	// minRev is the minimum revision update the watcher will accept
 	minRev int64
 	id     WatchID
@@ -601,6 +611,16 @@ func (w *watcher) send(wr WatchResponse) bool {
 		}
 		wr.Events = ne
 	}
+
+	verify.Verify(func() {
+		if w.startRev > 0 {
+			for _, ev := range wr.Events {
+				if ev.Kv.ModRevision < w.startRev {
+					panic(fmt.Sprintf("Event.ModRevision(%d) is less than the w.startRev(%d) for watchID: %d", ev.Kv.ModRevision, w.startRev, w.id))
+				}
+			}
+		}
+	})
 
 	// if all events are filtered out, we should send nothing.
 	if !progressEvent && len(wr.Events) == 0 {
