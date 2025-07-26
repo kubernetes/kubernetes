@@ -137,7 +137,7 @@ func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.T
 	logger, tCtx := ktesting.NewTestContext(t)
 	manager := topologymanager.NewFakeManager()
 	if hint != nil {
-		manager = topologymanager.NewFakeManagerWithHint(hint)
+		manager = topologymanager.NewFakeManagerWithHint(tCtx, hint)
 	}
 
 	p, err := NewPolicyStatic(tCtx, testCase.machineInfo, testCase.systemReserved, manager)
