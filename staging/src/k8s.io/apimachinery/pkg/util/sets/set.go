@@ -55,6 +55,13 @@ func (s Set[T]) Insert(items ...T) Set[T] {
 	return s
 }
 
+// InsertSet adds items to the set.
+func (s Set[T]) InsertSet(items Set[T]) {
+	for item := range items {
+		s[item] = Empty{}
+	}
+}
+
 func Insert[T comparable](set Set[T], items ...T) Set[T] {
 	return set.Insert(items...)
 }
