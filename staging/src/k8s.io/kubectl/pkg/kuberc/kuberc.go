@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/kubectl/pkg/config"
+	"k8s.io/kubectl/pkg/util/i18n"
 )
 
 const RecommendedKubeRCFileName = "kuberc"
@@ -81,7 +82,9 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 // Apply firstly applies the aliases in the preferences file and secondly overrides
 // the default values of flags.
 func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
-	if len(args) <= 1 {
+	if len(args) <= 1 || (len(args) == 2 && (args[1] == "--help" || args[1] == "-h")) {
+		// Load aliases for help display when kubectl is run without arguments or with help flag
+		p.loadAliasesForHelpDisplay(rootCmd, errOut)
 		return args, nil
 	}
 
@@ -444,4 +447,52 @@ func validate(plugin *config.Preference) error {
 	}
 
 	return nil
+}
+
+// loadAliasesForHelpDisplay loads all aliases from the kuberc file and registers them
+// in the command hierarchy for help display. This is called when kubectl is run without arguments.
+func (p *Preferences) loadAliasesForHelpDisplay(rootCmd *cobra.Command, errOut io.Writer) {
+	kuberc, err := p.getPreferencesFunc("", errOut)
+	if err != nil || kuberc == nil {
+		return
+	}
+
+	// Register aliases in the command
+	for _, alias := range kuberc.Aliases {
+		commands := strings.Fields(alias.Command)
+		_, _, err := rootCmd.Find(commands)
+		if err != nil {
+			continue
+		}
+
+		// Build the full expanded command for display
+		fullCommand := []string{alias.Command}
+		if len(alias.PrependArgs) > 0 {
+			fullCommand = append(fullCommand, alias.PrependArgs...)
+		}
+
+		// Add flags/options to display
+		var flagParts []string
+		for _, option := range alias.Options {
+			flagParts = append(flagParts, fmt.Sprintf("--%s=%s", option.Name, option.Default))
+		}
+		if len(flagParts) > 0 {
+			fullCommand = append(fullCommand, flagParts...)
+		}
+
+		if len(alias.AppendArgs) > 0 {
+			fullCommand = append(fullCommand, alias.AppendArgs...)
+		}
+		fullCommandStr := strings.Join(fullCommand, " ")
+
+		// Create a copy of the existing command with the alias name
+		aliasCmd := &cobra.Command{
+			Use:   alias.Name,
+			Short: fmt.Sprintf(i18n.T("Alias for: %s"), fullCommandStr),
+			// Add a Run function to make it a valid command
+			Run: func(cmd *cobra.Command, args []string) {},
+		}
+
+		rootCmd.AddCommand(aliasCmd)
+	}
 }
