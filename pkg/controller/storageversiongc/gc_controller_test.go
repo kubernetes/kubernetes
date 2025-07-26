@@ -103,7 +103,7 @@ func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *te
 	}
 
 	// add a delay to ensure controller had a chance to reconcile
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	storageVersion, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
 	if err != nil {
