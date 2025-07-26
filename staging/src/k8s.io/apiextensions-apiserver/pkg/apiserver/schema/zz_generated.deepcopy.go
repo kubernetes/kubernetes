@@ -43,6 +43,13 @@ func (in *Extensions) DeepCopyInto(out *Extensions) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.XUnions != nil {
+		in, out := &in.XUnions, &out.XUnions
+		*out = make(v1.Unions, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 

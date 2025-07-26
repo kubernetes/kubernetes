@@ -129,6 +129,11 @@ type Extensions struct {
 	//      Atomic maps will be entirely replaced when updated.
 	// +optional
 	XMapType *string
+
+	// x-kubernetes-unions defines a union of fields.
+	// At most one of the fields must be set.
+	// +optional
+	XUnions apiextensionsv1.Unions
 }
 
 // +k8s:deepcopy-gen=true

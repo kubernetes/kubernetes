@@ -281,6 +281,15 @@ func newExtensions(s *apiextensions.JSONSchemaProps) (*Extensions, error) {
 		ret.XPreserveUnknownFields = true
 	}
 
+	if len(s.XUnions) > 0 {
+		ret.XUnions = make(apiextensionsv1.Unions, len(s.XUnions))
+		for i := range s.XUnions {
+			if err := apiextensionsv1.Convert_apiextensions_Union_To_v1_Union(&s.XUnions[i], &ret.XUnions[i], nil); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return ret, nil
 }
 

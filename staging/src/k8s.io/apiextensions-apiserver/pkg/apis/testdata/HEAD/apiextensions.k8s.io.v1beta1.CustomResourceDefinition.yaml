@@ -130,6 +130,11 @@ spec:
       x-kubernetes-list-type: x-kubernetes-list-typeValue
       x-kubernetes-map-type: x-kubernetes-map-typeValue
       x-kubernetes-preserve-unknown-fields: true
+      x-kubernetes-unions:
+      - discriminator: discriminatorValue
+        members:
+        - discriminatorValue: discriminatorValueValue
+          fieldName: fieldNameValue
       x-kubernetes-validations:
       - fieldPath: fieldPathValue
         message: messageValue
@@ -207,6 +212,11 @@ spec:
         x-kubernetes-list-type: x-kubernetes-list-typeValue
         x-kubernetes-map-type: x-kubernetes-map-typeValue
         x-kubernetes-preserve-unknown-fields: true
+        x-kubernetes-unions:
+        - discriminator: discriminatorValue
+          members:
+          - discriminatorValue: discriminatorValueValue
+            fieldName: fieldNameValue
         x-kubernetes-validations:
         - fieldPath: fieldPathValue
           message: messageValue
