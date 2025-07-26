@@ -160,6 +160,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.PublicAddress = s.AdvertiseAddress
 	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
 	c.ShutdownWatchTerminationGracePeriod = s.ShutdownWatchTerminationGracePeriod
+	fmt.Println("JTL ServerRunOptions set EffectiveVersion")
 	c.EffectiveVersion = s.ComponentGlobalsRegistry.EffectiveVersionFor(s.ComponentName)
 	c.FeatureGate = s.ComponentGlobalsRegistry.FeatureGateFor(s.ComponentName)
 	c.EmulationForwardCompatible = s.EmulationForwardCompatible

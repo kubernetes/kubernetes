@@ -138,7 +138,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		return nil, fmt.Errorf("unexpected error while constructing resource list from fake discovery client: %v", err)
 	}
 	restMapper := restmapper.NewDiscoveryRESTMapper(restMapperRes)
-	genericPluginInitializer := initializer.New(nil, nil, nil, fakeAuthorizer{}, nil, nil, restMapper)
+	genericPluginInitializer := initializer.New(nil, nil, nil, fakeAuthorizer{}, nil, nil, nil, restMapper)
 	pluginInitializer := controlplaneadmission.NewPluginInitializer(nil, nil)
 	initializersChain := apiserveradmission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)

@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
@@ -30,6 +31,7 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/informers"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/compatibility"
 )
 
 // AdmissionOptions holds the admission options.
@@ -116,6 +118,7 @@ func (a *AdmissionOptions) ApplyTo(
 	kubeClient kubernetes.Interface,
 	dynamicClient dynamic.Interface,
 	features featuregate.FeatureGate,
+	effectiveVersion compatibility.EffectiveVersion,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
 	if a == nil {
@@ -127,7 +130,7 @@ func (a *AdmissionOptions) ApplyTo(
 		a.GenericAdmission.EnablePlugins, a.GenericAdmission.DisablePlugins = computePluginNames(a.PluginNames, a.GenericAdmission.RecommendedPluginOrder)
 	}
 
-	return a.GenericAdmission.ApplyTo(c, informers, kubeClient, dynamicClient, features, pluginInitializers...)
+	return a.GenericAdmission.ApplyTo(c, informers, kubeClient, dynamicClient, features, effectiveVersion, pluginInitializers...)
 }
 
 // explicitly disable all plugins that are not in the enabled list

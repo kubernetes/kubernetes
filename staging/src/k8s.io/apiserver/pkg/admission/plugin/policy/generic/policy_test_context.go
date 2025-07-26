@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/util/compatibility"
 )
 
 // Logger allows t.Testing and b.Testing to be passed to PolicyTestContext
@@ -203,6 +204,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	plugin.SetEnabled(true)
 
 	featureGate := featuregate.NewFeatureGate()
+	effectiveVersion := compatibility.DefaultBuildEffectiveVersion()
 	testContext, testCancel := context.WithCancel(context.Background())
 	genericInitializer := initializer.New(
 		nativeClient,
@@ -210,6 +212,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 		fakeInformerFactory,
 		fakeAuthorizer{},
 		featureGate,
+		effectiveVersion,
 		testContext.Done(),
 		fakeRestMapper,
 	)
