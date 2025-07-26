@@ -72,6 +72,7 @@ allowed_prometheus_importers=(
   ./test/e2e/apimachinery/flowcontrol.go
   ./test/e2e_node/mirror_pod_grace_period_test.go
   ./test/e2e/node/pods.go
+  ./test/e2e_node/metrics_api_test.go
   ./test/e2e_node/resource_metrics_test.go
   ./test/instrumentation/main_test.go
   ./test/integration/apiserver/flowcontrol/concurrency_test.go
