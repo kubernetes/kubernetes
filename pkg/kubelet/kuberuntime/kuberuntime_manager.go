@@ -1147,7 +1147,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		var reason containerKillReason
 		restart := shouldRestartOnFailure(pod)
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-			restart = kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus)
+			if container.RestartPolicy != nil {
+				restart = *container.RestartPolicy != v1.ContainerRestartPolicyNever
+			}
 		}
 		if _, _, changed := containerChanged(&container, containerStatus); changed {
 			message = fmt.Sprintf("Container %s definition changed", container.Name)

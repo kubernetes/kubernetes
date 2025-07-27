@@ -2110,6 +2110,11 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 }
 
 func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
+	// Make sure existing test cases pass with feature enabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
+	TestComputePodActions(t)
+	TestComputePodActionsWithInitContainers(t)
+
 	var (
 		containerRestartPolicyAlways    = v1.ContainerRestartPolicyAlways
 		containerRestartPolicyOnFailure = v1.ContainerRestartPolicyOnFailure
@@ -2231,7 +2236,6 @@ func TestComputePodActionsWithContainerRestartRules(t *testing.T) {
 			},
 		},
 	} {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerRestartRules, true)
 		pod, status := makeBasePodAndStatus()
 		if test.mutatePodFn != nil {
 			test.mutatePodFn(pod)
