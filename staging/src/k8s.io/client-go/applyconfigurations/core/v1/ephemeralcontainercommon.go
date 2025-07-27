@@ -36,7 +36,6 @@ type EphemeralContainerCommonApplyConfiguration struct {
 	Resources                *ResourceRequirementsApplyConfiguration   `json:"resources,omitempty"`
 	ResizePolicy             []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
 	RestartPolicy            *corev1.ContainerRestartPolicy            `json:"restartPolicy,omitempty"`
-	RestartPolicyRules       []ContainerRestartRuleApplyConfiguration  `json:"restartPolicyRules,omitempty"`
 	VolumeMounts             []VolumeMountApplyConfiguration           `json:"volumeMounts,omitempty"`
 	VolumeDevices            []VolumeDeviceApplyConfiguration          `json:"volumeDevices,omitempty"`
 	LivenessProbe            *ProbeApplyConfiguration                  `json:"livenessProbe,omitempty"`
@@ -167,19 +166,6 @@ func (b *EphemeralContainerCommonApplyConfiguration) WithResizePolicy(values ...
 // If called multiple times, the RestartPolicy field is set to the value of the last call.
 func (b *EphemeralContainerCommonApplyConfiguration) WithRestartPolicy(value corev1.ContainerRestartPolicy) *EphemeralContainerCommonApplyConfiguration {
 	b.RestartPolicy = &value
-	return b
-}
-
-// WithRestartPolicyRules adds the given value to the RestartPolicyRules field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the RestartPolicyRules field.
-func (b *EphemeralContainerCommonApplyConfiguration) WithRestartPolicyRules(values ...*ContainerRestartRuleApplyConfiguration) *EphemeralContainerCommonApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithRestartPolicyRules")
-		}
-		b.RestartPolicyRules = append(b.RestartPolicyRules, *values[i])
-	}
 	return b
 }
 

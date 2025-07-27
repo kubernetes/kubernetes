@@ -136,13 +136,6 @@ const (
 	// Enables container Checkpoint support in the kubelet
 	ContainerCheckpoint featuregate.Feature = "ContainerCheckpoint"
 
-	// onwer: @yuanwang04
-	// kep: https://kep.k8s.io/5307
-	//
-	// Supports container restart policy and container restart policy rules to override the pod restart policy.
-	// Enable a single container to restart even if the pod has restart policy "Never".
-	ContainerRestartRules featuregate.Feature = "ContainerRestartRules"
-
 	// owner: @sreeram-venkitesh
 	//
 	// Enables configuring custom stop signals for containers from container lifecycle
@@ -1141,10 +1134,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ContainerCheckpoint: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	ContainerRestartRules: {
-		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	ContainerStopSignals: {
