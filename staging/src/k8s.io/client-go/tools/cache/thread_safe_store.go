@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sync"
 
+	iradix "github.com/hashicorp/go-immutable-radix"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -374,12 +375,21 @@ func (c *threadSafeMap) Resync() error {
 }
 
 // NewThreadSafeStore creates a new instance of ThreadSafeStore.
-func NewThreadSafeStore(indexers Indexers, indices Indices) ThreadSafeStore {
-	return &threadSafeMap{
-		items: map[string]interface{}{},
-		index: &storeIndex{
-			indexers: indexers,
-			indices:  indices,
-		},
+func NewThreadSafeStore(indexers Indexers, _ Indices) ThreadSafeStore {
+	if indexers == nil {
+		indexers = make(Indexers)
 	}
+	s := &threadSafeMVCCStore{
+		indexers: indexers,
+	}
+	snapshot := &mvccStoreSnapshot{
+		data:    iradix.New(),
+		indexes: make(map[string]*iradix.Tree, len(indexers)),
+	}
+	for indexer := range indexers {
+		snapshot.indexes[indexer] = iradix.New()
+	}
+	s.snapshot.Store(snapshot)
+
+	return s
 }
