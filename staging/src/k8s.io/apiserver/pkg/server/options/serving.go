@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -78,6 +79,16 @@ type SecureServingOptions struct {
 
 	// PermitAddressSharing controls if SO_REUSEADDR is used when binding the port.
 	PermitAddressSharing bool
+
+	// ReadIdleTimeout is the timeout after which a health check using a ping
+	// frame will be carried out if no frame is received on the connection.
+	// If zero, no health check is performed.
+	HTTP2ReadIdleTimeout time.Duration
+
+	// PingTimeout is the timeout after which the connection will be closed
+	// if a response to a ping is not received.
+	// If zero, a default of 15 seconds is used.
+	HTTP2PingTimeout time.Duration
 }
 
 type CertKey struct {
@@ -218,6 +229,15 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"If true, SO_REUSEADDR will be used when binding the port. This allows binding "+
 			"to wildcard IPs like 0.0.0.0 and specific IPs in parallel, and it avoids waiting "+
 			"for the kernel to release sockets in TIME_WAIT state. [default=false]")
+
+	fs.DurationVar(&s.HTTP2ReadIdleTimeout, "http2-read-idle-timeout", s.HTTP2ReadIdleTimeout,
+		"The duration that server waits until server sends PING frame to client."+
+			"Zero means to use golang's default.")
+
+	fs.DurationVar(&s.HTTP2PingTimeout, "http2-ping-timeout", s.HTTP2PingTimeout,
+		"The duration to wait for sent PING request's response from server to client."+
+			"After the duration, if no response received connection will be closed."+
+			"Zero means to use golang's default, has no effect without --http2-read-idle-timeout")
 }
 
 // ApplyTo fills up serving information in the server configuration.
@@ -262,7 +282,10 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 		Listener:                     s.Listener,
 		HTTP2MaxStreamsPerConnection: s.HTTP2MaxStreamsPerConnection,
 		DisableHTTP2:                 s.DisableHTTP2Serving,
+		HTTP2ReadIdleTimeout:         s.HTTP2ReadIdleTimeout,
+		HTTP2PingTimeout:             s.HTTP2PingTimeout,
 	}
+
 	c := *config
 
 	serverCertFile, serverKeyFile := s.ServerCert.CertKey.CertFile, s.ServerCert.CertKey.KeyFile
