@@ -45,6 +45,16 @@ func IsDataConsistencyDetectionForWatchListEnabled() bool {
 	return dataConsistencyDetectionForWatchListEnabled
 }
 
+// SetDataConsistencyDetectionForWatchListEnabledForTest allows to enable/disable data consistency detection for testing purposes.
+// It returns a function that restores the original value.
+func SetDataConsistencyDetectionForWatchListEnabledForTest(enabled bool) func() {
+	original := dataConsistencyDetectionForWatchListEnabled
+	dataConsistencyDetectionForWatchListEnabled = enabled
+	return func() {
+		dataConsistencyDetectionForWatchListEnabled = original
+	}
+}
+
 type RetrieveItemsFunc[U any] func() []U
 
 type ListFunc[T runtime.Object] func(ctx context.Context, options metav1.ListOptions) (T, error)
