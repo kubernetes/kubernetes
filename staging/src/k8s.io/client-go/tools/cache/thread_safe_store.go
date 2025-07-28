@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	iradix "github.com/hashicorp/go-immutable-radix"
+	iradix "github.com/alvaroaleman/iradix-go"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -383,11 +383,11 @@ func NewThreadSafeStore(indexers Indexers, _ Indices) ThreadSafeStore {
 		indexers: indexers,
 	}
 	snapshot := &mvccStoreSnapshot{
-		data:    iradix.New(),
-		indexes: make(map[string]*iradix.Tree, len(indexers)),
+		data:    iradix.New[any](),
+		indexes: make(map[string]*iradix.Iradix[[]string], len(indexers)),
 	}
 	for indexer := range indexers {
-		snapshot.indexes[indexer] = iradix.New()
+		snapshot.indexes[indexer] = iradix.New[[]string]()
 	}
 	s.snapshot.Store(snapshot)
 

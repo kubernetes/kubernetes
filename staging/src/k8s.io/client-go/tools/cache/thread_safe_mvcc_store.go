@@ -22,7 +22,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	iradix "github.com/hashicorp/go-immutable-radix"
+	iradix "github.com/alvaroaleman/iradix-go"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -39,8 +39,8 @@ type threadSafeMVCCStore struct {
 }
 
 type mvccStoreSnapshot struct {
-	data    *iradix.Tree
-	indexes map[string]*iradix.Tree
+	data    *iradix.Iradix[any]
+	indexes map[string]*iradix.Iradix[[]string]
 }
 
 func (s *threadSafeMVCCStore) Add(key string, obj any) {
@@ -52,9 +52,7 @@ func (s *threadSafeMVCCStore) Update(key string, obj any) {
 	defer s.updateLock.Unlock()
 
 	snap := s.snapshot.Load()
-	txn := snap.data.Txn()
-	previous, _ := txn.Insert([]byte(key), obj)
-	newData := txn.Commit()
+	previous, _, newData := snap.data.Insert([]byte(key), obj)
 	newIndexes := s.updateIndexesLocked(snap.indexes, key, previous, obj)
 
 	s.snapshot.Store(&mvccStoreSnapshot{
@@ -68,9 +66,7 @@ func (s *threadSafeMVCCStore) Delete(key string) {
 	defer s.updateLock.Unlock()
 
 	snap := s.snapshot.Load()
-	txn := snap.data.Txn()
-	previous, _ := txn.Delete([]byte(key))
-	newData := txn.Commit()
+	previous, _, newData := snap.data.Delete([]byte(key))
 	newIndexes := s.updateIndexesLocked(snap.indexes, key, previous, nil)
 
 	s.snapshot.Store(&mvccStoreSnapshot{
@@ -91,10 +87,9 @@ func (s *threadSafeMVCCStore) Get(key string) (any, bool) {
 func (s *threadSafeMVCCStore) List() []any {
 	snap := s.snapshot.Load()
 	result := make([]any, 0, snap.data.Len())
-	snap.data.Root().Walk(func(_ []byte, v interface{}) bool {
+	for _, v := range snap.data.Iterate() {
 		result = append(result, v)
-		return false
-	})
+	}
 
 	return result
 }
@@ -102,10 +97,9 @@ func (s *threadSafeMVCCStore) List() []any {
 func (s *threadSafeMVCCStore) ListKeys() []string {
 	snap := s.snapshot.Load()
 	result := make([]string, 0, snap.data.Len())
-	snap.data.Root().Walk(func(k []byte, _ interface{}) bool {
+	for k := range snap.data.Iterate() {
 		result = append(result, string(k))
-		return false
-	})
+	}
 	return result
 }
 
@@ -113,13 +107,11 @@ func (s *threadSafeMVCCStore) Replace(items map[string]interface{}, resourceVers
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
 
-	snap := &mvccStoreSnapshot{data: iradix.New()}
-	dataTxn := snap.data.Txn()
+	snap := &mvccStoreSnapshot{data: iradix.New[any]()}
 	for k, v := range items {
-		dataTxn.Insert([]byte(k), v)
+		_, _, snap.data = snap.data.Insert([]byte(k), v)
 		snap.indexes = s.updateIndexesLocked(snap.indexes, k, nil, v)
 	}
-	snap.data = dataTxn.Commit()
 
 	s.snapshot.Store(snap)
 }
@@ -146,7 +138,7 @@ func (s *threadSafeMVCCStore) Index(indexName string, obj interface{}) ([]interf
 	for _, indexedValue := range indexedValues {
 		val, exists := snap.indexes[indexName].Get([]byte(indexedValue))
 		if exists {
-			storeKeySet.Insert(val.([]string)...)
+			storeKeySet.Insert(val...)
 		}
 	}
 
@@ -168,7 +160,7 @@ func (s *threadSafeMVCCStore) IndexKeys(indexName, indexedValue string) ([]strin
 
 	vals, exist := index.Get([]byte(indexedValue))
 	if exist {
-		return vals.([]string), nil
+		return vals, nil
 	}
 
 	return nil, nil
@@ -183,10 +175,9 @@ func (s *threadSafeMVCCStore) ListIndexFuncValues(indexName string) []string {
 	}
 
 	names := make([]string, 0, index.Len())
-	index.Root().Walk(func(k []byte, _ interface{}) bool {
+	for k := range index.Iterate() {
 		names = append(names, string(k))
-		return false
-	})
+	}
 
 	return names
 }
@@ -198,12 +189,10 @@ func (s *threadSafeMVCCStore) ByIndex(indexName, indexedValue string) ([]any, er
 		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
 	}
 
-	keysRaw, hasKeys := index.Get([]byte(indexedValue))
+	keys, hasKeys := index.Get([]byte(indexedValue))
 	if !hasKeys {
 		return nil, nil
 	}
-
-	keys := keysRaw.([]string)
 
 	result := make([]any, 0, len(keys))
 	for _, key := range keys {
@@ -233,14 +222,13 @@ func (s *threadSafeMVCCStore) AddIndexers(newIndexers Indexers) error {
 	}
 
 	snap := s.snapshot.Load()
-	newIndixes := make(map[string]*iradix.Tree, len(newIndexers)+len(snap.indexes))
+	newIndixes := make(map[string]*iradix.Iradix[[]string], len(newIndexers)+len(snap.indexes))
 	for name, indexFunc := range newIndexers {
 		s.indexers[name] = indexFunc
-		index := iradix.New()
-		snap.data.Root().Walk(func(key []byte, v interface{}) bool {
+		index := iradix.New[[]string]()
+		for key, v := range snap.data.Iterate() {
 			index = s.updateIndexLocked(name, index, string(key), nil, v)
-			return false
-		})
+		}
 		newIndixes[name] = index
 	}
 
@@ -258,12 +246,12 @@ func (s *threadSafeMVCCStore) AddIndexers(newIndexers Indexers) error {
 
 func (s *threadSafeMVCCStore) Resync() error { return nil }
 
-func (s *threadSafeMVCCStore) updateIndexesLocked(current map[string]*iradix.Tree, key string, oldObj, newObj any) map[string]*iradix.Tree {
-	result := make(map[string]*iradix.Tree, len(s.indexers))
+func (s *threadSafeMVCCStore) updateIndexesLocked(current map[string]*iradix.Iradix[[]string], key string, oldObj, newObj any) map[string]*iradix.Iradix[[]string] {
+	result := make(map[string]*iradix.Iradix[[]string], len(s.indexers))
 	for name := range s.indexers {
 		current := current[name]
 		if current == nil {
-			current = iradix.New()
+			current = iradix.New[[]string]()
 		}
 		result[name] = s.updateIndexLocked(name, current, key, oldObj, newObj)
 	}
@@ -271,7 +259,7 @@ func (s *threadSafeMVCCStore) updateIndexesLocked(current map[string]*iradix.Tre
 	return result
 }
 
-func (s *threadSafeMVCCStore) updateIndexLocked(name string, current *iradix.Tree, key string, oldObj, newObj any) *iradix.Tree {
+func (s *threadSafeMVCCStore) updateIndexLocked(name string, current *iradix.Iradix[[]string], key string, oldObj, newObj any) *iradix.Iradix[[]string] {
 	indexFunc, ok := s.indexers[name]
 	if !ok {
 		// Should never happen. Caller is responsible for ensuring this exists, and should call with lock
@@ -299,12 +287,11 @@ func (s *threadSafeMVCCStore) updateIndexLocked(name string, current *iradix.Tre
 		return current
 	}
 
-	txn := current.Txn()
+	result := current
 	for oldIndexVal := range oldValuesSet.Difference(newValuesSet) {
-		idxRaw, _ := txn.Get([]byte(oldIndexVal))
-		idx := idxRaw.([]string)
+		idx, _ := result.Get([]byte(oldIndexVal))
 		if len(idx) == 1 {
-			txn.Delete([]byte(oldIndexVal))
+			_, _, result = result.Delete([]byte(oldIndexVal))
 			continue
 		}
 		newIdx := make([]string, 0, len(idx)-1)
@@ -313,20 +300,20 @@ func (s *threadSafeMVCCStore) updateIndexLocked(name string, current *iradix.Tre
 				newIdx = append(newIdx, v)
 			}
 		}
-		txn.Insert([]byte(oldIndexVal), newIdx)
+		_, _, result = result.Insert([]byte(oldIndexVal), newIdx)
 	}
 	for newIndexVal := range newValuesSet.Difference(oldValuesSet) {
-		idxRaw, exists := txn.Get([]byte(newIndexVal))
+		idx, exists := result.Get([]byte(newIndexVal))
 		if !exists {
-			idx := make([]string, 1)
-			idx[0] = key
-			idxRaw = idx
+			newIdx := make([]string, 1)
+			newIdx[0] = key
+			idx = newIdx
 		} else {
-			pos, _ := slices.BinarySearch(idxRaw.([]string), key)
-			idxRaw = slices.Insert(slices.Clone(idxRaw.([]string)), pos, key)
+			pos, _ := slices.BinarySearch(idx, key)
+			idx = slices.Insert(slices.Clone(idx), pos, key)
 		}
-		txn.Insert([]byte(newIndexVal), idxRaw)
+		_, _, result = result.Insert([]byte(newIndexVal), idx)
 	}
 
-	return txn.Commit()
+	return result
 }
