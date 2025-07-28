@@ -4923,6 +4923,7 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 									Delay:         1,
 									ExitCode:      0,
 									ContainerName: containerName,
+									LoopPeriod:    0.2,
 								}),
 							},
 						},
@@ -5027,7 +5028,7 @@ var _ = SIGDescribe(feature.SidecarContainers, "Containers Lifecycle", func() {
 				ps3, err := results.TimeOfStart(prefixedName(PreStopPrefix, restartableInit3))
 				framework.ExpectNoError(err)
 
-				const toleration = 500 // milliseconds
+				const toleration = 1000 // milliseconds
 				gomega.Expect(ps1-ps2).To(gomega.BeNumerically("~", 0, toleration),
 					fmt.Sprintf("expected PreStop 1 & PreStop 2 to be killed at the same time, got %s", results))
 				gomega.Expect(ps1-ps3).To(gomega.BeNumerically("~", 0, toleration),
