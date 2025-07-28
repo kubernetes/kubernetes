@@ -25,6 +25,7 @@ import (
 	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/util/rand"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type namedAccessor struct {
@@ -72,7 +73,8 @@ func directRecordReadFunc(expectHit bool) benchmarkedCheckFunc {
 
 func mustAttemptPullReadFunc(expectHit bool) benchmarkedCheckFunc {
 	return func(b *testing.B, pullManager PullManager, imgRef string) {
-		mustPull := pullManager.MustAttemptImagePull("test.repo/org/"+imgRef, imgRef, nil, nil)
+		tCtx := ktesting.Init(b)
+		mustPull := pullManager.MustAttemptImagePull(tCtx, "test.repo/org/"+imgRef, imgRef, nil, nil)
 		if mustPull != !expectHit {
 			b.Fatalf("MustAttemptImagePull() expected %t, got %t", !expectHit, mustPull)
 		}
@@ -93,7 +95,9 @@ func BenchmarkPullManagerWriteImagePullIntent(b *testing.B) {
 
 func BenchmarkPullManagerWriteIfNotChanged(b *testing.B) {
 	benchmarkAllPullAccessorsWrite(b, func(b *testing.B, pullManager PullManager, imgRef string) {
+		tCtx := ktesting.Init(b)
 		if err := pullManager.writePulledRecordIfChanged(
+			tCtx,
 			"test.repo/org/"+imgRef,
 			imgRef,
 			&kubeletconfig.ImagePullCredentials{NodePodsAccessible: true},
