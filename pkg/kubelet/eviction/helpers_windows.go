@@ -26,15 +26,15 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
-func makeMemoryAvailableSignalObservation(summary *statsapi.Summary) *signalObservation {
-	klog.V(4).InfoS("Eviction manager: building memory signal observations for windows")
+func makeMemoryAvailableSignalObservation(logger klog.Logger, summary *statsapi.Summary) *signalObservation {
+	logger.V(4).Info("Eviction manager: building memory signal observations for windows")
 	sysContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerWindowsGlobalCommitMemory)
 	if err != nil {
-		klog.ErrorS(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalMemoryAvailable)
+		logger.Error(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalMemoryAvailable)
 		return nil
 	}
 	if memory := sysContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.UsageBytes != nil {
-		klog.V(4).InfoS(
+		logger.V(4).Info(
 			"Eviction manager: memory signal observations for windows",
 			"Available", *memory.AvailableBytes,
 			"Usage", *memory.UsageBytes)
