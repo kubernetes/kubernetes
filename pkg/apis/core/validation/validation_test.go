@@ -25538,6 +25538,7 @@ func TestValidateHostUsers(t *testing.T) {
 		name    string
 		success bool
 		spec    *core.PodSpec
+		opts    PodValidationOptions
 	}{{
 		name:    "empty",
 		success: true,
@@ -25617,7 +25618,7 @@ func TestValidateHostUsers(t *testing.T) {
 			}},
 		},
 	}, {
-		name:    "hostUsers=true - unsupported volume",
+		name:    "hostUsers=true - stateful volume",
 		success: true,
 		spec: &core.PodSpec{
 			SecurityContext: &core.PodSecurityContext{
@@ -25657,6 +25658,107 @@ func TestValidateHostUsers(t *testing.T) {
 				HostIPC:   true,
 			},
 		},
+	}, {
+		name:    "hostUsers=false & container volumeDevice",
+		success: false,
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				HostUsers: &falseVar,
+			},
+			Containers: []core.Container{{
+				Name: "test-container",
+				VolumeDevices: []core.VolumeDevice{{
+					Name:       "test-volume",
+					DevicePath: "/dev/test-device",
+				}},
+			}},
+		},
+	}, {
+		name:    "hostUsers=false & initContainer volumeDevice",
+		success: false,
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				HostUsers: &falseVar,
+			},
+			InitContainers: []core.Container{{
+				Name: "test-container",
+				VolumeDevices: []core.VolumeDevice{{
+					Name:       "test-volume",
+					DevicePath: "/dev/test-device",
+				}},
+			}},
+		},
+	}, {
+		name:    "hostUsers=false & ephemeralContainer volumeDevice",
+		success: false,
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				HostUsers: &falseVar,
+			},
+			EphemeralContainers: []core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name: "test-container",
+					VolumeDevices: []core.VolumeDevice{{
+						Name:       "test-volume",
+						DevicePath: "/dev/test-device",
+					}}},
+			}},
+		},
+	}, {
+		name:    "opts: Allow... & hostUsers=false & container volumeDevice",
+		success: true,
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				HostUsers: &falseVar,
+			},
+			Containers: []core.Container{{
+				Name: "test-container",
+				VolumeDevices: []core.VolumeDevice{{
+					Name:       "test-volume",
+					DevicePath: "/dev/test-device",
+				}},
+			}},
+		},
+		opts: PodValidationOptions{
+			AllowUserNamespacesWithVolumeDevices: true,
+		},
+	}, {
+		name:    "opts: Allow... & hostUsers=false & initContainer volumeDevice",
+		success: true,
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				HostUsers: &falseVar,
+			},
+			InitContainers: []core.Container{{
+				Name: "test-container",
+				VolumeDevices: []core.VolumeDevice{{
+					Name:       "test-volume",
+					DevicePath: "/dev/test-device",
+				}},
+			}},
+		},
+		opts: PodValidationOptions{
+			AllowUserNamespacesWithVolumeDevices: true,
+		},
+	}, {
+		name:    "opts: Allow... & hostUsers=false & ephemeralContainer volumeDevice",
+		success: true,
+		spec: &core.PodSpec{
+			SecurityContext: &core.PodSecurityContext{
+				HostUsers: &falseVar,
+			},
+			EphemeralContainers: []core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name: "test-container",
+					VolumeDevices: []core.VolumeDevice{{
+						Name:       "test-volume",
+						DevicePath: "/dev/test-device",
+					}}},
+			}},
+		},
+		opts: PodValidationOptions{
+			AllowUserNamespacesWithVolumeDevices: true,
+		},
 	},
 	}
 
@@ -25664,7 +25766,7 @@ func TestValidateHostUsers(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fPath := field.NewPath("spec")
 
-			allErrs := validateHostUsers(tc.spec, fPath)
+			allErrs := validateHostUsers(tc.spec, fPath, tc.opts)
 			if !tc.success && len(allErrs) == 0 {
 				t.Errorf("Unexpected success")
 			}
