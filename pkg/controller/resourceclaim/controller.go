@@ -69,6 +69,13 @@ const (
 	fieldManager = "ResourceClaimController"
 
 	maxUIDCacheEntries = 500
+
+	// maxRetries is the number of times a ResourceClaim will be retried before it is dropped out of the queue.
+	// With the current rate-limiter in use (5ms*2^(maxRetries-1)) the following numbers represent the times
+	// a ResourceClaim is going to be requeued:
+	//
+	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
+	maxRetries = 15
 )
 
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
@@ -432,9 +439,14 @@ func (ec *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	runtime.HandleError(fmt.Errorf("%v failed with: %v", key, err))
-	ec.queue.AddRateLimited(key)
+	if ec.queue.NumRequeues(key) < maxRetries {
+		runtime.HandleError(fmt.Errorf("%v failed with: %w", key, err))
+		ec.queue.AddRateLimited(key)
+		return true
+	}
 
+	runtime.HandleError(fmt.Errorf("dropping key %v out of queue after %d retries: %w", key, maxRetries, err))
+	ec.queue.Forget(key)
 	return true
 }
 
