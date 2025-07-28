@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/api_calls"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -128,6 +129,10 @@ type SchedulingQueue interface {
 	// Run starts the goroutines managing the queue.
 	Run(logger klog.Logger)
 
+	// PatchPodStatus handles the pod status update by sending an update API call through API dispatcher.
+	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+	PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) (<-chan error, error)
+
 	// The following functions are supposed to be used only for testing or debugging.
 	GetPod(name, namespace string) (*framework.QueuedPodInfo, bool)
 	PendingPods() ([]*v1.Pod, string)
@@ -193,6 +198,10 @@ type PriorityQueue struct {
 	// pluginMetricsSamplePercent is the percentage of plugin metrics to be sampled.
 	pluginMetricsSamplePercent int
 
+	// apiDispatcher is used for the methods that are expected to send API calls.
+	// It's non-nil only if the SchedulerAsyncAPICalls feature gate is enabled.
+	apiDispatcher fwk.APIDispatcher
+
 	// isSchedulingQueueHintEnabled indicates whether the feature gate for the scheduling queue is enabled.
 	isSchedulingQueueHintEnabled bool
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
@@ -224,6 +233,7 @@ type priorityQueueOptions struct {
 	pluginMetricsSamplePercent        int
 	preEnqueuePluginMap               map[string]map[string]framework.PreEnqueuePlugin
 	queueingHintMap                   QueueingHintMapPerProfile
+	apiDispatcher                     fwk.APIDispatcher
 }
 
 // Option configures a PriorityQueue
@@ -298,6 +308,13 @@ func WithPluginMetricsSamplePercent(percent int) Option {
 	}
 }
 
+// WithAPIDispatcher sets the API dispatcher.
+func WithAPIDispatcher(apiDispatcher fwk.APIDispatcher) Option {
+	return func(o *priorityQueueOptions) {
+		o.apiDispatcher = apiDispatcher
+	}
+}
+
 var defaultPriorityQueueOptions = priorityQueueOptions{
 	clock:                             clock.RealClock{},
 	podInitialBackoffDuration:         DefaultPodInitialBackoffDuration,
@@ -349,6 +366,7 @@ func NewPriorityQueue(
 		metricsRecorder:                   options.metricsRecorder,
 		pluginMetricsSamplePercent:        options.pluginMetricsSamplePercent,
 		moveRequestCycle:                  -1,
+		apiDispatcher:                     options.apiDispatcher,
 		isSchedulingQueueHintEnabled:      isSchedulingQueueHintEnabled,
 		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
 	}
@@ -1305,6 +1323,20 @@ func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 		result = append(result, pInfo.Pod)
 	}
 	return result, fmt.Sprintf(pendingPodsSummary, activeQLen, backoffQLen, len(p.unschedulablePods.podInfoMap))
+}
+
+// PatchPodStatus handles the pod status update by sending an update API call through API dispatcher.
+// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
+func (p *PriorityQueue) PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) (<-chan error, error) {
+	// Don't store anything in the cache. This might be extended in the next releases.
+	onFinish := make(chan error, 1)
+	err := p.apiDispatcher.Add(apicalls.Implementations.PodStatusPatch(pod, condition, nominatingInfo), fwk.APICallOptions{
+		OnFinish: onFinish,
+	})
+	if fwk.IsUnexpectedError(err) {
+		return onFinish, err
+	}
+	return onFinish, nil
 }
 
 // Note: this function assumes the caller locks both p.lock.RLock and p.activeQ.getLock().RLock.
