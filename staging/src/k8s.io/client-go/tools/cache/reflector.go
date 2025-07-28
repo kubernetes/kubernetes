@@ -79,7 +79,7 @@ type ReflectorStore interface {
 // TransformingStore is an optional interface that can be implemented by the provided store.
 // If implemented on the provided store reflector will use the same transformer in its internal stores.
 type TransformingStore interface {
-	Store
+	ReflectorStore
 	Transformer() TransformFunc
 }
 

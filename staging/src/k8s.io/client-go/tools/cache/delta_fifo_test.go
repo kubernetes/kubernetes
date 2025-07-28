@@ -28,7 +28,7 @@ import (
 // from the most recent Delta.
 // You should treat the items returned inside the deltas as immutable.
 // This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
-func (f *DeltaFIFO) List() []interface{} {
+func (f *DeltaFIFO) list() []interface{} {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	return f.listLocked()
@@ -46,7 +46,7 @@ func (f *DeltaFIFO) listLocked() []interface{} {
 // ListKeys returns a list of all the keys of the objects currently
 // in the FIFO.
 // This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
-func (f *DeltaFIFO) ListKeys() []string {
+func (f *DeltaFIFO) listKeys() []string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	list := make([]string, 0, len(f.queue))
@@ -60,19 +60,19 @@ func (f *DeltaFIFO) ListKeys() []string {
 // or sets exists=false.
 // You should treat the items returned inside the deltas as immutable.
 // This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
-func (f *DeltaFIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
+func (f *DeltaFIFO) get(obj interface{}) (item interface{}, exists bool, err error) {
 	key, err := f.KeyOf(obj)
 	if err != nil {
 		return nil, false, KeyError{obj, err}
 	}
-	return f.GetByKey(key)
+	return f.getByKey(key)
 }
 
 // GetByKey returns the complete list of deltas for the requested item,
 // setting exists=false if that list is empty.
 // You should treat the items returned inside the deltas as immutable.
 // This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
-func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
+func (f *DeltaFIFO) getByKey(key string) (item interface{}, exists bool, err error) {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	d, exists := f.items[key]
@@ -320,10 +320,10 @@ func TestDeltaFIFO_addUpdate(t *testing.T) {
 	f.Update(mkFifoObj("foo", 12))
 	f.Delete(mkFifoObj("foo", 15))
 
-	if e, a := []interface{}{mkFifoObj("foo", 15)}, f.List(); !reflect.DeepEqual(e, a) {
+	if e, a := []interface{}{mkFifoObj("foo", 15)}, f.list(); !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %+v, got %+v", e, a)
 	}
-	if e, a := []string{"foo"}, f.ListKeys(); !reflect.DeepEqual(e, a) {
+	if e, a := []string{"foo"}, f.listKeys(); !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %+v, got %+v", e, a)
 	}
 
@@ -349,7 +349,7 @@ func TestDeltaFIFO_addUpdate(t *testing.T) {
 		t.Errorf("Got second value %v", unexpected.val)
 	case <-time.After(50 * time.Millisecond):
 	}
-	_, exists, _ := f.Get(mkFifoObj("foo", ""))
+	_, exists, _ := f.get(mkFifoObj("foo", ""))
 	if exists {
 		t.Errorf("item did not get removed")
 	}
@@ -397,7 +397,7 @@ func TestDeltaFIFO_transformer(t *testing.T) {
 	must(f.Replace([]interface{}{}, ""))
 
 	// Should be empty
-	if e, a := []string{"foo", "bar"}, f.ListKeys(); !reflect.DeepEqual(e, a) {
+	if e, a := []string{"foo", "bar"}, f.listKeys(); !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected %+v, got %+v", e, a)
 	}
 
@@ -507,7 +507,7 @@ func TestDeltaFIFO_addReplace(t *testing.T) {
 		t.Errorf("Got second value %v", unexpected.val)
 	case <-time.After(50 * time.Millisecond):
 	}
-	_, exists, _ := f.Get(mkFifoObj("foo", ""))
+	_, exists, _ := f.get(mkFifoObj("foo", ""))
 	if exists {
 		t.Errorf("item did not get removed")
 	}
@@ -991,7 +991,7 @@ func BenchmarkDeltaFIFOListKeys(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			_ = f.ListKeys()
+			_ = f.listKeys()
 		}
 	})
 	b.StopTimer()
