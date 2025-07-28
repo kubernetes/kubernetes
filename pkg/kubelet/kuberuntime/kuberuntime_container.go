@@ -1222,6 +1222,9 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 
 				restartOnFailure := restartOnFailure
 				if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+					// Only container-level restart policy is used. The container-level restart
+					// rules are not evaluated because the container might not have exited, so
+					// there is no exit code on which the rules can be used.
 					if container.RestartPolicy != nil {
 						restartOnFailure = *container.RestartPolicy != v1.ContainerRestartPolicyNever
 					}
