@@ -201,6 +201,10 @@ func getHugepagesTestPod(f *framework.Framework, podResources *v1.ResourceRequir
 		},
 	}
 
+	if podResources == nil {
+		return pod
+	}
+
 	if podResources.Requests != nil || podResources.Limits != nil {
 		pod.Spec.Resources = podResources
 	}
