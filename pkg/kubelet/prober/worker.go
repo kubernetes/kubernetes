@@ -170,6 +170,14 @@ func newWorker(
 	w.proberDurationSuccessfulMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 	w.proberDurationUnknownMetricLabels = deepCopyPrometheusLabels(proberDurationLabels)
 
+	// Initailzie the HTTP probe request holder if this worker will perform HTTP probing
+	if w.spec != nil && w.spec.HTTPGet != nil {
+		w.httpProbeRequest = &httpProbeRequestHolder{
+			httpGet: w.spec.HTTPGet,
+			podIP:   "", // Empty Initially because we are not sure if the pod IP is available yet (better to dynamically set in worker loop)
+		}
+	}
+
 	return w
 }
 
