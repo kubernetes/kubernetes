@@ -63,6 +63,80 @@ func TestWebhookConverterWithoutWatchCache(t *testing.T) {
 	testWebhookConverter(t, false)
 }
 
+// TestWebhookNotCalledForUnusedVersions tests scenario where conversion webhook could be called for
+// versions that are nor served or nor stored.
+// Described in detail in https://github.com/kubernetes/kubernetes/issues/129979
+func TestWebhookNotCalledForUnusedVersions(t *testing.T) {
+	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
+	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
+
+	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
+	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
+
+	tearDown, config, options, err := fixtures.StartDefaultServer(t, "--watch-cache=true")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	apiExtensionsClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		tearDown()
+		t.Fatal(err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		tearDown()
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	crd := multiVersionFixture.DeepCopy()
+
+	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd, nil, nil)
+	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	etcdClient, _, err := storage.GetEtcdClients(restOptions.StorageConfig.Transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer etcdClient.Close()
+
+	etcdObjectReader := storage.NewEtcdObjectReader(etcdClient, &restOptions, crd)
+	ctcTearDown, ctc := newConversionTestContext(t, apiExtensionsClient, dynamicClient, etcdObjectReader, crd)
+	defer ctcTearDown()
+
+	upCh, handler := closeOnCall(NewObjectConverterWebhookHandler(t, getUnexpectedVersionCheckConverter(t, "v1alpha2")))
+	tearDown, webhookClientConfig, err := StartConversionWebhookServer(handler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	ctc.setConversionWebhook(t, webhookClientConfig, []string{"v1alpha1", "v1beta1"})
+
+	// create an object to initiate webhook calls
+	_, err = ctc.versionedClient("marker", "v1beta1").Create(context.TODO(), newConversionMultiVersionFixture("marker", "marker", "v1beta1"), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait until new webhook is called the first time
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
+		select {
+		case <-upCh:
+			return true, nil
+		default:
+			t.Log("Waiting until webhook is effective")
+			return false, nil
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func testWebhookConverter(t *testing.T, watchCache bool) {
 	tests := []struct {
 		group          string
@@ -248,6 +322,9 @@ func validateStorageVersion(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace
 
 	for _, version := range ctc.crd.Spec.Versions {
+		if !version.Storage && !version.Served {
+			continue
+		}
 		t.Run(version.Name, func(t *testing.T) {
 			name := "storageversion-" + version.Name
 			client := ctc.versionedClient(ns, version.Name)
@@ -315,6 +392,9 @@ func validateServed(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace
 
 	for _, version := range ctc.crd.Spec.Versions {
+		if !version.Storage && !version.Served {
+			continue
+		}
 		t.Run(version.Name, func(t *testing.T) {
 			name := "served-" + version.Name
 			client := ctc.versionedClient(ns, version.Name)
@@ -334,6 +414,9 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace
 
 	for _, createVersion := range ctc.crd.Spec.Versions {
+		if !createVersion.Storage && !createVersion.Served {
+			continue
+		}
 		t.Run(fmt.Sprintf("getting objects created as %s", createVersion.Name), func(t *testing.T) {
 			name := "converted-" + createVersion.Name
 			client := ctc.versionedClient(ns, createVersion.Name)
@@ -354,6 +437,9 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 			verifyMultiVersionObject(t, "v1beta1", obj)
 
 			for _, getVersion := range ctc.crd.Spec.Versions {
+				if !getVersion.Storage && !getVersion.Served {
+					continue
+				}
 				client := ctc.versionedClient(ns, getVersion.Name)
 				obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
 				if err != nil {
@@ -391,7 +477,15 @@ func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace + "-list"
 
 	names := sets.String{}
-	for _, createVersion := range ctc.crd.Spec.Versions {
+	servedVersions := []apiextensionsv1.CustomResourceDefinitionVersion{}
+	for _, version := range ctc.crd.Spec.Versions {
+		if !version.Storage && !version.Served {
+			continue
+		}
+		servedVersions = append(servedVersions, version)
+	}
+
+	for _, createVersion := range servedVersions {
 		name := "converted-" + createVersion.Name
 		client := ctc.versionedClient(ns, createVersion.Name)
 		fixture := newConversionMultiVersionFixture(ns, name, createVersion.Name)
@@ -405,14 +499,14 @@ func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 		names.Insert(name)
 	}
 
-	for _, listVersion := range ctc.crd.Spec.Versions {
+	for _, listVersion := range servedVersions {
 		t.Run(fmt.Sprintf("listing objects as %s", listVersion.Name), func(t *testing.T) {
 			client := ctc.versionedClient(ns, listVersion.Name)
 			obj, err := client.List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(obj.Items) != len(ctc.crd.Spec.Versions) {
+			if len(obj.Items) != len(servedVersions) {
 				t.Fatal("unexpected number of items")
 			}
 			foundNames := sets.String{}
@@ -431,6 +525,9 @@ func validateStoragePruning(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace
 
 	for _, createVersion := range ctc.crd.Spec.Versions {
+		if !createVersion.Storage && !createVersion.Served {
+			continue
+		}
 		t.Run(fmt.Sprintf("getting objects created as %s", createVersion.Name), func(t *testing.T) {
 			name := "storagepruning-" + createVersion.Name
 			client := ctc.versionedClient(ns, createVersion.Name)
@@ -466,6 +563,9 @@ func validateStoragePruning(t *testing.T, ctc *conversionTestContext) {
 			}
 
 			for _, getVersion := range ctc.crd.Spec.Versions {
+				if !getVersion.Storage && !getVersion.Served {
+					continue
+				}
 				client := ctc.versionedClient(ns, getVersion.Name)
 				obj, err := client.Get(context.TODO(), name, metav1.GetOptions{})
 				if err != nil {
@@ -593,8 +693,15 @@ func validateDefaulting(t *testing.T, ctc *conversionTestContext) {
 
 	ns := ctc.namespace
 	storageVersion := "v1beta1"
+	servedVersions := []apiextensionsv1.CustomResourceDefinitionVersion{}
+	for _, version := range ctc.crd.Spec.Versions {
+		if !version.Storage && !version.Served {
+			continue
+		}
+		servedVersions = append(servedVersions, version)
+	}
 
-	for _, createVersion := range ctc.crd.Spec.Versions {
+	for _, createVersion := range servedVersions {
 		t.Run(fmt.Sprintf("getting objects created as %s", createVersion.Name), func(t *testing.T) {
 			name := "defaulting-" + createVersion.Name
 			client := ctc.versionedClient(ns, createVersion.Name)
@@ -644,7 +751,7 @@ func validateDefaulting(t *testing.T, ctc *conversionTestContext) {
 			}
 
 			// check that when reading any other version, we do not default that version, but only the (non-persisted) storage version default
-			for _, v := range ctc.crd.Spec.Versions {
+			for _, v := range servedVersions {
 				if v.Name == createVersion.Name {
 					// create version is persisted anyway, nothing to verify
 					continue
@@ -921,6 +1028,16 @@ func uidMutatingConverter(desiredAPIVersion string, obj runtime.RawExtension) (r
 	return runtime.RawExtension{Raw: raw}, nil
 }
 
+func getUnexpectedVersionCheckConverter(t *testing.T, version string) ObjectConverterFunc {
+	return func(desiredAPIVersion string, obj runtime.RawExtension) (runtime.RawExtension, error) {
+		if desiredAPIVersion == "stable.example.com/"+version {
+			t.Fatalf("webhook received unexpected version: %s", version)
+		}
+
+		return noopConverter(desiredAPIVersion, obj)
+	}
+}
+
 func newConversionTestContext(t *testing.T, apiExtensionsClient clientset.Interface, dynamicClient dynamic.Interface, etcdObjectReader *storage.EtcdObjectReader, v1CRD *apiextensionsv1.CustomResourceDefinition) (func(), *conversionTestContext) {
 	v1CRD, err := fixtures.CreateNewV1CustomResourceDefinition(v1CRD, apiExtensionsClient, dynamicClient)
 	if err != nil {
@@ -959,6 +1076,9 @@ func (c *conversionTestContext) versionedClient(ns string, version string) dynam
 func (c *conversionTestContext) versionedClients(ns string) map[string]dynamic.ResourceInterface {
 	ret := map[string]dynamic.ResourceInterface{}
 	for _, v := range c.crd.Spec.Versions {
+		if !v.Storage && !v.Served {
+			continue
+		}
 		ret[v.Name] = c.versionedClient(ns, v.Name)
 	}
 	return ret
@@ -1129,6 +1249,7 @@ var multiVersionFixture = &apiextensionsv1.CustomResourceDefinition{
 								Type: "object",
 								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"v1alpha1": {Type: "boolean"},
+									"v1alpha2": {Type: "boolean"},
 									"v1beta1":  {Type: "boolean", Default: jsonPtr(true)},
 									"v1beta2":  {Type: "boolean"},
 								},
@@ -1170,6 +1291,7 @@ var multiVersionFixture = &apiextensionsv1.CustomResourceDefinition{
 								Type: "object",
 								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"v1alpha1": {Type: "boolean", Default: jsonPtr(true)},
+									"v1alpha2": {Type: "boolean"},
 									"v1beta1":  {Type: "boolean"},
 									"v1beta2":  {Type: "boolean"},
 								},
@@ -1211,8 +1333,51 @@ var multiVersionFixture = &apiextensionsv1.CustomResourceDefinition{
 								Type: "object",
 								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"v1alpha1": {Type: "boolean"},
+									"v1alpha2": {Type: "boolean"},
 									"v1beta1":  {Type: "boolean"},
 									"v1beta2":  {Type: "boolean", Default: jsonPtr(true)},
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				// same schema as v1beta1
+				Name:    "v1alpha2",
+				Served:  false,
+				Storage: false,
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+						SpecReplicasPath:   ".spec.num.num1",
+						StatusReplicasPath: ".status.num.num2",
+					},
+				},
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
+							"content": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
+									"key": {Type: "string"},
+								},
+							},
+							"num": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
+									"num1": {Type: "integer"},
+									"num2": {Type: "integer"},
+								},
+							},
+							"defaults": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
+									"v1alpha1": {Type: "boolean"},
+									"v1alpha2": {Type: "boolean", Default: jsonPtr(true)},
+									"v1beta1":  {Type: "boolean"},
+									"v1beta2":  {Type: "boolean"},
 								},
 							},
 						},
