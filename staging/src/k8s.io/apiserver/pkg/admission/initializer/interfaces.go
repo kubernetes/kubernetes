@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -70,6 +71,12 @@ type WantsDrainedNotification interface {
 //	}
 type WantsFeatures interface {
 	InspectFeatureGates(featuregate.FeatureGate)
+	admission.InitializationValidator
+}
+
+// WantsEffectiveVersion defines a function which passes the effective version for inspection by an admission plugin.
+type WantsEffectiveVersion interface {
+	InspectEffectiveVersion(compatibility.EffectiveVersion)
 	admission.InitializationValidator
 }
 
