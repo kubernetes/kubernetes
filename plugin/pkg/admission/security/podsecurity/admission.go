@@ -153,10 +153,6 @@ func (p *Plugin) updateDelegate() {
 func (c *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	c.inspectedFeatureGates = true
 	policy.RelaxPolicyForUserNamespacePods(featureGates.Enabled(features.UserNamespacesPodSecurityStandards))
-
-	if !featureGates.Enabled(features.ProbeHostPodSecurityStandards) {
-		policy.SkipProbeHostEnforcement()
-	}
 }
 
 // ValidateInitialization ensures all required options are set
