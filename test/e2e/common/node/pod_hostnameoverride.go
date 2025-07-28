@@ -56,6 +56,14 @@ var _ = SIGDescribe("Override hostname of Pod", framework.WithFeatureGate(featur
 	f := framework.NewDefaultFramework("hostfqdn")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
+	ginkgo.It("a pod has hostnameOverride field with value that is a valid DNS subdomain.", func(ctx context.Context) {
+		pod := newTestPod(f.Namespace.Name)
+		hostnameOverride := "override.example.host"
+		pod.Spec.HostnameOverride = &hostnameOverride
+		output := []string{fmt.Sprintf("%s;%s;", hostnameOverride, hostnameOverride)}
+		e2eoutput.TestContainerOutput(ctx, f, "hostnameOverride overrides hostname", pod, 0, output)
+	})
+
 	ginkgo.It("a pod with hostname and hostnameOverride fields will have hostnameOverride as hostname", func(ctx context.Context) {
 		pod := newTestPod(f.Namespace.Name)
 		hostname := "custom-host"

@@ -7468,7 +7468,15 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 			podHostnameOverride: ptr.To("Invalid-Hostname-!"),
 			featureGateEnabled:  true,
 			expectError:         true,
-			errorContains:       "pod HostnameOverride \"Invalid-Hostname-!\" is not a valid DNS label",
+			errorContains:       "pod HostnameOverride \"Invalid-Hostname-!\" is not a valid DNS subdomain",
+		},
+		{
+			name:                "HostnameOverride - enabled - overrides all - valid DNS hostname",
+			podName:             "test-pod",
+			podHostnameOverride: ptr.To("valid.hostname"),
+			expectedHostname:    "valid.hostname",
+			featureGateEnabled:  true,
+			errorContains:       "",
 		},
 		{
 			name:                "HostnameOverride - disabled - is ignored",
