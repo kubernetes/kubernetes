@@ -486,7 +486,7 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 	}
 
 	// The CPU manager static policy does not support pod-level resources.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+	if p.isPodWithPodLevelResources(pod) {
 		return 0
 	}
 
@@ -840,7 +840,7 @@ func updateAllocationPerNUMAMetric(topo *topology.CPUTopology, allocatedCPUs cpu
 
 func (p *staticPolicy) isPodWithPodLevelResources(pod *v1.Pod) bool {
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
-		// The Memory manager static policy does not support pod-level resources.
+		// The CPU manager static policy does not support pod-level resources.
 		klog.V(5).InfoS("CPU Manager allocation skipped, pod is using pod-level resources which are not supported by the static CPU manager policy", "pod", klog.KObj(pod))
 
 		return true

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -91,6 +92,9 @@ func GetPodAdmitResult(err error) lifecycle.PodAdmitResult {
 
 	if len(otherErrs) == 0 {
 		// This should not happen if err != nil, but as a safeguard.
+		// This indicates a logical inconsistency where a primary error was
+		// detected, but supporting detailed errors are missing. This is a bug.
+		klog.ErrorS(err, "Logical inconsistency: Primary error detected, but 'otherErrs' list is empty")
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 
