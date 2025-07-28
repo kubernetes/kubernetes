@@ -539,16 +539,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
 
-		var fifo Queue
-		if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
-			fifo = NewRealFIFO(MetaNamespaceKeyFunc, s.indexer, s.transform)
-		} else {
-			fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-				KnownObjects:          s.indexer,
-				EmitDeltaTypeReplaced: true,
-				Transformer:           s.transform,
-			})
-		}
+		fifo := newQueueFIFO(s.indexer, s.transform)
 
 		cfg := &Config{
 			Queue:             fifo,
