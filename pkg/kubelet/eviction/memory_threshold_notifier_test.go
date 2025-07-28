@@ -20,6 +20,7 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const testCgroupPath = "/sys/fs/cgroups/memory"
@@ -135,14 +137,15 @@ func TestUpdateThreshold(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
 			notifierFactory := NewMockNotifierFactory(t)
 			notifier := NewMockCgroupNotifier(t)
 
 			m := newTestMemoryThresholdNotifier(tc.evictionThreshold, notifierFactory, nil)
-			notifierFactory.EXPECT().NewCgroupNotifier(testCgroupPath, memoryUsageAttribute, tc.expectedThreshold.Value()).Return(notifier, tc.updateThresholdErr).Times(1)
+			notifierFactory.EXPECT().NewCgroupNotifier(logger, testCgroupPath, memoryUsageAttribute, tc.expectedThreshold.Value()).Return(notifier, tc.updateThresholdErr).Times(1)
 			var events chan<- struct{} = m.events
-			notifier.EXPECT().Start(events).Return().Maybe()
-			err := m.UpdateThreshold(nodeSummary(tc.available, tc.workingSet, tc.usage, isAllocatableEvictionThreshold(tc.evictionThreshold)))
+			notifier.EXPECT().Start(logger, events).Return().Maybe()
+			err := m.UpdateThreshold(tCtx, nodeSummary(tc.available, tc.workingSet, tc.usage, isAllocatableEvictionThreshold(tc.evictionThreshold)))
 			if err != nil && !tc.expectErr {
 				t.Errorf("Unexpected error updating threshold: %v", err)
 			} else if err == nil && tc.expectErr {
@@ -183,16 +186,18 @@ func TestUpdateThresholdWithInvalidSummary(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			m := newTestMemoryThresholdNotifier(evictionapi.Threshold{}, nil, nil)
 			if tc.allocatableEvictionThreshold {
 				m.threshold.Signal = evictionapi.SignalAllocatableMemoryAvailable
 			}
-			assert.Error(t, m.UpdateThreshold(tc.summary))
+			assert.Error(t, m.UpdateThreshold(tCtx, tc.summary))
 		})
 	}
 }
 
 func TestStart(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	noResources := resource.MustParse("0")
 	threshold := evictionapi.Threshold{
 		Signal:   evictionapi.SignalMemoryAvailable,
@@ -209,21 +214,21 @@ func TestStart(t *testing.T) {
 	m := newTestMemoryThresholdNotifier(threshold, notifierFactory, func(string) {
 		wg.Done()
 	})
-	notifierFactory.EXPECT().NewCgroupNotifier(testCgroupPath, memoryUsageAttribute, int64(0)).Return(notifier, nil).Times(1)
+	notifierFactory.EXPECT().NewCgroupNotifier(logger, testCgroupPath, memoryUsageAttribute, int64(0)).Return(notifier, nil).Times(1)
 
 	var events chan<- struct{} = m.events
-	notifier.EXPECT().Start(events).Run(func(events chan<- struct{}) {
+	notifier.EXPECT().Start(logger, events).Run(func(tCtx context.Context, events chan<- struct{}) {
 		for i := 0; i < 4; i++ {
 			events <- struct{}{}
 		}
 	})
 
-	err := m.UpdateThreshold(nodeSummary(noResources, noResources, noResources, isAllocatableEvictionThreshold(threshold)))
+	err := m.UpdateThreshold(tCtx, nodeSummary(noResources, noResources, noResources, isAllocatableEvictionThreshold(threshold)))
 	if err != nil {
 		t.Errorf("Unexpected error updating threshold: %v", err)
 	}
 
-	go m.Start()
+	go m.Start(tCtx)
 
 	wg.Wait()
 }
