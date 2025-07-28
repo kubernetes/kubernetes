@@ -589,16 +589,6 @@ func containerChanged(container *v1.Container, containerStatus *kubecontainer.St
 }
 
 func shouldRestartOnFailure(pod *v1.Pod) bool {
-	// With feature ContainerRestartRules enabled, the pod should be restarted
-	// on failure if any of its containers have container-level restart policy
-	// that is restartable.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-		for _, c := range pod.Spec.Containers {
-			if podutil.IsContainerRestartable(pod.Spec, c) {
-				return true
-			}
-		}
-	}
 	return pod.Spec.RestartPolicy != v1.RestartPolicyNever
 }
 
@@ -1147,7 +1137,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		var reason containerKillReason
 		restart := shouldRestartOnFailure(pod)
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
-			restart = kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus)
+			// For probe failures, use container-level restart policy only. Container-level restart
+			// rules are not evaluated because the container is still running.
+			if container.RestartPolicy != nil {
+				restart = *container.RestartPolicy != v1.ContainerRestartPolicyNever
+			}
 		}
 		if _, _, changed := containerChanged(&container, containerStatus); changed {
 			message = fmt.Sprintf("Container %s definition changed", container.Name)

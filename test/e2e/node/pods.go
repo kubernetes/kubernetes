@@ -718,7 +718,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 	})
 })
 
-var _ = SIGDescribe("Pod Extended (container restart policy)", feature.ContainerRestartRules, framework.WithFeatureGate(features.ContainerRestartRules), func() {
+var _ = SIGDescribe("Pod Extended (container restart policy)", framework.WithFeatureGate(features.ContainerRestartRules), func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
