@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -59,7 +60,7 @@ type Config struct {
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
 type Manager interface {
 	// Start starts the control loop to monitor eviction thresholds at specified interval.
-	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration)
+	Start(ctx context.Context, diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration)
 
 	// IsUnderMemoryPressure returns true if the node is under memory pressure.
 	IsUnderMemoryPressure() bool
@@ -144,7 +145,7 @@ type nodeReclaimFuncs []nodeReclaimFunc
 // CgroupNotifier generates events from cgroup events
 type CgroupNotifier interface {
 	// Start causes the CgroupNotifier to begin notifying on the eventCh
-	Start(eventCh chan<- struct{})
+	Start(ctx context.Context, eventCh chan<- struct{})
 	// Stop stops all processes and cleans up file descriptors associated with the CgroupNotifier
 	Stop()
 }
@@ -153,18 +154,18 @@ type CgroupNotifier interface {
 type NotifierFactory interface {
 	// NewCgroupNotifier creates a CgroupNotifier that creates events when the threshold
 	// on the attribute in the cgroup specified by the path is crossed.
-	NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error)
+	NewCgroupNotifier(logger klog.Logger, path, attribute string, threshold int64) (CgroupNotifier, error)
 }
 
 // ThresholdNotifier manages CgroupNotifiers based on memory eviction thresholds, and performs a function
 // when memory eviction thresholds are crossed
 type ThresholdNotifier interface {
 	// Start calls the notifier function when the CgroupNotifier notifies the ThresholdNotifier that an event occurred
-	Start()
+	Start(ctx context.Context)
 	// UpdateThreshold updates the memory cgroup threshold based on the metrics provided.
 	// Calling UpdateThreshold with recent metrics allows the ThresholdNotifier to trigger at the
 	// eviction threshold more accurately
-	UpdateThreshold(summary *statsapi.Summary) error
+	UpdateThreshold(ctx context.Context, summary *statsapi.Summary) error
 	// Description produces a relevant string describing the Memory Threshold Notifier
 	Description() string
 }
