@@ -1962,7 +1962,7 @@ func TestReflectorReplacesStoreOnUnsafeDelete(t *testing.T) {
 	s := NewFIFO(MetaNamespaceKeyFunc)
 	var replaceInvoked atomic.Int32
 	store := &fakeStore{
-		Store: s,
+		ReflectorStore: s,
 		beforeReplace: func(list []interface{}, rv string) {
 			// interested in the Replace call that happens after the Error event
 			if rv == lastExpectedRV {
@@ -2085,30 +2085,16 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 		{Type: watch.Added, Object: pod3},
 	}
 
-	s := NewFIFO(MetaNamespaceKeyFunc)
-	var replaceInvoked atomic.Int32
-	store := &fakeStore{
-		Store: s,
-		beforeReplace: func(list []interface{}, rv string) {
-			replaceInvoked.Add(1)
-			// Only two pods are present at the point when Replace is called.
-			if len(list) != 2 {
-				t.Errorf("unexpected nb of objects: expected 2 received %d", len(list))
-			}
-			for _, obj := range list {
-				cast := obj.(*v1.Pod)
-				if cast.Spec.Hostname != "transformed" {
-					t.Error("Object was not transformed prior to replacement")
-				}
-			}
-		},
-		afterReplace: func(rv string, err error) {},
-		transformer: func(i interface{}) (interface{}, error) {
+	var transformerInvoked atomic.Int32
+	s := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction: MetaNamespaceKeyFunc,
+		Transformer: func(i interface{}) (interface{}, error) {
+			transformerInvoked.Add(1)
 			cast := i.(*v1.Pod)
 			cast.Spec.Hostname = "transformed"
 			return cast, nil
 		},
-	}
+	})
 
 	var once sync.Once
 	lw := &ListWatch{
@@ -2130,7 +2116,7 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 	}
 
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
-	r := NewReflector(lw, &v1.Pod{}, store, 0)
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	ctx, cancel := context.WithCancel(context.Background())
 	doneCh := make(chan struct{})
 	go func() {
@@ -2152,8 +2138,21 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 	if want, got := lastExpectedRV, r.LastSyncResourceVersion(); want != got {
 		t.Errorf("expected LastSyncResourceVersion to be %q, but got: %q", want, got)
 	}
-	if want, got := 1, int(replaceInvoked.Load()); want != got {
-		t.Errorf("expected replace to be invoked %d times, but got: %d", want, got)
+
+	if want, got := 3, len(s.list()); want != got {
+		t.Errorf("expected informer to contain %d objects, but got: %d", want, got)
+	}
+	for _, item := range s.list() {
+		cast := item.(*v1.Pod)
+		if cast.Spec.Hostname != "transformed" {
+			t.Error("Object was not transformed prior to replacement")
+		}
+	}
+
+	// Transformer should have been invoked twice for the initial sync in the informer on the temporary store,
+	// then twice on replace, then once on the following update.
+	if want, got := 5, int(transformerInvoked.Load()); want != got {
+		t.Errorf("expected transformer to be invoked %d times, but got: %d", want, got)
 	}
 
 	cancel()
@@ -2165,21 +2164,16 @@ func TestReflectorRespectStoreTransformer(t *testing.T) {
 }
 
 type fakeStore struct {
-	Store
+	ReflectorStore
 	beforeReplace func(list []interface{}, s string)
 	afterReplace  func(rv string, err error)
-	transformer   TransformFunc
 }
 
 func (f *fakeStore) Replace(list []interface{}, rv string) error {
 	f.beforeReplace(list, rv)
-	err := f.Store.Replace(list, rv)
+	err := f.ReflectorStore.Replace(list, rv)
 	f.afterReplace(rv, err)
 	return err
-}
-
-func (f *fakeStore) Transformer() TransformFunc {
-	return f.transformer
 }
 
 func BenchmarkExtractList(b *testing.B) {
