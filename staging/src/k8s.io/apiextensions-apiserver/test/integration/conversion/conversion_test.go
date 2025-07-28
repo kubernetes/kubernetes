@@ -102,6 +102,7 @@ func TestWebhookNotCalledForUnusedVersions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// nolint:errcheck
 	defer etcdClient.Close()
 
 	etcdObjectReader := storage.NewEtcdObjectReader(etcdClient, &restOptions, crd)
@@ -124,7 +125,7 @@ func TestWebhookNotCalledForUnusedVersions(t *testing.T) {
 	}
 
 	// wait until new webhook is called the first time
-	if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), time.Second*1, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 		select {
 		case <-upCh:
 			return true, nil
