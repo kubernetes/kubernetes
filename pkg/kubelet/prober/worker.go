@@ -42,7 +42,14 @@ type httpProbeRequestHolder struct {
 }
 
 // getRequest returns the cached HTTP request or creates a new one if needed
-func (h *httpProbeRequestHolder) getRequest(container *v1.Container) (*http.Request, error) {
+func (h *httpProbeRequestHolder) getRequest(container *v1.Container, currentPodIP string) (*http.Request, error) {
+	// If the pod IP has changed, we need to create a new request and clear the cached request.
+	if h.podIP != currentPodIP {
+		h.podIP = currentPodIP
+		h.request = nil
+		h.reset()
+	}
+
 	if h.request == nil {
 		req, err := httpprobe.NewRequestForHTTPGetAction(h.httpGet, container, h.podIP, "probe")
 		if err != nil {
@@ -339,7 +346,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	var err error
 	// Use cached HTTP request if available
 	if w.httpProbeRequest != nil {
-		req, err = w.httpProbeRequest.getRequest(&w.container) // either returns cached request or creates a new one
+		req, err = w.httpProbeRequest.getRequest(&w.container, status.PodIP) // either returns cached request or creates a new one
 		if err != nil {
 			// Request creation/reuse failed, try again next time.
 			klog.V(4).InfoS("HTTP-Probe worker failed to create request", "error", err)
