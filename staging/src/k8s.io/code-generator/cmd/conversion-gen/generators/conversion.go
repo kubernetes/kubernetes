@@ -946,6 +946,17 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			continue
 		}
 
+		if namer.IsPrivateGoName(inMember.Name) && g.outputPackage != inType.Name.Package {
+			sw.Do("// WARNING: in."+inMember.Name+" is not exported and cannot be read\n", nil)
+			g.skippedFields[inType] = append(g.skippedFields[inType], inMember.Name)
+			continue
+		}
+		if namer.IsPrivateGoName(outMember.Name) && g.outputPackage != outType.Name.Package {
+			sw.Do("// WARNING: out."+inMember.Name+" is not exported and cannot be set\n", nil)
+			g.skippedFields[inType] = append(g.skippedFields[inType], inMember.Name)
+			continue
+		}
+
 		inMemberType, outMemberType := inMember.Type, outMember.Type
 		// create a copy of both underlying types but give them the top level alias name (since aliases
 		// are assignable)
