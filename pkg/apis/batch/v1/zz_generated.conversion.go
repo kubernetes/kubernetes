@@ -331,6 +331,7 @@ func autoConvert_v1_CronJobStatus_To_batch_CronJobStatus(in *batchv1.CronJobStat
 	out.Active = *(*[]core.ObjectReference)(unsafe.Pointer(&in.Active))
 	out.LastScheduleTime = (*metav1.Time)(unsafe.Pointer(in.LastScheduleTime))
 	out.LastSuccessfulTime = (*metav1.Time)(unsafe.Pointer(in.LastSuccessfulTime))
+	out.NextScheduleTime = (*metav1.Time)(unsafe.Pointer(in.NextScheduleTime))
 	return nil
 }
 
@@ -343,6 +344,7 @@ func autoConvert_batch_CronJobStatus_To_v1_CronJobStatus(in *batch.CronJobStatus
 	out.Active = *(*[]corev1.ObjectReference)(unsafe.Pointer(&in.Active))
 	out.LastScheduleTime = (*metav1.Time)(unsafe.Pointer(in.LastScheduleTime))
 	out.LastSuccessfulTime = (*metav1.Time)(unsafe.Pointer(in.LastSuccessfulTime))
+	out.NextScheduleTime = (*metav1.Time)(unsafe.Pointer(in.NextScheduleTime))
 	return nil
 }
 

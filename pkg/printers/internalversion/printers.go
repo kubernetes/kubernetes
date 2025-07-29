@@ -190,6 +190,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Suspend", Type: "boolean", Description: batchv1beta1.CronJobSpec{}.SwaggerDoc()["suspend"]},
 		{Name: "Active", Type: "integer", Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["active"]},
 		{Name: "Last Schedule", Type: "string", Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["lastScheduleTime"]},
+		{Name: "Next Schedule", Type: "string", Priority: 1, Description: batchv1beta1.CronJobStatus{}.SwaggerDoc()["nextScheduleTime"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Containers", Type: "string", Priority: 1, Description: "Names of each container in the template."},
 		{Name: "Images", Type: "string", Priority: 1, Description: "Images referenced by each container in the template."},
@@ -1302,10 +1303,36 @@ func printCronJob(obj *batch.CronJob, options printers.GenerateOptions) ([]metav
 		timeZone = *obj.Spec.TimeZone
 	}
 
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Schedule, timeZone, printBoolPtr(obj.Spec.Suspend), int64(len(obj.Status.Active)), lastScheduleTime, translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
+		nextScheduleTime := "<none>"
+		if obj.Status.NextScheduleTime != nil {
+			nextScheduleTime = translateTimestampUntil(*obj.Status.NextScheduleTime)
+		}
+
 		names, images := layoutContainerCells(obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
-		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.JobTemplate.Spec.Selector))
+		row.Cells = append(row.Cells,
+			obj.Name,
+			obj.Spec.Schedule,
+			timeZone,
+			printBoolPtr(obj.Spec.Suspend),
+			int64(len(obj.Status.Active)),
+			lastScheduleTime,
+			nextScheduleTime,
+			translateTimestampSince(obj.CreationTimestamp),
+			names,
+			images,
+			metav1.FormatLabelSelector(obj.Spec.JobTemplate.Spec.Selector),
+		)
+	} else {
+		row.Cells = append(row.Cells,
+			obj.Name,
+			obj.Spec.Schedule,
+			timeZone,
+			printBoolPtr(obj.Spec.Suspend),
+			int64(len(obj.Status.Active)),
+			lastScheduleTime,
+			translateTimestampSince(obj.CreationTimestamp),
+		)
 	}
 	return []metav1.TableRow{row}, nil
 }
