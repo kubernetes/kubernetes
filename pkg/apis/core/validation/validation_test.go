@@ -14498,21 +14498,21 @@ func TestValidatePodUpdate(t *testing.T) {
 
 func TestValidatePodStatusUpdate(t *testing.T) {
 	tests := []struct {
-		new  core.Pod
-		old  core.Pod
-		err  string
-		test string
+		test                                        string
+		new                                         core.Pod
+		old                                         core.Pod
+		err                                         string
+		enableClearingNominatedNodeNameAfterBinding bool
 	}{{
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ObservedGeneration: 1,
 			}),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"set valid status.observedGeneration",
+		old:  *podtest.MakePod("foo"),
+		test: "set valid status.observedGeneration",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				Conditions: []core.PodCondition{{
 					Type:               core.PodScheduled,
@@ -14521,20 +14521,19 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"set valid condition.observedGeneration",
+		old:  *podtest.MakePod("foo"),
+		test: "set valid condition.observedGeneration",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ObservedGeneration: -1,
 			}),
 		),
-		*podtest.MakePod("foo"),
-		"status.observedGeneration: Invalid value: -1: must be a non-negative integer",
-		"set invalid status.observedGeneration",
+		old:  *podtest.MakePod("foo"),
+		err:  "status.observedGeneration: Invalid value: -1: must be a non-negative integer",
+		test: "set invalid status.observedGeneration",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				Conditions: []core.PodCondition{{
 					Type:               core.PodScheduled,
@@ -14543,63 +14542,154 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo"),
-		"status.conditions[0].observedGeneration: Invalid value: -1: must be a non-negative integer",
-		"set invalid condition.observedGeneration",
+		old:  *podtest.MakePod("foo"),
+		err:  "status.conditions[0].observedGeneration: Invalid value: -1: must be a non-negative integer",
+		test: "set invalid condition.observedGeneration",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
 			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "node1",
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
 			podtest.SetStatus(core.PodStatus{}),
 		),
-		"",
-		"removed nominatedNodeName",
+		test: "add valid nominatedNodeName",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
 			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "node1",
 			}),
 		),
-		"",
-		"add valid nominatedNodeName",
+		test: "remove nominatedNodeName",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
 			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "Node1",
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
 		),
-		"nominatedNodeName",
-		"Add invalid nominatedNodeName",
+		err:  "nominatedNodeName",
+		test: "Add invalid nominatedNodeName",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
 			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "node1",
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
 			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "node2",
 			}),
 		),
-		"",
-		"Update nominatedNodeName",
+		test: "Update nominatedNodeName",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				NominatedNodeName: "node1",
+			}),
+		),
+		old: *podtest.MakePod("foo"),
+		enableClearingNominatedNodeNameAfterBinding: true,
+		test: "allow setting NominatedNodeName on unbound pod with feature enabled",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+		),
+		old: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
+				NominatedNodeName: "node2",
+			}),
+		),
+		enableClearingNominatedNodeNameAfterBinding: true,
+		test: "allow clearing NominatedNodeName on bound pod with feature enabled",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
+				NominatedNodeName: "node2",
+			}),
+		),
+		old: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+		),
+		err: "may not be set on pods that are already bound to a node",
+		enableClearingNominatedNodeNameAfterBinding: true,
+		test: "prevent setting NominatedNodeName on already bound pod with feature enabled",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
+				NominatedNodeName: "node1",
+			}),
+		),
+		old: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+		),
+		err: "may not be set on pods that are already bound to a node",
+		enableClearingNominatedNodeNameAfterBinding: true,
+		test: "prevent setting NominatedNodeName to same node on already bound pod with feature enabled",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
+				NominatedNodeName: "node3",
+			}),
+		),
+		old: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
+				NominatedNodeName: "node2",
+			}),
+		),
+		err: "may not be set on pods that are already bound to a node",
+		enableClearingNominatedNodeNameAfterBinding: true,
+		test: "prevent updating NominatedNodeName on already bound pod with feature enabled",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
+				NominatedNodeName: "node1",
+			}),
+		),
+		old: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
+				NominatedNodeName: "node2",
+			}),
+		),
+		err: "may not be set on pods that are already bound to a node",
+		enableClearingNominatedNodeNameAfterBinding: true,
+		test: "prevent updating NominatedNodeName to same node on already bound pod with feature enabled",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
+				NominatedNodeName: "node2",
+			}),
+		),
+		old: *podtest.MakePod("foo",
+			podtest.SetNodeName("node1"),
+			podtest.SetStatus(core.PodStatus{
+				NominatedNodeName: "node2",
+			}),
+		),
+		enableClearingNominatedNodeNameAfterBinding: true,
+		test: "allow keeping same NominatedNodeName on bound pod with feature enabled",
+	}, {
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14627,11 +14717,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"Container statuses pending",
+		old:  *podtest.MakePod("foo"),
+		test: "Container statuses pending",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14661,7 +14750,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14688,10 +14777,9 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		"",
-		"Container statuses running",
+		test: "Container statuses running",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14719,7 +14807,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14736,10 +14824,9 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		"",
-		"Container statuses add ephemeral container",
+		test: "Container statuses add ephemeral container",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14768,7 +14855,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14796,10 +14883,9 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		"",
-		"Container statuses ephemeral container running",
+		test: "Container statuses ephemeral container running",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14831,7 +14917,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14860,10 +14946,9 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		"",
-		"Container statuses ephemeral container exited",
+		test: "Container statuses ephemeral container exited",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14911,7 +14996,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
 					ContainerID: "docker://numbers",
@@ -14953,21 +15038,20 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		"",
-		"Container statuses all containers terminated",
+		test: "Container statuses all containers terminated",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
 					{Name: "no-such-claim", ResourceClaimName: ptr.To("my-claim")},
 				},
 			}),
 		),
-		*podtest.MakePod("foo"),
-		"status.resourceClaimStatuses[0].name: Invalid value: \"no-such-claim\": must match the name of an entry in `spec.resourceClaims`",
-		"Non-existent PodResourceClaim",
+		old:  *podtest.MakePod("foo"),
+		err:  "status.resourceClaimStatuses[0].name: Invalid value: \"no-such-claim\": must match the name of an entry in `spec.resourceClaims`",
+		test: "Non-existent PodResourceClaim",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
 			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
@@ -14975,13 +15059,13 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
 		),
-		`status.resourceClaimStatuses[0].name: Invalid value: "%$!#": a lowercase RFC 1123 subdomain must consist of`,
-		"Invalid ResourceClaim name",
+		err:  `status.resourceClaimStatuses[0].name: Invalid value: "%$!#": a lowercase RFC 1123 subdomain must consist of`,
+		test: "Invalid ResourceClaim name",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetResourceClaims(
 				core.PodResourceClaim{Name: "my-claim"},
 				core.PodResourceClaim{Name: "my-other-claim"},
@@ -14994,13 +15078,13 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
 		),
-		`status.resourceClaimStatuses[2].name: Duplicate value: "my-other-claim"`,
-		"Duplicate ResourceClaimStatuses.Name",
+		err:  `status.resourceClaimStatuses[2].name: Duplicate value: "my-other-claim"`,
+		test: "Duplicate ResourceClaimStatuses.Name",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetResourceClaims(
 				core.PodResourceClaim{Name: "my-claim"},
 				core.PodResourceClaim{Name: "my-other-claim"},
@@ -15012,13 +15096,12 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
 		),
-		"",
-		"ResourceClaimStatuses okay",
+		test: "ResourceClaimStatuses okay",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("init")),
 			podtest.SetStatus(core.PodStatus{
 				InitContainerStatuses: []core.ContainerStatus{{
@@ -15048,7 +15131,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("init")),
 			podtest.SetRestartPolicy(core.RestartPolicyNever),
 			podtest.SetStatus(core.PodStatus{
@@ -15080,10 +15163,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		`status.initContainerStatuses[0].state: Forbidden: may not be transitioned to non-terminated state`,
-		"init container cannot restart if RestartPolicyNever",
+		err:  `status.initContainerStatuses[0].state: Forbidden: may not be transitioned to non-terminated state`,
+		test: "init container cannot restart if RestartPolicyNever",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
 			podtest.SetRestartPolicy(core.RestartPolicyNever),
 			podtest.SetStatus(core.PodStatus{
@@ -15114,7 +15197,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
 			podtest.SetRestartPolicy(core.RestartPolicyNever),
 			podtest.SetStatus(core.PodStatus{
@@ -15146,10 +15229,9 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		"",
-		"restartable init container can restart if RestartPolicyNever",
+		test: "restartable init container can restart if RestartPolicyNever",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
 			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
 			podtest.SetStatus(core.PodStatus{
@@ -15180,7 +15262,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
 			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
 			podtest.SetStatus(core.PodStatus{
@@ -15212,10 +15294,9 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		"",
-		"restartable init container can restart if RestartPolicyOnFailure",
+		test: "restartable init container can restart if RestartPolicyOnFailure",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
 			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetStatus(core.PodStatus{
@@ -15246,7 +15327,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetInitContainers(podtest.MakeContainer("restartable-init", podtest.SetContainerRestartPolicy(containerRestartPolicyAlways))),
 			podtest.SetRestartPolicy(core.RestartPolicyAlways),
 			podtest.SetStatus(core.PodStatus{
@@ -15278,47 +15359,44 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				}},
 			}),
 		),
-		"",
-		"restartable init container can restart if RestartPolicyAlways",
+		test: "restartable init container can restart if RestartPolicyAlways",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				QOSClass: core.PodQOSBurstable,
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				QOSClass: core.PodQOSGuaranteed,
 			}),
 		),
-		"tatus.qosClass: Invalid value: \"Burstable\": field is immutable",
-		"qosClass can not be changed",
+		err:  "tatus.qosClass: Invalid value: \"Burstable\": field is immutable",
+		test: "qosClass can not be changed",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				QOSClass: core.PodQOSBurstable,
 			}),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				QOSClass: core.PodQOSBurstable,
 			}),
 		),
-		"",
-		"qosClass no change",
+		test: "qosClass no change",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetContainerStatuses(core.ContainerStatus{}),
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"nil containerUser in containerStatuses",
+		old:  *podtest.MakePod("foo"),
+		test: "nil containerUser in containerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetContainerStatuses(core.ContainerStatus{
@@ -15327,11 +15405,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"empty containerUser in containerStatuses",
+		old:  *podtest.MakePod("foo"),
+		test: "empty containerUser in containerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetContainerStatuses(core.ContainerStatus{
@@ -15346,11 +15423,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"containerUser with valid ids in containerStatuses",
+		old:  *podtest.MakePod("foo"),
+		test: "containerUser with valid ids in containerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetContainerStatuses(core.ContainerStatus{
@@ -15365,13 +15441,13 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		`status.containerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+		old: *podtest.MakePod("foo"),
+		err: `status.containerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.containerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.containerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
-		"containerUser with invalid uids/gids/supplementalGroups in containerStatuses",
+		test: "containerUser with invalid uids/gids/supplementalGroups in containerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetOS(core.Windows),
 			podtest.SetStatus(
 				podtest.MakePodStatus(
@@ -15383,25 +15459,23 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetOS(core.Windows),
 		),
-		`status.containerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
-		"containerUser cannot be set for windows pod in containerStatuses",
+		err:  `status.containerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
+		test: "containerUser cannot be set for windows pod in containerStatuses",
 	}, {
-
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetInitContainerStatuses(core.ContainerStatus{}),
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"nil containerUser in initContainerStatuses",
+		old:  *podtest.MakePod("foo"),
+		test: "nil containerUser in initContainerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetInitContainerStatuses(core.ContainerStatus{
@@ -15410,11 +15484,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"empty containerUser in initContainerStatuses",
+		old:  *podtest.MakePod("foo"),
+		test: "empty containerUser in initContainerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetInitContainerStatuses(core.ContainerStatus{
@@ -15429,11 +15502,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"containerUser with valid ids in initContainerStatuses",
+		old:  *podtest.MakePod("foo"),
+		test: "containerUser with valid ids in initContainerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetInitContainerStatuses(core.ContainerStatus{
@@ -15448,13 +15520,13 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		`status.initContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+		old: *podtest.MakePod("foo"),
+		err: `status.initContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.initContainerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.initContainerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
-		"containerUser with invalid uids/gids/supplementalGroups in initContainerStatuses",
+		test: "containerUser with invalid uids/gids/supplementalGroups in initContainerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetOS(core.Windows),
 			podtest.SetStatus(
 				podtest.MakePodStatus(
@@ -15466,24 +15538,23 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetOS(core.Windows),
 		),
-		`status.initContainerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
-		"containerUser cannot be set for windows pod in initContainerStatuses",
+		err:  `status.initContainerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
+		test: "containerUser cannot be set for windows pod in initContainerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{}),
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"nil containerUser in ephemeralContainerStatuses",
+		old:  *podtest.MakePod("foo"),
+		test: "nil containerUser in ephemeralContainerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
@@ -15492,11 +15563,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"empty containerUser in ephemeralContainerStatuses",
+		old:  *podtest.MakePod("foo"),
+		test: "empty containerUser in ephemeralContainerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
@@ -15511,11 +15581,10 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		"",
-		"containerUser with valid ids in ephemeralContainerStatuses",
+		old:  *podtest.MakePod("foo"),
+		test: "containerUser with valid ids in ephemeralContainerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
 				podtest.MakePodStatus(
 					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
@@ -15530,13 +15599,13 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo"),
-		`status.ephemeralContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+		old: *podtest.MakePod("foo"),
+		err: `status.ephemeralContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.ephemeralContainerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
 			`, status.ephemeralContainerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
-		"containerUser with invalid uids/gids/supplementalGroups in ephemeralContainerStatuses",
+		test: "containerUser with invalid uids/gids/supplementalGroups in ephemeralContainerStatuses",
 	}, {
-		*podtest.MakePod("foo",
+		new: *podtest.MakePod("foo",
 			podtest.SetOS(core.Windows),
 			podtest.SetStatus(
 				podtest.MakePodStatus(
@@ -15548,17 +15617,19 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				),
 			),
 		),
-		*podtest.MakePod("foo",
+		old: *podtest.MakePod("foo",
 			podtest.SetOS(core.Windows),
 		),
-		`status.ephemeralContainerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
-		"containerUser cannot be set for windows pod in ephemeralContainerStatuses",
+		err:  `status.ephemeralContainerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
+		test: "containerUser cannot be set for windows pod in ephemeralContainerStatuses",
 	},
 	}
 
 	for _, test := range tests {
-		test.new.ObjectMeta.ResourceVersion = "1"
-		test.old.ObjectMeta.ResourceVersion = "1"
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ClearingNominatedNodeNameAfterBinding, test.enableClearingNominatedNodeNameAfterBinding)
+
+		test.new.ResourceVersion = "1"
+		test.old.ResourceVersion = "1"
 		errs := ValidatePodStatusUpdate(&test.new, &test.old, PodValidationOptions{})
 		if test.err == "" {
 			if len(errs) != 0 {

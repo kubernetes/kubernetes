@@ -5847,6 +5847,15 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 		}
 	}
 
+	// Prevent setting NominatedNodeName on already bound pods
+	if utilfeature.DefaultFeatureGate.Enabled(features.ClearingNominatedNodeNameAfterBinding) &&
+		oldPod.Spec.NodeName != "" &&
+		newPod.Status.NominatedNodeName != "" &&
+		newPod.Status.NominatedNodeName != oldPod.Status.NominatedNodeName {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nominatedNodeName"),
+			"may not be set on pods that are already bound to a node"))
+	}
+
 	if newPod.Status.ObservedGeneration < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("observedGeneration"), newPod.Status.ObservedGeneration, "must be a non-negative integer"))
 	}
