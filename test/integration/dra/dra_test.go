@@ -287,6 +287,7 @@ func TestDRA(t *testing.T) {
 				features.DRADeviceTaints:         true,
 				features.DRAPartitionableDevices: true,
 				features.DRAPrioritizedList:      true,
+				features.DRAResourceSliceMixins:  true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
@@ -296,6 +297,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx, true) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
+				tCtx.Run("MaxResourceSliceWithMixins", testMaxResourceSliceWithMixins)
 			},
 		},
 	} {
@@ -813,12 +815,14 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 							}
 							return expected
 						}()...),
+						"Includes": gomega.Equal(device.Includes),
 					}))
 				}
 				return expected
 			}()...),
 			"PerDeviceNodeSelection": matchPointer(spec.PerDeviceNodeSelection),
 			"SharedCounters":         gomega.Equal(spec.SharedCounters),
+			"Mixins":                 gomega.Equal(spec.Mixins),
 		})))
 	}
 
@@ -1154,6 +1158,17 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 // and prints some information about it.
 func testMaxResourceSlice(tCtx ktesting.TContext) {
 	slice := NewMaxResourceSlice()
+	checkResourceSliceSize(tCtx, slice)
+}
+
+// testMaxResourceSliceWithMixins creates a ResourceSlice leveraging mixins that is
+// as large as possible and prints some information about it.
+func testMaxResourceSliceWithMixins(tCtx ktesting.TContext) {
+	slice := NewMaxResourceSliceWithMixins()
+	checkResourceSliceSize(tCtx, slice)
+}
+
+func checkResourceSliceSize(tCtx ktesting.TContext, slice *resourceapi.ResourceSlice) {
 	createdSlice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
 	tCtx.ExpectNoError(err)
 	totalSize := createdSlice.Size()

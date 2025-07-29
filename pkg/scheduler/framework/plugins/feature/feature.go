@@ -41,6 +41,7 @@ type Features struct {
 	EnablePodLevelResources                      bool
 	EnablePartitionableDevices                   bool
 	EnableStorageCapacityScoring                 bool
+	EnableResourceSliceMixins                    bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
@@ -62,5 +63,6 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnablePodLevelResources:                      featureGate.Enabled(features.PodLevelResources),
 		EnablePartitionableDevices:                   featureGate.Enabled(features.DRAPartitionableDevices),
 		EnableStorageCapacityScoring:                 featureGate.Enabled(features.StorageCapacityScoring),
+		EnableResourceSliceMixins:                    featureGate.Enabled(features.DRAResourceSliceMixins),
 	}
 }
