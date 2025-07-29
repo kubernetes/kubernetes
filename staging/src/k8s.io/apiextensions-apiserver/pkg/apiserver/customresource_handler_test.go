@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -29,10 +30,14 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"sigs.k8s.io/yaml"
+
+	"k8s.io/apimachinery/pkg/util/version"
+	basecompatibility "k8s.io/component-base/compatibility"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -1071,4 +1076,126 @@ func getOpenAPISpecFromFile() (*spec.Swagger, error) {
 	}
 
 	return staticSpec, nil
+}
+
+func TestFormatVersioning(t *testing.T) {
+	testCases := []struct {
+		name        string
+		version     string
+		format      string
+		value       string
+		expectedErr string
+	}{
+		{
+			name:    "value for format added at a later version is not validated",
+			version: "1.33",
+			value:   "not-a-name!", // an invalid value is allowed because it is not validated
+		},
+		{
+			name:    "valid value for format added at current version is validated as allowed",
+			version: "1.34",
+			value:   "valid-name",
+		},
+		{
+			name:        "invalid value for formatted added at current version is validated as invalid",
+			version:     "1.34",
+			value:       "invalid-name!",
+			expectedErr: `testName in body must be of type k8s-short-name`,
+		},
+	}
+
+	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	defer server.Terminate(t)
+
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "versionedresources.stable.example.com"},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group:      "stable.example.com",
+			Conversion: &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.NoneConverter},
+			Scope:      apiextensionsv1.ClusterScoped,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name: "v1", Served: true, Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"testName": {Type: "string", Format: "k8s-short-name"},
+							},
+						},
+					},
+				},
+			},
+		},
+		Status: apiextensionsv1.CustomResourceDefinitionStatus{
+			AcceptedNames: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural: "versionedresources", Singular: "versionedresource", Kind: "VersionedResource", ListKind: "VersionedResourceList",
+			},
+		},
+	}
+
+	validateFunc := func(ctx context.Context, obj runtime.Object) error { return nil }
+
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cl := fake.NewSimpleClientset()
+			informers := informers.NewSharedInformerFactory(cl, 0)
+			crdInformer := informers.Apiextensions().V1().CustomResourceDefinitions()
+			etcdOptions := options.NewEtcdOptions(storageConfig)
+			etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
+			restOptionsGetter := generic.RESTOptions{
+				StorageConfig:           etcdOptions.StorageConfig.ForResource(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}),
+				Decorator:               generic.UndecoratedStorage,
+				EnableGarbageCollection: true,
+				DeleteCollectionWorkers: 1,
+				ResourcePrefix:          crd.Spec.Group + "/" + crd.Spec.Names.Plural,
+				CountMetricPollPeriod:   time.Minute,
+			}
+			ctx := apirequest.WithNamespace(apirequest.NewContext(), metav1.NamespaceNone)
+			if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if err := crdInformer.Informer().GetStore().Add(crd); err != nil {
+				t.Fatal(err)
+			}
+			handler, err := NewCustomResourceDefinitionHandler(
+				&versionDiscoveryHandler{}, &groupDiscoveryHandler{},
+				crdInformer,
+				http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+				restOptionsGetter,
+				dummyAdmissionImpl{},
+				&establish.EstablishingController{},
+				dummyServiceResolverImpl{},
+				func(r webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver { return r },
+				1,
+				dummyAuthorizerImpl{},
+				time.Minute, time.Minute, nil, 3*1024*1024)
+			if err != nil {
+				t.Fatal(err)
+			}
+			handler.effectiveVersion = basecompatibility.NewEffectiveVersion(version.MustParse(tc.version), false, version.MustParse(tc.version), version.MustParse(tc.version))
+			crdInfo, err := handler.getOrCreateServingInfoFor(crd.UID, crd.Name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+			u.SetGroupVersionKind(schema.GroupVersionKind{Group: "stable.example.com", Version: "v1", Kind: "VersionedResource"})
+			u.SetName(fmt.Sprintf("cr-%d", i))
+			unstructured.SetNestedField(u.Object, tc.value, "testName")
+
+			_, err = crdInfo.storages["v1"].CustomResource.Create(ctx, u, validateFunc, &metav1.CreateOptions{})
+			if tc.expectedErr == "" {
+				if err != nil {
+					t.Fatalf("expected no error, but got: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Fatalf("expected error containing %q, but got none", tc.expectedErr)
+				}
+				if !strings.Contains(err.Error(), tc.expectedErr) {
+					t.Errorf("expected error to contain %q, but got %v", tc.expectedErr, err)
+				}
+			}
+		})
+	}
 }
