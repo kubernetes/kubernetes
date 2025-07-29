@@ -1989,8 +1989,9 @@ var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", ginkgo.Or
 	ginkgo.When("running guaranteed pod level resources tests", ginkgo.Label("guaranteed pod level resources", "reserved-cpus"), func() {
 		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
-				reservedSystemCPUs: cpuset.CPUSet{},
+				policyName:              string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:      cpuset.CPUSet{},
+				enablePodLevelResources: true,
 			}))
 
 			pod := makeCPUManagerPod("gu-pod-level-resources", []ctnAttribute{
@@ -2023,8 +2024,9 @@ var _ = SIGDescribe("CPU Manager Incompatibility Pod Level Resources", ginkgo.Or
 			reservedCPUs = cpuset.New(0)
 
 			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         string(cpumanager.PolicyStatic),
-				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+				policyName:              string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+				enablePodLevelResources: true,
 			}))
 
 			pod := makeCPUManagerPod("gu-pod-level-resources", []ctnAttribute{

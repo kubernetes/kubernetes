@@ -778,6 +778,10 @@ var _ = SIGDescribe("Memory Manager Incompatibility Pod Level Resources", framew
 			kubeParams := *defaultKubeParams
 			kubeParams.policy = staticPolicy
 			updateKubeletConfigWithMemoryManagerParams(initialConfig, &kubeParams)
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = make(map[string]bool)
+			}
+			initialConfig.FeatureGates["PodLevelResources"] = true
 		})
 
 		ginkgo.Context("", func() {
