@@ -79,7 +79,7 @@ func DeleteResourceAndWaitForGC(ctx context.Context, c clientset.Interface, kind
 	}
 	deleteObject := func() error {
 		background := metav1.DeletePropagationBackground
-		return testutils.DeleteResource(c, kind, ns, name, metav1.DeleteOptions{PropagationPolicy: &background})
+		return testutils.DeleteResource(ctx, c, kind, ns, name, metav1.DeleteOptions{PropagationPolicy: &background})
 	}
 	return deleteObjectAndWaitForGC(ctx, c, rtObject, deleteObject, ns, name, kind.String())
 }

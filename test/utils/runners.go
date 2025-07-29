@@ -82,7 +82,7 @@ func waitUntilPodIsScheduled(ctx context.Context, c clientset.Interface, name, n
 func RunPodAndGetNodeName(ctx context.Context, c clientset.Interface, pod *v1.Pod, timeout time.Duration) (string, error) {
 	name := pod.Name
 	namespace := pod.Namespace
-	if err := CreatePodWithRetries(c, namespace, pod); err != nil {
+	if err := CreatePodWithRetries(ctx, c, namespace, pod); err != nil {
 		return "", err
 	}
 	p, err := waitUntilPodIsScheduled(ctx, c, name, namespace, timeout)
@@ -348,7 +348,7 @@ func (config *DeploymentConfig) create() error {
 
 	config.applyTo(&deployment.Spec.Template)
 
-	if err := CreateDeploymentWithRetries(config.Client, config.Namespace, deployment); err != nil {
+	if err := CreateDeploymentWithRetries(context.TODO(), config.Client, config.Namespace, deployment); err != nil {
 		return fmt.Errorf("error creating deployment: %v", err)
 	}
 	config.RCConfigLog("Created deployment with name: %v, namespace: %v, replica count: %v", deployment.Name, config.Namespace, removePtr(deployment.Spec.Replicas))
@@ -415,7 +415,7 @@ func (config *ReplicaSetConfig) create() error {
 
 	config.applyTo(&rs.Spec.Template)
 
-	if err := CreateReplicaSetWithRetries(config.Client, config.Namespace, rs); err != nil {
+	if err := CreateReplicaSetWithRetries(context.TODO(), config.Client, config.Namespace, rs); err != nil {
 		return fmt.Errorf("error creating replica set: %v", err)
 	}
 	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, removePtr(rs.Spec.Replicas))
@@ -491,7 +491,7 @@ func (config *RCConfig) create() error {
 
 	config.applyTo(rc.Spec.Template)
 
-	if err := CreateRCWithRetries(config.Client, config.Namespace, rc); err != nil {
+	if err := CreateRCWithRetries(context.TODO(), config.Client, config.Namespace, rc); err != nil {
 		return fmt.Errorf("error creating replication controller: %v", err)
 	}
 	config.RCConfigLog("Created replication controller with name: %v, namespace: %v, replica count: %v", rc.Name, config.Namespace, removePtr(rc.Spec.Replicas))
@@ -735,7 +735,7 @@ func StartPods(c clientset.Interface, replicas int, namespace string, podNamePre
 		pod.ObjectMeta.Labels["name"] = podName
 		pod.ObjectMeta.Labels["startPodsID"] = startPodsID
 		pod.Spec.Containers[0].Name = podName
-		if err := CreatePodWithRetries(c, namespace, &pod); err != nil {
+		if err := CreatePodWithRetries(context.TODO(), c, namespace, &pod); err != nil {
 			return err
 		}
 	}
@@ -1145,7 +1145,7 @@ func MakePodSpec() v1.PodSpec {
 }
 
 func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1.Pod) error {
-	if err := CreatePodWithRetries(client, namespace, podTemplate); err != nil {
+	if err := CreatePodWithRetries(context.TODO(), client, namespace, podTemplate); err != nil {
 		return fmt.Errorf("error creating pod: %v", err)
 	}
 	return nil
@@ -1216,7 +1216,7 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		}
 
 		// Create PVC first as it's referenced by the PV when the `bindVolume` is true.
-		if err := CreatePersistentVolumeClaimWithRetries(client, namespace, pvc); err != nil {
+		if err := CreatePersistentVolumeClaimWithRetries(ctx, client, namespace, pvc); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = fmt.Errorf("error creating PVC: %s", err)
@@ -1231,7 +1231,7 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 			return
 		}
 
-		if err := CreatePersistentVolumeWithRetries(client, pv); err != nil {
+		if err := CreatePersistentVolumeWithRetries(ctx, client, pv); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = fmt.Errorf("error creating PV: %s", err)

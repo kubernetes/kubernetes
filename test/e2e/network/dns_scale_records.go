@@ -70,7 +70,7 @@ var _ = common.SIGDescribe(feature.PerformanceDNS, framework.WithSerial(), func(
 		services := generateServicesInNamespaces(namespaces, maxServicesPerCluster)
 		createService := func(i int) {
 			defer ginkgo.GinkgoRecover()
-			framework.ExpectNoError(testutils.CreateServiceWithRetries(f.ClientSet, services[i].Namespace, services[i]))
+			framework.ExpectNoError(testutils.CreateServiceWithRetries(ctx, f.ClientSet, services[i].Namespace, services[i]))
 		}
 		framework.Logf("Creating %v test services", maxServicesPerCluster)
 		workqueue.ParallelizeUntil(ctx, parallelCreateServiceWorkers, len(services), createService)

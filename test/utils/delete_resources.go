@@ -39,8 +39,7 @@ func deleteGenericResource(ctx context.Context, deleter ResourceDeleter, name st
 	return deleter.Delete(ctx, name, options)
 }
 
-func DeleteResource(c clientset.Interface, kind schema.GroupKind, namespace, name string, options metav1.DeleteOptions) error {
-	ctx := context.TODO()
+func DeleteResource(ctx context.Context, c clientset.Interface, kind schema.GroupKind, namespace, name string, options metav1.DeleteOptions) error {
 	switch kind {
 	case api.Kind("Pod"):
 		return deleteGenericResource(ctx, c.CoreV1().Pods(namespace), name, options)

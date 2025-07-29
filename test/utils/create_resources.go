@@ -50,6 +50,7 @@ func RetryWithExponentialBackOff(fn wait.ConditionFunc) error {
 
 // createWithRetries is a generic function to create Kubernetes resources with retries.
 func createWithRetries[T metav1.Object](
+	ctx context.Context,
 	create func() (T, error),
 ) error {
 	if create == nil {
@@ -67,45 +68,45 @@ func createWithRetries[T metav1.Object](
 	})
 }
 
-func CreatePodWithRetries(c clientset.Interface, ns string, pod *v1.Pod) error {
-	return createWithRetries(func() (*v1.Pod, error) {
-		return c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+func CreatePodWithRetries(ctx context.Context, c clientset.Interface, ns string, pod *v1.Pod) error {
+	return createWithRetries(ctx, func() (*v1.Pod, error) {
+		return c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 	})
 }
 
-func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.ReplicationController) error {
-	return createWithRetries(func() (*v1.ReplicationController, error) {
-		return c.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+func CreateRCWithRetries(ctx context.Context, c clientset.Interface, namespace string, obj *v1.ReplicationController) error {
+	return createWithRetries(ctx, func() (*v1.ReplicationController, error) {
+		return c.CoreV1().ReplicationControllers(namespace).Create(ctx, obj, metav1.CreateOptions{})
 	})
 }
 
-func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *apps.ReplicaSet) error {
-	return createWithRetries(func() (*apps.ReplicaSet, error) {
-		return c.AppsV1().ReplicaSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+func CreateReplicaSetWithRetries(ctx context.Context, c clientset.Interface, namespace string, obj *apps.ReplicaSet) error {
+	return createWithRetries(ctx, func() (*apps.ReplicaSet, error) {
+		return c.AppsV1().ReplicaSets(namespace).Create(ctx, obj, metav1.CreateOptions{})
 	})
 }
 
-func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *apps.Deployment) error {
-	return createWithRetries(func() (*apps.Deployment, error) {
-		return c.AppsV1().Deployments(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+func CreateDeploymentWithRetries(ctx context.Context, c clientset.Interface, namespace string, obj *apps.Deployment) error {
+	return createWithRetries(ctx, func() (*apps.Deployment, error) {
+		return c.AppsV1().Deployments(namespace).Create(ctx, obj, metav1.CreateOptions{})
 	})
 }
 
-func CreateServiceWithRetries(c clientset.Interface, namespace string, obj *v1.Service) error {
-	return createWithRetries(func() (*v1.Service, error) {
-		return c.CoreV1().Services(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+func CreateServiceWithRetries(ctx context.Context, c clientset.Interface, namespace string, obj *v1.Service) error {
+	return createWithRetries(ctx, func() (*v1.Service, error) {
+		return c.CoreV1().Services(namespace).Create(ctx, obj, metav1.CreateOptions{})
 	})
 }
 
-func CreatePersistentVolumeWithRetries(c clientset.Interface, obj *v1.PersistentVolume) error {
-	return createWithRetries(func() (*v1.PersistentVolume, error) {
-		return c.CoreV1().PersistentVolumes().Create(context.TODO(), obj, metav1.CreateOptions{})
+func CreatePersistentVolumeWithRetries(ctx context.Context, c clientset.Interface, obj *v1.PersistentVolume) error {
+	return createWithRetries(ctx, func() (*v1.PersistentVolume, error) {
+		return c.CoreV1().PersistentVolumes().Create(ctx, obj, metav1.CreateOptions{})
 	})
 }
 
-func CreatePersistentVolumeClaimWithRetries(c clientset.Interface, namespace string, obj *v1.PersistentVolumeClaim) error {
-	return createWithRetries(func() (*v1.PersistentVolumeClaim, error) {
-		return c.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+func CreatePersistentVolumeClaimWithRetries(ctx context.Context, c clientset.Interface, namespace string, obj *v1.PersistentVolumeClaim) error {
+	return createWithRetries(ctx, func() (*v1.PersistentVolumeClaim, error) {
+		return c.CoreV1().PersistentVolumeClaims(namespace).Create(ctx, obj, metav1.CreateOptions{})
 	})
 }
 
