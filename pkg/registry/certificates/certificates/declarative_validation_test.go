@@ -42,12 +42,7 @@ type validationStrategy interface {
 	ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList
 }
 
-type validationStrategy interface {
-	Validate(ctx context.Context, obj runtime.Object) field.ErrorList
-	ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList
-}
-
-func TestDeclarativeValidateForDeclarative(t *testing.T) {
+func TestDeclarativeValidation(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		testDeclarativeValidation(t, apiVersion)
 	}
@@ -218,94 +213,6 @@ func createContextForSubresource(apiVersion, subresource string) context.Context
 	}
 
 	if subresource != "/" {
-		requestInfo.Subresource = subresource[1:] // Remove leading "/"
-	}
-
-	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), requestInfo)
-}
-
-func makeValidCSR(mutators ...func(*api.CertificateSigningRequest)) api.CertificateSigningRequest {
-	csr := api.CertificateSigningRequest{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-csr",
-		},
-		Spec: api.CertificateSigningRequestSpec{
-			Request:    newCSRPEM(&testing.T{}),
-			SignerName: "example.com/signer",
-			Usages:     []api.KeyUsage{api.UsageDigitalSignature, api.UsageKeyEncipherment},
-		},
-	}
-	for _, mutate := range mutators {
-		mutate(&csr)
-	}
-	return csr
-}
-
-func newCSRPEM(t *testing.T) []byte {
-	template := &x509.CertificateRequest{
-		Subject: pkix.Name{
-			Organization: []string{"testing-org"},
-		},
-	}
-
-	_, key, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, key)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	csrPemBlock := &pem.Block{
-		Type:  "CERTIFICATE REQUEST",
-		Bytes: csrDER,
-	}
-
-	p := pem.EncodeToMemory(csrPemBlock)
-	if p == nil {
-		t.Fatal("invalid pem block")
-	}
-
-	return p
-}
-
-func withApprovedCondition() func(*api.CertificateSigningRequest) {
-	return func(csr *api.CertificateSigningRequest) {
-		csr.Status.Conditions = append(csr.Status.Conditions, api.CertificateSigningRequestCondition{
-			Type:   api.CertificateApproved,
-			Status: core.ConditionTrue,
-		})
-	}
-}
-
-func withDeniedCondition() func(*api.CertificateSigningRequest) {
-	return func(csr *api.CertificateSigningRequest) {
-		csr.Status.Conditions = append(csr.Status.Conditions, api.CertificateSigningRequestCondition{
-			Type:   api.CertificateDenied,
-			Status: core.ConditionTrue,
-		})
-	}
-}
-
-func withFailedCondition() func(*api.CertificateSigningRequest) {
-	return func(csr *api.CertificateSigningRequest) {
-		csr.Status.Conditions = append(csr.Status.Conditions, api.CertificateSigningRequestCondition{
-			Type:   api.CertificateFailed,
-			Status: core.ConditionTrue,
-		})
-	}
-}
-
-func createContextForSubresource(apiVersion, subresource string) context.Context {
-	requestInfo := &genericapirequest.RequestInfo{
-		APIGroup:   "certificates.k8s.io",
-		APIVersion: apiVersion,
-	}
-
-	if subresource != "/" {
-		requestInfo.IsResourceRequest = true
 		requestInfo.Subresource = subresource[1:] // Remove leading "/"
 	}
 
