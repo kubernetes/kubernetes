@@ -18,8 +18,6 @@ package sliceofstruct
 
 import (
 	"testing"
-
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Test(t *testing.T) {
