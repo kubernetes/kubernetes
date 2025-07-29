@@ -29,7 +29,6 @@ import (
 
 const (
 	// Parameters for retrying updates/waits with linear backoff.
-	// TODO: Try to move this to exponential backoff by modifying scale.Scale().
 	updateRetryInterval = 5 * time.Second
 	updateRetryTimeout  = 1 * time.Minute
 	waitRetryInterval   = 5 * time.Second
