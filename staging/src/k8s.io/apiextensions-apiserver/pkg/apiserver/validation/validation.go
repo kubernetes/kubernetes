@@ -116,15 +116,14 @@ func NewSchemaValidatorForVersion(customResourceValidation *apiextensions.JSONSc
 			return nil, nil, err
 		}
 	}
-	return NewSchemaValidatorFromOpenAPI(openapiSchema), openapiSchema, nil
+	return NewSchemaValidatorFromOpenAPI(openapiSchema, NewVersionedRegistry(emulationVersion)), openapiSchema, nil
 }
 
-func NewSchemaValidatorFromOpenAPI(openapiSchema *spec.Schema) SchemaValidator {
+func NewSchemaValidatorFromOpenAPI(openapiSchema *spec.Schema, formats strfmt.Registry) SchemaValidator {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CRDValidationRatcheting) {
-		return NewRatchetingSchemaValidator(openapiSchema, nil, "", strfmt.Default)
+		return NewRatchetingSchemaValidator(openapiSchema, nil, "", formats)
 	}
-	return basicSchemaValidator{validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default)}
-
+	return basicSchemaValidator{validate.NewSchemaValidator(openapiSchema, nil, "", formats)}
 }
 
 // ValidateCustomResourceUpdate validates the transition of Custom Resource from

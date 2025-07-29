@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 // supportedVersionedFormats tracks the formats supported by CRD schemas, and the version at which support was introduced.
@@ -159,3 +160,25 @@ var (
 )
 
 var legacyPostProcessor = StripUnsupportedFormatsPostProcessorForVersion(version.MajorMinor(1, 0))
+
+// NewVersionedRegistry returns a format registry with only the formats for the given Kubernetes version.
+func NewVersionedRegistry(emulationVersion *version.Version) strfmt.Registry {
+	registry := strfmt.NewFormats() // This creates a copy of the default registry
+	supported := supportedFormatsAtVersion(emulationVersion).supported
+
+	allKnownFormats := sets.New[string]()
+	for _, vf := range supportedVersionedFormats {
+		for format := range vf.formats {
+			allKnownFormats.Insert(format)
+		}
+	}
+
+	for formatName := range allKnownFormats {
+		normalized := strings.ReplaceAll(formatName, "-", "")
+		if !supported.Has(normalized) {
+			registry.DelByName(formatName)
+		}
+	}
+
+	return registry
+}

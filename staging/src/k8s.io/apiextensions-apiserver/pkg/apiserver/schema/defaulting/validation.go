@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -73,7 +74,8 @@ func validate(ctx context.Context, pth *field.Path, s *structuralschema.Structur
 	isResourceRoot := s == rootSchema
 
 	if s.Default.Object != nil {
-		validator := apiservervalidation.NewSchemaValidatorFromOpenAPI(s.ToKubeOpenAPI())
+		formatRegistry := apiservervalidation.NewVersionedRegistry(compatibility.KubeComponentEffectiveVersion(compatibility.DefaultComponentGlobalsRegistry).EmulationVersion())
+		validator := apiservervalidation.NewSchemaValidatorFromOpenAPI(s.ToKubeOpenAPI(), formatRegistry)
 
 		if insideMeta {
 			obj, _, err := f(runtime.DeepCopyJSONValue(s.Default.Object))
