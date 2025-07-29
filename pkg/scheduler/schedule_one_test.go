@@ -917,7 +917,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			eventReason:        "FailedScheduling",
 		},
 		{
-			name: "pod with existing nominated node name on scheduling error",
+			name: "pod with existing nominated node name on scheduling error keeps nomination",
 			sendPod: func() *v1.Pod {
 				p := podWithID("foo", "")
 				p.Status.NominatedNodeName = "existing-node"
@@ -936,7 +936,38 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				p.Status.NominatedNodeName = "existing-node"
 				return p
 			}(),
-			eventReason: "FailedScheduling",
+			// Depending on the timing, if asyncAPICallsEnabled, the NNN update might not be sent yet while checking the expectNominatedNodeName.
+			// So, asyncAPICallsEnabled is set to false.
+			asyncAPICallsEnabled:                   ptr.To(false),
+			nominatedNodeNameForExpectationEnabled: ptr.To(true),
+			expectNominatedNodeName:                "existing-node",
+			eventReason:                            "FailedScheduling",
+		},
+		{
+			name: "pod with existing nominated node name on scheduling error clears nomination",
+			sendPod: func() *v1.Pod {
+				p := podWithID("foo", "")
+				p.Status.NominatedNodeName = "existing-node"
+				return p
+			}(),
+			injectSchedulingError: schedulingErr,
+			mockScheduleResult:    scheduleResultOk,
+			expectError:           schedulingErr,
+			expectErrorPod: func() *v1.Pod {
+				p := podWithID("foo", "")
+				p.Status.NominatedNodeName = "existing-node"
+				return p
+			}(),
+			expectPodInBackoffQ: func() *v1.Pod {
+				p := podWithID("foo", "")
+				p.Status.NominatedNodeName = "existing-node"
+				return p
+			}(),
+			// Depending on the timing, if asyncAPICallsEnabled, the NNN update might not be sent yet while checking the expectNominatedNodeName.
+			// So, asyncAPICallsEnabled is set to false.
+			asyncAPICallsEnabled:                   ptr.To(false),
+			nominatedNodeNameForExpectationEnabled: ptr.To(false),
+			eventReason:                            "FailedScheduling",
 		},
 	}
 
@@ -1127,6 +1158,16 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						} else if item.expectError.Error() != gotError.Error() {
 							t.Errorf("Unexpected error. Wanted %v, got %v", item.expectError.Error(), gotError.Error())
 						}
+						if item.expectError != nil {
+							var expectedNominatingInfo *framework.NominatingInfo
+							// Check nominatingInfo expectation based on feature gate
+							if !nominatedNodeNameForExpectationEnabled {
+								expectedNominatingInfo = &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: ""}
+							}
+							if diff := cmp.Diff(expectedNominatingInfo, gotNominatingInfo); diff != "" {
+								t.Errorf("Unexpected nominatingInfo (-want,+got):\n%s", diff)
+							}
+						}
 						if diff := cmp.Diff(item.expectBind, gotBinding); diff != "" {
 							t.Errorf("Unexpected binding (-want,+got):\n%s", diff)
 						}
@@ -1155,16 +1196,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 						} else {
 							if len(unschedulablePods) > 0 {
 								t.Errorf("Expected unschedulable pods to be empty, but it's not.\nGot: %v", unschedulablePods)
-							}
-						}
-						if item.expectError != nil {
-							var expectedNominatingInfo *framework.NominatingInfo
-							// Check nominatingInfo expectation based on feature gate
-							if !nominatedNodeNameForExpectationEnabled {
-								expectedNominatingInfo = &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: ""}
-							}
-							if diff := cmp.Diff(expectedNominatingInfo, gotNominatingInfo); diff != "" {
-								t.Errorf("Unexpected nominatingInfo diff (-want +got):\n%s", diff)
 							}
 						}
 						stopFunc()
