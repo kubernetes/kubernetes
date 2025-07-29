@@ -133,8 +133,9 @@ type Evaluator struct {
 	PodLister  corelisters.PodLister
 	PdbLister  policylisters.PodDisruptionBudgetLister
 
-	enableAsyncPreemption bool
-	mu                    sync.RWMutex
+	enableAsyncPreemption                 bool
+	enableNominatedNodeNameForExpectation bool
+	mu                                    sync.RWMutex
 	// preempting is a set that records the pods that are currently triggering preemption asynchronously,
 	// which is used to prevent the pods from entering the scheduling cycle meanwhile.
 	preempting sets.Set[types.UID]
@@ -146,18 +147,19 @@ type Evaluator struct {
 	Interface
 }
 
-func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsyncPreemption bool) *Evaluator {
+func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsyncPreemption bool, enableNominatedNodeNameForExpectation bool) *Evaluator {
 	podLister := fh.SharedInformerFactory().Core().V1().Pods().Lister()
 	pdbLister := fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister()
 
 	ev := &Evaluator{
-		PluginName:            pluginName,
-		Handler:               fh,
-		PodLister:             podLister,
-		PdbLister:             pdbLister,
-		Interface:             i,
-		enableAsyncPreemption: enableAsyncPreemption,
-		preempting:            sets.New[types.UID](),
+		PluginName:                            pluginName,
+		Handler:                               fh,
+		PodLister:                             podLister,
+		PdbLister:                             pdbLister,
+		Interface:                             i,
+		enableAsyncPreemption:                 enableAsyncPreemption,
+		enableNominatedNodeNameForExpectation: enableNominatedNodeNameForExpectation,
+		preempting:                            sets.New[types.UID](),
 	}
 
 	// PreemptPod actually makes API calls to preempt a specific Pod.
@@ -274,6 +276,10 @@ func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.
 			},
 		}
 		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling"))
+
+		if ev.enableNominatedNodeNameForExpectation {
+			return nil, fwk.NewStatus(fwk.Unschedulable, fitError.Error())
+		}
 		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
 		return framework.NewPostFilterResultWithNominatedNode(""), fwk.NewStatus(fwk.Unschedulable, fitError.Error())
 	}
