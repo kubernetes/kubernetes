@@ -77,6 +77,15 @@ func testResourceSlice(name, nodeName, driverName string, numDevices int) *resou
 	return slice
 }
 
+func testResourceSliceWithBindingConditions(name, nodeName, driverName string, numDevices int, bindingConditions, bindingFailureConditions []string) *resourceapi.ResourceSlice {
+	slice := testResourceSlice(name, nodeName, driverName, numDevices)
+	for i := range slice.Spec.Devices {
+		slice.Spec.Devices[i].BindingConditions = bindingConditions
+		slice.Spec.Devices[i].BindingFailureConditions = bindingFailureConditions
+	}
+	return slice
+}
+
 func TestValidateResourceSlice(t *testing.T) {
 	goodName := "foo"
 	badName := "!@#$%^"
@@ -778,6 +787,45 @@ func TestValidateResourceSlice(t *testing.T) {
 				slice.Spec.Devices[64].ConsumesCounters = createConsumesCounters(1)
 				return slice
 			}(),
+		},
+		"good-binding-conditions": {
+			slice: testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"example.com/condition1", "condition2"}, []string{"example.com/condition3", "condition4"}),
+		},
+		"too-many-binding-conditions": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("bindingConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2", "condition3", "condition4", "condition5"}, []string{"condition6", "condition7"}),
+		},
+		"too-many-binding-failure-conditions": {
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition4", "condition5", "condition6", "condition7"}),
+		},
+		"invalid-binding-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("bindingConditions").Index(1), "condition2!", conditionValidationErrMessage)},
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2!"}, []string{"condition3", "condition4"}),
+		},
+		"invalid-binding-failure-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions").Index(0), "condition3!", conditionValidationErrMessage)},
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3!", "condition4"}),
+		},
+		"invalid-slice-has-binding-failure-but-no-binding-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("bindingConditions"), []string(nil), "bindingConditions are required to use bindingFailureConditions")},
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, nil, []string{"condition1", "condition2"}),
+		},
+		"invalid-slice-has-binding-conditions-but-no-binding-failure-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions"), []string(nil), "bindingFailureConditions are required to use bindingConditions")},
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, nil),
+		},
+		"duplicate-binding-conditions": {
+			wantFailures: field.ErrorList{field.Duplicate(field.NewPath("spec", "devices").Index(0).Child("bindingConditions").Index(1), "condition1")},
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition1"}, []string{"condition2", "condition3"}),
+		},
+		"duplicate-binding-failure-conditions": {
+			wantFailures: field.ErrorList{field.Duplicate(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions").Index(1), "condition3")},
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition3"}),
+		},
+		"overlapping-binding-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions").Index(0), "condition1", "bindingFailureConditions must not overlap with bindingConditions")},
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition1", "condition3"}),
 		},
 	}
 
