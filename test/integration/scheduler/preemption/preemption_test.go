@@ -1558,9 +1558,9 @@ func newAlwaysFail(_ context.Context, _ runtime.Object, _ framework.Handle) (fra
 	return &alwaysFail{}, nil
 }
 
-// TestNominatedNodeCleanUp verifies if a pod's nominatedNodeName is set and unset
+// TestNominatedNode verifies if a pod's nominatedNodeName is set and unset
 // properly in different scenarios.
-func TestNominatedNodeCleanUp(t *testing.T) {
+func TestNominatedNode(t *testing.T) {
 	tests := []struct {
 		name string
 		// Initial nodes to simulate special conditions.
@@ -1574,6 +1574,9 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		deleteFakeNode bool
 		// Pods to be deleted. Optional.
 		podNamesToDelete []string
+		// Whether NominatedNodeName will be always nil at the end of the test,
+		// regardless of the NominatedNodeNameForExpectation feature gate state.
+		expectNilNominatedNodeName bool
 
 		// Register dummy plugin to simulate particular scheduling failures. Optional.
 		customPlugins     *configv1.Plugins
@@ -1601,7 +1604,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 				testutils.WaitForNominatedNodeName,
 				testutils.WaitForNominatedNodeName,
 			},
-			podNamesToDelete: []string{"low-1", "low-2", "low-3", "low-4"},
+			podNamesToDelete:           []string{"low-1", "low-2", "low-3", "low-4"},
+			expectNilNominatedNodeName: true,
 		},
 		{
 			name:         "mid-priority pod preempts low-priority pod, followed by a high-priority pod without additional preemption",
@@ -1703,84 +1707,102 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, asyncAPICallsEnabled := range []bool{true, false} {
-			for _, tt := range tests {
-				t.Run(fmt.Sprintf("%s (Async preemption enabled: %v, Async API calls enabled: %v)", tt.name, asyncPreemptionEnabled, asyncAPICallsEnabled), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
+			for _, nominatedNodeNameForExpectationEnabled := range []bool{false} {
+				for _, tt := range tests {
+					t.Run(fmt.Sprintf("%s (Async preemption: %v, Async API calls: %v, NNN for expectation: %v)", tt.name, asyncPreemptionEnabled, asyncAPICallsEnabled, nominatedNodeNameForExpectationEnabled), func(t *testing.T) {
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, asyncPreemptionEnabled)
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NominatedNodeNameForExpectation, nominatedNodeNameForExpectationEnabled)
 
-					cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
-						Profiles: []configv1.KubeSchedulerProfile{{
-							SchedulerName: ptr.To(v1.DefaultSchedulerName),
-							Plugins:       tt.customPlugins,
-						}},
-					})
-					testCtx := initTest(
-						t,
-						"preemption",
-						scheduler.WithProfiles(cfg.Profiles...),
-						scheduler.WithFrameworkOutOfTreeRegistry(tt.outOfTreeRegistry),
-					)
+						cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+							Profiles: []configv1.KubeSchedulerProfile{{
+								SchedulerName: ptr.To(v1.DefaultSchedulerName),
+								Plugins:       tt.customPlugins,
+							}},
+						})
+						testCtx := initTest(
+							t,
+							"preemption",
+							scheduler.WithProfiles(cfg.Profiles...),
+							scheduler.WithFrameworkOutOfTreeRegistry(tt.outOfTreeRegistry),
+						)
 
-					cs, ns := testCtx.ClientSet, testCtx.NS.Name
-					for _, node := range tt.initNodes {
-						if _, err := createNode(cs, node); err != nil {
-							t.Fatalf("Error creating initial node %v: %v", node.Name, err)
-						}
-					}
-
-					// Create a node with the specified capacity.
-					nodeName := "fake-node"
-					if _, err := createNode(cs, st.MakeNode().Name(nodeName).Capacity(tt.nodeCapacity).Obj()); err != nil {
-						t.Fatalf("Error creating node %v: %v", nodeName, err)
-					}
-
-					// Create pods and run post check if necessary.
-					for i, pods := range tt.podsToCreate {
-						for _, p := range pods {
-							p.Namespace = ns
-							if _, err := createPausePod(cs, p); err != nil {
-								t.Fatalf("Error creating pod %v: %v", p.Name, err)
+						cs, ns := testCtx.ClientSet, testCtx.NS.Name
+						for _, node := range tt.initNodes {
+							if _, err := createNode(cs, node); err != nil {
+								t.Fatalf("Error creating initial node %v: %v", node.Name, err)
 							}
 						}
-						// If necessary, run the post check function.
-						if len(tt.postChecks) > i && tt.postChecks[i] != nil {
+
+						// Create a node with the specified capacity.
+						nodeName := "fake-node"
+						if _, err := createNode(cs, st.MakeNode().Name(nodeName).Capacity(tt.nodeCapacity).Obj()); err != nil {
+							t.Fatalf("Error creating node %v: %v", nodeName, err)
+						}
+
+						// Create pods and run post check if necessary.
+						for i, pods := range tt.podsToCreate {
 							for _, p := range pods {
-								if err := tt.postChecks[i](testCtx.Ctx, cs, p); err != nil {
-									t.Fatalf("Pod %v didn't pass the postChecks[%v]: %v", p.Name, i, err)
+								p.Namespace = ns
+								if _, err := createPausePod(cs, p); err != nil {
+									t.Fatalf("Error creating pod %v: %v", p.Name, err)
+								}
+							}
+							// If necessary, run the post check function.
+							if len(tt.postChecks) > i && tt.postChecks[i] != nil {
+								for _, p := range pods {
+									if err := tt.postChecks[i](testCtx.Ctx, cs, p); err != nil {
+										t.Fatalf("Pod %v didn't pass the postChecks[%v]: %v", p.Name, i, err)
+									}
 								}
 							}
 						}
-					}
 
-					// Delete the fake node if necessary.
-					if tt.deleteFakeNode {
-						if err := cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, *metav1.NewDeleteOptions(0)); err != nil {
-							t.Fatalf("Node %v cannot be deleted: %v", nodeName, err)
+						// Delete the fake node if necessary.
+						if tt.deleteFakeNode {
+							if err := cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, *metav1.NewDeleteOptions(0)); err != nil {
+								t.Fatalf("Node %v cannot be deleted: %v", nodeName, err)
+							}
 						}
-					}
 
-					// Force deleting the terminating pods if necessary.
-					// This is required if we demand to delete terminating Pods physically.
-					for _, podName := range tt.podNamesToDelete {
-						if err := deletePod(cs, podName, ns); err != nil {
-							t.Fatalf("Pod %v cannot be deleted: %v", podName, err)
+						// Force deleting the terminating pods if necessary.
+						// This is required if we demand to delete terminating Pods physically.
+						for _, podName := range tt.podNamesToDelete {
+							if err := deletePod(cs, podName, ns); err != nil {
+								t.Fatalf("Pod %v cannot be deleted: %v", podName, err)
+							}
 						}
-					}
 
-					// Verify if .status.nominatedNodeName is cleared.
-					if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-						pod, err := cs.CoreV1().Pods(ns).Get(ctx, "medium", metav1.GetOptions{})
-						if err != nil {
-							t.Errorf("Error getting the medium pod: %v", err)
+						if nominatedNodeNameForExpectationEnabled && !tt.expectNilNominatedNodeName {
+							// Verify if .status.nominatedNodeName is not cleared when NominatedNodeNameForExpectation is enabled.
+							// Wait for 1 second to make sure the pod is re-processed, what would potentially clear the NominatedNodeName (when the feature won't work).
+							select {
+							case <-time.After(time.Second):
+							case <-testCtx.Ctx.Done():
+							}
+							pod, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, "medium", metav1.GetOptions{})
+							if err != nil {
+								t.Errorf("Error getting the medium pod: %v", err)
+							} else if len(pod.Status.NominatedNodeName) == 0 {
+								t.Errorf(".status.nominatedNodeName of the medium pod was cleared: %v", err)
+							}
+						} else {
+							// Verify if .status.nominatedNodeName is cleared when NominatedNodeNameForExpectation is disabled.
+							if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
+								pod, err := cs.CoreV1().Pods(ns).Get(ctx, "medium", metav1.GetOptions{})
+								if err != nil {
+									t.Errorf("Error getting the medium pod: %v", err)
+								}
+								if len(pod.Status.NominatedNodeName) == 0 {
+									return true, nil
+								}
+								return false, err
+							}); err != nil {
+								t.Errorf(".status.nominatedNodeName of the medium pod was not cleared: %v", err)
+							}
 						}
-						if len(pod.Status.NominatedNodeName) == 0 {
-							return true, nil
-						}
-						return false, err
-					}); err != nil {
-						t.Errorf(".status.nominatedNodeName of the medium pod was not cleared: %v", err)
-					}
-				})
+					})
+				}
 			}
 		}
 	}
