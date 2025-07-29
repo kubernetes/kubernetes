@@ -188,8 +188,12 @@ func autoConvert_v1_ConversionCustomContainer_To_example_ConversionCustomContain
 		in, out := &in.SliceP, &out.SliceP
 		*out = make([]*example.ConversionCustom, len(*in))
 		for i := range *in {
-			// FIXME: Provide conversion function to convert *ConversionCustom to *example.ConversionCustom
-			compileErrorOnMissingConversion()
+			if (*in)[i] != nil {
+				(*out)[i] = new(example.ConversionCustom)
+				if err := Convert_v1_ConversionCustom_To_example_ConversionCustom((*in)[i], (*out)[i], s); err != nil {
+					return err
+				}
+			}
 		}
 	} else {
 		out.SliceP = nil
@@ -211,8 +215,14 @@ func autoConvert_v1_ConversionCustomContainer_To_example_ConversionCustomContain
 		in, out := &in.MapP, &out.MapP
 		*out = make(map[string]*example.ConversionCustom, len(*in))
 		for key, val := range *in {
-			// FIXME: Provide conversion function to convert *ConversionCustom to *example.ConversionCustom
-			compileErrorOnMissingConversion()
+			newVal := new(*example.ConversionCustom)
+			if val != nil {
+				*newVal = new(example.ConversionCustom)
+				if err := Convert_v1_ConversionCustom_To_example_ConversionCustom(val, *newVal, s); err != nil {
+					return err
+				}
+			}
+			(*out)[key] = *newVal
 		}
 	} else {
 		out.MapP = nil
@@ -253,8 +263,12 @@ func autoConvert_example_ConversionCustomContainer_To_v1_ConversionCustomContain
 		in, out := &in.SliceP, &out.SliceP
 		*out = make([]*ConversionCustom, len(*in))
 		for i := range *in {
-			// FIXME: Provide conversion function to convert *example.ConversionCustom to *ConversionCustom
-			compileErrorOnMissingConversion()
+			if (*in)[i] != nil {
+				(*out)[i] = new(ConversionCustom)
+				if err := Convert_example_ConversionCustom_To_v1_ConversionCustom((*in)[i], (*out)[i], s); err != nil {
+					return err
+				}
+			}
 		}
 	} else {
 		out.SliceP = nil
@@ -276,8 +290,14 @@ func autoConvert_example_ConversionCustomContainer_To_v1_ConversionCustomContain
 		in, out := &in.MapP, &out.MapP
 		*out = make(map[string]*ConversionCustom, len(*in))
 		for key, val := range *in {
-			// FIXME: Provide conversion function to convert *example.ConversionCustom to *ConversionCustom
-			compileErrorOnMissingConversion()
+			newVal := new(*ConversionCustom)
+			if val != nil {
+				*newVal = new(ConversionCustom)
+				if err := Convert_example_ConversionCustom_To_v1_ConversionCustom(val, *newVal, s); err != nil {
+					return err
+				}
+			}
+			(*out)[key] = *newVal
 		}
 	} else {
 		out.MapP = nil
