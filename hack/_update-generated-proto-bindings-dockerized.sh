@@ -27,11 +27,9 @@ source "${KUBE_ROOT}/hack/lib/protoc.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 if (( $# < 2 )); then
-    echo "usage: $0 [gogo|protoc] <api_dir>..."
+    echo "usage: $0 <api_dir>..."
     exit 1
 fi
-
-generator=$1; shift
 
 kube::protoc::check_protoc
 
@@ -49,16 +47,6 @@ for api; do
 
     for file in "${protos[@]}"; do
         dir="$(dirname "${file}")"
-        case "${generator}" in
-        gogo)
-          kube::protoc::generate_proto_gogo "${dir}"
-          ;;
-        protoc)
-          kube::protoc::generate_proto "${dir}"
-          ;;
-        *)
-          echo "Unknown generator ${generator}" >&2
-          exit 1
-        esac        
+        kube::protoc::generate_proto "${dir}"
     done
 done
