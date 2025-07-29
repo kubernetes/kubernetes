@@ -34,9 +34,6 @@ github.com/Microsoft/hnslib/internal/runhcs
 # github.com/NYTimes/gziphandler v1.1.1
 ## explicit; go 1.11
 github.com/NYTimes/gziphandler
-# github.com/alvaroaleman/iradix-go v0.0.0-20250729021833-9302b373cbd2
-## explicit; go 1.23.0
-github.com/alvaroaleman/iradix-go
 # github.com/antlr4-go/antlr/v4 v4.13.0
 ## explicit; go 1.20
 github.com/antlr4-go/antlr/v4

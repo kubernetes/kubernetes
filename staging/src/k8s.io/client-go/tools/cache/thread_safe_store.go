@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"sync"
 
-	iradix "github.com/alvaroaleman/iradix-go"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -376,20 +375,5 @@ func (c *threadSafeMap) Resync() error {
 
 // NewThreadSafeStore creates a new instance of ThreadSafeStore.
 func NewThreadSafeStore(indexers Indexers, _ Indices) ThreadSafeStore {
-	if indexers == nil {
-		indexers = make(Indexers)
-	}
-	s := &threadSafeMVCCStore{
-		indexers: indexers,
-	}
-	snapshot := &mvccStoreSnapshot{
-		data:    iradix.New[any](),
-		indexes: make(map[string]*iradix.Iradix[[]string], len(indexers)),
-	}
-	for indexer := range indexers {
-		snapshot.indexes[indexer] = iradix.New[[]string]()
-	}
-	s.snapshot.Store(snapshot)
-
-	return s
+	return newThreadSafeMVCCStore(indexers)
 }
