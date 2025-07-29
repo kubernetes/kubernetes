@@ -12800,6 +12800,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1.AllocationResult
   map:
     fields:
+    - name: allocationTimestamp
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: devices
       type:
         namedType: io.k8s.api.resource.v1.DeviceAllocationResult
@@ -12843,6 +12846,21 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1.DeviceAttribute
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindsToNode
+      type:
+        scalar: boolean
     - name: capacity
       type:
         map:
@@ -13039,6 +13057,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: adminAccess
       type:
         scalar: boolean
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: device
       type:
         scalar: string
@@ -13460,6 +13490,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta1.AllocationResult
   map:
     fields:
+    - name: allocationTimestamp
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: devices
       type:
         namedType: io.k8s.api.resource.v1beta1.DeviceAllocationResult
@@ -13478,6 +13511,21 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceAttribute
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindsToNode
+      type:
+        scalar: boolean
     - name: capacity
       type:
         map:
@@ -13727,6 +13775,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: adminAccess
       type:
         scalar: boolean
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: device
       type:
         scalar: string
@@ -14042,6 +14102,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta2.AllocationResult
   map:
     fields:
+    - name: allocationTimestamp
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: devices
       type:
         namedType: io.k8s.api.resource.v1beta2.DeviceAllocationResult
@@ -14085,6 +14148,21 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.DeviceAttribute
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindsToNode
+      type:
+        scalar: boolean
     - name: capacity
       type:
         map:
@@ -14281,6 +14359,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: adminAccess
       type:
         scalar: boolean
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: device
       type:
         scalar: string

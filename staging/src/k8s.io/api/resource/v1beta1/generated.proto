@@ -94,6 +94,16 @@ message AllocationResult {
   //
   // +optional
   optional .k8s.io.api.core.v1.NodeSelector nodeSelector = 3;
+
+  // AllocationTimestamp stores the time when the resources were allocated.
+  // This field is not guaranteed to be set, in which case that time is unknown.
+  //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gate.
+  //
+  // +optional
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time allocationTimestamp = 5;
 }
 
 // BasicDevice defines one device instance.
@@ -172,6 +182,51 @@ message BasicDevice {
   // +listType=atomic
   // +featureGate=DRADeviceTaints
   repeated DeviceTaint taints = 7;
+
+  // BindsToNode indicates if the usage of an allocation involving this device
+  // has to be limited to exactly the node that was chosen when allocating the claim.
+  // If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
+  // to match the node where the allocation was made.
+  //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
+  //
+  // +optional
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  optional bool bindsToNode = 8;
+
+  // BindingConditions defines the conditions for proceeding with binding.
+  // All of these conditions must be set in the per-device status
+  // conditions with a value of True to proceed with binding the pod to the node
+  // while scheduling the pod.
+  //
+  // The maximum number of binding conditions is 4.
+  //
+  // The conditions must be a valid condition type string.
+  //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  repeated string bindingConditions = 9;
+
+  // BindingFailureConditions defines the conditions for binding failure.
+  // They may be set in the per-device status conditions.
+  // If any is true, a binding failure occurred.
+  //
+  // The maximum number of binding failure conditions is 4.
+  //
+  // The conditions must be a valid condition type string.
+  //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  repeated string bindingFailureConditions = 10;
 }
 
 // CELDeviceSelector contains a CEL expression for selecting a device.
@@ -730,6 +785,28 @@ message DeviceRequestAllocationResult {
   // +listType=atomic
   // +featureGate=DRADeviceTaints
   repeated DeviceToleration tolerations = 6;
+
+  // BindingConditions contains a copy of the BindingConditions
+  // from the corresponding ResourceSlice at the time of allocation.
+  //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  repeated string bindingConditions = 7;
+
+  // BindingFailureConditions contains a copy of the BindingFailureConditions
+  // from the corresponding ResourceSlice at the time of allocation.
+  //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  repeated string bindingFailureConditions = 8;
 }
 
 // DeviceSelector must have exactly one field set.

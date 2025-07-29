@@ -54,6 +54,8 @@ var SupportedFeatures = internal.Features{
 	PrioritizedList:      true,
 	PartitionableDevices: true,
 	DeviceTaints:         true,
+	DeviceBinding:        true,
+	DeviceStatus:         true,
 }
 
 type Allocator struct {
@@ -293,6 +295,13 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				Device:      internal.id.Device.String(),
 				AdminAccess: internal.adminAccess,
 			}
+			// Performance optimization: skip the for loop if the feature is off.
+			// Not needed for correctness because if the feature is off, the selected
+			// device should not have binding conditions.
+			if a.features.DeviceBinding {
+				allocationResult.Devices.Results[i].BindingConditions = internal.BindingConditions
+				allocationResult.Devices.Results[i].BindingFailureConditions = internal.BindingFailureConditions
+			}
 		}
 
 		// Populate configs.
@@ -356,7 +365,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 		}
 
 		// Determine node selector.
-		nodeSelector, err := alloc.createNodeSelector(internalResult.devices)
+		nodeSelector, err := alloc.createNodeSelector(internalResult.devices, node.Name)
 		if err != nil {
 			return nil, fmt.Errorf("create NodeSelector for claim %s: %w", claim.Name, err)
 		}
@@ -930,6 +939,12 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 // isSelectable checks whether a device satisfies the request and class selectors.
 func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, slice *draapi.ResourceSlice, deviceIndex int) (bool, error) {
 	device := &slice.Spec.Devices[deviceIndex]
+	if (!alloc.features.DeviceBinding || !alloc.features.DeviceStatus) &&
+		len(device.BindingConditions) > 0 {
+		// Devices with binding conditions are not supported, feature is off.
+		return false, nil
+	}
+
 	deviceID := DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name}
 	matchKey := matchKey{DeviceID: deviceID, requestIndices: r}
 	if matches, ok := alloc.deviceMatchesRequest[matchKey]; ok {
@@ -1296,7 +1311,7 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
 // otherwise it returns nil.
-func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.NodeSelector, error) {
+func (alloc *allocator) createNodeSelector(result []internalDeviceResult, targetNodeName string) (*v1.NodeSelector, error) {
 	// Selector with one term. That term gets extended with additional
 	// requirements from the different devices.
 	ns := &v1.NodeSelector{
@@ -1314,15 +1329,15 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 			nodeName = slice.Spec.NodeName
 			nodeSelector = slice.Spec.NodeSelector
 		}
-		if nodeName != nil {
-			// At least one device is local to one node. This
-			// restricts the allocation to that node.
+		if nodeName != nil || result[i].BindsToNode {
+			// At least one device is local to one node or binds to a node,
+			// so we need to restrict the allocation to that node.
 			return &v1.NodeSelector{
 				NodeSelectorTerms: []v1.NodeSelectorTerm{{
 					MatchFields: []v1.NodeSelectorRequirement{{
 						Key:      "metadata.name",
 						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{*nodeName},
+						Values:   []string{targetNodeName},
 					}},
 				}},
 			}, nil

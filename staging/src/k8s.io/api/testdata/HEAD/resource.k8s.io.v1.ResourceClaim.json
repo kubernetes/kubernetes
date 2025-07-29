@@ -144,6 +144,12 @@
                 "effect": "effectValue",
                 "tolerationSeconds": 5
               }
+            ],
+            "bindingConditions": [
+              "bindingConditionsValue"
+            ],
+            "bindingFailureConditions": [
+              "bindingFailureConditionsValue"
             ]
           }
         ],
@@ -192,7 +198,8 @@
             ]
           }
         ]
-      }
+      },
+      "allocationTimestamp": "2005-01-01T01:01:01Z"
     },
     "reservedFor": [
       {
