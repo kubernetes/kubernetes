@@ -25,6 +25,12 @@ func addEnvironmentSelectors(specs et.ExtensionTestSpecs) {
 	specs.SelectAny([]et.SelectFunction{ // Since these must use "NameContainsAll" they cannot be included in filterByNetwork
 		et.NameContainsAll("NetworkPolicy", "named port"),
 	}).Exclude(et.NetworkEquals("OVNKubernetes")).AddLabel("[Skipped:Network/OVNKubernetes]")
+
+	// SELinux tests marked with [Feature:SELinuxMountReadWriteOncePodOnly] require SELinuxMount
+	// feature gate **disabled**.
+	// TODO(jsafrane): once SELinuxMount graduates to GA, remove the tests upstream + remove this check.
+	specs.Select(et.NameContains("[Feature:SELinuxMountReadWriteOncePodOnly]")).
+		Exclude(et.FeatureGateEnabled("SELinuxMount"))
 }
 
 // filterByPlatform is a helper function to do, simple, "NameContains" filtering on tests by platform
