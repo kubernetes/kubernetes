@@ -18,15 +18,16 @@ package oidc
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -86,7 +87,7 @@ func runEgressProxy(t testing.TB, udsName string, ready chan<- struct{}) {
 
 		go func() {
 			_, err := io.Copy(backendConn, requestHijackedConn)
-			if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			if err != nil && !utilnet.IsProbableEOF(err) {
 				t.Errorf("unexpected writer error: %v", err)
 			}
 			close(writerComplete)
@@ -94,7 +95,7 @@ func runEgressProxy(t testing.TB, udsName string, ready chan<- struct{}) {
 
 		go func() {
 			_, err := io.Copy(requestHijackedConn, backendConn)
-			if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			if err != nil && !utilnet.IsProbableEOF(err) {
 				t.Errorf("unexpected reader error: %v", err)
 			}
 			close(readerComplete)
@@ -116,7 +117,9 @@ func runEgressProxy(t testing.TB, udsName string, ready chan<- struct{}) {
 		}
 
 		err := server.Shutdown(context.Background())
-		t.Logf("shutdown exit error: %v", err)
+		if err != nil && !utilnet.IsProbableEOF(err) {
+			t.Logf("shutdown exit error: %v", err)
+		}
 	})
 
 	var once sync.Once
@@ -147,5 +150,7 @@ func runEgressProxy(t testing.TB, udsName string, ready chan<- struct{}) {
 	}()
 
 	err = server.Serve(l)
-	t.Logf("egress exit error: %v", err)
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		t.Logf("egress exit error: %v", err)
+	}
 }
