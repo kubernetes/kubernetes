@@ -1047,13 +1047,13 @@ function codegen::protobindings() {
     done
 
     if kube::protoc::check_protoc >/dev/null; then
-      hack/_update-generated-proto-bindings-dockerized.sh protoc "${apis[@]}"
+      hack/_update-generated-proto-bindings-dockerized.sh "${apis[@]}"
     else
       kube::log::status "protoc ${PROTOC_VERSION} not found (can install with hack/install-protoc.sh); generating containerized..."
       # NOTE: All output from this script needs to be copied back to the calling
       # source tree.  This is managed in kube::build::copy_output in build/common.sh.
       # If the output set is changed update that function.
-      build/run.sh hack/_update-generated-proto-bindings-dockerized.sh protoc "${apis[@]}"
+      build/run.sh hack/_update-generated-proto-bindings-dockerized.sh "${apis[@]}"
     fi
 }
 
