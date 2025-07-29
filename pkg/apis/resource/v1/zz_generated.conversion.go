@@ -479,6 +479,7 @@ func autoConvert_v1_AllocationResult_To_resource_AllocationResult(in *resourcev1
 		return err
 	}
 	out.NodeSelector = (*core.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	out.AllocationTimestamp = (*metav1.Time)(unsafe.Pointer(in.AllocationTimestamp))
 	return nil
 }
 
@@ -492,6 +493,7 @@ func autoConvert_resource_AllocationResult_To_v1_AllocationResult(in *resource.A
 		return err
 	}
 	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	out.AllocationTimestamp = (*metav1.Time)(unsafe.Pointer(in.AllocationTimestamp))
 	return nil
 }
 
@@ -571,6 +573,9 @@ func autoConvert_v1_Device_To_resource_Device(in *resourcev1.Device, out *resour
 	out.NodeSelector = (*core.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
 	out.Taints = *(*[]resource.DeviceTaint)(unsafe.Pointer(&in.Taints))
+	out.BindsToNode = (*bool)(unsafe.Pointer(in.BindsToNode))
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	return nil
 }
 
@@ -588,6 +593,9 @@ func autoConvert_resource_Device_To_v1_Device(in *resource.Device, out *resource
 	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
 	out.Taints = *(*[]resourcev1.DeviceTaint)(unsafe.Pointer(&in.Taints))
+	out.BindsToNode = (*bool)(unsafe.Pointer(in.BindsToNode))
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	return nil
 }
 
@@ -931,6 +939,8 @@ func autoConvert_v1_DeviceRequestAllocationResult_To_resource_DeviceRequestAlloc
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	out.Tolerations = *(*[]resource.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	return nil
 }
 
@@ -946,6 +956,8 @@ func autoConvert_resource_DeviceRequestAllocationResult_To_v1_DeviceRequestAlloc
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	out.Tolerations = *(*[]resourcev1.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	return nil
 }
 

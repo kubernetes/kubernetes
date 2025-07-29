@@ -82,6 +82,7 @@ spec:
       name: nameValue
 status:
   allocation:
+    allocationTimestamp: "2005-01-01T01:01:01Z"
     devices:
       config:
       - opaque:
@@ -98,6 +99,10 @@ status:
         source: sourceValue
       results:
       - adminAccess: true
+        bindingConditions:
+        - bindingConditionsValue
+        bindingFailureConditions:
+        - bindingFailureConditionsValue
         device: deviceValue
         driver: driverValue
         pool: poolValue

@@ -218,6 +218,11 @@ func autoConvert_api_Device_To_v1_Device(in *Device, out *v1.Device, s conversio
 	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
 	out.Taints = *(*[]v1.DeviceTaint)(unsafe.Pointer(&in.Taints))
+	if err := metav1.Convert_bool_To_Pointer_bool(&in.BindsToNode, &out.BindsToNode, s); err != nil {
+		return err
+	}
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	return nil
 }
 
@@ -247,6 +252,11 @@ func autoConvert_v1_Device_To_api_Device(in *v1.Device, out *Device, s conversio
 	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
 	out.Taints = *(*[]v1.DeviceTaint)(unsafe.Pointer(&in.Taints))
+	if err := metav1.Convert_Pointer_bool_To_bool(&in.BindsToNode, &out.BindsToNode, s); err != nil {
+		return err
+	}
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	return nil
 }
 
