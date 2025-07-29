@@ -103,7 +103,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		The endpointslice controller should create and delete EndpointSlices for Pods matching a Service.
 	*/
 	framework.ConformanceIt("should create and delete Endpoints and EndpointSlices for a Service with a selector specified", func(ctx context.Context) {
-		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-empty-selector",
 			},
@@ -117,7 +117,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					Protocol: v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc, err := cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
 		// Expect Endpoints resource to be created.
 		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
@@ -160,7 +162,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			framework.Failf("Expected EndpointSlice to have 0 endpoints, got %d: %#v", len(endpointSlice.Endpoints), endpointSlice.Endpoints)
 		}
 
-		err := cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
+		err = cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "error deleting Service")
 
 		// Expect Endpoints resource to be deleted when Service is.
@@ -259,7 +261,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			},
 		})
 
-		svc1 := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc1 := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-int-port",
 			},
@@ -273,9 +275,11 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc1, err := cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc1, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
-		svc2 := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc2 := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-named-port",
 			},
@@ -289,9 +293,11 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc2, err = cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc2, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
-		svc3 := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc3 := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-no-match",
 			},
@@ -305,9 +311,11 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					Protocol:   v1.ProtocolTCP,
 				}},
 			},
-		})
+		}
+		svc3, err = cs.CoreV1().Services(f.Namespace.Name).Create(ctx, svc3, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
-		err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 2*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
 			var err error
 			pod1, err = podClient.Get(ctx, pod1.Name, metav1.GetOptions{})
 			if err != nil {
@@ -537,7 +545,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 	*/
 	framework.ConformanceIt("should support a Service with multiple ports specified in multiple EndpointSlices", func(ctx context.Context) {
 		ns := f.Namespace.Name
-		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-custom-endpoints",
 			},
@@ -555,7 +563,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					},
 				},
 			},
-		})
+		}
+		svc, err := cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
 		// Add a backend pod to the service in the other node
 		port8090 := []v1.ContainerPort{
@@ -614,7 +624,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			Protocol: &tcpProtocol,
 		}}
 
-		_, err := f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps1, metav1.CreateOptions{})
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(ctx, eps1, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Ports = []discoveryv1.EndpointPort{{
@@ -647,7 +657,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 	*/
 	framework.ConformanceIt("should support a Service with multiple endpoint IPs specified in multiple EndpointSlices", func(ctx context.Context) {
 		ns := f.Namespace.Name
-		svc := createServiceReportErr(ctx, cs, f.Namespace.Name, &v1.Service{
+		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-custom-endpoints",
 			},
@@ -665,7 +675,9 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 					},
 				},
 			},
-		})
+		}
+		svc, err := cs.CoreV1().Services(ns).Create(ctx, svc, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "error creating Service")
 
 		// Add a backend pod to the service in the other node
 		port8090 := []v1.ContainerPort{
@@ -726,7 +738,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			Protocol: &tcpProtocol,
 		}}
 
-		_, err := f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps1, metav1.CreateOptions{})
+		_, err = f.ClientSet.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), eps1, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		eps2 := epsTemplate.DeepCopy()
 		eps2.Endpoints = []discoveryv1.Endpoint{
@@ -1030,13 +1042,6 @@ func ensurePodTargetRef(pod *v1.Pod, targetRef *v1.ObjectReference) {
 	if targetRef.UID != pod.UID {
 		framework.Failf("Expected TargetRef.UID to be %s, got %s", pod.UID, targetRef.UID)
 	}
-}
-
-// createServiceReportErr creates a Service and reports any associated error.
-func createServiceReportErr(ctx context.Context, cs clientset.Interface, ns string, service *v1.Service) *v1.Service {
-	svc, err := cs.CoreV1().Services(ns).Create(ctx, service, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "error deleting Service")
-	return svc
 }
 
 // endpointSlicesEqual compare if the Endpoint and the EndpointSliceList contains the same endpoints values
