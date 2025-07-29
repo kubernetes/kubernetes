@@ -33,6 +33,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	kubedefaults "k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
@@ -128,13 +129,18 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 	return fstore.Read(mappingsFile)
 }
 
-func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
+func MakeUserNsManager(kl userNsPodsManager, idsPerPod *int64) (*UsernsManager, error) {
 	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings()
 	if err != nil {
 		return nil, fmt.Errorf("kubelet mappings: %w", err)
 	}
 
-	userNsLength := kl.GetUserNamespacesIDsPerPod()
+	userNsLength := uint32(kubedefaults.DefaultKubeletUserNamespacesIDsPerPod)
+	if idsPerPod != nil {
+		// The value is already validated as part of kubelet config validation, so we can safely
+		// cast it.
+		userNsLength = uint32(*idsPerPod)
+	}
 
 	if userNsLength%userNsUnitLength != 0 {
 		return nil, fmt.Errorf("kubelet user namespace length %v is not a multiple of %d", userNsLength, userNsUnitLength)

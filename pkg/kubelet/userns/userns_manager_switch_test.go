@@ -44,7 +44,7 @@ func TestMakeUserNsManagerSwitch(t *testing.T) {
 		// manager, it will find these pods on disk with userns data.
 		podList: pods,
 	}
-	m, err := MakeUserNsManager(testUserNsPodsManager)
+	m, err := MakeUserNsManager(testUserNsPodsManager, nil)
 	require.NoError(t, err)
 
 	// Record the pods on disk.
@@ -57,7 +57,7 @@ func TestMakeUserNsManagerSwitch(t *testing.T) {
 	// Test re-init works when the feature gate is disabled and there were some
 	// pods written on disk.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
-	m2, err := MakeUserNsManager(testUserNsPodsManager)
+	m2, err := MakeUserNsManager(testUserNsPodsManager, nil)
 	require.NoError(t, err)
 
 	// The feature gate is off, no pods should be allocated.
@@ -79,7 +79,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 		// manager, it will find these pods on disk with userns data.
 		podList: pods,
 	}
-	m, err := MakeUserNsManager(testUserNsPodsManager)
+	m, err := MakeUserNsManager(testUserNsPodsManager, nil)
 	require.NoError(t, err)
 
 	// Record the pods on disk.
@@ -93,7 +93,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 	// pods registered on disk.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 	// Create a new manager with the feature gate off and verify the userns range is nil.
-	m2, err := MakeUserNsManager(testUserNsPodsManager)
+	m2, err := MakeUserNsManager(testUserNsPodsManager, nil)
 	require.NoError(t, err)
 
 	for _, podUID := range pods {
@@ -116,7 +116,7 @@ func TestCleanupOrphanedPodUsernsAllocationsSwitch(t *testing.T) {
 		podList: listPods,
 	}
 
-	m, err := MakeUserNsManager(testUserNsPodsManager)
+	m, err := MakeUserNsManager(testUserNsPodsManager, nil)
 	require.NoError(t, err)
 
 	// Record the pods on disk.
