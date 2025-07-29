@@ -64,12 +64,3 @@ func NEQError[T any](disallowed T) string {
 	}
 	return fmt.Sprintf("must not be equal to "+format, disallowed)
 }
-
-// NEQError returns a string explanation of a "must not be equal to" validation failure.
-func NEQError[T any](disallowed T) string {
-	format := "%v"
-	if reflect.ValueOf(disallowed).Kind() == reflect.String {
-		format = "%q"
-	}
-	return fmt.Sprintf("must not be equal to "+format, disallowed)
-}
