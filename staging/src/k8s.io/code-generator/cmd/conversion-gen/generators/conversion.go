@@ -685,6 +685,16 @@ func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, boo
 	return function, ok
 }
 
+func (g *genConversion) preexistsPointers(inType, outType *types.Type) (*types.Type, bool) {
+	if inType.Kind != types.Pointer {
+		return nil, false
+	}
+	if outType.Kind != types.Pointer {
+		return nil, false
+	}
+	return g.preexists(inType.Elem, outType.Elem)
+}
+
 func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	klogV := klog.V(6)
 	if klogV.Enabled() {
@@ -864,9 +874,16 @@ func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.Snippet
 			}
 		} else {
 			conversionExists := true
+			conditionalConversionExists := false
 			if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 				sw.Do("newVal := new($.|raw$)\n", outType.Elem)
 				sw.Do("if err := $.|raw$(&val, newVal, s); err != nil {\n", function)
+			} else if function, ok := g.preexistsPointers(inType.Elem, outType.Elem); ok {
+				sw.Do("newVal := new($.|raw$)\n", outType.Elem)
+				sw.Do("if val != nil {\n", nil)
+				sw.Do("*newVal = new($.|raw$)\n", outType.Elem.Elem)
+				sw.Do("if err := $.|raw$(val, *newVal, s); err != nil {\n", function)
+				conditionalConversionExists = true
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				sw.Do("newVal := new($.|raw$)\n", outType.Elem)
 				sw.Do("if err := "+nameTmpl+"(&val, newVal, s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
@@ -879,6 +896,9 @@ func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.Snippet
 			if conversionExists {
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
+				if conditionalConversionExists {
+					sw.Do("}\n", nil)
+				}
 				if inType.Key == outType.Key {
 					sw.Do("(*out)[key] = *newVal\n", nil)
 				} else {
@@ -908,8 +928,14 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 			}
 		} else {
 			conversionExists := true
+			conditionalConversionExists := false
 			if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 				sw.Do("if err := $.|raw$(&(*in)[i], &(*out)[i], s); err != nil {\n", function)
+			} else if function, ok := g.preexistsPointers(inType.Elem, outType.Elem); ok {
+				sw.Do("if (*in)[i] != nil {\n", nil)
+				sw.Do("(*out)[i] = new($.|raw$)\n", outType.Elem.Elem)
+				sw.Do("if err := $.|raw$((*in)[i], (*out)[i], s); err != nil {\n", function)
+				conditionalConversionExists = true
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				sw.Do("if err := "+nameTmpl+"(&(*in)[i], &(*out)[i], s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 			} else {
@@ -921,6 +947,9 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 			if conversionExists {
 				sw.Do("return err\n", nil)
 				sw.Do("}\n", nil)
+				if conditionalConversionExists {
+					sw.Do("}\n", nil)
+				}
 			}
 		}
 		sw.Do("}\n", nil)
