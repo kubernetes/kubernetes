@@ -40,7 +40,9 @@ import (
 	basecompatibility "k8s.io/component-base/compatibility"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
@@ -1078,66 +1080,116 @@ func getOpenAPISpecFromFile() (*spec.Swagger, error) {
 	return staticSpec, nil
 }
 
-func TestFormatVersioning(t *testing.T) {
+func TestCRDFieldValidation(t *testing.T) {
+	baseSpec := apiextensionsv1.CustomResourceDefinitionSpec{
+		Group: "stable.example.com",
+		Names: apiextensionsv1.CustomResourceDefinitionNames{
+			Plural:   "versionedresources",
+			Singular: "versionedresource",
+			Kind:     "VersionedResource",
+			ListKind: "VersionedResourceList",
+		},
+		Conversion: &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.NoneConverter},
+		Scope:      apiextensionsv1.ClusterScoped,
+		Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+			{
+				Name: "v1", Served: true, Storage: true,
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
+							"testName": {Type: "string", Format: "k8s-short-name"},
+						},
+					},
+				},
+			},
+		},
+	}
+
 	testCases := []struct {
 		name        string
 		version     string
-		format      string
+		spec        apiextensionsv1.CustomResourceDefinitionSpec
 		value       string
 		expectedErr string
 	}{
 		{
 			name:    "value for format added at a later version is not validated",
 			version: "1.33",
+			spec:    baseSpec,
 			value:   "not-a-name!", // an invalid value is allowed because it is not validated
 		},
 		{
 			name:    "valid value for format added at current version is validated as allowed",
 			version: "1.34",
+			spec:    baseSpec,
 			value:   "valid-name",
 		},
 		{
 			name:        "invalid value for formatted added at current version is validated as invalid",
 			version:     "1.34",
+			spec:        baseSpec,
 			value:       "invalid-name!",
 			expectedErr: `testName in body must be of type k8s-short-name`,
+		},
+		{
+			name:    "invalid default for field with format",
+			version: "1.34",
+			spec: func() apiextensionsv1.CustomResourceDefinitionSpec {
+				spec := baseSpec.DeepCopy()
+				spec.Versions[0].Schema.OpenAPIV3Schema.Properties["testName"] = apiextensionsv1.JSONSchemaProps{
+					Type:    "string",
+					Format:  "k8s-short-name",
+					Default: &apiextensionsv1.JSON{Raw: []byte(`"invalid-name!"`)},
+				}
+				return *spec
+			}(),
+			expectedErr: `in body must be of type k8s-short-name`,
 		},
 	}
 
 	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	defer server.Terminate(t)
 
-	crd := &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: "versionedresources.stable.example.com"},
-		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group:      "stable.example.com",
-			Conversion: &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.NoneConverter},
-			Scope:      apiextensionsv1.ClusterScoped,
-			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
-				{
-					Name: "v1", Served: true, Storage: true,
-					Schema: &apiextensionsv1.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object",
-							Properties: map[string]apiextensionsv1.JSONSchemaProps{
-								"testName": {Type: "string", Format: "k8s-short-name"},
-							},
-						},
-					},
-				},
-			},
-		},
-		Status: apiextensionsv1.CustomResourceDefinitionStatus{
-			AcceptedNames: apiextensionsv1.CustomResourceDefinitionNames{
-				Plural: "versionedresources", Singular: "versionedresource", Kind: "VersionedResource", ListKind: "VersionedResourceList",
-			},
-		},
-	}
-
-	validateFunc := func(ctx context.Context, obj runtime.Object) error { return nil }
-
 	for i, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			crd := &apiextensionsv1.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: tc.spec.Group + "." + tc.spec.Names.Plural, ResourceVersion: "1"},
+				Spec:       tc.spec,
+				Status: apiextensionsv1.CustomResourceDefinitionStatus{
+					AcceptedNames:  tc.spec.Names,
+					StoredVersions: []string{"v1"},
+				},
+			}
+			crd.Name = crd.Spec.Names.Plural + "." + crd.Spec.Group
+
+			if len(tc.value) == 0 {
+				// For CRD validation tests, we can call the validation function directly.
+				// This is a unit test of the validation logic.
+				scheme := runtime.NewScheme()
+				install.Install(scheme)
+				internalCRD := &apiextensions.CustomResourceDefinition{}
+				if err := scheme.Convert(crd, internalCRD, nil); err != nil {
+					t.Fatal(err)
+				}
+
+				errs := validation.ValidateCustomResourceDefinition(context.TODO(), internalCRD)
+				err := errs.ToAggregate()
+				if tc.expectedErr == "" {
+					if err != nil {
+						t.Fatalf("expected no error, but got: %v", err)
+					}
+				} else {
+					if err == nil {
+						t.Fatalf("expected error containing %q, but got none", tc.expectedErr)
+					}
+					if !strings.Contains(err.Error(), tc.expectedErr) {
+						t.Errorf("expected error to contain %q, but got %v", tc.expectedErr, err)
+					}
+				}
+				return
+			}
+
 			cl := fake.NewSimpleClientset()
 			informers := informers.NewSharedInformerFactory(cl, 0)
 			crdInformer := informers.Apiextensions().V1().CustomResourceDefinitions()
@@ -1155,6 +1207,7 @@ func TestFormatVersioning(t *testing.T) {
 			if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{}); err != nil {
 				t.Fatal(err)
 			}
+
 			if err := crdInformer.Informer().GetStore().Add(crd); err != nil {
 				t.Fatal(err)
 			}
@@ -1183,6 +1236,7 @@ func TestFormatVersioning(t *testing.T) {
 			u.SetName(fmt.Sprintf("cr-%d", i))
 			unstructured.SetNestedField(u.Object, tc.value, "testName")
 
+			validateFunc := func(ctx context.Context, obj runtime.Object) error { return nil }
 			_, err = crdInfo.storages["v1"].CustomResource.Create(ctx, u, validateFunc, &metav1.CreateOptions{})
 			if tc.expectedErr == "" {
 				if err != nil {
