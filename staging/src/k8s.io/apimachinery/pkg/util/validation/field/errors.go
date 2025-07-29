@@ -289,7 +289,7 @@ func TooMany(field *Path, actualQuantity, maxQuantity int) *Error {
 		}
 		msg = fmt.Sprintf("must have at most %d %s", maxQuantity, is)
 	} else {
-		msg = "too many items"
+		msg = "has too many items"
 	}
 
 	var actual interface{}
