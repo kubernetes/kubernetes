@@ -575,8 +575,8 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, er
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.HostnameOverride) && pod.Spec.HostnameOverride != nil {
 		hostname := *pod.Spec.HostnameOverride
-		if msgs := utilvalidation.IsDNS1123Label(hostname); len(msgs) != 0 {
-			return "", "", fmt.Errorf("pod HostnameOverride %q is not a valid DNS label: %s", hostname, strings.Join(msgs, ";"))
+		if msgs := utilvalidation.IsDNS1123Subdomain(hostname); len(msgs) != 0 {
+			return "", "", fmt.Errorf("pod HostnameOverride %q is not a valid DNS subdomain: %s", hostname, strings.Join(msgs, ";"))
 		}
 		truncatedHostname, err := truncatePodHostnameIfNeeded(pod.Name, hostname)
 		if err != nil {
