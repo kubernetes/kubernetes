@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -91,12 +92,10 @@ var _ = common.SIGDescribe("Proxy", func() {
 		*/
 		ginkgo.It("should proxy logs on node using proxy subresource ", func(ctx context.Context) { nodeProxyTest(ctx, f, prefix+"/nodes/", "/proxy/logs/") })
 
-		// using the porter image to serve content, access the content
-		// (of multiple pods?) from multiple (endpoints/services?)
 		/*
 			Release: v1.9
-			Testname: Proxy, logs service endpoint
-			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
+			Testname: Proxy through apiserver to a Service
+			Description: The apiserver will proxy a connection to a Service.
 		*/
 		framework.ConformanceIt("should proxy through a service and a pod", func(ctx context.Context) {
 			start := time.Now()
@@ -133,7 +132,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
-			// Make a deployment with a single pod. The 'porter' image is
+			// Make a deployment with a single pod. 'agnhost porter' is
 			// a simple server which serves the values of the
 			// environmental variables below.
 			ginkgo.By("starting an echo server on multiple ports")
@@ -223,7 +222,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 			framework.ExpectNoError(err)
 			pods := podList.Items
 
-			err = framework.WaitForServiceEndpointsNum(ctx, f.ClientSet, f.Namespace.Name, service.Name, 1, time.Second, e2eservice.ServiceEndpointsTimeout)
+			err = e2eendpointslice.WaitForEndpointCount(ctx, f.ClientSet, f.Namespace.Name, service.Name, 1)
 			framework.ExpectNoError(err)
 
 			// table constructors
@@ -260,6 +259,16 @@ var _ = common.SIGDescribe("Proxy", func() {
 				// podPrefix + ":dest1": "foo",
 				// podPrefix + ":dest2": "bar",
 			}
+
+			// Poll until the apiserver is aware of the service and its endpoints,
+			// before starting the main part of the test.
+			pollTestPath := subresourceServiceProxyURL("", "portname1") + "/"
+			pollTestBody := "foo"
+			err = wait.PollUntilContextTimeout(ctx, time.Second, e2eservice.ServiceEndpointsTimeout, true, func(ctx context.Context) (bool, error) {
+				body, _, _, _ := doProxy(ctx, f, pollTestPath, 0)
+				return string(body) == pollTestBody, nil
+			})
+			framework.ExpectNoError(err, "Unable to reach service through proxy")
 
 			wg := sync.WaitGroup{}
 			errs := []string{}

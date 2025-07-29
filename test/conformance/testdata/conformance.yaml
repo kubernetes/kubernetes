@@ -1867,11 +1867,10 @@
     MUST be returned for each endpoint.
   release: v1.21
   file: test/e2e/network/proxy.go
-- testname: Proxy, logs service endpoint
+- testname: Proxy through apiserver to a Service
   codename: '[sig-network] Proxy version v1 should proxy through a service and a pod
     [Conformance]'
-  description: Select any node in the cluster to invoke  /logs endpoint  using the
-    /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
+  description: The apiserver will proxy a connection to a Service.
   release: v1.9
   file: test/e2e/network/proxy.go
 - testname: Service endpoint latency, thresholds
