@@ -235,12 +235,12 @@ func (pl *TestPlugin) Reserve(ctx context.Context, state fwk.CycleState, p *v1.P
 func (pl *TestPlugin) Unreserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
 }
 
-func (pl *TestPlugin) PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
-	return fwk.NewStatus(fwk.Code(pl.inj.PreBindStatus), injectReason)
+func (pl *TestPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+	return fwk.NewStatus(fwk.Code(pl.inj.PreBindPreFlightStatus), injectReason)
 }
 
-func (pl *TestPlugin) PreBindPreFlight(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
-	return nil
+func (pl *TestPlugin) PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
+	return fwk.NewStatus(fwk.Code(pl.inj.PreBindStatus), injectReason)
 }
 
 func (pl *TestPlugin) PostBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) {
@@ -2613,6 +2613,110 @@ func TestPreBindPlugins(t *testing.T) {
 	}
 }
 
+func TestPreBindPreFlightPlugins(t *testing.T) {
+	tests := []struct {
+		name       string
+		plugins    []*TestPlugin
+		wantStatus *fwk.Status
+	}{
+		{
+			name:       "Skip when there's no PreBind Plugin",
+			plugins:    []*TestPlugin{},
+			wantStatus: fwk.NewStatus(fwk.Skip),
+		},
+		{
+			name: "Success when PreBindPreFlight returns Success",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Skip)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Success)},
+				},
+			},
+			wantStatus: nil,
+		},
+		{
+			name: "Skip when all PreBindPreFlight returns Skip",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Skip)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Skip)},
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.Skip),
+		},
+		{
+			name: "Error when PreBindPreFlight returns Error",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin1",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Skip)},
+				},
+				{
+					name: "TestPlugin2",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Error)},
+				},
+			},
+			wantStatus: fwk.AsStatus(fmt.Errorf(`running PreBindPreFlight "TestPlugin2": %w`, errInjectedStatus)),
+		},
+		{
+			name: "Error when PreBindPreFlight returns Unschedulable",
+			plugins: []*TestPlugin{
+				{
+					name: "TestPlugin",
+					inj:  injectedResult{PreBindPreFlightStatus: int(fwk.Unschedulable)},
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.Error, "PreBindPreFlight TestPlugin returned \"Unschedulable\", which is unsupported. It is supposed to return Success, Skip, or Error status"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			registry := Registry{}
+			configPlugins := &config.Plugins{}
+
+			for _, pl := range tt.plugins {
+				tmpPl := pl
+				if err := registry.Register(pl.name, func(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+					return tmpPl, nil
+				}); err != nil {
+					t.Fatalf("Unable to register pre bind plugins: %s", pl.name)
+				}
+
+				configPlugins.PreBind.Enabled = append(
+					configPlugins.PreBind.Enabled,
+					config.Plugin{Name: pl.name},
+				)
+			}
+			profile := config.KubeSchedulerProfile{Plugins: configPlugins}
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+			if err != nil {
+				t.Fatalf("fail to create framework: %s", err)
+			}
+			defer func() {
+				_ = f.Close()
+			}()
+
+			status := f.RunPreBindPreFlights(ctx, state, pod, "")
+
+			if diff := cmp.Diff(tt.wantStatus, status, statusCmpOpts...); diff != "" {
+				t.Errorf("Wrong status code (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestReservePlugins(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -3458,6 +3562,7 @@ type injectedResult struct {
 	PostFilterStatus         int                        `json:"postFilterStatus,omitempty"`
 	PreScoreStatus           int                        `json:"preScoreStatus,omitempty"`
 	ReserveStatus            int                        `json:"reserveStatus,omitempty"`
+	PreBindPreFlightStatus   int                        `json:"preBindPreFlightStatus,omitempty"`
 	PreBindStatus            int                        `json:"preBindStatus,omitempty"`
 	BindStatus               int                        `json:"bindStatus,omitempty"`
 	PermitStatus             int                        `json:"permitStatus,omitempty"`

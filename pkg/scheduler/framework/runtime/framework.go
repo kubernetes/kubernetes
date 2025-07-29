@@ -1278,6 +1278,10 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state fwk.CycleSt
 		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	}
 	for _, pl := range f.preBindPlugins {
+		if state.GetSkipPreBindPlugins().Has(pl.Name()) {
+			continue
+		}
+
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -1305,6 +1309,60 @@ func (f *frameworkImpl) runPreBindPlugin(ctx context.Context, pl framework.PreBi
 	startTime := time.Now()
 	status := pl.PreBind(ctx, state, pod, nodeName)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.PreBind, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+	return status
+}
+
+// RunPreBindPreFlights runs the set of configured PreBindPreFlight functions from PreBind plugins.
+// The returning value is:
+// - Success: one or more plugins return success, meaning, some PreBind plugins will work for this pod.
+// - Skip: all plugins return skip.
+// - Error: any plugin return error.
+func (f *frameworkImpl) RunPreBindPreFlights(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (status *fwk.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreBindPreFlight, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+	logger := klog.FromContext(ctx)
+	verboseLogs := logger.V(4).Enabled()
+	if verboseLogs {
+		logger = klog.LoggerWithName(logger, "PreBindPreFlight")
+		logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
+	}
+	skipPlugins := sets.New[string]()
+	returningStatus := fwk.NewStatus(fwk.Skip)
+	for _, pl := range f.preBindPlugins {
+		ctx := ctx
+		if verboseLogs {
+			logger := klog.LoggerWithName(logger, pl.Name())
+			ctx = klog.NewContext(ctx, logger)
+		}
+		status = f.runPreBindPreFlight(ctx, pl, state, pod, nodeName)
+		switch {
+		case status.Code() == fwk.Error:
+			err := status.AsError()
+			logger.Error(err, "Plugin failed", "plugin", pl.Name(), "pod", klog.KObj(pod), "node", nodeName)
+			return fwk.AsStatus(fmt.Errorf("running PreBindPreFlight %q: %w", pl.Name(), err))
+		case status.IsSuccess():
+			// We return success when one or more plugins return success.
+			returningStatus = nil
+		case status.IsSkip():
+			skipPlugins.Insert(pl.Name())
+		default:
+			// Other statuses are unexpected
+			return fwk.AsStatus(fmt.Errorf("PreBindPreFlight %s returned %q, which is unsupported. It is supposed to return Success, Skip, or Error status", pl.Name(), status.Code()))
+		}
+	}
+	state.SetSkipPreBindPlugins(skipPlugins)
+	return returningStatus
+}
+
+func (f *frameworkImpl) runPreBindPreFlight(ctx context.Context, pl framework.PreBindPlugin, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	if !state.ShouldRecordPluginMetrics() {
+		return pl.PreBindPreFlight(ctx, state, pod, nodeName)
+	}
+	startTime := time.Now()
+	status := pl.PreBindPreFlight(ctx, state, pod, nodeName)
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.PreBindPreFlight, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return status
 }
 
@@ -1534,6 +1592,10 @@ func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl framework.Permit
 	status, timeout := pl.Permit(ctx, state, pod, nodeName)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.Permit, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return status, timeout
+}
+
+func (f *frameworkImpl) WillWaitOnPermit(ctx context.Context, pod *v1.Pod) bool {
+	return f.waitingPods.get(pod.UID) != nil
 }
 
 // WaitOnPermit will block, if the pod is a waiting pod, until the waiting pod is rejected or allowed.
