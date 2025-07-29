@@ -26,5 +26,4 @@ type userNsPodsManager interface {
 	ListPodsFromDisk() ([]types.UID, error)
 	GetKubeletMappings() (uint32, uint32, error)
 	GetMaxPods() int
-	GetUserNamespacesIDsPerPod() uint32
 }
