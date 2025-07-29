@@ -43,6 +43,9 @@ github.com/armon/circbuf
 # github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 ## explicit
 github.com/armon/go-socks5
+# github.com/benbjohnson/immutable v0.4.3
+## explicit; go 1.18
+github.com/benbjohnson/immutable
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -793,6 +796,8 @@ golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
+# golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf
+## explicit; go 1.20
 # golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
 ## explicit; go 1.20
 golang.org/x/exp/constraints

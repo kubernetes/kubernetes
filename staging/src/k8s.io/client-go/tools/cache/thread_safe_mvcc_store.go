@@ -22,7 +22,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/google/btree"
+	"github.com/benbjohnson/immutable"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -35,11 +35,11 @@ func newThreadSafeMVCCStore(indexers Indexers) ThreadSafeStore {
 		indexers: indexers,
 	}
 	snapshot := &mvccStoreSnapshot{
-		data:    btree.NewG[mvccStoreKey[any]](mvccStoreDegree, isMVCCStoreKeyLess),
-		indexes: make(map[string]*btree.BTreeG[mvccStoreKey[[]string]], len(indexers)),
+		data:    immutable.NewMap[string, any](nil),
+		indexes: make(map[string]*immutable.Map[string, []string], len(indexers)),
 	}
 	for indexer := range indexers {
-		snapshot.indexes[indexer] = btree.NewG[mvccStoreKey[[]string]](mvccStoreDegree, isMVCCStoreKeyLess)
+		snapshot.indexes[indexer] = &immutable.Map[string, []string]{}
 	}
 	s.snapshot.Store(snapshot)
 
@@ -57,8 +57,8 @@ type threadSafeMVCCStore struct {
 }
 
 type mvccStoreSnapshot struct {
-	data    *btree.BTreeG[mvccStoreKey[any]]
-	indexes map[string]*btree.BTreeG[mvccStoreKey[[]string]]
+	data    *immutable.Map[string, any]
+	indexes map[string]*immutable.Map[string, []string]
 }
 
 type mvccStoreKey[t any] struct {
@@ -79,12 +79,10 @@ func (s *threadSafeMVCCStore) Update(key string, obj any) {
 	defer s.updateLock.Unlock()
 
 	snap := s.snapshot.Load()
-	newData := snap.data.Clone()
-	previous, _ := newData.ReplaceOrInsert(mvccStoreKey[any]{
-		key:   key,
-		value: obj,
-	})
-	newIndexes := s.updateIndexesLocked(snap.indexes, key, previous.value, obj)
+
+	previous, _ := snap.data.Get(key)
+	newData := snap.data.Set(key, obj)
+	newIndexes := s.updateIndexesLocked(snap.indexes, key, previous, obj)
 
 	s.snapshot.Store(&mvccStoreSnapshot{
 		data:    newData,
@@ -97,12 +95,12 @@ func (s *threadSafeMVCCStore) Delete(key string) {
 	defer s.updateLock.Unlock()
 
 	snap := s.snapshot.Load()
-	newData := snap.data.Clone()
-	previous, existed := newData.Delete(mvccStoreKey[any]{key: key})
-	newIndexes := snap.indexes
-	if existed {
-		newIndexes = s.updateIndexesLocked(snap.indexes, key, previous.value, nil)
+	previous, existed := snap.data.Get(key)
+	if !existed {
+		return
 	}
+	newData := snap.data.Delete(key)
+	newIndexes := s.updateIndexesLocked(snap.indexes, key, previous, nil)
 
 	s.snapshot.Store(&mvccStoreSnapshot{
 		data:    newData,
@@ -112,20 +110,17 @@ func (s *threadSafeMVCCStore) Delete(key string) {
 
 func (s *threadSafeMVCCStore) Get(key string) (any, bool) {
 	snap := s.snapshot.Load()
-	raw, exists := snap.data.Get(mvccStoreKey[any]{key: key})
-	if !exists {
-		return nil, false
-	}
-	return raw.value, true
+	return snap.data.Get(key)
 }
 
 func (s *threadSafeMVCCStore) List() []any {
 	snap := s.snapshot.Load()
 	result := make([]any, 0, snap.data.Len())
-	snap.data.Ascend(func(item mvccStoreKey[any]) bool {
-		result = append(result, item.value)
-		return true
-	})
+	itr := snap.data.Iterator()
+	for !itr.Done() {
+		_, v, _ := itr.Next()
+		result = append(result, v)
+	}
 
 	return result
 }
@@ -133,10 +128,11 @@ func (s *threadSafeMVCCStore) List() []any {
 func (s *threadSafeMVCCStore) ListKeys() []string {
 	snap := s.snapshot.Load()
 	result := make([]string, 0, snap.data.Len())
-	snap.data.Ascend(func(item mvccStoreKey[any]) bool {
-		result = append(result, item.key)
-		return true
-	})
+	itr := snap.data.Iterator()
+	for !itr.Done() {
+		k, _, _ := itr.Next()
+		result = append(result, k)
+	}
 	return result
 }
 
@@ -144,9 +140,8 @@ func (s *threadSafeMVCCStore) Replace(items map[string]interface{}, resourceVers
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
 
-	snap := &mvccStoreSnapshot{data: btree.NewG[mvccStoreKey[any]](mvccStoreDegree, isMVCCStoreKeyLess)}
+	snap := &mvccStoreSnapshot{data: immutable.NewMapOf(nil, items)}
 	for k, v := range items {
-		snap.data.ReplaceOrInsert(mvccStoreKey[any]{key: k, value: v})
 		snap.indexes = s.updateIndexesLocked(snap.indexes, k, nil, v)
 	}
 
@@ -173,16 +168,16 @@ func (s *threadSafeMVCCStore) Index(indexName string, obj interface{}) ([]interf
 
 	storeKeySet := sets.New[string]()
 	for _, indexedValue := range indexedValues {
-		val, exists := snap.indexes[indexName].Get(mvccStoreKey[[]string]{key: indexedValue})
+		val, exists := snap.indexes[indexName].Get(indexedValue)
 		if exists {
-			storeKeySet.Insert(val.value...)
+			storeKeySet.Insert(val...)
 		}
 	}
 
 	list := make([]interface{}, 0, storeKeySet.Len())
 	for k := range storeKeySet {
-		raw, _ := snap.data.Get(mvccStoreKey[any]{key: k})
-		list = append(list, raw.value)
+		value, _ := snap.data.Get(k)
+		list = append(list, value)
 	}
 
 	return list, nil
@@ -195,9 +190,9 @@ func (s *threadSafeMVCCStore) IndexKeys(indexName, indexedValue string) ([]strin
 		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
 	}
 
-	vals, exist := index.Get(mvccStoreKey[[]string]{key: indexedValue})
+	vals, exist := index.Get(indexedValue)
 	if exist {
-		return vals.value, nil
+		return vals, nil
 	}
 
 	return nil, nil
@@ -212,10 +207,11 @@ func (s *threadSafeMVCCStore) ListIndexFuncValues(indexName string) []string {
 	}
 
 	names := make([]string, 0, index.Len())
-	index.Ascend(func(item mvccStoreKey[[]string]) bool {
-		names = append(names, item.key)
-		return true
-	})
+	itr := index.Iterator()
+	for !itr.Done() {
+		k, _, _ := itr.Next()
+		names = append(names, k)
+	}
 
 	return names
 }
@@ -227,15 +223,15 @@ func (s *threadSafeMVCCStore) ByIndex(indexName, indexedValue string) ([]any, er
 		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
 	}
 
-	keys, hasKeys := index.Get(mvccStoreKey[[]string]{key: indexedValue})
+	keys, hasKeys := index.Get(indexedValue)
 	if !hasKeys {
 		return nil, nil
 	}
 
-	result := make([]any, 0, len(keys.value))
-	for _, key := range keys.value {
-		item, _ := snap.data.Get(mvccStoreKey[any]{key: key})
-		result = append(result, item.value)
+	result := make([]any, 0, len(keys))
+	for _, key := range keys {
+		item, _ := snap.data.Get(key)
+		result = append(result, item)
 	}
 
 	return result, nil
@@ -260,14 +256,15 @@ func (s *threadSafeMVCCStore) AddIndexers(newIndexers Indexers) error {
 	}
 
 	snap := s.snapshot.Load()
-	newIndixes := make(map[string]*btree.BTreeG[mvccStoreKey[[]string]], len(newIndexers)+len(snap.indexes))
+	newIndixes := make(map[string]*immutable.Map[string, []string], len(newIndexers)+len(snap.indexes))
 	for name, indexFunc := range newIndexers {
 		s.indexers[name] = indexFunc
-		index := btree.NewG[mvccStoreKey[[]string]](mvccStoreDegree, isMVCCStoreKeyLess)
-		snap.data.Ascend(func(item mvccStoreKey[any]) bool {
-			index = s.updateIndexLocked(name, index, item.key, nil, item.value)
-			return true
-		})
+		index := immutable.NewMap[string, []string](nil)
+		itr := snap.data.Iterator()
+		for !itr.Done() {
+			k, v, _ := itr.Next()
+			index = s.updateIndexLocked(name, index, k, nil, v)
+		}
 		newIndixes[name] = index
 	}
 
@@ -286,16 +283,16 @@ func (s *threadSafeMVCCStore) AddIndexers(newIndexers Indexers) error {
 func (s *threadSafeMVCCStore) Resync() error { return nil }
 
 func (s *threadSafeMVCCStore) updateIndexesLocked(
-	current map[string]*btree.BTreeG[mvccStoreKey[[]string]],
+	current map[string]*immutable.Map[string, []string],
 	key string,
 	oldObj any,
 	newObj any,
-) map[string]*btree.BTreeG[mvccStoreKey[[]string]] {
-	result := make(map[string]*btree.BTreeG[mvccStoreKey[[]string]], len(s.indexers))
+) map[string]*immutable.Map[string, []string] {
+	result := make(map[string]*immutable.Map[string, []string], len(s.indexers))
 	for name := range s.indexers {
 		current := current[name]
 		if current == nil {
-			current = btree.NewG[mvccStoreKey[[]string]](mvccStoreDegree, isMVCCStoreKeyLess)
+			current = immutable.NewMap[string, []string](nil)
 		}
 		result[name] = s.updateIndexLocked(name, current, key, oldObj, newObj)
 	}
@@ -305,11 +302,11 @@ func (s *threadSafeMVCCStore) updateIndexesLocked(
 
 func (s *threadSafeMVCCStore) updateIndexLocked(
 	name string,
-	current *btree.BTreeG[mvccStoreKey[[]string]],
+	current *immutable.Map[string, []string],
 	key string,
 	oldObj any,
 	newObj any,
-) *btree.BTreeG[mvccStoreKey[[]string]] {
+) *immutable.Map[string, []string] {
 	indexFunc, ok := s.indexers[name]
 	if !ok {
 		// Should never happen. Caller is responsible for ensuring this exists, and should call with lock
@@ -337,35 +334,31 @@ func (s *threadSafeMVCCStore) updateIndexLocked(
 		return current
 	}
 
-	result := current.Clone()
+	result := current
 	for oldIndexVal := range oldValuesSet.Difference(newValuesSet) {
-		idx, _ := result.Get(mvccStoreKey[[]string]{key: oldIndexVal})
-		if len(idx.value) == 1 {
-			_, _ = result.Delete(idx)
+		idx, _ := result.Get(oldIndexVal)
+		if len(idx) == 1 {
+			result = result.Delete(oldIndexVal)
 			continue
 		}
-		newIdx := make([]string, 0, len(idx.value)-1)
-		for _, v := range idx.value {
+		newIdx := make([]string, 0, len(idx)-1)
+		for _, v := range idx {
 			if v != key {
 				newIdx = append(newIdx, v)
 			}
 		}
-		result.ReplaceOrInsert(mvccStoreKey[[]string]{key: oldIndexVal, value: newIdx})
+		result = result.Set(oldIndexVal, newIdx)
 	}
 	for newIndexVal := range newValuesSet.Difference(oldValuesSet) {
-		idx, exists := result.Get(mvccStoreKey[[]string]{key: newIndexVal})
+		idx, exists := result.Get(newIndexVal)
 		if !exists {
-			newIdx := make([]string, 1)
-			newIdx[0] = key
-			idx = mvccStoreKey[[]string]{key: newIndexVal, value: newIdx}
+			idx = make([]string, 1)
+			idx[0] = key
 		} else {
-			pos, _ := slices.BinarySearch(idx.value, key)
-			idx = mvccStoreKey[[]string]{
-				key:   newIndexVal,
-				value: slices.Insert(slices.Clone(idx.value), pos, key),
-			}
+			pos, _ := slices.BinarySearch(idx, key)
+			idx = slices.Insert(slices.Clone(idx), pos, key)
 		}
-		result.ReplaceOrInsert(idx)
+		result = result.Set(newIndexVal, idx)
 	}
 
 	return result

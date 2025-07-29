@@ -121,11 +121,11 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 		}
 	case *threadSafeMVCCStore:
 		compare = func(key string, expected []string) error {
-			val, _ := store.snapshot.Load().indexes[testIndexer].Get(mvccStoreKey[[]string]{key: key})
-			if val.value == nil {
-				val.value = []string{}
+			val, _ := store.snapshot.Load().indexes[testIndexer].Get(key)
+			if val == nil {
+				val = []string{}
 			}
-			if cmp.Equal(val.value, expected) {
+			if cmp.Equal(val, expected) {
 				return nil
 			}
 			return fmt.Errorf("unexpected index for key %s, diff=%s", key, cmp.Diff(val, expected))

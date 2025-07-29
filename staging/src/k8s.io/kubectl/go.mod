@@ -49,6 +49,7 @@ require (
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
+	github.com/benbjohnson/immutable v0.4.3 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
@@ -81,6 +82,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf // indirect
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect

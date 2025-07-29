@@ -7,9 +7,9 @@ go 1.24.0
 godebug default=go1.24
 
 require (
+	github.com/benbjohnson/immutable v0.4.3
 	github.com/go-logr/logr v1.4.2
 	github.com/gogo/protobuf v1.3.2
-	github.com/google/btree v1.1.3
 	github.com/google/gnostic-models v0.7.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
@@ -44,6 +44,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
+	github.com/google/btree v1.1.3 // indirect
 	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -58,6 +59,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/exp v0.0.0-20220518171630-0b5c67f07fdf // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect

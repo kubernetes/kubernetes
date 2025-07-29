@@ -374,6 +374,13 @@ func (c *threadSafeMap) Resync() error {
 }
 
 // NewThreadSafeStore creates a new instance of ThreadSafeStore.
-func NewThreadSafeStore(indexers Indexers, _ Indices) ThreadSafeStore {
+func NewThreadSafeStore(indexers Indexers, indices Indices) ThreadSafeStore {
 	return newThreadSafeMVCCStore(indexers)
+	return &threadSafeMap{
+		items: map[string]interface{}{},
+		index: &storeIndex{
+			indexers: indexers,
+			indices:  indices,
+		},
+	}
 }
