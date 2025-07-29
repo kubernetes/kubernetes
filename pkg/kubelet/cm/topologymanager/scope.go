@@ -19,11 +19,8 @@ package topologymanager
 import (
 	"sync"
 
-	v1 "k8s.io/api/core/v1"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -151,21 +148,11 @@ func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
 // It would be better to implement this function in topologymanager instead of scope
 // but topologymanager do not track providers anymore
 func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) error {
-	isPodLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
-
-	var errs []error
 	for _, provider := range s.hintProviders {
 		err := provider.Allocate(pod, container)
-		if err != nil && isPodLevelResourcesEnabled {
-			errs = append(errs, err)
-		} else if err != nil {
+		if err != nil {
 			return err
 		}
 	}
-
-	if isPodLevelResourcesEnabled {
-		return utilerrors.NewAggregate(errs)
-	}
-
 	return nil
 }

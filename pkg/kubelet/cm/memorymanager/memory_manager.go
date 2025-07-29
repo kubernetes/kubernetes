@@ -18,7 +18,6 @@ package memorymanager
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"runtime"
 	"sync"
@@ -274,12 +273,6 @@ func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 
 	// Call down into the policy to assign this container memory if required.
 	if err := m.policy.Allocate(ctx, m.state, pod, container); err != nil {
-		// If it gets this error it means that the pod requires pod level resources but this is not aligned.
-		// We do not want the pod to fail to schedule on this error so we Admit it, this is just a warning
-		if errors.As(err, &MemoryManagerPodLevelResourcesError{}) {
-			return err
-		}
-
 		logger.Error(err, "Allocate error", "pod", klog.KObj(pod), "containerName", container.Name)
 		return err
 	}

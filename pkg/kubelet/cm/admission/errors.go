@@ -20,19 +20,11 @@ import (
 	"errors"
 	"fmt"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 const (
 	ErrorReasonUnexpected = "UnexpectedAdmissionError"
-
-	// Explicit reason when CPU/Memory manager's policy is incompatible with pod level resources.
-	PodLevelResourcesIncompatible = "PodLevelResourcesIncompatible"
-
-	// Warnings for pod level resources when manager's policy incompatibility.
-	CPUManagerPodLevelResourcesError    = "CPUManagerPodLevelResourcesError"
-	MemoryManagerPodLevelResourcesError = "MemoryManagerPodLevelResourcesError"
 )
 
 type Error interface {
@@ -57,53 +49,14 @@ func GetPodAdmitResult(err error) lifecycle.PodAdmitResult {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 
-	var errs []error
-	// To support multiple pod-level resource errors, we need to check if the error
-	// is an aggregate error.
-	var agg utilerrors.Aggregate
-	if errors.As(err, &agg) {
-		errs = agg.Errors()
-	} else {
-		errs = []error{err}
-	}
-
-	var podLevelWarnings []error
-	var otherErrs []error
-	for _, e := range errs {
-		var admissionErr Error
-		if errors.As(e, &admissionErr) && (admissionErr.Type() == CPUManagerPodLevelResourcesError || admissionErr.Type() == MemoryManagerPodLevelResourcesError) {
-			podLevelWarnings = append(podLevelWarnings, e)
-		} else {
-			otherErrs = append(otherErrs, e)
-		}
-	}
-
-	// If all errors are pod-level resource errors, we should treat them as warnings
-	// and not block pod admission.
-	if len(otherErrs) == 0 && len(podLevelWarnings) > 0 {
-		return lifecycle.PodAdmitResult{
-			Admit:   true,
-			Reason:  PodLevelResourcesIncompatible,
-			Message: "",
-			Errors:  podLevelWarnings,
-		}
-	}
-
-	if len(otherErrs) == 0 {
-		// This should not happen if err != nil, but as a safeguard.
-		return lifecycle.PodAdmitResult{Admit: true}
-	}
-
-	// At this point, we have at least one error that requires pod rejection.
-	firstErr := otherErrs[0]
 	var admissionErr Error
-	if !errors.As(firstErr, &admissionErr) {
-		admissionErr = &unexpectedAdmissionError{firstErr}
+	if !errors.As(err, &admissionErr) {
+		admissionErr = &unexpectedAdmissionError{err}
 	}
 
 	return lifecycle.PodAdmitResult{
-		Admit:   false,
 		Message: admissionErr.Error(),
 		Reason:  admissionErr.Type(),
+		Admit:   false,
 	}
 }
