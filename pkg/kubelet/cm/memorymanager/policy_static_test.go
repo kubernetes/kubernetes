@@ -2074,7 +2074,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			pod:                      getPodWithPodLevelResources("pod1", podLevelRequirementsGuaranteed, "container1", requirementsGuaranteed),
 			expectedTopologyHints:    nil,
 			topologyHint:             &topologymanager.TopologyHint{},
-			expectedError:            fmt.Errorf("Memory Manager static policy does not support pod-level resources"),
+			expectedError:            nil,
 			podLevelResourcesEnabled: true,
 		},
 	}
