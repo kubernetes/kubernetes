@@ -924,8 +924,75 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedError: `create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAPartitionableDevices`,
 		},
+		"create-device-with-binding-condition": {
+			nodeUID: nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{
+							Devices: func() []resourceapi.Device {
+								d := newDevice(deviceName)
+								d.BindingConditions = []string{"condition1", "condition2"}
+								d.BindingFailureConditions = []string{"failure-condition1"}
+								d.BindsToNode = ptr.To(true)
+								return []resourceapi.Device{d}
+							}(),
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices(func() []resourceapi.Device {
+						d := newDevice(deviceName)
+						d.BindingConditions = []string{"condition1", "condition2"}
+						d.BindingFailureConditions = []string{"failure-condition1"}
+						d.BindsToNode = ptr.To(true)
+						return []resourceapi.Device{d}
+					}()).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+		},
+		"drop-device-with-binding-condition": {
+			features: features{disableBindingConditions: true},
+			nodeUID:  nodeUID,
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{
+							Devices: func() []resourceapi.Device {
+								d := newDevice(deviceName)
+								d.BindingConditions = []string{"condition1", "condition2"}
+								d.BindingFailureConditions = []string{"failure-condition1"}
+								d.BindsToNode = ptr.To(true)
+								return []resourceapi.Device{d}
+							}(),
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumCreates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).
+					Devices([]resourceapi.Device{newDevice(deviceName)}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			expectedError: `create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceBindingConditions`,
+		},
 	}
-
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
@@ -1050,6 +1117,7 @@ func sortResourceSlices(slices []resourceapi.ResourceSlice) {
 }
 
 type features struct {
+	disableBindingConditions    bool
 	disableDeviceTaints         bool
 	disablePartitionableDevices bool
 }
@@ -1114,6 +1182,13 @@ func dropDisabledFields(features features, resourceslice *resourceapi.ResourceSl
 			resourceslice.Spec.Devices[i].NodeName = nil
 			resourceslice.Spec.Devices[i].NodeSelector = nil
 			resourceslice.Spec.Devices[i].ConsumesCounters = nil
+		}
+	}
+	if features.disableBindingConditions {
+		for i := range resourceslice.Spec.Devices {
+			resourceslice.Spec.Devices[i].BindingConditions = nil
+			resourceslice.Spec.Devices[i].BindingFailureConditions = nil
+			resourceslice.Spec.Devices[i].BindsToNode = nil
 		}
 	}
 }

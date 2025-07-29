@@ -865,6 +865,12 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 // isSelectable checks whether a device satisfies the request and class selectors.
 func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, slice *draapi.ResourceSlice, deviceIndex int) (bool, error) {
 	device := &slice.Spec.Devices[deviceIndex]
+	if (!alloc.features.DeviceBinding || !alloc.features.DeviceStatus) &&
+		len(device.BindingConditions) > 0 {
+		// Devices with binding conditions are not supported, feature is off.
+		return false, nil
+	}
+
 	deviceID := DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name}
 	matchKey := matchKey{DeviceID: deviceID, requestIndices: r}
 	if matches, ok := alloc.deviceMatchesRequest[matchKey]; ok {
