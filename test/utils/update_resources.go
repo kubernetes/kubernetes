@@ -29,11 +29,9 @@ import (
 
 const (
 	// Parameters for retrying updates/waits with linear backoff.
+	// TODO: Try to move this to exponential backoff by modifying scale.Scale().
 	updateRetryInterval = 5 * time.Second
-	updateRetryFactor   = 2.0
-	updateRetrySteps    = 5
-	updateRetryCap      = 1 * time.Minute
-	updateRetryJitter   = 0.1
+	updateRetryTimeout  = 1 * time.Minute
 	waitRetryInterval   = 5 * time.Second
 	waitRetryTimeout    = 5 * time.Minute
 )
@@ -53,13 +51,40 @@ func ScaleResourceWithRetries(scalesGetter scaleclient.ScalesGetter, namespace, 
 	}
 	waitForReplicas := scale.NewRetryParams(waitRetryInterval, waitRetryTimeout)
 	cond := RetryErrorCondition(scale.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gvr, false))
+	err := wait.PollUntilContextTimeout(context.Background(), updateRetryInterval, updateRetryTimeout, true, cond)
+	if err == nil {
+		err = scale.WaitForScaleHasDesiredReplicas(scalesGetter, gvr.GroupResource(), name, namespace, size, waitForReplicas)
+	}
+	if err != nil {
+		return fmt.Errorf("error while scaling %s to %d replicas: %v", name, size, err)
+	}
+	return nil
+}
+
+func ScaleResourceWithExponentialRetries(scalesGetter scaleclient.ScalesGetter, namespace, name string, size uint, gvr schema.GroupVersionResource) error {
+	// Parameters for retrying updates/waits with exponential backoff.
+	const (
+		expUpdateRetryInterval = 5 * time.Second
+		expUpdateRetryFactor   = 2.0
+		expUpdateRetrySteps    = 5
+		expUpdateRetryCap      = 1 * time.Minute
+		expUpdateRetryJitter   = 0.1
+	)
+
+	scaler := scale.NewScaler(scalesGetter)
+	preconditions := &scale.ScalePrecondition{
+		Size:            -1,
+		ResourceVersion: "",
+	}
+	waitForReplicas := scale.NewRetryParams(waitRetryInterval, waitRetryTimeout)
+	cond := RetryErrorCondition(scale.ScaleCondition(scaler, preconditions, namespace, name, size, nil, gvr, false))
 
 	backoff := wait.Backoff{
-		Duration: updateRetryInterval, // Initial interval
-		Factor:   updateRetryFactor,   // Exponential factor
-		Jitter:   updateRetryJitter,   // Random jitter
-		Steps:    updateRetrySteps,    // Maximum number of steps
-		Cap:      updateRetryCap,      // Maximum interval cap
+		Duration: expUpdateRetryInterval, // Initial interval
+		Factor:   expUpdateRetryFactor,   // Exponential factor
+		Jitter:   expUpdateRetryJitter,   // Random jitter
+		Steps:    expUpdateRetrySteps,    // Maximum number of steps
+		Cap:      expUpdateRetryCap,      // Maximum interval cap
 	}
 
 	err := wait.ExponentialBackoffWithContext(context.Background(), backoff, cond)
